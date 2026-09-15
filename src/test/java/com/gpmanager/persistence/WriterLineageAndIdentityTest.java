@@ -22,6 +22,11 @@ import static org.junit.Assert.assertTrue;
 
 public class WriterLineageAndIdentityTest
 {
+    static
+    {
+        com.gpmanager.persistence.JsonCodec.bind(new com.google.gson.Gson());
+    }
+
     @Rule
     public TemporaryFolder temporary = new TemporaryFolder();
 

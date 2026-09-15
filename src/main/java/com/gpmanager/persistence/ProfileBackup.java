@@ -25,26 +25,17 @@ import java.util.Map;
 public final class ProfileBackup
 {
     public static final int CURRENT_FORMAT_VERSION = 1;
-    /**
-     * The client's injected Gson, bound once by the plugin (Plugin Hub rule: never construct a fresh
-     * Gson; customise the injected one through {@code newBuilder()}, which the wrapper does).
-     */
-    private static volatile Gson gson;
-
+    /** Kept for callers that bound here before {@link JsonCodec} existed. */
     public static void bindGson(Gson clientGson)
     {
-        gson = UnknownFieldPreservation.wrap(clientGson);
+        JsonCodec.bind(clientGson);
     }
 
     private static Gson gson()
     {
-        Gson bound = gson;
-        if (bound == null)
-        {
-            throw new IllegalStateException("ProfileBackup.bindGson(...) must run before any export or import");
-        }
-        return bound;
+        return JsonCodec.gson();
     }
+
     private static final DateTimeFormatter FILE_DATE = DateTimeFormatter.ISO_LOCAL_DATE;
 
     private int formatVersion;

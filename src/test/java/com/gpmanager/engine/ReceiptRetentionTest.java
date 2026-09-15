@@ -29,6 +29,11 @@ import static org.junit.Assert.assertTrue;
 
 public class ReceiptRetentionTest
 {
+    static
+    {
+        com.gpmanager.persistence.JsonCodec.bind(new com.google.gson.Gson());
+    }
+
     private static final long DAY = 86_400_000L;
 
     private static final GpManagerConfig CONFIG = new GpManagerConfig()

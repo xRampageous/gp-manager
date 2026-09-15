@@ -1,6 +1,10 @@
+## 1.0.2 — 2026-09-15
+
+- Plugin Hub review fix, complete: every JSON use outside the injected repository (profile backup, profile-size estimate, staged profile restore) goes through one `JsonCodec` bound to the client's injected Gson at start-up (customised through `newBuilder()`); the built JAR contains no Gson constructor. No behaviour change.
+
 ## 1.0.1 — 2026-09-15
 
-- Plugin Hub review fix: the profile backup envelope now serialises with the client's injected Gson (bound once at start-up and customised through `newBuilder()`), never a fresh instance. No behaviour change.
+- First attempt at the Gson rule (profile backup only); superseded by 1.0.2.
 
 ## 1.0.0 — 2026-09-15
 

@@ -18,7 +18,7 @@ def runeLiteVersion = providers.gradleProperty('runeliteVersion').getOrElse('1.1
 def pluginMainClass = 'com.gpmanager.GpManagerPluginTest'
 
 group = 'com.gpmanager'
-version = '1.0.1'
+version = '1.0.2'
 
 
 

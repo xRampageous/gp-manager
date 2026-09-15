@@ -26,6 +26,11 @@ import static org.junit.Assert.assertTrue;
 
 public class ChargeLoadReviewLifecycleTest
 {
+    static
+    {
+        com.gpmanager.persistence.JsonCodec.bind(new com.google.gson.Gson());
+    }
+
     private static final String TARGET = "149:0:9764864:12934:TOXIC_BLOWPIPE";
     private static final GpManagerConfig CONFIG = new GpManagerConfig()
     {

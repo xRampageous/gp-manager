@@ -31,6 +31,11 @@ import javax.swing.WindowConstants;
  */
 public final class BentoPreview
 {
+    static
+    {
+        com.gpmanager.persistence.JsonCodec.bind(new com.google.gson.Gson());
+    }
+
     private static final int LOGS = 1519;
     private static final int RUNE = 554;
     private static final int SHARK = 385;

@@ -15,6 +15,11 @@ import static org.junit.Assert.assertTrue;
 
 public class DataHealthSnapshotTest
 {
+    static
+    {
+        com.gpmanager.persistence.JsonCodec.bind(new com.google.gson.Gson());
+    }
+
     @Test
     public void healthReportsRetentionProfileUnknownsAndCoinFreshnessFailClosed()
     {

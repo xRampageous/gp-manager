@@ -34,6 +34,11 @@ import static org.junit.Assert.assertTrue;
 
 public class AlertEventEngineTest
 {
+    static
+    {
+        com.gpmanager.persistence.JsonCodec.bind(new com.google.gson.Gson());
+    }
+
     private static final int DROP_ITEM = 40_001;
 
     @Test

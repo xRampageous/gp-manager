@@ -1055,7 +1055,7 @@ public class GpManagerEngine
             compactedReceiptCount = saturatingAdd(compactedReceiptCount,
                 session.getCompactedTransactionCount());
         }
-        long bytes = new com.google.gson.Gson().toJson(createSavedState())
+        long bytes = com.gpmanager.persistence.JsonCodec.gson().toJson(createSavedState())
             .getBytes(StandardCharsets.UTF_8).length;
         return new ProfileSizeEstimate(sessions.size(), receiptCount, compactedReceiptCount, bytes);
     }
@@ -1418,7 +1418,7 @@ public class GpManagerEngine
     private static SavedState detachSavedState(@Nullable SavedState state)
     {
         if (state == null) return null;
-        com.google.gson.Gson gson = new com.google.gson.Gson();
+        com.google.gson.Gson gson = com.gpmanager.persistence.JsonCodec.gson();
         return gson.fromJson(gson.toJson(state), SavedState.class);
     }
 

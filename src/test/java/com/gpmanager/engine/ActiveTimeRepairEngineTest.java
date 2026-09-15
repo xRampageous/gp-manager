@@ -23,6 +23,11 @@ import static org.junit.Assert.assertTrue;
 /** Pass 10 step 44: day summaries inflated by the old read-accrual defect are clamped on restore and marked. */
 public class ActiveTimeRepairEngineTest
 {
+    static
+    {
+        com.gpmanager.persistence.JsonCodec.bind(new com.google.gson.Gson());
+    }
+
     private static final int LOGS = 1519;
     private static final long NOW = System.currentTimeMillis() - 3_600_000L;
 

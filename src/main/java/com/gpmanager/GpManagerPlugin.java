@@ -278,7 +278,7 @@ public class GpManagerPlugin extends Plugin
     @Override
     protected void startUp()
     {
-        com.gpmanager.persistence.ProfileBackup.bindGson(gson);
+        com.gpmanager.persistence.JsonCodec.bind(gson);
         GpManagerConfigMigration.apply(configManager);
         loadChargeCalibration();
 

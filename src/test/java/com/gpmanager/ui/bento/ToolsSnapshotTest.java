@@ -33,6 +33,11 @@ import static org.junit.Assert.assertTrue;
  */
 public class ToolsSnapshotTest
 {
+    static
+    {
+        com.gpmanager.persistence.JsonCodec.bind(new com.google.gson.Gson());
+    }
+
     private static final int LOGS = 1519;
 
     @Test

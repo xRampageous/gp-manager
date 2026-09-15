@@ -23,7 +23,7 @@ public class ProfileBackupEngineTest
 {
     static
     {
-        com.gpmanager.persistence.ProfileBackup.bindGson(new com.google.gson.Gson());
+        com.gpmanager.persistence.JsonCodec.bind(new com.google.gson.Gson());
     }
 
     private static final String PROFILE = "profile-key-123";
