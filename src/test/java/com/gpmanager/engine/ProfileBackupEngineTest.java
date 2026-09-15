@@ -21,6 +21,11 @@ import static org.junit.Assert.*;
 
 public class ProfileBackupEngineTest
 {
+    static
+    {
+        com.gpmanager.persistence.ProfileBackup.bindGson(new com.google.gson.Gson());
+    }
+
     private static final String PROFILE = "profile-key-123";
     private static final long NOW = 1_800_000_000_000L;
     private static final Gson GSON = new Gson();

@@ -139,6 +139,9 @@ public class GpManagerPlugin extends Plugin
     private Client client;
 
     @Inject
+    private com.google.gson.Gson gson;
+
+    @Inject
     private GpManagerConfig config;
 
     @Inject
@@ -275,6 +278,7 @@ public class GpManagerPlugin extends Plugin
     @Override
     protected void startUp()
     {
+        com.gpmanager.persistence.ProfileBackup.bindGson(gson);
         GpManagerConfigMigration.apply(configManager);
         loadChargeCalibration();
 

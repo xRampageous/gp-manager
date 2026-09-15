@@ -25,7 +25,26 @@ import java.util.Map;
 public final class ProfileBackup
 {
     public static final int CURRENT_FORMAT_VERSION = 1;
-    private static final Gson GSON = UnknownFieldPreservation.wrap(new Gson());
+    /**
+     * The client's injected Gson, bound once by the plugin (Plugin Hub rule: never construct a fresh
+     * Gson; customise the injected one through {@code newBuilder()}, which the wrapper does).
+     */
+    private static volatile Gson gson;
+
+    public static void bindGson(Gson clientGson)
+    {
+        gson = UnknownFieldPreservation.wrap(clientGson);
+    }
+
+    private static Gson gson()
+    {
+        Gson bound = gson;
+        if (bound == null)
+        {
+            throw new IllegalStateException("ProfileBackup.bindGson(...) must run before any export or import");
+        }
+        return bound;
+    }
     private static final DateTimeFormatter FILE_DATE = DateTimeFormatter.ISO_LOCAL_DATE;
 
     private int formatVersion;
@@ -46,7 +65,7 @@ public final class ProfileBackup
         if (source == null) throw new IllegalArgumentException("state");
         String owner = profileId == null ? "" : profileId.trim();
         if (owner.isEmpty()) throw new IllegalArgumentException("profileId");
-        SavedState detached = GSON.fromJson(GSON.toJson(source), SavedState.class);
+        SavedState detached = gson().fromJson(gson().toJson(source), SavedState.class);
         detached.setOwnerKey(owner);
 
         ProfileBackup backup = new ProfileBackup();
@@ -100,7 +119,7 @@ public final class ProfileBackup
         ProfileBackup backup;
         try
         {
-            backup = GSON.fromJson(root, ProfileBackup.class);
+            backup = gson().fromJson(root, ProfileBackup.class);
         }
         catch (RuntimeException ex)
         {
@@ -126,7 +145,7 @@ public final class ProfileBackup
         String suppliedHash = backup.sha256 == null ? "" : backup.sha256.trim().toLowerCase();
         JsonObject withoutHash = root.deepCopy();
         withoutHash.remove("sha256");
-        String expectedHash = sha256(GSON.toJson(withoutHash));
+        String expectedHash = sha256(gson().toJson(withoutHash));
         if (!constantTimeEquals(suppliedHash, expectedHash))
             throw new IllegalArgumentException("Backup content hash does not match");
         if (!backup.counts.matches(Counts.from(backup.state)))
@@ -142,9 +161,9 @@ public final class ProfileBackup
 
     private String calculateHash()
     {
-        JsonObject object = GSON.toJsonTree(this).getAsJsonObject();
+        JsonObject object = gson().toJsonTree(this).getAsJsonObject();
         object.remove("sha256");
-        return sha256(GSON.toJson(object));
+        return sha256(gson().toJson(object));
     }
 
     private static String sha256(String value)
@@ -182,7 +201,7 @@ public final class ProfileBackup
 
     public String toJson()
     {
-        return GSON.toJson(this);
+        return gson().toJson(this);
     }
 
     /** Human-readable confirmation summary. Size is the final UTF-8 JSON size. */
@@ -223,7 +242,7 @@ public final class ProfileBackup
     public String getSha256() { return sha256; }
     public SavedState getState()
     {
-        return state == null ? null : GSON.fromJson(GSON.toJson(state), SavedState.class);
+        return state == null ? null : gson().fromJson(gson().toJson(state), SavedState.class);
     }
 
     public static final class Counts

@@ -25,6 +25,11 @@ import static org.junit.Assert.*;
 
 public class ProfileBackupCoordinatorTest
 {
+    static
+    {
+        com.gpmanager.persistence.ProfileBackup.bindGson(new com.google.gson.Gson());
+    }
+
     private static final String PROFILE = "rsprofile.backup-test";
     private static final long NOW = 1_800_000_000_000L;
 

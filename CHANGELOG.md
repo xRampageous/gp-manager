@@ -1,3 +1,7 @@
+## 1.0.1 — 2026-09-15
+
+- Plugin Hub review fix: the profile backup envelope now serialises with the client's injected Gson (bound once at start-up and customised through `newBuilder()`), never a fresh instance. No behaviour change.
+
 ## 1.0.0 — 2026-09-15
 
 GP Manager's first release: passive, inventory-based profit tracking with a Bento sidebar (Live · Ledger · Sessions · Insights · Tools), session categories and automatic boundaries, a Supplies / Loss / Market split that only counts what the engine evidenced, PvP accounting, wealth history with coin stores, records, session merge and compare, alerts, idle auto-end, profile backup / restore with rotated saves, and a Grand Exchange reconciliation path that stays observation-only until a live sale confirms the sell-side reading (Tools › Rules). Data lives in `.runelite/gp-manager`; older folders migrate in once. Everything below was the development review that led here, newest first.

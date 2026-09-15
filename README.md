@@ -2,7 +2,7 @@
 
 Passive RuneLite profit tracking by **Rampageous**. Track estimated revenue and supply costs, see live GP drops, review uncertain changes, and keep a local session history.
 
-**Version 1.0.0** — the first release candidate. It has not yet been submitted to Plugin Hub; the live acceptance sweep is deferred to the first players' reports.
+**Version 1.0.1** — the first release candidate. It has not yet been submitted to Plugin Hub; the live acceptance sweep is deferred to the first players' reports.
 
 ## Features
 
