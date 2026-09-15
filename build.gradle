@@ -1,0 +1,474 @@
+plugins {
+    id 'java'
+}
+
+repositories {
+    mavenLocal()
+    maven {
+        url = 'https://repo.runelite.net'
+        content {
+            includeGroupByRegex("net\\.runelite.*")
+        }
+    }
+    mavenCentral()
+}
+
+// Repeatable baseline; use -PruneliteVersion=... for an explicit compatibility run.
+def runeLiteVersion = providers.gradleProperty('runeliteVersion').getOrElse('1.12.38')
+def pluginMainClass = 'com.gpmanager.GpManagerPluginTest'
+
+group = 'com.gpmanager'
+version = '1.0.0'
+
+
+
+sourceSets {
+    simulation {
+        java.srcDir 'src/simulation/java'
+        compileClasspath += sourceSets.main.output
+        runtimeClasspath += output + compileClasspath
+    }
+}
+
+configurations {
+    simulationImplementation.extendsFrom testImplementation
+    simulationRuntimeOnly.extendsFrom testRuntimeOnly
+}
+
+dependencies {
+    compileOnly "net.runelite:client:${runeLiteVersion}"
+
+    testImplementation 'junit:junit:4.13.2'
+    testImplementation "net.runelite:client:${runeLiteVersion}"
+    testImplementation "net.runelite:jshell:${runeLiteVersion}"
+}
+
+tasks.withType(JavaCompile).configureEach {
+    options.encoding = 'UTF-8'
+    options.release.set(11)
+}
+
+test {
+    useJUnit()
+    failOnNoDiscoveredTests = true
+    testLogging {
+        events 'passed', 'skipped', 'failed'
+        exceptionFormat = 'full'
+    }
+}
+
+tasks.register('run', JavaExec) {
+    classpath = sourceSets.test.runtimeClasspath
+    mainClass = pluginMainClass
+    jvmArgs '-ea'
+    args '--developer-mode', '--debug'
+}
+
+tasks.register('panelPreview', JavaExec) {
+    group = 'verification'
+    dependsOn 'testClasses'
+    classpath = sourceSets.test.runtimeClasspath
+    mainClass = 'com.gpmanager.ui.bento.BentoPreview'
+    args layout.buildDirectory.dir('bento-preview').get().asFile.path
+    // BentoPreview realizes an off-screen JFrame so Swing accessibility uses
+    // a valid component tree while the real sidebar is painted to PNGs.
+    systemProperty 'java.awt.headless', 'false'
+}
+
+tasks.register('shadowJar', Jar) {
+    dependsOn 'testClasses'
+    manifest {
+        attributes('Main-Class': pluginMainClass, 'Multi-Release': true)
+    }
+
+    duplicatesStrategy = DuplicatesStrategy.EXCLUDE
+    from sourceSets.main.output
+    from sourceSets.test.output
+    from {
+        configurations.testRuntimeClasspath.collect { file ->
+            file.isDirectory() ? file : zipTree(file)
+        }
+    }
+
+    exclude 'META-INF/INDEX.LIST'
+    exclude 'META-INF/*.SF'
+    exclude 'META-INF/*.DSA'
+    exclude 'META-INF/*.RSA'
+    exclude '**/module-info.class'
+
+    archiveClassifier.set('shadow')
+    archiveFileName.set("${rootProject.name}-${project.version}-all.jar")
+}
+
+tasks.named('processResources') {
+    def buildVersion = project.version.toString()
+    def generated = layout.buildDirectory.dir('generated/gp-manager-build')
+    doFirst {
+        def dir = generated.get().asFile
+        dir.mkdirs()
+        def builtAt = new Date().format("yyyy-MM-dd'T'HH:mm:ss'Z'", TimeZone.getTimeZone('UTC'))
+        def runeLite = configurations.compileClasspath
+            .resolvedConfiguration
+            .resolvedArtifacts
+            .find { it.moduleVersion.id.group == 'net.runelite' && it.moduleVersion.id.name == 'client' }
+            ?.moduleVersion?.id?.version ?: runeLiteVersion
+        def fingerprint = "${buildVersion}+rl-${runeLite}+built-${builtAt}"
+        file("$dir/gp-manager-build.properties").text = """version=${buildVersion}
+runeliteDependency=${runeLite}
+builtAt=${builtAt}
+fingerprint=${fingerprint}
+"""
+    }
+    from(generated)
+}
+
+tasks.named('jar') {
+    from('LICENSE') { into 'META-INF' }
+    manifest {
+        attributes('Implementation-Title': 'GP Manager', 'Implementation-Version': project.version)
+    }
+}
+
+tasks.register('releaseMetadataCheck') {
+    def buildVersion = project.version.toString()
+    group = 'verification'
+    description = 'Checks release metadata and the actual distributable plugin JAR.'
+    dependsOn 'jar'
+    doLast {
+        def metadata = new Properties()
+        file('runelite-plugin.properties').withInputStream { metadata.load(it) }
+        if (metadata.version != buildVersion) {
+            throw new GradleException('Plugin metadata version does not match build version.')
+        }
+        ['displayName', 'author', 'description', 'plugins'].each { key ->
+            if (!metadata.getProperty(key)?.trim()) {
+                throw new GradleException("Missing Plugin Hub metadata: ${key}")
+            }
+        }
+        def archive = new java.util.zip.ZipFile(tasks.named('jar').get().archiveFile.get().asFile)
+        try {
+            ['com/gpmanager/GpManagerPlugin.class', 'profit_manager_icon.png', 'gp-manager-build.properties', 'META-INF/LICENSE'].each { path ->
+                if (archive.getEntry(path) == null) {
+                    throw new GradleException("Plugin JAR is missing ${path}")
+                }
+            }
+            archive.entries().each { entry ->
+                if (entry.name.endsWith('.class')) {
+                    if (!entry.name.startsWith('com/gpmanager/') || entry.name.contains('/simulation/') || entry.name.endsWith('Test.class')) {
+                        throw new GradleException("Unexpected class in plugin JAR: ${entry.name}")
+                    }
+                    archive.getInputStream(entry).withCloseable { stream ->
+                        def data = new DataInputStream(stream)
+                        data.readInt()
+                        data.readUnsignedShort()
+                        if (data.readUnsignedShort() != 55) {
+                            throw new GradleException("Plugin class does not target Java 11: ${entry.name}")
+                        }
+                    }
+                }
+            }
+        } finally {
+            archive.close()
+        }
+    }
+}
+
+tasks.named('check') {
+    dependsOn 'safetyAudit', 'simulationCheck', 'configurationStabilityAudit',
+        'brandingCompatibilityAudit', 'releaseMetadataCheck'
+}
+
+tasks.register('releaseCheck') {
+    group = 'verification'
+    description = 'Runs the current release gate: tests, simulations, safety, compatibility, and packaging.'
+    dependsOn 'check'
+}
+
+tasks.register('releaseBundle', Zip) {
+    group = 'distribution'
+    description = 'Packages verified source, plugin JAR, and release documentation.'
+    dependsOn 'releaseCheck'
+    archiveFileName.set("${rootProject.name}-${project.version}-release.zip")
+    destinationDirectory.set(layout.buildDirectory.dir('distributions'))
+    from(tasks.named('jar')) { into 'lib' }
+    into('source') {
+        from('.') {
+            include 'src/**', 'gradle/**', '.github/**', 'scripts/**'
+            include 'build.gradle', 'settings.gradle', 'gradle.properties', 'gradlew', 'gradlew.bat'
+            include 'README.md', 'CHANGELOG.md', 'LICENSE', 'SAFETY_POLICY.md'
+            include 'docs/**', 'runelite-plugin.properties', '.gitignore', '.gitattributes'
+        }
+    }
+}
+
+
+
+def forbiddenSafetyPatterns = [
+    'java.awt.Robot',
+    'Class.forName(',
+    'Runtime.getRuntime().exec',
+    'new ProcessBuilder',
+    'java.net.',
+    'javax.net.',
+    'okhttp3.',
+    'org.apache.http.',
+    'Socket(',
+    'ServerSocket(',
+    'invokeMenuAction',
+    'setMenuEntries',
+    'createMenuEntry',
+    'net.runelite.client.input',
+    'Robot(',
+    'client.runScript(',
+    'setMouseCanvasPosition',
+    'setKeyboardIdleTicks',
+    'setMouseIdleTicks',
+    'writeChatbox',
+    'insecure-write-credentials'
+]
+
+// Broader patterns that false-positive on Swing sidebar UI / ConfigPlugin openers.
+// Still forbidden everywhere except the allowlisted files below.
+def gatedSafetyPatterns = [
+    'java.lang.reflect',
+    'Method.invoke(',
+    'KeyEvent',
+    'MouseEvent'
+]
+
+def gatedSafetyAllowlist = [
+    'ConfigurationPanelOpener.java': ['java.lang.reflect', 'Method.invoke('] as Set
+]
+
+// The Bento sidebar kit (src/main/java/com/gpmanager/ui/bento) paints its own Swing
+// controls and therefore handles mouse/keyboard events on those components. That is
+// ordinary sidebar UI input, never client input; the package is allowlisted for the two
+// Swing event names only. Everything else in the forbidden list still applies to it.
+def gatedSafetyPackageAllowlist = [
+    'com/gpmanager/ui/bento/': ['MouseEvent', 'KeyEvent'] as Set
+]
+
+tasks.register('safetyAudit') {
+    group = 'verification'
+    description = 'Fails if passive-only safety boundaries are violated.'
+
+    doLast {
+        def violations = []
+        files(
+            fileTree('src/main/java') { include '**/*.java' },
+            fileTree('src/simulation/java') { include '**/*.java' }
+        ).each { sourceFile ->
+            def source = sourceFile.getText('UTF-8')
+            def name = sourceFile.name
+            forbiddenSafetyPatterns.each { pattern ->
+                if (source.contains(pattern)) {
+                    violations << "${sourceFile}: forbidden pattern '${pattern}'"
+                }
+            }
+            def normalizedPath = sourceFile.path.replace(File.separatorChar, '/' as char)
+            gatedSafetyPatterns.each { pattern ->
+                if (source.contains(pattern)) {
+                    def allowed = gatedSafetyAllowlist[name]
+                    def packageAllowed = gatedSafetyPackageAllowlist.find { pkg, set ->
+                        normalizedPath.contains(pkg) && set.contains(pattern)
+                    } != null
+                    if (!packageAllowed && (allowed == null || !allowed.contains(pattern))) {
+                        violations << "${sourceFile}: forbidden pattern '${pattern}'"
+                    }
+                }
+            }
+        }
+
+        def buildText = file('build.gradle').getText('UTF-8')
+        // Only match real top-level dependency declarations. The previous
+        // contains() check matched the audit's own list of forbidden names.
+        def runtimeDependencyDeclaration = ~/(?m)^\s*(implementation|api|runtimeOnly)\s*(?:\(|['"])/
+        def dependencyMatcher = runtimeDependencyDeclaration.matcher(buildText)
+        while (dependencyMatcher.find()) {
+            violations << "build.gradle: unsupported runtime dependency declaration '${dependencyMatcher.group(1)}'"
+        }
+
+        if (!violations.isEmpty()) {
+            throw new GradleException('Passive-only safety audit failed:\n - ' + violations.join('\n - '))
+        }
+
+        println 'Passive-only safety audit passed: no automation, input injection, direct networking, reflection, JNI, or subprocess APIs detected.'
+    }
+}
+
+tasks.register('generalSimulation', JavaExec) {
+    group = 'verification'
+    description = 'Runs the fully offline general-profit accounting simulation suite.'
+    dependsOn 'simulationClasses', 'safetyAudit'
+    classpath = sourceSets.simulation.runtimeClasspath
+    mainClass = 'com.gpmanager.simulation.GeneralProfitSimulation'
+    doFirst {
+        args = [layout.buildDirectory.dir('simulation/general').get().asFile.absolutePath]
+    }
+}
+
+
+tasks.register('pkSimulation', JavaExec) {
+    group = 'verification'
+    description = 'Runs the fully offline PK-profit accounting simulation suite.'
+    dependsOn 'simulationClasses', 'safetyAudit'
+    classpath = sourceSets.simulation.runtimeClasspath
+    mainClass = 'com.gpmanager.simulation.PkProfitSimulation'
+    doFirst {
+        args = [layout.buildDirectory.dir('simulation/pk').get().asFile.absolutePath]
+    }
+}
+
+
+tasks.register('simulationIsolationCheck') {
+    group = 'verification'
+    description = 'Verifies developer simulation classes are absent from normal plugin output.'
+    dependsOn 'classes', 'simulationClasses'
+    doLast {
+        def leakedClasses = sourceSets.main.output.classesDirs.asFileTree.matching {
+            include '**/gpmanager/simulation/**'
+        }.files
+        if (!leakedClasses.isEmpty()) {
+            throw new GradleException('Simulation classes leaked into normal plugin output: ' + leakedClasses)
+        }
+        println 'Simulation isolation passed: developer harness is absent from normal plugin output.'
+    }
+}
+
+
+tasks.register('simulationCheck') {
+    group = 'verification'
+    description = 'Runs both offline simulation suites and fails on any accounting regression.'
+    dependsOn 'generalSimulation', 'pkSimulation', 'simulationIsolationCheck'
+    doLast {
+        println 'Offline simulation checks passed: general accounting and PK ledger.'
+        println "Reports: ${layout.buildDirectory.dir('simulation').get().asFile}"
+    }
+}
+
+
+
+tasks.register('configurationStabilityAudit') {
+    group = 'verification'
+    description = 'Checks v0.4.4 setting groups, migration, hidden legacy controls, and lazy panel refresh.'
+    doLast {
+        def configSource = file('src/main/java/com/gpmanager/GpManagerConfig.java').getText('UTF-8')
+        [
+            'name = "General"',
+            'name = "Session tracking"',
+            'name = "Activity detection"',
+            'name = "Sidebar Item changes"',
+            'name = "Display selection"',
+            'name = "HUD+"',
+            'name = "HUD+ - Item tray"',
+            'name = "HUD"',
+            'name = "HUD - Custom rows"',
+            'name = "HUD appearance - Shared"',
+            'name = "Loot visibility"',
+            'name = "Floating drops"',
+            'name = "Floating drops - Appearance"',
+            'name = "Floating drops - Animation"',
+            'name = "Floating drops - Custom preset"',
+            'name = "Pricing and item rules"',
+            'name = "Advanced tracking"',
+            'name = "Party tracker"'
+        ].each { marker ->
+            if (!configSource.contains(marker)) {
+                throw new GradleException("v0.4.4 config audit failed: missing ${marker}")
+            }
+        }
+        if (!configSource.contains('keyName = "autoResumeOnActivity"')
+            || !configSource.contains('hidden = true')
+            || !configSource.contains('keyName = "defaultSessionName"')
+            || !configSource.contains('keyName = "hudPlusWidth"')) {
+            throw new GradleException('config audit failed: legacy pause/session keys or hudPlusWidth missing.')
+        }
+
+        def migrationSource = file('src/main/java/com/gpmanager/GpManagerConfigMigration.java').getText('UTF-8')
+        if (!migrationSource.contains('CURRENT_SCHEMA_VERSION = 31')
+            || !migrationSource.contains('derivePreset')
+            || !migrationSource.contains('sanitizeInt')
+            || !migrationSource.contains('feedbackStyle')
+            || !migrationSource.contains('keepRewardTrayExpanded')
+            || !migrationSource.contains('hudPlusWidth')
+            || !migrationSource.contains('hudPlusMaxHeight')
+            || !migrationSource.contains('HUD_PLUS')
+            || !migrationSource.contains('migrateFloatingFontAndBackground')
+            || !migrationSource.contains('hudPlusShowActivityHeader')
+            || !migrationSource.contains('hudPlusShowItemIcons')
+            || !migrationSource.contains('hudPlusShowTrayTags')) {
+            throw new GradleException('v0.4.4 migration audit failed: safe one-time migration policy is incomplete.')
+        }
+        if (!configSource.contains('keyName = "gpDropFontType"')
+            || !configSource.contains('keyName = "gpDropTextBackground"')
+            || !configSource.contains('keyName = "hudPlusDensity"')
+            || !configSource.contains('keyName = "liveItemGridMaxHeight"')
+            || !configSource.contains('keyName = "hudPlusShowItemIcons"')
+            || !configSource.contains('keyName = "hudPlusShowTrayTags"')
+            || !configSource.contains('name = "HUD+ - Colours"')) {
+            throw new GradleException('config audit failed: Phase A/B floating or HUD+ keys missing.')
+        }
+
+        def pluginSource = file('src/main/java/com/gpmanager/GpManagerPlugin.java').getText('UTF-8')
+        if (!pluginSource.contains('GpManagerConfigMigration.apply(configManager)')) {
+            throw new GradleException('v0.4.4 migration audit failed: startup does not apply migration.')
+        }
+
+        // The sidebar refreshes only while shown, and captures only the current page's read model.
+        def panelSource = file('src/main/java/com/gpmanager/ui/bento/BentoPanel.java').getText('UTF-8')
+        if (!panelSource.contains('public void onActivate()')
+            || !panelSource.contains('if (!active && !isShowing())')
+            || !panelSource.contains('String page = shell.currentPage();')) {
+            throw new GradleException('performance audit failed: hidden-panel or current-page refresh gating is missing.')
+        }
+
+        println 'Configuration stability audit passed: grouped settings, safe migration, hidden legacy keys, and lazy panel refresh.'
+    }
+}
+
+
+
+tasks.register('brandingCompatibilityAudit') {
+    group = 'verification'
+    description = 'Checks the GP Manager public identity and stable compatibility identifiers.'
+    doLast {
+        def propertiesSource = file('runelite-plugin.properties').getText('UTF-8')
+        def pluginSource = file('src/main/java/com/gpmanager/GpManagerPlugin.java').getText('UTF-8')
+        def panelSource = file('src/main/java/com/gpmanager/ui/bento/PopoutWindow.java').getText('UTF-8')
+        def configSource = file('src/main/java/com/gpmanager/GpManagerConfig.java').getText('UTF-8')
+        def migrationSource = file('src/main/java/com/gpmanager/GpManagerConfigMigration.java').getText('UTF-8')
+        def repositorySource = file('src/main/java/com/gpmanager/persistence/SessionRepository.java').getText('UTF-8')
+
+        if (!propertiesSource.contains('displayName=GP Manager')
+            || !pluginSource.contains('name = "GP Manager"')
+            || !pluginSource.contains('.tooltip("GP Manager")')
+            || !panelSource.contains('"GP Manager')) {
+            throw new GradleException('GP Manager branding check failed: the new name is missing from a public surface.')
+        }
+
+        if (!configSource.contains('String GROUP = "profitmanager"')
+            || !pluginSource.contains('public class GpManagerPlugin')
+            || !repositorySource.contains('DATA_DIRECTORY = "gp-manager"')
+            || !repositorySource.contains('"profit-manager", "smart-profit-tracker"')
+            || !pluginSource.contains('/profit_manager_icon.png')
+            || !propertiesSource.contains('plugins=com.gpmanager.GpManagerPlugin')
+            || !migrationSource.contains('LEGACY_GROUP = "smartprofittracker"')
+            || !repositorySource.contains('LEGACY_DATA_DIRECTORIES = {')) {
+            throw new GradleException('GP Manager compatibility check failed: a renamed identifier or legacy migration bridge is missing.')
+        }
+
+        if (file('src/main/java/com/smartprofittracker').exists()
+            || file('src/test/java/com/smartprofittracker').exists()
+            || file('src/simulation/java/com/smartprofittracker').exists()) {
+            throw new GradleException('GP Manager compatibility check failed: an obsolete Smart Profit Tracker package tree remains.')
+        }
+
+        if (file('src/main/java/com/profitmanager').exists()
+            || file('src/test/java/com/profitmanager').exists()
+            || file('src/simulation/java/com/profitmanager').exists()) {
+            throw new GradleException('GP Manager compatibility check failed: an obsolete com.profitmanager package tree remains.')
+        }
+
+        println 'Branding compatibility audit passed: GP Manager public identity with stable settings, history, and package compatibility.'
+    }
+}

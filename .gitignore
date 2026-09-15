@@ -1,0 +1,19 @@
+.gradle/
+build/
+out/
+.idea/
+*.iml
+.classpath
+.project
+.settings/
+.gradle-bootstrap/
+*.log
+.DS_Store
+
+# Local backups and review scratch outputs
+/review-artifacts/
+/gp-manager.rar
+/compile_log.txt
+.env
+.env.*
+
