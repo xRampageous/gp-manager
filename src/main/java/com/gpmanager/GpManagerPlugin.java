@@ -365,9 +365,30 @@ public class GpManagerPlugin extends Plugin
         log.debug("GP Manager stopped");
     }
 
+    private GameState lastGameState;
+
     @Subscribe
     public void onGameStateChanged(GameStateChanged event)
     {
+        GameState previous = lastGameState;
+        lastGameState = event.getGameState();
+        // LOGGED_IN -> LOADING -> LOGGED_IN is a region change (teleport, instance, stairs), not a
+        // login. Re-priming the baseline there swallowed whatever changed on the way -- a teleport
+        // tablet breaking never booked. Only the location-bound trackers reset on a load.
+        if (event.getGameState() == GameState.LOADING)
+        {
+            interactionContextTracker.clear();
+            neutralZoneTracker.reset();
+            trackingDisplayModel.setNeutralZoneActive(false);
+            clearConfirmedProcessTitle();
+            return;
+        }
+        if (event.getGameState() == GameState.LOGGED_IN && previous == GameState.LOADING)
+        {
+            syncActivitySession();
+            panel.refresh();
+            return;
+        }
         if (event.getGameState() != GameState.LOGGED_IN)
         {
             geOfferLedger.beginLoginSeed();

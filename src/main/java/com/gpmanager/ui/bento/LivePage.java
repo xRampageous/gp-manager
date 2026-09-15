@@ -335,11 +335,17 @@ public final class LivePage implements BentoShell.Page
         riskLabel.setText(pvp.pvpPossible && pvp.riskKnown ? "  risk " + Fmt.compact(pvp.riskValue) : "");
 
         // Page bar.
-        if (!s.hasSession || s.stopped)
+        if (!s.hasSession)
         {
-            pause.setText("▶ Waiting");
-            pause.setKind(Controls.Button.Kind.DEFAULT);
-            pause.setToolTipText("Tracking starts when your inventory first changes");
+            pause.setText("▶ Start");
+            pause.setKind(Controls.Button.Kind.RESUME);
+            pause.setToolTipText("Start tracking now - or just play, it starts on your first change");
+        }
+        else if (s.stopped)
+        {
+            pause.setText("▶ Resume");
+            pause.setKind(Controls.Button.Kind.RESUME);
+            pause.setToolTipText("Tracking is stopped until you press Resume");
         }
         else if (s.paused)
         {
@@ -577,7 +583,7 @@ public final class LivePage implements BentoShell.Page
             empty.add(Box.createVerticalStrut(6));
             empty.add(title);
             empty.add(Box.createVerticalStrut(4));
-            for (String line : Tile.wrap("Pick something up, drink, or bank — tracking starts when the inventory settles.",
+            for (String line : Tile.wrap("Pick something up, drink, or bank and it starts by itself - or press Start above.",
                 empty.getFontMetrics(BentoTheme.secondary()), Tile.interiorWidth() - 8))
             {
                 javax.swing.JLabel hint = Tile.label(line, BentoTheme.secondary(), BentoTheme.DIM);

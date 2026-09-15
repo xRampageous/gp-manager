@@ -59,6 +59,14 @@ public final class DedicatedHudRenderer
     private final TripBeaconPainter tripBeacon = new TripBeaconPainter();
 
     /** PvP layout line for the next paint; null for the General layout. */
+    private boolean showIcons = true;
+
+    /** Item icons on the tray and drop rows; text shifts left when they are off. */
+    public void setShowIcons(boolean value)
+    {
+        showIcons = value;
+    }
+
     public void setPvpLine(@javax.annotation.Nullable String text)
     {
         tripBeacon.setPvpLine(text);
@@ -966,12 +974,12 @@ public final class DedicatedHudRenderer
             || reward.getSourceKind().isRecentPickup();
         boolean lossRow = best != null && best.isLoss();
         int rowH = Math.max(ICON_SLOT, line);
-        BufferedImage sprite = best == null ? fallback() : sprite(best.getItemId());
+        BufferedImage sprite = !showIcons ? null : best == null ? fallback() : sprite(best.getItemId());
         if (sprite != null)
         {
             drawSprite(g, sprite, x, y + (rowH - ICON_SLOT) / 2, ICON_SLOT);
         }
-        int textX = x + ICON_SLOT + 3;
+        int textX = showIcons ? x + ICON_SLOT + 3 : x + 2;
         int rightReserve = 0;
         String rightTop = "";
         if (best != null && best.isValueKnown())
@@ -1414,7 +1422,7 @@ public final class DedicatedHudRenderer
         Color accent)
     {
         Color edge = accent == null ? ACCENT : accent;
-        BufferedImage image = sprite(item.getItemId());
+        BufferedImage image = showIcons ? sprite(item.getItemId()) : null;
         if (image != null)
         {
             drawSprite(g, image, x, y + (rowH - ROW_ICON) / 2, ROW_ICON);
@@ -1431,8 +1439,9 @@ public final class DedicatedHudRenderer
                 + QuantityFormatter.compactGp(item.getRecordedValue()))
             : "unpriced";
         int priceW = metrics.stringWidth(price) + 4;
-        int textX = x + ROW_ICON + 3;
-        int maxName = Math.max(20, contentW - ROW_ICON - 10 - priceW);
+        int iconW = showIcons ? ROW_ICON : 0;
+        int textX = x + iconW + 3;
+        int maxName = Math.max(20, contentW - iconW - 10 - priceW);
         boolean loss = item.isLoss();
         g.setColor(withAlpha(value, alpha));
         g.drawString(

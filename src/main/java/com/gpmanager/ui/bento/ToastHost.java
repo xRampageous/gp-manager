@@ -147,17 +147,23 @@ public final class ToastHost extends JPanel
         return show("↶", title, detail, "Undo", BentoTheme.accentColor(), seconds * 1000L, onUndo);
     }
 
+    /** Toasts dismiss themselves: five seconds, eight when there is an action to click. */
+    private static long lifetimeFor(@Nullable String action)
+    {
+        return action == null ? 5_000L : 8_000L;
+    }
+
     public Toast info(String glyph, String title, String detail, @Nullable String action, Color border,
         @Nullable Runnable onAction)
     {
-        return show(glyph, title, detail, action, border, 0L, onAction);
+        return show(glyph, title, detail, action, border, lifetimeFor(action), onAction);
     }
 
     /** As {@link #info}, with a sprite instead of the glyph. */
     public Toast info(@Nullable java.awt.image.BufferedImage image, String glyph, String title, String detail, @Nullable String action,
         Color border, @Nullable Runnable onAction)
     {
-        Toast toast = show(glyph, title, detail, action, border, 0L, onAction);
+        Toast toast = show(glyph, title, detail, action, border, lifetimeFor(action), onAction);
         toast.image = image;
         toast.repaint();
         return toast;

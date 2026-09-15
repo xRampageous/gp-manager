@@ -1306,6 +1306,18 @@ public interface GpManagerConfig extends Config
     }
 
     @ConfigItem(
+        keyName = "hudShowIcons",
+        name = "Item icons",
+        description = "Show item icons on HUD+ rows.",
+        position = 0,
+        section = infoBoxContentSection
+    )
+    default boolean hudShowIcons()
+    {
+        return true;
+    }
+
+    @ConfigItem(
         keyName = "showInfoBoxRate",
         name = "Show rate",
         description = "Rate row when HUD detail is Custom only.",

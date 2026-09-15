@@ -1,3 +1,7 @@
+## 1.0.4 — 2026-09-16
+
+- A teleport (or any region load) no longer re-primes the inventory baseline, so the tablet that just broke is booked. Fresh install: the Live button reads **Start** (or **Resume** when stopped) instead of "Waiting". HUD+ item icons can be turned off (Info box › Item icons). Toasts dismiss themselves after 5 s (8 s with an action).
+
 ## 1.0.3 — 2026-09-15
 
 - README rewritten for players, with screenshots; shorter Plugin Hub description. No code change.
