@@ -355,7 +355,7 @@ public class GpManagerOverlay extends Overlay
         }
         // Text size / metric labels / activity header from config.
         dedicated.setPvpLine(pvpLine(snapshot));
-        dedicated.setShowIcons(config.hudShowIcons());
+        dedicated.setShowIcons(config.hudPlusShowItemIcons());
         lastDedicatedPaint = dedicated.renderTripBeacon(
             graphics,
             snapshot,

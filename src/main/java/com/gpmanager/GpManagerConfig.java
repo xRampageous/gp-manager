@@ -541,7 +541,7 @@ public interface GpManagerConfig extends Config
     )
     default boolean hudPlusShowItemIcons()
     {
-        return true;
+        return false;
     }
 
     @ConfigItem(
@@ -1301,18 +1301,6 @@ public interface GpManagerConfig extends Config
         section = pricingSection
     )
     default boolean geSellSpentIsNet()
-    {
-        return true;
-    }
-
-    @ConfigItem(
-        keyName = "hudShowIcons",
-        name = "Item icons",
-        description = "Show item icons on HUD+ rows.",
-        position = 0,
-        section = infoBoxContentSection
-    )
-    default boolean hudShowIcons()
     {
         return true;
     }

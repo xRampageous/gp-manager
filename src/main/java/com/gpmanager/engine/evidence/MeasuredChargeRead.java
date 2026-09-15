@@ -29,6 +29,11 @@ public final class MeasuredChargeRead
     private static final int TRIDENT_SWAMP_ENHANCED_CHARGED = 22292;
     private static final int TRIDENT_SWAMP_ENHANCED_UNCHARGED = 22294;
     private static final int TOXIC_BLOWPIPE_ID = 12926;
+    private static final int BOTTOMLESS_COMPOST_BUCKET_EMPTY = ItemID.BOTTOMLESS_COMPOST_BUCKET;
+    private static final int BOTTOMLESS_COMPOST_BUCKET_FILLED = ItemID.BOTTOMLESS_COMPOST_BUCKET_FILLED;
+    private static final int BUCKET_COMPOST = ItemID.BUCKET_COMPOST;
+    private static final int BUCKET_SUPERCOMPOST = ItemID.BUCKET_SUPERCOMPOST;
+    private static final int BUCKET_ULTRACOMPOST = ItemID.BUCKET_ULTRACOMPOST;
 
     private static final String COUNT = "(?:\\d{1,3}(?:,\\d{3})+|\\d+)";
     private static final Pattern TRIDENT_CHECK = Pattern.compile(
@@ -41,6 +46,12 @@ public final class MeasuredChargeRead
     private static final Pattern TYPED_DARTS = Pattern.compile(
         "^(.+?) x (" + COUNT + ")$",
         Pattern.CASE_INSENSITIVE);
+    /** "Your bottomless compost bucket has 42 uses of ultracompost left." / "... has 1 use of compost left." */
+    private static final Pattern COMPOST_CHECK = Pattern.compile(
+        "^Your bottomless compost bucket has (" + COUNT + ") uses? of (compost|supercompost|ultracompost) left\\.$",
+        Pattern.CASE_INSENSITIVE);
+    private static final Pattern COMPOST_EMPTY = Pattern.compile(
+        "^Your bottomless compost bucket is (?:currently )?empty\\.$", Pattern.CASE_INSENSITIVE);
 
     public enum Variant
     {
@@ -48,7 +59,9 @@ public final class MeasuredChargeRead
         TRIDENT_SWAMP(ChargeFamilyIds.TRIDENT, "Trident of the swamp", true),
         TRIDENT_SWAMP_ENHANCED(ChargeFamilyIds.TRIDENT, "Trident of the swamp (e)", true),
         TRIDENT_SEAS_ENHANCED(ChargeFamilyIds.TRIDENT, "Trident of the seas (e)", false),
-        TOXIC_BLOWPIPE(ChargeFamilyIds.BLOWPIPE, "Toxic blowpipe", true);
+        TOXIC_BLOWPIPE(ChargeFamilyIds.BLOWPIPE, "Toxic blowpipe", true),
+        /** One bucket of compost gives two uses; the read is in uses, priced at half a bucket each. */
+        BOTTOMLESS_COMPOST_BUCKET(ChargeFamilyIds.COMPOST_BUCKET, "Bottomless compost bucket", true);
 
         private final String familyId;
         private final String displayName;
@@ -209,7 +222,38 @@ public final class MeasuredChargeRead
                 Variant.TOXIC_BLOWPIPE, components, 0L, dartId, dartCount, true);
         }
 
+        Matcher compost = COMPOST_CHECK.matcher(message);
+        if (compost.matches())
+        {
+            long uses;
+            try
+            {
+                uses = parseCount(compost.group(1));
+            }
+            catch (NumberFormatException ex)
+            {
+                return unsupported(Variant.BOTTOMLESS_COMPOST_BUCKET);
+            }
+            int compostId = compostItemId(compost.group(2));
+            Map<Integer, Long> components = new LinkedHashMap<>();
+            components.put(compostId, uses);
+            return new MeasuredChargeRead(Variant.BOTTOMLESS_COMPOST_BUCKET, components, uses, -1, 0L, true);
+        }
+        if (COMPOST_EMPTY.matcher(message).matches())
+        {
+            // Empty is a valid measured read of zero for every compost kind; a later fill is an increase.
+            Map<Integer, Long> components = new LinkedHashMap<>();
+            components.put(BUCKET_COMPOST, 0L);
+            components.put(BUCKET_SUPERCOMPOST, 0L);
+            components.put(BUCKET_ULTRACOMPOST, 0L);
+            return new MeasuredChargeRead(Variant.BOTTOMLESS_COMPOST_BUCKET, components, 0L, -1, 0L, true);
+        }
+
         String lower = message.toLowerCase(Locale.ROOT);
+        if (lower.startsWith("your bottomless compost bucket "))
+        {
+            return unsupported(Variant.BOTTOMLESS_COMPOST_BUCKET);
+        }
         if (lower.startsWith("darts:") && lower.contains("scales:"))
         {
             return unsupported(Variant.TOXIC_BLOWPIPE);
@@ -238,6 +282,10 @@ public final class MeasuredChargeRead
     public static Variant supportedVariantForItemName(@Nullable String itemName)
     {
         String name = normalizeItemName(itemName);
+        if ("bottomless compost bucket".equals(name))
+        {
+            return Variant.BOTTOMLESS_COMPOST_BUCKET;
+        }
         if ("trident of the seas".equals(name))
         {
             return Variant.TRIDENT_SEAS;
@@ -261,6 +309,10 @@ public final class MeasuredChargeRead
     @Nullable
     public static Variant supportedVariantForItemId(int itemId)
     {
+        if (itemId == BOTTOMLESS_COMPOST_BUCKET_EMPTY || itemId == BOTTOMLESS_COMPOST_BUCKET_FILLED)
+        {
+            return Variant.BOTTOMLESS_COMPOST_BUCKET;
+        }
         if (itemId == TRIDENT_SEAS_CHARGED || itemId == TRIDENT_SEAS_UNCHARGED)
         {
             return Variant.TRIDENT_SEAS;
@@ -343,6 +395,27 @@ public final class MeasuredChargeRead
     public boolean isBookable()
     {
         return bookable;
+    }
+
+    private static int compostItemId(String kind)
+    {
+        switch (kind.toLowerCase(Locale.ROOT))
+        {
+            case "ultracompost":
+                return BUCKET_ULTRACOMPOST;
+            case "supercompost":
+                return BUCKET_SUPERCOMPOST;
+            default:
+                return BUCKET_COMPOST;
+        }
+    }
+
+    /** Component units per priced item: compost uses are half a bucket each; everything else is one. */
+    public static int unitsPerPricedItem(Variant variant, int componentItemId)
+    {
+        return variant == Variant.BOTTOMLESS_COMPOST_BUCKET
+            && (componentItemId == BUCKET_COMPOST || componentItemId == BUCKET_SUPERCOMPOST || componentItemId == BUCKET_ULTRACOMPOST)
+            ? 2 : 1;
     }
 
     private static MeasuredChargeRead unsupported(Variant variant)

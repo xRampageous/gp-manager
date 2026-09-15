@@ -268,8 +268,12 @@ public final class ItemRow extends Painted
             }
             int nameAvail = right - x - reserved;
             String nameText = StatBlock.fit(name, bold, Math.max(24, nameAvail));
+            // The name is measured bold at body size; paint it that way too (it used to inherit the
+            // small quantity font set above, which is why item names read a size too small).
+            g2.setFont(BentoTheme.font(java.awt.Font.BOLD, BentoTheme.density().body));
             g2.setColor(BentoTheme.TEXT);
             g2.drawString(nameText, x, base);
+            g2.setFont(BentoTheme.font(java.awt.Font.PLAIN, BentoTheme.density().secondary - 1));
             int nx = x + bold.stringWidth(nameText);
             int spare = nameAvail - bold.stringWidth(nameText);
             if (tag != null && spare > 24)

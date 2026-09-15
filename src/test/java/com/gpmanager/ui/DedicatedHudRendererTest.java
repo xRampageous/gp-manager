@@ -639,10 +639,10 @@ public class DedicatedHudRendererTest
             null, null, null, null, null, null, null, DedicatedHudRenderer.ACCENT,
             false, false, false, false, null, false, 1_000L, false);
         g.dispose();
-        assertEquals("Session · Willow tree", HudPlusHeaderLabel.resolve(snap));
+        assertEquals("Willow tree", HudPlusHeaderLabel.resolve(snap));
         assertNull("truncated=" + paint.truncatedHeaderTitle + " w=" + paint.tripWidth,
             paint.truncatedHeaderTitle);
-        assertTrue(paint.tripWidth > 160);
+        assertTrue("trip width " + paint.tripWidth, paint.tripWidth >= 100);
     }
 
     @Test

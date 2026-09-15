@@ -2667,6 +2667,12 @@ public class GpManagerPlugin extends Plugin
                 {
                     return true;
                 }
+                // A component measured in fractions of the priced item (compost uses = half a bucket).
+                int perItem = com.gpmanager.engine.evidence.MeasuredChargeRead.unitsPerPricedItem(read.getVariant(), itemId);
+                if (perItem > 1)
+                {
+                    unitPrice = Math.max(1, unitPrice / perItem);
+                }
                 long valueDelta = Math.multiplyExact(quantityDelta, (long) unitPrice);
                 totalCost = Math.addExact(totalCost, Math.negateExact(valueDelta));
                 losses.add(new com.gpmanager.model.ItemFlow(
@@ -2754,7 +2760,7 @@ public class GpManagerPlugin extends Plugin
             itemVariant = com.gpmanager.engine.evidence.MeasuredChargeRead.supportedVariantForItemName(target);
         }
 
-        if (("uncharge".equals(option) || "unload".equals(option))
+        if (("uncharge".equals(option) || "unload".equals(option) || "empty".equals(option))
             && itemVariant != null)
         {
             // These actions can return loaded components. A later lower Check value

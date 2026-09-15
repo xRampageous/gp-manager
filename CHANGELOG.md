@@ -1,3 +1,9 @@
+## 1.0.5 — 2026-09-16
+
+- Bottomless compost bucket: Check-to-Check measured uses (half a bucket of compost each), like the blowpipe and tridents.
+- HUD+: the header no longer says "Session", and the Overall / paused line is gone (the Sessions page has it). Item icons are off by default.
+- Sidebar type: Compact keeps its spacing but item rows, wealth rows and all secondary text read a size larger; item names were being painted in the quantity font.
+
 ## 1.0.4 — 2026-09-16
 
 - A teleport (or any region load) no longer re-primes the inventory baseline, so the tablet that just broke is booked. Fresh install: the Live button reads **Start** (or **Resume** when stopped) instead of "Waiting". HUD+ item icons can be turned off (Info box › Item icons). Toasts dismiss themselves after 5 s (8 s with an action).

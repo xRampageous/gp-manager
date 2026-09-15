@@ -16,7 +16,8 @@ public class TrackingDisplaySnapshotSessionChromeTest
             .withSessionChrome(true, "Vorkath", true, 50_000L, 12_000L, true);
         assertTrue(snap.isCustomSessionActive());
         assertEquals("Vorkath", snap.getSessionName());
-        assertTrue(snap.isOverallPeekPresent());
+        assertTrue(snap.hasOverallPeek());
+        assertFalse(snap.isOverallPeekPresent()); // the HUD no longer paints it
         assertEquals(50_000L, snap.getOverallNet());
         assertEquals(12_000L, snap.getOverallProfitPerHour());
         assertTrue(snap.isOverallRateAvailable());

@@ -74,7 +74,8 @@ public final class BentoTheme
 
     public enum Density
     {
-        COMPACT(12f, 11f, 10f, 26f, 8, 6, 12),
+        // Compact spacing with readable type: body 13, secondary 12 (item rows, wealth rows), micro 10.5.
+        COMPACT(13f, 12f, 10.5f, 28f, 8, 6, 12),
         COMFORTABLE(13f, 12f, 10.5f, 30f, 10, 8, 12);
 
         public final float body;

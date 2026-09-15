@@ -293,8 +293,8 @@ public class HudPlusHeaderLabelTest
             .withSessionChrome(true, "Boss trip", true, 12_000L, 3_600L, true);
 
         assertEquals("Grand Exchange Clerk ×2", reward.displaySourceLabel());
-        assertEquals("Session · GE Clerk ×2", HudPlusHeaderLabel.resolve(snapshot));
-        assertEquals("Session · Boss trip · Grand Exchange Clerk ×2",
+        assertEquals("GE Clerk ×2", HudPlusHeaderLabel.resolve(snapshot));
+        assertEquals("Boss trip · Grand Exchange Clerk ×2",
             HudPlusHeaderLabel.resolveHover(snapshot));
     }
 
@@ -541,9 +541,9 @@ public class HudPlusHeaderLabelTest
             null, "Smelting", "Live", null, 1_000L, 5_000L, 0L, null, null)
             .withConfirmedProcessTitle("Smelting")
             .withSessionChrome(true, "Boss trip", true, 12_000L, 3_600L, true);
-        assertEquals("Session · Smelting", HudPlusHeaderLabel.resolve(snap));
-        assertEquals("Session · Boss trip · Smelting", HudPlusHeaderLabel.resolveHover(snap));
-        assertEquals("Session · Smelting",
+        assertEquals("Smelting", HudPlusHeaderLabel.resolve(snap));
+        assertEquals("Boss trip · Smelting", HudPlusHeaderLabel.resolveHover(snap));
+        assertEquals("Smelting",
             HudPlusHeaderLabel.resolve(snap.withBankingUiOpen(true)));
     }
 

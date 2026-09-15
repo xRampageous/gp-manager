@@ -149,18 +149,18 @@ public final class HudPlusHeaderLabel
         {
             return body == null ? "" : body;
         }
+        // The word "Session" carried nothing the sidebar does not already say; the header is
+        // the activity (and, where asked for, the session's name).
         String activity = body == null ? "" : body.trim();
         if (includeName)
         {
             String name = safeTrim(snapshot.getSessionName());
             if (!name.isEmpty())
             {
-                return activity.isEmpty()
-                    ? "Session · " + name
-                    : "Session · " + name + " · " + activity;
+                return activity.isEmpty() ? name : name + " · " + activity;
             }
         }
-        return activity.isEmpty() ? "Session" : "Session · " + activity;
+        return activity;
     }
 
     private static String preferredLiveProcessTitle(String activityHint)

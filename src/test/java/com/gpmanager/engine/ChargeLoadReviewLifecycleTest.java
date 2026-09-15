@@ -396,6 +396,40 @@ public class ChargeLoadReviewLifecycleTest
         assertEquals("Vorkath", laterSpend.transaction.getActivityName());
     }
 
+    @Test
+    public void bottomlessCompostBucketUsesAreMeasuredAtHalfABucketEach()
+    {
+        MeasuredChargeRead full = MeasuredChargeRead.parseCheckMessage(
+            "Your bottomless compost bucket has 42 uses of ultracompost left.");
+        assertNotNull(full);
+        assertEquals(MeasuredChargeRead.Variant.BOTTOMLESS_COMPOST_BUCKET, full.getVariant());
+        assertTrue(full.isBookable());
+        assertEquals(Long.valueOf(42L), full.getComponentCounts().get(net.runelite.api.gameval.ItemID.BUCKET_ULTRACOMPOST));
+        assertEquals(2, MeasuredChargeRead.unitsPerPricedItem(full.getVariant(), net.runelite.api.gameval.ItemID.BUCKET_ULTRACOMPOST));
+        assertEquals(1, MeasuredChargeRead.unitsPerPricedItem(MeasuredChargeRead.Variant.TOXIC_BLOWPIPE, 12934));
+        MeasuredChargeRead one = MeasuredChargeRead.parseCheckMessage("Your bottomless compost bucket has 1 use of compost left.");
+        assertNotNull(one);
+        assertEquals(Long.valueOf(1L), one.getComponentCounts().get(net.runelite.api.gameval.ItemID.BUCKET_COMPOST));
+        MeasuredChargeRead empty = MeasuredChargeRead.parseCheckMessage("Your bottomless compost bucket is currently empty.");
+        assertNotNull(empty);
+        assertTrue(empty.isBookable());
+        assertEquals(MeasuredChargeRead.Variant.BOTTOMLESS_COMPOST_BUCKET,
+            MeasuredChargeRead.supportedVariantForItemId(net.runelite.api.gameval.ItemID.BOTTOMLESS_COMPOST_BUCKET_FILLED));
+        assertEquals(MeasuredChargeRead.Variant.BOTTOMLESS_COMPOST_BUCKET,
+            MeasuredChargeRead.supportedVariantForItemName("Bottomless compost bucket"));
+
+        // Two Checks, three uses apart, book one decrease of three uses on that bucket.
+        GpManagerEngine engine = engine();
+        long start = 85_000L;
+        engine.ensureSession(start);
+        String bucket = "149:0:9764864:22997:BOTTOMLESS_COMPOST_BUCKET";
+        assertNull(engine.observeMeasuredChargeRead(full, bucket, start));
+        MeasuredChargeDelta used = engine.observeMeasuredChargeRead(
+            MeasuredChargeRead.parseCheckMessage("Your bottomless compost bucket has 39 uses of ultracompost left."), bucket, start + 1_000L);
+        assertNotNull(used);
+        assertEquals(-3L, used.getComponentDeltas().get(0).getQuantityDelta());
+    }
+
     private static int countTransactions(ProfitSession session, TransactionType type)
     {
         int count = 0;

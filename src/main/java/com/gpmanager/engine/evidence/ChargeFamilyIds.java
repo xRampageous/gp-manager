@@ -8,6 +8,7 @@ public final class ChargeFamilyIds
 {
     public static final String BLOWPIPE = "blowpipe";
     public static final String TRIDENT = "trident";
+    public static final String COMPOST_BUCKET = "compost_bucket";
     public static final String IBAN_STAFF = "iban_staff";
     public static final String SCYTHE = "scythe";
     public static final String SANGUINESTI = "sanguinesti";

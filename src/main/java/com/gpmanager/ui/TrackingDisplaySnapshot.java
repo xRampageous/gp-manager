@@ -362,7 +362,14 @@ public final class TrackingDisplaySnapshot
         return sessionName;
     }
 
+    /** The HUD no longer paints the Overall peek line; the Sessions page carries it. */
     public boolean isOverallPeekPresent()
+    {
+        return false;
+    }
+
+    /** The raw flag, for the model tests that build it. */
+    boolean hasOverallPeek()
     {
         return overallPeekPresent;
     }
