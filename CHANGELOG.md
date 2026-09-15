@@ -1,3 +1,7 @@
+## 1.0.3 — 2026-09-15
+
+- README rewritten for players, with screenshots; shorter Plugin Hub description. No code change.
+
 ## 1.0.2 — 2026-09-15
 
 - Plugin Hub review fix, complete: every JSON use outside the injected repository (profile backup, profile-size estimate, staged profile restore) goes through one `JsonCodec` bound to the client's injected Gson at start-up (customised through `newBuilder()`); the built JAR contains no Gson constructor. No behaviour change.
