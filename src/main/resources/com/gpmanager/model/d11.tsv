@@ -1,0 +1,38 @@
+# Key/chest pairs (OSRS Wiki; sources in KeyChestCatalogue). Order matters: a key's first row is its default chest.
+# key item id <TAB> chest name <TAB> key tradeable <TAB> RuneLite gameval ItemID name
+989	Crystal chest	true	CRYSTAL_KEY
+23951	Elven Crystal Chest	false	PRIF_CRYSTAL_KEY
+23490	Larran's small chest	true	SLAYER_WILDERNESS_KEY
+23490	Larran's big chest	true	SLAYER_WILDERNESS_KEY
+4850	Ogre coffin	true	ZOGRE_COFFINKEY
+991	Muddy chest	true	MUDDY_KEY
+993	Sinister chest	true	SINISTER_KEY
+23499	Grubby chest	true	HOSDUN_GRUBBY_KEY
+23083	Brimstone chest	false	KONAR_KEY
+29408	Moon chest	false	VARLAMORE_NICE_KEY
+# Shades of Mort'ton: one key per metal tier and chest colour.
+3450	Bronze Chest (red)	false	SHADEKEY_BRONZE_BLOODRED
+3451	Bronze Chest (brown)	false	SHADEKEY_BRONZE_BROWN
+3452	Bronze Chest (crimson)	false	SHADEKEY_BRONZE_CRIMSON
+3453	Bronze Chest (black)	false	SHADEKEY_BRONZE_BLACK
+3454	Bronze Chest (purple)	false	SHADEKEY_BRONZE_PURPLE
+3455	Steel Chest (red)	false	SHADEKEY_STEEL_BLOODRED
+3456	Steel Chest (brown)	false	SHADEKEY_STEEL_BROWN
+3457	Steel Chest (crimson)	false	SHADEKEY_STEEL_CRIMSON
+3458	Steel Chest (black)	false	SHADEKEY_STEEL_BLACK
+3459	Steel Chest (purple)	false	SHADEKEY_STEEL_PURPLE
+3460	Black Chest (red)	false	SHADEKEY_BLACK_BLOODRED
+3461	Black Chest (brown)	false	SHADEKEY_BLACK_BROWN
+3462	Black Chest (crimson)	false	SHADEKEY_BLACK_CRIMSON
+3463	Black Chest (black)	false	SHADEKEY_BLACK_BLACK
+3464	Black Chest (purple)	false	SHADEKEY_BLACK_PURPLE
+3465	Silver Chest (red)	false	SHADEKEY_SILVER_BLOODRED
+3466	Silver Chest (brown)	false	SHADEKEY_SILVER_BROWN
+3467	Silver Chest (crimson)	false	SHADEKEY_SILVER_CRIMSON
+3468	Silver Chest (black)	false	SHADEKEY_SILVER_BLACK
+3469	Silver Chest (purple)	false	SHADEKEY_SILVER_PURPLE
+25424	Gold Chest (red)	false	SHADEKEY_GOLD_BLOODRED
+25426	Gold Chest (brown)	false	SHADEKEY_GOLD_BROWN
+25428	Gold Chest (crimson)	false	SHADEKEY_GOLD_CRIMSON
+25430	Gold Chest (black)	false	SHADEKEY_GOLD_BLACK
+25432	Gold Chest (purple)	false	SHADEKEY_GOLD_PURPLE
