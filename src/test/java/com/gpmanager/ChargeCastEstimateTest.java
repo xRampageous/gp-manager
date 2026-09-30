@@ -5,7 +5,7 @@ import java.util.Collections;
 import java.util.Map;
 import net.runelite.api.gameval.AnimationID;
 import net.runelite.api.gameval.ItemID;
-import net.runelite.api.widgets.WidgetInfo;
+import net.runelite.api.gameval.InterfaceID;
 import org.junit.Test;
 
 import static org.junit.Assert.assertArrayEquals;
@@ -172,7 +172,7 @@ public class ChargeCastEstimateTest
     @Test
     public void wornEstimateIdentityMatchesTheWornCheckIdentity()
     {
-        int equipmentWidget = WidgetInfo.EQUIPMENT.getId();
+        int equipmentWidget = InterfaceID.Wornitems.UNIVERSE;
         assertEquals((equipmentWidget >>> 16) + ":3:" + ItemID.TOTS_CHARGED + ":TRIDENT_SEAS",
             ChargeIntake.akz(Ar.V.TRIDENT_SEAS,
                 ItemID.TOTS_CHARGED));

@@ -12,7 +12,7 @@ import net.runelite.api.MenuEntry;
 import net.runelite.api.events.MenuOptionClicked;
 import net.runelite.api.gameval.ItemID;
 import net.runelite.api.widgets.Widget;
-import net.runelite.api.widgets.WidgetInfo;
+import net.runelite.api.gameval.InterfaceID;
 import org.junit.Test;
 
 public final class MeasuredChargeReadTrackerTest
@@ -127,8 +127,8 @@ public final class MeasuredChargeReadTrackerTest
     @Test
     public void checkIdentityIncludesWidgetGroupAndSlotForInventoryAndWornItems()
     {
-        int inventoryWidget = WidgetInfo.INVENTORY.getId();
-        int equipmentWidget = WidgetInfo.EQUIPMENT.getId();
+        int inventoryWidget = InterfaceID.Inventory.ITEMS;
+        int equipmentWidget = InterfaceID.Wornitems.UNIVERSE;
         String inventory = ChargeIntake.nt(
             menuCheck(ItemID.TOXIC_BLOWPIPE_LOADED, inventoryWidget, 7),
             Ar.V.V1b, ItemID.TOXIC_BLOWPIPE_LOADED);
@@ -145,7 +145,7 @@ public final class MeasuredChargeReadTrackerTest
     @Test
     public void wornCheckWithoutItemFieldsResolvesItemAndWidgetFromTheSlotWidget()
     {
-        int equipmentWidget = WidgetInfo.EQUIPMENT.getId();
+        int equipmentWidget = InterfaceID.Wornitems.UNIVERSE;
         MenuOptionClicked event = menuCheckViaWidget(ItemID.TOXIC_BLOWPIPE_LOADED, equipmentWidget, 3);
         assertEquals(ItemID.TOXIC_BLOWPIPE_LOADED, ChargeIntake.ns(event));
         assertEquals((equipmentWidget >>> 16) + ":3:" + ItemID.TOXIC_BLOWPIPE_LOADED
