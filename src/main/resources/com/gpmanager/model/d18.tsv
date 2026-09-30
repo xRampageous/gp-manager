@@ -1,0 +1,19 @@
+# Pinned item/action and Check-message grammars: key, exact regex, Java Pattern flags.
+ayq	.* (weed|leaf|grass|root|dust|berries|berry|horn|fungus|nest|eggs)$	0
+ayo	\((\d)\)\s*$	0
+ayn	.*( (arrows?|bolts?( \(e\))?|darts?|javelins?|knife|knives|thrownaxe|throwing axe)|chinchompa)$	0
+ayp	.*(arrowtip|bolt tip|dart tip|javelin head|arrow shaft).*	0
+ayz	^Your Trident of the (seas|swamp)( \(e\))? has (?:((?:\d{1,3}(?:,\d{3})+|\d+)) charges|(one) charge|(no) charges)\.$	2
+ays	^Darts: (.+?)\. Scales: ((?:\d{1,3}(?:,\d{3})+|\d+)) \((?:\d+(?:\.\d+)?)%\)\.$	2
+aza	^(.+?) x ((?:\d{1,3}(?:,\d{3})+|\d+))$	2
+ayt	^Your bottomless compost bucket has ((?:\d{1,3}(?:,\d{3})+|\d+)) uses? of (compost|supercompost|ultracompost) left\.$	2
+ayv	^Your bottomless compost bucket is currently holding ((?:\d{1,3}(?:,\d{3})+|\d+)|one|a single) uses? of (compost|supercompost|ultracompost)\.$	2
+ayu	^Your (?:bottomless )?compost bucket is (?:currently )?empty\.$	2
+azb	(small|medium|large|giant|colossal) pouch	0
+ayx	^(?:Your )?(Holy sanguinesti staff|Sanguinesti staff|warped sceptre|Tumeken's shadow|echo venator bow|venator bow)(?: only)? has (?:((?:\d{1,3}(?:,\d{3})+|\d+)) charges?|(one) charge|(no) charges?)(?: (?:remaining|left))?\.$	2
+ayr	^The pendant has (?:((?:\d{1,3}(?:,\d{3})+|\d+)) charges?|(one) charge|(no) charges)\.$	2
+ayy	^(?:Your tome has been charged with (?:Burnt|Searing) Pages\. It currently holds|Your tome currently holds) (?:([\d,]+)|(one)) charges?\.$	2
+ayw	^Your (crystal bow|crystal halberd|bow of Faerdhinen) has (?:([\d,]+)|(one)) charges? remaining\.$	2
+aya	^Your Amulet of blood fury will work for ((\d{1,3}(?:,\d{3})+|\d+)) more hits?\.$	2
+ayc	^The Eye of Ayak has been charged with demon tears\. It currently has ((\d{1,3}(?:,\d{3})+|\d+)) charges?\.$	2
+ayd	^The Eye of Ayak has been charged with runes\. It currently has ((\d{1,3}(?:,\d{3})+|\d+)) charges?\.$	2

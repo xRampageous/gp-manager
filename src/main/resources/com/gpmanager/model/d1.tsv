@@ -1,0 +1,17 @@
+# Untradeable non-GP currencies, unpriced unless a manual override supplies a price.
+# item id <TAB> RuneLite gameval ItemID name (or the item's name where no constant is used)
+# Proxy rows instead read: item id <TAB> proxy item id <TAB> units per proxy item <TAB> name.
+# A shard is one hundred-and-fiftieth of an enhanced crystal teleport seed, the most
+# efficient seed exchange.
+6529	TZHAAR_TOKEN
+23866	GAUNTLET_CRYSTAL_SHARD
+23964	PRIF_CRYSTAL_SHARD_CRUSHED
+21649	Mermaid's tear
+25527	STAR_DUST
+21341	MGUILD_MINERALS
+12012	MOTHERLODE_NUGGET
+27285	Abyssal pearl
+24714	HALLOWED_MARK_3
+12746	BH_EMBLEM
+26879	Guardian fragments
+23962	23959	150	PRIF_CRYSTAL_SHARD

@@ -1,0 +1,4 @@
+// These public root files are explicit allowlist entries. Keep all Git directories excluded.
+org.apache.tools.ant.DirectoryScanner.removeDefaultExclude('**/.gitignore')
+org.apache.tools.ant.DirectoryScanner.removeDefaultExclude('**/.gitattributes')
+rootProject.name = 'gp-manager'

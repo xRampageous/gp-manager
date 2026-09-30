@@ -1,0 +1,14 @@
+# Item Retrieval Services and their published fees (OSRS Wiki "Item Retrieval Service", checked 2026-09-13).
+# Order matters: partial target matches are tried top to bottom.
+# key <TAB> activity <TAB> interactable <TAB> fee (-1 varies by run, -2 tiered, see DeathReclaimFees) <TAB> note <TAB> ambiguous target
+zulrah	Zulrah	Priestess Zul-Gwenwynig	100000	Free below 50 kills and for Ultimate Ironmen	false
+vorkath	Vorkath	Torfinn	100000		false
+hydra	Alchemical Hydra	Orrvor quo Maten	100000		false
+grotesque_guardians	Grotesque Guardians	Magical chest	50000		false
+sepulchre	Hallowed Sepulchre	Mysterious Stranger	25000		false
+hespori	Hespori	Arno	25000		false
+nightmare	The Nightmare	Shura	60000		false
+phosani	Phosani's Nightmare	Sister Senga	60000		false
+retrieval_chest	Raid / boss retrieval chest	Chest	-1	Nex and Theatre of Blood 100,000; Tombs of Amascut up to 500,000 by raid level	true
+gravestone	Gravestone	Gravestone	-2	Tiered per item, 500,000 cap; paid from Death's Coffer or bank when carried coins are absent	true
+deaths_office	Death's Office	Death	-2	5% of items worth 100,000 or more (2.5% ironman)	true

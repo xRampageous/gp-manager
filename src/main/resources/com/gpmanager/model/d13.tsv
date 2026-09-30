@@ -1,0 +1,15 @@
+# Region hints for minigame instances.
+# region id <TAB> lms | neutral
+# Last Man Standing instances (not exhaustive; menu and chat stay primary).
+13658	lms
+13659	lms
+13660	lms
+13661	lms
+13662	lms
+13663	lms
+13664	lms
+13665	lms
+# The Gauntlet and Corrupted Gauntlet store gear on entry and restore it on exit. The lobby (12127) is
+# deliberately excluded: the reward chest is claimed there. Ids match Loze-Put/hunllef-helper.
+7512	neutral
+7768	neutral

@@ -1,0 +1,7 @@
+# Combination runes -> the two elemental runes each one pays for.
+mist	air water
+dust	air earth
+mud	water earth
+smoke	air fire
+steam	water fire
+lava	earth fire
