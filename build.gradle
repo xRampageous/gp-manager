@@ -260,7 +260,14 @@ tasks.register('releaseMetadataCheck') {
                         throw new GradleException("Unexpected class in plugin JAR: ${entry.name}")
                     }
                     archive.getInputStream(entry).withCloseable { stream ->
-                        def data = new DataInputStream(stream)
+                        def classBytes = stream.bytes
+                        def constants = new String(classBytes, 'ISO-8859-1')
+                        ['net/runelite/api/widgets/WidgetInfo', 'net/runelite/api/widgets/WidgetID'].each { type ->
+                            if (constants.contains(type)) {
+                                throw new GradleException("Plugin Hub rejects terminally deprecated ${type}: ${entry.name}")
+                            }
+                        }
+                        def data = new DataInputStream(new ByteArrayInputStream(classBytes))
                         data.readInt()
                         data.readUnsignedShort()
                         if (data.readUnsignedShort() != 55) {

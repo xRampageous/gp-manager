@@ -9,7 +9,7 @@ import net.runelite.api.*;
 import net.runelite.api.events.MenuOptionClicked;
 import net.runelite.api.gameval.InventoryID;
 import net.runelite.api.gameval.ItemID;
-import net.runelite.api.widgets.WidgetInfo;
+import net.runelite.api.gameval.InterfaceID;
 import net.runelite.client.game.ItemManager;
 /**
 * Client-thread intake for the exact Check-to-Check charge contract: a Check click binds a
@@ -239,7 +239,7 @@ return null;
 for (int slot = 0; slot < inventory.size(); slot++) {
 Item item = inventory.getItem(slot);
 if (item != null && aja(item.getId()) == V.EYE_OF_AYAK) {
-return (WidgetInfo.INVENTORY.getId() >>> 16) + ":" + slot + ":" + item.getId()
+return (InterfaceID.Inventory.ITEMS >>> 16) + ":" + slot + ":" + item.getId()
 + ":" + V.EYE_OF_AYAK.name();
 }
 }
@@ -256,7 +256,7 @@ Item amulet = worn.getItem(slot);
 if (amulet == null || amulet.getId() != ItemID.BLOOD_AMULET) {
 return null;
 }
-return (WidgetInfo.EQUIPMENT.getId() >>> 16) + ":" + slot + ":" + amulet.getId()
+return (InterfaceID.Wornitems.UNIVERSE >>> 16) + ":" + slot + ":" + amulet.getId()
 + ":" + V.BLOOD_FURY.name();
 }
 /** Every menu click: supersede a pending Check link, then arm Check / unload / load intents. */
@@ -471,7 +471,7 @@ return variant == V.VENATOR || variant == V.VENATOR_ECHO || variant == V.CRYSTAL
 }
 /** The equipment-side identity a worn Check uses: container group, weapon slot, item, variant. */
 static String akz(V variant, int weaponItemId) {
-int widgetId = WidgetInfo.EQUIPMENT.getId();
+int widgetId = InterfaceID.Wornitems.UNIVERSE;
 return (widgetId >>> 16) + ":" + EquipmentInventorySlot.WEAPON.getSlotIdx() + ":"
 + weaponItemId + ":" + variant.name();
 }

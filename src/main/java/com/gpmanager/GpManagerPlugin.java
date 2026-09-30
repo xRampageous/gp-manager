@@ -1305,7 +1305,7 @@ Bb ajm(MenuOptionClicked event, String option) {
 Widget clicked = event.getWidget();
 if (clicked != null) {
 Bb direct = Bb.tv(option, clicked.getId(),
-WidgetID.SPELLBOOK_GROUP_ID, clicked.getText(), clicked.getName());
+InterfaceID.MAGIC_SPELLBOOK, clicked.getText(), clicked.getName());
 if (direct != null) {
 return direct;
 }
@@ -1316,7 +1316,7 @@ return null;
 Widget selected = client.getSelectedWidget();
 return selected == null ? null
 : Bb.tv(option, selected.getId(),
-WidgetID.SPELLBOOK_GROUP_ID, selected.getText(), selected.getName());
+InterfaceID.MAGIC_SPELLBOOK, selected.getText(), selected.getName());
 }
 /**
 * Inventory Bury/Drop/Eat menus sometimes report {@code getItemId() == -1}. Fall back to

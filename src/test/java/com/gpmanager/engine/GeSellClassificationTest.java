@@ -236,7 +236,7 @@ public class GeSellClassificationTest
         Map<Integer, Long> inventory = inventory(ItemID.COINS, 100_000L, ItemID.NATURERUNE, 5L);
         engine.setBaseline(new Cc(inventory));
 
-        int spellbookGroup = net.runelite.api.widgets.WidgetID.SPELLBOOK_GROUP_ID;
+        int spellbookGroup = net.runelite.api.gameval.InterfaceID.MAGIC_SPELLBOOK;
         Bb iceBurst = Bb.tv("Cast",
             spellbookGroup << 16 | 14, spellbookGroup, "<col=ff9040>Ice Burst</col>", "Cast");
         assertNotNull(iceBurst);

@@ -13,7 +13,7 @@ import net.runelite.api.MenuEntry;
 import net.runelite.api.events.MenuOptionClicked;
 import net.runelite.api.gameval.ItemID;
 import net.runelite.api.widgets.Widget;
-import net.runelite.api.widgets.WidgetID;
+import net.runelite.api.gameval.InterfaceID;
 import org.junit.Test;
 
 import static org.junit.Assert.assertEquals;
@@ -432,7 +432,7 @@ public class ExactSpellEvidenceProductionTest
 
     private static Widget spellWidget(String spell)
     {
-        return widget(WidgetID.SPELLBOOK_GROUP_ID << 16 | 17,
+        return widget(InterfaceID.MAGIC_SPELLBOOK << 16 | 17,
             "<col=ff9040>" + spell + "</col>", "Cast");
     }
 
