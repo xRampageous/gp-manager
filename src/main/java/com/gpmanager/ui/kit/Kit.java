@@ -4,7 +4,7 @@ import java.awt.*;
 import javax.swing.*;
 import net.runelite.client.ui.*;
 /**
-* Palette, fonts and small builders shared by the sidebar and HUD+ (docs/design/SIDEBAR_SPEC.md §1).
+* Palette, fonts and small builders shared by the sidebar and HUD+.
 * Colour always means a category, never a sign.
 */
 class Kit {

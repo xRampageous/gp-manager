@@ -286,90 +286,12 @@ tasks.register('releaseCheck') {
     dependsOn 'check'
 }
 
-tasks.register('sourceBudget') {
-    group = 'verification'
-    description = 'Soft Hub-token proxy from src/main/java bytes. Warns above 175k; never fails.'
-    doLast {
-        def javaFiles = fileTree('src/main/java') { include '**/*.java' }.files
-        def allText = fileTree('src/main/java').files
-        long javaBytes = javaFiles.sum { it.length() } as long
-        double tokensPerByte = 0.183588d
-        long proxy = Math.round(javaBytes * tokensPerByte)
-        println "sourceBudget javaFiles=${javaFiles.size()} javaBytes=${javaBytes} proxyTokens=${proxy}"
-        println "sourceBudget allPathsUnderSrcMainJava=${allText.size()}"
-        def nonJavaPaths = allText.findAll { !it.name.endsWith('.java') }
-        nonJavaPaths.sort { it.path }.each { f ->
-            println "  nonJava ${f.length()}  ${f.path.replace('\\', '/')}"
-        }
-        javaFiles.groupBy { it.parentFile.path.replace('\\', '/') }
-            .sort { -it.value.sum { f -> f.length() } }
-            .each { dir, files ->
-                long bytes = files.sum { it.length() } as long
-                println "  ${dir}: ${files.size()} files, ${bytes} bytes"
-            }
-        javaFiles.sort { -it.length() }.take(15).each { f ->
-            println "  top ${f.length()}  ${f.path.replace('\\', '/')}"
-        }
-        // The same measurement over the committed HEAD tree (normalised LF blobs), so the physical
-        // working tree (mixed CRLF/LF) and the Git tree are never compared as if identical.
-        try {
-            def process = new ProcessBuilder('git', 'ls-tree', '-r', '-l', 'HEAD', '--', 'src/main/java')
-                .directory(projectDir).redirectErrorStream(true).start()
-            def out = process.inputStream.getText('UTF-8')
-            process.waitFor()
-            long headBytes = 0L
-            int headFiles = 0
-            out.readLines().each { line ->
-                def parts = line.trim().split(/\s+/, 5)
-                if (parts.length == 5 && parts[4].endsWith('.java')) {
-                    headFiles++
-                    headBytes += parts[3].toLong()
-                }
-            }
-            println "sourceBudget GIT_HEAD_NORMALIZED javaFiles=${headFiles} javaBytes=${headBytes} proxyTokens=${Math.round(headBytes * tokensPerByte)}"
-        } catch (Exception ex) {
-            println "sourceBudget GIT_HEAD_NORMALIZED unavailable: ${ex.message}"
-        }
-        if (proxy > 175_000L) {
-            logger.warn("sourceBudget proxy ${proxy} > 175000. Trim dead/duplicate code; do not cut HUD+/PvP/Party/fail-closed accounting.")
-        }
-    }
-}
-
-tasks.register('hubTokenEstimate') {
-    group = 'verification'
-    description = 'Prints an unofficial local Hub-like token estimate without changing plugin runtime.'
-    doLast {
-        def python = providers.gradleProperty('pythonExecutable').getOrElse('python')
-        def arguments = [python, file('tools/hub_token_estimate.py').absolutePath]
-        if (project.hasProperty('hubTokensVerbose')) {
-            arguments << '--verbose'
-        }
-        def process = new ProcessBuilder(arguments)
-            .directory(project.projectDir)
-            .redirectErrorStream(true)
-            .start()
-        def output = process.inputStream.getText('UTF-8')
-        int status = process.waitFor()
-        print output
-        if (status != 0) {
-            throw new GradleException("hubTokenEstimate exited with status ${status}.")
-        }
-    }
-}
-
-// The public Hub snapshot: only these paths leave this clone. Internal plans, backlog, handoff,
-// review, roadmap, research and release-plan documents, review archives, the token estimator and
-// local audit artifacts stay behind (FINAL charter, "Public Hub snapshot vs this clone").
+// Only build files, plugin source, tests, simulations, screenshots and root release files are public.
 def publicSnapshotAllowlist = [
     'src/main/**', 'src/test/**', 'src/simulation/**', 'gradle/**', '.github/**',
     'build.gradle', 'settings.gradle', 'gradle.properties', 'gradlew', 'gradlew.bat',
     'runelite-plugin.properties', 'LICENSE', 'README.md', 'CHANGELOG.md', 'SAFETY_POLICY.md', 'icon.png',
-    '.gitignore', '.gitattributes',
-    'docs/ACCOUNT_ISOLATION.md', 'docs/SUPPORTED_SCENARIOS.md', 'docs/ACTIVITY_COVERAGE.md',
-    'docs/SETTINGS_MAPPING.md', 'docs/GROUND_ITEMS_FILTER.md', 'docs/INTERACTION_CONTEXT.md',
-    'docs/LIVE_ACCEPTANCE_MATRIX.md', 'docs/screenshots/**',
-    'docs/design/ENGINE_API.md', 'docs/design/CHARGE_ACCOUNTING.md', 'docs/design/SIDEBAR_BENTO.md'
+    '.gitignore', '.gitattributes', 'docs/screenshots/*.png'
 ]
 
 def publicSnapshotFiles = {

@@ -1,42 +1,10 @@
 package com.gpmanager;
 import static java.lang.Math.*;
 /**
-* Base type for a time-boxed evidence signal used to classify an inventory
-* change (bank transfer, consumption, own-drop, etc.).
-*
-* <p>The core P1 bug this package exists to prevent: a single shared
-* "is the bank open" flag was previously used both to detect a genuine
-* deposit/withdrawal AND, incidentally, to suppress unrelated inventory
-* drops (bone burial, potion drinking, rune casting) that merely happened
-* to settle while the bank UI was still open or had just closed. One piece
-* of evidence with one lifetime cannot correctly describe two different
-* real-world events with two different lifetimes.
-*
-* <p>Each {@code TimedEvidence} instance represents evidence from exactly
-* one source (for example: "the bank interface widget is visible this
-* tick" or "the player confirmed a Bury/Eat/Drink menu action") and decays
-* on its own schedule via {@link #tick()}. Callers hold a nullable
-* reference to the relevant evidence object; a {@code null} reference (or
-* an expired one) means that source currently has no bearing on
-* classification. This lets {@code Am} keep, for example,
-* "hard" bank-container evidence (a real deposit/withdraw menu action)
-* alive across a bank-close tick while unrelated "soft" bank-open evidence
-* (the widget was merely visible) is dropped immediately on close — so a
-* burial that settles after the bank UI closes is classified as
-* {@code CONSUMPTION}, not {@code TRANSFER}.
-*
-* <p>This is intentionally a small scaffold, not a general accounting
-* framework. {@code Am} currently models bank transfer
-* evidence with dedicated tick counters rather than this base type, chosen
-* for minimal risk to the existing, heavily-regression-tested settlement
-* state machine (see {@code ConsumptionBurialEngineTest} and
-* {@code FollowupBoundaryReviewTest}). {@code Am}'s
-* consumption-intent and own-drop-intent evidence already extend this
-* class. Future per-source evidence (for example, charge/dose counters
-* needed for full equipment-charge accounting) should extend this type
-* rather than adding another ad-hoc boolean + tick-counter pair. See this
-* package's {@code README.md} for why charge/container accounting is not
-* implemented yet.
+* Evidence from one observed source with its own tick lifetime.
+* Independent lifetimes keep bank transfers, consumption and own-drop evidence
+* from suppressing unrelated inventory changes. Expired evidence has no bearing
+* on classification; refreshes can extend its remaining lifetime.
 */
 abstract class TimedEvidence {
 int ticksRemaining;
