@@ -17,43 +17,43 @@ public class LabelTablesTest
     static String snapshot()
     {
         StringBuilder out = new StringBuilder();
-        for (ActionKind kind : ActionKind.values())
+        for (Au kind : Au.values())
         {
-            out.append("action ").append(kind).append(" = ").append(SemanticFinancialProjection.actionVerb(kind)).append('\n');
+            out.append("action ").append(kind).append(" = ").append(Br.jy(kind)).append('\n');
         }
-        out.append("correction null = ").append(SemanticFinancialProjection.correctionLabel(null)).append('\n');
-        for (Correction correction : Correction.values())
+        out.append("correction null = ").append(Br.qj(null)).append('\n');
+        for (Ah correction : Ah.values())
         {
             out.append("correction ").append(correction).append(" = ")
-                .append(SemanticFinancialProjection.correctionLabel(correction)).append(" | ")
-                .append(LedgerPage.correctionLabel(correction)).append('\n');
+                .append(Br.qj(correction)).append(" | ")
+                .append(LedgerPage.qj(correction)).append('\n');
         }
-        for (ReviewDecision decision : ReviewDecision.values())
+        for (Cl decision : Cl.values())
         {
-            out.append("review ").append(decision).append(" = ").append(LedgerPage.reviewLabel(decision)).append('\n');
+            out.append("review ").append(decision).append(" = ").append(LedgerPage.ahh(decision)).append('\n');
         }
-        for (TransactionType type : TransactionType.values())
+        for (Ai type : Ai.values())
         {
             for (boolean counted : new boolean[]{true, false})
             {
                 for (long value : new long[]{250L, -250L})
                 {
-                    Transaction tx = Tx.of(1_000L, type, Context.GENERIC, "", counted,
-                        Collections.singletonList(new Flow(526, "Bones", value > 0 ? 1 : -1, 250, value)));
+                    Ac tx = Tx.of(1_000L, type, Aj.GENERIC, "", counted,
+                        Collections.singletonList(new Ab(526, "Bones", value > 0 ? 1 : -1, 250, value)));
                     out.append("type ").append(type).append(' ').append(counted).append(' ').append(value).append(" = ")
-                        .append(SemanticFinancialProjection.verbOf(tx)).append(" | ")
-                        .append(SemanticFinancialProjection.why(tx, false, false)).append('\n');
+                        .append(Br.verbOf(tx)).append(" | ")
+                        .append(Br.why(tx, false, false)).append('\n');
                 }
             }
-            for (Correction correction : Correction.values())
+            for (Ah correction : Ah.values())
             {
-                Transaction tx = Tx.of(1_000L, type, Context.GENERIC, "", true,
-                    Collections.singletonList(new Flow(526, "Bones", 1, 250, 250L)));
+                Ac tx = Tx.of(1_000L, type, Aj.GENERIC, "", true,
+                    Collections.singletonList(new Ab(526, "Bones", 1, 250, 250L)));
                 tx.correction = correction;
                 out.append("why ").append(type).append(' ').append(correction).append(" = ")
-                    .append(SemanticFinancialProjection.why(tx, false, false)).append(" | ")
-                    .append(SemanticFinancialProjection.why(tx, true, false)).append(" | ")
-                    .append(SemanticFinancialProjection.why(tx, false, true)).append('\n');
+                    .append(Br.why(tx, false, false)).append(" | ")
+                    .append(Br.why(tx, true, false)).append(" | ")
+                    .append(Br.why(tx, false, true)).append('\n');
             }
         }
         return out.toString();

@@ -13,12 +13,12 @@ public class PlayerCombatLifecycleTest
     {
         GpManagerPlugin plugin = new GpManagerPlugin();
         plugin.config = new GpManagerConfig() {};
-        plugin.engine = new Engine(d -> Collections.emptyList(), new TransactionClassifier(), plugin.config);
+        plugin.engine = new Am(d -> Collections.emptyList(), new TransactionClassifier(), plugin.config);
         plugin.charges = new ChargeIntake(null, null, plugin.config, plugin.engine, null);
-        plugin.geOfferLedger = new OfferLedger();
+        plugin.geOfferLedger = new Bj();
         plugin.characterIdleTracker = new CharacterIdleTracker(null, new CharacterIdleModel());
         plugin.interactionContextTracker = new InteractionContextTracker(null, plugin.engine, plugin.config);
-        plugin.persistence = new PersistenceCoordinator(null, null, null, null, plugin.engine)
+        plugin.persistence = new Ei(null, null, null, null, plugin.engine)
         {
             @Override boolean isTrackingReady() { return false; }
             @Override void onLogout(boolean persistHistory) { }
@@ -29,8 +29,8 @@ public class PlayerCombatLifecycleTest
 
     private void assertPvmReclaimAllowed(GpManagerPlugin plugin)
     {
-        assertEquals(GpManagerPlugin.LocalDeathDisposition.TRACK_PVM_RECLAIM,
-            GpManagerPlugin.localDeathDisposition(true, plugin.recentPlayerCombatTicks, true, PvpContext.DANGEROUS_PVP));
+        assertEquals(GpManagerPlugin.Cn.TRACK_PVM_RECLAIM,
+            GpManagerPlugin.yr(true, plugin.recentPlayerCombatTicks, true, Dh.DANGEROUS_PVP));
     }
 
     private GameStateChanged event(GameState state)
@@ -55,7 +55,7 @@ public class PlayerCombatLifecycleTest
     public void anOwnerSwitchDropsPlayerCombatEvidence()
     {
         GpManagerPlugin plugin = plugin();
-        plugin.beginOwnerSwitch();
+        plugin.lx();
         assertPvmReclaimAllowed(plugin);
     }
 
@@ -63,20 +63,20 @@ public class PlayerCombatLifecycleTest
     public void ownerSwitchPreservesHeldCashBeforeThePreviousProfileIsSaved()
     {
         GpManagerPlugin plugin = plugin();
-        plugin.engine.ensureSession(1_000L);
-        plugin.engine.noteGeCollectionIntent(1_100L);
-        plugin.engine.geCustody.retainSettlementCash(100L, 1_200L);
-        Session previous = plugin.engine.getActiveSession();
-        plugin.beginOwnerSwitch();
+        plugin.engine.rm(1_000L);
+        plugin.engine.abg(1_100L);
+        plugin.engine.geCustody.agq(100L, 1_200L);
+        Ad previous = plugin.engine.getActiveSession();
+        plugin.lx();
         assertEquals(0L, plugin.engine.geCollectionIntentUntil);
         assertEquals(0L, plugin.engine.geCustody.pendingSettlementCashGp);
         assertEquals(1, previous.getTransactions().size());
-        Transaction held = previous.getTransactions().get(0);
-        assertEquals(TransactionType.UNCERTAIN, held.getType());
+        Ac held = previous.getTransactions().get(0);
+        assertEquals(Ai.UNCERTAIN, held.getType());
         assertFalse(held.isCounted());
         assertEquals(100L, held.getFlows().get(0).valueDelta);
         assertEquals(1_200L, held.timestampEpochMillis);
-        assertEquals(1, plugin.engine.createSavedState().getActiveSession().getTransactions().size());
+        assertEquals(1, plugin.engine.qm().getActiveSession().getTransactions().size());
     }
 
     @Test

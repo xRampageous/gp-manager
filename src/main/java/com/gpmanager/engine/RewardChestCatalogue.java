@@ -5,15 +5,15 @@ import java.util.*;
 * Name matching for Loot Tracker EVENT + live reward UIs.
 */
 class RewardChestCatalogue {
-static final List<String[]> SOURCES = GameData.rows("d3");
+static final List<String[]> SOURCES = Ak.rows("d3");
 /** True when this LT/event name is a reward chest / raid / clue pool — not floor loot. */
-static boolean isPendingRewardName(String name) {
-if (ModelText.blank(name)) return false;
-if (KeyChestCatalogue.entryForChestMention(name) != null) return true;
-String lower = name.trim().toLowerCase(Locale.ROOT);
-for (String[] source : SOURCES) {
-if (lower.contains(source[0])) return true;
-}
-return false;
+static boolean xn(String name) {
+ if (Ag.blank(name)) return false;
+ if (KeyChestCatalogue.rp(name) != null) return true;
+ String lower = name.trim().toLowerCase(Locale.ROOT);
+ for (String[] source : SOURCES) {
+  if (lower.contains(source[0])) return true;
+ }
+ return false;
 }
 }

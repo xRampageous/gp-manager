@@ -1,5 +1,11 @@
 # GP Manager changelog
 
+## 1.0.3 — 2026-10-02
+
+- **Source size for the Plugin Hub limit.** Internal names are shortened again and
+  lines keep a light indent, which brings the source under the Hub's 200k review
+  limit. No change in behaviour.
+
 ## 1.0.2 — 2026-10-02
 
 - **Source layout for the Plugin Hub size limit.** Lines no longer use indentation,

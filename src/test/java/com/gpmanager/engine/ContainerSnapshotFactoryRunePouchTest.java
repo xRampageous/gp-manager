@@ -44,16 +44,16 @@ public class ContainerSnapshotFactoryRunePouchTest
         Client client = client(varbits, runeEnum, new Item(FIRE_RUNE, 20), new Item(995, 100));
         ContainerSnapshotFactory factory = new ContainerSnapshotFactory(client, null);
 
-        ContainerSnapshot with = factory.capture(false, true);
-        ContainerSnapshot without = factory.capture(false, false);
+        Cc with = factory.capture(false, true);
+        Cc without = factory.capture(false, false);
 
-        assertEquals(1_520L, with.quantityOf(FIRE_RUNE));
-        assertEquals(40L, with.quantityOf(CHAOS_RUNE));
-        assertEquals(100L, with.quantityOf(995));
-        assertEquals(20L, without.quantityOf(FIRE_RUNE));
-        assertEquals(0L, without.quantityOf(CHAOS_RUNE));
+        assertEquals(1_520L, with.aea(FIRE_RUNE));
+        assertEquals(40L, with.aea(CHAOS_RUNE));
+        assertEquals(100L, with.aea(995));
+        assertEquals(20L, without.aea(FIRE_RUNE));
+        assertEquals(0L, without.aea(CHAOS_RUNE));
         // Empty slot with a stale quantity contributes nothing.
-        assertEquals(3, with.diff(new ContainerSnapshot(new HashMap<>())).size());
+        assertEquals(3, with.diff(new Cc(new HashMap<>())).size());
     }
 
     @Test
@@ -65,7 +65,7 @@ public class ContainerSnapshotFactoryRunePouchTest
         ContainerSnapshotFactory factory = new ContainerSnapshotFactory(
             client(varbits, new HashMap<>(), new Item(995, 7)), null);
 
-        assertEquals(0L, factory.capture(false, true).quantityOf(FIRE_RUNE));
+        assertEquals(0L, factory.capture(false, true).aea(FIRE_RUNE));
     }
 
     @Test
@@ -76,18 +76,18 @@ public class ContainerSnapshotFactoryRunePouchTest
         varbits.put(VarbitID.RUNE_POUCH_QUANTITY_1, 100);
         Map<Integer, Integer> runeEnum = new HashMap<>();
         runeEnum.put(4, FIRE_RUNE);
-        ContainerSnapshot before = new ContainerSnapshotFactory(
+        Cc before = new ContainerSnapshotFactory(
             client(varbits, runeEnum, new Item(FIRE_RUNE, 50)), null).capture(false, true);
 
         // Fill: 50 runes move from the inventory into the pouch.
         varbits.put(VarbitID.RUNE_POUCH_QUANTITY_1, 150);
-        ContainerSnapshot filled = new ContainerSnapshotFactory(client(varbits, runeEnum), null)
+        Cc filled = new ContainerSnapshotFactory(client(varbits, runeEnum), null)
             .capture(false, true);
         assertTrue("fill nets to zero", filled.diff(before).isEmpty());
 
         // Cast: five runes leave the pouch with no inventory change at all.
         varbits.put(VarbitID.RUNE_POUCH_QUANTITY_1, 145);
-        ContainerSnapshot cast = new ContainerSnapshotFactory(client(varbits, runeEnum), null)
+        Cc cast = new ContainerSnapshotFactory(client(varbits, runeEnum), null)
             .capture(false, true);
         assertEquals(Long.valueOf(-5L), cast.diff(filled).get(FIRE_RUNE));
     }
@@ -95,10 +95,10 @@ public class ContainerSnapshotFactoryRunePouchTest
     @Test
     public void onlyPouchVarbitsAreRecognised()
     {
-        assertTrue(ContainerSnapshotFactory.isRunePouchVarbit(VarbitID.RUNE_POUCH_TYPE_1));
-        assertTrue(ContainerSnapshotFactory.isRunePouchVarbit(VarbitID.RUNE_POUCH_QUANTITY_6));
-        assertFalse(ContainerSnapshotFactory.isRunePouchVarbit(VarbitID.LOOTINGBAG_USEALLITEMS));
-        assertFalse(ContainerSnapshotFactory.isRunePouchVarbit(-1));
+        assertTrue(ContainerSnapshotFactory.xv(VarbitID.RUNE_POUCH_TYPE_1));
+        assertTrue(ContainerSnapshotFactory.xv(VarbitID.RUNE_POUCH_QUANTITY_6));
+        assertFalse(ContainerSnapshotFactory.xv(VarbitID.LOOTINGBAG_USEALLITEMS));
+        assertFalse(ContainerSnapshotFactory.xv(-1));
     }
 
     @Test
@@ -107,10 +107,10 @@ public class ContainerSnapshotFactoryRunePouchTest
         Map<Integer, Integer> varbits = new HashMap<>();
         varbits.put(VarbitID.RUNE_POUCH_TYPE_1, 4);
         varbits.put(VarbitID.RUNE_POUCH_QUANTITY_1, 100);
-        ContainerSnapshot snapshot = new ContainerSnapshotFactory(
+        Cc snapshot = new ContainerSnapshotFactory(
             client(varbits, null, new Item(995, 7)), null).capture(false, true);
-        assertEquals(7L, snapshot.quantityOf(995));
-        assertNull(snapshot.diff(new ContainerSnapshot(new HashMap<>())).get(FIRE_RUNE));
+        assertEquals(7L, snapshot.aea(995));
+        assertNull(snapshot.diff(new Cc(new HashMap<>())).get(FIRE_RUNE));
     }
 
     @Test
@@ -138,14 +138,14 @@ public class ContainerSnapshotFactoryRunePouchTest
         });
         ContainerSnapshotFactory factory = new ContainerSnapshotFactory(client, null);
 
-        ContainerSnapshot withEquipment = factory.captureDeathHeldItems(true);
-        ContainerSnapshot withoutEquipment = factory.captureDeathHeldItems(false);
+        Cc withEquipment = factory.nr(true);
+        Cc withoutEquipment = factory.nr(false);
 
-        assertEquals(20L, withEquipment.quantityOf(FIRE_RUNE));
-        assertEquals(50L, withEquipment.quantityOf(995));
-        assertEquals(1L, withEquipment.quantityOf(4151));
-        assertEquals(0L, withEquipment.quantityOf(CHAOS_RUNE));
-        assertEquals(0L, withoutEquipment.quantityOf(4151));
+        assertEquals(20L, withEquipment.aea(FIRE_RUNE));
+        assertEquals(50L, withEquipment.aea(995));
+        assertEquals(1L, withEquipment.aea(4151));
+        assertEquals(0L, withEquipment.aea(CHAOS_RUNE));
+        assertEquals(0L, withoutEquipment.aea(4151));
     }
 
     private static Client client(Map<Integer, Integer> varbits, Map<Integer, Integer> runeEnum, Item... inventory)

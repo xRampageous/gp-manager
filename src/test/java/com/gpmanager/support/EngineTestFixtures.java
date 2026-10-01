@@ -35,28 +35,28 @@ public final class EngineTestFixtures
     {
         return deltas ->
         {
-            List<Flow> flows = new ArrayList<>();
+            List<Ab> flows = new ArrayList<>();
             for (Map.Entry<Integer, Long> entry : deltas.entrySet())
             {
-                flows.add(new Flow(entry.getKey(), "Item " + entry.getKey(),
+                flows.add(new Ab(entry.getKey(), "Item " + entry.getKey(),
                     entry.getValue(), 100, entry.getValue() * 100L));
             }
             return flows;
         };
     }
 
-    public static Engine engine()
+    public static Am engine()
     {
         return engine(config());
     }
 
-    public static Engine engine(GpManagerConfig config)
+    public static Am engine(GpManagerConfig config)
     {
         if (!JsonCodec.isBound())
         {
             JsonCodec.bind(new Gson());
         }
-        return new Engine(valuator(), new TransactionClassifier(), config);
+        return new Am(valuator(), new TransactionClassifier(), config);
     }
 
 }

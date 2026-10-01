@@ -48,17 +48,17 @@ final class SimulationSupport
         NAMES.put(itemId, name);
     }
 
-    static Engine newEngine(SessionMode mode)
+    static Am newEngine(Cx mode)
     {
         FlowValuator valuator = quantityDeltas ->
         {
-            List<Flow> flows = new ArrayList<>();
+            List<Ab> flows = new ArrayList<>();
             for (Map.Entry<Integer, Long> entry : quantityDeltas.entrySet())
             {
                 int itemId = entry.getKey();
                 long quantity = entry.getValue();
                 int unitPrice = PRICES.getOrDefault(itemId, 100);
-                flows.add(new Flow(
+                flows.add(new Ab(
                     itemId,
                     NAMES.getOrDefault(itemId, "Item " + itemId),
                     quantity,
@@ -84,10 +84,10 @@ final class SimulationSupport
 
         };
 
-        return new Engine(valuator, new TransactionClassifier(), config);
+        return new Am(valuator, new TransactionClassifier(), config);
     }
 
-    static ContainerSnapshot snapshot(Object... itemQuantityPairs)
+    static Cc snapshot(Object... itemQuantityPairs)
     {
         if (itemQuantityPairs.length % 2 != 0)
         {
@@ -103,40 +103,40 @@ final class SimulationSupport
                 quantities.put(itemId, quantity);
             }
         }
-        return new ContainerSnapshot(quantities);
+        return new Cc(quantities);
     }
 
-    static Transaction settle(
-        Engine engine,
-        ContainerSnapshot snapshot,
+    static Ac settle(
+        Am engine,
+        Cc snapshot,
         long firstTick)
     {
-        Transaction transaction = engine.processIfDirty(snapshot, firstTick);
+        Ac transaction = engine.adj(snapshot, firstTick);
         equal(null, transaction, "transaction must wait for first stable tick");
-        transaction = engine.processIfDirty(snapshot, firstTick + 600L);
+        transaction = engine.adj(snapshot, firstTick + 600L);
         equal(null, transaction, "transaction must wait for second stable tick");
-        return engine.processIfDirty(snapshot, firstTick + 1_200L);
+        return engine.adj(snapshot, firstTick + 1_200L);
     }
 
-    static Flow gain(int itemId, long quantity)
+    static Ab gain(int itemId, long quantity)
     {
         return flow(itemId, quantity);
     }
 
-    static Flow cost(int itemId, long quantity)
+    static Ab cost(int itemId, long quantity)
     {
         return flow(itemId, -Math.abs(quantity));
     }
 
-    static Flow valuedFlow(int itemId, String name, long quantity, int unitPrice)
+    static Ab valuedFlow(int itemId, String name, long quantity, int unitPrice)
     {
-        return new Flow(itemId, name, quantity, unitPrice, quantity * unitPrice);
+        return new Ab(itemId, name, quantity, unitPrice, quantity * unitPrice);
     }
 
-    private static Flow flow(int itemId, long quantity)
+    private static Ab flow(int itemId, long quantity)
     {
         int unitPrice = PRICES.getOrDefault(itemId, 100);
-        return new Flow(
+        return new Ab(
             itemId,
             NAMES.getOrDefault(itemId, "Item " + itemId),
             quantity,
@@ -144,10 +144,10 @@ final class SimulationSupport
             quantity * unitPrice);
     }
 
-    static Filepath export(Session session, Path output) throws IOException
+    static Filepath export(Ad session, Path output) throws IOException
     {
         Filepath exportDirectory = Filepath.Unchecked.getRooted(output.resolve("exports"));
-        return new CsvExporter().exportSession(session, exportDirectory);
+        return new CsvExporter().si(session, exportDirectory);
     }
 
     static void equal(long expected, long actual, String message)

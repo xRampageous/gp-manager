@@ -70,59 +70,59 @@ public class GeCustodyPersistenceTest
     @Test
     public void schemaIs104AndCustodyRoundTripsInsideTheCanonicalGeneration()
     {
-        Engine engine = engine();
+        Am engine = engine();
         long now = T0;
-        engine.startCustomSession("Trading", SessionMode.AUTO, now);
-        engine.setBaseline(new ContainerSnapshot(inventory(COINS, 100_000L, RUNE, 10L)));
+        engine.ajl("Trading", Cx.AUTO, now);
+        engine.setBaseline(new Cc(inventory(COINS, 100_000L, RUNE, 10L)));
 
-        OfferLedger ledger = new OfferLedger();
+        Bj ledger = new Bj();
         noteGe(engine, ledger, 0, SELLING, RUNE, 10, 0, 7, 0, now);
         settle(engine, inventory(COINS, 100_000L, RUNE, 0L), now);
 
-        SavedState state = engine.createSavedState();
+        SavedState state = engine.qm();
         assertEquals(SavedState.CURRENT_SCHEMA_VERSION, state.schemaVersion);
         assertEquals(108, state.schemaVersion);
         assertEquals(1, state.getGeCustody().size());
         assertEquals(10L, state.getGeCustody().get(0).getCapturedQty());
 
-        Engine restored = engine();
+        Am restored = engine();
         restored.restore(state, now + 1_000L);
         assertEquals("custody continuity survives restart", 1,
-            restored.geCustody.snapshotRecords().size());
-        assertEquals(10L, restored.geCustody.snapshotRecords().get(0).getCapturedQty());
+            restored.geCustody.aji().size());
+        assertEquals(10L, restored.geCustody.aji().get(0).getCapturedQty());
         assertEquals("resumed confidence after restore",
-            GeRecord.Confidence.RESUMED,
-            restored.geCustody.snapshotRecords().get(0).getConfidence());
+            Aa.Confidence.RESUMED,
+            restored.geCustody.aji().get(0).getConfidence());
     }
 
     @Test
     public void resumedOfferContinuesExactExecutionAndSettlesOnce()
     {
-        Engine engine = engine();
+        Am engine = engine();
         long now = T0;
-        engine.startCustomSession("Trading", SessionMode.AUTO, now);
-        engine.setBaseline(new ContainerSnapshot(inventory(COINS, 100_000L, RUNE, 10L)));
+        engine.ajl("Trading", Cx.AUTO, now);
+        engine.setBaseline(new Cc(inventory(COINS, 100_000L, RUNE, 10L)));
         gain(engine, RUNE, 10L, 60L, now - 60_000L);
 
-        OfferLedger ledger = new OfferLedger();
+        Bj ledger = new Bj();
         noteGe(engine, ledger, 0, SELLING, RUNE, 10, 0, 7, 0, now);
         settle(engine, inventory(COINS, 100_000L, RUNE, 0L), now);
         noteGe(engine, ledger, 0, SELLING, RUNE, 10, 4, 7, 28, now + 1_000L);
-        SavedState state = engine.createSavedState();
+        SavedState state = engine.qm();
 
-        Engine restored = engine();
+        Am restored = engine();
         restored.restore(state, now + 2_000L);
-        restored.resume(now + 2_500L, PauseReason.IDLE, PauseReason.RECOVERY);
+        restored.resume(now + 2_500L, Ed.IDLE, Ed.RECOVERY);
         prime(restored, inventory(COINS, 100_000L), now + 2_600L);
         // Login seed resumes the same offer; while-away progress is adopted as exact cumulative.
-        Map<Integer, OfferLedger.Snapshot> slots = new HashMap<>();
-        slots.put(0, new OfferLedger.Snapshot(0, SOLD, RUNE, 10, 10, 7, 70));
-        restored.seedGeOfferSlots(slots, now + 2_500L);
+        Map<Integer, Bj.Snapshot> slots = new HashMap<>();
+        slots.put(0, new Bj.Snapshot(0, SOLD, RUNE, 10, 10, 7, 70));
+        restored.ahy(slots, now + 2_500L);
 
-        Transaction settlement = settle(restored, inventory(COINS, 100_070L), now + 3_500L);
+        Ac settlement = settle(restored, inventory(COINS, 100_070L), now + 3_500L);
 
         assertNotNull(settlement);
-        assertEquals(TransactionType.TRADE, settlement.getType());
+        assertEquals(Ai.TRADE, settlement.getType());
         assertTrue(settlement.isCounted());
         assertEquals("resumed basis still consumes the exact known coverage",
             -60L, flow(settlement, RUNE));
@@ -131,7 +131,7 @@ public class GeCustodyPersistenceTest
             restored.getMetrics(now + 4_500L).net);
 
         // A second replay of the same terminal collection must never book again.
-        Transaction again = settle(restored, inventory(COINS, 100_070L), now + 5_000L);
+        Ac again = settle(restored, inventory(COINS, 100_070L), now + 5_000L);
         assertTrue(again == null || !again.isCounted());
         assertEquals("only the resumed settlement is counted beyond the gain", 2,
             countCounted(restored));
@@ -143,49 +143,49 @@ public class GeCustodyPersistenceTest
     {
         for (boolean soldWhileOnline : new boolean[]{true, false})
         {
-            Engine engine = engine(210L);
+            Am engine = engine(210L);
             long now = T0;
-            engine.startCustomSession("Trading", SessionMode.AUTO, now);
-            engine.setBaseline(new ContainerSnapshot(inventory(COINS, 100_000L, RUNE, 26L)));
-            OfferLedger ledger = new OfferLedger();
+            engine.ajl("Trading", Cx.AUTO, now);
+            engine.setBaseline(new Cc(inventory(COINS, 100_000L, RUNE, 26L)));
+            Bj ledger = new Bj();
             noteGe(engine, ledger, 0, SELLING, RUNE, 26, 0, 210, 0, now);
             settle(engine, inventory(COINS, 100_000L, RUNE, 0L), now + 200L);
             if (soldWhileOnline)
             {
                 noteGe(engine, ledger, 0, SOLD, RUNE, 26, 26, 210, 5_460, now + 60_000L);
             }
-            SavedState state = engine.createSavedState();
+            SavedState state = engine.qm();
 
             long tomorrow = now + 20L * 60L * 60L * 1000L;
-            Engine restored = engine(210L);
+            Am restored = engine(210L);
             restored.restore(state, tomorrow);
-            restored.resume(tomorrow, PauseReason.IDLE, PauseReason.RECOVERY);
+            restored.resume(tomorrow, Ed.IDLE, Ed.RECOVERY);
             prime(restored, inventory(COINS, 100_000L), tomorrow);
-            Map<Integer, OfferLedger.Snapshot> slots = new HashMap<>();
-            slots.put(0, new OfferLedger.Snapshot(0, SOLD, RUNE, 26, 26, 210, 5_460));
-            restored.seedGeOfferSlots(slots, tomorrow + 2_000L);
+            Map<Integer, Bj.Snapshot> slots = new HashMap<>();
+            slots.put(0, new Bj.Snapshot(0, SOLD, RUNE, 26, 26, 210, 5_460));
+            restored.ahy(slots, tomorrow + 2_000L);
 
-            restored.noteGeCollectionIntent(tomorrow + 60_000L);
+            restored.abg(tomorrow + 60_000L);
             settle(restored, inventory(COINS, 105_356L), tomorrow + 60_000L);
-            OfferLedger live = new OfferLedger();
-            live.observe(new OfferLedger.Snapshot(0, SOLD, RUNE, 26, 26, 210, 5_460));
-            OfferLedger.Transition cleared = live.observe(
-                new OfferLedger.Snapshot(0, EMPTY, 0, 0, 0, 0, 0)).orElse(null);
+            Bj live = new Bj();
+            live.observe(new Bj.Snapshot(0, SOLD, RUNE, 26, 26, 210, 5_460));
+            Bj.Transition cleared = live.observe(
+                new Bj.Snapshot(0, EMPTY, 0, 0, 0, 0, 0)).orElse(null);
             if (cleared != null)
             {
-                restored.noteGeOfferObservation(cleared, "", tomorrow + 60_600L);
+                restored.abh(cleared, "", tomorrow + 60_600L);
             }
-            for (Transaction booking : restored.geCustody.maintenance(tomorrow + 70_000L,
+            for (Ac booking : restored.geCustody.maintenance(tomorrow + 70_000L,
                 restored.getActiveSession().getId()).countedBookings)
             {
-                restored.getActiveSession().addTransaction(booking, 500, true);
+                restored.getActiveSession().kf(booking, 500, true);
             }
 
             assertEquals("sold " + (soldWhileOnline ? "online" : "offline") + ": no Review row", 0,
                 reviewCount(restored));
             assertEquals(0, countUncertainCoinRows(restored));
-            assertEquals(MarketSettlementProjection.Lifecycle.REALIZED,
-                restored.getMarketSettlements().get(0).lifecycle);
+            assertEquals(Bi.Lifecycle.REALIZED,
+                restored.ub().get(0).lifecycle);
         }
     }
 
@@ -199,54 +199,54 @@ public class GeCustodyPersistenceTest
     {
         for (boolean soldWhileOnline : new boolean[]{true, false})
         {
-            Engine engine = engine(210L);
+            Am engine = engine(210L);
             long now = T0;
-            engine.startCustomSession("Trading", SessionMode.AUTO, now);
-            engine.setBaseline(new ContainerSnapshot(inventory(COINS, 100_000L, RUNE, 26L)));
-            OfferLedger ledger = new OfferLedger();
+            engine.ajl("Trading", Cx.AUTO, now);
+            engine.setBaseline(new Cc(inventory(COINS, 100_000L, RUNE, 26L)));
+            Bj ledger = new Bj();
             noteGe(engine, ledger, 0, SELLING, RUNE, 26, 0, 210, 0, now);
             settle(engine, inventory(COINS, 100_000L, RUNE, 0L), now + 200L);
             if (soldWhileOnline)
             {
                 noteGe(engine, ledger, 0, SOLD, RUNE, 26, 26, 210, 5_460, now + 60_000L);
             }
-            SavedState state = engine.createSavedState();
+            SavedState state = engine.qm();
 
             long tomorrow = now + 20L * 60L * 60L * 1000L;
-            Engine restored = engine(210L);
+            Am restored = engine(210L);
             restored.restore(state, tomorrow);
-            restored.resume(tomorrow, PauseReason.IDLE, PauseReason.RECOVERY);
+            restored.resume(tomorrow, Ed.IDLE, Ed.RECOVERY);
             prime(restored, inventory(COINS, 100_000L), tomorrow);
             // The seed only saw the login EMPTY placeholders.
-            OfferLedger live = new OfferLedger();
-            live.beginLoginSeed();
-            Map<Integer, OfferLedger.Snapshot> slots = new HashMap<>();
+            Bj live = new Bj();
+            live.lu();
+            Map<Integer, Bj.Snapshot> slots = new HashMap<>();
             for (int slot = 0; slot < 8; slot++)
             {
-                OfferLedger.Snapshot empty = new OfferLedger.Snapshot(slot, EMPTY, 0, 0, 0, 0, 0);
+                Bj.Snapshot empty = new Bj.Snapshot(slot, EMPTY, 0, 0, 0, 0, 0);
                 live.observe(empty);
                 slots.put(slot, empty);
             }
-            live.finishLoginSeed();
-            restored.seedGeOfferSlots(slots, tomorrow + 2_000L);
+            live.tg();
+            restored.ahy(slots, tomorrow + 2_000L);
             // The server's restored offer arrives a few ticks later.
             noteGe(restored, live, 0, SOLD, RUNE, 26, 26, 210, 5_460, tomorrow + 4_000L);
 
-            restored.noteGeCollectionIntent(tomorrow + 60_000L);
+            restored.abg(tomorrow + 60_000L);
             settle(restored, inventory(COINS, 105_356L), tomorrow + 60_000L);
             noteGe(restored, live, 0, EMPTY, 0, 0, 0, 0, 0, tomorrow + 60_600L);
-            for (Transaction booking : restored.geCustody.maintenance(tomorrow + 70_000L,
+            for (Ac booking : restored.geCustody.maintenance(tomorrow + 70_000L,
                 restored.getActiveSession().getId()).countedBookings)
             {
-                restored.getActiveSession().addTransaction(booking, 500, true);
+                restored.getActiveSession().kf(booking, 500, true);
             }
 
             String label = "sold " + (soldWhileOnline ? "online" : "offline");
             assertEquals(label + ": no Review row", 0, reviewCount(restored));
             assertEquals(label, 0, countUncertainCoinRows(restored));
-            assertEquals(label, 1, restored.getMarketSettlements().size());
-            assertEquals(label, MarketSettlementProjection.Lifecycle.REALIZED,
-                restored.getMarketSettlements().get(0).lifecycle);
+            assertEquals(label, 1, restored.ub().size());
+            assertEquals(label, Bi.Lifecycle.REALIZED,
+                restored.ub().get(0).lifecycle);
         }
     }
 
@@ -260,12 +260,12 @@ public class GeCustodyPersistenceTest
     {
         for (boolean changeBeforeClear : new boolean[]{true, false})
         {
-            Engine engine = engine(73L);
+            Am engine = engine(73L);
             long now = T0;
-            engine.startCustomSession("Mining", SessionMode.AUTO, now);
+            engine.ajl("Mining", Cx.AUTO, now);
             Map<Integer, Long> held = inventory(COINS, 100_000L);
-            engine.setBaseline(new ContainerSnapshot(new HashMap<>(held)));
-            OfferLedger ledger = new OfferLedger();
+            engine.setBaseline(new Cc(new HashMap<>(held)));
+            Bj ledger = new Bj();
             for (int slot = 0; slot < 2; slot++)
             {
                 long at = now + slot * 5_000L;
@@ -279,8 +279,8 @@ public class GeCustodyPersistenceTest
             for (int slot = 0; slot < 2; slot++)
             {
                 long at = now + 40_000L + slot * 10_000L;
-                engine.noteGeCollectionIntent(at);
-                engine.markContext(Context.MARKET, 10, "Grand Exchange collect");
+                engine.abg(at);
+                engine.markContext(Aj.MARKET, 10, "Grand Exchange collect");
                 if (!changeBeforeClear)
                 {
                     noteGe(engine, ledger, slot, EMPTY, 0, 0, 0, 0, 0, at);
@@ -293,25 +293,25 @@ public class GeCustodyPersistenceTest
                     noteGe(engine, ledger, slot, EMPTY, 0, 0, 0, 0, 0, at + 1_300L);
                 }
             }
-            for (Transaction booking : engine.geCustody.maintenance(now + 20L * 60_000L,
+            for (Ac booking : engine.geCustody.maintenance(now + 20L * 60_000L,
                 engine.getActiveSession().getId()).countedBookings)
             {
-                engine.getActiveSession().addTransaction(booking, 500, true);
+                engine.getActiveSession().kf(booking, 500, true);
             }
 
             String label = changeBeforeClear ? "change before clear" : "clear before change";
             assertEquals(label + ": no Review row", 0, reviewCount(engine));
             assertEquals(label + ": a buy at its own spend is Net-neutral", 0L,
                 engine.getMetrics(now + 21L * 60_000L).net);
-            assertEquals(label, 2, engine.getMarketSettlements().size());
-            for (MarketSettlementProjection.Row row : engine.getMarketSettlements())
+            assertEquals(label, 2, engine.ub().size());
+            for (Bi.Row row : engine.ub())
             {
-                assertEquals(label, MarketSettlementProjection.Lifecycle.REALIZED, row.lifecycle);
+                assertEquals(label, Bi.Lifecycle.REALIZED, row.lifecycle);
             }
-            for (GeRecord record : engine.geCustody.snapshotRecords())
+            for (Aa record : engine.geCustody.aji())
             {
                 assertEquals(label + ": reserve = spend + change, so the offer closes",
-                    GeRecord.Stage.CLOSED, record.getStage());
+                    Aa.Stage.CLOSED, record.getStage());
             }
         }
     }
@@ -319,51 +319,51 @@ public class GeCustodyPersistenceTest
     @Test
     public void legacyOpenOfferAtSeedIsQuarantinedWithoutInventedBasis()
     {
-        Engine engine = engine();
+        Am engine = engine();
         long now = T0;
-        engine.startCustomSession("Trading", SessionMode.AUTO, now);
-        engine.setBaseline(new ContainerSnapshot(inventory(COINS, 100_000L, RUNE, 10L)));
+        engine.ajl("Trading", Cx.AUTO, now);
+        engine.setBaseline(new Cc(inventory(COINS, 100_000L, RUNE, 10L)));
 
-        Map<Integer, OfferLedger.Snapshot> slots = new HashMap<>();
-        slots.put(0, new OfferLedger.Snapshot(0, SELLING, RUNE, 10, 4, 7, 28));
-        engine.seedGeOfferSlots(slots, now);
+        Map<Integer, Bj.Snapshot> slots = new HashMap<>();
+        slots.put(0, new Bj.Snapshot(0, SELLING, RUNE, 10, 4, 7, 28));
+        engine.ahy(slots, now);
 
-        List<GeRecord> records = engine.geCustody.snapshotRecords();
+        List<Aa> records = engine.geCustody.aji();
         assertEquals(1, records.size());
-        assertEquals(GeRecord.Confidence.LEGACY_UNBASED, records.get(0).getConfidence());
+        assertEquals(Aa.Confidence.LEGACY_UNBASED, records.get(0).getConfidence());
         assertFalse("no basis is invented for a pre-upgrade offer",
-            records.get(0).hasFrozenBasis());
+            records.get(0).vf());
         assertEquals("the persisted cumulative is adopted as a baseline only", 4L,
             records.get(0).getFilledQty());
 
         // Its movements follow the ordinary classification path; custody records nothing.
-        Transaction loss = settle(engine, inventory(COINS, 100_000L, RUNE, 6L), now + 1_000L);
+        Ac loss = settle(engine, inventory(COINS, 100_000L, RUNE, 6L), now + 1_000L);
         assertNotNull(loss);
-        assertEquals(records.size(), engine.geCustody.snapshotRecords().size());
+        assertEquals(records.size(), engine.geCustody.aji().size());
     }
 
     @Test
     public void profileIsolationReplacesCustodyState()
     {
-        Engine engine = engine();
+        Am engine = engine();
         long now = T0;
-        engine.startCustomSession("Trading", SessionMode.AUTO, now);
-        engine.setBaseline(new ContainerSnapshot(inventory(COINS, 100_000L, RUNE, 10L)));
+        engine.ajl("Trading", Cx.AUTO, now);
+        engine.setBaseline(new Cc(inventory(COINS, 100_000L, RUNE, 10L)));
 
-        OfferLedger ledger = new OfferLedger();
+        Bj ledger = new Bj();
         noteGe(engine, ledger, 0, SELLING, RUNE, 10, 0, 7, 0, now);
         settle(engine, inventory(COINS, 100_000L, RUNE, 0L), now);
-        SavedState profileA = engine.createSavedState();
+        SavedState profileA = engine.qm();
         profileA.setOwnerKey("rsprofile.ge-audit-a");
         assertEquals(1, profileA.getGeCustody().size());
 
-        engine.restoreForProfile("rsprofile.ge-audit-b", new SavedState(), now + 1_000L);
+        engine.agl("rsprofile.ge-audit-b", new SavedState(), now + 1_000L);
         assertTrue("another profile never sees the previous custody state",
-            engine.geCustody.snapshotRecords().isEmpty());
+            engine.geCustody.aji().isEmpty());
 
-        engine.restoreForProfile("rsprofile.ge-audit-a", profileA, now + 2_000L);
+        engine.agl("rsprofile.ge-audit-a", profileA, now + 2_000L);
         assertEquals("the owning profile recovers exactly its own custody state",
-            1, engine.geCustody.snapshotRecords().size());
+            1, engine.geCustody.aji().size());
     }
 
     @Test
@@ -373,51 +373,51 @@ public class GeCustodyPersistenceTest
         state.setSchemaVersion(103);
         assertTrue("pre-104 files carry no custody", state.getGeCustody().isEmpty());
 
-        List<GeRecord> records = new ArrayList<>();
-        GeRecord invalid = new GeRecord();
+        List<Aa> records = new ArrayList<>();
+        Aa invalid = new Aa();
         records.add(invalid);
         state.setGeCustody(records);
         assertTrue("records without a stable offer id are dropped",
             state.getGeCustody().isEmpty());
 
-        GeRecord unknownEnums = new GeRecord("offer-1", 0, GeRecord.Side.BUY,
+        Aa unknownEnums = new Aa("offer-1", 0, Aa.Side.BUY,
             RUNE, "Nature rune", 10L, 7L, T0, "");
-        unknownEnums.setStage(GeRecord.Stage.OPEN);
-        unknownEnums.setConfidence(GeRecord.Confidence.LEGACY_UNBASED);
+        unknownEnums.setStage(Aa.Stage.OPEN);
+        unknownEnums.setConfidence(Aa.Confidence.LEGACY_UNBASED);
         state.setGeCustody(Collections.singletonList(unknownEnums));
 
-        Engine engine = engine();
+        Am engine = engine();
         engine.restore(state, T0 + 1_000L);
-        assertEquals(1, engine.geCustody.snapshotRecords().size());
+        assertEquals(1, engine.geCustody.aji().size());
         assertEquals("legacy/unbased records never invent basis",
-false, engine.geCustody.snapshotRecords().get(0).hasFrozenBasis());
+false, engine.geCustody.aji().get(0).vf());
     }
 
     @Test
     public void crossGrindSettlementBooksWhereCollectedWithoutReview()
     {
-        Engine engine = engine();
+        Am engine = engine();
         long now = T0;
-        engine.startCustomSession("Grind A", SessionMode.AUTO, now);
-        engine.setBaseline(new ContainerSnapshot(inventory(COINS, 100_000L, RUNE, 10L)));
+        engine.ajl("Grind A", Cx.AUTO, now);
+        engine.setBaseline(new Cc(inventory(COINS, 100_000L, RUNE, 10L)));
 
-        OfferLedger ledger = new OfferLedger();
+        Bj ledger = new Bj();
         noteGe(engine, ledger, 0, SELLING, RUNE, 10, 0, 7, 0, now);
         settle(engine, inventory(COINS, 100_000L, RUNE, 0L), now);
         noteGe(engine, ledger, 0, SOLD, RUNE, 10, 10, 7, 70, now + 500L);
 
         // A different Grind becomes current before the collection arrives.
-        engine.finishCustomSession(now + 1_000L);
-        engine.startCustomSession("Grind B", SessionMode.AUTO, now + 1_100L);
-        engine.setBaseline(new ContainerSnapshot(inventory(COINS, 100_000L)));
+        engine.sx(now + 1_000L);
+        engine.ajl("Grind B", Cx.AUTO, now + 1_100L);
+        engine.setBaseline(new Cc(inventory(COINS, 100_000L)));
 
-        Transaction settlement = settle(engine, inventory(COINS, 100_070L), now + 2_000L);
+        Ac settlement = settle(engine, inventory(COINS, 100_070L), now + 2_000L);
         assertNotNull(settlement);
         // Owner policy 2026-09-24 (replaces PRE-R5B 11.19): the exact settlement books in the
         // collecting Grind; the closed origin Grind is never rewritten.
         assertEquals("a cross-Grind settlement is an exact market settlement",
-            TransactionType.TRADE, settlement.getType());
-        assertFalse("never a Review nag", ReviewEligibility.needsOwnerDecision(settlement));
+            Ai.TRADE, settlement.getType());
+        assertFalse("never a Review nag", Eh.aal(settlement));
         assertTrue("booked in the collecting Grind",
             engine.getActiveSession().getTransactions().contains(settlement));
         assertEquals("an untaxed unknown-basis sale stays Net-neutral", 0L,
@@ -427,13 +427,13 @@ false, engine.geCustody.snapshotRecords().get(0).hasFrozenBasis());
     @Test
     public void batchCollectAllKeepsExactCombinedAdjustment()
     {
-        Engine engine = engine();
+        Am engine = engine();
         long now = T0;
-        engine.startCustomSession("Trading", SessionMode.AUTO, now);
-        engine.setBaseline(new ContainerSnapshot(inventory(COINS, 100_000L, RUNE, 20L)));
+        engine.ajl("Trading", Cx.AUTO, now);
+        engine.setBaseline(new Cc(inventory(COINS, 100_000L, RUNE, 20L)));
         gain(engine, RUNE, 20L, 120L, now - 60_000L);
 
-        OfferLedger ledger = new OfferLedger();
+        Bj ledger = new Bj();
         noteGe(engine, ledger, 0, SELLING, RUNE, 10, 0, 7, 0, now);
         settle(engine, inventory(COINS, 100_000L, RUNE, 10L), now);
         noteGe(engine, ledger, 1, SELLING, RUNE, 10, 0, 7, 0, now + 200L);
@@ -442,14 +442,14 @@ false, engine.geCustody.snapshotRecords().get(0).hasFrozenBasis());
         noteGe(engine, ledger, 1, SOLD, RUNE, 10, 10, 7, 70, now + 800L);
 
         // One combined collection of 138 coins for gross execution 140 (2 coins of shortfall).
-        Transaction last = settle(engine, inventory(COINS, 100_138L), now + 1_000L);
+        Ac last = settle(engine, inventory(COINS, 100_138L), now + 1_000L);
         assertNotNull(last);
         long total = 0L;
         int countedRows = 0;
-        for (Transaction transaction : engine.getActiveSession().getTransactions())
+        for (Ac transaction : engine.getActiveSession().getTransactions())
         {
             if (transaction != null && transaction.isCounted()
-                && transaction.getAutomaticType() == TransactionType.TRADE)
+                && transaction.tm() == Ai.TRADE)
             {
                 countedRows++;
                 total += transaction.getNet();
@@ -464,14 +464,14 @@ false, engine.geCustody.snapshotRecords().get(0).hasFrozenBasis());
     @Test
     public void ownerFourSaleBatchAttributesAfterTaxCashAndTaxAdjustedReference()
     {
-        Engine engine = ownerEngine();
+        Am engine = ownerEngine();
         long now = T0;
-        engine.startCustomSession("Trading", SessionMode.AUTO, now);
+        engine.ajl("Trading", Cx.AUTO, now);
         Map<Integer, Long> held = inventory(COINS, 100_000L, CHAOS_RUNE, 1_000L, OAK_LOGS, 50L,
             DIAMOND_BOLTS_E, 10L, SAPPHIRE_DRAGON_BOLTS_E, 50L);
-        engine.setBaseline(new ContainerSnapshot(held));
+        engine.setBaseline(new Cc(held));
 
-        OfferLedger ledger = new OfferLedger();
+        Bj ledger = new Bj();
         int[] items = {CHAOS_RUNE, OAK_LOGS, DIAMOND_BOLTS_E, SAPPHIRE_DRAGON_BOLTS_E};
         long[] quantity = {1_000L, 50L, 10L, 50L};
         long[] reference = {104L, 41L, 157L, 2_802L};
@@ -507,7 +507,7 @@ false, engine.geCustody.snapshotRecords().get(0).hasFrozenBasis());
         long referenceTotal = 0L;
         long differenceTotal = 0L;
         int rows = 0;
-        for (MarketSettlementProjection.Row row : engine.getMarketSettlements())
+        for (Bi.Row row : engine.ub())
         {
             int slot = slotByItem.get(row.itemId);
             rows++;
@@ -517,10 +517,10 @@ false, engine.geCustody.snapshotRecords().get(0).hasFrozenBasis());
                 row.settlementAdjustmentGp);
             assertEquals(tax[slot], row.inferredGeTaxGp);
             assertEquals(gross[slot], MarketFacts.realizedGrossGp(MarketFacts.record(engine, row)));
-            assertEquals(MarketSettlementProjection.Coverage.FULLY_UNKNOWN, row.coverage);
+            assertEquals(Bi.Coverage.FULLY_UNKNOWN, row.coverage);
             assertEquals(0L, MarketFacts.trackedQtyConsumed(MarketFacts.record(engine, row)));
             assertEquals(quantity[slot], MarketFacts.unknownQtyRealized(MarketFacts.record(engine, row)));
-            assertEquals(MarketSettlementProjection.Lifecycle.REALIZED, row.lifecycle);
+            assertEquals(Bi.Lifecycle.REALIZED, row.lifecycle);
             assertFalse(row.manualFinancialResult);
             assertEquals(grossReference[slot], MarketFacts.grossGeReferenceGp(MarketFacts.record(engine, row)));
             assertEquals(expectedReferenceTax[slot], row.expectedReferenceTaxGp);
@@ -540,15 +540,15 @@ false, engine.geCustody.snapshotRecords().get(0).hasFrozenBasis());
         assertEquals("the individual differences sum exactly", -6_610L, differenceTotal);
         assertEquals("unknown bank stock contributes exactly the proven tax per sale",
             -4_680L, engine.getMetrics(now + 12_000L).net);
-        for (Transaction transaction : engine.getActiveSession().getTransactions())
+        for (Ac transaction : engine.getActiveSession().getTransactions())
         {
             assertFalse("no counted Coins fee row may exist: " + transaction,
                 transaction != null && transaction.isCounted()
-                    && transaction.getAutomaticType() == TransactionType.TRADE
+                    && transaction.tm() == Ai.TRADE
                     && transaction.getFlows().size() == 1
                     && transaction.getFlows().get(0).itemId == COINS);
             if (transaction != null && transaction.isCounted()
-                && transaction.getAutomaticType() == TransactionType.TRADE)
+                && transaction.tm() == Ai.TRADE)
             {
                 assertEquals("each counted settlement books exactly its accepted tax",
                     -tax[slotByItem.get(transaction.getFlows().get(0).itemId)],
@@ -560,13 +560,13 @@ false, engine.geCustody.snapshotRecords().get(0).hasFrozenBasis());
     @Test
     public void ownerSevenSaleCollectAllSettlesExactlyInOneBatch()
     {
-        Engine engine = ownerEngine();
+        Am engine = ownerEngine();
         long now = T0;
-        engine.startCustomSession("Trading", SessionMode.AUTO, now);
+        engine.ajl("Trading", Cx.AUTO, now);
         Map<Integer, Long> held = ownerBatchInventory(100_000L);
-        engine.setBaseline(new ContainerSnapshot(held));
+        engine.setBaseline(new Cc(held));
 
-        OfferLedger ledger = new OfferLedger();
+        Bj ledger = new Bj();
         placeOwnerBatch(engine, ledger, held, now, true);
         // One Collect All pays exactly the after-tax 24,550 for 25,030 gross execution.
         settle(engine, inventory(COINS, 100_000L + OWNER_BATCH_RECEIVED_TOTAL), now + 20_000L);
@@ -579,24 +579,24 @@ false, engine.geCustody.snapshotRecords().get(0).hasFrozenBasis());
     @Test
     public void ownerSevenSaleCollectAllIsIndependentOfCoinsFirstOrdering()
     {
-        Engine engine = ownerEngine();
+        Am engine = ownerEngine();
         long now = T0;
-        engine.startCustomSession("Trading", SessionMode.AUTO, now);
+        engine.ajl("Trading", Cx.AUTO, now);
         Map<Integer, Long> held = ownerBatchInventory(100_000L);
-        engine.setBaseline(new ContainerSnapshot(held));
+        engine.setBaseline(new Cc(held));
 
-        OfferLedger ledger = new OfferLedger();
+        Bj ledger = new Bj();
         // Placements observed; the offers have not reported any fill or terminal evidence yet.
         placeOwnerBatch(engine, ledger, held, now, false);
         // The aggregate collect arrives first, proven by the live Collect interaction.
-        engine.noteGeCollectionIntent(now + 20_000L);
+        engine.abg(now + 20_000L);
         settle(engine, inventory(COINS, 100_000L + OWNER_BATCH_RECEIVED_TOTAL), now + 20_000L);
         assertEquals("the observed collect is retained internally, not reviewed",
             OWNER_BATCH_RECEIVED_TOTAL, EngineProbe.pendingSettlementCash(engine.geCustody));
         assertEquals("a held collect never reaches the decision inbox", 0, reviewCount(engine));
         assertTrue("no settlement exists before the execution evidence arrives",
-            engine.getMarketSettlements().stream()
-                .noneMatch(row -> row.lifecycle == MarketSettlementProjection.Lifecycle.REALIZED));
+            engine.ub().stream()
+                .noneMatch(row -> row.lifecycle == Bi.Lifecycle.REALIZED));
 
         // The fill/terminal evidence arrives afterward; the held batch settles exactly.
         completeOwnerBatch(engine, ledger, now + 30_000L);
@@ -607,18 +607,18 @@ false, engine.geCustody.snapshotRecords().get(0).hasFrozenBasis());
     @Test
     public void singleSaleCoinsFirstSettlesExactlyWhenTheTerminalEvidenceArrives()
     {
-        Engine engine = engine(210L);
+        Am engine = engine(210L);
         long now = T0;
-        engine.startCustomSession("Trading", SessionMode.AUTO, now);
+        engine.ajl("Trading", Cx.AUTO, now);
         Map<Integer, Long> held = inventory(COINS, 100_000L, RUNE, 26L);
-        engine.setBaseline(new ContainerSnapshot(held));
+        engine.setBaseline(new Cc(held));
 
-        OfferLedger ledger = new OfferLedger();
+        Bj ledger = new Bj();
         noteGe(engine, ledger, 0, SELLING, RUNE, 26, 0, 210, 0, now);
         held.put(RUNE, 0L);
         settle(engine, held, now + 200L);
         // The collect arrives before any fill/terminal evidence.
-        engine.noteGeCollectionIntent(now + 1_000L);
+        engine.abg(now + 1_000L);
         settle(engine, inventory(COINS, 105_356L), now + 1_000L);
         assertEquals("the collect is retained until the sale is proven", 5_356L,
             EngineProbe.pendingSettlementCash(engine.geCustody));
@@ -626,11 +626,11 @@ false, engine.geCustody.snapshotRecords().get(0).hasFrozenBasis());
 
         // The SOLD evidence completes the exact sale.
         noteGe(engine, ledger, 0, SOLD, RUNE, 26, 26, 210, 5_460, now + 2_000L);
-        MarketSettlementProjection.Row row = engine.getMarketSettlements().get(0);
+        Bi.Row row = engine.ub().get(0);
         assertEquals(5_356L, row.observedSettlementGp);
         assertEquals(-104L, row.settlementAdjustmentGp);
         assertEquals(104L, row.inferredGeTaxGp);
-        assertEquals(MarketSettlementProjection.Lifecycle.REALIZED, row.lifecycle);
+        assertEquals(Bi.Lifecycle.REALIZED, row.lifecycle);
         assertEquals("the proven tax is the only unknown-basis contribution", -104L,
             engine.getMetrics(now + 3_000L).net);
         assertEquals(0L, EngineProbe.pendingSettlementCash(engine.geCustody));
@@ -639,20 +639,20 @@ false, engine.geCustody.snapshotRecords().get(0).hasFrozenBasis());
     @Test
     public void ownerSevenSaleCollectAllIsIndependentOfInterleavedOrdering()
     {
-        Engine engine = ownerEngine();
+        Am engine = ownerEngine();
         long now = T0;
-        engine.startCustomSession("Trading", SessionMode.AUTO, now);
+        engine.ajl("Trading", Cx.AUTO, now);
         Map<Integer, Long> held = ownerBatchInventory(100_000L);
-        engine.setBaseline(new ContainerSnapshot(held));
+        engine.setBaseline(new Cc(held));
 
-        OfferLedger ledger = new OfferLedger();
+        Bj ledger = new Bj();
         placeOwnerBatch(engine, ledger, held, now, false);
         // Only the first three offers are terminal when the collect arrives.
         for (int slot = 0; slot < 3; slot++)
         {
             completeOwnerSale(engine, ledger, slot, now + 20_000L + slot * 1_000L);
         }
-        engine.noteGeCollectionIntent(now + 25_000L);
+        engine.abg(now + 25_000L);
         settle(engine, inventory(COINS, 100_000L + OWNER_BATCH_RECEIVED_TOTAL), now + 25_000L);
         assertEquals("a partially proven batch is never partially booked",
             OWNER_BATCH_RECEIVED_TOTAL, EngineProbe.pendingSettlementCash(engine.geCustody));
@@ -670,13 +670,13 @@ false, engine.geCustody.snapshotRecords().get(0).hasFrozenBasis());
     @Test
     public void ownerSevenSaleCollectAllSettlesWhenFillsFinalizeBeforeTerminalState()
     {
-        Engine engine = ownerEngine();
+        Am engine = ownerEngine();
         long now = T0;
-        engine.startCustomSession("Trading", SessionMode.AUTO, now);
+        engine.ajl("Trading", Cx.AUTO, now);
         Map<Integer, Long> held = ownerBatchInventory(100_000L);
-        engine.setBaseline(new ContainerSnapshot(held));
+        engine.setBaseline(new Cc(held));
 
-        OfferLedger ledger = new OfferLedger();
+        Bj ledger = new Bj();
         placeOwnerBatch(engine, ledger, held, now, false);
         // Every fill is final and comparable, but the terminal SOLD states are still unobserved.
         for (int slot = 0; slot < OWNER_BATCH_ITEMS.length; slot++)
@@ -685,16 +685,16 @@ false, engine.geCustody.snapshotRecords().get(0).hasFrozenBasis());
                 OWNER_BATCH_LISTED[slot], (int) OWNER_BATCH_EXECUTION[slot],
                 now + 20_000L + slot * 1_000L);
         }
-        engine.noteGeCollectionIntent(now + 30_000L);
+        engine.abg(now + 30_000L);
         settle(engine, inventory(COINS, 100_000L + OWNER_BATCH_RECEIVED_TOTAL), now + 30_000L);
         assertEquals("the collect is retained until the SLOT WINDOW confirms it",
             OWNER_BATCH_RECEIVED_TOTAL, EngineProbe.pendingSettlementCash(engine.geCustody));
         // The unique exact attribution books at the window end when no contradicting slot evidence
         // arrived; the terminal SOLD states are still unobserved.
-        for (Transaction booking : engine.geCustody.maintenance(now + 33_500L,
+        for (Ac booking : engine.geCustody.maintenance(now + 33_500L,
             engine.getActiveSession().getId()).countedBookings)
         {
-            engine.getActiveSession().addTransaction(booking, 500, true);
+            engine.getActiveSession().kf(booking, 500, true);
         }
         assertOwnerBatchSettled(engine, now + 33_500L);
 
@@ -707,13 +707,13 @@ false, engine.geCustody.snapshotRecords().get(0).hasFrozenBasis());
     @Test
     public void ownerSevenSaleWrongAggregateGapFailsClosedWithoutAbsorbingIt()
     {
-        Engine engine = ownerEngine();
+        Am engine = ownerEngine();
         long now = T0;
-        engine.startCustomSession("Trading", SessionMode.AUTO, now);
+        engine.ajl("Trading", Cx.AUTO, now);
         Map<Integer, Long> held = ownerBatchInventory(100_000L);
-        engine.setBaseline(new ContainerSnapshot(held));
+        engine.setBaseline(new Cc(held));
 
-        OfferLedger ledger = new OfferLedger();
+        Bj ledger = new Bj();
         placeOwnerBatch(engine, ledger, held, now, true);
         // Five coins short of the exact after-tax settlement: the gap is not the tax rule.
         settle(engine, inventory(COINS, 100_000L + OWNER_BATCH_RECEIVED_TOTAL - 5L), now + 20_000L);
@@ -723,12 +723,12 @@ false, engine.geCustody.snapshotRecords().get(0).hasFrozenBasis());
         assertEquals("an all-terminal wrong gap is never held", 0L,
             EngineProbe.pendingSettlementCash(engine.geCustody));
         Map<Integer, Integer> slotByItem = ownerBatchSlots();
-        for (MarketSettlementProjection.Row row : engine.getMarketSettlements())
+        for (Bi.Row row : engine.ub())
         {
             int slot = slotByItem.get(row.itemId);
             assertEquals("gross execution is retained, not split",
                 OWNER_BATCH_EXECUTION[slot], row.observedSettlementGp);
-            assertEquals(MarketSettlementProjection.Lifecycle.AMBIGUOUS, row.lifecycle);
+            assertEquals(Bi.Lifecycle.AMBIGUOUS, row.lifecycle);
         }
         assertEquals("the unexplained gap stays one uncounted Coins row", 1,
             countUncertainCoinRows(engine));
@@ -738,16 +738,16 @@ false, engine.geCustody.snapshotRecords().get(0).hasFrozenBasis());
     @Test
     public void mixedCollectWithUnrelatedCoinsIsNeverAbsorbedToBalanceTheEquation()
     {
-        Engine engine = ownerEngine();
+        Am engine = ownerEngine();
         long now = T0;
-        engine.startCustomSession("Trading", SessionMode.AUTO, now);
+        engine.ajl("Trading", Cx.AUTO, now);
         Map<Integer, Long> held = ownerBatchInventory(100_000L);
-        engine.setBaseline(new ContainerSnapshot(held));
+        engine.setBaseline(new Cc(held));
 
-        OfferLedger ledger = new OfferLedger();
+        Bj ledger = new Bj();
         placeOwnerBatch(engine, ledger, held, now, true);
         // The collect movement carries 500 unrelated coins: the equation cannot balance.
-        engine.noteGeCollectionIntent(now + 20_000L);
+        engine.abg(now + 20_000L);
         settle(engine, inventory(COINS, 100_000L + OWNER_BATCH_RECEIVED_TOTAL + 500L), now + 20_000L);
         // The collect cleared every slot within the SLOT WINDOW; once the window closes without an
         // exact attribution, the slot-evidenced offers are quarantined and the whole movement
@@ -756,28 +756,28 @@ false, engine.geCustody.snapshotRecords().get(0).hasFrozenBasis());
         {
             noteGe(engine, ledger, slot, EMPTY, 0, 0, 0, 0, 0, now + 20_600L + slot * 100L);
         }
-        for (Transaction booking : engine.geCustody.maintenance(now + 23_000L,
+        for (Ac booking : engine.geCustody.maintenance(now + 23_000L,
             engine.getActiveSession().getId()).countedBookings)
         {
-            engine.getActiveSession().addTransaction(booking, 500, true);
+            engine.getActiveSession().kf(booking, 500, true);
         }
 
         assertEquals("the mixed movement is not retained as a GE settlement", 0L,
             EngineProbe.pendingSettlementCash(engine.geCustody));
         Map<Integer, Integer> slotByItem = ownerBatchSlots();
-        for (MarketSettlementProjection.Row row : engine.getMarketSettlements())
+        for (Bi.Row row : engine.ub())
         {
             int slot = slotByItem.get(row.itemId);
-            assertEquals(MarketSettlementProjection.Lifecycle.AMBIGUOUS, row.lifecycle);
+            assertEquals(Bi.Lifecycle.AMBIGUOUS, row.lifecycle);
             assertEquals("gross evidence is preserved, never split to fit",
                 OWNER_BATCH_EXECUTION[slot], row.observedSettlementGp);
         }
         assertEquals("the unexplained movement stays its own uncounted row", 1,
             countUncertainCoinRows(engine));
         long excess = 0L;
-        for (Transaction transaction : engine.getActiveSession().getTransactions())
+        for (Ac transaction : engine.getActiveSession().getTransactions())
         {
-            if (transaction.getAutomaticType() == TransactionType.UNCERTAIN
+            if (transaction.tm() == Ai.UNCERTAIN
                 && transaction.getFlows().size() == 1
                 && transaction.getFlows().get(0).itemId == COINS)
             {
@@ -792,13 +792,13 @@ false, engine.geCustody.snapshotRecords().get(0).hasFrozenBasis());
     @Test
     public void duplicateSettlesAndReplayedEvidenceNeverDoubleBookTheBatch()
     {
-        Engine engine = ownerEngine();
+        Am engine = ownerEngine();
         long now = T0;
-        engine.startCustomSession("Trading", SessionMode.AUTO, now);
+        engine.ajl("Trading", Cx.AUTO, now);
         Map<Integer, Long> held = ownerBatchInventory(100_000L);
-        engine.setBaseline(new ContainerSnapshot(held));
+        engine.setBaseline(new Cc(held));
 
-        OfferLedger ledger = new OfferLedger();
+        Bj ledger = new Bj();
         placeOwnerBatch(engine, ledger, held, now, true);
         settle(engine, inventory(COINS, 100_000L + OWNER_BATCH_RECEIVED_TOTAL), now + 20_000L);
         assertOwnerBatchSettled(engine, now + 22_000L);
@@ -818,17 +818,17 @@ false, engine.geCustody.snapshotRecords().get(0).hasFrozenBasis());
     @Test
     public void heldCollectFailsClosedWhenTheExecutionEvidenceNeverArrives()
     {
-        Engine engine = engine();
+        Am engine = engine();
         long now = T0;
-        engine.startCustomSession("Trading", SessionMode.AUTO, now);
+        engine.ajl("Trading", Cx.AUTO, now);
         Map<Integer, Long> held = inventory(COINS, 100_000L, RUNE, 10L);
-        engine.setBaseline(new ContainerSnapshot(held));
+        engine.setBaseline(new Cc(held));
 
-        OfferLedger ledger = new OfferLedger();
+        Bj ledger = new Bj();
         noteGe(engine, ledger, 0, SELLING, RUNE, 10, 0, 7, 0, now);
         held.put(RUNE, 0L);
         settle(engine, held, now + 200L);
-        engine.noteGeCollectionIntent(now + 1_000L);
+        engine.abg(now + 1_000L);
         settle(engine, inventory(COINS, 100_070L), now + 1_000L);
         assertEquals("the observed collect is retained", 70L,
             EngineProbe.pendingSettlementCash(engine.geCustody));
@@ -845,18 +845,18 @@ false, engine.geCustody.snapshotRecords().get(0).hasFrozenBasis());
     @Test
     public void unrelatedCollectWindowCoinsWithoutSellEvidenceAreNeverHeld()
     {
-        Engine engine = engine();
+        Am engine = engine();
         long now = T0;
-        engine.startCustomSession("Trading", SessionMode.AUTO, now);
-        engine.setBaseline(new ContainerSnapshot(inventory(COINS, 100_000L)));
+        engine.ajl("Trading", Cx.AUTO, now);
+        engine.setBaseline(new Cc(inventory(COINS, 100_000L)));
 
-        engine.noteGeCollectionIntent(now + 1_000L);
-        engine.markContext(Context.MARKET, 10, "Grand Exchange collect");
+        engine.abg(now + 1_000L);
+        engine.markContext(Aj.MARKET, 10, "Grand Exchange collect");
         settle(engine, inventory(COINS, 100_500L), now + 1_000L);
 
         assertEquals("no sell lifecycle may absorb an unrelated movement", 0L,
             EngineProbe.pendingSettlementCash(engine.geCustody));
-        assertTrue("no custody settlement is invented", engine.getMarketSettlements().isEmpty());
+        assertTrue("no custody settlement is invented", engine.ub().isEmpty());
         assertEquals("the unexplained cash stays on the ordinary review path", 1,
             reviewCount(engine));
         assertEquals(0L, engine.getMetrics(now + 2_000L).net);
@@ -865,17 +865,17 @@ false, engine.geCustody.snapshotRecords().get(0).hasFrozenBasis());
     @Test
     public void singleUnknownSaleReceiptsAfterTaxCashAndTaxAdjustedReference()
     {
-        Engine engine = engine(210L);
+        Am engine = engine(210L);
         long now = T0;
-        engine.startCustomSession("Trading", SessionMode.AUTO, now);
-        engine.setBaseline(new ContainerSnapshot(inventory(COINS, 100_000L, RUNE, 26L)));
-        OfferLedger ledger = new OfferLedger();
+        engine.ajl("Trading", Cx.AUTO, now);
+        engine.setBaseline(new Cc(inventory(COINS, 100_000L, RUNE, 26L)));
+        Bj ledger = new Bj();
         noteGe(engine, ledger, 0, SELLING, RUNE, 26, 0, 210, 0, now);
         settle(engine, inventory(COINS, 100_000L, RUNE, 0L), now + 200L);
         noteGe(engine, ledger, 0, SOLD, RUNE, 26, 26, 210, 5_460, now + 1_000L);
         settle(engine, inventory(COINS, 105_356L), now + 2_000L);
 
-        MarketSettlementProjection.Row row = engine.getMarketSettlements().get(0);
+        Bi.Row row = engine.ub().get(0);
         assertEquals(5_460L, MarketFacts.realizedGrossGp(MarketFacts.record(engine, row)));
         assertEquals("the receipt shows actual after-tax cash", 5_356L,
             row.observedSettlementGp);
@@ -886,7 +886,7 @@ false, engine.geCustody.snapshotRecords().get(0).hasFrozenBasis());
         assertEquals(5_356L, row.geReferenceGp);
         assertEquals("after-tax Received against the tax-adjusted reference", 0L,
             row.geDifferenceGp);
-        assertEquals(MarketSettlementProjection.Coverage.FULLY_UNKNOWN, row.coverage);
+        assertEquals(Bi.Coverage.FULLY_UNKNOWN, row.coverage);
         assertEquals("unknown liquidation contributes exactly the proven tax", -104L,
             engine.getMetrics(now + 3_000L).net);
     }
@@ -894,21 +894,21 @@ false, engine.geCustody.snapshotRecords().get(0).hasFrozenBasis());
     @Test
     public void knownBasisSaleResultUsesAfterTaxCashWithoutASecondTaxCost()
     {
-        Engine engine = engine(210L);
+        Am engine = engine(210L);
         long now = T0;
-        engine.startCustomSession("Trading", SessionMode.AUTO, now);
-        engine.setBaseline(new ContainerSnapshot(inventory(COINS, 100_000L, RUNE, 26L)));
+        engine.ajl("Trading", Cx.AUTO, now);
+        engine.setBaseline(new Cc(inventory(COINS, 100_000L, RUNE, 26L)));
         gain(engine, RUNE, 26L, 5_000L, now - 60_000L);
-        OfferLedger ledger = new OfferLedger();
+        Bj ledger = new Bj();
         noteGe(engine, ledger, 0, SELLING, RUNE, 26, 0, 210, 0, now);
         settle(engine, inventory(COINS, 100_000L, RUNE, 0L), now + 200L);
         noteGe(engine, ledger, 0, SOLD, RUNE, 26, 26, 210, 5_460, now + 1_000L);
-        Transaction settlement = settle(engine, inventory(COINS, 105_356L), now + 2_000L);
+        Ac settlement = settle(engine, inventory(COINS, 105_356L), now + 2_000L);
 
         assertNotNull(settlement);
         assertTrue(settlement.isCounted());
-        MarketSettlementProjection.Row row = engine.getMarketSettlements().get(0);
-        assertEquals(MarketSettlementProjection.Coverage.FULLY_KNOWN, row.coverage);
+        Bi.Row row = engine.ub().get(0);
+        assertEquals(Bi.Coverage.FULLY_KNOWN, row.coverage);
         assertEquals(5_000L, row.trackedBasisConsumedGp);
         assertEquals(5_356L, MarketFacts.knownProceedsGp(MarketFacts.record(engine, row)));
         assertEquals("Result = after-tax Received - proven tracked basis", 356L,
@@ -921,11 +921,11 @@ false, engine.geCustody.snapshotRecords().get(0).hasFrozenBasis());
     @Test
     public void unexplainedBatchGapWithUnknownStockFailsClosed()
     {
-        Engine engine = engine();
+        Am engine = engine();
         long now = T0;
-        engine.startCustomSession("Trading", SessionMode.AUTO, now);
-        engine.setBaseline(new ContainerSnapshot(inventory(COINS, 100_000L, RUNE, 20L)));
-        OfferLedger ledger = new OfferLedger();
+        engine.ajl("Trading", Cx.AUTO, now);
+        engine.setBaseline(new Cc(inventory(COINS, 100_000L, RUNE, 20L)));
+        Bj ledger = new Bj();
         noteGe(engine, ledger, 0, SELLING, RUNE, 10, 0, 7, 0, now);
         settle(engine, inventory(COINS, 100_000L, RUNE, 10L), now);
         noteGe(engine, ledger, 1, SELLING, RUNE, 10, 0, 7, 0, now + 200L);
@@ -935,23 +935,23 @@ false, engine.geCustody.snapshotRecords().get(0).hasFrozenBasis());
         settle(engine, inventory(COINS, 100_138L), now + 1_000L);
 
         assertEquals(0L, engine.getMetrics(now + 2_000L).net);
-        for (MarketSettlementProjection.Row row : engine.getMarketSettlements())
+        for (Bi.Row row : engine.ub())
         {
-            assertEquals(MarketSettlementProjection.Lifecycle.AMBIGUOUS, row.lifecycle);
+            assertEquals(Bi.Lifecycle.AMBIGUOUS, row.lifecycle);
             assertEquals("unexplained gross evidence is retained, not split",
                 70L, row.observedSettlementGp);
         }
-        for (Transaction transaction : engine.getActiveSession().getTransactions())
+        for (Ac transaction : engine.getActiveSession().getTransactions())
         {
             assertFalse("no counted Coins loss may be invented for the gap: " + transaction,
                 transaction != null && transaction.isCounted()
-                    && transaction.getAutomaticType() == TransactionType.TRADE);
+                    && transaction.tm() == Ai.TRADE);
         }
     }
 
-    private static long flow(Transaction transaction, int itemId)
+    private static long flow(Ac transaction, int itemId)
     {
-        for (Flow itemFlow : transaction.getFlows())
+        for (Ab itemFlow : transaction.getFlows())
         {
             if (itemFlow.itemId == itemId)
             {
@@ -962,20 +962,20 @@ false, engine.geCustody.snapshotRecords().get(0).hasFrozenBasis());
     }
 
     /** Establish exact known coverage for an item (schema-106 tracked basis). */
-    private static void gain(Engine engine, int item, long quantity, long value, long at)
+    private static void gain(Am engine, int item, long quantity, long value, long at)
     {
-        engine.getActiveSession().addTransaction(new Transaction(at, null,
-            TransactionType.GAIN, Context.GENERIC, "", "Loot", true,
-            Collections.singletonList(new Flow(item, "Nature rune", quantity,
+        engine.getActiveSession().kf(new Ac(at, null,
+            Ai.GAIN, Aj.GENERIC, "", "Loot", true,
+            Collections.singletonList(new Ab(item, "Nature rune", quantity,
                 (int) (quantity > 0L ? value / quantity : 0L), value,
-                PriceSource.GRAND_EXCHANGE)),
-            ClassificationConfidence.CONFIRMED, "", null), 500);
+                Av.GRAND_EXCHANGE)),
+            Bd.CONFIRMED, "", null), 500);
     }
 
-    private static int countCounted(Engine engine)
+    private static int countCounted(Am engine)
     {
         int counted = 0;
-        for (Transaction transaction : engine.getActiveSession().getTransactions())
+        for (Ac transaction : engine.getActiveSession().getTransactions())
         {
             if (transaction != null && transaction.isCounted())
             {
@@ -985,16 +985,16 @@ false, engine.geCustody.snapshotRecords().get(0).hasFrozenBasis());
         return counted;
     }
 
-    private static void noteGe(Engine engine, OfferLedger ledger, int slot,
+    private static void noteGe(Am engine, Bj ledger, int slot,
         GrandExchangeOfferState state, int itemId, int totalQuantity, int quantityTraded, int price,
         int spent, long at)
     {
-        OfferLedger.Transition transition = ledger.observe(
-            new OfferLedger.Snapshot(slot, state, itemId, totalQuantity, quantityTraded, price, spent))
+        Bj.Transition transition = ledger.observe(
+            new Bj.Snapshot(slot, state, itemId, totalQuantity, quantityTraded, price, spent))
             .orElse(null);
         if (transition != null)
         {
-            engine.noteGeOfferObservation(transition, itemName(itemId), at);
+            engine.abh(transition, itemName(itemId), at);
         }
     }
 
@@ -1010,7 +1010,7 @@ false, engine.geCustody.snapshotRecords().get(0).hasFrozenBasis());
     }
 
     /** Place the owner's seven sell offers and capture each placement principal. */
-    private static void placeOwnerBatch(Engine engine, OfferLedger ledger,
+    private static void placeOwnerBatch(Am engine, Bj ledger,
         Map<Integer, Long> held, long now, boolean terminal)
     {
         for (int slot = 0; slot < OWNER_BATCH_ITEMS.length; slot++)
@@ -1028,7 +1028,7 @@ false, engine.geCustody.snapshotRecords().get(0).hasFrozenBasis());
     }
 
     /** Feed the owner's terminal SOLD evidence for every offer. */
-    private static void completeOwnerBatch(Engine engine, OfferLedger ledger, long now)
+    private static void completeOwnerBatch(Am engine, Bj ledger, long now)
     {
         for (int slot = 0; slot < OWNER_BATCH_ITEMS.length; slot++)
         {
@@ -1036,7 +1036,7 @@ false, engine.geCustody.snapshotRecords().get(0).hasFrozenBasis());
         }
     }
 
-    private static void completeOwnerSale(Engine engine, OfferLedger ledger, int slot,
+    private static void completeOwnerSale(Am engine, Bj ledger, int slot,
         long at)
     {
         noteGe(engine, ledger, slot, SOLD, OWNER_BATCH_ITEMS[slot], 5, 5, OWNER_BATCH_LISTED[slot],
@@ -1044,14 +1044,14 @@ false, engine.geCustody.snapshotRecords().get(0).hasFrozenBasis());
     }
 
     /** The exact owner-batch accounting every ordering must converge to. */
-    private static void assertOwnerBatchSettled(Engine engine, long now)
+    private static void assertOwnerBatchSettled(Am engine, long now)
     {
         Map<Integer, Integer> slotByItem = ownerBatchSlots();
         long grossTotal = 0L;
         long taxTotal = 0L;
         long receivedTotal = 0L;
         int rows = 0;
-        for (MarketSettlementProjection.Row row : engine.getMarketSettlements())
+        for (Bi.Row row : engine.ub())
         {
             Integer slot = slotByItem.get(row.itemId);
             if (slot == null)
@@ -1067,8 +1067,8 @@ false, engine.geCustody.snapshotRecords().get(0).hasFrozenBasis());
             assertEquals(OWNER_BATCH_EXECUTION[slot], MarketFacts.realizedGrossGp(MarketFacts.record(engine, row)));
             assertEquals("the actual after-tax unit value is exact",
                 OWNER_BATCH_RECEIVED[slot] / 5L, row.receivedEachGp);
-            assertEquals(MarketSettlementProjection.Coverage.FULLY_UNKNOWN, row.coverage);
-            assertEquals(MarketSettlementProjection.Lifecycle.REALIZED, row.lifecycle);
+            assertEquals(Bi.Coverage.FULLY_UNKNOWN, row.coverage);
+            assertEquals(Bi.Lifecycle.REALIZED, row.lifecycle);
             assertFalse(row.manualFinancialResult);
             if (OWNER_BATCH_TAX[slot] > 0L)
             {
@@ -1091,17 +1091,17 @@ false, engine.geCustody.snapshotRecords().get(0).hasFrozenBasis());
         assertEquals(OWNER_BATCH_RECEIVED_TOTAL, receivedTotal);
         assertEquals("unknown bank stock drops by exactly the proven batch tax", -480L,
             engine.getMetrics(now).net);
-        for (Transaction transaction : engine.getActiveSession().getTransactions())
+        for (Ac transaction : engine.getActiveSession().getTransactions())
         {
             assertFalse("no uncounted review row may exist for an exact batch: " + transaction,
-                ReviewEligibility.needsOwnerDecision(transaction));
+                Eh.aal(transaction));
             assertFalse("no synthetic Coins fee row may exist: " + transaction,
                 transaction != null && transaction.isCounted()
-                    && transaction.getAutomaticType() == TransactionType.TRADE
+                    && transaction.tm() == Ai.TRADE
                     && transaction.getFlows().size() == 1
                     && transaction.getFlows().get(0).itemId == COINS);
             if (transaction != null && transaction.isCounted()
-                && transaction.getAutomaticType() == TransactionType.TRADE)
+                && transaction.tm() == Ai.TRADE)
             {
                 assertEquals("one counted settlement per sale, each exactly its accepted tax",
                     -OWNER_BATCH_TAX[slotByItem.get(transaction.getFlows().get(0).itemId)],
@@ -1120,12 +1120,12 @@ false, engine.geCustody.snapshotRecords().get(0).hasFrozenBasis());
         return slotByItem;
     }
 
-    private static int reviewCount(Engine engine)
+    private static int reviewCount(Am engine)
     {
         int reviews = 0;
-        for (Transaction transaction : engine.getActiveSession().getTransactions())
+        for (Ac transaction : engine.getActiveSession().getTransactions())
         {
-            if (ReviewEligibility.needsOwnerDecision(transaction))
+            if (Eh.aal(transaction))
             {
                 reviews++;
             }
@@ -1133,12 +1133,12 @@ false, engine.geCustody.snapshotRecords().get(0).hasFrozenBasis());
         return reviews;
     }
 
-    private static int countUncertainCoinRows(Engine engine)
+    private static int countUncertainCoinRows(Am engine)
     {
         int rows = 0;
-        for (Transaction transaction : engine.getActiveSession().getTransactions())
+        for (Ac transaction : engine.getActiveSession().getTransactions())
         {
-            if (transaction != null && transaction.getAutomaticType() == TransactionType.UNCERTAIN
+            if (transaction != null && transaction.tm() == Ai.UNCERTAIN
                 && transaction.getFlows().size() == 1
                 && transaction.getFlows().get(0).itemId == COINS)
             {
@@ -1170,23 +1170,23 @@ false, engine.geCustody.snapshotRecords().get(0).hasFrozenBasis());
     }
 
     /** Production login priming: feed the stable baseline until the engine is ready to book. */
-    private static void prime(Engine engine, Map<Integer, Long> inventory, long now)
+    private static void prime(Am engine, Map<Integer, Long> inventory, long now)
     {
-        ContainerSnapshot snapshot = new ContainerSnapshot(inventory);
+        Cc snapshot = new Cc(inventory);
         for (int i = 0; i < 20 && EngineProbe.isBaselinePriming(engine); i++)
         {
-            engine.processIfDirty(snapshot, now + i * 600L);
+            engine.adj(snapshot, now + i * 600L);
         }
     }
 
-    private static Transaction settle(Engine engine, Map<Integer, Long> next, long now)
+    private static Ac settle(Am engine, Map<Integer, Long> next, long now)
     {
-        engine.markInventoryDirty();
-        ContainerSnapshot snapshot = new ContainerSnapshot(next);
-        Transaction result = null;
+        engine.yz();
+        Cc snapshot = new Cc(next);
+        Ac result = null;
         for (int i = 0; i < 3; i++)
         {
-            Transaction settled = engine.processIfDirty(snapshot, now + i * 600L);
+            Ac settled = engine.adj(snapshot, now + i * 600L);
             if (settled != null)
             {
                 result = settled;
@@ -1205,19 +1205,19 @@ false, engine.geCustody.snapshotRecords().get(0).hasFrozenBasis());
         return map;
     }
 
-    private static Engine engine()
+    private static Am engine()
     {
         return engine(6L);
     }
 
     /** One frozen reference unit for every non-coin item (the schema-106 test default is 6). */
-    private static Engine engine(long unitPrice)
+    private static Am engine(long unitPrice)
     {
         return pricedEngine(id -> unitPrice);
     }
 
     /** The owner's true frozen references per item, as shown in the reference screenshots. */
-    private static Engine ownerEngine()
+    private static Am ownerEngine()
     {
         return pricedEngine(GeCustodyPersistenceTest::ownerReference);
     }
@@ -1242,23 +1242,23 @@ false, engine.geCustody.snapshotRecords().get(0).hasFrozenBasis());
         }
     }
 
-    private static Engine pricedEngine(java.util.function.IntToLongFunction unitOf)
+    private static Am pricedEngine(java.util.function.IntToLongFunction unitOf)
     {
         GpManagerConfig config = new GpManagerConfig()
         {
             @Override public int stabilizationTicks() { return 1; }
             @Override public boolean keepTransferAuditRows() { return true; }
         };
-        return new Engine(deltas ->
+        return new Am(deltas ->
         {
-            List<Flow> flows = new ArrayList<>();
+            List<Ab> flows = new ArrayList<>();
             for (Map.Entry<Integer, Long> delta : deltas.entrySet())
             {
                 int id = delta.getKey();
                 long unit = id == COINS ? 1L : unitOf.applyAsLong(id);
-                flows.add(new Flow(id, itemName(id), delta.getValue(), (int) unit,
+                flows.add(new Ab(id, itemName(id), delta.getValue(), (int) unit,
                     delta.getValue() * unit,
-                    id == COINS ? PriceSource.FACE_VALUE : PriceSource.GRAND_EXCHANGE));
+                    id == COINS ? Av.FACE_VALUE : Av.GRAND_EXCHANGE));
             }
             return flows;
         }, new TransactionClassifier(), config);

@@ -13,11 +13,11 @@ import static org.junit.Assert.assertTrue;
  */
 public class MarketSettlementProjectionTest
 {
-    private static GeRecord sell(long offered, long captured, long filled, long spent,
+    private static Aa sell(long offered, long captured, long filled, long spent,
         long settled, long settledExecution, long settledCash, long realized)
     {
-        GeRecord record = new GeRecord("offer-" + offered + "-" + filled, 0,
-            GeRecord.Side.SELL, 561, "Nature rune", offered, 7L, 1_000L, "session-a");
+        Aa record = new Aa("offer-" + offered + "-" + filled, 0,
+            Aa.Side.SELL, 561, "Nature rune", offered, 7L, 1_000L, "session-a");
         record.setCapturedQty(captured);
         record.setFilledQty(filled);
         record.setSpentGp(spent);
@@ -26,7 +26,7 @@ public class MarketSettlementProjectionTest
         record.setSettledCashGp(settledCash);
         record.setRealizedResultGp(realized);
         record.setBasisUnitPrice(6L);
-        record.setBasisSource(PriceSource.GRAND_EXCHANGE.name());
+        record.setBasisSource(Av.GRAND_EXCHANGE.name());
         record.setBasisCapturedAtEpochMillis(1_000L);
         return record;
     }
@@ -34,11 +34,11 @@ public class MarketSettlementProjectionTest
     @Test
     public void pendingExecutionEdgeIsNeverRealized()
     {
-        GeRecord record = sell(10, 10, 10, 70, 0, 0, 0, 0);
+        Aa record = sell(10, 10, 10, 70, 0, 0, 0, 0);
         record.setOfferState("SOLD");
-        MarketSettlementProjection.Row row = MarketFacts.row(record);
+        Bi.Row row = MarketFacts.row(record);
 
-        assertEquals(MarketSettlementProjection.Lifecycle.EXECUTED_UNSETTLED, row.lifecycle);
+        assertEquals(Bi.Lifecycle.EXECUTED_UNSETTLED, row.lifecycle);
         assertEquals(0L, row.realizedResultGp);
         assertFalse(row.isRealizedIncluded());
     }
@@ -46,11 +46,11 @@ public class MarketSettlementProjectionTest
     @Test
     public void settlementAdjustmentAndRealizedResultAreExact()
     {
-        GeRecord record = sell(10, 10, 10, 70, 10, 70, 69, 9);
+        Aa record = sell(10, 10, 10, 70, 10, 70, 69, 9);
         record.setOfferState("SOLD");
-        MarketSettlementProjection.Row row = MarketFacts.row(record);
+        Bi.Row row = MarketFacts.row(record);
 
-        assertEquals(MarketSettlementProjection.Lifecycle.REALIZED, row.lifecycle);
+        assertEquals(Bi.Lifecycle.REALIZED, row.lifecycle);
         assertEquals(60L, MarketFacts.basisValueGp(record));
         assertEquals(69L, row.observedSettlementGp);
         assertEquals(-1L, row.settlementAdjustmentGp);
@@ -61,11 +61,11 @@ public class MarketSettlementProjectionTest
     @Test
     public void partiallyRealizedCountsOnlySettledQuantity()
     {
-        GeRecord record = sell(100, 100, 100, 700, 40, 280, 280, 40);
+        Aa record = sell(100, 100, 100, 700, 40, 280, 280, 40);
         record.setOfferState("SELLING");
-        MarketSettlementProjection.Row row = MarketFacts.row(record);
+        Bi.Row row = MarketFacts.row(record);
 
-        assertEquals(MarketSettlementProjection.Lifecycle.PARTIALLY_REALIZED, row.lifecycle);
+        assertEquals(Bi.Lifecycle.PARTIALLY_REALIZED, row.lifecycle);
         assertEquals(40L, row.settledQty);
         assertEquals(40L, row.realizedResultGp);
     }
@@ -73,26 +73,26 @@ public class MarketSettlementProjectionTest
     @Test
     public void cancellingBeforeAnyFillIsCancelledReturned()
     {
-        GeRecord record = sell(100, 100, 0, 0, 0, 0, 0, 0);
+        Aa record = sell(100, 100, 0, 0, 0, 0, 0, 0);
         record.setOfferState("CANCELLED_SELL");
         record.setReturnedQty(100L);
-        MarketSettlementProjection.Row row = MarketFacts.row(record);
+        Bi.Row row = MarketFacts.row(record);
 
-        assertEquals(MarketSettlementProjection.Lifecycle.CANCELLED_RETURNED, row.lifecycle);
+        assertEquals(Bi.Lifecycle.CANCELLED_RETURNED, row.lifecycle);
     }
 
     @Test
     public void ambiguousAndLegacyFailClosed()
     {
-        GeRecord ambiguous = sell(10, 10, 10, 70, 0, 0, 0, 0);
+        Aa ambiguous = sell(10, 10, 10, 70, 0, 0, 0, 0);
         ambiguous.setQuantityModified(true);
-        assertEquals(MarketSettlementProjection.Lifecycle.AMBIGUOUS,
-            MarketSettlementProjection.lifecycleOf(ambiguous));
+        assertEquals(Bi.Lifecycle.AMBIGUOUS,
+            Bi.yw(ambiguous));
 
-        GeRecord legacy = sell(10, 0, 4, 28, 0, 0, 0, 0);
-        legacy.setConfidence(GeRecord.Confidence.LEGACY_UNBASED);
-        assertEquals(MarketSettlementProjection.Lifecycle.UNAVAILABLE,
-            MarketSettlementProjection.lifecycleOf(legacy));
+        Aa legacy = sell(10, 0, 4, 28, 0, 0, 0, 0);
+        legacy.setConfidence(Aa.Confidence.LEGACY_UNBASED);
+        assertEquals(Bi.Lifecycle.UNAVAILABLE,
+            Bi.yw(legacy));
         assertEquals("unknown basis is never presented as a value", -1L,
             MarketFacts.basisValueGp(legacy));
     }
@@ -100,17 +100,17 @@ public class MarketSettlementProjectionTest
     @Test
     public void resumedLifecycleIsExplicit()
     {
-        GeRecord record = sell(10, 10, 0, 0, 0, 0, 0, 0);
-        record.setConfidence(GeRecord.Confidence.RESUMED);
+        Aa record = sell(10, 10, 0, 0, 0, 0, 0, 0);
+        record.setConfidence(Aa.Confidence.RESUMED);
         record.setOfferState("SELLING");
-        assertEquals(MarketSettlementProjection.Lifecycle.RESUMED,
-            MarketSettlementProjection.lifecycleOf(record));
+        assertEquals(Bi.Lifecycle.RESUMED,
+            Bi.yw(record));
     }
 
     @Test
     public void rowsAreReadOnlyAndEmptyInputsAreSafe()
     {
-        assertTrue(MarketSettlementProjection.rows(Collections.emptyList(), null, null).isEmpty());
-        assertTrue(MarketSettlementProjection.rows(null, null, null).isEmpty());
+        assertTrue(Bi.rows(Collections.emptyList(), null, null).isEmpty());
+        assertTrue(Bi.rows(null, null, null).isEmpty());
     }
 }

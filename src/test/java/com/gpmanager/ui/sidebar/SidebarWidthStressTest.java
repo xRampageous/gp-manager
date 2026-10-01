@@ -21,12 +21,12 @@ public class SidebarWidthStressTest
     @Test
     public void heroBoundsALongNameAndKeepsTheFullTextInItsTooltip() throws Exception
     {
-        Engine engine = PresentationLifecycleTest.engine();
+        Am engine = PresentationLifecycleTest.engine();
         String name = "Fishing trawler veteran of the north";
-        engine.startCustomSession(name, SessionMode.GENERAL, NOW);
-        SidebarPanel panel = onEdt(() ->
+        engine.ajl(name, Cx.GENERAL, NOW);
+        Dp panel = onEdt(() ->
         {
-            SidebarPanel created = new SidebarPanel(engine, PresentationLifecycleTest.config(), null);
+            Dp created = new Dp(engine, PresentationLifecycleTest.config(), null);
             SidebarPanelProbe.refresh(created);
             return created;
         });
@@ -42,14 +42,14 @@ public class SidebarWidthStressTest
     @Test
     public void ledgerToolbarCarriesItsActionsAndFits() throws Exception
     {
-        Engine engine = PresentationLifecycleTest.engine();
-        engine.startCustomSession("Fishing trawler veteran of the north", SessionMode.GENERAL, NOW);
-        engine.getActiveSession().addTransaction(booked(NOW + 1_000L, "Twisted bow", 20997, 1L,
+        Am engine = PresentationLifecycleTest.engine();
+        engine.ajl("Fishing trawler veteran of the north", Cx.GENERAL, NOW);
+        engine.getActiveSession().kf(booked(NOW + 1_000L, "Twisted bow", 20997, 1L,
             2_147_483_647, 2_147_483_647L), 2_000);
-        engine.setActiveSessionTargets(2_147_483_647L, null, NOW + 2_000L);
-        SidebarPanel panel = onEdt(() ->
+        engine.ahq(2_147_483_647L, null, NOW + 2_000L);
+        Dp panel = onEdt(() ->
         {
-            SidebarPanel created = new SidebarPanel(engine, PresentationLifecycleTest.config(), null);
+            Dp created = new Dp(engine, PresentationLifecycleTest.config(), null);
             created.shell().show(Shell.LEDGER);
             SidebarPanelProbe.refresh(created);
             return created;
@@ -86,9 +86,9 @@ public class SidebarWidthStressTest
     @Test
     public void costChipsWrapTwoByTwoWithRoomForEveryCount() throws Exception
     {
-        SidebarPanel panel = onEdt(() -> new SidebarPanel(PresentationLifecycleTest.engine(),
+        Dp panel = onEdt(() -> new Dp(PresentationLifecycleTest.engine(),
             PresentationLifecycleTest.config(), null));
-        javax.swing.JPanel chips = onEdt(() -> panel.ledger.costChips(LedgerData.CostView.ALL,
+        javax.swing.JPanel chips = onEdt(() -> panel.ledger.auf(Ao.Bs.ALL,
             new int[] {2_000, 2_000, 2_000, 2_000}));
         assertTrue("every choice stays present", onEdt(() -> chips.getComponentCount()) == 4);
         Object layout = onEdt(() -> chips.getLayout());
@@ -116,11 +116,11 @@ public class SidebarWidthStressTest
             onEdt(() -> table.header.getPreferredSize().width) <= SIDEBAR);
     }
 
-    private static Transaction booked(long at, String name, int itemId, long quantity, int unitPrice, long value)
+    private static Ac booked(long at, String name, int itemId, long quantity, int unitPrice, long value)
     {
-        return new Transaction(at, null, TransactionType.GAIN, Context.GENERIC, "", "Vorkath", true,
-            Collections.singletonList(new Flow(itemId, name, quantity, unitPrice, value)),
-            ClassificationConfidence.LIKELY, "Test sample.", null);
+        return new Ac(at, null, Ai.GAIN, Aj.GENERIC, "", "Vorkath", true,
+            Collections.singletonList(new Ab(itemId, name, quantity, unitPrice, value)),
+            Bd.LIKELY, "Test sample.", null);
     }
 
     private static <T> T onEdt(java.util.concurrent.Callable<T> callable) throws Exception

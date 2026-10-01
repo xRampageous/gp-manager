@@ -16,8 +16,8 @@ public class SidebarSheetTest
     @Test
     public void addGrindSavesAndStartGrindStartsSavedAndNew() throws Exception
     {
-        Engine engine = PresentationLifecycleTest.engine();
-        SidebarPanel panel = onEdt(() -> new SidebarPanel(engine, PresentationLifecycleTest.config(), null));
+        Am engine = PresentationLifecycleTest.engine();
+        Dp panel = onEdt(() -> new Dp(engine, PresentationLifecycleTest.config(), null));
         Shell shell = panel.shell();
         GrindsController grinds = new GrindsController(panel);
         onEdt(() ->
@@ -43,9 +43,9 @@ public class SidebarSheetTest
             return null;
         });
         assertEquals(1, engine.getSavedGrinds(true).size());
-        SavedState.SavedGrind saved = engine.getSavedGrinds(true).get(0);
+        SavedState.Ap saved = engine.getSavedGrinds(true).get(0);
         assertEquals("the name is trimmed", "Vorkath", saved.getName());
-        assertFalse("Add keeps it for later", engine.isCustomSessionActive());
+        assertFalse("Add keeps it for later", engine.wb());
 
         // Owner 2026-09-28: the same sheet lists saved Grinds, one click each.
         onEdt(() ->
@@ -59,7 +59,7 @@ public class SidebarSheetTest
             ShellProbe.pressSheet(shell, "Vorkath");
             return null;
         });
-        assertTrue(engine.isCustomSessionActive());
+        assertTrue(engine.wb());
         assertEquals(saved.getGrindId(), engine.getActiveSession().getGrindId());
 
         onEdt(() ->
@@ -82,9 +82,9 @@ public class SidebarSheetTest
     @Test
     public void confirmRunsOnlyOnItsButton() throws Exception
     {
-        Engine engine = PresentationLifecycleTest.engine();
-        engine.startCustomSession("Vorkath", SessionMode.GENERAL, System.currentTimeMillis());
-        SidebarPanel panel = onEdt(() -> new SidebarPanel(engine, PresentationLifecycleTest.config(), null));
+        Am engine = PresentationLifecycleTest.engine();
+        engine.ajl("Vorkath", Cx.GENERAL, System.currentTimeMillis());
+        Dp panel = onEdt(() -> new Dp(engine, PresentationLifecycleTest.config(), null));
         Shell shell = panel.shell();
         boolean[] ran = {false};
         onEdt(() ->
@@ -101,16 +101,16 @@ public class SidebarSheetTest
             return null;
         });
         assertTrue("the named button runs it", ran[0]);
-        assertTrue(engine.isCustomSessionActive());
+        assertTrue(engine.wb());
     }
 
     /** A rename from the Live hero name is a change like any other: the revision advances, so it is saved. */
     @Test
     public void liveRenameIsSaved() throws Exception
     {
-        Engine engine = PresentationLifecycleTest.engine();
-        engine.startCustomSession("Vorkath", SessionMode.GENERAL, System.currentTimeMillis());
-        SidebarPanel panel = onEdt(() -> new SidebarPanel(engine, PresentationLifecycleTest.config(), null));
+        Am engine = PresentationLifecycleTest.engine();
+        engine.ajl("Vorkath", Cx.GENERAL, System.currentTimeMillis());
+        Dp panel = onEdt(() -> new Dp(engine, PresentationLifecycleTest.config(), null));
         Shell shell = panel.shell();
         long before = engine.getRevision();
         onEdt(() ->
@@ -128,16 +128,16 @@ public class SidebarSheetTest
     @Test
     public void liveEndGrindEndsAtOnce() throws Exception
     {
-        Engine engine = PresentationLifecycleTest.engine();
-        engine.startCustomSession("Vorkath", SessionMode.GENERAL, System.currentTimeMillis());
-        SidebarPanel panel = onEdt(() -> new SidebarPanel(engine, PresentationLifecycleTest.config(), null));
+        Am engine = PresentationLifecycleTest.engine();
+        engine.ajl("Vorkath", Cx.GENERAL, System.currentTimeMillis());
+        Dp panel = onEdt(() -> new Dp(engine, PresentationLifecycleTest.config(), null));
         Shell shell = panel.shell();
         onEdt(() ->
         {
             panel.new LiveActions().endGrind();
             return null;
         });
-        assertFalse("End ends it", engine.isCustomSessionActive());
+        assertFalse("End ends it", engine.wb());
         assertEquals("no confirm sheet opens", "", ShellProbe.sheetTitle(shell));
     }
 
@@ -146,9 +146,9 @@ public class SidebarSheetTest
     public void aLongKeyValueKeepsItsKey() throws Exception
     {
         String value = "Ended before target \u00b7 +4.98M remaining";
-        KeyValue kv = onEdt(() ->
+        Dd kv = onEdt(() ->
         {
-            KeyValue created = new KeyValue(null).put("Target", value, null);
+            Dd created = new Dd(null).put("Target", value, null);
             created.setSize(200, 40);
             created.doLayout();
             created.body.doLayout();
@@ -166,13 +166,13 @@ public class SidebarSheetTest
     @Test
     public void ledgerMenuUndoesAndRestoresTheLastChange() throws Exception
     {
-        Engine engine = PresentationLifecycleTest.engine();
+        Am engine = PresentationLifecycleTest.engine();
         long now = System.currentTimeMillis();
-        engine.startCustomSession("Vorkath", SessionMode.GENERAL, now);
-        engine.getActiveSession().addTransaction(new Transaction(now + 1_000L, null, TransactionType.LOOT,
-            Context.LOOT, "", "Vorkath", true, java.util.Collections.singletonList(
-                new Flow(536, "Dragon bones", 1L, 2_000, 2_000L)), ClassificationConfidence.CONFIRMED, "fixture", null), 2_000);
-        SidebarPanel panel = onEdt(() -> new SidebarPanel(engine, PresentationLifecycleTest.config(), null));
+        engine.ajl("Vorkath", Cx.GENERAL, now);
+        engine.getActiveSession().kf(new Ac(now + 1_000L, null, Ai.LOOT,
+            Aj.LOOT, "", "Vorkath", true, java.util.Collections.singletonList(
+                new Ab(536, "Dragon bones", 1L, 2_000, 2_000L)), Bd.CONFIRMED, "fixture", null), 2_000);
+        Dp panel = onEdt(() -> new Dp(engine, PresentationLifecycleTest.config(), null));
         LedgerPage.Actions ledger = SidebarPanelProbe.ledgerPage(panel).actions;
         onEdt(() ->
         {
@@ -194,9 +194,9 @@ public class SidebarSheetTest
     @Test
     public void malformedTargetsReopenTheFormAndChangeNothing() throws Exception
     {
-        Engine engine = PresentationLifecycleTest.engine();
-        engine.startCustomSession("Vorkath", SessionMode.GENERAL, System.currentTimeMillis());
-        SidebarPanel panel = onEdt(() -> new SidebarPanel(engine, PresentationLifecycleTest.config(), null));
+        Am engine = PresentationLifecycleTest.engine();
+        engine.ajl("Vorkath", Cx.GENERAL, System.currentTimeMillis());
+        Dp panel = onEdt(() -> new Dp(engine, PresentationLifecycleTest.config(), null));
         Shell shell = panel.shell();
         GrindsController grinds = new GrindsController(panel);
         onEdt(() ->
@@ -222,9 +222,9 @@ public class SidebarSheetTest
     @Test
     public void unchangedTargetsSaveAsShown() throws Exception
     {
-        Engine engine = PresentationLifecycleTest.engine();
-        engine.startCustomSession("Vorkath", SessionMode.GENERAL, System.currentTimeMillis());
-        SidebarPanel panel = onEdt(() -> new SidebarPanel(engine, PresentationLifecycleTest.config(), null));
+        Am engine = PresentationLifecycleTest.engine();
+        engine.ajl("Vorkath", Cx.GENERAL, System.currentTimeMillis());
+        Dp panel = onEdt(() -> new Dp(engine, PresentationLifecycleTest.config(), null));
         Shell shell = panel.shell();
         GrindsController grinds = new GrindsController(panel);
         for (long target : new long[]{30L * 60_000L, 90L * 60_000L, 26L * 3_600_000L + 30L * 60_000L})
@@ -244,7 +244,7 @@ public class SidebarSheetTest
     @Test
     public void switchingPagesClosesTheSheet() throws Exception
     {
-        SidebarPanel panel = onEdt(() -> new SidebarPanel(PresentationLifecycleTest.engine(),
+        Dp panel = onEdt(() -> new Dp(PresentationLifecycleTest.engine(),
             PresentationLifecycleTest.config(), null));
         Shell shell = panel.shell();
         onEdt(() ->

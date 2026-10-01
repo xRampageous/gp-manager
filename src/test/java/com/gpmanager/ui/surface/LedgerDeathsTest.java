@@ -12,12 +12,12 @@ public class LedgerDeathsTest
     @Test
     public void deathsListOnlyDeathLossesNewestFirst()
     {
-        Transaction older = death(1_000L, -500L);
-        Transaction newer = death(5_000L, -2_000L);
-        Transaction food = Tx.of(3_000L, TransactionType.CONSUMPTION, Context.GENERIC,
-            "", true, Collections.singletonList(new Flow(1, "Food", -1, 100, -100)));
+        Ac older = death(1_000L, -500L);
+        Ac newer = death(5_000L, -2_000L);
+        Ac food = Tx.of(3_000L, Ai.CONSUMPTION, Aj.GENERIC,
+            "", true, Collections.singletonList(new Ab(1, "Food", -1, 100, -100)));
 
-        List<LedgerData.Death> deaths = LedgerData.deaths(Arrays.asList(older, food, newer), "");
+        List<Ao.Death> deaths = Ao.deaths(Arrays.asList(older, food, newer), "");
 
         assertEquals(2, deaths.size());
         assertEquals(newer.getId(), deaths.get(0).transactionId);
@@ -29,14 +29,14 @@ public class LedgerDeathsTest
     @Test
     public void pvmDeathIsTheWipeWithItsReclaimFee()
     {
-        Transaction wipe = Tx.of(1_000L, TransactionType.TRANSFER, Context.TRANSFER,
+        Ac wipe = Tx.of(1_000L, Ai.TRANSFER, Aj.TRANSFER,
             "Death: items held by gravestone / retrieval service", false,
-            Collections.singletonList(new Flow(3, "Abyssal whip", -1, 1_500_000, -1_500_000)));
-        Transaction fee = Tx.of(2_000L, null, TransactionType.CONSUMPTION,
-            Context.GENERIC, "Death reclaim fee", "Death reclaim", true,
-            Collections.singletonList(new Flow(995, "Coins", -1_000, 1, -1_000)));
+            Collections.singletonList(new Ab(3, "Abyssal whip", -1, 1_500_000, -1_500_000)));
+        Ac fee = Tx.of(2_000L, null, Ai.CONSUMPTION,
+            Aj.GENERIC, "Death reclaim fee", "Death reclaim", true,
+            Collections.singletonList(new Ab(995, "Coins", -1_000, 1, -1_000)));
 
-        List<LedgerData.Death> deaths = LedgerData.deaths(Arrays.asList(wipe, fee), "");
+        List<Ao.Death> deaths = Ao.deaths(Arrays.asList(wipe, fee), "");
 
         assertEquals(1, deaths.size());
         assertEquals(wipe.getId(), deaths.get(0).transactionId);
@@ -47,9 +47,9 @@ public class LedgerDeathsTest
         assertEquals(0, deaths.get(0).lost.size());
     }
 
-    private static Transaction death(long at, long value)
+    private static Ac death(long at, long value)
     {
-        return Tx.of(at, TransactionType.PK_DEATH_LOSS, Context.PK_DEATH, "", true,
-            Collections.singletonList(new Flow(2, "Rune scimitar", -1, (int) -value, value)));
+        return Tx.of(at, Ai.PK_DEATH_LOSS, Aj.PK_DEATH, "", true,
+            Collections.singletonList(new Ab(2, "Rune scimitar", -1, (int) -value, value)));
     }
 }

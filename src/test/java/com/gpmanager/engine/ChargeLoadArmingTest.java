@@ -80,12 +80,12 @@ public class ChargeLoadArmingTest
         return new MenuOptionClicked(entry);
     }
 
-    private static Engine engine()
+    private static Am engine()
     {
-        return new Engine(deltas -> Collections.emptyList(), new TransactionClassifier(), new GpManagerConfig() {});
+        return new Am(deltas -> Collections.emptyList(), new TransactionClassifier(), new GpManagerConfig() {});
     }
 
-    private static ChargeIntake intake(Client client, Engine engine)
+    private static ChargeIntake intake(Client client, Am engine)
     {
         return new ChargeIntake(client, null, new GpManagerConfig() {}, engine, null)
         {
@@ -98,17 +98,17 @@ public class ChargeLoadArmingTest
     }
 
     private static final String BLOWPIPE_IDENTITY = (InterfaceID.Inventory.ITEMS >>> 16) + ":" + BLOWPIPE_SLOT + ":"
-        + ItemID.TOXIC_BLOWPIPE_LOADED + ":" + ChargeRead.Variant.V1b.name();
+        + ItemID.TOXIC_BLOWPIPE_LOADED + ":" + Ar.V.V1b.name();
 
     @Test
     public void scalesUsedOnTheBlowpipeArmTheLoad()
     {
-        Engine engine = engine();
+        Am engine = engine();
         Widget blowpipe = item(ItemID.TOXIC_BLOWPIPE_LOADED, BLOWPIPE_SLOT);
         Widget scales = item(ItemID.SNAKEBOSS_SCALE, SCALES_SLOT);
-        intake(selecting(scales), engine).armChargeLoadTransfer(
+        intake(selecting(scales), engine).lc(
             click(MenuAction.WIDGET_TARGET_ON_WIDGET, "Use", blowpipe), "");
-        assertEquals(ChargeRead.Variant.V1b, engine.chargeLoadTransferEvidence.variant);
+        assertEquals(Ar.V.V1b, engine.chargeLoadTransferEvidence.variant);
         assertEquals("the item in hand is the source", ItemID.SNAKEBOSS_SCALE,
             engine.chargeLoadTransferEvidence.selectedItemId);
         assertEquals("the weapon's own slot", BLOWPIPE_IDENTITY, engine.chargeLoadTransferEvidence.targetIdentity);
@@ -117,12 +117,12 @@ public class ChargeLoadArmingTest
     @Test
     public void theBlowpipeUsedOnScalesArmsTheSameLoad()
     {
-        Engine engine = engine();
+        Am engine = engine();
         Widget blowpipe = item(ItemID.TOXIC_BLOWPIPE_LOADED, BLOWPIPE_SLOT);
         Widget scales = item(ItemID.SNAKEBOSS_SCALE, SCALES_SLOT);
-        intake(selecting(blowpipe), engine).armChargeLoadTransfer(
+        intake(selecting(blowpipe), engine).lc(
             click(MenuAction.WIDGET_TARGET_ON_WIDGET, "Use", scales), "");
-        assertEquals(ChargeRead.Variant.V1b, engine.chargeLoadTransferEvidence.variant);
+        assertEquals(Ar.V.V1b, engine.chargeLoadTransferEvidence.variant);
         assertEquals(ItemID.SNAKEBOSS_SCALE, engine.chargeLoadTransferEvidence.selectedItemId);
         assertEquals("the identity follows the weapon, not the clicked scales", BLOWPIPE_IDENTITY,
             engine.chargeLoadTransferEvidence.targetIdentity);
@@ -131,12 +131,12 @@ public class ChargeLoadArmingTest
     @Test
     public void anUnrelatedItemOrPlainClickArmsNothing()
     {
-        Engine engine = engine();
+        Am engine = engine();
         Widget blowpipe = item(ItemID.TOXIC_BLOWPIPE_LOADED, BLOWPIPE_SLOT);
-        intake(selecting(item(ItemID.BIG_BONES, 2)), engine).armChargeLoadTransfer(
+        intake(selecting(item(ItemID.BIG_BONES, 2)), engine).lc(
             click(MenuAction.WIDGET_TARGET_ON_WIDGET, "Use", blowpipe), "");
         assertNull(engine.chargeLoadTransferEvidence.variant);
-        intake(selecting(item(ItemID.SNAKEBOSS_SCALE, SCALES_SLOT)), engine).armChargeLoadTransfer(
+        intake(selecting(item(ItemID.SNAKEBOSS_SCALE, SCALES_SLOT)), engine).lc(
             click(MenuAction.CC_OP, "Check", blowpipe), "");
         assertNull("only a use-on click arms a load", engine.chargeLoadTransferEvidence.variant);
     }
@@ -144,14 +144,14 @@ public class ChargeLoadArmingTest
     @Test
     public void anyOtherActionEndsTheUnchargeWatchButAnsweringThePromptKeepsIt()
     {
-        Engine engine = engine();
-        engine.ensureSession(1_000L);
+        Am engine = engine();
+        engine.rm(1_000L);
         ChargeIntake intake = intake(selecting(null), engine);
         Widget trident = item(ItemID.TOTS_CHARGED, 0);
         intake.onMenuOptionClicked(click(MenuAction.CC_OP, "uncharge", trident), "uncharge", "trident of the seas");
-        assertEquals(ChargeRead.Variant.TRIDENT_SEAS, intake.returnVariant);
+        assertEquals(Ar.V.TRIDENT_SEAS, intake.returnVariant);
         intake.onMenuOptionClicked(click(MenuAction.WIDGET_CONTINUE, "continue", null), "continue", "");
-        assertEquals("answering the prompt keeps watching", ChargeRead.Variant.TRIDENT_SEAS, intake.returnVariant);
+        assertEquals("answering the prompt keeps watching", Ar.V.TRIDENT_SEAS, intake.returnVariant);
         intake.onMenuOptionClicked(click(MenuAction.WALK, "walk here", null), "walk here", "");
         assertNull("walking away ends it, so later runes stay loot", intake.returnVariant);
     }

@@ -16,7 +16,7 @@ static final long MIN_ACTIVE_MILLIS = 60_000L;
 *
 * @param activeMillis                  canonical Active Time of the Grind
 */
-static boolean isFullRateEstablished(long activeMillis) {
-return activeMillis >= MIN_ACTIVE_MILLIS;
+static boolean wn(long activeMillis) {
+ return activeMillis >= MIN_ACTIVE_MILLIS;
 }
 }

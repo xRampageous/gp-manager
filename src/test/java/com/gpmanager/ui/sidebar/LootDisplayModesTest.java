@@ -24,20 +24,20 @@ public class LootDisplayModesTest
     {
         // The Ground Items lists: Iron mace highlighted, Bones hidden, Onion seed on neither.
         LootPresentationFilterService service = new LootPresentationFilterService(
-            new GroundItemsConfigSnapshot(true, "Iron mace", "Bones", false));
-        Engine engine = PresentationLifecycleTest.engine();
-        engine.startCustomSession("Guard", SessionMode.GENERAL, T0);
-        book(engine, T0 + 1_000L, new Flow(1420, "Iron mace", 1, 52, 52L));
-        book(engine, T0 + 2_000L, new Flow(526, "Bones", 4, 90, 360L));
-        book(engine, T0 + 3_000L, new Flow(5319, "Onion seed", 4, 3, 12L));
+            new Bc(true, "Iron mace", "Bones", false));
+        Am engine = PresentationLifecycleTest.engine();
+        engine.ajl("Guard", Cx.GENERAL, T0);
+        book(engine, T0 + 1_000L, new Ab(1420, "Iron mace", 1, 52, 52L));
+        book(engine, T0 + 2_000L, new Ab(526, "Bones", 4, 90, 360L));
+        book(engine, T0 + 3_000L, new Ab(5319, "Onion seed", 4, 3, 12L));
         long net = engine.getMetrics(T0 + 4_000L).net;
 
         assertEquals(List.of("Onion seed", "Bones", "Iron mace"),
-            shown(engine, service, LootPresentationFilter.ALL_ITEMS));
+            shown(engine, service, Dl.ALL_ITEMS));
         assertEquals("Follow Ground Items hides the hidden list", List.of("Onion seed", "Iron mace"),
-            shown(engine, service, LootPresentationFilter.FOLLOW_GROUND_ITEMS));
+            shown(engine, service, Dl.FOLLOW_GROUND_ITEMS));
         assertEquals("Highlighted list only shows the highlighted list", List.of("Iron mace"),
-            shown(engine, service, LootPresentationFilter.HIGHLIGHTED_LIST_ONLY));
+            shown(engine, service, Dl.HIGHLIGHTED_LIST_ONLY));
         assertEquals("no display mode changes Net", net, engine.getMetrics(T0 + 5_000L).net);
         assertEquals(52L + 360L + 12L, net);
     }
@@ -49,23 +49,23 @@ public class LootDisplayModesTest
         for (WorldType flag : EnumSet.complementOf(EnumSet.of(WorldType.DEADMAN, WorldType.SEASONAL,
             WorldType.QUEST_SPEEDRUNNING, WorldType.BETA_WORLD, WorldType.TOURNAMENT_WORLD, WorldType.NOSAVE_MODE)))
         {
-            ItemValuationService valuation = new ItemValuationService(new GpManagerConfig() {}, id -> null,
+            Bl valuation = new Bl(new GpManagerConfig() {}, id -> null,
                 (id, active) -> 52, id -> false,
-                ItemValuationService.economyStateFor(EnumSet.of(WorldType.MEMBERS, flag)));
-            Flow drop = valuation.value(Collections.singletonMap(1420, 1L), T0).get(0);
-            assertEquals(flag + " prices drops", PriceSource.GRAND_EXCHANGE, drop.getPriceSource());
+                Bl.rh(EnumSet.of(WorldType.MEMBERS, flag)));
+            Ab drop = valuation.value(Collections.singletonMap(1420, 1L), T0).get(0);
+            assertEquals(flag + " prices drops", Av.GRAND_EXCHANGE, drop.getPriceSource());
             assertEquals(52L, drop.valueDelta);
         }
     }
 
-    private static List<String> shown(Engine engine, LootPresentationFilterService service,
-        LootPresentationFilter mode)
+    private static List<String> shown(Am engine, LootPresentationFilterService service,
+        Dl mode)
     {
         RecentFilter filter = flow -> service.isFlowIncluded(flow, mode);
-        LiveSnapshot snapshot = LiveSnapshot.capture(engine, T0 + 4_000L,
-            new LiveContext(false, filter, 0L, PvpState.NONE, "", false, ""));
+        Ca snapshot = Ca.capture(engine, T0 + 4_000L,
+            new Dz(false, filter, 0L, Bo.NONE, "", false, ""));
         List<String> names = new ArrayList<>();
-        for (LiveSnapshot.Recent row : snapshot.recent)
+        for (Ca.Recent row : snapshot.recent)
         {
             assertFalse(mode + ": " + row.name + " keeps its price", row.unpriced);
             assertTrue(mode + ": " + row.name + " shows a value", row.value > 0L);
@@ -74,9 +74,9 @@ public class LootDisplayModesTest
         return names;
     }
 
-    private static void book(Engine engine, long at, Flow flow)
+    private static void book(Am engine, long at, Ab flow)
     {
-        engine.getActiveSession().addTransaction(Tx.of(at, TransactionType.LOOT, Context.LOOT,
+        engine.getActiveSession().kf(Tx.of(at, Ai.LOOT, Aj.LOOT,
             "Loot from Guard", true, Collections.singletonList(flow)), 2_000);
     }
 }

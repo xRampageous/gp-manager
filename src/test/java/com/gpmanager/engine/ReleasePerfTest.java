@@ -30,99 +30,99 @@ public class ReleasePerfTest
     public void heavyProfileStaysInsideTheFrameBudget() throws Exception
     {
         Assume.assumeTrue("set GP_PERF to run", System.getenv("GP_PERF") != null);
-        Engine engine = PresentationLifecycleTest.engine();
+        Am engine = PresentationLifecycleTest.engine();
         for (int grind = 0; grind < 300; grind++)
         {
-            Session done = new Session("Grind " + grind, T0 - (300 - grind) * 3_600_000L);
+            Ad done = new Ad("Grind " + grind, T0 - (300 - grind) * 3_600_000L);
             for (int i = 0; i < 60; i++)
             {
-                done.addTransaction(receipt(done.startedAtEpochMillis + i * 1_000L), 2_000);
+                done.kf(receipt(done.startedAtEpochMillis + i * 1_000L), 2_000);
             }
             done.close(done.startedAtEpochMillis + 3_000_000L);
             engine.history.add(0, done);
         }
-        engine.startCustomSession("Greater Nechryael", SessionMode.GENERAL, T0);
+        engine.ajl("Greater Nechryael", Cx.GENERAL, T0);
         for (int i = 0; i < 2_000; i++)
         {
-            engine.getActiveSession().addTransaction(receipt(T0 + i * 1_800L), 2_000);
+            engine.getActiveSession().kf(receipt(T0 + i * 1_800L), 2_000);
         }
         long now = T0 + 4_000_000L;
 
-        List<Transaction> all = engine.getActiveSession().getTransactions();
-        report("Bp.transaction x2000", () -> all.stream().mapToLong(t -> AccountingProjection.transaction(t).costs).sum());
-        report("Bp.costSplit x2000", () -> all.stream().mapToLong(t -> AccountingProjection.costSplit(t).supplies).sum());
+        List<Ac> all = engine.getActiveSession().getTransactions();
+        report("Bp.transaction x2000", () -> all.stream().mapToLong(t -> Bp.transaction(t).costs).sum());
+        report("Bp.costSplit x2000", () -> all.stream().mapToLong(t -> Bp.costSplit(t).supplies).sum());
         report("spellName x2000", () -> all.stream().mapToLong(t -> t.spellName().length()).sum());
-        report("Ledger contributions x2000", () -> all.stream().mapToLong(t -> Contribution.project(t).size()).sum());
+        report("Ledger contributions x2000", () -> all.stream().mapToLong(t -> Af.project(t).size()).sum());
         report("session metrics", () -> engine.getActiveSession().metrics(now).net);
         int[] flip = {0};
-        report("Live capture (cold)", () -> LiveSnapshot.capture(engine, now,
-            new LiveContext(false, null, flip[0]++ % 2, PvpState.NONE, "", false, "")).net);
-        report("Live capture (warm)", () -> LiveSnapshot.capture(engine, now, LiveContext.NONE).net);
-        report("Ledger capture", () -> LedgerData.capture(engine, now, LedgerData.Entry.current()).net);
-        report("Grinds capture", () -> GrindsData.capture(engine, now, false, null).myGrinds.size());
+        report("Live capture (cold)", () -> Ca.capture(engine, now,
+            new Dz(false, null, flip[0]++ % 2, Bo.NONE, "", false, "")).net);
+        report("Live capture (warm)", () -> Ca.capture(engine, now, Dz.NONE).net);
+        report("Ledger capture", () -> Ao.capture(engine, now, Ao.Entry.current()).net);
+        report("Grinds capture", () -> As.capture(engine, now, false, null).myGrinds.size());
         GpManagerConfig config = HudBuilderTest.config(true, 4);
-        HudBuilder builder = new HudBuilder(config, null);
-        HudOverlay overlay = new HudOverlay(builder, config);
+        Cp builder = new Cp(config, null);
+        De overlay = new De(builder, config);
         Graphics2D g = new BufferedImage(1, 1, BufferedImage.TYPE_INT_ARGB).createGraphics();
-        LiveSnapshot snapshot = LiveSnapshot.capture(engine, now, LiveContext.NONE);
+        Ca snapshot = Ca.capture(engine, now, Dz.NONE);
         report("HUD+ update + render", () ->
         {
             builder.update(snapshot, f -> true, null, now);
             return overlay.render(g).width;
         });
         Gson gson = new Gson();
-        String once = gson.toJson(engine.createSavedState());
+        String once = gson.toJson(engine.qm());
         SavedState copy = gson.fromJson(once, SavedState.class);
-        copy.normalizeActionLabels();
+        copy.aar();
         System.out.println("PERF save JSON bytes " + once.length()
             + ", identical to the old detached copy: " + once.equals(gson.toJson(copy)));
-        report("save snapshot (engine lock)", () -> engine.createSavedState().schemaVersion);
-        report("detach round trip", () -> gson.fromJson(gson.toJson(engine.createSavedState()), SavedState.class).schemaVersion);
-        report("save snapshot + JSON", () -> gson.toJson(engine.createSavedState()).length());
+        report("save snapshot (engine lock)", () -> engine.qm().schemaVersion);
+        report("detach round trip", () -> gson.fromJson(gson.toJson(engine.qm()), SavedState.class).schemaVersion);
+        report("save snapshot + JSON", () -> gson.toJson(engine.qm()).length());
         SessionRepository repository = new SessionRepository(gson,
             FilepathTestSupport.root(java.nio.file.Files.createTempDirectory("gp-perf")));
-        PersistenceCoordinator coordinator = new PersistenceCoordinator(null, null, repository,
+        Ei coordinator = new Ei(null, null, repository,
             new OrderedPersistenceWriter(repository, null), engine);
-        report("save intent (client thread)", () -> coordinator.currentIntent().expectedBaseRevision);
+        report("save intent (client thread)", () -> coordinator.qn().expectedBaseRevision);
     }
 
-    private static Transaction receipt(long at)
+    private static Ac receipt(long at)
     {
-        List<Flow> flows;
-        TransactionType type;
-        ActionKind action = null;
+        List<Ab> flows;
+        Ai type;
+        Au action = null;
         switch (RANDOM.nextInt(5))
         {
             case 0:
-                type = TransactionType.LOOT;
-                flows = Arrays.asList(new Flow(1_319, "Rune axe", 1L, 7_202, 7_202L),
-                    new Flow(560, "Death rune", 46L, 187, 8_602L));
+                type = Ai.LOOT;
+                flows = Arrays.asList(new Ab(1_319, "Rune axe", 1L, 7_202, 7_202L),
+                    new Ab(560, "Death rune", 46L, 187, 8_602L));
                 break;
             case 1:
-                type = TransactionType.CONSUMPTION;
-                action = ActionKind.CAST;
-                flows = Arrays.asList(new Flow(560, "Death rune", -4L, 187, -748L),
-                    new Flow(565, "Blood rune", -2L, 341, -682L), new Flow(555, "Water rune", -6L, 5, -30L));
+                type = Ai.CONSUMPTION;
+                action = Au.CAST;
+                flows = Arrays.asList(new Ab(560, "Death rune", -4L, 187, -748L),
+                    new Ab(565, "Blood rune", -2L, 341, -682L), new Ab(555, "Water rune", -6L, 5, -30L));
                 break;
             case 2:
-                type = TransactionType.CONSUMPTION;
-                action = ActionKind.DRINK;
-                flows = Arrays.asList(new Flow(2434, "Prayer potion(4)", -1L, 9_800, -9_800L),
-                    new Flow(139, "Prayer potion(3)", 1L, 7_350, 7_350L));
+                type = Ai.CONSUMPTION;
+                action = Au.DRINK;
+                flows = Arrays.asList(new Ab(2434, "Prayer potion(4)", -1L, 9_800, -9_800L),
+                    new Ab(139, "Prayer potion(3)", 1L, 7_350, 7_350L));
                 break;
             case 3:
-                type = TransactionType.CONSUMPTION;
-                action = ActionKind.FIRE;
-                flows = Collections.singletonList(new Flow(808, "Steel dart", -2L, 4, -8L));
+                type = Ai.CONSUMPTION;
+                action = Au.FIRE;
+                flows = Collections.singletonList(new Ab(808, "Steel dart", -2L, 4, -8L));
                 break;
             default:
-                type = TransactionType.GAIN;
-                flows = Collections.singletonList(new Flow(526, "Bones", 1L, 37, 37L));
+                type = Ai.GAIN;
+                flows = Collections.singletonList(new Ab(526, "Bones", 1L, 37, 37L));
                 break;
         }
-        Transaction transaction = new Transaction(at, null, type,
-            type == TransactionType.LOOT ? Context.LOOT : Context.GENERIC, "",
-            "Greater Nechryael", true, flows, ClassificationConfidence.CONFIRMED, "perf", null);
+        Ac transaction = new Ac(at, null, type,
+            type == Ai.LOOT ? Aj.LOOT : Aj.GENERIC, "",
+            "Greater Nechryael", true, flows, Bd.CONFIRMED, "perf", null);
         transaction.setActionKind(action);
         return transaction;
     }

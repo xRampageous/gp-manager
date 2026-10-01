@@ -24,31 +24,31 @@ public class HudBestsCacheTest
     public void deletingOrRestoringTheRecordRunRecomputesTheBests() throws Exception
     {
         GpManagerConfig config = new GpManagerConfig() {};
-        Engine engine = new Engine(deltas -> Collections.emptyList(), new TransactionClassifier(), config);
+        Am engine = new Am(deltas -> Collections.emptyList(), new TransactionClassifier(), config);
 
-        engine.startCustomSession("Vorkath", SessionMode.GENERAL, NOW - 10_800_000L);
+        engine.ajl("Vorkath", Cx.GENERAL, NOW - 10_800_000L);
         String recordId = engine.getActiveSession().getId();
-        SavedState.SavedGrind saved = engine.saveGrind("Vorkath", null, null, false, recordId);
+        SavedState.Ap saved = engine.avg("Vorkath", null, null, false, recordId);
         book(engine.getActiveSession(), NOW - 10_799_000L, 2_000_000L);
-        engine.finishCustomSession(NOW - 7_200_000L);
+        engine.sx(NOW - 7_200_000L);
 
         engine.startGrind("Vorkath", saved.getGrindId(), null, null, NOW - 7_200_000L);
         book(engine.getActiveSession(), NOW - 7_199_000L, 1_000_000L);
-        engine.finishCustomSession(NOW - 3_600_000L);
+        engine.sx(NOW - 3_600_000L);
 
         // A live linked run keeps the lineage in view while the closed runs are the record.
         engine.startGrind("Vorkath", saved.getGrindId(), null, null, NOW - 3_600_000L);
 
-        SidebarPanel panel = onEdt(() -> new SidebarPanel(engine, config, null));
-        panel.bindHud(new HudBuilder(config, null));
+        Dp panel = onEdt(() -> new Dp(engine, config, null));
+        panel.axn(new Cp(config, null));
         refresh(panel);
         assertNotNull("the bests cache ran", panel.bestsFor);
         assertNotNull("the lineage resolved", panel.bests);
         assertEquals("the record run is the best", 2_000_000L, panel.bests[1]);
         String recorded = panel.bestsFor;
-        SavedState snapshot = engine.createSavedState();
+        SavedState snapshot = engine.qm();
 
-        assertTrue(engine.deleteHistorySession(recordId));
+        assertTrue(engine.qu(recordId));
         refresh(panel);
         assertNotEquals("the key follows the history", recorded, panel.bestsFor);
         assertEquals("the next best takes over", 1_000_000L, panel.bests[1]);
@@ -60,7 +60,7 @@ public class HudBestsCacheTest
         assertEquals("the restored record is back", 2_000_000L, panel.bests[1]);
     }
 
-    private static void refresh(SidebarPanel panel) throws Exception
+    private static void refresh(Dp panel) throws Exception
     {
         onEdt(() ->
         {
@@ -69,11 +69,11 @@ public class HudBestsCacheTest
         });
     }
 
-    private static void book(Session session, long at, long value)
+    private static void book(Ad session, long at, long value)
     {
-        session.addTransaction(new Transaction(at, null, TransactionType.LOOT, Context.LOOT, "", "Vorkath", true,
-            Collections.singletonList(new Flow(536, "Dragon bones", 1L, (int) value, value)),
-            ClassificationConfidence.CONFIRMED, "fixture", null), 2_000);
+        session.kf(new Ac(at, null, Ai.LOOT, Aj.LOOT, "", "Vorkath", true,
+            Collections.singletonList(new Ab(536, "Dragon bones", 1L, (int) value, value)),
+            Bd.CONFIRMED, "fixture", null), 2_000);
     }
 
     @SuppressWarnings("unchecked")

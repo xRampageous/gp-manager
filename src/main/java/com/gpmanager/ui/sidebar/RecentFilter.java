@@ -7,11 +7,11 @@ package com.gpmanager;
 @FunctionalInterface
 interface RecentFilter {
 /** @return true when presentation may show a row carrying this flow */
-boolean isFlowIncluded(Flow flow);
+boolean isFlowIncluded(Ab flow);
 default boolean showRecent(String name, long quantity) { return true; }
 default void hideRecent(String name) { }
 /** Changes whenever the decisions may change, so the Live list is rebuilt only then. */
 default String version() {
-return "";
+ return "";
 }
 }

@@ -5,32 +5,32 @@ import static org.junit.Assert.*;
 
 public class DataManagementEngineTest
 {
-    private Engine engine()
+    private Am engine()
     {
-        return new Engine(deltas -> java.util.Collections.emptyList(), new TransactionClassifier(), new GpManagerConfig() {});
+        return new Am(deltas -> java.util.Collections.emptyList(), new TransactionClassifier(), new GpManagerConfig() {});
     }
 
     @Test public void clearHistoryPreservesOwnersAndTargets()
     {
-        Engine engine = engine();
-        engine.ensureSession(1L);
+        Am engine = engine();
+        engine.rm(1L);
         engine.getGeneralSession().setProfitTargetGp(100L);
-        engine.startCustomSession("Custom", SessionMode.AUTO, 2L);
-        engine.finishCustomSession(3L);
-        assertTrue(engine.deleteHistorySession(engine.getHistory().get(0).getId()));
+        engine.ajl("Custom", Cx.AUTO, 2L);
+        engine.sx(3L);
+        assertTrue(engine.qu(engine.getHistory().get(0).getId()));
         assertEquals(0, engine.getHistory().size());
         assertEquals(Long.valueOf(100L), engine.getGeneralSession().getProfitTargetGp());
     }
 
     @Test public void resetTrackingClearsOwnersHistoryAndTargetsLikeANewInstall()
     {
-        Engine engine = engine();
-        engine.ensureSession(1L);
+        Am engine = engine();
+        engine.rm(1L);
         engine.getGeneralSession().setProfitTargetGp(100L);
-        engine.startCustomSession("Custom", SessionMode.AUTO, 2L);
-        engine.resetTrackingData(3L);
+        engine.ajl("Custom", Cx.AUTO, 2L);
+        engine.agr(3L);
         assertEquals(0, engine.getHistory().size());
-        assertFalse(engine.isCustomSessionActive());
+        assertFalse(engine.wb());
         // A reset is a new install: no owner (and so no target) until play or Start.
         assertNull(engine.getActiveSession());
         assertNull(engine.getGeneralSession());

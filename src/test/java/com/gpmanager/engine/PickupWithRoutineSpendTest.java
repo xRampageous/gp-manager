@@ -32,19 +32,19 @@ public class PickupWithRoutineSpendTest
     @Test
     public void openingCoinPouchesIsACountedGain()
     {
-        Transaction settled = settleFrom(POUCH, 2L, 995, 60L, POUCH, 0L);
+        Ac settled = settleFrom(POUCH, 2L, 995, 60L, POUCH, 0L);
         assertNotNull(settled);
         assertEquals("the coins count as income, not an uncounted Review",
-            TransactionType.GAIN, settled.getType());
+            Ai.GAIN, settled.getType());
         assertTrue(settled.isCounted());
     }
 
     @Test
     public void aPickupWithADartThrownIsACountedGain()
     {
-        Transaction settled = settleFrom(808, 10L, 562, 50L, 808, 9L);
+        Ac settled = settleFrom(808, 10L, 562, 50L, 808, 9L);
         assertNotNull(settled);
-        assertEquals(TransactionType.GAIN, settled.getType());
+        assertEquals(Ai.GAIN, settled.getType());
         assertTrue("counted, never an uncounted Review", settled.isCounted());
         assertEquals("Net is the runes less the dart", 50L * 90L - 4L, settled.getNet());
     }
@@ -52,26 +52,26 @@ public class PickupWithRoutineSpendTest
     @Test
     public void aPickupWithFoodEatenStaysReview()
     {
-        Transaction settled = settleFrom(385, 3L, 562, 50L, 385, 2L);
+        Ac settled = settleFrom(385, 3L, 562, 50L, 385, 2L);
         assertNotNull(settled);
-        assertEquals("food is not a routine combat spend", TransactionType.UNCERTAIN, settled.getType());
+        assertEquals("food is not a routine combat spend", Ai.UNCERTAIN, settled.getType());
     }
 
     /** Baseline {first: firstQty}, then {gainId: gainQty, first: firstAfter}. */
-    private static Transaction settleFrom(int first, long firstQty, int gainId, long gainQty, int after, long afterQty)
+    private static Ac settleFrom(int first, long firstQty, int gainId, long gainQty, int after, long afterQty)
     {
-        Engine engine = engine();
-        engine.startCustomSession("Nechryael", SessionMode.GENERAL, T0);
+        Am engine = engine();
+        engine.ajl("Nechryael", Cx.GENERAL, T0);
         Map<Integer, Long> held = new HashMap<>();
         held.put(first, firstQty);
-        engine.setBaseline(new ContainerSnapshot(new HashMap<>(held)));
+        engine.setBaseline(new Cc(new HashMap<>(held)));
         held.put(gainId, gainQty);
         held.put(after, afterQty);
-        engine.markInventoryDirty();
-        Transaction result = null;
+        engine.yz();
+        Ac result = null;
         for (int i = 0; i < 3; i++)
         {
-            Transaction settled = engine.processIfDirty(new ContainerSnapshot(new HashMap<>(held)), T0 + 600L + i * 600L);
+            Ac settled = engine.adj(new Cc(new HashMap<>(held)), T0 + 600L + i * 600L);
             if (settled != null)
             {
                 result = settled;
@@ -80,7 +80,7 @@ public class PickupWithRoutineSpendTest
         return result;
     }
 
-    private static Engine engine()
+    private static Am engine()
     {
         GpManagerConfig config = new GpManagerConfig()
         {
@@ -90,14 +90,14 @@ public class PickupWithRoutineSpendTest
                 return 1;
             }
         };
-        return new Engine(deltas ->
+        return new Am(deltas ->
         {
-            List<Flow> flows = new ArrayList<>();
+            List<Ab> flows = new ArrayList<>();
             for (Map.Entry<Integer, Long> delta : deltas.entrySet())
             {
                 int unit = delta.getKey() == 562 ? 90 : delta.getKey() == 808 ? 4 : 900;
-                flows.add(new Flow(delta.getKey(), NAMES.get(delta.getKey()), delta.getValue(), unit,
-                    delta.getValue() * unit, PriceSource.GRAND_EXCHANGE));
+                flows.add(new Ab(delta.getKey(), NAMES.get(delta.getKey()), delta.getValue(), unit,
+                    delta.getValue() * unit, Av.GRAND_EXCHANGE));
             }
             return flows;
         }, new TransactionClassifier(), config);

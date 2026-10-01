@@ -20,16 +20,16 @@ public class ClosedRateReadinessTest
     public void aCompactedClosedRunStillShowsItsFullRunRate()
     {
         Fixture fixture = new Fixture();
-        fixture.engine.startCustomSession("Vorkath", SessionMode.GENERAL, NOW - HOUR);
-        Session session = fixture.engine.getActiveSession();
+        fixture.engine.ajl("Vorkath", Cx.GENERAL, NOW - HOUR);
+        Ad session = fixture.engine.getActiveSession();
         String id = session.getId();
         book(session, NOW - HOUR + 60_000L, 1_000_000L);
         book(session, NOW - 30_000L, 1_000_000L);
-        fixture.engine.finishCustomSession(NOW);
+        fixture.engine.sx(NOW);
 
-        Session closed = fixture.engine.getHistorySession(id);
-        closed.compactTransactionsBefore(NOW - 30_000L, null);
-        GrindsData data = GrindsData.capture(fixture.engine, NOW, false, id);
+        Ad closed = fixture.engine.ua(id);
+        closed.pj(NOW - 30_000L, null);
+        As data = As.capture(fixture.engine, NOW, false, id);
         assertTrue("the closed detail rate is established", data.detail.rateEstablished);
         assertEquals("on the full-session basis", 2_000_000L, data.detail.gpPerHour);
         assertEquals("the money stays exact", 2_000_000L, data.detail.net);
@@ -39,12 +39,12 @@ public class ClosedRateReadinessTest
     public void theActiveRateSurvivesCompaction()
     {
         Fixture fixture = new Fixture();
-        fixture.engine.startCustomSession("Vorkath", SessionMode.GENERAL, NOW - HOUR);
-        Session session = fixture.engine.getActiveSession();
+        fixture.engine.ajl("Vorkath", Cx.GENERAL, NOW - HOUR);
+        Ad session = fixture.engine.getActiveSession();
         book(session, NOW - HOUR + 60_000L, 1_000_000L);
         book(session, NOW - 30_000L, 1_000_000L);
-        session.compactTransactionsBefore(NOW - 30_000L, null);
-        GrindsData data = GrindsData.capture(fixture.engine, NOW, false, session.getId());
+        session.pj(NOW - 30_000L, null);
+        As data = As.capture(fixture.engine, NOW, false, session.getId());
         assertTrue("compaction never hides the live rate: it is Net over active time",
             data.detail.rateEstablished);
         assertEquals(2_000_000L, data.detail.gpPerHour);
@@ -53,42 +53,42 @@ public class ClosedRateReadinessTest
     @Test
     public void theClosedFloorIsSixtySecondsAndZeroIsHonest()
     {
-        Engine under = engine();
-        under.startCustomSession("Vorkath", SessionMode.GENERAL, NOW - 59_000L);
+        Am under = engine();
+        under.ajl("Vorkath", Cx.GENERAL, NOW - 59_000L);
         book(under.getActiveSession(), NOW - 58_000L, 60_000L);
         String underId = under.getActiveSession().getId();
-        under.finishCustomSession(NOW);
+        under.sx(NOW);
         assertFalse("under a minute has no rate",
-            GrindsData.capture(under, NOW, false, underId).detail.rateEstablished);
+            As.capture(under, NOW, false, underId).detail.rateEstablished);
 
-        Engine exact = engine();
-        exact.startCustomSession("Vorkath", SessionMode.GENERAL, NOW - 60_000L);
+        Am exact = engine();
+        exact.ajl("Vorkath", Cx.GENERAL, NOW - 60_000L);
         book(exact.getActiveSession(), NOW - 59_000L, 60_000L);
         String exactId = exact.getActiveSession().getId();
-        exact.finishCustomSession(NOW);
-        GrindsData closed = GrindsData.capture(exact, NOW, false, exactId);
+        exact.sx(NOW);
+        As closed = As.capture(exact, NOW, false, exactId);
         assertTrue("exactly a minute qualifies", closed.detail.rateEstablished);
         assertEquals(3_600_000L, closed.detail.gpPerHour);
 
-        Engine zero = engine();
-        zero.startCustomSession("Vorkath", SessionMode.GENERAL, NOW - 120_000L);
+        Am zero = engine();
+        zero.ajl("Vorkath", Cx.GENERAL, NOW - 120_000L);
         String zeroId = zero.getActiveSession().getId();
-        zero.finishCustomSession(NOW);
-        GrindsData empty = GrindsData.capture(zero, NOW, false, zeroId);
+        zero.sx(NOW);
+        As empty = As.capture(zero, NOW, false, zeroId);
         assertTrue("a real zero is not unavailable", empty.detail.rateEstablished);
         assertEquals(0L, empty.detail.gpPerHour);
     }
 
-    private static void book(Session session, long at, long value)
+    private static void book(Ad session, long at, long value)
     {
-        session.addTransaction(new Transaction(at, null, TransactionType.LOOT, Context.LOOT, "", "Vorkath", true,
-            Collections.singletonList(new Flow(536, "Dragon bones", 1L, (int) value, value)),
-            ClassificationConfidence.CONFIRMED, "fixture", null), 2_000);
+        session.kf(new Ac(at, null, Ai.LOOT, Aj.LOOT, "", "Vorkath", true,
+            Collections.singletonList(new Ab(536, "Dragon bones", 1L, (int) value, value)),
+            Bd.CONFIRMED, "fixture", null), 2_000);
     }
 
-    private static Engine engine()
+    private static Am engine()
     {
-        return new Engine(deltas -> Collections.emptyList(), new TransactionClassifier(),
+        return new Am(deltas -> Collections.emptyList(), new TransactionClassifier(),
             new GpManagerConfig()
             {
             });
@@ -96,6 +96,6 @@ public class ClosedRateReadinessTest
 
     private static final class Fixture
     {
-        final Engine engine = engine();
+        final Am engine = engine();
     }
 }

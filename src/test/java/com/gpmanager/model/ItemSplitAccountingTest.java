@@ -12,62 +12,62 @@ public class ItemSplitAccountingTest
     @Test
     public void applyItemSplitKeepsPersonalShareAndRecordsUndoableCorrection()
     {
-        Session session = new Session("Split", 0L);
+        Ad session = new Ad("Split", 0L);
         long priceCapturedAt = 1_725_000_000_123L;
-        Transaction loot = Tx.of(
+        Ac loot = Tx.of(
             1_000L,
-            TransactionType.LOOT,
-            Context.LOOT,
+            Ai.LOOT,
+            Aj.LOOT,
             "Loot from Corp",
             true,
-            Collections.singletonList(new Flow(995, "Coins", 10, 1, 10,
-                PriceSource.FACE_VALUE, priceCapturedAt)));
-        session.addTransaction(loot, 50);
+            Collections.singletonList(new Ab(995, "Coins", 10, 1, 10,
+                Av.FACE_VALUE, priceCapturedAt)));
+        session.kf(loot, 50);
 
         assertEquals(10L, session.metrics(2_000L).net);
-        assertTrue(session.applyItemSplit(loot.getId(), 995, 4L, 3_000L, "team"));
+        assertTrue(session.kr(loot.getId(), 995, 4L, 3_000L, "team"));
         assertEquals(4L, session.metrics(4_000L).net);
         assertEquals(priceCapturedAt, loot.getFlows().get(0).getPriceCapturedAtEpochMillis());
-        assertTrue(ItemSplitAccounting.isSplitReason(loot.getExplanation()));
-        assertTrue(ItemSplitAccounting.isSplitReason(loot.getCorrectionReason()));
+        assertTrue(Dm.xr(loot.getExplanation()));
+        assertTrue(Dm.xr(loot.tq()));
         assertEquals(1, ModelProbe.activeCorrections(session).size());
         assertTrue(ModelProbe.activeCorrections(session).get(0).getChanges().get(0).hasFlowSnapshot());
         assertEquals(priceCapturedAt,
             ModelProbe.activeCorrections(session).get(0).getChanges().get(0).getFlowSnapshot().get(0).getPriceCapturedAtEpochMillis());
 
-        assertTrue(session.undoLastCorrection(5_000L));
+        assertTrue(session.akb(5_000L));
         assertEquals(10L, session.metrics(6_000L).net);
         assertEquals(priceCapturedAt, loot.getFlows().get(0).getPriceCapturedAtEpochMillis());
-        assertFalse(ItemSplitAccounting.isSplitReason(loot.getExplanation()));
+        assertFalse(Dm.xr(loot.getExplanation()));
     }
 
     @Test
     public void fullGiveawayIgnoresSingleItemGain()
     {
-        Session session = new Session("Split", 0L);
-        Transaction loot = Tx.of(
+        Ad session = new Ad("Split", 0L);
+        Ac loot = Tx.of(
             1_000L,
-            TransactionType.LOOT,
-            Context.LOOT,
+            Ai.LOOT,
+            Aj.LOOT,
             "Loot",
             true,
-            Collections.singletonList(new Flow(526, "Bones", 3, 50, 150)));
-        session.addTransaction(loot, 50);
+            Collections.singletonList(new Ab(526, "Bones", 3, 50, 150)));
+        session.kf(loot, 50);
 
-        assertTrue(session.applyItemSplit(loot.getId(), 526, 0L, 2_000L, null));
-        assertEquals(Correction.IGNORE, loot.getCorrection());
+        assertTrue(session.kr(loot.getId(), 526, 0L, 2_000L, null));
+        assertEquals(Ah.IGNORE, loot.getCorrection());
         assertEquals(0L, session.metrics(3_000L).net);
-        assertTrue(session.undoLastCorrection(4_000L));
-        assertEquals(Correction.AUTO, loot.getCorrection());
+        assertTrue(session.akb(4_000L));
+        assertEquals(Ah.AUTO, loot.getCorrection());
         assertEquals(150L, session.metrics(5_000L).net);
     }
 
     @Test
     public void reasonFormatIsStableForLedgerFilter()
     {
-        String reason = ItemSplitAccounting.reason(2, 5, "Alice");
+        String reason = Dm.reason(2, 5, "Alice");
         assertTrue(reason, reason.startsWith("Split keep 2/5"));
         assertTrue(reason, reason.contains("Split share"));
-        assertTrue(ItemSplitAccounting.isSplitReason(reason));
+        assertTrue(Dm.xr(reason));
     }
 }

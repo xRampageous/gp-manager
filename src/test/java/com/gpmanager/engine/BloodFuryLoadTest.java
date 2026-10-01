@@ -17,19 +17,19 @@ public class BloodFuryLoadTest
     @Test
     public void attachingABloodShardToAFuryIsAnUncountedMixedChange()
     {
-        Engine engine = engine();
-        engine.ensureSession(T0);
+        Am engine = engine();
+        engine.rm(T0);
         Map<Integer, Long> held = new HashMap<>();
         held.put(ItemID.BLOOD_SHARD, 1L);
         held.put(ItemID.ENCHANTED_ONYX_AMULET, 1L);
-        engine.setBaseline(new ContainerSnapshot(held));
-        engine.markInventoryDirty();
+        engine.setBaseline(new Cc(held));
+        engine.yz();
         Map<Integer, Long> attached = new HashMap<>();
         attached.put(ItemID.BLOOD_AMULET, 1L);
 
-        Transaction settled = settle(engine, attached, T0);
+        Ac settled = settle(engine, attached, T0);
         assertNotNull(settled);
-        assertEquals("a mixed attach with no context stays uncertain", TransactionType.UNCERTAIN,
+        assertEquals("a mixed attach with no context stays uncertain", Ai.UNCERTAIN,
             settled.getType());
         assertFalse("the default never counts an uncertain mixed change", settled.isCounted());
         assertEquals("Net stays 0 until a read measures hits used", 0L,
@@ -39,30 +39,30 @@ public class BloodFuryLoadTest
     @Test
     public void aValidatedRechargeTransfersNeutrallyAndNeverBlocks()
     {
-        Engine engine = engine();
-        engine.ensureSession(T0);
+        Am engine = engine();
+        engine.rm(T0);
         Map<Integer, Long> held = new HashMap<>();
         held.put(ItemID.BLOOD_SHARD, 1L);
-        engine.setBaseline(new ContainerSnapshot(held));
-        engine.markInventoryDirty();
-        assertTrue(engine.markChargeLoadTransfer(ChargeRead.Variant.BLOOD_FURY, ItemID.BLOOD_SHARD, "Blood shard",
+        engine.setBaseline(new Cc(held));
+        engine.yz();
+        assertTrue(engine.yx(Ar.V.BLOOD_FURY, ItemID.BLOOD_SHARD, "Blood shard",
             "149:2:0:" + ItemID.BLOOD_AMULET + ":BLOOD_FURY", 6));
 
-        Transaction load = settle(engine, new HashMap<>(), T0);
+        Ac load = settle(engine, new HashMap<>(), T0);
         assertNotNull(load);
-        assertEquals("value moved into charges, never a cost", TransactionType.TRANSFER, load.getAutomaticType());
+        assertEquals("value moved into charges, never a cost", Ai.TRANSFER, load.tm());
         assertFalse(load.isCounted());
         assertEquals(0L, engine.getMetrics(T0 + 2_400L).net);
         assertTrue("nothing is left to block measured hits",
-            engine.chargeLoadReviews.pendingChargeLoadComponents(ChargeRead.Variant.BLOOD_FURY).isEmpty());
+            engine.chargeLoadReviews.acy(Ar.V.BLOOD_FURY).isEmpty());
     }
 
-    private static Transaction settle(Engine engine, Map<Integer, Long> held, long from)
+    private static Ac settle(Am engine, Map<Integer, Long> held, long from)
     {
-        Transaction result = null;
+        Ac result = null;
         for (int i = 0; i < 3; i++)
         {
-            Transaction settled = engine.processIfDirty(new ContainerSnapshot(new HashMap<>(held)), from + 600L + i * 600L);
+            Ac settled = engine.adj(new Cc(new HashMap<>(held)), from + 600L + i * 600L);
             if (settled != null)
             {
                 result = settled;
@@ -71,7 +71,7 @@ public class BloodFuryLoadTest
         return result;
     }
 
-    private static Engine engine()
+    private static Am engine()
     {
         Map<Integer, String> names = new HashMap<>();
         names.put(ItemID.BLOOD_SHARD, "Blood shard");
@@ -80,15 +80,15 @@ public class BloodFuryLoadTest
         Map<Integer, Integer> prices = new HashMap<>();
         prices.put(ItemID.BLOOD_SHARD, 8_000_000);
         prices.put(ItemID.ENCHANTED_ONYX_AMULET, 2_800_000);
-        return new Engine(deltas ->
+        return new Am(deltas ->
         {
-            List<Flow> flows = new ArrayList<>();
+            List<Ab> flows = new ArrayList<>();
             for (Map.Entry<Integer, Long> delta : deltas.entrySet())
             {
                 int unit = prices.getOrDefault(delta.getKey(), 0);
-                flows.add(new Flow(delta.getKey(),
+                flows.add(new Ab(delta.getKey(),
                     names.getOrDefault(delta.getKey(), "Item " + delta.getKey()),
-                    delta.getValue(), unit, delta.getValue() * unit, PriceSource.GRAND_EXCHANGE));
+                    delta.getValue(), unit, delta.getValue() * unit, Av.GRAND_EXCHANGE));
             }
             return flows;
         }, new TransactionClassifier(), new GpManagerConfig()

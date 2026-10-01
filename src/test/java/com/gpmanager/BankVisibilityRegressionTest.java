@@ -19,22 +19,22 @@ public class BankVisibilityRegressionTest
             GpManagerConfig config = new GpManagerConfig() {
                 public int stabilizationTicks() { return 0; }
             };
-            Engine engine = new Engine(deltas -> {
-                java.util.List<Flow> flows = new java.util.ArrayList<>();
-                deltas.forEach((id, qty) -> flows.add(new Flow(id, "Item " + id, qty, 50, qty * 50)));
+            Am engine = new Am(deltas -> {
+                java.util.List<Ab> flows = new java.util.ArrayList<>();
+                deltas.forEach((id, qty) -> flows.add(new Ab(id, "Item " + id, qty, 50, qty * 50)));
                 return flows;
             }, new TransactionClassifier(), config);
-            engine.ensureSession(1000);
-            ContainerSnapshot held = new ContainerSnapshot(Collections.singletonMap(itemId, 1L));
-            engine.setBaseline(consuming ? held : ContainerSnapshot.empty());
+            engine.rm(1000);
+            Cc held = new Cc(Collections.singletonMap(itemId, 1L));
+            engine.setBaseline(consuming ? held : Cc.empty());
             // The same bank visibility decision used by the production tick adapter.
-            if (bankOpen(false)) engine.markBankInterfaceOpen(6);
-            else engine.markBankInterfaceClosed();
-            engine.markInventoryDirty();
-            ContainerSnapshot next = consuming ? ContainerSnapshot.empty() : held;
-            engine.processIfDirty(next, 1600);
-            assertEquals(consuming ? TransactionType.CONSUMPTION : TransactionType.GAIN,
-                engine.processIfDirty(next, 2200).getType());
+            if (bankOpen(false)) engine.ze(6);
+            else engine.yu();
+            engine.yz();
+            Cc next = consuming ? Cc.empty() : held;
+            engine.adj(next, 1600);
+            assertEquals(consuming ? Ai.CONSUMPTION : Ai.GAIN,
+                engine.adj(next, 2200).getType());
             assertEquals(consuming ? -50 : 50, engine.getMetrics(2200).net);
         }
     }
@@ -49,8 +49,8 @@ public class BankVisibilityRegressionTest
         Widget shown = proxy(Widget.class, name -> "isHidden".equals(name) ? false : null);
         Client open = proxy(Client.class, name -> "getWidget".equals(name) ? shown : null);
         Client closed = proxy(Client.class, name -> null);
-        assertTrue(LiveWidgets.isToolStoreOpen(open));
-        assertFalse(LiveWidgets.isToolStoreOpen(closed));
+        assertTrue(Ee.yf(open));
+        assertFalse(Ee.yf(closed));
     }
 
     private boolean bankOpen(boolean visible) throws Exception
@@ -62,7 +62,7 @@ public class BankVisibilityRegressionTest
             if ("getWidget".equals(name)) return widget;
             return null;
         });
-        return LiveWidgets.isBankingUiOpen(client);
+        return Ee.vp(client);
     }
 
     private static <T> T proxy(Class<T> type, java.util.function.Function<String, Object> values)

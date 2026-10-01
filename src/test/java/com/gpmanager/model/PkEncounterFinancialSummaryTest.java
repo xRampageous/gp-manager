@@ -13,85 +13,85 @@ public class PkEncounterFinancialSummaryTest
     @Test
     public void newEncounterTracksCorrectionAwareSnapshotsAndReplacesSameTransaction()
     {
-        PkEncounter encounter = encounter();
-        Transaction receipt = transaction(true, TransactionType.LOOT, 500L, -100L);
+        Bx encounter = encounter();
+        Ac receipt = transaction(true, Ai.LOOT, 500L, -100L);
 
-        encounter.setFinancialContribution(receipt);
-        assertEquals(400L, encounter.getFinancialNetGp());
-        assertEquals(0L, encounter.getFinancialLossGp());
+        encounter.ahr(receipt);
+        assertEquals(400L, encounter.ur());
+        assertEquals(0L, encounter.uk());
 
-        receipt.applyCorrection(Correction.COST, 20L, "Manual cost");
-        encounter.setFinancialContribution(receipt);
-        assertEquals(-600L, encounter.getFinancialNetGp());
-        assertEquals(600L, encounter.total().getCostsGp());
+        receipt.ko(Ah.COST, 20L, "Manual cost");
+        encounter.ahr(receipt);
+        assertEquals(-600L, encounter.ur());
+        assertEquals(600L, encounter.total().tr());
     }
 
     @Test
     public void excludesUncountedIgnoredAndTransferTransactions()
     {
-        PkEncounter encounter = encounter();
-        Transaction uncounted = transaction(false, TransactionType.LOOT, 900L, -50L);
-        Transaction ignored = transaction(true, TransactionType.LOOT, 300L, -100L);
-        ignored.applyCorrection(Correction.IGNORE, 30L, "Ignore");
-        Transaction transfer = transaction(true, TransactionType.TRANSFER, 400L, -200L);
+        Bx encounter = encounter();
+        Ac uncounted = transaction(false, Ai.LOOT, 900L, -50L);
+        Ac ignored = transaction(true, Ai.LOOT, 300L, -100L);
+        ignored.ko(Ah.IGNORE, 30L, "Ignore");
+        Ac transfer = transaction(true, Ai.TRANSFER, 400L, -200L);
 
-        encounter.setFinancialContribution(uncounted);
-        encounter.setFinancialContribution(ignored);
-        encounter.setFinancialContribution(transfer);
+        encounter.ahr(uncounted);
+        encounter.ahr(ignored);
+        encounter.ahr(transfer);
 
-        assertEquals(0L, encounter.getFinancialNetGp());
-        assertEquals(0L, encounter.total().getCostsGp());
+        assertEquals(0L, encounter.ur());
+        assertEquals(0L, encounter.total().tr());
     }
 
     @Test
     public void undoRemovesDetailedContributionAndCompactionRetainsTotals()
     {
-        PkEncounter encounter = encounter();
-        Transaction first = transaction(true, TransactionType.LOOT, 250L, -75L);
-        Transaction undone = transaction(true, TransactionType.LOOT, 100L, -20L);
-        encounter.setFinancialContribution(first);
-        encounter.setFinancialContribution(undone);
+        Bx encounter = encounter();
+        Ac first = transaction(true, Ai.LOOT, 250L, -75L);
+        Ac undone = transaction(true, Ai.LOOT, 100L, -20L);
+        encounter.ahr(first);
+        encounter.ahr(undone);
 
-        assertTrue(encounter.removeFinancialContribution(undone.getId()));
-        assertEquals(175L, encounter.getFinancialNetGp());
-        assertTrue(encounter.compactFinancialContribution(first.getId()));
-        assertFalse(encounter.compactFinancialContribution(first.getId()));
-        assertEquals(175L, encounter.getFinancialNetGp());
-        assertEquals(0L, encounter.getFinancialLossGp());
-        assertEquals(75L, encounter.total().getCostsGp());
-        assertFalse(encounter.removeFinancialContribution(first.getId()));
+        assertTrue(encounter.afd(undone.getId()));
+        assertEquals(175L, encounter.ur());
+        assertTrue(encounter.pf(first.getId()));
+        assertFalse(encounter.pf(first.getId()));
+        assertEquals(175L, encounter.ur());
+        assertEquals(0L, encounter.uk());
+        assertEquals(75L, encounter.total().tr());
+        assertFalse(encounter.afd(first.getId()));
     }
 
     @Test
     public void gsonRoundTripPreservesCompactedAndDetailedSummary()
     {
         Gson gson = new Gson();
-        PkEncounter encounter = encounter();
-        Transaction compacted = transaction(true, TransactionType.LOOT, 500L, -100L);
-        Transaction detailed = transaction(true, TransactionType.LOOT, 200L, -50L);
-        encounter.setFinancialContribution(compacted);
-        encounter.setFinancialContribution(detailed);
-        encounter.compactFinancialContribution(compacted.getId());
+        Bx encounter = encounter();
+        Ac compacted = transaction(true, Ai.LOOT, 500L, -100L);
+        Ac detailed = transaction(true, Ai.LOOT, 200L, -50L);
+        encounter.ahr(compacted);
+        encounter.ahr(detailed);
+        encounter.pf(compacted.getId());
 
-        PkEncounter restored = gson.fromJson(gson.toJson(encounter), PkEncounter.class);
-        assertEquals(550L, restored.getFinancialNetGp());
-        assertEquals(0L, restored.getFinancialLossGp());
-        assertTrue(restored.removeFinancialContribution(detailed.getId()));
-        assertEquals(400L, restored.getFinancialNetGp());
+        Bx restored = gson.fromJson(gson.toJson(encounter), Bx.class);
+        assertEquals(550L, restored.ur());
+        assertEquals(0L, restored.uk());
+        assertTrue(restored.afd(detailed.getId()));
+        assertEquals(400L, restored.ur());
     }
 
-    private static PkEncounter encounter()
+    private static Bx encounter()
     {
-        return new PkEncounter(EncounterType.KILL, 1L, "Victim",
-            ClassificationConfidence.CONFIRMED, "test");
+        return new Bx(Be.KILL, 1L, "Victim",
+            Bd.CONFIRMED, "test");
     }
 
-    private static Transaction transaction(boolean counted, TransactionType type,
+    private static Ac transaction(boolean counted, Ai type,
         long gainGp, long costGp)
     {
-        return Tx.of(2L, type, Context.GENERIC, "PK receipt", counted,
+        return Tx.of(2L, type, Aj.GENERIC, "PK receipt", counted,
             Arrays.asList(
-                new Flow(1, "Loot", 1L, (int) gainGp, gainGp),
-                new Flow(2, "Cost", -1L, (int) -costGp, costGp)));
+                new Ab(1, "Loot", 1L, (int) gainGp, gainGp),
+                new Ab(2, "Cost", -1L, (int) -costGp, costGp)));
     }
 }

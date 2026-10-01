@@ -13,10 +13,10 @@ public class FactoryResetResumeTest
     @Test
     public void factoryResetResumesByItselfShortly()
     {
-        Engine engine = engine();
-        engine.ensureSession(T0);
+        Am engine = engine();
+        engine.rm(T0);
         assertNotNull(engine.getActiveSession());
-        engine.resetTrackingData(T0 + 1_000L);
+        engine.agr(T0 + 1_000L);
         assertNull("a reset clears the session", engine.getActiveSession());
 
         engine.tickAutoStart(T0 + 1_500L);
@@ -28,8 +28,8 @@ public class FactoryResetResumeTest
     @Test
     public void aManualPauseCancelsThePendingResume()
     {
-        Engine engine = engine();
-        engine.resetTrackingData(T0);
+        Am engine = engine();
+        engine.agr(T0);
         engine.togglePause(T0 + 1_000L);
         assertNotNull(engine.getActiveSession());
         engine.togglePause(T0 + 2_000L);
@@ -41,9 +41,9 @@ public class FactoryResetResumeTest
         assertTrue(engine.getActiveSession().paused);
     }
 
-    private static Engine engine()
+    private static Am engine()
     {
-        return new Engine(deltas -> Collections.emptyList(),
+        return new Am(deltas -> Collections.emptyList(),
             new TransactionClassifier(), new GpManagerConfig() {});
     }
 }

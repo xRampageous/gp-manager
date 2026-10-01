@@ -12,12 +12,12 @@ import org.junit.Test;
 import static org.junit.Assert.assertEquals;
 
 /**
- * A Session saved by the code before Phase N (one PvP money class, projection extends profile base)
+ * A Ad saved by the code before Phase N (one PvP money class, projection extends profile base)
  * loads with the same PvP metrics and writes the same PvP field names back.
  */
 public class PvpSaveCompatibilityTest
 {
-    /** PkMetrics and per-encounter net/cost as the pre-N code computed them for this save. */
+    /** Dt and per-encounter net/cost as the pre-N code computed them for this save. */
     private static final String BEFORE =
         "2|1|1|5700|2300|3400|4700|2000|5400|2000|300|2000|true|2700.0|2000.0|4700/300|-2000/2000|700/0";
 
@@ -33,8 +33,8 @@ public class PvpSaveCompatibilityTest
     @Test
     public void preNSaveLoadsWithTheSamePvpMetrics() throws Exception
     {
-        Session session = new Gson().fromJson(fixture(), Session.class);
-        PkMetrics m = session.pkMetrics();
+        Ad session = new Gson().fromJson(fixture(), Ad.class);
+        Dt m = session.ava();
         StringBuilder out = new StringBuilder();
         out.append(m.kills).append('|').append(m.deaths).append('|').append(m.currentStreak)
             .append('|').append(m.revenue).append('|').append(m.costs).append('|').append(m.net)
@@ -43,9 +43,9 @@ public class PvpSaveCompatibilityTest
             .append('|').append(m.suppliesCosts).append('|').append(m.otherCosts)
             .append('|').append(m.costSplitAvailable).append('|').append(m.medianKillNetGp)
             .append('|').append(m.medianDeathLossGp);
-        for (PkEncounter encounter : session.getPkEncounters())
+        for (Bx encounter : session.getPkEncounters())
         {
-            out.append('|').append(encounter.getFinancialNetGp()).append('/').append(encounter.total().getCostsGp());
+            out.append('|').append(encounter.ur()).append('/').append(encounter.total().tr());
         }
         assertEquals(BEFORE, out.toString());
     }
@@ -54,7 +54,7 @@ public class PvpSaveCompatibilityTest
     public void pvpFieldNamesAreWrittenBackUnchanged() throws Exception
     {
         JsonObject before = fixture();
-        JsonObject after = new Gson().toJsonTree(new Gson().fromJson(before, Session.class)).getAsJsonObject();
+        JsonObject after = new Gson().toJsonTree(new Gson().fromJson(before, Ad.class)).getAsJsonObject();
         assertEquals(keys(before.getAsJsonObject("pkProjection")), keys(after.getAsJsonObject("pkProjection")));
         assertEquals(keys(before.getAsJsonArray("pkAttributions").get(0).getAsJsonObject()),
             keys(after.getAsJsonArray("pkAttributions").get(0).getAsJsonObject()));

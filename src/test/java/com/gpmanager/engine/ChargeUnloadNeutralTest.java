@@ -28,30 +28,30 @@ public class ChargeUnloadNeutralTest
                 return 1;
             }
         };
-        Engine engine = engine(config);
+        Am engine = engine(config);
         ChargeIntake intake = new ChargeIntake(null, null, config, engine, null);
 
-        engine.startCustomSession("Nechryael", SessionMode.GENERAL, T0);
+        engine.ajl("Nechryael", Cx.GENERAL, T0);
         Map<Integer, Long> held = new HashMap<>();
         held.put(ItemID.TOTS_CHARGED, 1L);
-        engine.setBaseline(new ContainerSnapshot(new HashMap<>(held)));
+        engine.setBaseline(new Cc(new HashMap<>(held)));
         held.remove(ItemID.TOTS_CHARGED);
         held.put(ItemID.TOTS_UNCHARGED, 1L);
         held.put(ItemID.DEATHRUNE, 100L);
-        engine.markInventoryDirty();
+        engine.yz();
         // A right-click Uncharge on the worn trident; the plugin passes the lowercased option.
-        intake.armMeasuredChargeCheck(click(ItemID.TOTS_CHARGED), "uncharge", "Trident of the seas");
-        Transaction result = null;
+        intake.ld(click(ItemID.TOTS_CHARGED), "uncharge", "Trident of the seas");
+        Ac result = null;
         for (int i = 0; i < 3; i++)
         {
-            Transaction settled = engine.processIfDirty(new ContainerSnapshot(new HashMap<>(held)), T0 + 600L + i * 600L);
+            Ac settled = engine.adj(new Cc(new HashMap<>(held)), T0 + 600L + i * 600L);
             if (settled != null)
             {
                 result = settled;
             }
         }
         assertNotNull(result);
-        assertEquals("the refund is a transfer, not income", TransactionType.TRANSFER, result.getType());
+        assertEquals("the refund is a transfer, not income", Ai.TRANSFER, result.getType());
         assertFalse(result.isCounted());
         assertEquals("nothing books to the session", 0L, engine.getMetrics(T0 + 2_400L).net);
         assertEquals(0L, engine.getMetrics(T0 + 2_400L).costs);
@@ -68,7 +68,7 @@ public class ChargeUnloadNeutralTest
                 return 1;
             }
         };
-        Engine engine = engine(config);
+        Am engine = engine(config);
         int[] tick = {100};
         Map<Integer, Long> held = new HashMap<>();
         held.put(ItemID.TOTS_CHARGED, 1L);
@@ -80,34 +80,34 @@ public class ChargeUnloadNeutralTest
                 return itemId == ItemID.DEATHRUNE ? "Death rune" : null;
             }
         };
-        engine.startCustomSession("Nechryael", SessionMode.GENERAL, T0);
-        engine.setBaseline(new ContainerSnapshot(new HashMap<>(held)));
-        intake.armMeasuredChargeCheck(click(ItemID.TOTS_CHARGED), "uncharge", "Trident of the seas");
+        engine.ajl("Nechryael", Cx.GENERAL, T0);
+        engine.setBaseline(new Cc(new HashMap<>(held)));
+        intake.ld(click(ItemID.TOTS_CHARGED), "uncharge", "Trident of the seas");
         long now = T0;
         // The "Really uncharge?" prompt sits open for twelve ticks: the click's own context lapses.
         for (int i = 0; i < 12; i++)
         {
             tick[0]++;
             intake.watchReturn();
-            assertNull(engine.processIfDirty(new ContainerSnapshot(new HashMap<>(held)), now += 600L));
+            assertNull(engine.adj(new Cc(new HashMap<>(held)), now += 600L));
         }
         held.remove(ItemID.TOTS_CHARGED);
         held.put(ItemID.TOTS_UNCHARGED, 1L);
         held.put(ItemID.DEATHRUNE, 100L);
-        engine.markInventoryDirty();
-        Transaction result = null;
+        engine.yz();
+        Ac result = null;
         for (int i = 0; i < 3; i++)
         {
             tick[0]++;
             intake.watchReturn();
-            Transaction settled = engine.processIfDirty(new ContainerSnapshot(new HashMap<>(held)), now += 600L);
+            Ac settled = engine.adj(new Cc(new HashMap<>(held)), now += 600L);
             if (settled != null)
             {
                 result = settled;
             }
         }
         assertNotNull(result);
-        assertEquals("a slow confirm is still a transfer, not income", TransactionType.TRANSFER, result.getType());
+        assertEquals("a slow confirm is still a transfer, not income", Ai.TRANSFER, result.getType());
         assertEquals(0L, engine.getMetrics(now).net);
     }
 
@@ -142,20 +142,20 @@ public class ChargeUnloadNeutralTest
             });
     }
 
-    private static Engine engine(GpManagerConfig config)
+    private static Am engine(GpManagerConfig config)
     {
         Map<Integer, String> names = new HashMap<>();
         names.put(ItemID.TOTS_CHARGED, "Trident of the seas (full)");
         names.put(ItemID.TOTS_UNCHARGED, "Trident of the seas");
         names.put(ItemID.DEATHRUNE, "Death rune");
-        return new Engine(deltas ->
+        return new Am(deltas ->
         {
-            List<Flow> flows = new ArrayList<>();
+            List<Ab> flows = new ArrayList<>();
             for (Map.Entry<Integer, Long> delta : deltas.entrySet())
             {
                 int unit = delta.getKey() == ItemID.DEATHRUNE ? 200 : 1_000_000;
-                flows.add(new Flow(delta.getKey(), names.get(delta.getKey()), delta.getValue(), unit,
-                    delta.getValue() * unit, PriceSource.GRAND_EXCHANGE));
+                flows.add(new Ab(delta.getKey(), names.get(delta.getKey()), delta.getValue(), unit,
+                    delta.getValue() * unit, Av.GRAND_EXCHANGE));
             }
             return flows;
         }, new TransactionClassifier(), config);

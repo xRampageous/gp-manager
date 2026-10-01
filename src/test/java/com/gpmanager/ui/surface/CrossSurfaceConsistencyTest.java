@@ -42,7 +42,7 @@ public class CrossSurfaceConsistencyTest
         MarketFixture market = new MarketFixture();
         market.sell(0, 561, 10);
 
-        LiveSnapshot snapshot = LiveSnapshot.capture(market.engine, market.now + 1_000L, null);
+        Ca snapshot = Ca.capture(market.engine, market.now + 1_000L, null);
         assertTrue("a realized Market result is separated", snapshot.marketResult > 0L);
         assertEquals(0, snapshot.marketPending);
         assertEquals("the canonical Net is unchanged by the separation",
@@ -60,8 +60,8 @@ public class CrossSurfaceConsistencyTest
             onEdt(() -> HeroProbe.cell(page.hero, "MARKET")));
         assertEquals("ordinary Gains exclude the whole Market transaction",
             Fmt.signed(snapshot.gains), onEdt(() -> HeroProbe.cell(page.hero, "GAINS")));
-        AccountingProjection.MarketFold fold =
-            AccountingProjection.marketFold(
+        Bp.Dy fold =
+            Bp.zl(
                 market.engine.getActiveSession().getTransactions());
         assertEquals("the canonical session still books the gross Market legs",
             snapshot.gains + fold.revenue,
@@ -76,7 +76,7 @@ public class CrossSurfaceConsistencyTest
         MarketFixture market = new MarketFixture();
         market.pendingSell(0, 561, 10);
 
-        LiveSnapshot snapshot = LiveSnapshot.capture(market.engine, market.now + 1_000L, null);
+        Ca snapshot = Ca.capture(market.engine, market.now + 1_000L, null);
         assertEquals("pending Market is not a realized result", 0L, snapshot.marketResult);
         assertEquals("pending Market context is counted separately", 1, snapshot.marketPending);
         assertEquals("pending Market never alters Net",
@@ -94,26 +94,26 @@ public class CrossSurfaceConsistencyTest
     @Test
     public void liveReviewCountEqualsLedgerReviewTruthForTheSameScope()
     {
-        Engine engine = engine();
-        engine.startCustomSession("Vorkath", SessionMode.GENERAL, T0);
-        Transaction uncertain = new Transaction(T0 + 1_000L, null, TransactionType.UNCERTAIN,
-            Context.GENERIC, "", "Vorkath", true,
-            Collections.singletonList(new Flow(777, "Unknown rune", -1L, 0, 0L)),
-            ClassificationConfidence.UNCERTAIN, "Awaiting a decision", null);
-        engine.getActiveSession().addTransaction(uncertain, 100);
-        engine.getActiveSession().addTransaction(unpriced(T0 + 2_000L), 100);
+        Am engine = engine();
+        engine.ajl("Vorkath", Cx.GENERAL, T0);
+        Ac uncertain = new Ac(T0 + 1_000L, null, Ai.UNCERTAIN,
+            Aj.GENERIC, "", "Vorkath", true,
+            Collections.singletonList(new Ab(777, "Unknown rune", -1L, 0, 0L)),
+            Bd.UNCERTAIN, "Awaiting a decision", null);
+        engine.getActiveSession().kf(uncertain, 100);
+        engine.getActiveSession().kf(unpriced(T0 + 2_000L), 100);
 
-        LiveSnapshot live = LiveSnapshot.capture(engine, T0 + 3_000L, null);
-        LedgerData ledger = captureLedger(engine, T0 + 3_000L);
+        Ca live = Ca.capture(engine, T0 + 3_000L, null);
+        Ao ledger = captureLedger(engine, T0 + 3_000L);
         assertEquals("Live and Ledger share one owner-decision truth",
             ledger.review.scopeCount, live.reviewCount);
         assertEquals(1, live.reviewCount);
 
-        Engine quiet = engine();
-        quiet.startCustomSession("Vorkath", SessionMode.GENERAL, T0);
-        quiet.getActiveSession().addTransaction(unpriced(T0 + 1_000L), 100);
-        LiveSnapshot quietLive = LiveSnapshot.capture(quiet, T0 + 2_000L, null);
-        LedgerData quietLedger = captureLedger(quiet, T0 + 2_000L);
+        Am quiet = engine();
+        quiet.ajl("Vorkath", Cx.GENERAL, T0);
+        quiet.getActiveSession().kf(unpriced(T0 + 1_000L), 100);
+        Ca quietLive = Ca.capture(quiet, T0 + 2_000L, null);
+        Ao quietLedger = captureLedger(quiet, T0 + 2_000L);
         assertEquals("unpriced alone is never Review", 0, quietLive.reviewCount);
         assertEquals(quietLedger.review.scopeCount, quietLive.reviewCount);
     }
@@ -121,13 +121,13 @@ public class CrossSurfaceConsistencyTest
     @Test
     public void currentGrindNetAgreesBetweenLiveAndLedger()
     {
-        Engine engine = engine();
-        engine.startCustomSession("Vorkath", SessionMode.GENERAL, T0);
-        engine.getActiveSession().addTransaction(gain(T0 + 1_000L, "Dragon bones", 536, 3_200L), 100);
-        engine.getActiveSession().addTransaction(food(T0 + 2_000L, "Shark", 950L), 100);
+        Am engine = engine();
+        engine.ajl("Vorkath", Cx.GENERAL, T0);
+        engine.getActiveSession().kf(gain(T0 + 1_000L, "Dragon bones", 536, 3_200L), 100);
+        engine.getActiveSession().kf(food(T0 + 2_000L, "Shark", 950L), 100);
 
-        LiveSnapshot live = LiveSnapshot.capture(engine, T0 + 3_000L, null);
-        LedgerData ledger = captureLedger(engine, T0 + 3_000L);
+        Ca live = Ca.capture(engine, T0 + 3_000L, null);
+        Ao ledger = captureLedger(engine, T0 + 3_000L);
         assertEquals("same canonical current-Grind Net", ledger.net, live.net);
     }
 
@@ -136,10 +136,10 @@ public class CrossSurfaceConsistencyTest
     @Test
     public void grindsBiggestCostPrefersTheExactAllCostActionName()
     {
-        Session session = new Session("Grind", 1_000L);
-        session.addTransaction(cast("Ice Burst", T0), 100);
+        Ad session = new Ad("Grind", 1_000L);
+        session.kf(cast("Ice Burst", T0), 100);
 
-        GrindHistory.Highlight cost = GrindHistory.biggestCost(session);
+        Ba.Highlight cost = Ba.lz(session);
         assertNotNull(cost);
         assertEquals("Ice Burst", cost.name);
         assertTrue(cost.net < 0L);
@@ -148,17 +148,17 @@ public class CrossSurfaceConsistencyTest
     @Test
     public void grindsBiggestCostKeepsTheLeadContributionForMixedReceipts()
     {
-        Session session = new Session("Grind", 1_000L);
-        Transaction mixed = new Transaction(T0, null, TransactionType.CONSUMPTION,
-            Context.GENERIC, "", "Vorkath", true, Arrays.asList(
-                new Flow(561, "Nature rune", -10L, 100, -1_000L, PriceSource.GRAND_EXCHANGE),
-                new Flow(COINS, "Coins", 120L, 1, 120L, PriceSource.FACE_VALUE)),
-            ClassificationConfidence.CONFIRMED, "High alchemy", null);
-        mixed.setActionKind(ActionKind.CAST);
-        mixed.setObservedActionLabel(ActionLabel.of("High Level Alchemy"));
-        session.addTransaction(mixed, 100);
+        Ad session = new Ad("Grind", 1_000L);
+        Ac mixed = new Ac(T0, null, Ai.CONSUMPTION,
+            Aj.GENERIC, "", "Vorkath", true, Arrays.asList(
+                new Ab(561, "Nature rune", -10L, 100, -1_000L, Av.GRAND_EXCHANGE),
+                new Ab(COINS, "Coins", 120L, 1, 120L, Av.FACE_VALUE)),
+            Bd.CONFIRMED, "High alchemy", null);
+        mixed.setActionKind(Au.CAST);
+        mixed.ahu(Bb.of("High Level Alchemy"));
+        session.kf(mixed, 100);
 
-        GrindHistory.Highlight cost = GrindHistory.biggestCost(session);
+        Ba.Highlight cost = Ba.lz(session);
         assertNotNull(cost);
         assertEquals("a mixed receipt keeps its honest lead contribution", "Nature rune", cost.name);
     }
@@ -166,16 +166,16 @@ public class CrossSurfaceConsistencyTest
     @Test
     public void grindsBiggestCostNeverUsesTheWeaponAsConsumedIdentity()
     {
-        Session session = new Session("Grind", 1_000L);
-        Transaction measured = new Transaction(T0, null, TransactionType.CONSUMPTION,
-            Context.GENERIC, "Measured charge spend \u00b7 Toxic blowpipe", "Vorkath", true,
-            Collections.singletonList(new Flow(12934, "Zulrah's scales", -3L, 110, -330L,
-                PriceSource.GRAND_EXCHANGE)),
-            ClassificationConfidence.CONFIRMED, "Measured Check difference.", null);
-        measured.setActionKind(ActionKind.FIRE);
-        session.addTransaction(measured, 100);
+        Ad session = new Ad("Grind", 1_000L);
+        Ac measured = new Ac(T0, null, Ai.CONSUMPTION,
+            Aj.GENERIC, "Measured charge spend \u00b7 Toxic blowpipe", "Vorkath", true,
+            Collections.singletonList(new Ab(12934, "Zulrah's scales", -3L, 110, -330L,
+                Av.GRAND_EXCHANGE)),
+            Bd.CONFIRMED, "Measured Check difference.", null);
+        measured.setActionKind(Au.FIRE);
+        session.kf(measured, 100);
 
-        GrindHistory.Highlight cost = GrindHistory.biggestCost(session);
+        Ba.Highlight cost = Ba.lz(session);
         assertNotNull(cost);
         assertEquals("the booked consumed resource is the cost identity", "Zulrah's scales", cost.name);
     }
@@ -183,17 +183,17 @@ public class CrossSurfaceConsistencyTest
     @Test
     public void grindsGenericCastNeverBecomesASpellName()
     {
-        Session session = new Session("Grind", 1_000L);
+        Ad session = new Ad("Grind", 1_000L);
         // Runes no spell pays (a Nature rune too): an unnamed Cast keeps its largest rune as the lead.
-        Transaction generic = new Transaction(T0, null, TransactionType.CONSUMPTION,
-            Context.GENERIC, "", "Vorkath", true, Arrays.asList(
-                new Flow(562, "Chaos rune", -4L, 106, -424L, PriceSource.GRAND_EXCHANGE),
-                new Flow(561, "Nature rune", -1L, 100, -100L, PriceSource.GRAND_EXCHANGE)),
-            ClassificationConfidence.CONFIRMED, "Exact fixture", null);
-        generic.setActionKind(ActionKind.CAST);
-        session.addTransaction(generic, 100);
+        Ac generic = new Ac(T0, null, Ai.CONSUMPTION,
+            Aj.GENERIC, "", "Vorkath", true, Arrays.asList(
+                new Ab(562, "Chaos rune", -4L, 106, -424L, Av.GRAND_EXCHANGE),
+                new Ab(561, "Nature rune", -1L, 100, -100L, Av.GRAND_EXCHANGE)),
+            Bd.CONFIRMED, "Exact fixture", null);
+        generic.setActionKind(Au.CAST);
+        session.kf(generic, 100);
 
-        GrindHistory.Highlight cost = GrindHistory.biggestCost(session);
+        Ba.Highlight cost = Ba.lz(session);
         assertNotNull(cost);
         assertEquals("the largest rune stays the honest lead for a generic cast", "Chaos rune", cost.name);
     }
@@ -205,10 +205,10 @@ public class CrossSurfaceConsistencyTest
     @Test
     public void ledgerZeroStateHidesReviewAndKeepsCorrectedReachable() throws Exception
     {
-        Engine engine = engine();
-        engine.startCustomSession("Vorkath", SessionMode.GENERAL, T0);
-        engine.getActiveSession().addTransaction(gain(T0 + 1_000L, "Dragon bones", 536, 3_200L), 100);
-        LedgerData data = captureLedger(engine, T0 + 2_000L);
+        Am engine = engine();
+        engine.ajl("Vorkath", Cx.GENERAL, T0);
+        engine.getActiveSession().kf(gain(T0 + 1_000L, "Dragon bones", 536, 3_200L), 100);
+        Ao data = captureLedger(engine, T0 + 2_000L);
 
         LedgerPage page = onEdt(() ->
         {
@@ -232,105 +232,105 @@ public class CrossSurfaceConsistencyTest
 
     // ── fixtures ───────────────────────────────────────────────────────────────────────────────
 
-    private static LedgerData captureLedger(Engine engine, long now)
+    private static Ao captureLedger(Am engine, long now)
     {
-        return LedgerData.capture(engine, now, LedgerData.Entry.current());
+        return Ao.capture(engine, now, Ao.Entry.current());
     }
 
-    private static Engine engine()
+    private static Am engine()
     {
-        return new Engine(deltas ->
+        return new Am(deltas ->
         {
-            List<Flow> flows = new ArrayList<>();
+            List<Ab> flows = new ArrayList<>();
             for (java.util.Map.Entry<Integer, Long> delta : deltas.entrySet())
             {
                 int id = delta.getKey();
                 int unit = id == COINS ? 1 : 7;
-                PriceSource source = id == COINS ? PriceSource.FACE_VALUE
-                    : PriceSource.GRAND_EXCHANGE;
-                flows.add(new Flow(id, id == COINS ? "Coins" : "Rune " + id, delta.getValue(),
+                Av source = id == COINS ? Av.FACE_VALUE
+                    : Av.GRAND_EXCHANGE;
+                flows.add(new Ab(id, id == COINS ? "Coins" : "Rune " + id, delta.getValue(),
                     unit, delta.getValue() * unit, source));
             }
             return flows;
         }, new TransactionClassifier(), new GpManagerConfig()
         {
             @Override
-            public ReceiptRetentionPeriod receiptRetentionDays()
+            public Db receiptRetentionDays()
             {
-                return ReceiptRetentionPeriod.DAYS_365;
+                return Db.DAYS_365;
             }
         });
     }
 
-    private static Transaction gain(long at, String name, int itemId, long value)
+    private static Ac gain(long at, String name, int itemId, long value)
     {
-        return new Transaction(at, null, TransactionType.GAIN, Context.GENERIC, "", "Vorkath",
-            true, Collections.singletonList(new Flow(itemId, name, 1L, (int) value, value,
-                PriceSource.GRAND_EXCHANGE)), ClassificationConfidence.LIKELY, "Loot", null);
+        return new Ac(at, null, Ai.GAIN, Aj.GENERIC, "", "Vorkath",
+            true, Collections.singletonList(new Ab(itemId, name, 1L, (int) value, value,
+                Av.GRAND_EXCHANGE)), Bd.LIKELY, "Loot", null);
     }
 
-    private static Transaction food(long at, String name, long value)
+    private static Ac food(long at, String name, long value)
     {
-        Transaction transaction = new Transaction(at, null, TransactionType.CONSUMPTION,
-            Context.GENERIC, "", "Vorkath", true,
-            Collections.singletonList(new Flow(SHARK, name, -1L, (int) value, -value,
-                PriceSource.GRAND_EXCHANGE)), ClassificationConfidence.CONFIRMED, "Food", null);
-        transaction.setActionKind(ActionKind.EAT);
+        Ac transaction = new Ac(at, null, Ai.CONSUMPTION,
+            Aj.GENERIC, "", "Vorkath", true,
+            Collections.singletonList(new Ab(SHARK, name, -1L, (int) value, -value,
+                Av.GRAND_EXCHANGE)), Bd.CONFIRMED, "Food", null);
+        transaction.setActionKind(Au.EAT);
         return transaction;
     }
 
-    private static Transaction unpriced(long at)
+    private static Ac unpriced(long at)
     {
-        Transaction transaction = new Transaction(at, null, TransactionType.CONSUMPTION,
-            Context.GENERIC, "", "Vorkath", true,
-            Collections.singletonList(new Flow(SHARK, "Shark", -1L, 0, 0L,
-                PriceSource.UNPRICED)), ClassificationConfidence.CONFIRMED, "Unpriced food", null);
-        transaction.setActionKind(ActionKind.EAT);
+        Ac transaction = new Ac(at, null, Ai.CONSUMPTION,
+            Aj.GENERIC, "", "Vorkath", true,
+            Collections.singletonList(new Ab(SHARK, "Shark", -1L, 0, 0L,
+                Av.UNPRICED)), Bd.CONFIRMED, "Unpriced food", null);
+        transaction.setActionKind(Au.EAT);
         return transaction;
     }
 
-    private static Transaction cast(String label, long at)
+    private static Ac cast(String label, long at)
     {
-        Transaction transaction = new Transaction(at, null, TransactionType.CONSUMPTION,
-            Context.GENERIC, "", "Vorkath", true, Arrays.asList(
-                new Flow(560, "Death rune", -2L, 188, -376L, PriceSource.GRAND_EXCHANGE),
-                new Flow(562, "Chaos rune", -4L, 106, -424L, PriceSource.GRAND_EXCHANGE),
-                new Flow(555, "Water rune", -4L, 5, -20L, PriceSource.GRAND_EXCHANGE)),
-            ClassificationConfidence.CONFIRMED, "Exact fixture", null);
-        transaction.setActionKind(ActionKind.CAST);
+        Ac transaction = new Ac(at, null, Ai.CONSUMPTION,
+            Aj.GENERIC, "", "Vorkath", true, Arrays.asList(
+                new Ab(560, "Death rune", -2L, 188, -376L, Av.GRAND_EXCHANGE),
+                new Ab(562, "Chaos rune", -4L, 106, -424L, Av.GRAND_EXCHANGE),
+                new Ab(555, "Water rune", -4L, 5, -20L, Av.GRAND_EXCHANGE)),
+            Bd.CONFIRMED, "Exact fixture", null);
+        transaction.setActionKind(Au.CAST);
         if (label != null)
         {
-            transaction.setObservedActionLabel(ActionLabel.of(label));
+            transaction.ahu(Bb.of(label));
         }
         return transaction;
     }
 
-    /** Engine-level GE custody fixture: realized or pending market settlements. */
+    /** Am-level GE custody fixture: realized or pending market settlements. */
     private static final class MarketFixture
     {
-        final Engine engine;
-        final OfferLedger ledger = new OfferLedger();
+        final Am engine;
+        final Bj ledger = new Bj();
         final Map<Integer, Long> inventory = new HashMap<>();
         long now = T0;
 
         MarketFixture()
         {
             engine = engine();
-            engine.startCustomSession("Trading", SessionMode.AUTO, now);
+            engine.ajl("Trading", Cx.AUTO, now);
             inventory.put(COINS, 100_000L);
             inventory.put(561, 10L);
-            engine.setBaseline(new ContainerSnapshot(inventory));
+            engine.setBaseline(new Cc(inventory));
         }
 
         void sell(int slot, int item, int price)
         {
             // Known coverage for the sold quantity at the observed quote, so the sale realizes a
             // proven result.
-            engine.getActiveSession().addTransaction(new Transaction(now - 1_000L, null,
-                TransactionType.GAIN, Context.GENERIC, "", "Vorkath", true,
-                Collections.singletonList(new Flow(item, "Rune " + item, 10L, 7, 70L,
-                    PriceSource.GRAND_EXCHANGE)),
-                ClassificationConfidence.CONFIRMED, "Loot", null), 500);
+            engine.getActiveSession().kf(new Ac(now - 1_000L, null,
+                Ai.GAIN, Aj.GENERIC, "", "Vorkath", true,
+                Collections.singletonList(new Ab(item, "Rune " + item, 10L, 7, 70L,
+                    Av.GRAND_EXCHANGE)),
+                Bd.CONFIRMED, "Loot", null), 500);
             offer(slot, GrandExchangeOfferState.SELLING, item, 10, 0, price, 0);
             inventory.remove(item);
             settle();
@@ -349,11 +349,11 @@ public class CrossSurfaceConsistencyTest
         private void settle()
         {
             now += 600L;
-            engine.markInventoryDirty();
-            ContainerSnapshot snapshot = new ContainerSnapshot(inventory);
+            engine.yz();
+            Cc snapshot = new Cc(inventory);
             for (int i = 0; i < 3; i++)
             {
-                engine.processIfDirty(snapshot, now);
+                engine.adj(snapshot, now);
                 now += 600L;
             }
         }
@@ -362,11 +362,11 @@ public class CrossSurfaceConsistencyTest
             int price, int spent)
         {
             now += 600L;
-            OfferLedger.Transition transition = ledger.observe(
-                new OfferLedger.Snapshot(slot, state, item, total, traded, price, spent)).orElse(null);
+            Bj.Transition transition = ledger.observe(
+                new Bj.Snapshot(slot, state, item, total, traded, price, spent)).orElse(null);
             if (transition != null)
             {
-                engine.noteGeOfferObservation(transition, "Rune " + item, now);
+                engine.abh(transition, "Rune " + item, now);
             }
         }
     }
@@ -380,22 +380,22 @@ public class CrossSurfaceConsistencyTest
 
         @Override public void togglePause() { }
 
-        @Override public void openLedger(LedgerData.Entry entry) { }
+        @Override public void openLedger(Ao.Entry entry) { }
     }
 
     private static final class LedgerNoop implements LedgerPage.Actions
     {
         @Override public void openScopeMenu(JComponent anchor) { }
-        @Override public void costViewChanged(LedgerData.CostView view) { }
+        @Override public void costViewChanged(Ao.Bs view) { }
         @Override public void searchChanged(String text) { }
-        @Override public LedgerData.CorrectionPreview preview(String id,
-            Correction correction) { return null; }
-        @Override public LedgerPage.CorrectionOutcome correct(String id,
-            Correction correction, long previewRevision)
-        { return LedgerPage.CorrectionOutcome.REFUSED; }
+        @Override public Ao.Ef preview(String id,
+            Ah correction) { return null; }
+        @Override public LedgerPage.Ea correct(String id,
+            Ah correction, long previewRevision)
+        { return LedgerPage.Ea.REFUSED; }
         @Override public void split(String id) { }
         @Override public void undoCorrection() { }
-        @Override public void decideAll(ReviewDecision decision) { }
+        @Override public void decideAll(Cl decision) { }
         @Override public void refresh() { }
     }
 

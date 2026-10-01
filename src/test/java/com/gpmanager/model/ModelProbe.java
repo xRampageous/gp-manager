@@ -11,10 +11,10 @@ public final class ModelProbe
     }
 
     /** The session's corrections that have not been undone, oldest first. */
-    public static List<CorrectionRecord> activeCorrections(Session session)
+    public static List<Dx> activeCorrections(Ad session)
     {
-        List<CorrectionRecord> active = new ArrayList<>();
-        for (CorrectionRecord record : session.correctionHistory)
+        List<Dx> active = new ArrayList<>();
+        for (Dx record : session.correctionHistory)
         {
             if (record != null && !record.isUndone())
             {

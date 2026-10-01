@@ -25,39 +25,39 @@ public class ProfileBackupsTest
         Path root = temporary.newFolder().toPath();
         SessionRepository repository = new SessionRepository(new Gson(), FilepathTestSupport.root(root), true);
         OrderedPersistenceWriter writer = new OrderedPersistenceWriter(repository);
-        Engine engine = new Engine(d -> Collections.emptyList(),
+        Am engine = new Am(d -> Collections.emptyList(),
             new TransactionClassifier(), new GpManagerConfig() {});
-        PersistenceCoordinator coordinator = new PersistenceCoordinator(null, null, repository, writer, engine)
+        Ei coordinator = new Ei(null, null, repository, writer, engine)
         {
             @Override TrackingIdentity resolveCurrentIdentity() { return ALICE; }
         };
         try
         {
             JsonCodec.bind(new Gson());
-            assertTrue(coordinator.trySwitchIdentity(ALICE, true));
-            engine.ensureSession(1_000L);
+            assertTrue(coordinator.ajy(ALICE, true));
+            engine.rm(1_000L);
             engine.getActiveSession().rename("Before restore");
-            assertTrue(coordinator.saveNow());
+            assertTrue(coordinator.aya());
 
-            Filepath first = coordinator.writePreOperationBackup(T0);
+            Filepath first = coordinator.akt(T0);
             assertEquals("backups", first.getParent().getFileName());
             assertTrue(first.getFileName().startsWith("rsprofile.alice-"));
             for (int i = 1; i <= 11; i++)
             {
-                coordinator.writePreOperationBackup(T0 + i * 1_000L);
+                coordinator.akt(T0 + i * 1_000L);
             }
             List<Filepath> kept = coordinator.backups();
             assertEquals("only the newest 10 per account are kept", 10, kept.size());
             assertFalse("the oldest went first", kept.contains(first));
 
             engine.getActiveSession().rename("Changed");
-            assertTrue(coordinator.saveNow());
-            PersistenceCoordinator.ResetOutcome outcome = coordinator.restoreBackup(kept.get(0), T0 + 20_000L);
+            assertTrue(coordinator.aya());
+            Ei.Ds outcome = coordinator.agm(kept.get(0), T0 + 20_000L);
             assertTrue(outcome.getDetail(), outcome.isApplied());
             assertEquals("Before restore", engine.getActiveSession().getName());
             assertEquals("a safety copy of the replaced data is made first", 10, coordinator.backups().size());
 
-            assertEquals(9, coordinator.pruneBackups(1));
+            assertEquals(9, coordinator.adz(1));
             assertEquals(1, coordinator.backups().size());
         }
         finally { writer.shutdown(Duration.ofSeconds(5)); }

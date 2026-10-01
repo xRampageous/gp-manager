@@ -82,26 +82,26 @@ public final class FinancialFingerprint
     }
 
     /** Captures the engine's effective correction-aware money, PvP metrics and archives at {@code now}. */
-    public static FinancialFingerprint fingerprint(Engine engine, long now)
+    public static FinancialFingerprint fingerprint(Am engine, long now)
     {
         StringBuilder out = new StringBuilder();
-        Map<String, Session> sessions = new LinkedHashMap<>();
-        Session general = engine.getGeneralSession();
-        Session active = engine.getActiveSession();
+        Map<String, Ad> sessions = new LinkedHashMap<>();
+        Ad general = engine.getGeneralSession();
+        Ad active = engine.getActiveSession();
         if (general != null) sessions.put(general.getId(), general);
         if (active != null) sessions.put(active.getId(), active);
-        for (Session session : engine.getHistory())
+        for (Ad session : engine.getHistory())
         {
             if (session != null) sessions.put(session.getId(), session);
         }
-        List<Session> ordered = new ArrayList<>(sessions.values());
-        ordered.sort(Comparator.comparing(Session::getId));
+        List<Ad> ordered = new ArrayList<>(sessions.values());
+        ordered.sort(Comparator.comparing(Ad::getId));
         out.append("sessions=").append(ordered.size()).append('\n');
-        for (Session session : ordered)
+        for (Ad session : ordered)
         {
             boolean isActive = active != null && active.getId().equals(session.getId());
-            SessionMetrics metrics = session.metrics(now);
-            PkMetrics pk = session.pkMetrics();
+            Bu metrics = session.metrics(now);
+            Dt pk = session.ava();
             out.append("session ").append(session.getId())
                 .append(" owner=").append(session.getOwnerKind())
                 .append(" closed=").append(session.isClosed())
@@ -147,9 +147,9 @@ public final class FinancialFingerprint
             out.append("  retainedRows=").append(session.getTransactions().size())
                 .append(" compactedRows=").append(session.compactedTransactionCount)
                 .append('\n');
-            List<Transaction> rows = new ArrayList<>(session.getTransactions());
-            rows.sort(Comparator.comparing(Transaction::getId));
-            for (Transaction row : rows)
+            List<Ac> rows = new ArrayList<>(session.getTransactions());
+            rows.sort(Comparator.comparing(Ac::getId));
+            for (Ac row : rows)
             {
                 out.append("  row ").append(row.getId())
                     .append(" type=").append(row.getType())
@@ -161,7 +161,7 @@ public final class FinancialFingerprint
                     .append(" net=").append(row.getNet())
                     .append(" encounter=").append(row.getEncounterId())
                     .append('\n');
-                for (Flow flow : row.getFlows())
+                for (Ab flow : row.getFlows())
                 {
                     out.append("    flow item=").append(flow.itemId)
                         .append(" qty=").append(flow.quantityDelta)
@@ -171,15 +171,15 @@ public final class FinancialFingerprint
                         .append('\n');
                 }
             }
-            List<PkEncounter> encounters = new ArrayList<>(session.getPkEncounters());
-            encounters.sort(Comparator.comparing(PkEncounter::getId));
-            for (PkEncounter encounter : encounters)
+            List<Bx> encounters = new ArrayList<>(session.getPkEncounters());
+            encounters.sort(Comparator.comparing(Bx::getId));
+            for (Bx encounter : encounters)
             {
                 out.append("  encounter ").append(encounter.getId())
                     .append(" type=").append(encounter.getType())
                     .append(" at=").append(encounter.timestampEpochMillis)
-                    .append(" net=").append(encounter.getFinancialNetGp())
-                    .append(" loss=").append(encounter.getFinancialLossGp())
+                    .append(" net=").append(encounter.ur())
+                    .append(" loss=").append(encounter.uk())
                     .append('\n');
             }
         }
