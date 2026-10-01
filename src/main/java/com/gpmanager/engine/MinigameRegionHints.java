@@ -10,13 +10,13 @@ class MinigameRegionHints {
 * primary) and "neutral" for instances that store the player's gear on entry and restore it on
 * exit with no exit click (The Gauntlet and the Corrupted Gauntlet; see minigame-regions.tsv).
 */
-static final Map<Integer, String> KINDS = GameData.byId("d13");
+static final Map<Integer, String> KINDS = Ak.byId("d13");
 /** True inside an instance whose inventory changes are never profit or loss. */
-static boolean isNeutralZoneRegion(int regionId) {
-return "neutral".equals(KINDS.get(regionId));
+static boolean xl(int regionId) {
+ return "neutral".equals(KINDS.get(regionId));
 }
 
-static boolean isLmsRegion(int regionId) {
-return "lms".equals(KINDS.get(regionId));
+static boolean xh(int regionId) {
+ return "lms".equals(KINDS.get(regionId));
 }
 }

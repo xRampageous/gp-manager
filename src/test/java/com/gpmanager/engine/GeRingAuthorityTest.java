@@ -45,9 +45,9 @@ public class GeRingAuthorityTest
         h.settle(with(h.inventory, COINS, 1_000_000L - 700L));
 
         assertEquals("the reserve never changes Net", 0L, h.net());
-        for (Transaction transaction : h.transactions())
+        for (Ac transaction : h.transactions())
         {
-            assertFalse("no Review row", ReviewEligibility.needsOwnerDecision(transaction));
+            assertFalse("no Review row", Eh.aal(transaction));
             assertFalse("the reserve is uncounted", transaction.isCounted());
         }
 
@@ -56,9 +56,9 @@ public class GeRingAuthorityTest
         assertEquals("authoritative NEW BUY is Net-neutral", 0L, h.net());
         assertEquals("exact spend becomes known coverage", 5L, EngineProbe.knownCoverageQty(h.engine, LOGS));
         assertEquals(700L, EngineProbe.knownCoverageBasisGp(h.engine, LOGS));
-        List<Transaction> counted = h.counted();
+        List<Ac> counted = h.counted();
         assertEquals("only the authoritative settlement is counted", 1, counted.size());
-        assertEquals(TransactionType.TRADE, counted.get(0).getType());
+        assertEquals(Ai.TRADE, counted.get(0).getType());
         assertEquals("no duplicate spend", 0L, counted.get(0).getNet());
     }
 
@@ -67,7 +67,7 @@ public class GeRingAuthorityTest
     {
         Harness h = new Harness(7);
         h.inventory = with(h.inventory, RUNE, 10L);
-        h.engine.setBaseline(new ContainerSnapshot(h.inventory));
+        h.engine.setBaseline(new Cc(h.inventory));
 
         h.offer(0, SELLING, RUNE, 10, 0, 7, 0);
         h.settle(with(h.inventory, RUNE, 0L));
@@ -86,20 +86,20 @@ public class GeRingAuthorityTest
     public void explicitGeBuyClickCannotCountUnclaimedCoinLoss()
     {
         Harness h = new Harness(7);
-        h.engine.markContext(Context.MARKET, 10, "Grand Exchange buy");
+        h.engine.markContext(Aj.MARKET, 10, "Grand Exchange buy");
         h.settle(with(h.inventory, COINS, 999_990L));
 
         assertEquals(0L, h.net());
         assertFalse(h.hasCountedCoinsOnlyRow());
         assertEquals(1, h.reviews());
-        assertEquals(TransactionType.UNCERTAIN, h.transactions().get(0).getType());
+        assertEquals(Ai.UNCERTAIN, h.transactions().get(0).getType());
     }
 
     @Test
     public void explicitGeCollectCannotCountUnclaimedCashOrItem()
     {
         Harness h = new Harness(7);
-        h.engine.markContext(Context.MARKET, 10, "Grand Exchange collect");
+        h.engine.markContext(Aj.MARKET, 10, "Grand Exchange collect");
         h.settle(with(h.inventory, COINS, 1_000_010L, RUNE, 5L));
 
         assertEquals(0L, h.net());
@@ -112,11 +112,11 @@ public class GeRingAuthorityTest
     public void shopMarketContextStillCountsItsObservedSpend()
     {
         Harness h = new Harness(7);
-        h.engine.markContext(Context.MARKET, 10, "buy shop item");
+        h.engine.markContext(Aj.MARKET, 10, "buy shop item");
         h.settle(with(h.inventory, COINS, 999_990L));
 
         assertEquals(-10L, h.net());
-        assertEquals(TransactionType.TRADE, h.counted().get(0).getType());
+        assertEquals(Ai.TRADE, h.counted().get(0).getType());
     }
 
     @Test
@@ -126,17 +126,17 @@ public class GeRingAuthorityTest
         h.gain(LOGS, 5L, 775L, h.now - 60_000L);
 
         h.inventory = with(h.inventory, LOGS, 5L);
-        h.engine.setBaseline(new ContainerSnapshot(h.inventory));
+        h.engine.setBaseline(new Cc(h.inventory));
         h.offer(0, SELLING, LOGS, 5, 0, 159, 0);
         h.settle(with(h.inventory, LOGS, 0L));
         h.offer(0, SOLD, LOGS, 5, 5, 159, 790);
         h.settle(with(h.inventory, COINS, 1_000_790L));
 
         assertEquals("the earlier counted value plus the sale result", 790L, h.net());
-        List<Transaction> counted = h.counted();
+        List<Ac> counted = h.counted();
         assertEquals("the gain plus exactly one custody settlement", 2, counted.size());
-        Transaction settlement = counted.get(1);
-        assertEquals(TransactionType.TRADE, settlement.getType());
+        Ac settlement = counted.get(1);
+        assertEquals(Ai.TRADE, settlement.getType());
         assertEquals("custody books the sale exactly once", 15L, settlement.getNet());
         assertEquals("known coverage is consumed by the reservation", 0L,
             EngineProbe.knownCoverageQty(h.engine, LOGS));
@@ -148,8 +148,8 @@ public class GeRingAuthorityTest
     private static final class Harness
     {
         final int[] quote;
-        final Engine engine;
-        final OfferLedger ledger = new OfferLedger();
+        final Am engine;
+        final Bj ledger = new Bj();
         long now = T0;
         Map<Integer, Long> inventory = new HashMap<>();
 
@@ -157,42 +157,42 @@ public class GeRingAuthorityTest
         {
             quote = new int[] { initialQuote };
             engine = engine(quote);
-            engine.startCustomSession("Trading", SessionMode.AUTO, now);
+            engine.ajl("Trading", Cx.AUTO, now);
             inventory.put(COINS, 1_000_000L);
-            engine.setBaseline(new ContainerSnapshot(inventory));
+            engine.setBaseline(new Cc(inventory));
         }
 
         void gain(int item, long qty, long value, long at)
         {
-            engine.getActiveSession().addTransaction(new Transaction(at, null,
-                TransactionType.GAIN, Context.GENERIC, "", "Loot", true,
-                Collections.singletonList(new Flow(item, name(item), qty,
-                    (int) (qty > 0L ? value / qty : 0L), value, PriceSource.GRAND_EXCHANGE)),
-                ClassificationConfidence.CONFIRMED, "", null), 500);
+            engine.getActiveSession().kf(new Ac(at, null,
+                Ai.GAIN, Aj.GENERIC, "", "Loot", true,
+                Collections.singletonList(new Ab(item, name(item), qty,
+                    (int) (qty > 0L ? value / qty : 0L), value, Av.GRAND_EXCHANGE)),
+                Bd.CONFIRMED, "", null), 500);
         }
 
         void offer(int slot, GrandExchangeOfferState state, int item, int total, int traded,
             int price, int spent)
         {
             now += 600L;
-            OfferLedger.Transition transition = ledger.observe(
-                new OfferLedger.Snapshot(slot, state, item, total, traded, price, spent)).orElse(null);
+            Bj.Transition transition = ledger.observe(
+                new Bj.Snapshot(slot, state, item, total, traded, price, spent)).orElse(null);
             if (transition != null)
             {
-                engine.noteGeOfferObservation(transition, name(transition.current.itemId), now);
+                engine.abh(transition, name(transition.current.itemId), now);
             }
         }
 
-        Transaction settle(Map<Integer, Long> next)
+        Ac settle(Map<Integer, Long> next)
         {
             now += 600L;
             inventory = new HashMap<>(next);
-            engine.markInventoryDirty();
-            ContainerSnapshot snapshot = new ContainerSnapshot(inventory);
-            Transaction result = null;
+            engine.yz();
+            Cc snapshot = new Cc(inventory);
+            Ac result = null;
             for (int i = 0; i < 3; i++)
             {
-                Transaction settled = engine.processIfDirty(snapshot, now);
+                Ac settled = engine.adj(snapshot, now);
                 if (settled != null)
                 {
                     result = settled;
@@ -207,10 +207,10 @@ public class GeRingAuthorityTest
             return engine.getMetrics(now).net;
         }
 
-        List<Transaction> transactions()
+        List<Ac> transactions()
         {
-            List<Transaction> out = new ArrayList<>();
-            for (Transaction transaction : engine.getActiveSession().getTransactions())
+            List<Ac> out = new ArrayList<>();
+            for (Ac transaction : engine.getActiveSession().getTransactions())
             {
                 if (transaction != null)
                 {
@@ -220,10 +220,10 @@ public class GeRingAuthorityTest
             return out;
         }
 
-        List<Transaction> counted()
+        List<Ac> counted()
         {
-            List<Transaction> out = new ArrayList<>();
-            for (Transaction transaction : transactions())
+            List<Ac> out = new ArrayList<>();
+            for (Ac transaction : transactions())
             {
                 if (transaction.isCounted())
                 {
@@ -236,9 +236,9 @@ public class GeRingAuthorityTest
         int reviews()
         {
             int reviews = 0;
-            for (Transaction transaction : transactions())
+            for (Ac transaction : transactions())
             {
-                if (ReviewEligibility.needsOwnerDecision(transaction))
+                if (Eh.aal(transaction))
                 {
                     reviews++;
                 }
@@ -248,10 +248,10 @@ public class GeRingAuthorityTest
 
         boolean hasCountedCoinsOnlyRow()
         {
-            for (Transaction transaction : counted())
+            for (Ac transaction : counted())
             {
                 boolean coinsOnly = !transaction.getFlows().isEmpty();
-                for (Flow flow : transaction.getFlows())
+                for (Ab flow : transaction.getFlows())
                 {
                     coinsOnly &= flow.itemId == COINS;
                 }
@@ -287,23 +287,23 @@ public class GeRingAuthorityTest
         return map;
     }
 
-    private static Engine engine(int[] quote)
+    private static Am engine(int[] quote)
     {
         GpManagerConfig config = new GpManagerConfig()
         {
             @Override public int stabilizationTicks() { return 0; }
             @Override public boolean keepTransferAuditRows() { return true; }
         };
-        return new Engine(deltas ->
+        return new Am(deltas ->
         {
-            List<Flow> flows = new ArrayList<>();
+            List<Ab> flows = new ArrayList<>();
             for (Map.Entry<Integer, Long> delta : deltas.entrySet())
             {
                 int id = delta.getKey();
                 int unit = id == COINS ? 1 : quote[0];
-                PriceSource source = id == COINS ? PriceSource.FACE_VALUE
-                    : unit > 0 ? PriceSource.GRAND_EXCHANGE : PriceSource.UNPRICED;
-                flows.add(new Flow(id, name(id), delta.getValue(), unit, delta.getValue() * unit,
+                Av source = id == COINS ? Av.FACE_VALUE
+                    : unit > 0 ? Av.GRAND_EXCHANGE : Av.UNPRICED;
+                flows.add(new Ab(id, name(id), delta.getValue(), unit, delta.getValue() * unit,
                     source));
             }
             return flows;

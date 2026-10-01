@@ -22,13 +22,13 @@ public class ContainerSnapshotTest
         afterValues.put(561, 10L);
 
         Map<Integer, Long> diff =
-            new ContainerSnapshot(afterValues).diff(new ContainerSnapshot(beforeValues));
+            new Cc(afterValues).diff(new Cc(beforeValues));
 
         assertEquals(Long.valueOf(-250L), diff.get(995));
         assertEquals(Long.valueOf(-1L), diff.get(385));
         assertEquals(Long.valueOf(10L), diff.get(561));
         assertEquals(3, diff.size());
-        assertEquals(new ContainerSnapshot(afterValues), new ContainerSnapshot(afterValues));
-        assertNotEquals(new ContainerSnapshot(afterValues), new ContainerSnapshot(beforeValues));
+        assertEquals(new Cc(afterValues), new Cc(afterValues));
+        assertNotEquals(new Cc(afterValues), new Cc(beforeValues));
     }
 }

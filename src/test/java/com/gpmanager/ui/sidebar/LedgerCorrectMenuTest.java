@@ -19,10 +19,10 @@ public class LedgerCorrectMenuTest
     @Test
     public void aCorrectionPreviewsOnItsReceiptThenApplies() throws Exception
     {
-        Engine engine = PresentationLifecycleTest.engine();
-        engine.startCustomSession("Vorkath", SessionMode.GENERAL, T0);
-        Transaction bones = loot(T0 + 1_000L, 536, "Dragon bones", 2L, 3_000);
-        engine.getActiveSession().addTransaction(bones, 2_000);
+        Am engine = PresentationLifecycleTest.engine();
+        engine.ajl("Vorkath", Cx.GENERAL, T0);
+        Ac bones = loot(T0 + 1_000L, 536, "Dragon bones", 2L, 3_000);
+        engine.getActiveSession().kf(bones, 2_000);
         Harness harness = new Harness(engine, bones.getId());
         LedgerPage page = harness.page;
 
@@ -41,27 +41,27 @@ public class LedgerCorrectMenuTest
         });
         List<String> preview = onEdt(() -> LedgerPageProbe.detailTexts(page));
         assertTrue("the preview opens on the chosen receipt: " + preview, preview.contains("PREVIEW")
-            && preview.contains(Fmt.exactSigned(-6_000L) + " gp"));
+            && preview.contains(Fmt.ru(-6_000L) + " gp"));
         assertEquals("nothing changes before Confirm", 6_000L, engine.getMetrics(T0 + 5_000L).net);
 
         assertTrue(onEdt(() -> click(page.body(), "Confirm")));
         assertEquals(0L, engine.getMetrics(T0 + 5_000L).net);
-        assertEquals(Correction.IGNORE, engine.getActiveSession().findTransaction(bones.getId())
+        assertEquals(Ah.IGNORE, engine.getActiveSession().sw(bones.getId())
             .getCorrection());
     }
 
     @Test
     public void historyReceiptsAreReadOnly() throws Exception
     {
-        Engine engine = PresentationLifecycleTest.engine();
-        engine.startCustomSession("Vorkath", SessionMode.GENERAL, T0);
-        Transaction bones = loot(T0 + 1_000L, 536, "Dragon bones", 1L, 3_000);
-        engine.getActiveSession().addTransaction(bones, 2_000);
+        Am engine = PresentationLifecycleTest.engine();
+        engine.ajl("Vorkath", Cx.GENERAL, T0);
+        Ac bones = loot(T0 + 1_000L, 536, "Dragon bones", 1L, 3_000);
+        engine.getActiveSession().kf(bones, 2_000);
         String id = engine.getActiveSession().getId();
-        engine.finishCustomSession(T0 + 2_000L);
+        engine.sx(T0 + 2_000L);
         Harness harness = new Harness(engine, bones.getId());
-        harness.entry = new LedgerData.Entry(LedgerData.Scope.HISTORY, id, "Vorkath",
-            LedgerData.CostView.ALL, "", bones.getId(), null, null, null);
+        harness.entry = new Ao.Entry(Ao.Scope.HISTORY, id, "Vorkath",
+            Ao.Bs.ALL, "", bones.getId(), null, null, null);
         onEdt(() ->
         {
             harness.refresh();
@@ -72,10 +72,10 @@ public class LedgerCorrectMenuTest
         assertTrue(texts.stream().anyMatch(text -> text.contains("Read-only")));
     }
 
-    private static Transaction loot(long at, int itemId, String name, long quantity, int price)
+    private static Ac loot(long at, int itemId, String name, long quantity, int price)
     {
-        return Tx.of(at, TransactionType.LOOT, Context.LOOT, "Vorkath", true,
-            Collections.singletonList(new Flow(itemId, name, quantity, price, quantity * price)));
+        return Tx.of(at, Ai.LOOT, Aj.LOOT, "Vorkath", true,
+            Collections.singletonList(new Ab(itemId, name, quantity, price, quantity * price)));
     }
 
     private static boolean click(java.awt.Component root, String text)
@@ -125,15 +125,15 @@ public class LedgerCorrectMenuTest
     /** Recaptures on every selection, as the sidebar does, and books through the engine. */
     private static final class Harness implements LedgerPage.Actions
     {
-        final Engine engine;
+        final Am engine;
         final LedgerPage page;
-        LedgerData.Entry entry;
+        Ao.Entry entry;
 
-        Harness(Engine engine, String transactionId) throws Exception
+        Harness(Am engine, String transactionId) throws Exception
         {
             this.engine = engine;
-            this.entry = new LedgerData.Entry(LedgerData.Scope.CURRENT_GRIND, null, null,
-                LedgerData.CostView.ALL, "", transactionId, null, null, null);
+            this.entry = new Ao.Entry(Ao.Scope.CURRENT_GRIND, null, null,
+                Ao.Bs.ALL, "", transactionId, null, null, null);
             this.page = onEdt(() -> new LedgerPage(this, id -> null));
             onEdt(() ->
             {
@@ -143,11 +143,11 @@ public class LedgerCorrectMenuTest
         }
 
         @Override public void openScopeMenu(javax.swing.JComponent anchor) { }
-        @Override public void costViewChanged(LedgerData.CostView view) { }
+        @Override public void costViewChanged(Ao.Bs view) { }
         @Override public void searchChanged(String text) { }
         @Override public void split(String id) { }
         @Override public void undoCorrection() { }
-        @Override public void decideAll(ReviewDecision decision) { }
+        @Override public void decideAll(Cl decision) { }
 
         @Override
         public void selectionChanged(@Nullable String transactionId, @Nullable String contributionId,
@@ -158,23 +158,23 @@ public class LedgerCorrectMenuTest
         }
 
         @Override
-        public LedgerData.CorrectionPreview preview(String id, Correction correction)
+        public Ao.Ef preview(String id, Ah correction)
         {
-            return LedgerData.preview(engine, id, correction, T0 + 5_000L);
+            return Ao.preview(engine, id, correction, T0 + 5_000L);
         }
 
         @Override
-        public LedgerPage.CorrectionOutcome correct(String id, Correction correction, long revision)
+        public LedgerPage.Ea correct(String id, Ah correction, long revision)
         {
-            return engine.getRevision() != revision ? LedgerPage.CorrectionOutcome.STALE
-                : engine.correctTransaction(id, correction, T0 + 5_000L, "test")
-                    ? LedgerPage.CorrectionOutcome.APPLIED : LedgerPage.CorrectionOutcome.REFUSED;
+            return engine.getRevision() != revision ? LedgerPage.Ea.STALE
+                : engine.qi(id, correction, T0 + 5_000L, "test")
+                    ? LedgerPage.Ea.APPLIED : LedgerPage.Ea.REFUSED;
         }
 
         @Override
         public void refresh()
         {
-            page.apply(LedgerData.capture(engine, T0 + 5_000L, entry));
+            page.apply(Ao.capture(engine, T0 + 5_000L, entry));
         }
     }
 }

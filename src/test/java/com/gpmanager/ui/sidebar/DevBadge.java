@@ -19,7 +19,7 @@ public final class DevBadge
     }
 
     /** Development builds show the DEV marker; release builds leave the footer collapsed. */
-    public static void apply(SidebarPanel panel, @Nullable BuildInfo info)
+    public static void apply(Dp panel, @Nullable BuildInfo info)
     {
         BuildInfo resolved = info == null ? BuildInfo.fallback() : info;
         String badge = resolved.badgeText();
@@ -55,9 +55,9 @@ public final class DevBadge
 
     private static void badgeAll(Component component, BuildInfo info)
     {
-        if (component instanceof SidebarPanel)
+        if (component instanceof Dp)
         {
-            SidebarPanel panel = (SidebarPanel) component;
+            Dp panel = (Dp) component;
             if (ShellProbe.badge(panel.shell) == null)
             {
                 apply(panel, info);

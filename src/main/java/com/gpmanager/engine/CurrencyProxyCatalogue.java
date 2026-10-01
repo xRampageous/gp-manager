@@ -8,23 +8,23 @@ import java.util.Set;
 * would otherwise value some of them through an item mapping.
 */
 class CurrencyProxyCatalogue {
-static final Set<Integer> CURRENCIES = GameData.byId("d1").keySet();
+static final Set<Integer> CURRENCIES = Ak.byId("d1").keySet();
 /** Proxy rows: item id to {market item id, units per proxy item}. */
 static final Map<Integer, int[]> PROXIES = new HashMap<>();
 static {
-for (String[] row : GameData.rows("d1")) {
-if (row.length > 2) {
-PROXIES.put(Integer.parseInt(row[0]), new int[]{Integer.parseInt(row[1]), Integer.parseInt(row[2])});
-}
-}
+ for (String[] row : Ak.rows("d1")) {
+  if (row.length > 2) {
+   PROXIES.put(Integer.parseInt(row[0]), new int[]{Integer.parseInt(row[1]), Integer.parseInt(row[2])});
+  }
+ }
 }
 
-static boolean isMapped(int itemId) {
-return CURRENCIES.contains(itemId);
+static boolean awk(int itemId) {
+ return CURRENCIES.contains(itemId);
 }
 
 /** The proxy price source for this item, or null. */
-static int[] proxyOf(int itemId) {
-return PROXIES.get(itemId);
+static int[] axy(int itemId) {
+ return PROXIES.get(itemId);
 }
 }

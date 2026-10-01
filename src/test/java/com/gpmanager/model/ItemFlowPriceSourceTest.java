@@ -10,17 +10,17 @@ public class ItemFlowPriceSourceTest
     @Test
     public void legacyFlowDefaultsToUnknownSource()
     {
-        Flow flow = new Flow(995, "Coins", 100, 1, 100);
+        Ab flow = new Ab(995, "Coins", 100, 1, 100);
 
-        assertEquals(PriceSource.UNKNOWN, flow.getPriceSource());
+        assertEquals(Av.UNKNOWN, flow.getPriceSource());
         assertEquals(0L, flow.getPriceCapturedAtEpochMillis());
     }
 
     @Test
     public void timestampedFlowRetainsPriceCaptureTime()
     {
-        Flow flow = new Flow(995, "Coins", 100, 1, 100,
-            PriceSource.GRAND_EXCHANGE, 1_725_000_000_000L);
+        Ab flow = new Ab(995, "Coins", 100, 1, 100,
+            Av.GRAND_EXCHANGE, 1_725_000_000_000L);
 
         assertEquals(1_725_000_000_000L, flow.getPriceCapturedAtEpochMillis());
     }
@@ -28,19 +28,19 @@ public class ItemFlowPriceSourceTest
     @Test
     public void transactionSummarizesMixedPricingSources()
     {
-        Transaction transaction = Tx.of(
+        Ac transaction = Tx.of(
             100L,
             null,
-            TransactionType.LOOT,
-            Context.LOOT,
+            Ai.LOOT,
+            Aj.LOOT,
             "Loot",
             "PvM",
             true,
             Arrays.asList(
-                new Flow(995, "Coins", 100, 1, 100, PriceSource.GRAND_EXCHANGE),
-                new Flow(555, "Air rune", -2, 5, -10, PriceSource.MANUAL_OVERRIDE),
-                new Flow(995, "Coins", 1, 60, 60, PriceSource.HIGH_ALCHEMY)));
+                new Ab(995, "Coins", 100, 1, 100, Av.GRAND_EXCHANGE),
+                new Ab(555, "Air rune", -2, 5, -10, Av.MANUAL_OVERRIDE),
+                new Ab(995, "Coins", 1, 60, 60, Av.HIGH_ALCHEMY)));
 
-        assertEquals("Pricing: manual (1), RuneLite market (1), high alchemy (1)", transaction.getPricingSummary());
+        assertEquals("Pricing: manual (1), RuneLite market (1), high alchemy (1)", transaction.uu());
     }
 }

@@ -33,11 +33,11 @@ public class ConsumptionBurialEngineTest
 
     private final FlowValuator valuator = deltas ->
     {
-        List<Flow> flows = new ArrayList<>();
+        List<Ab> flows = new ArrayList<>();
         for (Map.Entry<Integer, Long> entry : deltas.entrySet())
         {
             int price = entry.getKey() == 526 ? 31 : 100;
-            flows.add(new Flow(
+            flows.add(new Ab(
                 entry.getKey(), "Item " + entry.getKey(), entry.getValue(), price, entry.getValue() * price));
         }
         return flows;
@@ -46,14 +46,14 @@ public class ConsumptionBurialEngineTest
     @Test
     public void activeBurialIsCountedConsumptionCost()
     {
-        Engine engine = startedWithBones(1L);
+        Am engine = startedWithBones(1L);
 
-        Transaction burial = settle(engine, ContainerSnapshot.empty(), 1_600L);
+        Ac burial = settle(engine, Cc.empty(), 1_600L);
 
-        assertEquals(TransactionType.CONSUMPTION, burial.getType());
+        assertEquals(Ai.CONSUMPTION, burial.getType());
         assertTrue(burial.isCounted());
         assertEquals(-31L, burial.getNet());
-        SessionMetrics metrics = engine.getMetrics(4_000L);
+        Bu metrics = engine.getMetrics(4_000L);
         assertEquals(0L, metrics.revenue);
         assertEquals(31L, metrics.costs);
         assertEquals(-31L, metrics.net);
@@ -63,17 +63,17 @@ public class ConsumptionBurialEngineTest
     public void sameTickPickupThenBuryBooksConsumption()
     {
         // Acquire + bury in one stabilize window nets to zero vs baseline.
-        Engine engine = new Engine(valuator, new TransactionClassifier(), CONFIG);
-        engine.ensureSession(1_000L);
-        engine.setBaseline(ContainerSnapshot.empty());
-        assertNull(engine.processIfDirty(snapshot(526, 1L), 1_000L));
+        Am engine = new Am(valuator, new TransactionClassifier(), CONFIG);
+        engine.rm(1_000L);
+        engine.setBaseline(Cc.empty());
+        assertNull(engine.adj(snapshot(526, 1L), 1_000L));
         engine.noteConsumptionIntent(526, 8);
-        engine.markInventoryDirty();
+        engine.yz();
 
-        Transaction burial = settle(engine, ContainerSnapshot.empty(), 1_600L);
+        Ac burial = settle(engine, Cc.empty(), 1_600L);
 
         assertNotNull(burial);
-        assertEquals(TransactionType.CONSUMPTION, burial.getType());
+        assertEquals(Ai.CONSUMPTION, burial.getType());
         assertTrue(burial.isCounted());
         assertEquals(31L, engine.getMetrics(4_000L).costs);
     }
@@ -81,16 +81,16 @@ public class ConsumptionBurialEngineTest
     @Test
     public void hardTransferWithStaleBoneIntentDoesNotBookOakDepositAsConsume()
     {
-        Engine engine = new Engine(valuator, new TransactionClassifier(), CONFIG);
-        engine.ensureSession(1_000L);
+        Am engine = new Am(valuator, new TransactionClassifier(), CONFIG);
+        engine.rm(1_000L);
         engine.setBaseline(snapshot(1511, 1L)); // oak logs
         engine.noteConsumptionIntent(526, 6); // stale bones bury
-        engine.markContext(Context.TRANSFER, 6, "Bank container transfer");
-        engine.markInventoryDirty();
+        engine.markContext(Aj.TRANSFER, 6, "Bank container transfer");
+        engine.yz();
 
-        Transaction deposit = settle(engine, ContainerSnapshot.empty(), 1_600L);
+        Ac deposit = settle(engine, Cc.empty(), 1_600L);
 
-        assertEquals(TransactionType.TRANSFER, deposit.getType());
+        assertEquals(Ai.TRANSFER, deposit.getType());
         assertFalse(deposit.isCounted());
         assertEquals(0L, engine.getMetrics(4_000L).costs);
     }
@@ -98,12 +98,12 @@ public class ConsumptionBurialEngineTest
     @Test
     public void repeatedBurialsAccumulateCosts()
     {
-        Engine engine = startedWithBones(2L);
+        Am engine = startedWithBones(2L);
 
         settle(engine, snapshot(526, 1L), 1_600L);
-        settle(engine, ContainerSnapshot.empty(), 3_400L);
+        settle(engine, Cc.empty(), 3_400L);
 
-        SessionMetrics metrics = engine.getMetrics(6_000L);
+        Bu metrics = engine.getMetrics(6_000L);
         assertEquals(62L, metrics.costs);
         assertEquals(-62L, metrics.net);
         assertEquals(2, engine.getActiveSession().getTransactions().size());
@@ -112,19 +112,19 @@ public class ConsumptionBurialEngineTest
     @Test
     public void lootThenBurialRecordsRevenueAndConsumptionRatherThanPerpetualProfit()
     {
-        Engine engine = engine();
-        engine.ensureSession(1_000L);
-        engine.setBaseline(ContainerSnapshot.empty());
-        engine.markLootContext(Collections.singletonMap(526, 1L), 6, "Loot from Chicken", "Chicken");
-        engine.markInventoryDirty();
+        Am engine = engine();
+        engine.rm(1_000L);
+        engine.setBaseline(Cc.empty());
+        engine.zk(Collections.singletonMap(526, 1L), 6, "Loot from Chicken", "Chicken");
+        engine.yz();
 
-        Transaction loot = settle(engine, snapshot(526, 1L), 1_600L);
-        engine.markInventoryDirty();
-        Transaction burial = settle(engine, ContainerSnapshot.empty(), 3_400L);
+        Ac loot = settle(engine, snapshot(526, 1L), 1_600L);
+        engine.yz();
+        Ac burial = settle(engine, Cc.empty(), 3_400L);
 
-        assertEquals(TransactionType.LOOT, loot.getType());
+        assertEquals(Ai.LOOT, loot.getType());
         assertEquals(31L, loot.getRevenue());
-        assertEquals(TransactionType.CONSUMPTION, burial.getType());
+        assertEquals(Ai.CONSUMPTION, burial.getType());
         assertEquals(31L, burial.getCosts());
         assertEquals(0L, engine.getMetrics(6_000L).net);
     }
@@ -132,22 +132,22 @@ public class ConsumptionBurialEngineTest
     @Test
     public void staleTransferContextCannotHideBurialButFreshBankEvidenceCan()
     {
-        Engine stale = startedWithBones(1L);
-        stale.markContext(Context.TRANSFER, 6, "Bank transfer");
+        Am stale = startedWithBones(1L);
+        stale.markContext(Aj.TRANSFER, 6, "Bank transfer");
         for (int tick = 1; tick <= 7; tick++)
         {
-            assertNull(stale.processIfDirty(snapshot(526, 1L), 1_000L + tick * 600L));
+            assertNull(stale.adj(snapshot(526, 1L), 1_000L + tick * 600L));
         }
-        stale.markInventoryDirty();
-        Transaction burial = settle(stale, ContainerSnapshot.empty(), 6_000L);
-        assertEquals(TransactionType.CONSUMPTION, burial.getType());
+        stale.yz();
+        Ac burial = settle(stale, Cc.empty(), 6_000L);
+        assertEquals(Ai.CONSUMPTION, burial.getType());
         assertTrue(burial.isCounted());
 
-        Engine duringBank = startedWithBones(1L);
-        duringBank.markBankInterfaceOpen(6);
-        duringBank.markInventoryDirty();
-        Transaction deposit = settle(duringBank, ContainerSnapshot.empty(), 1_600L);
-        assertEquals(TransactionType.TRANSFER, deposit.getType());
+        Am duringBank = startedWithBones(1L);
+        duringBank.ze(6);
+        duringBank.yz();
+        Ac deposit = settle(duringBank, Cc.empty(), 1_600L);
+        assertEquals(Ai.TRANSFER, deposit.getType());
         assertFalse(deposit.isCounted());
         assertEquals(0L, duringBank.getMetrics(4_000L).costs);
     }
@@ -155,14 +155,14 @@ public class ConsumptionBurialEngineTest
     @Test
     public void closingBankBeforeBurialClearsTransferClassification()
     {
-        Engine engine = startedWithBones(1L);
-        engine.markBankInterfaceOpen(6);
-        engine.markBankInterfaceClosed();
-        engine.markInventoryDirty();
+        Am engine = startedWithBones(1L);
+        engine.ze(6);
+        engine.yu();
+        engine.yz();
 
-        Transaction burial = settle(engine, ContainerSnapshot.empty(), 1_600L);
+        Ac burial = settle(engine, Cc.empty(), 1_600L);
 
-        assertEquals(TransactionType.CONSUMPTION, burial.getType());
+        assertEquals(Ai.CONSUMPTION, burial.getType());
         assertTrue(burial.isCounted());
         assertEquals(31L, engine.getMetrics(4_000L).costs);
     }
@@ -180,22 +180,22 @@ public class ConsumptionBurialEngineTest
     @Test
     public void burialAfterBankClosesWithNoFurtherOpenNotificationsIsConsumptionNotTransfer()
     {
-        Engine engine = startedWithBones(1L);
+        Am engine = startedWithBones(1L);
         // Live GameTick refreshes bank-open (soft) evidence every tick the bank is visible.
         for (int tick = 0; tick < 5; tick++)
         {
-            engine.markBankInterfaceOpen(6);
+            engine.ze(6);
         }
         // Bank closes; no more open notifications will ever arrive again.
-        engine.markBankInterfaceClosed();
-        engine.markInventoryDirty();
+        engine.yu();
+        engine.yz();
 
-        Transaction burial = settle(engine, ContainerSnapshot.empty(), 1_600L);
+        Ac burial = settle(engine, Cc.empty(), 1_600L);
 
-        assertEquals(TransactionType.CONSUMPTION, burial.getType());
+        assertEquals(Ai.CONSUMPTION, burial.getType());
         assertTrue(burial.isCounted());
         assertEquals(-31L, burial.getNet());
-        SessionMetrics metrics = engine.getMetrics(4_000L);
+        Bu metrics = engine.getMetrics(4_000L);
         assertEquals(31L, metrics.costs);
         assertEquals(0L, metrics.revenue);
         assertEquals(-31L, metrics.net);
@@ -209,17 +209,17 @@ public class ConsumptionBurialEngineTest
     @Test
     public void repeatedBankOpenCloseFlutterBeforeFinalCloseStillBooksBurialAsConsumption()
     {
-        Engine engine = startedWithBones(1L);
-        engine.markBankInterfaceOpen(6);
-        engine.markBankInterfaceClosed();
-        engine.markBankInterfaceOpen(6);
-        engine.markBankInterfaceOpen(6);
-        engine.markBankInterfaceClosed();
-        engine.markInventoryDirty();
+        Am engine = startedWithBones(1L);
+        engine.ze(6);
+        engine.yu();
+        engine.ze(6);
+        engine.ze(6);
+        engine.yu();
+        engine.yz();
 
-        Transaction burial = settle(engine, ContainerSnapshot.empty(), 1_600L);
+        Ac burial = settle(engine, Cc.empty(), 1_600L);
 
-        assertEquals(TransactionType.CONSUMPTION, burial.getType());
+        assertEquals(Ai.CONSUMPTION, burial.getType());
         assertTrue(burial.isCounted());
         assertEquals(31L, engine.getMetrics(4_000L).costs);
     }
@@ -233,19 +233,19 @@ public class ConsumptionBurialEngineTest
     @Test
     public void multipleBurialsAfterFinalBankCloseAllBookAsConsumption()
     {
-        Engine engine = startedWithBones(3L);
-        engine.markBankInterfaceOpen(6);
-        engine.markBankInterfaceOpen(6);
-        engine.markBankInterfaceClosed();
-        engine.markInventoryDirty();
+        Am engine = startedWithBones(3L);
+        engine.ze(6);
+        engine.ze(6);
+        engine.yu();
+        engine.yz();
 
-        Transaction firstBurial = settle(engine, snapshot(526, 2L), 1_600L);
-        assertEquals(TransactionType.CONSUMPTION, firstBurial.getType());
+        Ac firstBurial = settle(engine, snapshot(526, 2L), 1_600L);
+        assertEquals(Ai.CONSUMPTION, firstBurial.getType());
         assertTrue(firstBurial.isCounted());
 
-        engine.markInventoryDirty();
-        Transaction secondBurial = settle(engine, ContainerSnapshot.empty(), 3_400L);
-        assertEquals(TransactionType.CONSUMPTION, secondBurial.getType());
+        engine.yz();
+        Ac secondBurial = settle(engine, Cc.empty(), 3_400L);
+        assertEquals(Ai.CONSUMPTION, secondBurial.getType());
         assertTrue(secondBurial.isCounted());
 
         assertEquals(93L, engine.getMetrics(6_000L).costs);
@@ -254,21 +254,21 @@ public class ConsumptionBurialEngineTest
     @Test
     public void withdrawThenBurySameItemRecordsTransferThenConsumption()
     {
-        Engine engine = engine();
-        engine.ensureSession(1_000L);
-        engine.setBaseline(ContainerSnapshot.empty());
-        engine.markBankInterfaceOpen(6);
-        engine.markInventoryDirty();
+        Am engine = engine();
+        engine.rm(1_000L);
+        engine.setBaseline(Cc.empty());
+        engine.ze(6);
+        engine.yz();
 
-        Transaction withdrawal = settle(engine, snapshot(526, 1L), 1_600L);
-        assertEquals(TransactionType.TRANSFER, withdrawal.getType());
+        Ac withdrawal = settle(engine, snapshot(526, 1L), 1_600L);
+        assertEquals(Ai.TRANSFER, withdrawal.getType());
         assertFalse(withdrawal.isCounted());
 
-        engine.markBankInterfaceClosed();
-        engine.markInventoryDirty();
-        Transaction burial = settle(engine, ContainerSnapshot.empty(), 3_400L);
+        engine.yu();
+        engine.yz();
+        Ac burial = settle(engine, Cc.empty(), 3_400L);
 
-        assertEquals(TransactionType.CONSUMPTION, burial.getType());
+        assertEquals(Ai.CONSUMPTION, burial.getType());
         assertTrue(burial.isCounted());
         assertEquals(31L, engine.getMetrics(6_000L).costs);
     }
@@ -278,16 +278,16 @@ public class ConsumptionBurialEngineTest
     {
         // Live race: bank-container/menu hard evidence, GameTick closes bank and advances
         // idle context, then inventory callback arrives — must stay ownership-neutral.
-        Engine engine = startedWithBones(1L);
-        engine.markContext(Context.TRANSFER, 6, "Bank container transfer");
-        assertNull(engine.processIfDirty(snapshot(526, 1L), 1_200L));
-        engine.markBankInterfaceClosed();
-        assertNull(engine.processIfDirty(snapshot(526, 1L), 1_800L));
+        Am engine = startedWithBones(1L);
+        engine.markContext(Aj.TRANSFER, 6, "Bank container transfer");
+        assertNull(engine.adj(snapshot(526, 1L), 1_200L));
+        engine.yu();
+        assertNull(engine.adj(snapshot(526, 1L), 1_800L));
 
-        engine.markInventoryDirty();
-        Transaction deposit = settle(engine, ContainerSnapshot.empty(), 2_400L);
+        engine.yz();
+        Ac deposit = settle(engine, Cc.empty(), 2_400L);
 
-        assertEquals(TransactionType.TRANSFER, deposit.getType());
+        assertEquals(Ai.TRANSFER, deposit.getType());
         assertFalse(deposit.isCounted());
         assertEquals(0L, engine.getMetrics(5_000L).costs);
         assertEquals(0L, engine.getMetrics(5_000L).net);
@@ -296,13 +296,13 @@ public class ConsumptionBurialEngineTest
     @Test
     public void softOnlyDepositWhileBankOpenIsTransferNotLoss()
     {
-        Engine engine = startedWithBones(1L);
-        engine.markBankInterfaceOpen(6);
-        engine.markInventoryDirty();
+        Am engine = startedWithBones(1L);
+        engine.ze(6);
+        engine.yz();
 
-        Transaction deposit = settle(engine, ContainerSnapshot.empty(), 1_600L);
+        Ac deposit = settle(engine, Cc.empty(), 1_600L);
 
-        assertEquals(TransactionType.TRANSFER, deposit.getType());
+        assertEquals(Ai.TRANSFER, deposit.getType());
         assertFalse(deposit.isCounted());
         assertEquals(0L, engine.getMetrics(4_000L).costs);
     }
@@ -310,23 +310,23 @@ public class ConsumptionBurialEngineTest
     @Test
     public void buryIntentAfterBankCloseBothCallbackOrdersBooksConsumption()
     {
-        Engine closeFirst = startedWithBones(1L);
-        closeFirst.markBankInterfaceOpen(6);
-        closeFirst.markBankInterfaceClosed();
+        Am closeFirst = startedWithBones(1L);
+        closeFirst.ze(6);
+        closeFirst.yu();
         closeFirst.noteConsumptionIntent(526, 6);
-        closeFirst.markInventoryDirty();
-        Transaction burialCloseFirst = settle(closeFirst, ContainerSnapshot.empty(), 1_600L);
-        assertEquals(TransactionType.CONSUMPTION, burialCloseFirst.getType());
+        closeFirst.yz();
+        Ac burialCloseFirst = settle(closeFirst, Cc.empty(), 1_600L);
+        assertEquals(Ai.CONSUMPTION, burialCloseFirst.getType());
         assertTrue(burialCloseFirst.isCounted());
         assertEquals(31L, closeFirst.getMetrics(4_000L).costs);
 
-        Engine dirtyFirst = startedWithBones(1L);
-        dirtyFirst.markBankInterfaceOpen(6);
-        dirtyFirst.markInventoryDirty();
-        dirtyFirst.markBankInterfaceClosed();
+        Am dirtyFirst = startedWithBones(1L);
+        dirtyFirst.ze(6);
+        dirtyFirst.yz();
+        dirtyFirst.yu();
         dirtyFirst.noteConsumptionIntent(526, 6);
-        Transaction burialDirtyFirst = settle(dirtyFirst, ContainerSnapshot.empty(), 1_600L);
-        assertEquals(TransactionType.CONSUMPTION, burialDirtyFirst.getType());
+        Ac burialDirtyFirst = settle(dirtyFirst, Cc.empty(), 1_600L);
+        assertEquals(Ai.CONSUMPTION, burialDirtyFirst.getType());
         assertTrue(burialDirtyFirst.isCounted());
         assertEquals(31L, dirtyFirst.getMetrics(4_000L).costs);
     }
@@ -334,16 +334,16 @@ public class ConsumptionBurialEngineTest
     @Test
     public void buryIntentWinsOverSurvivingHardTransferEvidence()
     {
-        Engine engine = startedWithBones(1L);
-        engine.markContext(Context.TRANSFER, 6, "Bank container transfer");
-        engine.markBankInterfaceClosed();
-        assertNull(engine.processIfDirty(snapshot(526, 1L), 1_200L));
+        Am engine = startedWithBones(1L);
+        engine.markContext(Aj.TRANSFER, 6, "Bank container transfer");
+        engine.yu();
+        assertNull(engine.adj(snapshot(526, 1L), 1_200L));
         engine.noteConsumptionIntent(526, 6);
-        engine.markInventoryDirty();
+        engine.yz();
 
-        Transaction burial = settle(engine, ContainerSnapshot.empty(), 1_800L);
+        Ac burial = settle(engine, Cc.empty(), 1_800L);
 
-        assertEquals(TransactionType.CONSUMPTION, burial.getType());
+        assertEquals(Ai.CONSUMPTION, burial.getType());
         assertTrue(burial.isCounted());
         assertEquals(31L, engine.getMetrics(4_000L).costs);
     }
@@ -351,15 +351,15 @@ public class ConsumptionBurialEngineTest
     @Test
     public void eatIntentBooksConsumptionCost()
     {
-        Engine engine = engine();
-        engine.ensureSession(1_000L);
+        Am engine = engine();
+        engine.rm(1_000L);
         engine.setBaseline(snapshot(379, 1L)); // lobster
         engine.noteConsumptionIntent(379, 6);
-        engine.markInventoryDirty();
+        engine.yz();
 
-        Transaction eaten = settle(engine, ContainerSnapshot.empty(), 1_600L);
+        Ac eaten = settle(engine, Cc.empty(), 1_600L);
 
-        assertEquals(TransactionType.CONSUMPTION, eaten.getType());
+        assertEquals(Ai.CONSUMPTION, eaten.getType());
         assertTrue(eaten.isCounted());
         assertEquals(100L, engine.getMetrics(4_000L).costs);
     }
@@ -368,17 +368,17 @@ public class ConsumptionBurialEngineTest
     public void drinkIntentWithDoseLeftoverStillBooksConsumption()
     {
         // Prayer potion(4) → potion(3): mixed delta would be UNCERTAIN without intent.
-        Engine engine = engine();
-        engine.ensureSession(1_000L);
+        Am engine = engine();
+        engine.rm(1_000L);
         engine.setBaseline(snapshot(2434, 1L));
         engine.noteConsumptionIntent(2434, 6);
-        engine.markInventoryDirty();
+        engine.yz();
 
         Map<Integer, Long> after = new HashMap<>();
         after.put(139, 1L); // prayer potion(3)
-        Transaction drink = settle(engine, new ContainerSnapshot(after), 1_600L);
+        Ac drink = settle(engine, new Cc(after), 1_600L);
 
-        assertEquals(TransactionType.CONSUMPTION, drink.getType());
+        assertEquals(Ai.CONSUMPTION, drink.getType());
         assertTrue(drink.isCounted());
         assertTrue(engine.getMetrics(4_000L).costs > 0L);
     }
@@ -387,17 +387,17 @@ public class ConsumptionBurialEngineTest
     public void openDrinkIntentWithoutItemIdStillBooksDoseLeftover()
     {
         // Live CC_OP Drink often reports itemId -1; open intent + dose step must still count.
-        Engine engine = namedEngine();
-        engine.ensureSession(1_000L);
+        Am engine = namedEngine();
+        engine.rm(1_000L);
         engine.setBaseline(snapshot(2434, 1L));
         engine.noteConsumptionIntent(-1, 6);
-        engine.markInventoryDirty();
+        engine.yz();
 
         Map<Integer, Long> after = new HashMap<>();
         after.put(139, 1L);
-        Transaction drink = settle(engine, new ContainerSnapshot(after), 1_600L);
+        Ac drink = settle(engine, new Cc(after), 1_600L);
 
-        assertEquals(TransactionType.CONSUMPTION, drink.getType());
+        assertEquals(Ai.CONSUMPTION, drink.getType());
         assertTrue(drink.isCounted());
         // Net dose cost: lose (4) valued 200, gain (3) valued 100.
         assertEquals(-100L, drink.getNet());
@@ -409,16 +409,16 @@ public class ConsumptionBurialEngineTest
     @Test
     public void openBuryIntentBeatsSurvivingHardTransferEvidence()
     {
-        Engine engine = startedWithBones(1L);
-        engine.markContext(Context.TRANSFER, 6, "Bank container transfer");
-        engine.markBankInterfaceClosed();
-        assertNull(engine.processIfDirty(snapshot(526, 1L), 1_200L));
+        Am engine = startedWithBones(1L);
+        engine.markContext(Aj.TRANSFER, 6, "Bank container transfer");
+        engine.yu();
+        assertNull(engine.adj(snapshot(526, 1L), 1_200L));
         engine.noteConsumptionIntent(-1, 6);
-        engine.markInventoryDirty();
+        engine.yz();
 
-        Transaction burial = settle(engine, ContainerSnapshot.empty(), 1_800L);
+        Ac burial = settle(engine, Cc.empty(), 1_800L);
 
-        assertEquals(TransactionType.CONSUMPTION, burial.getType());
+        assertEquals(Ai.CONSUMPTION, burial.getType());
         assertTrue(burial.isCounted());
         assertEquals(31L, engine.getMetrics(4_000L).costs);
     }
@@ -427,18 +427,18 @@ public class ConsumptionBurialEngineTest
     public void runeCastStylePureLossBooksConsumption()
     {
         // Air rune stack spend — pure cost; cast intent confirms over stale transfer.
-        Engine engine = engine();
-        engine.ensureSession(1_000L);
+        Am engine = engine();
+        engine.rm(1_000L);
         engine.setBaseline(snapshot(556, 100L)); // air rune
-        engine.markContext(Context.TRANSFER, 6, "Bank container transfer");
-        engine.markBankInterfaceClosed();
-        assertNull(engine.processIfDirty(snapshot(556, 100L), 1_200L));
+        engine.markContext(Aj.TRANSFER, 6, "Bank container transfer");
+        engine.yu();
+        assertNull(engine.adj(snapshot(556, 100L), 1_200L));
         engine.noteConsumptionIntent(556, 6);
-        engine.markInventoryDirty();
+        engine.yz();
 
-        Transaction cast = settle(engine, snapshot(556, 95L), 1_800L);
+        Ac cast = settle(engine, snapshot(556, 95L), 1_800L);
 
-        assertEquals(TransactionType.CONSUMPTION, cast.getType());
+        assertEquals(Ai.CONSUMPTION, cast.getType());
         assertTrue(cast.isCounted());
         assertEquals(500L, engine.getMetrics(4_000L).costs);
     }
@@ -448,36 +448,36 @@ public class ConsumptionBurialEngineTest
     {
         // High-alchemy metadata is not a quote. An actual cast is represented by the observed
         // item removal plus the observed coin receipt under the existing cast/consume intent.
-        Engine engine = alchemyEngine();
-        engine.ensureSession(1_000L);
+        Am engine = alchemyEngine();
+        engine.rm(1_000L);
         engine.setBaseline(snapshot(1942, 1L));
         engine.noteConsumptionIntent(1942, 8);
-        engine.markInventoryDirty();
+        engine.yz();
 
         Map<Integer, Long> after = new HashMap<>();
         after.put(995, 60L);
-        Transaction alchemy = settle(engine, new ContainerSnapshot(after), 1_600L);
+        Ac alchemy = settle(engine, new Cc(after), 1_600L);
 
         assertNotNull(alchemy);
-        assertEquals(TransactionType.CONSUMPTION, alchemy.getType());
+        assertEquals(Ai.CONSUMPTION, alchemy.getType());
         assertTrue(alchemy.isCounted());
         assertEquals(-40L, alchemy.getNet());
         assertEquals(100L, engine.getMetrics(4_000L).costs);
         assertEquals(60L, engine.getMetrics(4_000L).revenue);
         assertNull("replaying the settled snapshot must not book alchemy twice",
-            engine.processIfDirty(new ContainerSnapshot(after), 2_800L));
+            engine.adj(new Cc(after), 2_800L));
     }
 
     @Test
     public void bankDepositStillTransferWhenConsumptionIntentAbsent()
     {
-        Engine engine = startedWithBones(1L);
-        engine.markContext(Context.TRANSFER, 6, "Bank container transfer");
-        engine.markInventoryDirty();
+        Am engine = startedWithBones(1L);
+        engine.markContext(Aj.TRANSFER, 6, "Bank container transfer");
+        engine.yz();
 
-        Transaction deposit = settle(engine, ContainerSnapshot.empty(), 1_600L);
+        Ac deposit = settle(engine, Cc.empty(), 1_600L);
 
-        assertEquals(TransactionType.TRANSFER, deposit.getType());
+        assertEquals(Ai.TRANSFER, deposit.getType());
         assertFalse(deposit.isCounted());
         assertEquals(0L, engine.getMetrics(4_000L).costs);
     }
@@ -485,14 +485,14 @@ public class ConsumptionBurialEngineTest
     @Test
     public void bankOpenClearsStaleConsumeIntentSoDepositStaysTransfer()
     {
-        Engine engine = startedWithBones(1L);
+        Am engine = startedWithBones(1L);
         engine.noteConsumptionIntent(526, 6);
-        engine.markBankInterfaceOpen(6);
-        engine.markInventoryDirty();
+        engine.ze(6);
+        engine.yz();
 
-        Transaction deposit = settle(engine, ContainerSnapshot.empty(), 1_600L);
+        Ac deposit = settle(engine, Cc.empty(), 1_600L);
 
-        assertEquals(TransactionType.TRANSFER, deposit.getType());
+        assertEquals(Ai.TRANSFER, deposit.getType());
         assertFalse(deposit.isCounted());
         assertEquals(0L, engine.getMetrics(4_000L).costs);
     }
@@ -500,15 +500,15 @@ public class ConsumptionBurialEngineTest
     @Test
     public void pickingPotatoRegistersCountedGain()
     {
-        Engine engine = engine();
-        engine.ensureSession(1_000L);
-        engine.setBaseline(ContainerSnapshot.empty());
+        Am engine = engine();
+        engine.rm(1_000L);
+        engine.setBaseline(Cc.empty());
         engine.setDetectedActivity("Farming", 1_100L);
-        engine.markInventoryDirty();
+        engine.yz();
 
-        Transaction harvest = settle(engine, snapshot(1942, 1L), 1_600L); // potato
+        Ac harvest = settle(engine, snapshot(1942, 1L), 1_600L); // potato
 
-        assertEquals(TransactionType.GAIN, harvest.getType());
+        assertEquals(Ai.GAIN, harvest.getType());
         assertTrue(harvest.isCounted());
         assertEquals(100L, harvest.getNet());
         assertEquals(100L, engine.getMetrics(4_000L).revenue);
@@ -521,25 +521,25 @@ public class ConsumptionBurialEngineTest
         // Live screenshot sequence: Drink dose leftover + Pick potato×2 + Bury×2 settle
         // in one dirty window. Open menu itemId (-1) previously failed dose-pair /
         // pure-cost match → UNCERTAIN → Used/lost 0 and no Potato row.
-        Engine engine = namedEngine();
-        engine.ensureSession(1_000L);
+        Am engine = namedEngine();
+        engine.rm(1_000L);
         Map<Integer, Long> before = new HashMap<>();
         before.put(526, 4L); // bones
         before.put(3012, 1L); // energy potion(2)
         before.put(1942, 3L); // potatoes already held
-        engine.setBaseline(new ContainerSnapshot(before));
+        engine.setBaseline(new Cc(before));
         engine.noteConsumptionIntent(-1, 8);
-        engine.markInventoryDirty();
+        engine.yz();
 
         Map<Integer, Long> after = new HashMap<>();
         after.put(526, 2L); // buried ×2
         after.put(3014, 1L); // energy potion(1) leftover
         after.put(1942, 5L); // picked ×2
-        Transaction settled = settle(engine, new ContainerSnapshot(after), 1_600L);
+        Ac settled = settle(engine, new Cc(after), 1_600L);
 
-        assertEquals(TransactionType.CONSUMPTION, settled.getType());
+        assertEquals(Ai.CONSUMPTION, settled.getType());
         assertTrue(settled.isCounted());
-        SessionMetrics metrics = engine.getMetrics(4_000L);
+        Bu metrics = engine.getMetrics(4_000L);
         assertTrue("bone + dose costs must book", metrics.costs > 0L);
         assertTrue("potato picks must book as revenue in the coalesced window",
             metrics.revenue > 0L);
@@ -548,7 +548,7 @@ public class ConsumptionBurialEngineTest
         long potatoGained = 0L;
         boolean sawPotionLoss = false;
         boolean sawPotionGain = false;
-        for (Flow flow : settled.getFlows())
+        for (Ab flow : settled.getFlows())
         {
             if (flow.itemId == 526 && flow.quantityDelta < 0L)
             {
@@ -576,13 +576,13 @@ public class ConsumptionBurialEngineTest
     @Test
     public void chatReinforceKeepsNamedIntentItemId()
     {
-        Engine engine = startedWithBones(1L);
+        Am engine = startedWithBones(1L);
         engine.noteConsumptionIntent(526, 4);
-        engine.reinforceConsumptionIntent(8);
-        engine.markInventoryDirty();
+        engine.aew(8);
+        engine.yz();
 
-        Transaction burial = settle(engine, ContainerSnapshot.empty(), 1_600L);
-        assertEquals(TransactionType.CONSUMPTION, burial.getType());
+        Ac burial = settle(engine, Cc.empty(), 1_600L);
+        assertEquals(Ai.CONSUMPTION, burial.getType());
         assertTrue(burial.isCounted());
         assertEquals(31L, engine.getMetrics(4_000L).costs);
     }
@@ -590,21 +590,21 @@ public class ConsumptionBurialEngineTest
     @Test
     public void openDrinkWithCompanionPotatoGainStillBooksDoseCost()
     {
-        Engine engine = namedEngine();
-        engine.ensureSession(1_000L);
+        Am engine = namedEngine();
+        engine.rm(1_000L);
         Map<Integer, Long> before = new HashMap<>();
         before.put(2434, 1L);
         before.put(1942, 1L);
-        engine.setBaseline(new ContainerSnapshot(before));
+        engine.setBaseline(new Cc(before));
         engine.noteConsumptionIntent(-1, 6);
-        engine.markInventoryDirty();
+        engine.yz();
 
         Map<Integer, Long> after = new HashMap<>();
         after.put(139, 1L);
         after.put(1942, 3L);
-        Transaction drink = settle(engine, new ContainerSnapshot(after), 1_600L);
+        Ac drink = settle(engine, new Cc(after), 1_600L);
 
-        assertEquals(TransactionType.CONSUMPTION, drink.getType());
+        assertEquals(Ai.CONSUMPTION, drink.getType());
         assertTrue(drink.isCounted());
         assertTrue(engine.getMetrics(4_000L).costs > 0L);
         assertTrue(engine.getMetrics(4_000L).revenue > 0L);
@@ -616,25 +616,25 @@ public class ConsumptionBurialEngineTest
         // Live miss: Drink intent expired before settle; dose leftover + Pick potato
         // coalesced into UNCERTAIN (Used/lost x0, no Potato row). Dose shape alone
         // must force CONSUMPTION without an armed intent.
-        Engine engine = namedEngine();
-        engine.ensureSession(1_000L);
+        Am engine = namedEngine();
+        engine.rm(1_000L);
         Map<Integer, Long> before = new HashMap<>();
         before.put(3012, 1L); // energy potion(2)
         before.put(1942, 1L);
-        engine.setBaseline(new ContainerSnapshot(before));
-        engine.markInventoryDirty();
+        engine.setBaseline(new Cc(before));
+        engine.yz();
 
         Map<Integer, Long> after = new HashMap<>();
         after.put(3014, 1L); // energy potion(1)
         after.put(1942, 4L); // picked ×3
-        Transaction settled = settle(engine, new ContainerSnapshot(after), 1_600L);
+        Ac settled = settle(engine, new Cc(after), 1_600L);
 
-        assertEquals(TransactionType.CONSUMPTION, settled.getType());
+        assertEquals(Ai.CONSUMPTION, settled.getType());
         assertTrue(settled.isCounted());
         assertTrue(engine.getMetrics(4_000L).costs > 0L);
         assertTrue(engine.getMetrics(4_000L).revenue > 0L);
         long potatoGained = 0L;
-        for (Flow flow : settled.getFlows())
+        for (Ab flow : settled.getFlows())
         {
             if (flow.itemId == 1942 && flow.quantityDelta > 0L)
             {
@@ -649,22 +649,22 @@ public class ConsumptionBurialEngineTest
     {
         // CC_OP sometimes resolves the wrong inventory slot id. Named match fails and
         // companion potato gains block hasOnlyCosts — any armed intent + any cost wins.
-        Engine engine = namedEngine();
-        engine.ensureSession(1_000L);
+        Am engine = namedEngine();
+        engine.rm(1_000L);
         Map<Integer, Long> before = new HashMap<>();
         before.put(526, 2L);
         before.put(1942, 2L);
-        engine.setBaseline(new ContainerSnapshot(before));
+        engine.setBaseline(new Cc(before));
         engine.noteConsumptionIntent(9999, 8); // wrong id (not bones)
-        engine.markInventoryDirty();
+        engine.yz();
 
         Map<Integer, Long> after = new HashMap<>();
         after.put(526, 0L);
         after.put(1942, 5L);
         after.entrySet().removeIf(e -> e.getValue() <= 0L);
-        Transaction settled = settle(engine, new ContainerSnapshot(after), 1_600L);
+        Ac settled = settle(engine, new Cc(after), 1_600L);
 
-        assertEquals(TransactionType.CONSUMPTION, settled.getType());
+        assertEquals(Ai.CONSUMPTION, settled.getType());
         assertTrue(settled.isCounted());
         assertEquals(62L, engine.getMetrics(4_000L).costs);
         assertTrue(engine.getMetrics(4_000L).revenue > 0L);
@@ -674,20 +674,20 @@ public class ConsumptionBurialEngineTest
     public void chatReinforcedBuryWithPotatoPickBooksUsedLostAndGain()
     {
         // Dig+bury chat arms open intent after menu itemId was -1; Pick coalesces.
-        Engine engine = namedEngine();
-        engine.ensureSession(1_000L);
+        Am engine = namedEngine();
+        engine.rm(1_000L);
         Map<Integer, Long> before = new HashMap<>();
         before.put(526, 2L);
         before.put(1942, 1L);
-        engine.setBaseline(new ContainerSnapshot(before));
-        engine.reinforceConsumptionIntent(12);
-        engine.markInventoryDirty();
+        engine.setBaseline(new Cc(before));
+        engine.aew(12);
+        engine.yz();
 
         Map<Integer, Long> after = new HashMap<>();
         after.put(1942, 3L);
-        Transaction settled = settle(engine, new ContainerSnapshot(after), 1_600L);
+        Ac settled = settle(engine, new Cc(after), 1_600L);
 
-        assertEquals(TransactionType.CONSUMPTION, settled.getType());
+        assertEquals(Ai.CONSUMPTION, settled.getType());
         assertTrue(settled.isCounted());
         assertEquals(62L, engine.getMetrics(4_000L).costs);
         assertTrue(engine.getMetrics(4_000L).revenue > 0L);
@@ -696,26 +696,26 @@ public class ConsumptionBurialEngineTest
     @Test
     public void repeatedBankOpenRefreshDoesNotClearArmedConsumeIntent()
     {
-        // Live GameTick calls markBankInterfaceOpen every tick while bank is open.
+        // Live GameTick calls ze every tick while bank is open.
         // Clearing intent each refresh made Drink→Pick settle as soft TRANSFER.
-        Engine engine = namedEngine();
-        engine.ensureSession(1_000L);
+        Am engine = namedEngine();
+        engine.rm(1_000L);
         Map<Integer, Long> before = new HashMap<>();
         before.put(3012, 1L);
         before.put(1942, 1L);
-        engine.setBaseline(new ContainerSnapshot(before));
-        engine.markBankInterfaceOpen(6); // open once
+        engine.setBaseline(new Cc(before));
+        engine.ze(6); // open once
         engine.noteConsumptionIntent(-1, 8); // armed while bank open (menu/chat)
-        engine.markBankInterfaceOpen(6); // per-tick refresh must keep intent
-        engine.markBankInterfaceOpen(6);
-        engine.markInventoryDirty();
+        engine.ze(6); // per-tick refresh must keep intent
+        engine.ze(6);
+        engine.yz();
 
         Map<Integer, Long> after = new HashMap<>();
         after.put(3014, 1L);
         after.put(1942, 3L);
-        Transaction settled = settle(engine, new ContainerSnapshot(after), 1_600L);
+        Ac settled = settle(engine, new Cc(after), 1_600L);
 
-        assertEquals(TransactionType.CONSUMPTION, settled.getType());
+        assertEquals(Ai.CONSUMPTION, settled.getType());
         assertTrue(settled.isCounted());
         assertTrue(engine.getMetrics(4_000L).costs > 0L);
         assertTrue(engine.getMetrics(4_000L).revenue > 0L);
@@ -726,25 +726,25 @@ public class ConsumptionBurialEngineTest
     {
         // Soft UI-open transfer evidence previously forced TRANSFER for any dirty
         // settle — including Drink dose leftover + Pick potato (Used/lost ×0).
-        Engine engine = namedEngine();
-        engine.ensureSession(1_000L);
+        Am engine = namedEngine();
+        engine.rm(1_000L);
         Map<Integer, Long> before = new HashMap<>();
         before.put(526, 2L);
         before.put(3012, 1L);
         before.put(1942, 2L);
-        engine.setBaseline(new ContainerSnapshot(before));
-        engine.markBankInterfaceOpen(6);
+        engine.setBaseline(new Cc(before));
+        engine.ze(6);
         engine.noteConsumptionIntent(-1, 8);
-        engine.markInventoryDirty();
+        engine.yz();
 
         Map<Integer, Long> after = new HashMap<>();
         after.put(526, 0L);
         after.put(3014, 1L);
         after.put(1942, 5L);
         after.entrySet().removeIf(e -> e.getValue() <= 0L);
-        Transaction settled = settle(engine, new ContainerSnapshot(after), 1_600L);
+        Ac settled = settle(engine, new Cc(after), 1_600L);
 
-        assertEquals(TransactionType.CONSUMPTION, settled.getType());
+        assertEquals(Ai.CONSUMPTION, settled.getType());
         assertTrue(settled.isCounted());
         assertTrue("bones + dose must book Used/lost", engine.getMetrics(4_000L).costs > 0L);
         assertTrue("potato picks must book Received", engine.getMetrics(4_000L).revenue > 0L);
@@ -753,21 +753,21 @@ public class ConsumptionBurialEngineTest
     @Test
     public void softBankLatchDoseWithoutIntentStillBooksWhenMixedWithPick()
     {
-        Engine engine = namedEngine();
-        engine.ensureSession(1_000L);
+        Am engine = namedEngine();
+        engine.rm(1_000L);
         Map<Integer, Long> before = new HashMap<>();
         before.put(3012, 1L);
         before.put(1942, 1L);
-        engine.setBaseline(new ContainerSnapshot(before));
-        engine.markBankInterfaceOpen(6);
-        engine.markInventoryDirty();
+        engine.setBaseline(new Cc(before));
+        engine.ze(6);
+        engine.yz();
 
         Map<Integer, Long> after = new HashMap<>();
         after.put(3014, 1L);
         after.put(1942, 4L);
-        Transaction settled = settle(engine, new ContainerSnapshot(after), 1_600L);
+        Ac settled = settle(engine, new Cc(after), 1_600L);
 
-        assertEquals(TransactionType.CONSUMPTION, settled.getType());
+        assertEquals(Ai.CONSUMPTION, settled.getType());
         assertTrue(settled.isCounted());
         assertTrue(engine.getMetrics(4_000L).costs > 0L);
         assertTrue(engine.getMetrics(4_000L).revenue > 0L);
@@ -778,48 +778,48 @@ public class ConsumptionBurialEngineTest
     {
         // Closest offline replay of the live Falador potato sequence:
         // Drink energy(2)→(1) + Pick×2 + Bury×2 settle together; Eat potato next.
-        Engine engine = namedEngine();
-        engine.ensureSession(1_000L);
+        Am engine = namedEngine();
+        engine.rm(1_000L);
         Map<Integer, Long> before = new HashMap<>();
         before.put(526, 4L);
         before.put(3012, 1L);
         before.put(1942, 3L);
-        engine.setBaseline(new ContainerSnapshot(before));
+        engine.setBaseline(new Cc(before));
 
         engine.noteConsumptionIntent(-1, 12);
-        engine.reinforceConsumptionIntent(12); // chat: drink / dig+bury
-        engine.markInventoryDirty();
+        engine.aew(12); // chat: drink / dig+bury
+        engine.yz();
         Map<Integer, Long> afterField = new HashMap<>();
         afterField.put(526, 2L);
         afterField.put(3014, 1L);
         afterField.put(1942, 5L);
-        Transaction field = settle(engine, new ContainerSnapshot(afterField), 1_600L);
-        assertEquals(TransactionType.CONSUMPTION, field.getType());
+        Ac field = settle(engine, new Cc(afterField), 1_600L);
+        assertEquals(Ai.CONSUMPTION, field.getType());
         assertTrue(field.isCounted());
 
         engine.noteConsumptionIntent(1942, 8);
-        engine.reinforceConsumptionIntent(8); // chat: you eat the potato. yuck!
-        engine.markInventoryDirty();
+        engine.aew(8); // chat: you eat the potato. yuck!
+        engine.yz();
         Map<Integer, Long> afterEat = new HashMap<>();
         afterEat.put(526, 2L);
         afterEat.put(3014, 1L);
         afterEat.put(1942, 4L);
-        Transaction eat = settle(engine, new ContainerSnapshot(afterEat), 3_400L);
-        assertEquals(TransactionType.CONSUMPTION, eat.getType());
+        Ac eat = settle(engine, new Cc(afterEat), 3_400L);
+        assertEquals(Ai.CONSUMPTION, eat.getType());
         assertTrue(eat.isCounted());
 
-        SessionMetrics metrics = engine.getMetrics(6_000L);
+        Bu metrics = engine.getMetrics(6_000L);
         assertTrue(metrics.costs > 0L);
         assertTrue(metrics.revenue > 0L);
         long boneUsed = 0L;
         long potatoNet = 0L;
-        for (Transaction tx : engine.getActiveSession().getTransactions())
+        for (Ac tx : engine.getActiveSession().getTransactions())
         {
             if (!tx.isCounted())
             {
                 continue;
             }
-            for (Flow flow : tx.getFlows())
+            for (Ab flow : tx.getFlows())
             {
                 if (flow.itemId == 526 && flow.quantityDelta < 0L)
                 {
@@ -838,13 +838,13 @@ public class ConsumptionBurialEngineTest
     @Test
     public void pausedBurialDoesNotCreateCatchUpCostAfterResume()
     {
-        Engine engine = startedWithBones(1L);
+        Am engine = startedWithBones(1L);
         engine.togglePause(1_100L);
-        engine.markInventoryDirty();
-        assertNull(engine.processIfDirty(ContainerSnapshot.empty(), 1_600L));
+        engine.yz();
+        assertNull(engine.adj(Cc.empty(), 1_600L));
         engine.togglePause(2_000L);
 
-        assertNull(engine.processIfDirty(ContainerSnapshot.empty(), 2_600L));
+        assertNull(engine.adj(Cc.empty(), 2_600L));
         assertTrue(engine.getActiveSession().getTransactions().isEmpty());
         assertEquals(0L, engine.getMetrics(3_000L).costs);
     }
@@ -852,13 +852,13 @@ public class ConsumptionBurialEngineTest
     @Test
     public void duplicateContainerDirtyForSameRemovalDoesNotDoubleCount()
     {
-        Engine engine = startedWithBones(1L);
-        engine.markInventoryDirty();
-        Transaction burial = settle(engine, ContainerSnapshot.empty(), 1_600L);
+        Am engine = startedWithBones(1L);
+        engine.yz();
+        Ac burial = settle(engine, Cc.empty(), 1_600L);
         assertNotNull(burial);
 
-        engine.markInventoryDirty();
-        assertNull(settle(engine, ContainerSnapshot.empty(), 3_400L));
+        engine.yz();
+        assertNull(settle(engine, Cc.empty(), 3_400L));
         assertEquals(1, engine.getActiveSession().getTransactions().size());
         assertEquals(31L, engine.getMetrics(6_000L).costs);
     }
@@ -866,8 +866,8 @@ public class ConsumptionBurialEngineTest
     @Test
     public void retainedSessionMetricsExposeCountedNegativeFlowForUsedLostAggregation()
     {
-        Engine engine = startedWithBones(1L);
-        Transaction burial = settle(engine, ContainerSnapshot.empty(), 1_600L);
+        Am engine = startedWithBones(1L);
+        Ac burial = settle(engine, Cc.empty(), 1_600L);
 
         assertTrue(burial.isCounted());
         assertEquals(31L, burial.getCosts());
@@ -875,42 +875,42 @@ public class ConsumptionBurialEngineTest
         assertEquals(31L, engine.getMetrics(4_000L).costs);
     }
 
-    private Engine startedWithBones(long quantity)
+    private Am startedWithBones(long quantity)
     {
-        Engine engine = engine();
-        engine.ensureSession(1_000L);
+        Am engine = engine();
+        engine.rm(1_000L);
         engine.setBaseline(snapshot(526, quantity));
         return engine;
     }
 
-    private Engine engine()
+    private Am engine()
     {
-        return new Engine(valuator, new TransactionClassifier(), CONFIG);
+        return new Am(valuator, new TransactionClassifier(), CONFIG);
     }
 
-    private Engine alchemyEngine()
+    private Am alchemyEngine()
     {
         FlowValuator alchemy = deltas ->
         {
-            List<Flow> flows = new ArrayList<>();
+            List<Ab> flows = new ArrayList<>();
             for (Map.Entry<Integer, Long> entry : deltas.entrySet())
             {
                 int price = entry.getKey() == 995 ? 1 : 100;
-                flows.add(new Flow(
+                flows.add(new Ab(
                     entry.getKey(), "Item " + entry.getKey(), entry.getValue(), price,
                     entry.getValue() * price));
             }
             return flows;
         };
-        return new Engine(alchemy, new TransactionClassifier(), CONFIG);
+        return new Am(alchemy, new TransactionClassifier(), CONFIG);
     }
 
     /** Valuator with potion dose names so open-intent dose matching can run offline. */
-    private Engine namedEngine()
+    private Am namedEngine()
     {
         FlowValuator named = deltas ->
         {
-            List<Flow> flows = new ArrayList<>();
+            List<Ab> flows = new ArrayList<>();
             for (Map.Entry<Integer, Long> entry : deltas.entrySet())
             {
                 int id = entry.getKey();
@@ -951,28 +951,28 @@ public class ConsumptionBurialEngineTest
                     name = "Item " + id;
                     price = 100;
                 }
-                flows.add(new Flow(
+                flows.add(new Ab(
                     id, name, entry.getValue(), price, entry.getValue() * price));
             }
             return flows;
         };
-        return new Engine(named, new TransactionClassifier(), CONFIG);
+        return new Am(named, new TransactionClassifier(), CONFIG);
     }
 
-    private static Transaction settle(Engine engine, ContainerSnapshot snapshot, long firstTick)
+    private static Ac settle(Am engine, Cc snapshot, long firstTick)
     {
-        assertNull(engine.processIfDirty(snapshot, firstTick));
-        assertNull(engine.processIfDirty(snapshot, firstTick + 600L));
-        return engine.processIfDirty(snapshot, firstTick + 1_200L);
+        assertNull(engine.adj(snapshot, firstTick));
+        assertNull(engine.adj(snapshot, firstTick + 600L));
+        return engine.adj(snapshot, firstTick + 1_200L);
     }
 
-    private static ContainerSnapshot snapshot(int itemId, long quantity)
+    private static Cc snapshot(int itemId, long quantity)
     {
         Map<Integer, Long> values = new HashMap<>();
         if (quantity > 0L)
         {
             values.put(itemId, quantity);
         }
-        return new ContainerSnapshot(values);
+        return new Cc(values);
     }
 }

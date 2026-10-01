@@ -16,11 +16,11 @@ public class ShellNavigationTest
     @Test
     public void navigationHasExactlyTheThreeFinalLabelsWithoutDecorativeGlyphs() throws Exception
     {
-        SidebarPanel panel = onEdt(() -> new SidebarPanel(PresentationLifecycleTest.engine(),
+        Dp panel = onEdt(() -> new Dp(PresentationLifecycleTest.engine(),
             PresentationLifecycleTest.config(), null));
         Shell shell = panel.shell();
         assertEquals(3, ShellProbe.tabLabels(shell).length);
-        assertEquals("live", shell.currentPage());
+        assertEquals("live", shell.qt());
         assertEquals(List.of("Live", "Ledger", "Grinds"), List.of(ShellProbe.tabLabels(shell)));
         for (String label : ShellProbe.tabLabels(shell))
         {
@@ -33,7 +33,7 @@ public class ShellNavigationTest
     @Test
     public void ledgerPlaceholderIsReplacedByTheRealAuditSurface() throws Exception
     {
-        SidebarPanel panel = onEdt(() -> new SidebarPanel(PresentationLifecycleTest.engine(),
+        Dp panel = onEdt(() -> new Dp(PresentationLifecycleTest.engine(),
             PresentationLifecycleTest.config(), null));
         panel.shell().show(Shell.LEDGER);
         java.util.List<String> labels = new java.util.ArrayList<>();
@@ -44,7 +44,7 @@ public class ShellNavigationTest
     @Test
     public void notificationShowsOneMessageAndDismissesOnDemand() throws Exception
     {
-        SidebarPanel panel = onEdt(() -> new SidebarPanel(PresentationLifecycleTest.engine(),
+        Dp panel = onEdt(() -> new Dp(PresentationLifecycleTest.engine(),
             PresentationLifecycleTest.config(), null));
         Shell shell = panel.shell();
         onEdt(() ->
@@ -113,16 +113,16 @@ public class ShellNavigationTest
     @Test
     public void everyPageIsSelectableAndTheShellReturnsToLive() throws Exception
     {
-        SidebarPanel panel = onEdt(() -> new SidebarPanel(PresentationLifecycleTest.engine(),
+        Dp panel = onEdt(() -> new Dp(PresentationLifecycleTest.engine(),
             PresentationLifecycleTest.config(), null));
         Shell shell = panel.shell();
 
         shell.show(Shell.LEDGER);
-        assertEquals("ledger", shell.currentPage());
+        assertEquals("ledger", shell.qt());
         shell.show(Shell.GRINDS);
-        assertEquals("grinds", shell.currentPage());
+        assertEquals("grinds", shell.qt());
         shell.show(Shell.LIVE);
-        assertEquals("live", shell.currentPage());
+        assertEquals("live", shell.qt());
         assertEquals("live", ShellProbe.selectedTab(shell));
     }
 }

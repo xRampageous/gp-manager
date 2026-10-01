@@ -37,29 +37,29 @@ public class C8rMigrationTest
             @Override
             public int maxTransactionsPerSession() { return 100_000; }
             @Override
-            public ReceiptRetentionPeriod receiptRetentionDays() { return ReceiptRetentionPeriod.DAYS_365; }
+            public Db receiptRetentionDays() { return Db.DAYS_365; }
             @Override
             public boolean autoStartSession() { return false; }
         };
     }
 
-    private static Engine engine()
+    private static Am engine()
     {
-        return new Engine(deltas -> Collections.emptyList(), new TransactionClassifier(),
+        return new Am(deltas -> Collections.emptyList(), new TransactionClassifier(),
             config());
     }
 
-    private static Session pkSessionWithKill(long at, String name)
+    private static Ad pkSessionWithKill(long at, String name)
     {
-        Session session = new Session(name, at - 60_000L, SessionMode.PK);
-        PkEncounter encounter = session.addPkEncounter(EncounterType.KILL, at, "Player kill",
-            ClassificationConfidence.CONFIRMED, "Kill");
-        Transaction loot = new Transaction(at + 1_000L, null, TransactionType.PK_LOOT,
-            Context.PK_LOOT, "pk", "PKing", true,
-            Collections.singletonList(new Flow(995, "Coins", 1_000L, 1, 1_000L)),
-            ClassificationConfidence.CONFIRMED, "test", null);
-        session.addTransaction(loot, 100_000);
-        session.attachTransactionToEncounter(loot.getId(), encounter.getId(), false);
+        Ad session = new Ad(name, at - 60_000L, Cx.PK);
+        Bx encounter = session.ke(Be.KILL, at, "Player kill",
+            Bd.CONFIRMED, "Kill");
+        Ac loot = new Ac(at + 1_000L, null, Ai.PK_LOOT,
+            Aj.PK_LOOT, "pk", "PKing", true,
+            Collections.singletonList(new Ab(995, "Coins", 1_000L, 1, 1_000L)),
+            Bd.CONFIRMED, "test", null);
+        session.kf(loot, 100_000);
+        session.ll(loot.getId(), encounter.getId(), false);
         return session;
     }
 
@@ -95,15 +95,15 @@ public class C8rMigrationTest
         {
             SavedState gap = new SavedState();
             gap.setSchemaVersion(preRelease);
-            assertFalse("pre-release schema " + preRelease + " is read-only", gap.isSupportedSchema());
+            assertFalse("pre-release schema " + preRelease + " is read-only", gap.ye());
             assertFalse((gap.schemaVersion > SavedState.CURRENT_SCHEMA_VERSION));
         }
         SavedState future = new SavedState();
         future.setSchemaVersion(SavedState.CURRENT_SCHEMA_VERSION + 1);
-        assertFalse(future.isSupportedSchema());
+        assertFalse(future.ye());
         assertTrue((future.schemaVersion > SavedState.CURRENT_SCHEMA_VERSION));
         SavedState current = new SavedState();
-        assertTrue(current.isSupportedSchema());
+        assertTrue(current.ye());
         assertFalse((current.schemaVersion > SavedState.CURRENT_SCHEMA_VERSION));
     }
 

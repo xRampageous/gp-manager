@@ -20,10 +20,10 @@ public final class MeasuredChargeLoadEvidenceTest
     @Test
     public void tridentSeasChargeIncreaseUsesVariantSpecificComponentRatios()
     {
-        ChargeRead before = trident("seas", "", 10L);
-        ChargeRead after = trident("seas", "", 12L);
+        Ar before = trident("seas", "", 10L);
+        Ar after = trident("seas", "", 12L);
 
-        Map<Integer, Long> evidence = ChargeRead.exactLoadQuantities(before, after);
+        Map<Integer, Long> evidence = Ar.exactLoadQuantities(before, after);
 
         Map<Integer, Long> expected = new LinkedHashMap<>();
         expected.put(DEATH_RUNE, 2L);
@@ -37,9 +37,9 @@ public final class MeasuredChargeLoadEvidenceTest
     @Test
     public void tridentSwampVariantsUseScalesRatherThanCoins()
     {
-        Map<Integer, Long> regular = ChargeRead.exactLoadQuantities(
+        Map<Integer, Long> regular = Ar.exactLoadQuantities(
             trident("swamp", "", 4L), trident("swamp", "", 7L));
-        Map<Integer, Long> enhanced = ChargeRead.exactLoadQuantities(
+        Map<Integer, Long> enhanced = Ar.exactLoadQuantities(
             trident("swamp", " (e)", 4L), trident("swamp", " (e)", 7L));
 
         Map<Integer, Long> expected = new LinkedHashMap<>();
@@ -55,10 +55,10 @@ public final class MeasuredChargeLoadEvidenceTest
     @Test
     public void blowpipeUsesOnlyMeasuredScaleIncreaseAndNeverDartChanges()
     {
-        Map<Integer, Long> scalesAndDarts = ChargeRead.exactLoadQuantities(
+        Map<Integer, Long> scalesAndDarts = Ar.exactLoadQuantities(
             blowpipe("Adamant dart", 100L, 50L),
             blowpipe("Adamant dart", 450L, 80L));
-        Map<Integer, Long> dartsOnly = ChargeRead.exactLoadQuantities(
+        Map<Integer, Long> dartsOnly = Ar.exactLoadQuantities(
             blowpipe("Adamant dart", 100L, 50L),
             blowpipe("Adamant dart", 100L, 80L));
 
@@ -69,45 +69,45 @@ public final class MeasuredChargeLoadEvidenceTest
     @Test
     public void noEvidenceForDecreasesSameReadsDifferentVariantsOrUnsupportedVariants()
     {
-        assertTrue(ChargeRead.exactLoadQuantities(
+        assertTrue(Ar.exactLoadQuantities(
             trident("seas", "", 12L), trident("seas", "", 10L)).isEmpty());
-        assertTrue(ChargeRead.exactLoadQuantities(
+        assertTrue(Ar.exactLoadQuantities(
             trident("seas", "", 10L), trident("seas", "", 10L)).isEmpty());
-        assertTrue(ChargeRead.exactLoadQuantities(
+        assertTrue(Ar.exactLoadQuantities(
             trident("seas", "", 10L), trident("swamp", "", 11L)).isEmpty());
-        assertTrue(ChargeRead.exactLoadQuantities(
+        assertTrue(Ar.exactLoadQuantities(
             blowpipe("Adamant dart", 10L, 10L),
-            ChargeRead.parseCheckMessage("Darts: Unknown dart x 12. Scales: 12 (1.0%).")).isEmpty());
-        assertTrue(ChargeRead.exactLoadQuantities(
+            Ar.acs("Darts: Unknown dart x 12. Scales: 12 (1.0%).")).isEmpty());
+        assertTrue(Ar.exactLoadQuantities(
             trident("seas", "", 10L),
             trident("seas", " (e)", 12L)).isEmpty());
-        assertTrue(ChargeRead.exactLoadQuantities(null, trident("seas", "", 12L)).isEmpty());
+        assertTrue(Ar.exactLoadQuantities(null, trident("seas", "", 12L)).isEmpty());
     }
 
     @Test
     public void arithmeticOverflowAndUnsupportedReadsFailClosed()
     {
-        ChargeRead baseline = trident("swamp", "", 0L);
-        ChargeRead overflowing = ChargeRead.parseCheckMessage(
+        Ar baseline = trident("swamp", "", 0L);
+        Ar overflowing = Ar.acs(
             "Your Trident of the swamp has 9223372036854775807 charges.");
 
         assertFalse("The overflowed parsed read must not be bookable", overflowing.bookable);
-        assertTrue(ChargeRead.exactLoadQuantities(baseline, overflowing).isEmpty());
-        assertTrue(ChargeRead.exactLoadQuantities(
-            ChargeRead.parseCheckMessage("Your Trident of the seas has 999999999999999999999999999 charges."),
+        assertTrue(Ar.exactLoadQuantities(baseline, overflowing).isEmpty());
+        assertTrue(Ar.exactLoadQuantities(
+            Ar.acs("Your Trident of the seas has 999999999999999999999999999 charges."),
             trident("seas", "", 1L)).isEmpty());
     }
 
-    private static ChargeRead trident(String type, String enhanced, long charges)
+    private static Ar trident(String type, String enhanced, long charges)
     {
-        return ChargeRead.parseCheckMessage(
+        return Ar.acs(
             "Your Trident of the " + type + enhanced + " has " + charges
                 + (charges == 1L ? " charge." : " charges."));
     }
 
-    private static ChargeRead blowpipe(String dart, long scales, long darts)
+    private static Ar blowpipe(String dart, long scales, long darts)
     {
-        return ChargeRead.parseCheckMessage(
+        return Ar.acs(
             "Darts: " + dart + " x " + darts + ". Scales: " + scales + " (1.0%).");
     }
 

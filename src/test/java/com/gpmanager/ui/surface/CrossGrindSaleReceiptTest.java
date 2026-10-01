@@ -40,34 +40,34 @@ public class CrossGrindSaleReceiptTest
     public void saleListedInOneGrindBooksAndIsLabelledInTheCollectingGrind()
     {
         Fixture fixture = new Fixture();
-        fixture.engine.startCustomSession("Grind A", SessionMode.AUTO, T0);
-        fixture.engine.setBaseline(new ContainerSnapshot(fixture.inventory));
+        fixture.engine.ajl("Grind A", Cx.AUTO, T0);
+        fixture.engine.setBaseline(new Cc(fixture.inventory));
         String grindA = fixture.engine.getActiveSession().getId();
         fixture.placeAndSell(0, SHARK, QTY, GROSS, T0 + 1_000L);
 
-        fixture.engine.finishCustomSession(T0 + 5_000L);
-        fixture.engine.startCustomSession("Grind B", SessionMode.AUTO, T0 + 6_000L);
-        fixture.engine.setBaseline(new ContainerSnapshot(fixture.inventory));
-        Session grindB = fixture.engine.getActiveSession();
+        fixture.engine.sx(T0 + 5_000L);
+        fixture.engine.ajl("Grind B", Cx.AUTO, T0 + 6_000L);
+        fixture.engine.setBaseline(new Cc(fixture.inventory));
+        Ad grindB = fixture.engine.getActiveSession();
         fixture.collectAlone(0, SHARK, RECEIVED, T0 + 10_000L);
 
-        Transaction settlement = fixture.settlement();
+        Ac settlement = fixture.settlement();
         assertNotNull(settlement);
         assertTrue("counted in the collecting Grind", settlement.isCounted());
         assertTrue(grindB.getTransactions().contains(settlement));
-        assertFalse(ReviewEligibility.needsOwnerDecision(settlement));
+        assertFalse(Eh.aal(settlement));
         assertEquals("Grind B pays exactly the proven tax", -TAX, fixture.engine.getMetrics(T0 + 11_000L).net);
 
-        MarketSettlementProjection.Row row = fixture.row(SHARK);
+        Bi.Row row = fixture.row(SHARK);
         assertEquals("the row follows its settlement's session", grindB.getId(), row.scopeSessionId);
         assertEquals("Grind A", row.listedDuring);
-        List<String> lines = MarketText.marketHumanLines(row, false);
+        List<String> lines = Dc.zs(row, false);
         assertTrue("labelled with the listing Grind: " + lines, lines.contains("Listed during|Grind A"));
         assertTrue(lines.contains("Received|" + Fmt.exact(RECEIVED) + " gp"));
 
-        LedgerData current = fixture.capture(LedgerData.Scope.CURRENT_GRIND, null, null);
+        Ao current = fixture.capture(Ao.Scope.CURRENT_GRIND, null, null);
         assertEquals("the collecting Grind shows the sale once", 1, current.market.receipts);
-        LedgerData origin = fixture.capture(LedgerData.Scope.HISTORY, grindA, "Grind A");
+        Ao origin = fixture.capture(Ao.Scope.HISTORY, grindA, "Grind A");
         assertEquals("the closed origin Grind is not rewritten", 0, origin.market.receipts);
         assertEquals(0L, origin.net);
     }
@@ -76,60 +76,60 @@ public class CrossGrindSaleReceiptTest
     public void saleListedInFreePlayIsLabelledOverallInTheGrind()
     {
         Fixture fixture = new Fixture();
-        fixture.engine.ensureSession(T0);
-        fixture.engine.setBaseline(new ContainerSnapshot(fixture.inventory));
+        fixture.engine.rm(T0);
+        fixture.engine.setBaseline(new Cc(fixture.inventory));
         fixture.placeAndSell(0, SHARK, QTY, GROSS, T0 + 1_000L);
 
-        fixture.engine.startCustomSession("Grind B", SessionMode.AUTO, T0 + 6_000L);
-        fixture.engine.setBaseline(new ContainerSnapshot(fixture.inventory));
+        fixture.engine.ajl("Grind B", Cx.AUTO, T0 + 6_000L);
+        fixture.engine.setBaseline(new Cc(fixture.inventory));
         fixture.collectAlone(0, SHARK, RECEIVED, T0 + 10_000L);
 
-        MarketSettlementProjection.Row row = fixture.row(SHARK);
+        Bi.Row row = fixture.row(SHARK);
         assertEquals("Overall", row.listedDuring);
-        assertTrue(MarketText.marketHumanLines(row, false).contains("Listed during|Overall"));
+        assertTrue(Dc.zs(row, false).contains("Listed during|Overall"));
     }
 
     @Test
     public void sameSessionSaleHasNoListedDuringLabel()
     {
         Fixture fixture = new Fixture();
-        fixture.engine.startCustomSession("Grind A", SessionMode.AUTO, T0);
-        fixture.engine.setBaseline(new ContainerSnapshot(fixture.inventory));
+        fixture.engine.ajl("Grind A", Cx.AUTO, T0);
+        fixture.engine.setBaseline(new Cc(fixture.inventory));
         fixture.placeAndSell(0, SHARK, QTY, GROSS, T0 + 1_000L);
         fixture.collectAlone(0, SHARK, RECEIVED, T0 + 10_000L);
 
-        MarketSettlementProjection.Row row = fixture.row(SHARK);
+        Bi.Row row = fixture.row(SHARK);
         assertEquals("", row.listedDuring);
-        assertFalse(MarketText.marketHumanLines(row, false).stream()
+        assertFalse(Dc.zs(row, false).stream()
             .anyMatch(line -> line.startsWith("Listed during")));
     }
 
     private static final class Fixture
     {
-        final Engine engine;
-        final OfferLedger ledger = new OfferLedger();
+        final Am engine;
+        final Bj ledger = new Bj();
         final Map<Integer, Long> inventory = new HashMap<>();
 
         Fixture()
         {
-            engine = new Engine(deltas ->
+            engine = new Am(deltas ->
             {
-                List<Flow> flows = new ArrayList<>();
+                List<Ab> flows = new ArrayList<>();
                 for (Map.Entry<Integer, Long> delta : deltas.entrySet())
                 {
                     int id = delta.getKey();
                     long unit = id == COINS ? 1L : 978L;
-                    flows.add(new Flow(id, id == COINS ? "Coins" : "Shark", delta.getValue(),
+                    flows.add(new Ab(id, id == COINS ? "Coins" : "Shark", delta.getValue(),
                         (int) unit, delta.getValue() * unit,
-                        id == COINS ? PriceSource.FACE_VALUE : PriceSource.GRAND_EXCHANGE));
+                        id == COINS ? Av.FACE_VALUE : Av.GRAND_EXCHANGE));
                 }
                 return flows;
             }, new TransactionClassifier(), new GpManagerConfig()
             {
                 @Override
-                public ReceiptRetentionPeriod receiptRetentionDays()
+                public Db receiptRetentionDays()
                 {
-                    return ReceiptRetentionPeriod.DAYS_365;
+                    return Db.DAYS_365;
                 }
 
                 @Override
@@ -144,7 +144,7 @@ public class CrossGrindSaleReceiptTest
         void placeAndSell(int slot, int item, long qty, long gross, long at)
         {
             inventory.put(item, qty);
-            engine.setBaseline(new ContainerSnapshot(inventory));
+            engine.setBaseline(new Cc(inventory));
             offer(slot, SELLING, item, (int) qty, 0, 978, 0, at);
             inventory.put(item, 0L);
             settleAt(at + 100L);
@@ -154,15 +154,15 @@ public class CrossGrindSaleReceiptTest
         void collectAlone(int slot, int item, long received, long at)
         {
             offer(slot, EMPTY, item, 0, 0, 0, 0, at - 600L);
-            engine.noteGeCollectionIntent(at);
+            engine.abg(at);
             inventory.put(COINS, inventory.getOrDefault(COINS, 0L) + received);
             settleAt(at);
         }
 
-        Transaction settlement()
+        Ac settlement()
         {
             String id = row(SHARK).settlementId;
-            for (Transaction transaction : engine.getActiveSession().getTransactions())
+            for (Ac transaction : engine.getActiveSession().getTransactions())
             {
                 if (transaction.getId().equals(id))
                 {
@@ -172,9 +172,9 @@ public class CrossGrindSaleReceiptTest
             return null;
         }
 
-        MarketSettlementProjection.Row row(int itemId)
+        Bi.Row row(int itemId)
         {
-            for (MarketSettlementProjection.Row row : engine.getMarketSettlements())
+            for (Bi.Row row : engine.ub())
             {
                 if (row.itemId == itemId)
                 {
@@ -184,30 +184,30 @@ public class CrossGrindSaleReceiptTest
             throw new AssertionError("no market row for " + itemId);
         }
 
-        LedgerData capture(LedgerData.Scope scope, String historyId, String historyName)
+        Ao capture(Ao.Scope scope, String historyId, String historyName)
         {
-            return LedgerData.capture(engine, T0 + 20_000L,
-                new LedgerData.Entry(scope, historyId, historyName,
-                    LedgerData.CostView.SUPPLIES, "", null, null, null, null));
+            return Ao.capture(engine, T0 + 20_000L,
+                new Ao.Entry(scope, historyId, historyName,
+                    Ao.Bs.SUPPLIES, "", null, null, null, null));
         }
 
         private void offer(int slot, GrandExchangeOfferState state, int item, int total, int traded,
             int price, int spent, long at)
         {
-            OfferLedger.Transition transition = ledger.observe(
-                new OfferLedger.Snapshot(slot, state, item, total, traded, price, spent)).orElse(null);
+            Bj.Transition transition = ledger.observe(
+                new Bj.Snapshot(slot, state, item, total, traded, price, spent)).orElse(null);
             if (transition != null)
             {
-                engine.noteGeOfferObservation(transition, "Shark", at);
+                engine.abh(transition, "Shark", at);
             }
         }
 
         private void settleAt(long at)
         {
-            engine.markInventoryDirty();
-            ContainerSnapshot snapshot = new ContainerSnapshot(inventory);
-            engine.processIfDirty(snapshot, at);
-            engine.processIfDirty(snapshot, at + 1L);
+            engine.yz();
+            Cc snapshot = new Cc(inventory);
+            engine.adj(snapshot, at);
+            engine.adj(snapshot, at + 1L);
         }
     }
 }

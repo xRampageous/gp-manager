@@ -36,30 +36,30 @@ public class GeSellClassificationTest
     @Test
     public void everySequentialRuneSaleSettlesAsNeutralCustodyNotCast()
     {
-        Engine engine = engine();
+        Am engine = engine();
         long now = T0;
-        engine.startCustomSession("Trading", SessionMode.AUTO, now);
+        engine.ajl("Trading", Cx.AUTO, now);
         Map<Integer, Long> inventory = inventory(ItemID.COINS, 100_000L);
         for (int rune : RUNES)
         {
             inventory.put(rune, 5L);
         }
-        engine.setBaseline(new ContainerSnapshot(inventory));
+        engine.setBaseline(new Cc(inventory));
 
-        OfferLedger ledger = new OfferLedger();
+        Bj ledger = new Bj();
         for (int i = 0; i < RUNES.length; i++)
         {
             int rune = RUNES[i];
             noteGe(engine, ledger, i, SELLING, rune, 5, 0, 200, 0, now);
             inventory.put(rune, inventory.get(rune) - 1L);
-            Transaction sale = settleStable(engine, inventory, now);
+            Ac sale = settleStable(engine, inventory, now);
             assertNotNull("sale settles: " + name(rune), sale);
             assertEquals("a proven GE sale placement is ownership-neutral custody: " + name(rune),
-                TransactionType.TRANSFER, sale.getType());
-            assertEquals(Context.TRANSFER, sale.getContext());
+                Ai.TRANSFER, sale.getType());
+            assertEquals(Aj.TRANSFER, sale.getContext());
             assertFalse("custody is never counted money", sale.isCounted());
             assertNotEquals("a sold rune is never stamped as a cast: " + name(rune),
-                ActionKind.CAST, sale.getActionKind());
+                Au.CAST, sale.getActionKind());
             assertEquals("the observed sold value is untouched: " + name(rune),
                 -200L, sale.getFlows().get(0).valueDelta);
             now += 10_000L;
@@ -68,27 +68,27 @@ public class GeSellClassificationTest
             0L, engine.getMetrics(now).net);
         assertEquals("no placement fell through to CAST", 0,
             engine.getActiveSession().getTransactions().stream()
-                .filter(t -> t != null && ActionKind.CAST == t.getActionKind()).count());
+                .filter(t -> t != null && Au.CAST == t.getActionKind()).count());
     }
 
     @Test
     public void coalescedRuneLossesSettleOnceAsNeutralCustody()
     {
-        Engine engine = engine();
+        Am engine = engine();
         long now = T0;
-        engine.startCustomSession("Trading", SessionMode.AUTO, now);
+        engine.ajl("Trading", Cx.AUTO, now);
         Map<Integer, Long> inventory = inventory(ItemID.COINS, 100_000L, ItemID.NATURERUNE, 5L, ItemID.FIRERUNE, 5L);
-        engine.setBaseline(new ContainerSnapshot(inventory));
+        engine.setBaseline(new Cc(inventory));
 
-        OfferLedger ledger = new OfferLedger();
+        Bj ledger = new Bj();
         noteGe(engine, ledger, 0, SELLING, ItemID.NATURERUNE, 5, 0, 200, 0, now);
         noteGe(engine, ledger, 1, SELLING, ItemID.FIRERUNE, 5, 0, 100, 0, now);
         inventory.put(ItemID.NATURERUNE, 4L);
         inventory.put(ItemID.FIRERUNE, 4L);
 
-        Transaction sale = settleStable(engine, inventory, now);
+        Ac sale = settleStable(engine, inventory, now);
         assertNotNull(sale);
-        assertEquals(TransactionType.TRANSFER, sale.getType());
+        assertEquals(Ai.TRANSFER, sale.getType());
         assertFalse(sale.isCounted());
         assertEquals(1, engine.getActiveSession().getTransactions().size());
         assertTrue(sale.getFlows().size() >= 2);
@@ -98,99 +98,99 @@ public class GeSellClassificationTest
     @Test
     public void offerEvidenceDuringTheDirtyWindowOwnsTheLossAsCustody()
     {
-        Engine engine = engine();
+        Am engine = engine();
         long now = T0;
-        engine.startCustomSession("Trading", SessionMode.AUTO, now);
+        engine.ajl("Trading", Cx.AUTO, now);
         Map<Integer, Long> inventory = inventory(ItemID.COINS, 100_000L, ItemID.NATURERUNE, 5L);
-        engine.setBaseline(new ContainerSnapshot(inventory));
+        engine.setBaseline(new Cc(inventory));
 
         // The inventory loss goes dirty first; the sell placement evidence arrives before the
         // stable settlement commits.
         inventory.put(ItemID.NATURERUNE, 4L);
-        ContainerSnapshot snapshot = new ContainerSnapshot(inventory);
-        engine.markInventoryDirty();
-        engine.processIfDirty(snapshot, now);
+        Cc snapshot = new Cc(inventory);
+        engine.yz();
+        engine.adj(snapshot, now);
 
-        OfferLedger ledger = new OfferLedger();
+        Bj ledger = new Bj();
         noteGe(engine, ledger, 0, SELLING, ItemID.NATURERUNE, 5, 0, 200, 0, now + 100L);
 
-        Transaction settled = engine.processIfDirty(snapshot, now + 600L);
-        Transaction finalSettle = engine.processIfDirty(snapshot, now + 1_200L);
-        Transaction sale = finalSettle == null ? settled : finalSettle;
+        Ac settled = engine.adj(snapshot, now + 600L);
+        Ac finalSettle = engine.adj(snapshot, now + 1_200L);
+        Ac sale = finalSettle == null ? settled : finalSettle;
         assertNotNull(sale);
-        assertEquals(TransactionType.TRANSFER, sale.getType());
-        assertEquals(Context.TRANSFER, sale.getContext());
+        assertEquals(Ai.TRANSFER, sale.getType());
+        assertEquals(Aj.TRANSFER, sale.getContext());
         assertFalse(sale.isCounted());
     }
 
     @Test
     public void claimedSellPlacementCannotOwnALaterUnrelatedLoss()
     {
-        Engine engine = engine();
+        Am engine = engine();
         long now = T0;
-        engine.startCustomSession("Trading", SessionMode.AUTO, now);
+        engine.ajl("Trading", Cx.AUTO, now);
         Map<Integer, Long> inventory = inventory(ItemID.COINS, 100_000L, ItemID.NATURERUNE, 5L);
-        engine.setBaseline(new ContainerSnapshot(inventory));
+        engine.setBaseline(new Cc(inventory));
 
-        OfferLedger ledger = new OfferLedger();
+        Bj ledger = new Bj();
         noteGe(engine, ledger, 0, SELLING, ItemID.NATURERUNE, 5, 0, 200, 0, now);
         inventory.put(ItemID.NATURERUNE, 4L);
-        Transaction sale = settleStable(engine, inventory, now);
+        Ac sale = settleStable(engine, inventory, now);
         assertNotNull(sale);
-        assertEquals("the placement principal is custody", TransactionType.TRANSFER, sale.getType());
+        assertEquals("the placement principal is custody", Ai.TRANSFER, sale.getType());
         assertFalse(sale.isCounted());
 
         // A later unrelated same-item loss inside the placement window must not reuse the
         // already-captured placement evidence.
         inventory.put(ItemID.NATURERUNE, 3L);
-        Transaction later = settleStable(engine, inventory, now + 5_000L);
+        Ac later = settleStable(engine, inventory, now + 5_000L);
         assertNotNull(later);
         assertEquals("a spent placement never owns a later unrelated loss",
-            TransactionType.CONSUMPTION, later.getType());
+            Ai.CONSUMPTION, later.getType());
     }
 
     @Test
     public void stalePlacementEvidenceNeverStealsAnExplicitCast()
     {
-        Engine engine = engine();
+        Am engine = engine();
         long now = T0;
-        engine.startCustomSession("Trading", SessionMode.AUTO, now);
+        engine.ajl("Trading", Cx.AUTO, now);
         Map<Integer, Long> inventory = inventory(ItemID.COINS, 100_000L, ItemID.NATURERUNE, 5L);
-        engine.setBaseline(new ContainerSnapshot(inventory));
+        engine.setBaseline(new Cc(inventory));
 
-        OfferLedger ledger = new OfferLedger();
+        Bj ledger = new Bj();
         noteGe(engine, ledger, 0, SELLING, ItemID.NATURERUNE, 5, 0, 200, 0, now);
-        engine.noteConsumptionIntent(ItemID.NATURERUNE, 18, false, ActionKind.CAST);
+        engine.noteConsumptionIntent(ItemID.NATURERUNE, 18, false, Au.CAST);
         inventory.put(ItemID.NATURERUNE, 4L);
 
-        Transaction cast = settleStable(engine, inventory, now);
+        Ac cast = settleStable(engine, inventory, now);
         assertNotNull(cast);
-        assertEquals(TransactionType.CONSUMPTION, cast.getType());
-        assertEquals("Cast", SemanticFinancialProjection.verbOf(cast));
+        assertEquals(Ai.CONSUMPTION, cast.getType());
+        assertEquals("Cast", Br.verbOf(cast));
     }
 
     @Test
     public void soldRunePlacementIsNeutralCustodyAndCastCostIsSupplies()
     {
-        Engine engine = engine();
+        Am engine = engine();
         long now = T0;
-        engine.startCustomSession("Trading", SessionMode.AUTO, now);
+        engine.ajl("Trading", Cx.AUTO, now);
         Map<Integer, Long> inventory = inventory(ItemID.COINS, 100_000L, ItemID.NATURERUNE, 5L);
-        engine.setBaseline(new ContainerSnapshot(inventory));
+        engine.setBaseline(new Cc(inventory));
 
-        OfferLedger ledger = new OfferLedger();
+        Bj ledger = new Bj();
         noteGe(engine, ledger, 0, SELLING, ItemID.NATURERUNE, 5, 0, 200, 0, now);
         inventory.put(ItemID.NATURERUNE, 4L);
-        Transaction sale = settleStable(engine, inventory, now);
+        Ac sale = settleStable(engine, inventory, now);
         assertNotNull(sale);
         assertEquals("a sold rune placement is ownership-neutral custody, never a cost",
             CostKind.NONE, CostKind.of(sale, sale.getFlows().get(0)));
 
-        engine.noteConsumptionIntent(ItemID.NATURERUNE, 18, false, ActionKind.CAST);
+        engine.noteConsumptionIntent(ItemID.NATURERUNE, 18, false, Au.CAST);
         inventory.put(ItemID.NATURERUNE, 3L);
-        Transaction cast = settleStable(engine, inventory, now + 10_000L);
+        Ac cast = settleStable(engine, inventory, now + 10_000L);
         assertNotNull(cast);
-        assertEquals(TransactionType.CONSUMPTION, cast.getType());
+        assertEquals(Ai.CONSUMPTION, cast.getType());
         assertEquals("a genuine cast stays a supply cost",
             CostKind.SUPPLIES, CostKind.of(cast, cast.getFlows().get(0)));
         assertEquals("only the cast remains counted", -200L, engine.getMetrics(now + 10_000L).net);
@@ -199,110 +199,110 @@ public class GeSellClassificationTest
     @Test
     public void lateOfferEvidenceNeverRewritesABookedSettle()
     {
-        Engine engine = engine();
+        Am engine = engine();
         long now = T0;
-        engine.startCustomSession("Trading", SessionMode.AUTO, now);
+        engine.ajl("Trading", Cx.AUTO, now);
         Map<Integer, Long> inventory = inventory(ItemID.COINS, 100_000L, ItemID.NATURERUNE, 5L);
-        engine.setBaseline(new ContainerSnapshot(inventory));
+        engine.setBaseline(new Cc(inventory));
 
         // The loss settles before any evidence exists: book once, conservatively.
         inventory.put(ItemID.NATURERUNE, 4L);
-        Transaction settled = settleStable(engine, inventory, now);
+        Ac settled = settleStable(engine, inventory, now);
         assertNotNull(settled);
-        assertEquals(TransactionType.CONSUMPTION, settled.getType());
+        assertEquals(Ai.CONSUMPTION, settled.getType());
         assertEquals(1, engine.getActiveSession().getTransactions().size());
 
         // Evidence arriving afterwards must not rewrite the booked row (no retroactive
         // reconciliation), and a later cast must still be a cast.
-        OfferLedger ledger = new OfferLedger();
+        Bj ledger = new Bj();
         noteGe(engine, ledger, 0, SELLING, ItemID.NATURERUNE, 5, 0, 200, 0, now + 1_000L);
         assertEquals(1, engine.getActiveSession().getTransactions().size());
-        assertEquals(TransactionType.CONSUMPTION, engine.getActiveSession().getTransactions().get(0).getType());
+        assertEquals(Ai.CONSUMPTION, engine.getActiveSession().getTransactions().get(0).getType());
 
-        engine.noteConsumptionIntent(ItemID.NATURERUNE, 18, false, ActionKind.CAST);
+        engine.noteConsumptionIntent(ItemID.NATURERUNE, 18, false, Au.CAST);
         inventory.put(ItemID.NATURERUNE, 3L);
-        Transaction cast = settleStable(engine, inventory, now + 10_000L);
+        Ac cast = settleStable(engine, inventory, now + 10_000L);
         assertNotNull(cast);
-        assertEquals(TransactionType.CONSUMPTION, cast.getType());
-        assertEquals("Cast", SemanticFinancialProjection.verbOf(cast));
+        assertEquals(Ai.CONSUMPTION, cast.getType());
+        assertEquals("Cast", Br.verbOf(cast));
     }
 
     @Test
     public void exactSpellNameAttachesOnlyToItsMatchedConsumptionIntent()
     {
-        Engine engine = engine();
+        Am engine = engine();
         long now = T0;
-        engine.startCustomSession("Vorkath", SessionMode.AUTO, now);
+        engine.ajl("Vorkath", Cx.AUTO, now);
         Map<Integer, Long> inventory = inventory(ItemID.COINS, 100_000L, ItemID.NATURERUNE, 5L);
-        engine.setBaseline(new ContainerSnapshot(inventory));
+        engine.setBaseline(new Cc(inventory));
 
         int spellbookGroup = net.runelite.api.gameval.InterfaceID.MAGIC_SPELLBOOK;
-        ActionLabel iceBurst = ActionLabel.fromSpellMenu("Cast",
+        Bb iceBurst = Bb.tv("Cast",
             spellbookGroup << 16 | 14, spellbookGroup, "<col=ff9040>Ice Burst</col>", "Cast");
         assertNotNull(iceBurst);
-        engine.noteConsumptionIntent(ItemID.NATURERUNE, 18, false, ActionKind.CAST, iceBurst);
+        engine.noteConsumptionIntent(ItemID.NATURERUNE, 18, false, Au.CAST, iceBurst);
         inventory.put(ItemID.NATURERUNE, 4L);
-        Transaction cast = settleStable(engine, inventory, now);
+        Ac cast = settleStable(engine, inventory, now);
         assertNotNull(cast);
-        assertEquals("Ice Burst", cast.getObservedActionLabel().value());
+        assertEquals("Ice Burst", cast.uc().value());
 
         inventory.put(ItemID.NATURERUNE, 3L);
-        Transaction laterLoss = settleStable(engine, inventory, now + 5_000L);
+        Ac laterLoss = settleStable(engine, inventory, now + 5_000L);
         assertNotNull(laterLoss);
         assertEquals("one matched intent cannot label later rune loss", null,
-            laterLoss.getObservedActionLabel());
+            laterLoss.uc());
     }
 
     @Test
     public void unresolvedCastClickCannotRewriteAnArmedSupplyVerb()
     {
-        Engine engine = engine();
+        Am engine = engine();
         long now = T0;
-        engine.startCustomSession("Vorkath", SessionMode.AUTO, now);
+        engine.ajl("Vorkath", Cx.AUTO, now);
         int dragonBones = 536;
         Map<Integer, Long> inventory = inventory(ItemID.COINS, 100_000L, dragonBones, 5L);
-        engine.setBaseline(new ContainerSnapshot(inventory));
+        engine.setBaseline(new Cc(inventory));
 
-        engine.noteConsumptionIntent(dragonBones, 18, false, ActionKind.BURY, null);
+        engine.noteConsumptionIntent(dragonBones, 18, false, Au.BURY, null);
         // A spellbook Cast click can resolve no item id. The open intent must keep the
         // resolved item's proven verb; the exact spell name is a hint, not a re-verb.
-        engine.noteConsumptionIntent(-1, 18, false, ActionKind.CAST,
-            ActionLabel.of("Ice Burst"));
+        engine.noteConsumptionIntent(-1, 18, false, Au.CAST,
+            Bb.of("Ice Burst"));
         inventory.put(dragonBones, 4L);
-        Transaction buried = settleStable(engine, inventory, now);
+        Ac buried = settleStable(engine, inventory, now);
         assertNotNull(buried);
         assertEquals("a later unresolved Cast click cannot rewrite the buried verb",
-            "Buried", SemanticFinancialProjection.verbOf(buried));
+            "Buried", Br.verbOf(buried));
         assertEquals("buried bones stay a supply cost, not a loss",
             CostKind.SUPPLIES, CostKind.of(buried, buried.getFlows().get(0)));
         assertNull("a Cast click that did not cast cannot name the spell",
-            buried.getObservedActionLabel());
+            buried.uc());
     }
 
     @Test
     public void hardTransferEvidenceWinsOverStaleSellPlacement()
     {
-        Engine engine = engine();
+        Am engine = engine();
         long now = T0;
-        engine.startCustomSession("Trading", SessionMode.AUTO, now);
+        engine.ajl("Trading", Cx.AUTO, now);
         Map<Integer, Long> inventory = inventory(ItemID.COINS, 100_000L, ItemID.NATURERUNE, 5L);
-        engine.setBaseline(new ContainerSnapshot(inventory));
+        engine.setBaseline(new Cc(inventory));
 
-        OfferLedger ledger = new OfferLedger();
+        Bj ledger = new Bj();
         noteGe(engine, ledger, 0, SELLING, ItemID.NATURERUNE, 5, 0, 200, 0, now);
-        engine.markContext(Context.TRANSFER, 6, "Bank container transfer");
+        engine.markContext(Aj.TRANSFER, 6, "Bank container transfer");
         inventory.put(ItemID.NATURERUNE, 4L);
 
-        Transaction deposit = settleStable(engine, inventory, now);
+        Ac deposit = settleStable(engine, inventory, now);
         assertNotNull(deposit);
-        assertEquals("hard transfer evidence keeps its own delta", TransactionType.TRANSFER, deposit.getType());
+        assertEquals("hard transfer evidence keeps its own delta", Ai.TRANSFER, deposit.getType());
     }
 
     // ---- helpers ----------------------------------------------------------------------------
 
     private static void noteGe(
-        Engine engine,
-        OfferLedger ledger,
+        Am engine,
+        Bj ledger,
         int slot,
         GrandExchangeOfferState state,
         int itemId,
@@ -312,24 +312,24 @@ public class GeSellClassificationTest
         int spent,
         long at)
     {
-        OfferLedger.Transition transition = ledger.observe(
-            new OfferLedger.Snapshot(slot, state, itemId, totalQuantity, quantityTraded, price, spent))
+        Bj.Transition transition = ledger.observe(
+            new Bj.Snapshot(slot, state, itemId, totalQuantity, quantityTraded, price, spent))
             .orElse(null);
         if (transition != null)
         {
-            engine.noteGeOfferObservation(transition, name(itemId), at);
+            engine.abh(transition, name(itemId), at);
         }
     }
 
     /** Production stabilization: a dirty change commits only after the configured quiet ticks. */
-    private static Transaction settleStable(Engine engine, Map<Integer, Long> next, long now)
+    private static Ac settleStable(Am engine, Map<Integer, Long> next, long now)
     {
-        engine.markInventoryDirty();
-        ContainerSnapshot snapshot = new ContainerSnapshot(next);
-        Transaction result = null;
+        engine.yz();
+        Cc snapshot = new Cc(next);
+        Ac result = null;
         for (int i = 0; i < 3; i++)
         {
-            Transaction settled = engine.processIfDirty(snapshot, now + i * 600L);
+            Ac settled = engine.adj(snapshot, now + i * 600L);
             if (settled != null)
             {
                 result = settled;
@@ -386,21 +386,21 @@ public class GeSellClassificationTest
         return id == ItemID.COINS ? 1 : 200;
     }
 
-    private static Engine engine()
+    private static Am engine()
     {
         GpManagerConfig config = new GpManagerConfig()
         {
             @Override public int stabilizationTicks() { return 2; }
             @Override public boolean keepTransferAuditRows() { return true; }
         };
-        return new Engine(deltas ->
+        return new Am(deltas ->
         {
-            List<Flow> flows = new ArrayList<>();
+            List<Ab> flows = new ArrayList<>();
             for (Map.Entry<Integer, Long> delta : deltas.entrySet())
             {
                 int id = delta.getKey();
-                flows.add(new Flow(id, name(id), delta.getValue(), price(id), delta.getValue() * price(id),
-                    id == ItemID.COINS ? PriceSource.FACE_VALUE : PriceSource.GRAND_EXCHANGE));
+                flows.add(new Ab(id, name(id), delta.getValue(), price(id), delta.getValue() * price(id),
+                    id == ItemID.COINS ? Av.FACE_VALUE : Av.GRAND_EXCHANGE));
             }
             return flows;
         }, new TransactionClassifier(), config);

@@ -18,7 +18,7 @@ public class PresentationWiringTest
         set(plugin, "clientToolbar", null);
         set(plugin, "lootPresentationFilter",
             new LootPresentationFilterService(
-                GroundItemsConfigSnapshot.disabled()));
+                Bc.disabled()));
         invoke(plugin, "installPresentation", new Class<?>[0]);
         assertNull("a missing toolbar leaves no panel bound", get(plugin, "activityPanel"));
     }
@@ -27,7 +27,7 @@ public class PresentationWiringTest
     public void ownerScopeHeldClearsAndResumesTheConcreteSidebar() throws Exception
     {
         GpManagerPlugin plugin = new GpManagerPlugin();
-        SidebarPanel panel = panel(plugin);
+        Dp panel = panel(plugin);
         SwingUtilities.invokeAndWait(() -> SidebarPanelProbe.refresh(panel));
         assertNotNull(SidebarPanelProbe.live(panel));
         invoke(plugin, "ownerScopeChanged", new Class<?>[] {String.class}, "held");
@@ -43,14 +43,14 @@ public class PresentationWiringTest
     public void presentationSignalsRefreshWithoutBookingMoney() throws Exception
     {
         GpManagerPlugin plugin = new GpManagerPlugin();
-        SidebarPanel panel = panel(plugin);
-        Engine engine = (Engine) get(plugin, "engine");
-        engine.ensureSession(1L);
-        Session session = engine.getActiveSession();
+        Dp panel = panel(plugin);
+        Am engine = (Am) get(plugin, "engine");
+        engine.rm(1L);
+        Ad session = engine.getActiveSession();
         long revision = engine.getRevision();
         invoke(plugin, "pulse", new Class<?>[0]);
-        invoke(plugin, "transactionBooked", new Class<?>[] {Transaction.class, long.class},
-            Tx.of(1L, null, TransactionType.GAIN, Context.GENERIC, "", "Test", true,
+        invoke(plugin, "transactionBooked", new Class<?>[] {Ac.class, long.class},
+            Tx.of(1L, null, Ai.GAIN, Aj.GENERIC, "", "Test", true,
                 Collections.emptyList()), 1L);
         invoke(plugin, "lootObserved", new Class<?>[] {boolean.class, String.class,
             java.util.Collection.class, int.class, long.class}, false, "Test", Collections.emptyList(), 1, 1L);
@@ -72,18 +72,18 @@ public class PresentationWiringTest
         invoke(plugin, "refreshPresentation", new Class<?>[0]);
         invoke(plugin, "ownerScopeChanged", new Class<?>[] {String.class}, (Object) null);
         invoke(plugin, "interactionChanged", new Class<?>[] {String.class, boolean.class}, "Goblin", true);
-        invoke(plugin, "transactionBooked", new Class<?>[] {Transaction.class, long.class}, null, 1L);
+        invoke(plugin, "transactionBooked", new Class<?>[] {Ac.class, long.class}, null, 1L);
         invoke(plugin, "lootObserved", new Class<?>[] {boolean.class, String.class,
             java.util.Collection.class, int.class, long.class}, true, "Test", null, 1, 1L);
     }
 
-    private static SidebarPanel panel(GpManagerPlugin plugin) throws Exception
+    private static Dp panel(GpManagerPlugin plugin) throws Exception
     {
         GpManagerConfig config = new GpManagerConfig() {};
-        Engine engine = new Engine(deltas -> Collections.emptyList(),
+        Am engine = new Am(deltas -> Collections.emptyList(),
             new TransactionClassifier(), config);
-        SidebarPanel[] panel = new SidebarPanel[1];
-        SwingUtilities.invokeAndWait(() -> panel[0] = new SidebarPanel(engine, config, null));
+        Dp[] panel = new Dp[1];
+        SwingUtilities.invokeAndWait(() -> panel[0] = new Dp(engine, config, null));
         set(plugin, "engine", engine);
         set(plugin, "activityPanel", panel[0]);
         return panel[0];

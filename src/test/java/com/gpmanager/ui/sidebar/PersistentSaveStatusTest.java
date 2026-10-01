@@ -56,54 +56,54 @@ public class PersistentSaveStatusTest
     public void theSidebarFollowsTheBackendStatusUntilRecovery() throws Exception
     {
         FakePersist persist = new FakePersist();
-        SidebarPanel panel = onEdt(() -> new SidebarPanel(engine(), new GpManagerConfig() {}, null, null, null, persist));
+        Dp panel = onEdt(() -> new Dp(engine(), new GpManagerConfig() {}, null, null, null, persist));
         Shell shell = panel.shell();
         onEdt(() ->
         {
-            persist.status = new SaveStatus(SaveStatus.State.FAILED, "disk full", false, "");
-            panel.surfacePersistenceWarning();
+            persist.status = new Ci(Ci.State.FAILED, "disk full", false, "");
+            panel.ajf();
             assertTrue(shell.notice.isVisible());
             assertTrue(ShellProbe.noticeText(shell).startsWith("Data not saved"));
-            panel.surfacePersistenceWarning();
+            panel.ajf();
             assertTrue("a repeated failing status stays up", shell.notice.isVisible());
 
-            persist.status = new SaveStatus(SaveStatus.State.OK, "", false, "backup-2026");
-            panel.surfacePersistenceWarning();
+            persist.status = new Ci(Ci.State.OK, "", false, "backup-2026");
+            panel.ajf();
             assertTrue("recovery replaces it with the recovery note",
                 ShellProbe.noticeText(shell).startsWith("Recovered from backup"));
             assertTrue("routine recovery has a timer", shell.noticeTimer.isRunning());
 
-            persist.status = new SaveStatus(SaveStatus.State.FAILED, "disk full", false, "");
-            panel.surfacePersistenceWarning();
+            persist.status = new Ci(Ci.State.FAILED, "disk full", false, "");
+            panel.ajf();
             assertTrue(shell.notice.isVisible());
-            panel.clearOwnerScope();
+            panel.ot();
             assertFalse("a profile switch drops the old profile's failure", shell.notice.isVisible());
             return null;
         });
     }
 
-    private static Engine engine()
+    private static Am engine()
     {
-        return new Engine(deltas -> Collections.emptyList(), new TransactionClassifier(),
+        return new Am(deltas -> Collections.emptyList(), new TransactionClassifier(),
             new GpManagerConfig() {});
     }
 
     private static final class Fixture
     {
-        final SidebarPanel panel;
+        final Dp panel;
         final Shell shell;
 
         Fixture() throws Exception
         {
-            panel = onEdt(() -> new SidebarPanel(engine(), new GpManagerConfig() {}, null));
+            panel = onEdt(() -> new Dp(engine(), new GpManagerConfig() {}, null));
             shell = panel.shell();
         }
     }
 
     /** Returns the status the test chooses; the real writer is never involved. */
-    private static final class FakePersist extends PersistenceCoordinator
+    private static final class FakePersist extends Ei
     {
-        SaveStatus status = SaveStatus.neverSaved();
+        Ci status = Ci.abd();
 
         FakePersist()
         {
@@ -111,7 +111,7 @@ public class PersistentSaveStatusTest
         }
 
         @Override
-        SaveStatus getSaveStatus()
+        Ci ux()
         {
             return status;
         }

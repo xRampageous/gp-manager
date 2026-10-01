@@ -14,80 +14,80 @@ public class ChargeEstimateReconciliationTest
     @Test
     public void estimatedUsageBooksLikelyCostAndKeepsComponentJournal()
     {
-        Engine engine = engine();
-        engine.ensureSession(T0);
+        Am engine = engine();
+        engine.rm(T0);
 
-        Transaction receipt = engine.bookEstimatedChargeUsage("slot-a", "seas",
-            ActionKind.CAST, flows(
+        Ac receipt = engine.mn("slot-a", "seas",
+            Au.CAST, flows(
                 flow(ItemID.DEATHRUNE, "Death rune", -2L, 100),
                 flow(ItemID.CHAOSRUNE, "Chaos rune", -2L, 50)), T0 + 1L);
 
         assertNotNull(receipt);
-        assertEquals(ClassificationConfidence.LIKELY, receipt.getConfidence());
+        assertEquals(Bd.LIKELY, receipt.getConfidence());
         assertEquals("Estimated", receipt.getExplanation());
         assertEquals(-300L, receipt.getNet());
-        assertEquals(2L, engine.chargeEstimateJournal.pendingQuantity(
+        assertEquals(2L, engine.chargeEstimateJournal.adp(
             engine.getActiveSession().getId(), "slot-a", "seas", ItemID.DEATHRUNE));
-        assertEquals(2L, engine.chargeEstimateJournal.pendingQuantity(
+        assertEquals(2L, engine.chargeEstimateJournal.adp(
             engine.getActiveSession().getId(), "slot-a", "seas", ItemID.CHAOSRUNE));
     }
 
     @Test
     public void checkShrinksEstimatesAtCapturedPricesAndBooksOnlyMeasuredRemainder()
     {
-        Engine engine = engine();
-        engine.ensureSession(T0);
-        Transaction estimate = engine.bookEstimatedChargeUsage("slot-a", "seas",
-            ActionKind.CAST, flows(
+        Am engine = engine();
+        engine.rm(T0);
+        Ac estimate = engine.mn("slot-a", "seas",
+            Au.CAST, flows(
                 flow(ItemID.DEATHRUNE, "Death rune", -3L, 100),
                 flow(ItemID.CHAOSRUNE, "Chaos rune", -1L, 50),
                 flow(ItemID.FIRERUNE, "Fire rune", -10L, 5),
-                new Flow(ItemID.COINS, "Coins", -20L, 1, -20L, PriceSource.FACE_VALUE)), T0 + 1L);
+                new Ab(ItemID.COINS, "Coins", -20L, 1, -20L, Av.FACE_VALUE)), T0 + 1L);
 
-        ChargeDelta delta = new ChargeDelta(ChargeRead.Variant.TRIDENT_SEAS,
-            Arrays.asList(new ChargeDelta.ComponentDelta(ItemID.DEATHRUNE, -2L),
-                new ChargeDelta.ComponentDelta(ItemID.CHAOSRUNE, -3L),
-                new ChargeDelta.ComponentDelta(ItemID.FIRERUNE, -10L),
-                new ChargeDelta.ComponentDelta(ItemID.COINS, -20L)));
-        Transaction measured = engine.bookChargeSpend(delta, "Trident of the seas",
+        Cm delta = new Cm(Ar.V.TRIDENT_SEAS,
+            Arrays.asList(new Cm.ComponentDelta(ItemID.DEATHRUNE, -2L),
+                new Cm.ComponentDelta(ItemID.CHAOSRUNE, -3L),
+                new Cm.ComponentDelta(ItemID.FIRERUNE, -10L),
+                new Cm.ComponentDelta(ItemID.COINS, -20L)));
+        Ac measured = engine.mj(delta, "Trident of the seas",
             flows(
                 flow(ItemID.DEATHRUNE, "Death rune", -2L, 100),
                 flow(ItemID.CHAOSRUNE, "Chaos rune", -3L, 50),
                 flow(ItemID.FIRERUNE, "Fire rune", -10L, 5),
-                new Flow(ItemID.COINS, "Coins", -20L, 1, -20L, PriceSource.FACE_VALUE)),
+                new Ab(ItemID.COINS, "Coins", -20L, 1, -20L, Av.FACE_VALUE)),
             T0 + 2L, "slot-a");
 
         assertNotNull(measured);
         assertEquals(2L, estimate.quantity(ItemID.DEATHRUNE, false));
         assertEquals(100, estimate.getFlows().get(0).unitPrice);
         assertEquals(1L, estimate.quantity(ItemID.CHAOSRUNE, false));
-        assertEquals(ClassificationConfidence.CONFIRMED, estimate.getConfidence());
+        assertEquals(Bd.CONFIRMED, estimate.getConfidence());
         assertEquals("Confirmed", estimate.getExplanation());
         assertEquals(2L, measured.quantity(ItemID.CHAOSRUNE, false));
-        assertEquals(0L, engine.chargeEstimateJournal.pendingQuantity(
+        assertEquals(0L, engine.chargeEstimateJournal.adp(
             engine.getActiveSession().getId(), "slot-a", "seas", ItemID.DEATHRUNE));
-        assertEquals(0L, engine.chargeEstimateJournal.pendingQuantity(
+        assertEquals(0L, engine.chargeEstimateJournal.adp(
             engine.getActiveSession().getId(), "slot-a", "seas", ItemID.CHAOSRUNE));
     }
 
     @Test
     public void manualCorrectionSurvivesReconciliationWithoutRepricing()
     {
-        Engine engine = engine();
-        engine.ensureSession(T0);
-        Transaction estimate = engine.bookEstimatedChargeUsage("slot-a", "seas",
-            ActionKind.CAST, Collections.singletonList(flow(ItemID.DEATHRUNE, "Death rune", -3L, 100)),
+        Am engine = engine();
+        engine.rm(T0);
+        Ac estimate = engine.mn("slot-a", "seas",
+            Au.CAST, Collections.singletonList(flow(ItemID.DEATHRUNE, "Death rune", -3L, 100)),
             T0 + 1L);
-        assertTrue(engine.getActiveSession().correctTransaction(estimate.getId(),
-            Correction.COST, T0 + 2L, "Owner decision"));
+        assertTrue(engine.getActiveSession().qi(estimate.getId(),
+            Ah.COST, T0 + 2L, "Owner decision"));
 
-        ChargeDelta delta = new ChargeDelta(ChargeRead.Variant.TRIDENT_SEAS,
-            Collections.singletonList(new ChargeDelta.ComponentDelta(ItemID.DEATHRUNE, -2L)));
-        Transaction measured = engine.bookChargeSpend(delta, "Trident of the seas",
+        Cm delta = new Cm(Ar.V.TRIDENT_SEAS,
+            Collections.singletonList(new Cm.ComponentDelta(ItemID.DEATHRUNE, -2L)));
+        Ac measured = engine.mj(delta, "Trident of the seas",
             Collections.singletonList(flow(ItemID.DEATHRUNE, "Death rune", -2L, 100)), T0 + 3L, "slot-a");
 
         assertNull(measured);
-        assertEquals(Correction.COST, estimate.getCorrection());
+        assertEquals(Ah.COST, estimate.getCorrection());
         assertEquals(3L, estimate.quantity(ItemID.DEATHRUNE, false));
         assertEquals(100, estimate.getFlows().get(0).unitPrice);
     }
@@ -95,60 +95,60 @@ public class ChargeEstimateReconciliationTest
     @Test
     public void estimatesCannotReconcileAcrossSessions()
     {
-        Engine engine = engine();
-        engine.ensureSession(T0);
-        Transaction old = engine.bookEstimatedChargeUsage("slot-a", "seas",
-            ActionKind.CAST, Collections.singletonList(flow(ItemID.DEATHRUNE, "Death rune", -2L, 100)),
+        Am engine = engine();
+        engine.rm(T0);
+        Ac old = engine.mn("slot-a", "seas",
+            Au.CAST, Collections.singletonList(flow(ItemID.DEATHRUNE, "Death rune", -2L, 100)),
             T0 + 1L);
         String oldSession = engine.getActiveSession().getId();
-        engine.startCustomSession("Custom", SessionMode.GENERAL, T0 + 2L);
+        engine.ajl("Custom", Cx.GENERAL, T0 + 2L);
 
-        ChargeDelta delta = new ChargeDelta(ChargeRead.Variant.TRIDENT_SEAS,
-            Collections.singletonList(new ChargeDelta.ComponentDelta(ItemID.DEATHRUNE, -2L)));
-        Transaction measured = engine.bookChargeSpend(delta, "Trident of the seas",
+        Cm delta = new Cm(Ar.V.TRIDENT_SEAS,
+            Collections.singletonList(new Cm.ComponentDelta(ItemID.DEATHRUNE, -2L)));
+        Ac measured = engine.mj(delta, "Trident of the seas",
             Collections.singletonList(flow(ItemID.DEATHRUNE, "Death rune", -2L, 100)), T0 + 3L, "slot-a");
 
         assertNotNull(measured);
         assertEquals(2L, old.quantity(ItemID.DEATHRUNE, false));
         assertEquals(2L, measured.quantity(ItemID.DEATHRUNE, false));
-        assertEquals(0L, engine.chargeEstimateJournal.pendingQuantity(oldSession,
+        assertEquals(0L, engine.chargeEstimateJournal.adp(oldSession,
             "slot-a", "seas", ItemID.DEATHRUNE));
     }
 
     @Test
     public void lifecycleResetClearsTransientEstimates()
     {
-        Engine engine = engine();
-        engine.ensureSession(T0);
-        engine.bookEstimatedChargeUsage("slot-a", "seas", ActionKind.CAST,
+        Am engine = engine();
+        engine.rm(T0);
+        engine.mn("slot-a", "seas", Au.CAST,
             Collections.singletonList(flow(ItemID.DEATHRUNE, "Death rune", -1L, 100)), T0 + 1L);
-        engine.pauseForLifecycle(T0 + 2L);
-        assertEquals(0L, engine.chargeEstimateJournal.pendingQuantity(
+        engine.acu(T0 + 2L);
+        assertEquals(0L, engine.chargeEstimateJournal.adp(
             engine.getActiveSession().getId(), "slot-a", "seas", ItemID.DEATHRUNE));
     }
 
-    private static Engine engine()
+    private static Am engine()
     {
-        return new Engine(deltas -> Collections.emptyList(),
+        return new Am(deltas -> Collections.emptyList(),
             new TransactionClassifier(), new GpManagerConfig() {});
     }
 
-    private static Flow flow(int id, String name, long quantity, int unit)
+    private static Ab flow(int id, String name, long quantity, int unit)
     {
-        return new Flow(id, name, quantity, unit, quantity * unit, PriceSource.GRAND_EXCHANGE);
+        return new Ab(id, name, quantity, unit, quantity * unit, Av.GRAND_EXCHANGE);
     }
 
-    private static List<Flow> flows(Flow... values)
+    private static List<Ab> flows(Ab... values)
     {
         return Arrays.asList(values);
     }
 
-    private static List<Flow> tridentLosses(long death)
+    private static List<Ab> tridentLosses(long death)
     {
         return flows(flow(ItemID.DEATHRUNE, "Death rune", death, 100),
             flow(ItemID.CHAOSRUNE, "Chaos rune", death, 50),
             flow(ItemID.FIRERUNE, "Fire rune", death * 5L, 5),
-            new Flow(ItemID.COINS, "Coins", death * 10L, 1, death * 10L,
-                PriceSource.FACE_VALUE));
+            new Ab(ItemID.COINS, "Coins", death * 10L, 1, death * 10L,
+                Av.FACE_VALUE));
     }
 }

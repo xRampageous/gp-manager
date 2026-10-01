@@ -20,7 +20,7 @@ public class ConfigProxyCompatibilityTest
         assertEquals(defaults.receiptRetentionDays(), config.receiptRetentionDays());
         assertEquals(defaults.hudTray(), config.hudTray());
         assertEquals(GpManagerConfig.HudTrayKeeps.STREAK, config.hudTrayKeeps());
-        assertEquals(LootPresentationFilter.FOLLOW_GROUND_ITEMS, config.lootPresentationFilter());
+        assertEquals(Dl.FOLLOW_GROUND_ITEMS, config.lootPresentationFilter());
         assertEquals("", config.hiddenRecentItems());
     }
 
@@ -33,8 +33,8 @@ public class ConfigProxyCompatibilityTest
         manager.setConfiguration(GpManagerConfig.GROUP, "hudTrayKeeps", "SESSION");
         manager.setConfiguration(GpManagerConfig.GROUP, "hiddenRecentItems", "Shark, Prayer potion");
         GpManagerConfig config = manager.getConfig(GpManagerConfig.class);
-        assertEquals(LootPresentationFilter.HIGHLIGHTED_LIST_ONLY, config.lootPresentationFilter());
-        assertEquals(ReceiptRetentionPeriod.DAYS_365, config.receiptRetentionDays());
+        assertEquals(Dl.HIGHLIGHTED_LIST_ONLY, config.lootPresentationFilter());
+        assertEquals(Db.DAYS_365, config.receiptRetentionDays());
         assertEquals(GpManagerConfig.HudTrayKeeps.SESSION, config.hudTrayKeeps());
         assertEquals("Shark, Prayer potion", config.hiddenRecentItems());
     }

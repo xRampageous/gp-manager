@@ -26,7 +26,7 @@ public class KeyChestCatalogueTest
     /** True when the key's first mapped chest keeps the GE opportunity cost. */
     private static boolean isTradeableKey(int keyItemId)
     {
-        java.util.List<KeyChestCatalogue.Entry> entries = KeyChestCatalogue.entriesForKey(keyItemId);
+        java.util.List<KeyChestCatalogue.Entry> entries = KeyChestCatalogue.rs(keyItemId);
         return !entries.isEmpty() && entries.get(0).isTradeable();
     }
 
@@ -72,17 +72,17 @@ public class KeyChestCatalogueTest
         };
         for (int keyId : shadeKeys)
         {
-            assertTrue("Shade key " + keyId + " is deferred", KeyChestCatalogue.isDeferredClaimKey(keyId));
+            assertTrue("Shade key " + keyId + " is deferred", KeyChestCatalogue.wg(keyId));
             assertFalse("Shade key " + keyId + " is not tradeable", isTradeableKey(keyId));
-            assertEquals(1, KeyChestCatalogue.entriesForKey(keyId).size());
+            assertEquals(1, KeyChestCatalogue.rs(keyId).size());
         }
     }
 
     @Test public void unknownKeyAndTradeableKeysAreNeverDeferred()
     {
-        assertFalse(KeyChestCatalogue.isDeferredClaimKey(995));
-        assertFalse(KeyChestCatalogue.isDeferredClaimKey(ItemID.CRYSTAL_KEY));
-        assertFalse(KeyChestCatalogue.isDeferredClaimKey(ItemID.SLAYER_WILDERNESS_KEY));
+        assertFalse(KeyChestCatalogue.wg(995));
+        assertFalse(KeyChestCatalogue.wg(ItemID.CRYSTAL_KEY));
+        assertFalse(KeyChestCatalogue.wg(ItemID.SLAYER_WILDERNESS_KEY));
         assertTrue(isTradeableKey(ItemID.CRYSTAL_KEY));
     }
 

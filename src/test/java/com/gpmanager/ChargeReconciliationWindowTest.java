@@ -45,59 +45,59 @@ public class ChargeReconciliationWindowTest
     @Test
     public void leftoverEstimatesAreRemovedWhenACheckClosesTheWindow()
     {
-        Engine engine = engine();
-        engine.ensureSession(T0);
-        Transaction first = estimate(engine, T0 + 1L);
-        Transaction second = estimate(engine, T0 + 2L);
-        Transaction third = estimate(engine, T0 + 3L);
+        Am engine = engine();
+        engine.rm(T0);
+        Ac first = estimate(engine, T0 + 1L);
+        Ac second = estimate(engine, T0 + 2L);
+        Ac third = estimate(engine, T0 + 3L);
 
-        ChargeDelta delta = new ChargeDelta(ChargeRead.Variant.TRIDENT_SEAS,
-            Collections.singletonList(new ChargeDelta.ComponentDelta(ItemID.DEATHRUNE, -1L)));
-        Transaction measured = engine.bookChargeSpend(delta, "Trident of the seas",
+        Cm delta = new Cm(Ar.V.TRIDENT_SEAS,
+            Collections.singletonList(new Cm.ComponentDelta(ItemID.DEATHRUNE, -1L)));
+        Ac measured = engine.mj(delta, "Trident of the seas",
             Collections.singletonList(flow(ItemID.DEATHRUNE, "Death rune", -1L, 100)), T0 + 4L, "slot-a");
 
         assertNull("the surviving estimate already booked the measured unit", measured);
         assertEquals(1L, first.quantity(ItemID.DEATHRUNE, false));
         assertEquals(0L, second.quantity(ItemID.DEATHRUNE, false));
         assertEquals(0L, third.quantity(ItemID.DEATHRUNE, false));
-        assertEquals(Correction.IGNORE, second.getCorrection());
-        assertEquals(Correction.IGNORE, third.getCorrection());
-        assertEquals(0L, engine.chargeEstimateJournal.pendingQuantity(
+        assertEquals(Ah.IGNORE, second.getCorrection());
+        assertEquals(Ah.IGNORE, third.getCorrection());
+        assertEquals(0L, engine.chargeEstimateJournal.adp(
             engine.getActiveSession().getId(), "slot-a", "seas", ItemID.DEATHRUNE));
     }
 
     @Test
     public void aCompatibleCheckThatMovedNothingClosesTheWindow()
     {
-        Engine engine = engine();
-        engine.ensureSession(T0);
-        Transaction first = estimate(engine, T0 + 1L);
-        Transaction second = estimate(engine, T0 + 2L);
+        Am engine = engine();
+        engine.rm(T0);
+        Ac first = estimate(engine, T0 + 1L);
+        Ac second = estimate(engine, T0 + 2L);
 
         engine.closeChargeWindow("slot-a");
 
         assertEquals(0L, first.quantity(ItemID.DEATHRUNE, false));
         assertEquals(0L, second.quantity(ItemID.DEATHRUNE, false));
-        assertEquals(Correction.IGNORE, first.getCorrection());
-        assertEquals(Correction.IGNORE, second.getCorrection());
-        assertEquals(0L, engine.chargeEstimateJournal.pendingQuantity(
+        assertEquals(Ah.IGNORE, first.getCorrection());
+        assertEquals(Ah.IGNORE, second.getCorrection());
+        assertEquals(0L, engine.chargeEstimateJournal.adp(
             engine.getActiveSession().getId(), "slot-a", "seas", ItemID.DEATHRUNE));
     }
 
-    private static Transaction estimate(Engine engine, long at)
+    private static Ac estimate(Am engine, long at)
     {
-        return engine.bookEstimatedChargeUsage("slot-a", "seas", ActionKind.CAST,
+        return engine.mn("slot-a", "seas", Au.CAST,
             Collections.singletonList(flow(ItemID.DEATHRUNE, "Death rune", -1L, 100)), at);
     }
 
-    private static Flow flow(int id, String name, long quantity, int unit)
+    private static Ab flow(int id, String name, long quantity, int unit)
     {
-        return new Flow(id, name, quantity, unit, quantity * unit, PriceSource.GRAND_EXCHANGE);
+        return new Ab(id, name, quantity, unit, quantity * unit, Av.GRAND_EXCHANGE);
     }
 
-    private static Engine engine()
+    private static Am engine()
     {
-        return new Engine(deltas -> Collections.emptyList(),
+        return new Am(deltas -> Collections.emptyList(),
             new TransactionClassifier(), new GpManagerConfig() {});
     }
 }

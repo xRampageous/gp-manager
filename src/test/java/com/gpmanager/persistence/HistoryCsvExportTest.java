@@ -27,13 +27,13 @@ public class HistoryCsvExportTest
     @Test
     public void exportsOneTruthfulRowPerRetainedGrind() throws Exception
     {
-        Engine engine = engine();
+        Am engine = engine();
         long now = 1_700_000_000_000L;
-        archived(engine, "Vorkath", now, TransactionType.GAIN, 6_400L);
-        archived(engine, "Zulrah", now + 3_600_000L, TransactionType.CONSUMPTION, -1_200L);
+        archived(engine, "Vorkath", now, Ai.GAIN, 6_400L);
+        archived(engine, "Zulrah", now + 3_600_000L, Ai.CONSUMPTION, -1_200L);
 
         Filepath directory = FilepathTestSupport.root(folder.getRoot().toPath());
-        Filepath exported = new CsvExporter().exportHistory(engine.getHistory(), directory, now + 7_200_000L);
+        Filepath exported = new CsvExporter().sh(engine.getHistory(), directory, now + 7_200_000L);
         List<String> lines = Files.readAllLines(FilepathTestSupport.path(exported), StandardCharsets.UTF_8);
 
         assertEquals("header + one row per retained Grind", 3, lines.size());
@@ -49,17 +49,17 @@ public class HistoryCsvExportTest
     @Test
     public void compactedHistoryIsLabelledNotFabricated() throws Exception
     {
-        Engine engine = engine();
+        Am engine = engine();
         long now = 1_700_000_000_000L;
-        engine.startCustomSession("Old grind", SessionMode.GENERAL, now);
-        engine.getActiveSession().addTransaction(receipt(now + 1_000L, TransactionType.GAIN, 400L), 2_000);
-        engine.getActiveSession().addTransaction(receipt(now + 2_000L, TransactionType.GAIN, 400L), 2_000);
-        engine.finishCustomSession(now + 3_000L);
-        Session closed = engine.getHistory().get(0);
-        closed.compactTransactionsBefore(now + 2_000L, transaction -> false);
+        engine.ajl("Old grind", Cx.GENERAL, now);
+        engine.getActiveSession().kf(receipt(now + 1_000L, Ai.GAIN, 400L), 2_000);
+        engine.getActiveSession().kf(receipt(now + 2_000L, Ai.GAIN, 400L), 2_000);
+        engine.sx(now + 3_000L);
+        Ad closed = engine.getHistory().get(0);
+        closed.pj(now + 2_000L, transaction -> false);
 
         Filepath directory = FilepathTestSupport.root(folder.getRoot().toPath());
-        Filepath exported = new CsvExporter().exportHistory(engine.getHistory(), directory, now + 3_600_000L);
+        Filepath exported = new CsvExporter().sh(engine.getHistory(), directory, now + 3_600_000L);
         String csv = Files.readString(FilepathTestSupport.path(exported), StandardCharsets.UTF_8);
 
         assertTrue("compacted detail is labelled", csv.contains("SUMMARY_ONLY_COMPACTED"));
@@ -70,17 +70,17 @@ public class HistoryCsvExportTest
     @Test
     public void correctionAwareTotalsAndCostSplitHonesty() throws Exception
     {
-        Engine engine = engine();
+        Am engine = engine();
         long now = 1_700_000_000_000L;
-        engine.startCustomSession("Vorkath", SessionMode.GENERAL, now);
-        Transaction change = receipt(now + 1_000L, TransactionType.GAIN, 200L);
-        engine.getActiveSession().addTransaction(change, 2_000);
+        engine.ajl("Vorkath", Cx.GENERAL, now);
+        Ac change = receipt(now + 1_000L, Ai.GAIN, 200L);
+        engine.getActiveSession().kf(change, 2_000);
         // Corrections apply while the Grind is current; the archived row then carries the result.
-        assertTrue(engine.correctTransaction(change.getId(), Correction.COST, now + 1_500L, "history csv"));
-        engine.finishCustomSession(now + 2_000L);
+        assertTrue(engine.qi(change.getId(), Ah.COST, now + 1_500L, "history csv"));
+        engine.sx(now + 2_000L);
 
         Filepath directory = FilepathTestSupport.root(folder.getRoot().toPath());
-        Filepath exported = new CsvExporter().exportHistory(engine.getHistory(), directory, now + 3_600_000L);
+        Filepath exported = new CsvExporter().sh(engine.getHistory(), directory, now + 3_600_000L);
         String csv = Files.readString(FilepathTestSupport.path(exported), StandardCharsets.UTF_8);
 
         assertTrue("the correction is reflected in the exported net", csv.contains("-200"));
@@ -93,38 +93,38 @@ public class HistoryCsvExportTest
     public void emptyHistoryStillProducesAHeaderOnlyReport() throws Exception
     {
         Filepath directory = FilepathTestSupport.root(folder.getRoot().toPath());
-        Filepath exported = new CsvExporter().exportHistory(Collections.emptyList(), directory,
+        Filepath exported = new CsvExporter().sh(Collections.emptyList(), directory,
             1_700_000_000_000L);
         List<String> lines = Files.readAllLines(FilepathTestSupport.path(exported), StandardCharsets.UTF_8);
         assertEquals(1, lines.size());
     }
 
-    private static void archived(Engine engine, String name, long now, TransactionType type, long value)
+    private static void archived(Am engine, String name, long now, Ai type, long value)
     {
-        engine.startCustomSession(name, SessionMode.GENERAL, now);
-        engine.getActiveSession().addTransaction(receipt(now + 1_000L, type, value), 2_000);
-        engine.finishCustomSession(now + 2_000L);
+        engine.ajl(name, Cx.GENERAL, now);
+        engine.getActiveSession().kf(receipt(now + 1_000L, type, value), 2_000);
+        engine.sx(now + 2_000L);
     }
 
-    private static Transaction receipt(long at, TransactionType type, long value)
+    private static Ac receipt(long at, Ai type, long value)
     {
-        return new Transaction(at, null, type, Context.GENERIC, "", "Vorkath", true,
-            Collections.singletonList(new Flow(1519, "Willow logs", value >= 0L ? 5L : -5L,
+        return new Ac(at, null, type, Aj.GENERIC, "", "Vorkath", true,
+            Collections.singletonList(new Ab(1519, "Willow logs", value >= 0L ? 5L : -5L,
                 (int) Math.abs(value / 5L), value)),
-            ClassificationConfidence.LIKELY, "test", null);
+            Bd.LIKELY, "test", null);
     }
 
-    private static Engine engine()
+    private static Am engine()
     {
         GpManagerConfig config = new GpManagerConfig()
         {
             @Override public int stabilizationTicks() { return 0; }
         };
-        return new Engine(deltas ->
+        return new Am(deltas ->
         {
-            java.util.List<Flow> flows = new java.util.ArrayList<>();
+            java.util.List<Ab> flows = new java.util.ArrayList<>();
             deltas.forEach((id, quantity) ->
-                flows.add(new Flow(id, "Willow logs", quantity, 40, quantity * 40)));
+                flows.add(new Ab(id, "Willow logs", quantity, 40, quantity * 40)));
             return flows;
         }, new TransactionClassifier(), config);
     }

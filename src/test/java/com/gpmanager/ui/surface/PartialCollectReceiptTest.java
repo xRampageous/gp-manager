@@ -43,20 +43,20 @@ public class PartialCollectReceiptTest
     public void ambiguousSettlementNeverShowsUnobservedReceived() throws Exception
     {
         Fixture fixture = ambiguousBoltFixture();
-        MarketSettlementProjection.Row bolt = fixture.row(BOLT);
+        Bi.Row bolt = fixture.row(BOLT);
         assertTrue(bolt.collectionAmbiguous);
-        assertEquals(MarketSettlementProjection.Lifecycle.AMBIGUOUS, bolt.lifecycle);
+        assertEquals(Bi.Lifecycle.AMBIGUOUS, bolt.lifecycle);
         String settlementId = bolt.settlementId;
 
-        List<String> lines = MarketText.marketHumanLines(bolt, false);
+        List<String> lines = Dc.zs(bolt, false);
         assertTrue("Received is never the unobserved allocation", lines.contains("Received|not proven"));
         assertFalse("no Received each without observed cash",
             lines.stream().anyMatch(line -> line.startsWith("Received each")));
         assertFalse("no Result is invented for a quarantined settlement",
             lines.stream().anyMatch(line -> line.startsWith("Result")));
 
-        SemanticFinancialProjection.Receipt receipt = fixture.capture(settlementId, null).detail.receipts.get(0);
-        LedgerPage page = fixture.openExact(settlementId, receipt.contributionId);
+        Br.Receipt receipt = fixture.capture(settlementId, null).detail.receipts.get(0);
+        LedgerPage page = fixture.auy(settlementId, receipt.contributionId);
         assertEquals("EXACT", LedgerPageProbe.drill(page));
         List<String> texts = LedgerPageProbe.detailTexts(page);
         assertTrue("Received is not proven: " + texts, texts.contains("Received") && texts.contains("not proven"));
@@ -67,18 +67,18 @@ public class PartialCollectReceiptTest
     {
         Fixture fixture = ambiguousBoltFixture();
         String settlementId = fixture.row(BOLT).settlementId;
-        LedgerData data = fixture.capture(settlementId, null);
+        Ao data = fixture.capture(settlementId, null);
         assertEquals("the market group owns exactly its sale receipt", 1, data.detail.receipts.size());
-        SemanticFinancialProjection.Receipt receipt = data.detail.receipts.get(0);
+        Br.Receipt receipt = data.detail.receipts.get(0);
         assertEquals("never the Coins leg", BOLT, receipt.itemId);
-        assertEquals("Bolt of linen", MarketText.marketReceiptTitle(receipt));
+        assertEquals("Bolt of linen", Dc.aab(receipt));
         assertFalse("the group never lists an unclaimed Coins receipt",
             data.detail.receipts.stream().anyMatch(candidate -> candidate.itemId == COINS));
 
         // A stale contribution anchor that points at the settlement's Coins leg must never open a
         // receipt titled "Coins": the sale's own receipt and item title win.
         String coinsLegAnchor = settlementId + ":flow:1";
-        LedgerPage page = fixture.openExact(settlementId, coinsLegAnchor);
+        LedgerPage page = fixture.auy(settlementId, coinsLegAnchor);
         assertEquals("EXACT", LedgerPageProbe.drill(page));
         List<String> texts = LedgerPageProbe.detailTexts(page);
         assertTrue("the exact receipt header is the sale's item: " + texts,
@@ -88,9 +88,9 @@ public class PartialCollectReceiptTest
 
         // The unclaimed collect stays its own uncounted Review row.
         int reviewRows = 0;
-        for (Transaction transaction : fixture.engine.getActiveSession().getTransactions())
+        for (Ac transaction : fixture.engine.getActiveSession().getTransactions())
         {
-            if (transaction.getAutomaticType() == TransactionType.UNCERTAIN
+            if (transaction.tm() == Ai.UNCERTAIN
                 && transaction.getFlows().size() == 1
                 && transaction.getFlows().get(0).itemId == COINS)
             {
@@ -113,9 +113,9 @@ public class PartialCollectReceiptTest
         // The owner smoke: the collected slot is reused by the next listing.
         fixture.placeAndSell(0, SILVER, 60L, 7_500L, t + 20_000L);
 
-        SemanticFinancialProjection.Receipt receipt = fixture.capture(settlementId, null).detail.receipts.get(0);
+        Br.Receipt receipt = fixture.capture(settlementId, null).detail.receipts.get(0);
         assertEquals(SHARK, receipt.itemId);
-        LedgerPage page = fixture.openExact(settlementId, receipt.contributionId);
+        LedgerPage page = fixture.auy(settlementId, receipt.contributionId);
         List<String> texts = LedgerPageProbe.detailTexts(page);
         assertTrue("the sale stays a market receipt: " + texts,
             texts.contains("Received") && texts.contains(Fmt.exact(SHARK_NET) + " gp"));
@@ -166,31 +166,31 @@ public class PartialCollectReceiptTest
 
     private static final class Fixture
     {
-        final Engine engine;
-        final OfferLedger ledger = new OfferLedger();
+        final Am engine;
+        final Bj ledger = new Bj();
         final Map<Integer, Long> inventory = new HashMap<>();
         long now = T0;
 
         Fixture()
         {
-            engine = new Engine(deltas ->
+            engine = new Am(deltas ->
             {
-                List<Flow> flows = new ArrayList<>();
+                List<Ab> flows = new ArrayList<>();
                 for (Map.Entry<Integer, Long> delta : deltas.entrySet())
                 {
                     int id = delta.getKey();
                     long unit = id == COINS ? 1L : reference(id);
-                    flows.add(new Flow(id, id == COINS ? "Coins" : name(id), delta.getValue(),
+                    flows.add(new Ab(id, id == COINS ? "Coins" : name(id), delta.getValue(),
                         (int) unit, delta.getValue() * unit,
-                        id == COINS ? PriceSource.FACE_VALUE : PriceSource.GRAND_EXCHANGE));
+                        id == COINS ? Av.FACE_VALUE : Av.GRAND_EXCHANGE));
                 }
                 return flows;
             }, new TransactionClassifier(), new GpManagerConfig()
             {
                 @Override
-                public ReceiptRetentionPeriod receiptRetentionDays()
+                public Db receiptRetentionDays()
                 {
-                    return ReceiptRetentionPeriod.DAYS_365;
+                    return Db.DAYS_365;
                 }
 
                 @Override
@@ -199,15 +199,15 @@ public class PartialCollectReceiptTest
                     return 0;
                 }
             });
-            engine.startCustomSession("Trading", SessionMode.AUTO, now);
+            engine.ajl("Trading", Cx.AUTO, now);
             inventory.put(COINS, 1_000_000L);
-            engine.setBaseline(new ContainerSnapshot(inventory));
+            engine.setBaseline(new Cc(inventory));
         }
 
         void placeAndSell(int slot, int item, long qty, long gross, long at)
         {
             inventory.put(item, qty);
-            engine.setBaseline(new ContainerSnapshot(inventory));
+            engine.setBaseline(new Cc(inventory));
             offer(slot, SELLING, item, (int) qty, 0, (int) reference(item), 0, at);
             inventory.put(item, 0L);
             settleAt(at + 100L);
@@ -217,7 +217,7 @@ public class PartialCollectReceiptTest
 
         void collect(long amount, long at)
         {
-            engine.noteGeCollectionIntent(at);
+            engine.abg(at);
             inventory.put(COINS, inventory.getOrDefault(COINS, 0L) + amount);
             settleAt(at);
         }
@@ -230,7 +230,7 @@ public class PartialCollectReceiptTest
         /** An unrelated bank transfer still runs custody maintenance and closes the window. */
         void unrelatedTransfer(long at)
         {
-            engine.markContext(Context.TRANSFER, 10, "Bank transfer");
+            engine.markContext(Aj.TRANSFER, 10, "Bank transfer");
             inventory.put(COINS, inventory.getOrDefault(COINS, 0L) + 1_000L);
             settleAt(at);
         }
@@ -238,26 +238,26 @@ public class PartialCollectReceiptTest
         private void offer(int slot, GrandExchangeOfferState state, int item, int total, int traded,
             int price, int spent, long at)
         {
-            OfferLedger.Transition transition = ledger.observe(
-                new OfferLedger.Snapshot(slot, state, item, total, traded, price, spent))
+            Bj.Transition transition = ledger.observe(
+                new Bj.Snapshot(slot, state, item, total, traded, price, spent))
                 .orElse(null);
             if (transition != null)
             {
-                engine.noteGeOfferObservation(transition, name(item), at);
+                engine.abh(transition, name(item), at);
             }
         }
 
         private void settleAt(long at)
         {
-            engine.markInventoryDirty();
-            ContainerSnapshot snapshot = new ContainerSnapshot(inventory);
-            engine.processIfDirty(snapshot, at);
-            engine.processIfDirty(snapshot, at + 1L);
+            engine.yz();
+            Cc snapshot = new Cc(inventory);
+            engine.adj(snapshot, at);
+            engine.adj(snapshot, at + 1L);
         }
 
-        MarketSettlementProjection.Row row(int itemId)
+        Bi.Row row(int itemId)
         {
-            for (MarketSettlementProjection.Row row : engine.getMarketSettlements())
+            for (Bi.Row row : engine.ub())
             {
                 if (row.itemId == itemId)
                 {
@@ -268,18 +268,18 @@ public class PartialCollectReceiptTest
         }
 
         /** Resolve the market detail by its settlement transaction (the ambiguous row's anchor). */
-        LedgerData capture(String transactionId, String contributionId)
+        Ao capture(String transactionId, String contributionId)
         {
-            LedgerData data = LedgerData.capture(engine, now + 20_000L,
-                new LedgerData.Entry(LedgerData.Scope.CURRENT_GRIND, null, null,
-                    LedgerData.CostView.SUPPLIES, "", transactionId, contributionId, null, null));
+            Ao data = Ao.capture(engine, now + 20_000L,
+                new Ao.Entry(Ao.Scope.CURRENT_GRIND, null, null,
+                    Ao.Bs.SUPPLIES, "", transactionId, contributionId, null, null));
             assertNotNull(data.detail);
             return data;
         }
 
-        LedgerPage openExact(String transactionId, String contributionId) throws Exception
+        LedgerPage auy(String transactionId, String contributionId) throws Exception
         {
-            LedgerData data = capture(transactionId, contributionId);
+            Ao data = capture(transactionId, contributionId);
             assertNotNull(data.detail.exact);
             return onEdt(() ->
             {
@@ -315,21 +315,21 @@ public class PartialCollectReceiptTest
     private static final class LedgerNoop implements LedgerPage.Actions
     {
         @Override public void openScopeMenu(javax.swing.JComponent anchor) { }
-        @Override public void costViewChanged(LedgerData.CostView view) { }
+        @Override public void costViewChanged(Ao.Bs view) { }
         @Override public void searchChanged(String text) { }
-        @Override public LedgerData.CorrectionPreview preview(String id,
-            Correction correction)
+        @Override public Ao.Ef preview(String id,
+            Ah correction)
         {
             return null;
         }
-        @Override public LedgerPage.CorrectionOutcome correct(String id,
-            Correction correction, long previewRevision)
+        @Override public LedgerPage.Ea correct(String id,
+            Ah correction, long previewRevision)
         {
-            return LedgerPage.CorrectionOutcome.REFUSED;
+            return LedgerPage.Ea.REFUSED;
         }
         @Override public void split(String id) { }
         @Override public void undoCorrection() { }
-        @Override public void decideAll(ReviewDecision decision) { }
+        @Override public void decideAll(Cl decision) { }
         @Override public void refresh() { }
     }
 }

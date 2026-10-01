@@ -17,10 +17,10 @@ public class HudBestRateBasisTest
     @Test
     public void aGenuineWholeRunRecordClaimsIt()
     {
-        Engine engine = engine();
-        engine.startCustomSession("Vorkath", SessionMode.GENERAL, RUN_START);
+        Am engine = engine();
+        engine.ajl("Vorkath", Cx.GENERAL, RUN_START);
         book(engine.getActiveSession(), RUN_START + 60_000L, 3_000_000L);
-        LiveSnapshot snapshot = LiveSnapshot.capture(engine, NOW, null);
+        Ca snapshot = Ca.capture(engine, NOW, null);
 
         assertEquals("the claim uses the whole-run rate",
             "New best GP/h · " + Fmt.rate(3_000_000L) + "/h",
@@ -30,40 +30,40 @@ public class HudBestRateBasisTest
     @Test
     public void theSixtySecondFloorStillApplies()
     {
-        Engine under = engine();
-        under.startCustomSession("Vorkath", SessionMode.GENERAL, NOW - 59_000L);
+        Am under = engine();
+        under.ajl("Vorkath", Cx.GENERAL, NOW - 59_000L);
         book(under.getActiveSession(), NOW - 58_000L, 3_000_000L);
         assertEquals("under a minute is not a rate", "",
-            new HudMoments().update(LiveSnapshot.capture(under, NOW, null), null, 1L, "", NOW));
+            new HudMoments().update(Ca.capture(under, NOW, null), null, 1L, "", NOW));
 
-        Engine exact = engine();
-        exact.startCustomSession("Vorkath", SessionMode.GENERAL, NOW - 60_000L);
+        Am exact = engine();
+        exact.ajl("Vorkath", Cx.GENERAL, NOW - 60_000L);
         book(exact.getActiveSession(), NOW - 59_000L, 3_000_000L);
         assertTrue("exactly a minute qualifies",
-            new HudMoments().update(LiveSnapshot.capture(exact, NOW, null), null, 1L, "", NOW)
+            new HudMoments().update(Ca.capture(exact, NOW, null), null, 1L, "", NOW)
                 .startsWith("New best GP/h"));
     }
 
     @Test
     public void aZeroRateClaimsNothing()
     {
-        Engine engine = engine();
-        engine.startCustomSession("Vorkath", SessionMode.GENERAL, RUN_START);
-        assertEquals("", new HudMoments().update(LiveSnapshot.capture(engine, NOW, null), null, 1L, "", NOW));
+        Am engine = engine();
+        engine.ajl("Vorkath", Cx.GENERAL, RUN_START);
+        assertEquals("", new HudMoments().update(Ca.capture(engine, NOW, null), null, 1L, "", NOW));
     }
 
-    private static void book(Session session, long at, long value)
+    private static void book(Ad session, long at, long value)
     {
-        session.addTransaction(new Transaction(at, null, TransactionType.LOOT, Context.LOOT, "", "Vorkath", true,
-            Collections.singletonList(new Flow(536, "Dragon bones", 1L, (int) value, value)),
-            ClassificationConfidence.CONFIRMED, "fixture", null), 2_000);
+        session.kf(new Ac(at, null, Ai.LOOT, Aj.LOOT, "", "Vorkath", true,
+            Collections.singletonList(new Ab(536, "Dragon bones", 1L, (int) value, value)),
+            Bd.CONFIRMED, "fixture", null), 2_000);
     }
 
-    private static Engine engine()
+    private static Am engine()
     {
         GpManagerConfig config = new GpManagerConfig()
         {
         };
-        return new Engine(deltas -> Collections.emptyList(), new TransactionClassifier(), config);
+        return new Am(deltas -> Collections.emptyList(), new TransactionClassifier(), config);
     }
 }

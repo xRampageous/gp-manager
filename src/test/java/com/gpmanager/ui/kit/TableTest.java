@@ -38,7 +38,7 @@ public class TableTest
         table.setRows(rows(12));
         assertEquals(1, TableRows.page(table));
         assertEquals(2, table.body.getComponentCount());
-        table.resetPage();
+        table.avd();
         assertEquals(0, TableRows.page(table));
         assertEquals(10, table.body.getComponentCount());
     }
@@ -167,17 +167,17 @@ public class TableTest
     @Test
     public void toneFollowsCategory()
     {
-        assertEquals(Kit.Tone.GAIN, Kit.Tone.of(Contribution.Category.GAIN));
-        assertEquals(Kit.Tone.SUPPLY, Kit.Tone.of(Contribution.Category.SUPPLY));
-        assertEquals(Kit.Tone.LOSS, Kit.Tone.of(Contribution.Category.FEE));
-        assertEquals(Kit.Tone.MARKET, Kit.Tone.of(Contribution.Category.MARKET));
+        assertEquals(Kit.Tone.GAIN, Kit.Tone.of(Af.Category.GAIN));
+        assertEquals(Kit.Tone.SUPPLY, Kit.Tone.of(Af.Category.SUPPLY));
+        assertEquals(Kit.Tone.LOSS, Kit.Tone.of(Af.Category.FEE));
+        assertEquals(Kit.Tone.MARKET, Kit.Tone.of(Af.Category.MARKET));
         assertEquals(Kit.Tone.DIM, Kit.Tone.of(null));
     }
 
     @Test
     public void keyValueAddsFixedLines()
     {
-        KeyValue kv = new KeyValue("WHY").put("How", "Charges used", Kit.Tone.PLAIN)
+        Dd kv = new Dd("WHY").put("How", "Charges used", Kit.Tone.PLAIN)
             .put("Net effect", "−24.2k", Kit.Tone.SUPPLY, "−24,190 gp");
         assertEquals(2, kv.lines());
         assertEquals(0, kv.clear().lines());

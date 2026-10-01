@@ -21,7 +21,7 @@ import static org.junit.Assert.assertTrue;
  * Charter section 17/13 on a <em>running</em> engine rather than a migration output: after GE
  * offer observations, charge Check reads, a death-reclaim intent, key-chest interaction, location
  * samples and repeated wealth captures, the state written through the real repository carries
- * only the canonical facts plus the minimal PendingClaim, and reloads to identical money.
+ * only the canonical facts plus the minimal By, and reloads to identical money.
  */
 public class RuntimeDurableStateAuditTest
 {

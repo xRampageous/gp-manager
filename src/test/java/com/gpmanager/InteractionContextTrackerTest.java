@@ -52,7 +52,7 @@ public class InteractionContextTrackerTest
 
     private static final class Harness
     {
-        private final Engine engine;
+        private final Am engine;
         private final Client client;
         private final Player local;
         private final InteractionContextTracker tracker;
@@ -68,13 +68,13 @@ public class InteractionContextTrackerTest
                     return 0;
                 }
             };
-            engine = new Engine(deltas ->
+            engine = new Am(deltas ->
             {
-                List<Flow> flows = new ArrayList<>();
-                deltas.forEach((id, quantity) -> flows.add(new Flow(id, "Item " + id, quantity, 50, quantity * 50)));
+                List<Ab> flows = new ArrayList<>();
+                deltas.forEach((id, quantity) -> flows.add(new Ab(id, "Item " + id, quantity, 50, quantity * 50)));
                 return flows;
             }, new TransactionClassifier(), config);
-            engine.ensureSession(T0);
+            engine.rm(T0);
             local = player("Local");
             client = (Client) Proxy.newProxyInstance(Client.class.getClassLoader(), new Class<?>[] {Client.class},
                 (proxy, method, args) ->
@@ -91,7 +91,7 @@ public class InteractionContextTrackerTest
                     }
                 });
             tracker = new InteractionContextTracker(client, engine, config);
-            tracker.bindPresentation(() -> true, (name, combat) -> published = name == null ? "" : name);
+            tracker.mf(() -> true, (name, combat) -> published = name == null ? "" : name);
         }
 
         String last()

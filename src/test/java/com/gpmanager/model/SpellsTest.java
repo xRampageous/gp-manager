@@ -13,9 +13,9 @@ import static org.junit.Assert.assertTrue;
 /** Owner report 2026-09-28: autocast Ice Barrage read "Cast · 3 rune types" with no icon. */
 public class SpellsTest
 {
-    private static Flow rune(String name, long spent)
+    private static Ab rune(String name, long spent)
     {
-        return new Flow(1, name, -spent, 100, -spent * 100L);
+        return new Ab(1, name, -spent, 100, -spent * 100L);
     }
 
     @Test
@@ -44,7 +44,7 @@ public class SpellsTest
         assertNull("a rune the spell never uses", Spells.named(Arrays.asList(rune("Death rune", 4),
             rune("Blood rune", 2), rune("Water rune", 6), rune("Nature rune", 1))));
         assertNull("not only runes", Spells.named(Arrays.asList(rune("Death rune", 4), rune("Blood rune", 2),
-            new Flow(2, "Steel dart", -1L, 4, -4L))));
+            new Ab(2, "Steel dart", -1L, 4, -4L))));
     }
 
     @Test
@@ -65,7 +65,7 @@ public class SpellsTest
             }
             assertTrue("every spell has a rune a staff cannot cover: " + spell[0], nonElemental);
             // Its own full cost always names itself.
-            List<Flow> exact = new java.util.ArrayList<>();
+            List<Ab> exact = new java.util.ArrayList<>();
             for (String part : spell[2].split(" "))
             {
                 String[] kv = part.split(":");

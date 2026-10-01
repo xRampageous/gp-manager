@@ -43,7 +43,7 @@ public class PersistenceLifecycleC0aTest
         }
 
         @Override
-        public boolean save(WriteIntent intent)
+        public boolean save(Cs intent)
         {
             if (intent.scopeGeneration == failingGeneration)
             {
@@ -84,7 +84,7 @@ public class PersistenceLifecycleC0aTest
         SessionRepository repository = new SessionRepository(new Gson(), FilepathTestSupport.root(directory))
         {
             @Override
-            public boolean save(WriteIntent intent)
+            public boolean save(Cs intent)
             {
                 entered.countDown();
                 try
@@ -107,7 +107,7 @@ public class PersistenceLifecycleC0aTest
         CountDownLatch shutdownReturned = new CountDownLatch(1);
         try
         {
-            writer.submit(new WriteIntent(null,
+            writer.submit(new Cs(null,
                 repository.scopeGeneration,
                 0L,
                 state("pending", 1L)));
@@ -161,9 +161,9 @@ public class PersistenceLifecycleC0aTest
             }
         };
         OrderedPersistenceWriter writer = new OrderedPersistenceWriter(repository);
-        Engine engine = new Engine(
+        Am engine = new Am(
             deltas -> Collections.emptyList(), new TransactionClassifier(), new GpManagerConfig() {});
-        PersistenceCoordinator coordinator = new PersistenceCoordinator(
+        Ei coordinator = new Ei(
             null, null, repository, writer, engine);
         ExecutorService caller = Executors.newSingleThreadExecutor();
         CountDownLatch requestReturned = new CountDownLatch(1);
@@ -172,7 +172,7 @@ public class PersistenceLifecycleC0aTest
             coordinator.start();
             caller.execute(() ->
             {
-                coordinator.trySwitchIdentityAsync(ALICE, true);
+                coordinator.ajz(ALICE, true);
                 requestReturned.countDown();
             });
             assertTrue(requestReturned.await(1, TimeUnit.SECONDS));
@@ -180,7 +180,7 @@ public class PersistenceLifecycleC0aTest
 
             release.countDown();
             assertTrue(String.valueOf(PersistenceProbe.identityBlockReason(coordinator)),
-                coordinator.trySwitchIdentity(ALICE, true));
+                coordinator.ajy(ALICE, true));
             assertEquals(ALICE, coordinator.getActiveIdentity());
         }
         finally
@@ -223,25 +223,25 @@ public class PersistenceLifecycleC0aTest
             }
         };
         OrderedPersistenceWriter writer = new OrderedPersistenceWriter(repository);
-        Engine engine = new Engine(
+        Am engine = new Am(
             deltas -> Collections.emptyList(), new TransactionClassifier(), new GpManagerConfig() {});
-        PersistenceCoordinator coordinator = new PersistenceCoordinator(
+        Ei coordinator = new Ei(
             null, null, repository, writer, engine);
         TrackingIdentity bob = new TrackingIdentity("rsprofile.bob", TrackingIdentity.ACCOUNT_HASH_INVALID);
         ExecutorService caller = Executors.newSingleThreadExecutor();
         try
         {
             coordinator.start();
-            assertTrue(coordinator.trySwitchIdentity(ALICE, true));
+            assertTrue(coordinator.ajy(ALICE, true));
 
             gateLoad.set(true);
-            coordinator.trySwitchIdentityAsync(bob, true);
+            coordinator.ajz(bob, true);
             assertTrue(entered.await(5, TimeUnit.SECONDS));
 
             CountDownLatch requestReturned = new CountDownLatch(1);
             caller.execute(() ->
             {
-                coordinator.scheduleSave();
+                coordinator.ahe();
                 requestReturned.countDown();
             });
             assertTrue("a gameplay save request must not wait behind lifecycle disk work",
@@ -249,7 +249,7 @@ public class PersistenceLifecycleC0aTest
 
             release.countDown();
             assertTrue(String.valueOf(PersistenceProbe.identityBlockReason(coordinator)),
-                coordinator.trySwitchIdentity(bob, true));
+                coordinator.ajy(bob, true));
         }
         finally
         {
@@ -300,25 +300,25 @@ public class PersistenceLifecycleC0aTest
                 writerShutdown.countDown();
             }
         };
-        Engine engine = new Engine(
+        Am engine = new Am(
             deltas -> Collections.emptyList(), new TransactionClassifier(), new GpManagerConfig() {});
-        PersistenceCoordinator coordinator = new PersistenceCoordinator(
+        Ei coordinator = new Ei(
             null, null, repository, writer, engine);
         TrackingIdentity bob = new TrackingIdentity("rsprofile.bob", TrackingIdentity.ACCOUNT_HASH_INVALID);
         ExecutorService caller = Executors.newSingleThreadExecutor();
         CountDownLatch shutdownReturned = new CountDownLatch(1);
         try
         {
-            assertTrue(coordinator.trySwitchIdentity(ALICE, true));
-            engine.ensureSession(1_000L);
+            assertTrue(coordinator.ajy(ALICE, true));
+            engine.rm(1_000L);
             engine.getGeneralSession().rename("Alice");
-            assertTrue(coordinator.saveNow());
+            assertTrue(coordinator.aya());
 
             gateLoad.set(true);
-            coordinator.trySwitchIdentityAsync(bob, true);
+            coordinator.ajz(bob, true);
             assertTrue(entered.await(5, TimeUnit.SECONDS));
 
-            engine.pauseForLifecycle(2_000L);
+            engine.acu(2_000L);
             caller.execute(() ->
             {
                 coordinator.shutdown(true);
@@ -350,27 +350,27 @@ public class PersistenceLifecycleC0aTest
         Path directory = temporary.newFolder().toPath();
         SessionRepository repository = new SessionRepository(new Gson(), FilepathTestSupport.root(directory), true);
         OrderedPersistenceWriter writer = new OrderedPersistenceWriter(repository);
-        Engine engine = new Engine(
+        Am engine = new Am(
             deltas -> Collections.emptyList(), new TransactionClassifier(), new GpManagerConfig() {});
-        PersistenceCoordinator coordinator = new PersistenceCoordinator(
+        Ei coordinator = new Ei(
             null, null, repository, writer, engine);
         TrackingIdentity bob = new TrackingIdentity("rsprofile.bob", TrackingIdentity.ACCOUNT_HASH_INVALID);
         try
         {
-            assertTrue(coordinator.trySwitchIdentity(ALICE, true));
-            engine.ensureSession(1_000L);
+            assertTrue(coordinator.ajy(ALICE, true));
+            engine.rm(1_000L);
             engine.getGeneralSession().rename("Alice");
-            assertTrue(coordinator.saveNow());
+            assertTrue(coordinator.aya());
 
-            assertTrue(coordinator.trySwitchIdentity(bob, true));
-            engine.ensureSession(2_000L);
+            assertTrue(coordinator.ajy(bob, true));
+            engine.rm(2_000L);
             engine.getGeneralSession().rename("Bob");
-            assertTrue(coordinator.saveNow());
+            assertTrue(coordinator.aya());
 
-            assertTrue(coordinator.trySwitchIdentity(ALICE, true));
+            assertTrue(coordinator.ajy(ALICE, true));
             assertEquals(ALICE, coordinator.getActiveIdentity());
             assertEquals("Alice", engine.getGeneralSession().getName());
-            assertTrue(coordinator.trySwitchIdentity(bob, true));
+            assertTrue(coordinator.ajy(bob, true));
             assertEquals("Bob", engine.getGeneralSession().getName());
         }
         finally
@@ -387,29 +387,29 @@ public class PersistenceLifecycleC0aTest
         CountDownLatch release = new CountDownLatch(1);
         FailingRepository repository = new FailingRepository(directory, entered, release);
         OrderedPersistenceWriter writer = new OrderedPersistenceWriter(repository);
-        Engine engine = new Engine(
+        Am engine = new Am(
             deltas -> Collections.emptyList(), new TransactionClassifier(), new GpManagerConfig() {});
-        PersistenceCoordinator coordinator = new PersistenceCoordinator(
+        Ei coordinator = new Ei(
             null, null, repository, writer, engine);
         TrackingIdentity bob = new TrackingIdentity("rsprofile.bob", TrackingIdentity.ACCOUNT_HASH_INVALID);
         try
         {
-            assertTrue(coordinator.trySwitchIdentity(ALICE, true));
-            engine.ensureSession(1_000L);
+            assertTrue(coordinator.ajy(ALICE, true));
+            engine.rm(1_000L);
             engine.getGeneralSession().rename("Alice");
-            assertTrue(coordinator.saveNow());
+            assertTrue(coordinator.aya());
             long aliceGeneration = repository.scopeGeneration;
             engine.getGeneralSession().notes = "failing old save";
             repository.failNextSaveForGeneration(aliceGeneration);
-            coordinator.scheduleSave();
+            coordinator.ahe();
             assertTrue(entered.await(5, TimeUnit.SECONDS));
 
-            coordinator.onAccountHashInvalidated(false);
-            assertTrue(coordinator.trySwitchIdentity(bob, true));
-            engine.ensureSession(2_000L);
+            coordinator.acd(false);
+            assertTrue(coordinator.ajy(bob, true));
+            engine.rm(2_000L);
             engine.getGeneralSession().rename("Bob");
-            SaveStatus bobStatus = writer.getStatus();
-            Path bobPrimary = FilepathTestSupport.path(repository.getDataDirectory().joinSegment("sessions.json"));
+            Ci bobStatus = writer.getStatus();
+            Path bobPrimary = FilepathTestSupport.path(repository.ty().joinSegment("sessions.json"));
 
             release.countDown();
             assertTrue(writer.flush(Duration.ofSeconds(10)));
@@ -429,7 +429,7 @@ public class PersistenceLifecycleC0aTest
     private static SavedState state(String name, long revision)
     {
         SavedState state = new SavedState(
-            new Session(name, 1_000L), null, false, Collections.emptyList());
+            new Ad(name, 1_000L), null, false, Collections.emptyList());
         state.setRevision(revision);
         return state;
     }

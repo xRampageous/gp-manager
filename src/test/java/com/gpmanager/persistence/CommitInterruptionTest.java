@@ -34,7 +34,7 @@ public class CommitInterruptionTest
 
     private static SavedState named(String name, long revision)
     {
-        SavedState state = new SavedState(new Session(name, 1_000L), null, false, Collections.emptyList());
+        SavedState state = new SavedState(new Ad(name, 1_000L), null, false, Collections.emptyList());
         state.setRevision(revision);
         return state;
     }
@@ -42,7 +42,7 @@ public class CommitInterruptionTest
     private static SessionRepository bound(Path root)
     {
         SessionRepository repository = new SessionRepository(new Gson(), FilepathTestSupport.root(root), true);
-        repository.bindIdentity(IDENTITY);
+        repository.mc(IDENTITY);
         return repository;
     }
 
@@ -52,22 +52,22 @@ public class CommitInterruptionTest
         SessionRepository repository = new SessionRepository(new Gson(), FilepathTestSupport.root(root), true)
         {
             @Override
-            void replaceFile(Filepath source, Filepath target) throws IOException
+            void afl(Filepath source, Filepath target) throws IOException
             {
                 if (target.getFileName().toString().equals(failingTarget))
                 {
                     throw new IOException("Simulated crash replacing " + failingTarget);
                 }
-                super.replaceFile(source, target);
+                super.afl(source, target);
             }
         };
-        repository.bindIdentity(IDENTITY);
+        repository.mc(IDENTITY);
         return repository;
     }
 
     private static String primary(SessionRepository repository) throws IOException
     {
-        return Files.readString(FilepathTestSupport.path(repository.getDataDirectory().joinSegment("sessions.json")), StandardCharsets.UTF_8);
+        return Files.readString(FilepathTestSupport.path(repository.ty().joinSegment("sessions.json")), StandardCharsets.UTF_8);
     }
 
     private static String activeName(SessionRepository repository)
@@ -87,7 +87,7 @@ public class CommitInterruptionTest
 
             SessionRepository failing = failingAt(root, crashPoint);
             failing.load();
-            assertFalse(crashPoint, failing.save(new WriteIntent(IDENTITY, failing.scopeGeneration, 1L, named("New", 2L))));
+            assertFalse(crashPoint, failing.save(new Cs(IDENTITY, failing.scopeGeneration, 1L, named("New", 2L))));
 
             // Old valid state, byte-identical primary; the next load sees exactly that.
             SessionRepository reload = bound(root);
@@ -98,10 +98,10 @@ public class CommitInterruptionTest
 
             // Recovery finishes idempotently: the next save advances from the old lineage and
             // leaves no staged leftovers behind.
-            assertTrue(reload.save(new WriteIntent(IDENTITY, reload.scopeGeneration, 1L, named("After", 2L))));
+            assertTrue(reload.save(new Cs(IDENTITY, reload.scopeGeneration, 1L, named("After", 2L))));
             assertEquals("After", activeName(bound(root)));
-            assertFalse(reload.getDataDirectory().joinSegment("sessions.commit.stage").exists());
-            assertFalse(reload.getDataDirectory().joinSegment("sessions.next.json").exists());
+            assertFalse(reload.ty().joinSegment("sessions.commit.stage").exists());
+            assertFalse(reload.ty().joinSegment("sessions.next.json").exists());
         }
     }
 
@@ -112,13 +112,13 @@ public class CommitInterruptionTest
         SessionRepository good = bound(root);
         assertTrue(PersistenceProbe.save(good, named("Old", 1L)));
         assertTrue(PersistenceProbe.save(good, named("New", 2L)));
-        Path dir = FilepathTestSupport.path(good.getDataDirectory());
+        Path dir = FilepathTestSupport.path(good.ty());
         String committed = primary(good);
 
         // Re-create the crash window: primary already holds the new state, next is still there,
         // the stage says PRIMARY_COMMITTED and the backup is one save behind.
         Files.writeString(dir.resolve("sessions.next.json"), committed, StandardCharsets.UTF_8);
-        Files.writeString(dir.resolve("sessions.commit.stage"), CommitStage.PRIMARY_COMMITTED.name(), StandardCharsets.UTF_8);
+        Files.writeString(dir.resolve("sessions.commit.stage"), Cv.PRIMARY_COMMITTED.name(), StandardCharsets.UTF_8);
         Files.writeString(dir.resolve("sessions.backup.json"), new Gson().toJson(named("Old", 1L)), StandardCharsets.UTF_8);
 
         SessionRepository reload = bound(root);
@@ -136,7 +136,7 @@ public class CommitInterruptionTest
 
         // The primary itself lost: the validated next payload is the committed state.
         Files.writeString(dir.resolve("sessions.next.json"), committed, StandardCharsets.UTF_8);
-        Files.writeString(dir.resolve("sessions.commit.stage"), CommitStage.PRIMARY_COMMITTED.name(), StandardCharsets.UTF_8);
+        Files.writeString(dir.resolve("sessions.commit.stage"), Cv.PRIMARY_COMMITTED.name(), StandardCharsets.UTF_8);
         Files.writeString(dir.resolve("sessions.backup.json"), new Gson().toJson(named("Old", 1L)), StandardCharsets.UTF_8);
         Files.delete(dir.resolve("sessions.json"));
         SessionRepository lostPrimary = bound(root);
@@ -152,17 +152,17 @@ public class CommitInterruptionTest
         SessionRepository noAtomic = new SessionRepository(new Gson(), FilepathTestSupport.root(root), true)
         {
             @Override
-            void atomicMove(Filepath source, Filepath target) throws IOException
+            void ma(Filepath source, Filepath target) throws IOException
             {
                 throw new java.nio.file.AtomicMoveNotSupportedException(source.toString(), target.toString(), "simulated volume");
             }
         };
-        noAtomic.bindIdentity(IDENTITY);
+        noAtomic.mc(IDENTITY);
         assertTrue(PersistenceProbe.save(noAtomic, named("First", 1L)));
         assertTrue(PersistenceProbe.save(noAtomic, named("Second", 2L)));
-        assertTrue(noAtomic.replaceStateDetailed(new WriteIntent(IDENTITY, noAtomic.scopeGeneration, 2L, named("Reset", 3L))).isCommitted());
+        assertTrue(noAtomic.replaceStateDetailed(new Cs(IDENTITY, noAtomic.scopeGeneration, 2L, named("Reset", 3L))).isCommitted());
         assertEquals("Reset", activeName(bound(root)));
-        try (Stream<Path> files = Files.list(FilepathTestSupport.path(noAtomic.getDataDirectory())))
+        try (Stream<Path> files = Files.list(FilepathTestSupport.path(noAtomic.ty())))
         {
             assertTrue(files.map(path -> path.getFileName().toString()).noneMatch(name -> name.endsWith(".tmp")));
         }
@@ -176,7 +176,7 @@ public class CommitInterruptionTest
         assertTrue(PersistenceProbe.save(repository, named("One", 1L)));
         assertTrue(PersistenceProbe.save(repository, named("Two", 2L)));
         assertTrue(PersistenceProbe.save(repository, named("Three", 3L)));
-        Path dir = FilepathTestSupport.path(repository.getDataDirectory());
+        Path dir = FilepathTestSupport.path(repository.ty());
         assertEquals("one crash copy, no rotation (owner 2026-09-28)", 0, PersistenceProbe.rotatedBackupCount(repository));
         Files.writeString(dir.resolve("sessions.json"), "{not json", StandardCharsets.UTF_8);
 
@@ -190,7 +190,7 @@ public class CommitInterruptionTest
                 files.map(path -> path.getFileName().toString()).anyMatch(name -> name.startsWith("sessions.corrupt-")));
         }
         // The next save continues from the recovered lineage.
-        assertTrue(reload.save(new WriteIntent(IDENTITY, reload.scopeGeneration, 2L, named("Four", 3L))));
+        assertTrue(reload.save(new Cs(IDENTITY, reload.scopeGeneration, 2L, named("Four", 3L))));
         assertEquals("Four", activeName(bound(root)));
         assertEquals("", bound(root).lastRecoveredFrom);
     }

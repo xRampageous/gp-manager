@@ -18,11 +18,11 @@ public class PersistenceConflictFenceTest
     private static final TrackingIdentity ALICE = new TrackingIdentity("rsprofile.alice", -1L);
     @Rule public TemporaryFolder temporary = new TemporaryFolder();
 
-    private PersistenceCoordinator coordinator(SessionRepository repository, OrderedPersistenceWriter writer)
+    private Ei coordinator(SessionRepository repository, OrderedPersistenceWriter writer)
     {
-        Engine engine = new Engine(d -> Collections.emptyList(),
+        Am engine = new Am(d -> Collections.emptyList(),
             new TransactionClassifier(), new GpManagerConfig() {});
-        return new PersistenceCoordinator(null, null, repository, writer, engine)
+        return new Ei(null, null, repository, writer, engine)
         {
             @Override TrackingIdentity resolveCurrentIdentity() { return ALICE; }
         };
@@ -33,31 +33,31 @@ public class PersistenceConflictFenceTest
         return new SessionRepository(new Gson(), FilepathTestSupport.root(root), true);
     }
 
-    private void seed(PersistenceCoordinator coordinator)
+    private void seed(Ei coordinator)
     {
         JsonCodec.bind(new Gson());
-        assertTrue(coordinator.trySwitchIdentity(ALICE, true));
-        coordinator.engine.ensureSession(1_000L);
+        assertTrue(coordinator.ajy(ALICE, true));
+        coordinator.engine.rm(1_000L);
         coordinator.engine.getActiveSession().rename("Seed");
-        assertTrue(coordinator.saveNow());
+        assertTrue(coordinator.aya());
         assertTrue(coordinator.isTrackingReady());
     }
 
     private void externalWrite(Path root)
     {
         SessionRepository external = repository(root);
-        external.bindIdentity(ALICE);
+        external.mc(ALICE);
         SavedState state = external.load();
         state.getActiveSession().rename("External");
         long base = state.revision;
         state.setRevision(base + 1L);
-        assertTrue(external.save(new WriteIntent(ALICE, external.scopeGeneration, base, state)));
+        assertTrue(external.save(new Cs(ALICE, external.scopeGeneration, base, state)));
     }
 
     private SavedState disk(Path root)
     {
         SessionRepository reader = repository(root);
-        reader.bindIdentity(ALICE);
+        reader.mc(ALICE);
         return reader.load();
     }
 
@@ -67,28 +67,28 @@ public class PersistenceConflictFenceTest
         Path root = temporary.newFolder().toPath();
         SessionRepository repository = repository(root);
         OrderedPersistenceWriter writer = new OrderedPersistenceWriter(repository);
-        PersistenceCoordinator coordinator = coordinator(repository, writer);
+        Ei coordinator = coordinator(repository, writer);
         try
         {
             seed(coordinator);
             externalWrite(root);
             coordinator.engine.getActiveSession().rename("Local stale");
-            assertFalse(coordinator.saveNow());
-            assertEquals(SaveStatus.State.CONFLICT, writer.getStatus().state);
-            coordinator.scheduleSave();
+            assertFalse(coordinator.aya());
+            assertEquals(Ci.State.CONFLICT, writer.getStatus().state);
+            coordinator.ahe();
             assertTrue(writer.flush(Duration.ofSeconds(5)));
             assertEquals("External", disk(root).getActiveSession().getName());
             assertFalse("new gameplay must wait for disk truth to be reloaded", coordinator.isTrackingReady());
-            assertFalse(coordinator.saveNow());
-            assertNotNull(coordinator.scopeRefusal());
+            assertFalse(coordinator.aya());
+            assertNotNull(coordinator.ahx());
 
             SavedState stale = coordinator.snapshot();
             stale.setRevision(50L);
-            WriteIntent retry = new WriteIntent(ALICE, repository.scopeGeneration,
+            Cs retry = new Cs(ALICE, repository.scopeGeneration,
                 repository.lastKnownDiskRevision, stale);
             writer.submit(retry);
             assertTrue(writer.flush(Duration.ofSeconds(5)));
-            assertFalse("reset cannot bypass the same conflict fence", writer.replaceNow(retry).isCommitted());
+            assertFalse("reset cannot bypass the same conflict fence", writer.aic(retry).isCommitted());
             assertEquals("External", disk(root).getActiveSession().getName());
             assertEquals(2L, disk(root).revision);
         }
@@ -101,15 +101,15 @@ public class PersistenceConflictFenceTest
         Path root = temporary.newFolder().toPath();
         SessionRepository repository = repository(root);
         OrderedPersistenceWriter writer = new OrderedPersistenceWriter(repository);
-        PersistenceCoordinator coordinator = coordinator(repository, writer);
+        Ei coordinator = coordinator(repository, writer);
         try
         {
             seed(coordinator);
             SavedState reset = coordinator.snapshot();
             long base = repository.lastKnownDiskRevision;
             externalWrite(root);
-            assertFalse(writer.replaceNow(new WriteIntent(ALICE, repository.scopeGeneration, base, reset)).isCommitted());
-            assertEquals(SaveStatus.State.CONFLICT, writer.getStatus().state);
+            assertFalse(writer.aic(new Cs(ALICE, repository.scopeGeneration, base, reset)).isCommitted());
+            assertEquals(Ci.State.CONFLICT, writer.getStatus().state);
             assertTrue(writer.getStatus().detail.contains("back up current data, then restart RuneLite"));
             assertFalse(coordinator.isTrackingReady());
             assertEquals("External", disk(root).getActiveSession().getName());
@@ -126,7 +126,7 @@ public class PersistenceConflictFenceTest
         CountDownLatch release = new CountDownLatch(1);
         SessionRepository repository = new SessionRepository(new Gson(), FilepathTestSupport.root(root), true)
         {
-            @Override boolean save(WriteIntent intent)
+            @Override boolean save(Cs intent)
             {
                 boolean ok = super.save(intent);
                 if (!ok && lastKnownDiskRevision != intent.expectedBaseRevision)
@@ -139,20 +139,20 @@ public class PersistenceConflictFenceTest
             }
         };
         OrderedPersistenceWriter writer = new OrderedPersistenceWriter(repository);
-        PersistenceCoordinator coordinator = coordinator(repository, writer);
+        Ei coordinator = coordinator(repository, writer);
         try
         {
             seed(coordinator);
             externalWrite(root);
             coordinator.engine.getActiveSession().rename("Local stale");
-            coordinator.scheduleSave();
+            coordinator.ahe();
             assertTrue(entered.await(5, TimeUnit.SECONDS));
             // Disk revision is observed, but the writer has not published CONFLICT yet.
-            coordinator.scheduleSave();
+            coordinator.ahe();
             release.countDown();
             assertTrue(writer.flush(Duration.ofSeconds(5)));
             assertEquals("External", disk(root).getActiveSession().getName());
-            assertEquals(SaveStatus.State.CONFLICT, writer.getStatus().state);
+            assertEquals(Ci.State.CONFLICT, writer.getStatus().state);
         }
         finally { release.countDown(); writer.shutdown(Duration.ofSeconds(5)); }
     }
@@ -163,26 +163,26 @@ public class PersistenceConflictFenceTest
         Path root = temporary.newFolder().toPath();
         SessionRepository repository = repository(root);
         OrderedPersistenceWriter writer = new OrderedPersistenceWriter(repository);
-        PersistenceCoordinator stale = coordinator(repository, writer);
+        Ei stale = coordinator(repository, writer);
         try
         {
             seed(stale);
             externalWrite(root);
-            assertFalse(stale.saveNow());
+            assertFalse(stale.aya());
             assertFalse(stale.isTrackingReady());
         }
         finally { writer.shutdown(Duration.ofSeconds(5)); }
 
         SessionRepository reopened = repository(root);
         OrderedPersistenceWriter newWriter = new OrderedPersistenceWriter(reopened);
-        PersistenceCoordinator fresh = coordinator(reopened, newWriter);
+        Ei fresh = coordinator(reopened, newWriter);
         try
         {
-            assertTrue(fresh.trySwitchIdentity(ALICE, true));
+            assertTrue(fresh.ajy(ALICE, true));
             assertEquals("External", fresh.engine.getActiveSession().getName());
             assertTrue(fresh.isTrackingReady());
             fresh.engine.getActiveSession().rename("Reloaded local");
-            assertTrue(fresh.saveNow());
+            assertTrue(fresh.aya());
             assertEquals("Reloaded local", disk(root).getActiveSession().getName());
         }
         finally { newWriter.shutdown(Duration.ofSeconds(5)); }
