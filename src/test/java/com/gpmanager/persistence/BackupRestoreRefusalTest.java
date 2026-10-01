@@ -3,7 +3,7 @@ package com.gpmanager;
 import com.google.gson.Gson;
 import com.google.gson.JsonObject;
 import com.google.gson.JsonParser;
-import com.gpmanager.SessionRepository.Bm;
+import com.gpmanager.SessionRepository.ReplaceOutcome;
 import java.nio.file.Path;
 import java.nio.file.StandardOpenOption;
 import java.time.Duration;
@@ -32,11 +32,11 @@ public class BackupRestoreRefusalTest
         try
         {
             Fixture.seed(fixture.coordinator);
-            Filepath backup = fixture.coordinator.akt(T0);
+            Filepath backup = fixture.coordinator.writePreOperationBackup(T0);
             backup.write("not json", StandardOpenOption.CREATE,
                 StandardOpenOption.TRUNCATE_EXISTING, StandardOpenOption.WRITE);
 
-            Ei.Ds outcome = fixture.coordinator.agm(backup, T0 + 1_000L);
+            PersistenceCoordinator.ResetOutcome outcome = fixture.coordinator.restoreBackup(backup, T0 + 1_000L);
 
             assertFalse(outcome.isApplied());
             assertTrue("names the read failure: " + outcome.getDetail(),
@@ -56,13 +56,13 @@ public class BackupRestoreRefusalTest
         try
         {
             Fixture.seed(fixture.coordinator);
-            Filepath backup = fixture.coordinator.akt(T0);
-            JsonObject json = new JsonParser().parse(SessionRepository.awy(backup)).getAsJsonObject();
+            Filepath backup = fixture.coordinator.writePreOperationBackup(T0);
+            JsonObject json = new JsonParser().parse(SessionRepository.readText(backup)).getAsJsonObject();
             json.addProperty("schemaVersion", 999);
             backup.write(json.toString(), StandardOpenOption.CREATE,
                 StandardOpenOption.TRUNCATE_EXISTING, StandardOpenOption.WRITE);
 
-            Ei.Ds outcome = fixture.coordinator.agm(backup, T0 + 1_000L);
+            PersistenceCoordinator.ResetOutcome outcome = fixture.coordinator.restoreBackup(backup, T0 + 1_000L);
 
             assertFalse(outcome.isApplied());
             assertTrue("names the version: " + outcome.getDetail(),
@@ -82,11 +82,11 @@ public class BackupRestoreRefusalTest
         try
         {
             Fixture.seed(fixture.coordinator);
-            Filepath backup = fixture.coordinator.akt(T0);
+            Filepath backup = fixture.coordinator.writePreOperationBackup(T0);
             fixture.coordinator.engine.getActiveSession().rename("Changed");
-            assertTrue(fixture.coordinator.aya());
+            assertTrue(fixture.coordinator.saveNow());
 
-            Ei.Ds restore = fixture.coordinator.agm(backup, T0 + 10_000L);
+            PersistenceCoordinator.ResetOutcome restore = fixture.coordinator.restoreBackup(backup, T0 + 10_000L);
 
             assertFalse(restore.isApplied());
             assertTrue("names the restore: " + restore.getDetail(),
@@ -99,7 +99,7 @@ public class BackupRestoreRefusalTest
             assertEquals("the old profile is rolled back", "Changed",
                 fixture.coordinator.engine.getActiveSession().getName());
 
-            Ei.Ds reset = fixture.coordinator.sj(T0 + 20_000L);
+            PersistenceCoordinator.ResetOutcome reset = fixture.coordinator.factoryResetCurrentAccount(T0 + 20_000L);
 
             assertFalse(reset.isApplied());
             assertTrue("names the reset: " + reset.getDetail(),
@@ -117,34 +117,34 @@ public class BackupRestoreRefusalTest
     {
         final SessionRepository repository;
         final OrderedPersistenceWriter writer;
-        final Am engine;
-        final Ei coordinator;
+        final Engine engine;
+        final PersistenceCoordinator coordinator;
 
         Fixture(Path root, boolean refusedCommit) throws Exception
         {
             repository = new SessionRepository(new Gson(), FilepathTestSupport.root(root), true);
             writer = new OrderedPersistenceWriter(repository);
-            engine = new Am(d -> Collections.emptyList(), new TransactionClassifier(),
+            engine = new Engine(d -> Collections.emptyList(), new TransactionClassifier(),
                 new GpManagerConfig() {});
             JsonCodec.bind(new Gson());
             coordinator = refusedCommit
-                ? new Ei(null, null, repository, writer, engine)
+                ? new PersistenceCoordinator(null, null, repository, writer, engine)
                 {
                     @Override TrackingIdentity resolveCurrentIdentity() { return ALICE; }
-                    @Override synchronized Bm agc() { return Bm.failedUnchanged("write failed"); }
+                    @Override synchronized ReplaceOutcome replaceStateNow() { return ReplaceOutcome.failedUnchanged("write failed"); }
                 }
-                : new Ei(null, null, repository, writer, engine)
+                : new PersistenceCoordinator(null, null, repository, writer, engine)
                 {
                     @Override TrackingIdentity resolveCurrentIdentity() { return ALICE; }
                 };
         }
 
-        static void seed(Ei coordinator)
+        static void seed(PersistenceCoordinator coordinator)
         {
-            assertTrue(coordinator.ajy(ALICE, true));
-            coordinator.engine.rm(1_000L);
+            assertTrue(coordinator.trySwitchIdentity(ALICE, true));
+            coordinator.engine.ensureSession(1_000L);
             coordinator.engine.getActiveSession().rename("Before");
-            assertTrue(coordinator.aya());
+            assertTrue(coordinator.saveNow());
         }
 
         void close()

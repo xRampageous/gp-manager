@@ -20,15 +20,15 @@ public class ActivityDetectorTest
                 return 0;
             }
         };
-        Am engine = new Am(deltas -> Collections.emptyList(),
+        Engine engine = new Engine(deltas -> Collections.emptyList(),
             new TransactionClassifier(), config);
-        engine.rm(1_000L);
+        engine.ensureSession(1_000L);
         ActivityDetector detector = new ActivityDetector(config, engine);
 
-        detector.abm("Woodcutting", true);
+        detector.observeActivity("Woodcutting", true);
         assertEquals("Woodcutting", engine.getMetrics(1_100L).activityHint);
 
-        detector.abm("NPC loot", true);
+        detector.observeActivity("NPC loot", true);
         assertEquals("a fallback is not an activity", "Woodcutting", engine.getMetrics(1_200L).activityHint);
     }
 
@@ -41,23 +41,23 @@ public class ActivityDetectorTest
     public void aSmeltingRunSurvivesFailedSmeltsWithoutXp()
     {
         GpManagerConfig config = new GpManagerConfig() {};
-        Am engine = new Am(deltas -> Collections.emptyList(),
+        Engine engine = new Engine(deltas -> Collections.emptyList(),
             new TransactionClassifier(), config);
-        engine.rm(1_000L);
+        engine.ensureSession(1_000L);
         ActivityDetector detector = new ActivityDetector(config, engine);
         long now = 1_000_000L;
 
-        detector.le("Smelting", now);
+        detector.armProductionContext("Smelting", now);
         engine.contextTicks = 0; // two failed smelts: the six-tick window has lapsed
-        detector.acj("Smithing", null, now + 12_000L);
-        assertEquals(Aj.PRODUCTION, engine.active.context);
+        detector.observeSkillXp("Smithing", null, now + 12_000L);
+        assertEquals(Context.PRODUCTION, engine.active.context);
         assertTrue("Smithing XP re-arms the run", engine.contextTicks > 0);
 
         engine.contextTicks = 0;
-        detector.acj("Attack", null, now + 17_000L);
+        detector.observeSkillXp("Attack", null, now + 17_000L);
         assertEquals("combat XP never opens production", 0, engine.contextTicks);
 
-        detector.acj("Smithing", null, now + 12_000L + 31_000L);
+        detector.observeSkillXp("Smithing", null, now + 12_000L + 31_000L);
         assertEquals("past the run window XP no longer re-arms", 0, engine.contextTicks);
     }
 }

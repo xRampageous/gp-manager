@@ -13,17 +13,19 @@ class CharacterIdleTracker {
 final Client client;
 final CharacterIdleModel model;
 void clear() {
-model.clear();
+ model.clear();
 }
+
 /** Soft-busy across Make-X / process XP gaps. */
-void abn() {
-model.abn(System.currentTimeMillis());
+void noteSkillingXp() {
+ model.noteSkillingXp(System.currentTimeMillis());
 }
+
 /** @return true once when the character newly becomes idle */
 boolean onGameTick() {
-Player local = client.getLocalPlayer();
-boolean animating = local != null && local.getAnimation() != -1;
-boolean interacting = local != null && local.getInteracting() != null;
-return model.tick(animating, interacting, System.currentTimeMillis());
+ Player local = client.getLocalPlayer();
+ boolean animating = local != null && local.getAnimation() != -1;
+ boolean interacting = local != null && local.getInteracting() != null;
+ return model.tick(animating, interacting, System.currentTimeMillis());
 }
 }

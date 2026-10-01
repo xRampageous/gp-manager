@@ -42,7 +42,7 @@ public class GePerFillTaxTest
 
         assertEquals("exactly the per-fill tax is counted", -80L, fixture.net());
         assertEquals(0, fixture.reviewRows());
-        Bi.Row row = fixture.row();
+        MarketSettlementProjection.Row row = fixture.row();
         assertEquals(80L, row.inferredGeTaxGp);
         assertTrue("the receipt shows the proven tax", row.knownCostOnly);
     }
@@ -68,7 +68,7 @@ public class GePerFillTaxTest
         Fixture fixture = new Fixture(RUNE, 25L);
         fixture.sellInFills(0, new long[] {25L}, new long[] {3_513L}, T0 + 1_000L);
         fixture.collectAlone(0, 3_513L - 50L, T0 + 20_000L);
-        fixture.engine.ajv(T0 + 23_000L);
+        fixture.engine.tickGeCustody(T0 + 23_000L);
 
         assertEquals("nothing is counted from an unprovable tax", 0L, fixture.net());
         assertTrue("it fails closed visibly", fixture.reviewRows() > 0);
@@ -93,9 +93,9 @@ public class GePerFillTaxTest
     {
         Fixture fixture = new Fixture(RUNE, 40L);
         fixture.sellInFills(0, new long[] {30L, 10L}, new long[] {4_200L, 1_290L}, T0 + 1_000L);
-        SavedState state = fixture.engine.qm();
+        SavedState state = fixture.engine.createSavedState();
         assertEquals(108, state.schemaVersion);
-        Aa saved = state.getGeCustody().get(0);
+        GeRecord saved = state.getGeCustody().get(0);
         assertTrue(saved.fillTaxExact);
         assertEquals(80L, saved.getFillTaxGp());
 
@@ -107,7 +107,7 @@ public class GePerFillTaxTest
         // A pre-107 record has no per-fill fields: it keeps the conservative uniform rule.
         String legacy = json.replace("\"fillTaxExact\":true", "\"fillTaxExact\":false")
             .replace("\"fillTaxGp\":80", "\"fillTaxGp\":0");
-        Aa old = JsonCodec.gson().fromJson(legacy, SavedState.class)
+        GeRecord old = JsonCodec.gson().fromJson(legacy, SavedState.class)
             .getGeCustody().get(0);
         assertFalse(old.fillTaxExact);
     }
@@ -116,32 +116,32 @@ public class GePerFillTaxTest
 
     private static final class Fixture
     {
-        final Am engine;
-        final Bj ledger = new Bj();
+        final Engine engine;
+        final OfferLedger ledger = new OfferLedger();
         final Map<Integer, Long> inventory = new HashMap<>();
         final int item;
 
         Fixture(int item, long stock)
         {
             this.item = item;
-            engine = new Am(deltas ->
+            engine = new Engine(deltas ->
             {
-                List<Ab> flows = new ArrayList<>();
+                List<Flow> flows = new ArrayList<>();
                 for (Map.Entry<Integer, Long> delta : deltas.entrySet())
                 {
                     int id = delta.getKey();
                     long unit = id == COINS ? 1L : 137L;
-                    flows.add(new Ab(id, id == COINS ? "Coins" : "Item " + id, delta.getValue(),
+                    flows.add(new Flow(id, id == COINS ? "Coins" : "Item " + id, delta.getValue(),
                         (int) unit, delta.getValue() * unit,
-                        id == COINS ? Av.FACE_VALUE : Av.GRAND_EXCHANGE));
+                        id == COINS ? PriceSource.FACE_VALUE : PriceSource.GRAND_EXCHANGE));
                 }
                 return flows;
             }, new TransactionClassifier(), new GpManagerConfig()
             {
                 @Override
-                public Db receiptRetentionDays()
+                public ReceiptRetentionPeriod receiptRetentionDays()
                 {
-                    return Db.DAYS_365;
+                    return ReceiptRetentionPeriod.DAYS_365;
                 }
 
                 @Override
@@ -150,10 +150,10 @@ public class GePerFillTaxTest
                     return 0;
                 }
             });
-            engine.ajl("Trading", Cx.AUTO, T0);
+            engine.startCustomSession("Trading", SessionMode.AUTO, T0);
             inventory.put(COINS, 1_000_000L);
             inventory.put(item, stock);
-            engine.setBaseline(new Cc(inventory));
+            engine.setBaseline(new ContainerSnapshot(inventory));
         }
 
         /** List the whole stack in one slot, then observe each fill as its own offer update. */
@@ -184,7 +184,7 @@ public class GePerFillTaxTest
 
         void collect(long received, long at)
         {
-            engine.abg(at);
+            engine.noteGeCollectionIntent(at);
             inventory.put(COINS, inventory.get(COINS) + received);
             settle(at);
         }
@@ -203,9 +203,9 @@ public class GePerFillTaxTest
         int reviewRows()
         {
             int count = 0;
-            for (Ac transaction : engine.getActiveSession().getTransactions())
+            for (Transaction transaction : engine.getActiveSession().getTransactions())
             {
-                if (Eh.aal(transaction))
+                if (ReviewEligibility.needsOwnerDecision(transaction))
                 {
                     count++;
                 }
@@ -213,24 +213,24 @@ public class GePerFillTaxTest
             return count;
         }
 
-        Bi.Row row()
+        MarketSettlementProjection.Row row()
         {
-            return engine.ub().get(0);
+            return engine.getMarketSettlements().get(0);
         }
 
         private void offer(int slot, GrandExchangeOfferState state, long total, long traded, long spent,
             long at)
         {
-            ledger.observe(new Bj.Snapshot(slot, state, item, (int) total, (int) traded, 137,
-                (int) spent)).ifPresent(transition -> engine.abh(transition, "Item", at));
+            ledger.observe(new OfferLedger.Snapshot(slot, state, item, (int) total, (int) traded, 137,
+                (int) spent)).ifPresent(transition -> engine.noteGeOfferObservation(transition, "Item", at));
         }
 
         private void settle(long at)
         {
-            engine.yz();
-            Cc snapshot = new Cc(inventory);
-            engine.adj(snapshot, at);
-            engine.adj(snapshot, at + 1L);
+            engine.markInventoryDirty();
+            ContainerSnapshot snapshot = new ContainerSnapshot(inventory);
+            engine.processIfDirty(snapshot, at);
+            engine.processIfDirty(snapshot, at + 1L);
         }
     }
 }

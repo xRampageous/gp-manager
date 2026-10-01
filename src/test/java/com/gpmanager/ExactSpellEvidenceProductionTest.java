@@ -43,20 +43,20 @@ public class ExactSpellEvidenceProductionTest
     public void iceBurstTwoStageWidgetTargetBooksTheExactName() throws Exception
     {
         Harness harness = harness("Vorkath");
-        Ac cast = harness.cast("Ice Burst", "Guard", ICE_BURST_RUNES, T0 + 100L);
+        Transaction cast = harness.cast("Ice Burst", "Guard", ICE_BURST_RUNES, T0 + 100L);
 
         assertNotNull("the rune spend settles", cast);
-        assertEquals(Ai.CONSUMPTION, cast.getType());
+        assertEquals(TransactionType.CONSUMPTION, cast.getType());
         assertTrue(cast.isCounted());
-        assertEquals(Au.CAST, cast.getActionKind());
-        assertNotNull("the two-stage interaction keeps its exact spell", cast.uc());
-        assertEquals("Ice Burst", cast.uc().value());
+        assertEquals(ActionKind.CAST, cast.getActionKind());
+        assertNotNull("the two-stage interaction keeps its exact spell", cast.getObservedActionLabel());
+        assertEquals("Ice Burst", cast.getObservedActionLabel().value());
         assertEquals(-180L, cast.getNet());
         assertEquals("rune accounting is untouched", 3, cast.getFlows().size());
         assertEquals("the spell spend stays a supply",
             CostKind.SUPPLIES, CostKind.of(cast, cast.getFlows().get(0)));
 
-        Ca.Recent row = recentFor(harness, cast.getId());
+        LiveSnapshot.Recent row = recentFor(harness, cast.getId());
         assertEquals("Ice Burst", row.name);
         assertEquals("Cast", LivePage.metaOf(row));
     }
@@ -65,12 +65,12 @@ public class ExactSpellEvidenceProductionTest
     public void iceBarrageTwoStageWidgetTargetBooksItsOwnExactName() throws Exception
     {
         Harness harness = harness("Vorkath");
-        Ac cast = harness.cast("Ice Barrage", "Guard",
+        Transaction cast = harness.cast("Ice Barrage", "Guard",
             new int[] {DEATH_RUNE, BLOOD_RUNE, WATER_RUNE}, T0 + 100L);
 
         assertNotNull(cast);
-        assertNotNull(cast.uc());
-        assertEquals("Ice Barrage", cast.uc().value());
+        assertNotNull(cast.getObservedActionLabel());
+        assertEquals("Ice Barrage", cast.getObservedActionLabel().value());
         assertEquals("Ice Barrage", recentFor(harness, cast.getId()).name);
     }
 
@@ -81,12 +81,12 @@ public class ExactSpellEvidenceProductionTest
         harness.select("Ice Burst");
         harness.select("Ice Barrage");
         harness.target("Guard");
-        Ac cast = harness.settle(ICE_BURST_RUNES, T0 + 100L);
+        Transaction cast = harness.settle(ICE_BURST_RUNES, T0 + 100L);
 
         assertNotNull(cast);
-        assertNotNull(cast.uc());
+        assertNotNull(cast.getObservedActionLabel());
         assertEquals("a later selection replaces the earlier evidence",
-            "Ice Barrage", cast.uc().value());
+            "Ice Barrage", cast.getObservedActionLabel().value());
     }
 
     @Test
@@ -98,12 +98,12 @@ public class ExactSpellEvidenceProductionTest
         // No matching consumption: the bounded evidence (18 ticks at the default settings)
         // expires on its own ticks.
         harness.tickStable(24, T0 + 100L);
-        Ac cast = harness.settle(ICE_BURST_RUNES, T0 + 8_000L);
+        Transaction cast = harness.settle(ICE_BURST_RUNES, T0 + 8_000L);
 
         assertNotNull(cast);
-        assertEquals(Au.CAST, cast.getActionKind());
+        assertEquals(ActionKind.CAST, cast.getActionKind());
         assertNull("expired evidence must never name a later rune loss",
-            cast.uc());
+            cast.getObservedActionLabel());
         assertEquals("Cast", recentFor(harness, cast.getId()).name);
     }
 
@@ -111,17 +111,17 @@ public class ExactSpellEvidenceProductionTest
     public void targetNamesNeverBecomeSpellNames() throws Exception
     {
         Harness harness = harness("Vorkath");
-        Ac burst = harness.cast("Ice Burst", "Vengeance", ICE_BURST_RUNES, T0 + 100L);
+        Transaction burst = harness.cast("Ice Burst", "Vengeance", ICE_BURST_RUNES, T0 + 100L);
         assertNotNull(burst);
         assertEquals("the NPC name is not spell evidence",
-            "Ice Burst", burst.uc().value());
+            "Ice Burst", burst.getObservedActionLabel().value());
 
         Harness plain = harness("Vorkath");
         plain.targetNamed("Ice Burst");
-        Ac generic = plain.settle(ICE_BURST_RUNES, T0 + 100L);
+        Transaction generic = plain.settle(ICE_BURST_RUNES, T0 + 100L);
         assertNotNull(generic);
         assertNull("a target named like a spell cannot fabricate one",
-            generic.uc());
+            generic.getObservedActionLabel());
         assertEquals("Cast", recentFor(plain, generic.getId()).name);
     }
 
@@ -131,11 +131,11 @@ public class ExactSpellEvidenceProductionTest
         Harness harness = harness("Vorkath");
         harness.selectWidget(widget(99 << 16 | 3, "<col=ff9040>Ice Burst</col>", "Cast"));
         harness.target("Guard");
-        Ac cast = harness.settle(ICE_BURST_RUNES, T0 + 100L);
+        Transaction cast = harness.settle(ICE_BURST_RUNES, T0 + 100L);
 
         assertNotNull(cast);
         assertNull("a selected widget outside the spellbook is not spell evidence",
-            cast.uc());
+            cast.getObservedActionLabel());
     }
 
     @Test
@@ -143,11 +143,11 @@ public class ExactSpellEvidenceProductionTest
     {
         Harness harness = harness("Vorkath");
         harness.select("Vengeance");
-        Ac cast = harness.settle(new int[] {DEATH_RUNE, ASTRAL_RUNE, EARTH_RUNE}, T0 + 100L);
+        Transaction cast = harness.settle(new int[] {DEATH_RUNE, ASTRAL_RUNE, EARTH_RUNE}, T0 + 100L);
 
         assertNotNull(cast);
-        assertNotNull(cast.uc());
-        assertEquals("Vengeance", cast.uc().value());
+        assertNotNull(cast.getObservedActionLabel());
+        assertEquals("Vengeance", cast.getObservedActionLabel().value());
     }
 
     @Test
@@ -156,18 +156,18 @@ public class ExactSpellEvidenceProductionTest
         Harness harness = harness("Vorkath");
         harness.select("High Level Alchemy");
         harness.targetOnWidget("Nature rune");
-        Ac cast = harness.settle(new int[] {NATURE_RUNE}, T0 + 100L);
+        Transaction cast = harness.settle(new int[] {NATURE_RUNE}, T0 + 100L);
 
         assertNotNull(cast);
-        assertNotNull(cast.uc());
-        assertEquals("High Level Alchemy", cast.uc().value());
+        assertNotNull(cast.getObservedActionLabel());
+        assertEquals("High Level Alchemy", cast.getObservedActionLabel().value());
     }
 
     @Test
     public void profileFenceClearsPendingSpellEvidenceButKeepsBookedLabels() throws Exception
     {
         Harness harness = harness("Vorkath");
-        Ac cast = harness.cast("Ice Burst", "Guard", ICE_BURST_RUNES, T0 + 100L);
+        Transaction cast = harness.cast("Ice Burst", "Guard", ICE_BURST_RUNES, T0 + 100L);
         assertNotNull(cast);
         long net = cast.getNet();
         int flows = cast.getFlows().size();
@@ -175,21 +175,21 @@ public class ExactSpellEvidenceProductionTest
         // A pending, unbooked selection exists when the owner fence runs.
         harness.select("Ice Burst");
         harness.target("Guard");
-        harness.engine.ov();
+        harness.engine.clearPendingActionEvidence();
 
         assertNotNull("booked schema-105 labels survive the presentation owner fence",
-            cast.uc());
-        assertEquals("Ice Burst", cast.uc().value());
+            cast.getObservedActionLabel());
+        assertEquals("Ice Burst", cast.getObservedActionLabel().value());
         assertEquals(net, cast.getNet());
         assertEquals(flows, cast.getFlows().size());
-        assertEquals(Ai.CONSUMPTION, cast.getType());
+        assertEquals(TransactionType.CONSUMPTION, cast.getType());
         assertTrue(cast.isCounted());
 
-        Ac later = harness.settle(ICE_BURST_RUNES, T0 + 2_000L);
+        Transaction later = harness.settle(ICE_BURST_RUNES, T0 + 2_000L);
         assertNotNull(later);
-        assertEquals(Au.CAST, later.getActionKind());
+        assertEquals(ActionKind.CAST, later.getActionKind());
         assertNull("pending pre-fence evidence must not label a later cast",
-            later.uc());
+            later.getObservedActionLabel());
     }
 
     @Test
@@ -200,16 +200,16 @@ public class ExactSpellEvidenceProductionTest
         harness.target("Guard");
         // Logout/relog fence: the lifecycle pause clears transient action evidence, and the
         // post-login baseline priming keeps the first change from inheriting anything.
-        harness.engine.acu(T0 + 200L);
+        harness.engine.pauseForLifecycle(T0 + 200L);
         harness.tickStable(2, T0 + 300L);
-        harness.engine.resume(T0 + 1_000L, Ed.LIFECYCLE);
-        harness.engine.setBaseline(new Cc(harness.inventory));
-        Ac cast = harness.settle(ICE_BURST_RUNES, T0 + 2_000L);
+        harness.engine.resume(T0 + 1_000L, PauseReason.LIFECYCLE);
+        harness.engine.setBaseline(new ContainerSnapshot(harness.inventory));
+        Transaction cast = harness.settle(ICE_BURST_RUNES, T0 + 2_000L);
 
         assertNotNull(cast);
-        assertEquals(Au.CAST, cast.getActionKind());
+        assertEquals(ActionKind.CAST, cast.getActionKind());
         assertNull("a paused/relogged session must not inherit pre-logout spell evidence",
-            cast.uc());
+            cast.getObservedActionLabel());
     }
 
     @Test
@@ -223,12 +223,12 @@ public class ExactSpellEvidenceProductionTest
         harness.targetNamed("Guard");
         assertNotNull(harness.settle(ICE_BURST_RUNES, T0 + 4_000L));
 
-        Ao data = Ao.capture(harness.engine, T0 + 5_000L,
-            new Ao.Entry(Ao.Scope.CURRENT_GRIND, null, null,
-                Ao.Bs.SUPPLIES, "", null, null, null, null));
-        Br.Group burstGroup = groupNamed(data.costs.groups, "Ice Burst", "Cast");
-        Br.Group barrage = groupNamed(data.costs.groups, "Ice Barrage", "Cast");
-        Br.Group generic = groupNamed(data.costs.groups, "Cast", "Cast");
+        LedgerData data = LedgerData.capture(harness.engine, T0 + 5_000L,
+            new LedgerData.Entry(LedgerData.Scope.CURRENT_GRIND, null, null,
+                LedgerData.CostView.SUPPLIES, "", null, null, null, null));
+        SemanticFinancialProjection.Group burstGroup = groupNamed(data.costs.groups, "Ice Burst", "Cast");
+        SemanticFinancialProjection.Group barrage = groupNamed(data.costs.groups, "Ice Barrage", "Cast");
+        SemanticFinancialProjection.Group generic = groupNamed(data.costs.groups, "Cast", "Cast");
         assertNotNull(burstGroup);
         assertNotNull(barrage);
         assertNotNull(generic);
@@ -248,12 +248,12 @@ public class ExactSpellEvidenceProductionTest
 
     private static final class Harness
     {
-        final Am engine;
+        final Engine engine;
         final GpManagerPlugin plugin;
         final MutableSpellClient client;
         final Map<Integer, Long> inventory = new HashMap<>();
 
-        Harness(Am engine, GpManagerPlugin plugin, MutableSpellClient client)
+        Harness(Engine engine, GpManagerPlugin plugin, MutableSpellClient client)
         {
             this.engine = engine;
             this.plugin = plugin;
@@ -288,14 +288,14 @@ public class ExactSpellEvidenceProductionTest
             plugin.onMenuOptionClicked(click("Cast", targetName, MenuAction.WIDGET_TARGET_ON_WIDGET, null, -1));
         }
 
-        Ac cast(String spell, String targetName, int[] runes, long now)
+        Transaction cast(String spell, String targetName, int[] runes, long now)
         {
             select(spell);
             target(targetName);
             return settle(runes, now);
         }
 
-        Ac settle(int[] runes, long now)
+        Transaction settle(int[] runes, long now)
         {
             for (int rune : runes)
             {
@@ -306,19 +306,19 @@ public class ExactSpellEvidenceProductionTest
 
         void tickStable(int ticks, long now)
         {
-            Cc snapshot = new Cc(inventory);
+            ContainerSnapshot snapshot = new ContainerSnapshot(inventory);
             for (int i = 0; i < ticks; i++)
             {
-                engine.adj(snapshot, now + i * 600L);
+                engine.processIfDirty(snapshot, now + i * 600L);
             }
         }
     }
 
     private static Harness harness(String sessionName) throws Exception
     {
-        Am engine = productionEngine();
+        Engine engine = productionEngine();
         long now = T0;
-        engine.ajl(sessionName, Cx.AUTO, now);
+        engine.startCustomSession(sessionName, SessionMode.AUTO, now);
         MutableSpellClient client = new MutableSpellClient();
         GpManagerPlugin plugin = plugin(engine, client.client());
         Harness harness = new Harness(engine, plugin, client);
@@ -328,22 +328,22 @@ public class ExactSpellEvidenceProductionTest
         {
             harness.inventory.put(rune, 20L);
         }
-        engine.setBaseline(new Cc(harness.inventory));
+        engine.setBaseline(new ContainerSnapshot(harness.inventory));
         return harness;
     }
 
-    private static Ca.Recent recentFor(Harness harness, String transactionId)
+    private static LiveSnapshot.Recent recentFor(Harness harness, String transactionId)
     {
-        Ca snapshot = Ca.capture(harness.engine, T0 + 60_000L, Dz.NONE);
+        LiveSnapshot snapshot = LiveSnapshot.capture(harness.engine, T0 + 60_000L, LiveContext.NONE);
         return snapshot.recent.stream()
             .filter(row -> transactionId.equals(row.receiptId))
             .findFirst().orElseThrow(AssertionError::new);
     }
 
-    private static Br.Group groupNamed(
-        List<Br.Group> groups, String name, String action)
+    private static SemanticFinancialProjection.Group groupNamed(
+        List<SemanticFinancialProjection.Group> groups, String name, String action)
     {
-        for (Br.Group group : groups)
+        for (SemanticFinancialProjection.Group group : groups)
         {
             if (name.equals(group.primaryName) && action.equals(group.actionLabel.isEmpty() ? ""
                 : group.actionLabel))
@@ -354,14 +354,14 @@ public class ExactSpellEvidenceProductionTest
         return null;
     }
 
-    private static Ac settleStable(Am engine, Map<Integer, Long> next, long now)
+    private static Transaction settleStable(Engine engine, Map<Integer, Long> next, long now)
     {
-        engine.yz();
-        Cc snapshot = new Cc(next);
-        Ac result = null;
+        engine.markInventoryDirty();
+        ContainerSnapshot snapshot = new ContainerSnapshot(next);
+        Transaction result = null;
         for (int i = 0; i < 3; i++)
         {
-            Ac settled = engine.adj(snapshot, now + i * 600L);
+            Transaction settled = engine.processIfDirty(snapshot, now + i * 600L);
             if (settled != null)
             {
                 result = settled;
@@ -370,28 +370,28 @@ public class ExactSpellEvidenceProductionTest
         return result;
     }
 
-    private static Am productionEngine()
+    private static Engine productionEngine()
     {
         GpManagerConfig config = new GpManagerConfig()
         {
             @Override public int stabilizationTicks() { return 2; }
             @Override public boolean keepTransferAuditRows() { return true; }
         };
-        return new Am(deltas ->
+        return new Engine(deltas ->
         {
-            List<Ab> flows = new ArrayList<>();
+            List<Flow> flows = new ArrayList<>();
             for (Map.Entry<Integer, Long> delta : deltas.entrySet())
             {
                 int id = delta.getKey();
-                flows.add(new Ab(id, runeName(id), delta.getValue(), price(id),
+                flows.add(new Flow(id, runeName(id), delta.getValue(), price(id),
                     delta.getValue() * price(id),
-                    id == ItemID.COINS ? Av.FACE_VALUE : Av.GRAND_EXCHANGE));
+                    id == ItemID.COINS ? PriceSource.FACE_VALUE : PriceSource.GRAND_EXCHANGE));
             }
             return flows;
         }, new TransactionClassifier(), config);
     }
 
-    private static GpManagerPlugin plugin(Am engine, Client client) throws Exception
+    private static GpManagerPlugin plugin(Engine engine, Client client) throws Exception
     {
         GpManagerConfig config = new GpManagerConfig() {};
         GpManagerPlugin plugin = new GpManagerPluginProbe();

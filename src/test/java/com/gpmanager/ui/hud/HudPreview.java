@@ -37,24 +37,24 @@ public final class HudPreview
             @Override
             public boolean reducedMotion() { return true; }
         };
-        Am engine = new Am(deltas ->
+        Engine engine = new Engine(deltas ->
         {
-            List<Ab> flows = new ArrayList<>();
-            deltas.forEach((id, quantity) -> flows.add(new Ab(id, "Item " + id, quantity, 50, quantity * 50)));
+            List<Flow> flows = new ArrayList<>();
+            deltas.forEach((id, quantity) -> flows.add(new Flow(id, "Item " + id, quantity, 50, quantity * 50)));
             return flows;
         }, new TransactionClassifier(), config);
-        engine.ajl("Vorkath", Cx.GENERAL, now - 2_400_000L);
+        engine.startCustomSession("Vorkath", SessionMode.GENERAL, now - 2_400_000L);
         engine.getActiveSession().setProfitTargetGp(5_000_000L);
 
-        Cp builder = new Cp(config, HudPreview::icon);
-        De overlay = new De(builder, config);
+        HudBuilder builder = new HudBuilder(config, HudPreview::icon);
+        HudOverlay overlay = new HudOverlay(builder, config);
         HudTray tray = builder.tray();
         long[] history = {Long.MIN_VALUE, Long.MIN_VALUE, 12_000_000L};
-        builder.update(Ca.capture(engine, now - 3_000L, null), f -> true, history, now - 3_000L);
+        builder.update(LiveSnapshot.capture(engine, now - 3_000L, null), f -> true, history, now - 3_000L);
         add(engine, tray, now - 1_500L, flow(536, "Superior dragon bones", 2L, 12_000));
         add(engine, tray, now - 1_000L, flow(11286, "Draconic visage", 1L, 10_400_000));
         add(engine, tray, now - 500L, flow(1319, "Rune 2h sword", 1L, 37_000));
-        builder.update(Ca.capture(engine, now, null), f -> true, history, now);
+        builder.update(LiveSnapshot.capture(engine, now, null), f -> true, history, now);
 
         BufferedImage image = new BufferedImage(520, 260, BufferedImage.TYPE_INT_ARGB);
         Graphics2D g = image.createGraphics();
@@ -71,21 +71,21 @@ public final class HudPreview
         ImageIO.write(image, "png", new File(out, "hud-grind.png"));
 
         // Nothing new for a while: the tray folds and HUD+ rests at its narrow width.
-        Cp resting = new Cp(config, HudPreview::icon);
-        resting.update(Ca.capture(engine, now + 60_000L, null), f -> true, history, now + 60_000L);
+        HudBuilder resting = new HudBuilder(config, HudPreview::icon);
+        resting.update(LiveSnapshot.capture(engine, now + 60_000L, null), f -> true, history, now + 60_000L);
         BufferedImage rest = new BufferedImage(200, 80, BufferedImage.TYPE_INT_ARGB);
         Graphics2D r = rest.createGraphics();
         r.setColor(new Color(62, 74, 44));
         r.fillRect(0, 0, rest.getWidth(), rest.getHeight());
         r.translate(8, 8);
-        new De(resting, config).render(r);
+        new HudOverlay(resting, config).render(r);
         r.dispose();
         ImageIO.write(rest, "png", new File(out, "hud-rest.png"));
 
         // End the Grind: the recap card opens beside HUD+ without hover.
-        Am after = new Am(deltas -> new ArrayList<>(), new TransactionClassifier(), config);
-        after.rm(now);
-        builder.update(Ca.capture(after, now + 1_000L, null), f -> true,
+        Engine after = new Engine(deltas -> new ArrayList<>(), new TransactionClassifier(), config);
+        after.ensureSession(now);
+        builder.update(LiveSnapshot.capture(after, now + 1_000L, null), f -> true,
             new long[] {Long.MIN_VALUE, Long.MIN_VALUE, 12_000_000L}, now + 1_000L);
         BufferedImage card = new BufferedImage(520, 200, BufferedImage.TYPE_INT_ARGB);
         Graphics2D c = card.createGraphics();
@@ -109,14 +109,14 @@ public final class HudPreview
             @Override
             public boolean reducedMotion() { return true; }
         };
-        Am engine = HudBuilderTest.engine();
-        engine.rm(now - 533_000L);
-        Cp builder = new Cp(config, HudPreview::icon);
-        builder.update(Ca.capture(engine, now, null), f -> true, null, now);
+        Engine engine = HudBuilderTest.engine();
+        engine.ensureSession(now - 533_000L);
+        HudBuilder builder = new HudBuilder(config, HudPreview::icon);
+        builder.update(LiveSnapshot.capture(engine, now, null), f -> true, null, now);
         shot(out, "hud-empty.png", builder, config);
-        builder.tray().booked(receipt(now, Ai.LOOT, flow(1, "Bones", 1L, 300)), now, false);
-        engine.getActiveSession().kf(receipt(now, Ai.LOOT, flow(1, "Bones", 1L, 300)), 2_000);
-        builder.update(Ca.capture(engine, now + 10L, null), f -> false, null, now + 10L);
+        builder.tray().booked(receipt(now, TransactionType.LOOT, flow(1, "Bones", 1L, 300)), now, false);
+        engine.getActiveSession().addTransaction(receipt(now, TransactionType.LOOT, flow(1, "Bones", 1L, 300)), 2_000);
+        builder.update(LiveSnapshot.capture(engine, now + 10L, null), f -> false, null, now + 10L);
         shot(out, "hud-filtered.png", builder, config);
         shot(out, "hud-filtered-folio.png", builder, config, true);
         shot(out, "hud-narrow.png", builder, new GpManagerConfig()
@@ -128,12 +128,12 @@ public final class HudPreview
         });
     }
 
-    private static void shot(File out, String name, Cp builder, GpManagerConfig config) throws IOException
+    private static void shot(File out, String name, HudBuilder builder, GpManagerConfig config) throws IOException
     {
         shot(out, name, builder, config, false);
     }
 
-    private static void shot(File out, String name, Cp builder, GpManagerConfig config,
+    private static void shot(File out, String name, HudBuilder builder, GpManagerConfig config,
         boolean hovering) throws IOException
     {
         BufferedImage image = new BufferedImage(hovering ? 550 : 350, 240, BufferedImage.TYPE_INT_ARGB);
@@ -141,7 +141,7 @@ public final class HudPreview
         g.setColor(new Color(62, 74, 44));
         g.fillRect(0, 0, image.getWidth(), image.getHeight());
         g.translate(8, 8);
-        De overlay = new De(builder, config);
+        HudOverlay overlay = new HudOverlay(builder, config);
         Dimension size = overlay.render(g);
         if (hovering)
         {
@@ -154,10 +154,10 @@ public final class HudPreview
             "png", new File(out, name));
     }
 
-    private static void add(Am engine, HudTray tray, long at, Ab item)
+    private static void add(Engine engine, HudTray tray, long at, Flow item)
     {
-        engine.getActiveSession().kf(receipt(at, Ai.LOOT, item), 2_000);
-        tray.booked(receipt(at, Ai.LOOT, item), at, false);
+        engine.getActiveSession().addTransaction(receipt(at, TransactionType.LOOT, item), 2_000);
+        tray.booked(receipt(at, TransactionType.LOOT, item), at, false);
     }
 
     /** A stand-in sprite: RuneLite's item images are 36 x 32. */

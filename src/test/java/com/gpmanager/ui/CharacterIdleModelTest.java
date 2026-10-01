@@ -61,7 +61,7 @@ public class CharacterIdleModelTest
         assertTrue(model.characterIdle);
 
         model.clear();
-        model.abn(10_000L);
+        model.noteSkillingXp(10_000L);
         assertFalse(model.tick(false, false, 11_000L));
         assertFalse(model.characterIdle);
         // XP soft-busy lasts for the idle delay after the drop — Idle fires then,
@@ -77,7 +77,7 @@ public class CharacterIdleModelTest
     {
         CharacterIdleModel model = new CharacterIdleModel();
         model.delayMillis = 2_000L;
-        model.abn(10_000L);
+        model.noteSkillingXp(10_000L);
         assertFalse(model.tick(true, false, 10_500L));
         assertFalse(model.tick(false, false, 12_000L));
         assertFalse(model.characterIdle);

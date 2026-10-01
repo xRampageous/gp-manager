@@ -20,7 +20,7 @@ public class SessionRepositoryRecoveryTest
 
     private SavedState state(String name)
     {
-        return new SavedState(new Ad(name, 1_000L), null, false, Collections.emptyList());
+        return new SavedState(new Session(name, 1_000L), null, false, Collections.emptyList());
     }
 
     @Test
@@ -63,13 +63,13 @@ public class SessionRepositoryRecoveryTest
         SessionRepository failing = new SessionRepository(new Gson(), FilepathTestSupport.root(directory))
         {
             @Override
-            void afl(Filepath source, Filepath target) throws IOException
+            void replaceFile(Filepath source, Filepath target) throws IOException
             {
                 if (target.getFileName().toString().equals("sessions.json"))
                 {
                     throw new IOException("Simulated full disk during replacement");
                 }
-                super.afl(source, target);
+                super.replaceFile(source, target);
             }
         };
         PersistenceProbe.save(failing, state("Uncommitted"));
@@ -94,22 +94,22 @@ public class SessionRepositoryRecoveryTest
     public void longSessionSaveReloadPreservesTotalsAfterCompaction() throws Exception
     {
         Path directory = temporary.newFolder().toPath();
-        Ad session = new Ad("Soak", 1_000L);
+        Session session = new Session("Soak", 1_000L);
         for (int i = 0; i < 200; i++)
         {
             for (int row = 0; row < 50; row++)
             {
-                session.kf(Tx.of(
+                session.addTransaction(Tx.of(
                     2_000L + i * 50L + row,
-                    Ai.GAIN,
-                    Aj.GENERIC, "Gain", true,
-                    Collections.singletonList(new Ab(995, "Coins", 1, 1, 1))), 100);
+                    TransactionType.GAIN,
+                    Context.GENERIC, "Gain", true,
+                    Collections.singletonList(new Flow(995, "Coins", 1, 1, 1))), 100);
             }
             SessionRepository writer = new SessionRepository(new Gson(), FilepathTestSupport.root(directory));
             PersistenceProbe.save(writer, new SavedState(session, null, false, Collections.emptyList()));
             SavedState reloaded = new SessionRepository(new Gson(), FilepathTestSupport.root(directory)).load();
             session = reloaded.getActiveSession();
-            assertEquals((i + 1L) * 50L, session.metrics(20_000L, 60_000L).net);
+            assertEquals((i + 1L) * 50L, session.metrics(20_000L).net);
             assertTrue(session.getTransactions().size() <= 100);
             assertEquals(SavedState.CURRENT_SCHEMA_VERSION, reloaded.schemaVersion);
         }
@@ -120,11 +120,11 @@ public class SessionRepositoryRecoveryTest
     public void explicitGeneralAndCustomOwnersRoundTripWithoutMerging() throws Exception
     {
         Path directory = temporary.newFolder().toPath();
-        Ad general = new Ad("General", 1_000L);
-        Ad custom = new Ad("Custom", 2_000L);
+        Session general = new Session("General", 1_000L);
+        Session custom = new Session("Custom", 2_000L);
         general.setProfitTargetGp(1_000_000_000L);
         custom.setProfitTargetGp(500_000_000L);
-        Ad archived = new Ad("Archived", 500L);
+        Session archived = new Session("Archived", 500L);
         archived.close(900L);
 
         SessionRepository repository = new SessionRepository(new Gson(), FilepathTestSupport.root(directory));

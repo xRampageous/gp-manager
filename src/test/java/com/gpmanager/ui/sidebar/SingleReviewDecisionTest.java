@@ -21,7 +21,7 @@ public class SingleReviewDecisionTest
     {
         RecordingActions actions = new RecordingActions();
         LedgerPage page = onEdt(() -> new LedgerPage(actions, id -> null));
-        Cu receiptA = row("A");
+        ReviewRow receiptA = row("A");
         JPopupMenu menu = onEdt(() -> LedgerPageProbe.reviewMenu(page, receiptA));
 
         onEdt(() ->
@@ -36,11 +36,11 @@ public class SingleReviewDecisionTest
         assertFalse("single decision must not invoke Decide All", actions.bulkCalled);
     }
 
-    private static Cu row(String id)
+    private static ReviewRow row(String id)
     {
-        return new Cu(id, "session", 1L, 0L,
-            Arrays.asList(new Cu.Item(1, "Unpriced item", -1L, -10L)), -10L,
-            "Needs a decision", EnumSet.allOf(Cl.class));
+        return new ReviewRow(id, "session", 1L, 0L,
+            Arrays.asList(new ReviewRow.Item(1, "Unpriced item", -1L, -10L)), -10L,
+            "Needs a decision", EnumSet.allOf(ReviewDecision.class));
     }
 
     private static <T> T onEdt(java.util.concurrent.Callable<T> callable) throws Exception
@@ -64,19 +64,19 @@ public class SingleReviewDecisionTest
         boolean bulkCalled;
 
         @Override public void openScopeMenu(javax.swing.JComponent anchor) { }
-        @Override public void costViewChanged(Ao.Bs view) { }
+        @Override public void costViewChanged(LedgerData.CostView view) { }
         @Override public void searchChanged(String text) { }
-        @Override public Ao.Ef preview(String id, Ah correction) { return null; }
-        @Override public LedgerPage.Ea correct(String id, Ah correction, long revision)
-        { return LedgerPage.Ea.REFUSED; }
+        @Override public LedgerData.CorrectionPreview preview(String id, Correction correction) { return null; }
+        @Override public LedgerPage.CorrectionOutcome correct(String id, Correction correction, long revision)
+        { return LedgerPage.CorrectionOutcome.REFUSED; }
         @Override public void split(String id) { }
         @Override public void undoCorrection() { }
-        @Override public void decideAll(Cl decision)
+        @Override public void decideAll(ReviewDecision decision)
         {
             bulkCalled = true;
             unresolved.clear();
         }
-        @Override public void decide(String id, Cl decision)
+        @Override public void decide(String id, ReviewDecision decision)
         {
             decidedTransactionId = id;
             unresolved.remove(id);

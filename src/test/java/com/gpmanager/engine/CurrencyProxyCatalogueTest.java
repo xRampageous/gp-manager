@@ -10,7 +10,7 @@ public class CurrencyProxyCatalogueTest
     @Test
     public void recognisesNonGpCurrencies()
     {
-        assertTrue(CurrencyProxyCatalogue.awk(6529)); // Tokkul
-        assertTrue(CurrencyProxyCatalogue.awk(12746)); // BH emblem
+        assertTrue(CurrencyProxyCatalogue.isMapped(6529)); // Tokkul
+        assertTrue(CurrencyProxyCatalogue.isMapped(12746)); // BH emblem
     }
 }

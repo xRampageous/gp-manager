@@ -36,8 +36,8 @@ public class MarketActivityValueSemanticsTest
         market.gain(DEATH, 200L, 37_200L, market.now - 60_000L);
         market.sell(0, DEATH, 200L, 180);
 
-        Ca snapshot = Ca.capture(market.engine, market.now + 1_000L, null);
-        Ca.Recent row = marketRow(snapshot);
+        LiveSnapshot snapshot = LiveSnapshot.capture(market.engine, market.now + 1_000L, null);
+        LiveSnapshot.Recent row = marketRow(snapshot);
         assertNotNull(row);
         assertTrue("the primary value is the observed settlement", row.marketSettlementValue);
         assertEquals("proceeds are positive", 36_000L, row.value);
@@ -57,7 +57,7 @@ public class MarketActivityValueSemanticsTest
         market.gain(DEATH, 200L, 37_200L, market.now - 60_000L);
         market.sell(0, DEATH, 200L, 180);
 
-        Ca snapshot = Ca.capture(market.engine, market.now + 1_000L, null);
+        LiveSnapshot snapshot = LiveSnapshot.capture(market.engine, market.now + 1_000L, null);
         assertEquals("Net moves by the result only, never by the gross proceeds",
             37_200L - 1_200L, snapshot.net);
         assertEquals(market.engine.getMetrics(market.now + 1_000L).net, snapshot.net);
@@ -69,13 +69,13 @@ public class MarketActivityValueSemanticsTest
         Market market = new Market(Collections.singletonMap(DEATH, 12));
         market.sell(0, DEATH, 15L, 12);
 
-        Ca snapshot = Ca.capture(market.engine, market.now + 1_000L, null);
-        Ca.Recent row = marketRow(snapshot);
+        LiveSnapshot snapshot = LiveSnapshot.capture(market.engine, market.now + 1_000L, null);
+        LiveSnapshot.Recent row = marketRow(snapshot);
         assertNotNull(row);
         assertTrue(row.marketSettlementValue);
         assertFalse("automatic Result is unavailable", row.valueAvailable);
         assertEquals(180L, row.value);
-        assertEquals(Fmt.signed(180L), LivePage.avo(row));
+        assertEquals(Fmt.signed(180L), LivePage.valueText(row));
         assertTrue(LivePage.metaOf(row).contains("Sold \u00b7 Result \u2014"));
         assertEquals("unknown liquidation does not inflate Net", 0L, snapshot.net);
     }
@@ -86,8 +86,8 @@ public class MarketActivityValueSemanticsTest
         Market market = new Market(Collections.singletonMap(DEATH, 186));
         market.buy(0, DEATH, 200L, 180, 200L);
 
-        Ca snapshot = Ca.capture(market.engine, market.now + 1_000L, null);
-        Ca.Recent row = marketRow(snapshot);
+        LiveSnapshot snapshot = LiveSnapshot.capture(market.engine, market.now + 1_000L, null);
+        LiveSnapshot.Recent row = marketRow(snapshot);
         assertNotNull(row);
         assertTrue("the primary value is the observed settlement", row.marketSettlementValue);
         assertEquals("spend is negative", -36_000L, row.value);
@@ -103,12 +103,12 @@ public class MarketActivityValueSemanticsTest
         Market market = new Market(Collections.singletonMap(DEATH, 186));
         market.pendingBuy(0, DEATH, 200L, 180);
 
-        Ca snapshot = Ca.capture(market.engine, market.now + 1_000L, null);
-        Ca.Recent row = marketRow(snapshot);
+        LiveSnapshot snapshot = LiveSnapshot.capture(market.engine, market.now + 1_000L, null);
+        LiveSnapshot.Recent row = marketRow(snapshot);
         assertNotNull(row);
         assertFalse("pending never claims a realized settlement", row.valueAvailable);
         assertFalse(row.marketSettlementValue);
-        assertEquals("Buying", LivePage.avo(row));
+        assertEquals("Buying", LivePage.valueText(row));
         assertTrue("the detail line is the quantity, not the state again", LivePage.metaOf(row).contains("×"));
         assertFalse("status is not repeated on both sides",
             LivePage.metaOf(row).contains("Pending"));
@@ -121,10 +121,10 @@ public class MarketActivityValueSemanticsTest
         Market market = new Market(Collections.singletonMap(DEATH, 186));
         market.partiallySoldUncollected(0, DEATH, 11L, 5L, 210);
 
-        Ca snapshot = Ca.capture(market.engine, market.now + 1_000L, null);
-        Ca.Recent row = marketRow(snapshot);
+        LiveSnapshot snapshot = LiveSnapshot.capture(market.engine, market.now + 1_000L, null);
+        LiveSnapshot.Recent row = marketRow(snapshot);
         assertNotNull(row);
-        assertEquals("Pending", LivePage.avo(row));
+        assertEquals("Pending", LivePage.valueText(row));
         assertTrue(LivePage.metaOf(row).contains("Part sold 5/11"));
         assertFalse(row.marketSettlementValue);
         assertEquals(0L, snapshot.net);
@@ -136,7 +136,7 @@ public class MarketActivityValueSemanticsTest
         Market market = new Market(Collections.singletonMap(DEATH, 186));
         market.cancelBuy(0, DEATH, 5L, 180);
 
-        Ca snapshot = Ca.capture(market.engine, market.now + 1_000L, null);
+        LiveSnapshot snapshot = LiveSnapshot.capture(market.engine, market.now + 1_000L, null);
         // Owner 2026-09-28: a canceled, returned offer stays in the Ledger but leaves Recent.
         assertNull(marketRow(snapshot));
         assertEquals(0, snapshot.marketPending);
@@ -147,10 +147,10 @@ public class MarketActivityValueSemanticsTest
     @Test
     public void anUncountedTradeCopyNeverBecomesItsOwnRow()
     {
-        Ac copy = new Ac(1_000L, null, Ai.TRADE, Aj.MARKET,
-            "Grand Exchange", "Market", false, java.util.Arrays.asList(new Ab(526, "Bones", -2L, 37, -74L),
-                new Ab(995, "Coins", 74L, 1, 74L)), Bd.CONFIRMED, "fixture", null);
-        assertTrue(Br.capture(Collections.singletonList(copy), Collections.emptyList(),
+        Transaction copy = new Transaction(1_000L, null, TransactionType.TRADE, Context.MARKET,
+            "Grand Exchange", "Market", false, java.util.Arrays.asList(new Flow(526, "Bones", -2L, 37, -74L),
+                new Flow(995, "Coins", 74L, 1, 74L)), ClassificationConfidence.CONFIRMED, "fixture", null);
+        assertTrue(SemanticFinancialProjection.capture(Collections.singletonList(copy), Collections.emptyList(),
             "", null).groups.isEmpty());
     }
 
@@ -160,8 +160,8 @@ public class MarketActivityValueSemanticsTest
         Market market = new Market(Collections.singletonMap(DEATH, 186));
         market.buy(0, DEATH, 200L, 180, 100L);
 
-        Ca snapshot = Ca.capture(market.engine, market.now + 1_000L, null);
-        Ca.Recent row = marketRow(snapshot);
+        LiveSnapshot snapshot = LiveSnapshot.capture(market.engine, market.now + 1_000L, null);
+        LiveSnapshot.Recent row = marketRow(snapshot);
         assertNotNull(row);
         assertEquals("only the proven settled 100 are presented", -18_000L, row.value);
         assertEquals("a NEW BUY is Net-neutral at acquisition", 0L, row.marketResult);
@@ -173,7 +173,7 @@ public class MarketActivityValueSemanticsTest
         Market market = new Market(Collections.singletonMap(DEATH, 186));
         market.gain(DEATH, 200L, 37_200L, market.now - 60_000L);
         market.sell(0, DEATH, 200L, 180);
-        Ca snapshot = Ca.capture(market.engine, market.now + 1_000L, null);
+        LiveSnapshot snapshot = LiveSnapshot.capture(market.engine, market.now + 1_000L, null);
 
         LivePage page = onEdt(() ->
         {
@@ -192,10 +192,10 @@ public class MarketActivityValueSemanticsTest
         market.gain(DEATH, 200L, 37_200L, market.now - 60_000L);
         market.sell(0, DEATH, 200L, 180);
 
-        Ao data = Ao.capture(market.engine, market.now + 1_000L,
-            Ao.Entry.current());
-        Br.Group group = null;
-        for (Br.Group candidate : data.market.groups)
+        LedgerData data = LedgerData.capture(market.engine, market.now + 1_000L,
+            LedgerData.Entry.current());
+        SemanticFinancialProjection.Group group = null;
+        for (SemanticFinancialProjection.Group candidate : data.market.groups)
         {
             if (candidate.market)
             {
@@ -203,7 +203,7 @@ public class MarketActivityValueSemanticsTest
             }
         }
         assertNotNull(group);
-        assertNotNull("the raw settlement evidence resolves", data.zu(group.marketPresentationId));
+        assertNotNull("the raw settlement evidence resolves", data.marketRowFor(group.marketPresentationId));
 
         LedgerPage page = onEdt(() ->
         {
@@ -217,9 +217,9 @@ public class MarketActivityValueSemanticsTest
 
     // ── fixtures ───────────────────────────────────────────────────────────────────────────────
 
-    private static Ca.Recent marketRow(Ca snapshot)
+    private static LiveSnapshot.Recent marketRow(LiveSnapshot snapshot)
     {
-        for (Ca.Recent row : snapshot.recent)
+        for (LiveSnapshot.Recent row : snapshot.recent)
         {
             if (row.market)
             {
@@ -229,59 +229,59 @@ public class MarketActivityValueSemanticsTest
         return null;
     }
 
-    private static Am engine(Map<Integer, Integer> quote)
+    private static Engine engine(Map<Integer, Integer> quote)
     {
-        return new Am(deltas ->
+        return new Engine(deltas ->
         {
-            List<Ab> flows = new ArrayList<>();
+            List<Flow> flows = new ArrayList<>();
             for (Map.Entry<Integer, Long> delta : deltas.entrySet())
             {
                 int id = delta.getKey();
                 int unit = id == COINS ? 1 : quote.getOrDefault(id, 7);
-                Av source = id == COINS ? Av.FACE_VALUE
-                    : Av.GRAND_EXCHANGE;
-                flows.add(new Ab(id, id == COINS ? "Coins" : "Death rune", delta.getValue(),
+                PriceSource source = id == COINS ? PriceSource.FACE_VALUE
+                    : PriceSource.GRAND_EXCHANGE;
+                flows.add(new Flow(id, id == COINS ? "Coins" : "Death rune", delta.getValue(),
                     unit, delta.getValue() * unit, source));
             }
             return flows;
         }, new TransactionClassifier(), new GpManagerConfig()
         {
             @Override
-            public Db receiptRetentionDays()
+            public ReceiptRetentionPeriod receiptRetentionDays()
             {
-                return Db.DAYS_365;
+                return ReceiptRetentionPeriod.DAYS_365;
             }
         });
     }
 
     private static final class Market
     {
-        final Am engine;
-        final Bj ledger = new Bj();
+        final Engine engine;
+        final OfferLedger ledger = new OfferLedger();
         final Map<Integer, Long> inventory = new HashMap<>();
         long now = T0;
 
         Market(Map<Integer, Integer> quote)
         {
             engine = engine(quote);
-            engine.ajl("Trading", Cx.AUTO, now);
+            engine.startCustomSession("Trading", SessionMode.AUTO, now);
             inventory.put(COINS, 1_000_000L);
-            engine.setBaseline(new Cc(inventory));
+            engine.setBaseline(new ContainerSnapshot(inventory));
         }
 
         void gain(int item, long qty, long value, long at)
         {
-            engine.getActiveSession().kf(new Ac(at, null,
-                Ai.GAIN, Aj.GENERIC, "", "Loot", true,
-                Collections.singletonList(new Ab(item, "Death rune", qty,
-                    (int) (qty > 0L ? value / qty : 0L), value, Av.GRAND_EXCHANGE)),
-                Bd.CONFIRMED, "", null), 500);
+            engine.getActiveSession().addTransaction(new Transaction(at, null,
+                TransactionType.GAIN, Context.GENERIC, "", "Loot", true,
+                Collections.singletonList(new Flow(item, "Death rune", qty,
+                    (int) (qty > 0L ? value / qty : 0L), value, PriceSource.GRAND_EXCHANGE)),
+                ClassificationConfidence.CONFIRMED, "", null), 500);
         }
 
         void sell(int slot, int item, long qty, int price)
         {
             inventory.put(item, qty);
-            engine.setBaseline(new Cc(inventory));
+            engine.setBaseline(new ContainerSnapshot(inventory));
             offer(slot, GrandExchangeOfferState.SELLING, item, (int) qty, 0, price, 0);
             inventory.remove(item);
             settle();
@@ -311,7 +311,7 @@ public class MarketActivityValueSemanticsTest
         void partiallySoldUncollected(int slot, int item, long total, long filled, int price)
         {
             inventory.put(item, total);
-            engine.setBaseline(new Cc(inventory));
+            engine.setBaseline(new ContainerSnapshot(inventory));
             offer(slot, GrandExchangeOfferState.SELLING, item, (int) total, 0, price, 0);
             inventory.remove(item);
             settle();
@@ -330,11 +330,11 @@ public class MarketActivityValueSemanticsTest
         private void settle()
         {
             now += 600L;
-            engine.yz();
-            Cc snapshot = new Cc(inventory);
+            engine.markInventoryDirty();
+            ContainerSnapshot snapshot = new ContainerSnapshot(inventory);
             for (int i = 0; i < 3; i++)
             {
-                engine.adj(snapshot, now);
+                engine.processIfDirty(snapshot, now);
                 now += 600L;
             }
         }
@@ -343,11 +343,11 @@ public class MarketActivityValueSemanticsTest
             int price, int spent)
         {
             now += 600L;
-            Bj.Transition transition = ledger.observe(
-                new Bj.Snapshot(slot, state, item, total, traded, price, spent)).orElse(null);
+            OfferLedger.Transition transition = ledger.observe(
+                new OfferLedger.Snapshot(slot, state, item, total, traded, price, spent)).orElse(null);
             if (transition != null)
             {
-                engine.abh(transition, "Death rune", now);
+                engine.noteGeOfferObservation(transition, "Death rune", now);
             }
         }
     }
@@ -383,22 +383,22 @@ public class MarketActivityValueSemanticsTest
         }
 
         @Override public void togglePause() { }
-        @Override public void openLedger(Ao.Entry entry) { }
+        @Override public void openLedger(LedgerData.Entry entry) { }
     }
 
     private static final class LedgerNoop implements LedgerPage.Actions
     {
         @Override public void openScopeMenu(javax.swing.JComponent anchor) { }
-        @Override public void costViewChanged(Ao.Bs view) { }
+        @Override public void costViewChanged(LedgerData.CostView view) { }
         @Override public void searchChanged(String text) { }
-        @Override public Ao.Ef preview(String id,
-            Ah correction) { return null; }
-        @Override public LedgerPage.Ea correct(String id,
-            Ah correction, long previewRevision)
-        { return LedgerPage.Ea.REFUSED; }
+        @Override public LedgerData.CorrectionPreview preview(String id,
+            Correction correction) { return null; }
+        @Override public LedgerPage.CorrectionOutcome correct(String id,
+            Correction correction, long previewRevision)
+        { return LedgerPage.CorrectionOutcome.REFUSED; }
         @Override public void split(String id) { }
         @Override public void undoCorrection() { }
-        @Override public void decideAll(Cl decision) { }
+        @Override public void decideAll(ReviewDecision decision) { }
         @Override public void refresh() { }
     }
 }

@@ -30,7 +30,7 @@ An empty, untitled run uses one compact row:
 - Supplies are things it saw you use: food, potions, runes, ammo, charges. Anything else that vanishes is a loss.
 - Bank deposits and withdrawals are neutral. So is the Grand Exchange until an offer fills.
 - Ground loot doesn't count until it's in your inventory. Loot keys and chests count when you open them.
-- Charged weapons (blowpipe, tridents, the bottomless compost bucket, the Eye of Ayak and more) are counted as you use them, from the item's own charge recipe; an in-game Check reconciles the running total if you choose to do one.
+- Charged weapons (blowpipe, tridents, the Eye of Ayak and more) are counted as you use them, from the item's own charge recipe; an in-game Check reconciles the running total if you choose to do one.
 - If it isn't sure, it doesn't guess — the row lands in Review with a reason, and you decide.
 - Prices come from RuneLite's GE prices or your own overrides; unpriced items stay unpriced.
 

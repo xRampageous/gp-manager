@@ -43,53 +43,53 @@ public class GeReconciliationEngineTest
     /** One offline accounting run: engine, ledger, and an explicit MARKET arm for confirmed ownership. */
     private static final class Harness
     {
-        final Am engine = engine();
-        final Bj ledger = new Bj();
+        final Engine engine = engine();
+        final OfferLedger ledger = new OfferLedger();
         long now = T0;
         Map<Integer, Long> inventory = new HashMap<>();
 
         Harness()
         {
-            engine.ajl("Trading", Cx.AUTO, now);
+            engine.startCustomSession("Trading", SessionMode.AUTO, now);
             inventory.put(COINS, 100_000L);
-            engine.setBaseline(new Cc(inventory));
+            engine.setBaseline(new ContainerSnapshot(inventory));
         }
 
         /** Observe, arm MARKET as confirmed-ownership scaffolding, remember any fill as evidence. */
-        Bj.Transition offer(int slot, GrandExchangeOfferState state, int item, int total, int traded, int price, int spent)
+        OfferLedger.Transition offer(int slot, GrandExchangeOfferState state, int item, int total, int traded, int price, int spent)
         {
             now += 600L;
-            Bj.Transition t = ledger.observe(new Bj.Snapshot(slot, state, item, total, traded, price, spent)).orElse(null);
+            OfferLedger.Transition t = ledger.observe(new OfferLedger.Snapshot(slot, state, item, total, traded, price, spent)).orElse(null);
             return handle(t);
         }
 
-        Bj.Transition handle(Bj.Transition t)
+        OfferLedger.Transition handle(OfferLedger.Transition t)
         {
             if (t == null) return null;
-            engine.abh(t, name(t.current.itemId), now);
+            engine.noteGeOfferObservation(t, name(t.current.itemId), now);
             // Test scaffolding only: production arms MARKET from proven GE interactions, never
             // from passive offer transitions (see GpManagerPluginGeEvidenceTest).
-            engine.markContext(Aj.MARKET, 10, "Grand Exchange offer");
+            engine.markContext(Context.MARKET, 10, "Grand Exchange offer");
             return t;
         }
 
         /** An inventory change with confirmed MARKET ownership injected by the harness. */
-        Ac geInventory(Map<Integer, Long> next)
+        Transaction geInventory(Map<Integer, Long> next)
         {
             now += 600L;
-            engine.markContext(Aj.MARKET, 10, "collect");
+            engine.markContext(Context.MARKET, 10, "collect");
             inventory = new HashMap<>(next);
-            engine.yz();
-            Ac first = engine.adj(new Cc(inventory), now);
-            Ac settled = engine.adj(new Cc(inventory), now + 600L);
+            engine.markInventoryDirty();
+            Transaction first = engine.processIfDirty(new ContainerSnapshot(inventory), now);
+            Transaction settled = engine.processIfDirty(new ContainerSnapshot(inventory), now + 600L);
             now += 600L;
             return settled == null ? first : settled;
         }
 
-        List<Ac> counted()
+        List<Transaction> counted()
         {
-            List<Ac> out = new ArrayList<>();
-            for (Ac t : engine.getActiveSession().getTransactions())
+            List<Transaction> out = new ArrayList<>();
+            for (Transaction t : engine.getActiveSession().getTransactions())
             {
                 if (t != null && t.isCounted()) out.add(t);
             }
@@ -105,13 +105,13 @@ public class GeReconciliationEngineTest
         long filled()
         {
             long total = 0L;
-            for (Aa record : engine.geCustody.aji()) total += record.getFilledQty();
+            for (GeRecord record : engine.geCustody.snapshotRecords()) total += record.getFilledQty();
             return total;
         }
 
-        Aa record(int itemId)
+        GeRecord record(int itemId)
         {
-            for (Aa record : engine.geCustody.aji())
+            for (GeRecord record : engine.geCustody.snapshotRecords())
             {
                 if (record.itemId == itemId) return record;
             }
@@ -119,20 +119,20 @@ public class GeReconciliationEngineTest
         }
 
         /** The plugin's login replay: seed the offer ledger, then the custody baseline. */
-        void relog(Bj.Snapshot... restored)
+        void relog(OfferLedger.Snapshot... restored)
         {
-            ledger.lu();
+            ledger.beginLoginSeed();
             for (int slot = 0; slot < 8; slot++)
             {
-                assertFalse(ledger.observe(new Bj.Snapshot(slot, EMPTY, 0, 0, 0, 0, 0)).isPresent());
+                assertFalse(ledger.observe(new OfferLedger.Snapshot(slot, EMPTY, 0, 0, 0, 0, 0)).isPresent());
             }
-            for (Bj.Snapshot snapshot : restored)
+            for (OfferLedger.Snapshot snapshot : restored)
             {
                 assertFalse("replay seeds the baseline only", ledger.observe(snapshot).isPresent());
             }
-            ledger.tg();
+            ledger.finishLoginSeed();
             now += 600L;
-            engine.ahy(ledger.snapshots(), now);
+            engine.seedGeOfferSlots(ledger.snapshots(), now);
         }
     }
 
@@ -158,9 +158,9 @@ public class GeReconciliationEngineTest
         return m;
     }
 
-    private static long flow(Ac t, int itemId)
+    private static long flow(Transaction t, int itemId)
     {
-        for (Ab f : t.getFlows()) if (f.itemId == itemId) return f.valueDelta;
+        for (Flow f : t.getFlows()) if (f.itemId == itemId) return f.valueDelta;
         return 0L;
     }
 
@@ -185,9 +185,9 @@ public class GeReconciliationEngineTest
         assertEquals("the fill is remembered, never booked from getSpent()", 10L, h.filled());
         assertTrue(h.counted().isEmpty());
 
-        Ac collect = h.geInventory(with(h.inventory, LOGS, 10L));
+        Transaction collect = h.geInventory(with(h.inventory, LOGS, 10L));
         assertNotNull(collect);
-        assertEquals(Ai.TRADE, collect.getType());
+        assertEquals(TransactionType.TRADE, collect.getType());
         assertTrue(collect.isCounted());
         assertEquals(480L, flow(collect, LOGS));
         assertFalse(new com.google.gson.Gson().toJson(collect).contains("geOfferProvenance"));
@@ -213,9 +213,9 @@ public class GeReconciliationEngineTest
     {
         Harness h = new Harness();
         h.inventory = with(h.inventory, SHARK, 10L);
-        h.engine.setBaseline(new Cc(h.inventory));
-        Ac placed = h.geInventory(with(h.inventory, SHARK, 0L));
-        assertEquals(Ai.TRADE, placed.getType());
+        h.engine.setBaseline(new ContainerSnapshot(h.inventory));
+        Transaction placed = h.geInventory(with(h.inventory, SHARK, 0L));
+        assertEquals(TransactionType.TRADE, placed.getType());
         assertEquals(-8_000L, flow(placed, SHARK));
         h.offer(2, SELLING, SHARK, 10, 0, 800, 0);
         h.offer(2, SOLD, SHARK, 10, 10, 800, 7_840);
@@ -224,7 +224,7 @@ public class GeReconciliationEngineTest
 
         // Collect: the coins that actually arrive are the executed sell value; the observed
         // shortfall against the counted item loss is the realized result, booked exactly once.
-        Ac collect = h.geInventory(with(h.inventory, COINS, 107_840L));
+        Transaction collect = h.geInventory(with(h.inventory, COINS, 107_840L));
         assertNotNull(collect);
         assertTrue(collect.isCounted());
         assertEquals(7_840L, flow(collect, COINS));
@@ -236,9 +236,9 @@ public class GeReconciliationEngineTest
     /** Band 3 C2: settlement is authoritative, so no synthetic tax cost may be reconstructed. */
     private static void assertNoSyntheticTaxFlows(Harness h)
     {
-        for (Ac transaction : h.counted())
+        for (Transaction transaction : h.counted())
         {
-            for (Ab itemFlow : transaction.getFlows())
+            for (Flow itemFlow : transaction.getFlows())
             {
                 assertTrue("no synthetic GE tax flow may be booked",
                     itemFlow.itemId != CostKind.GE_TAX_ITEM_ID);
@@ -251,14 +251,14 @@ public class GeReconciliationEngineTest
     {
         Harness h = new Harness();
         h.inventory = with(h.inventory, LOGS, 10L);
-        h.engine.setBaseline(new Cc(h.inventory));
+        h.engine.setBaseline(new ContainerSnapshot(h.inventory));
         h.geInventory(with(h.inventory, LOGS, 0L));
         h.offer(3, SELLING, LOGS, 10, 0, 48, 0);
         h.offer(3, SELLING, LOGS, 10, 3, 48, 144);
         h.offer(3, SOLD, LOGS, 10, 10, 48, 480);
         assertEquals(10L, h.filled());
         assertEquals(1, h.counted().size());
-        Ac collect = h.geInventory(with(h.inventory, COINS, 100_480L));
+        Transaction collect = h.geInventory(with(h.inventory, COINS, 100_480L));
         assertTrue(collect.isCounted());
         assertEquals(480L, flow(collect, COINS));
         assertEquals("below the tax floor nothing is guessed", 0L, h.net());
@@ -269,13 +269,13 @@ public class GeReconciliationEngineTest
     public void cancelWithCoinRefundIsNeutralEndToEnd()
     {
         Harness h = new Harness();
-        Ac placed = h.geInventory(with(h.inventory, COINS, 99_520L));
+        Transaction placed = h.geInventory(with(h.inventory, COINS, 99_520L));
         assertTrue("coins into a buy offer are a counted trade until refunded", placed.isCounted());
         h.offer(4, BUYING, LOGS, 10, 0, 48, 0);
-        Bj.Transition cancel = h.offer(4, CANCELLED_BUY, LOGS, 10, 0, 48, 0);
+        OfferLedger.Transition cancel = h.offer(4, CANCELLED_BUY, LOGS, 10, 0, 48, 0);
         assertNotNull(cancel);
         assertEquals(0L, h.filled());
-        Ac refund = h.geInventory(with(h.inventory, COINS, 100_000L));
+        Transaction refund = h.geInventory(with(h.inventory, COINS, 100_000L));
         assertTrue(refund.isCounted());
         assertEquals("placement and refund cancel out; nothing is double booked", 0L, h.net());
     }
@@ -285,7 +285,7 @@ public class GeReconciliationEngineTest
     {
         Harness h = new Harness();
         h.inventory = with(h.inventory, LOGS, 10L);
-        h.engine.setBaseline(new Cc(h.inventory));
+        h.engine.setBaseline(new ContainerSnapshot(h.inventory));
         h.geInventory(with(h.inventory, LOGS, 0L));
         h.offer(5, SELLING, LOGS, 10, 0, 48, 0);
         h.offer(5, CANCELLED_SELL, LOGS, 10, 0, 48, 0);
@@ -305,11 +305,11 @@ public class GeReconciliationEngineTest
         assertTrue(h.counted().isEmpty());
         assertEquals(0L, h.net());
         h.now += 600L;
-        h.engine.markContext(Aj.TRANSFER, 10, "Bank transfer");
+        h.engine.markContext(Context.TRANSFER, 10, "Bank transfer");
         h.inventory = with(h.inventory, SHARK, 5L);
-        h.engine.yz();
-        h.engine.adj(new Cc(h.inventory), h.now);
-        Ac withdrawal = h.engine.adj(new Cc(h.inventory), h.now + 600L);
+        h.engine.markInventoryDirty();
+        h.engine.processIfDirty(new ContainerSnapshot(h.inventory), h.now);
+        Transaction withdrawal = h.engine.processIfDirty(new ContainerSnapshot(h.inventory), h.now + 600L);
         assertTrue("a later bank withdrawal is a transfer, not a gain", withdrawal == null || !withdrawal.isCounted());
         assertTrue(h.counted().isEmpty());
     }
@@ -323,7 +323,7 @@ public class GeReconciliationEngineTest
         h.offer(0, BUYING, LOGS, 10, 0, 48, 0);
         h.offer(0, BUYING, LOGS, 10, 4, 48, 192);
         assertEquals(4L, h.filled());
-        h.relog(new Bj.Snapshot(0, BUYING, LOGS, 10, 7, 48, 336));
+        h.relog(new OfferLedger.Snapshot(0, BUYING, LOGS, 10, 7, 48, 336));
         assertEquals("the lifecycle resumes with what filled while away, once", 7L, h.filled());
         h.offer(0, BOUGHT, LOGS, 10, 10, 48, 480);
         assertEquals("3 more after the seed, not 7", 10L, h.filled());
@@ -335,7 +335,7 @@ public class GeReconciliationEngineTest
     {
         Harness h = new Harness();
         h.offer(0, SELLING, LOGS, 10, 0, 48, 0);
-        h.relog(new Bj.Snapshot(0, SOLD, LOGS, 10, 10, 48, 480));
+        h.relog(new OfferLedger.Snapshot(0, SOLD, LOGS, 10, 10, 48, 480));
         assertEquals(10L, h.filled());
         assertEquals("SOLD", h.record(LOGS).getOfferState());
         assertNull("nothing new happens on the slot after the seed", h.offer(0, SOLD, LOGS, 10, 10, 48, 480));
@@ -347,9 +347,9 @@ public class GeReconciliationEngineTest
     public void aSlotThisProcessNeverSawIsOnlyABaseline()
     {
         Harness h = new Harness();
-        h.relog(new Bj.Snapshot(1, BOUGHT, LOGS, 10, 10, 48, 480));
+        h.relog(new OfferLedger.Snapshot(1, BOUGHT, LOGS, 10, 10, 48, 480));
         assertEquals("no pre-logout snapshot: the completed offer cannot be dated",
-            Aa.Confidence.LEGACY_UNBASED, h.record(LOGS).getConfidence());
+            GeRecord.Confidence.LEGACY_UNBASED, h.record(LOGS).getConfidence());
         assertTrue(h.counted().isEmpty());
     }
 
@@ -364,7 +364,7 @@ public class GeReconciliationEngineTest
         h.offer(0, BUYING, SHARK, 10, 8, 800, 6_400);
         assertNull("a different item in the same slot retires the old offer", h.record(LOGS));
         assertEquals("and starts a quarantined one, not progress",
-            Aa.Confidence.AMBIGUOUS, h.record(SHARK).getConfidence());
+            GeRecord.Confidence.AMBIGUOUS, h.record(SHARK).getConfidence());
         assertTrue(h.counted().isEmpty());
     }
 
@@ -378,10 +378,10 @@ public class GeReconciliationEngineTest
         h.offer(1, BOUGHT, LOGS, 10, 10, 48, 480);
         assertEquals(20L, h.filled());
         h.geInventory(with(h.inventory, LOGS, 20L));
-        List<Ac> counted = h.counted();
+        List<Transaction> counted = h.counted();
         assertEquals("each offer settles its own acquisition exactly once", 2, counted.size());
         long total = 0L;
-        for (Ac transaction : counted)
+        for (Transaction transaction : counted)
         {
             total += flow(transaction, LOGS);
         }
@@ -452,21 +452,21 @@ public class GeReconciliationEngineTest
         return h.net();
     }
 
-    private static Am engine()
+    private static Engine engine()
     {
         GpManagerConfig config = new GpManagerConfig()
         {
             @Override public int stabilizationTicks() { return 0; }
             @Override public boolean keepTransferAuditRows() { return true; }
         };
-        return new Am(deltas ->
+        return new Engine(deltas ->
         {
-            List<Ab> flows = new ArrayList<>();
+            List<Flow> flows = new ArrayList<>();
             for (Map.Entry<Integer, Long> delta : deltas.entrySet())
             {
                 int id = delta.getKey();
-                flows.add(new Ab(id, name(id), delta.getValue(), price(id), delta.getValue() * price(id),
-                    id == COINS ? Av.FACE_VALUE : Av.GRAND_EXCHANGE));
+                flows.add(new Flow(id, name(id), delta.getValue(), price(id), delta.getValue() * price(id),
+                    id == COINS ? PriceSource.FACE_VALUE : PriceSource.GRAND_EXCHANGE));
             }
             return flows;
         }, new TransactionClassifier(), config);

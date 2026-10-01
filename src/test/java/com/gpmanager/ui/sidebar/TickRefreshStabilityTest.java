@@ -24,13 +24,13 @@ public class TickRefreshStabilityTest
     @Test
     public void liveRowsSurviveTicksAndRebuildOnlyWhenTheDataChanges() throws Exception
     {
-        Am engine = PresentationLifecycleTest.engine();
+        Engine engine = PresentationLifecycleTest.engine();
         long now = System.currentTimeMillis();
-        engine.ajl("Vorkath", Cx.GENERAL, now);
-        engine.getActiveSession().kf(gain(now + 1_000L, "Dragon bones", 536, 3_200L), 2_000);
-        Dp panel = onEdt(() ->
+        engine.startCustomSession("Vorkath", SessionMode.GENERAL, now);
+        engine.getActiveSession().addTransaction(gain(now + 1_000L, "Dragon bones", 536, 3_200L), 2_000);
+        SidebarPanel panel = onEdt(() ->
         {
-            Dp created = new Dp(engine, PresentationLifecycleTest.config(), null);
+            SidebarPanel created = new SidebarPanel(engine, PresentationLifecycleTest.config(), null);
             SidebarPanelProbe.refresh(created);
             return created;
         });
@@ -48,7 +48,7 @@ public class TickRefreshStabilityTest
             assertSame("tick " + index + " kept the same component", before.get(index), afterTicks.get(index));
         }
 
-        engine.getActiveSession().kf(gain(now + 2_000L, "Rune platebody", 1127, 38_000L), 2_000);
+        engine.getActiveSession().addTransaction(gain(now + 2_000L, "Rune platebody", 1127, 38_000L), 2_000);
         panel.tick();
         flushEdt();
         List<Component> afterBooking = onEdt(() -> children(SidebarPanelProbe.livePage(panel).body()));
@@ -58,15 +58,15 @@ public class TickRefreshStabilityTest
     @Test
     public void openLedgerIsNotRebuiltByTicksButIsByANewBooking() throws Exception
     {
-        Am engine = PresentationLifecycleTest.engine();
+        Engine engine = PresentationLifecycleTest.engine();
         long now = System.currentTimeMillis();
-        engine.ajl("Vorkath", Cx.GENERAL, now);
-        engine.getActiveSession().kf(gain(now + 1_000L, "Dragon bones", 536, 3_200L), 2_000);
-        Dp panel = onEdt(() ->
+        engine.startCustomSession("Vorkath", SessionMode.GENERAL, now);
+        engine.getActiveSession().addTransaction(gain(now + 1_000L, "Dragon bones", 536, 3_200L), 2_000);
+        SidebarPanel panel = onEdt(() ->
         {
-            Dp created = new Dp(engine, PresentationLifecycleTest.config(), null);
+            SidebarPanel created = new SidebarPanel(engine, PresentationLifecycleTest.config(), null);
             SidebarPanelProbe.refresh(created);
-            SidebarPanelProbe.openLedger(created, Ao.Entry.current());
+            SidebarPanelProbe.openLedger(created, LedgerData.Entry.current());
             return created;
         });
         flushEdt();
@@ -79,18 +79,18 @@ public class TickRefreshStabilityTest
         List<Component> afterTicks = onEdt(() -> children(SidebarPanelProbe.ledgerPage(panel).body()));
         assertEquals("ticks never rebuild the open Ledger", before, afterTicks);
 
-        engine.getActiveSession().kf(gain(now + 2_000L, "Rune platebody", 1127, 38_000L), 2_000);
+        engine.getActiveSession().addTransaction(gain(now + 2_000L, "Rune platebody", 1127, 38_000L), 2_000);
         panel.tick();
         flushEdt();
         List<Component> afterBooking = onEdt(() -> children(SidebarPanelProbe.ledgerPage(panel).body()));
         assertNotEquals("a new booking re-reads the Ledger", before, afterBooking);
     }
 
-    private static Ac gain(long at, String name, int itemId, long value)
+    private static Transaction gain(long at, String name, int itemId, long value)
     {
-        return new Ac(at, null, Ai.GAIN, Aj.GENERIC, "", "Vorkath", true,
-            Collections.singletonList(new Ab(itemId, name, 1L, (int) value, value)),
-            Bd.LIKELY, "Test sample.", null);
+        return new Transaction(at, null, TransactionType.GAIN, Context.GENERIC, "", "Vorkath", true,
+            Collections.singletonList(new Flow(itemId, name, 1L, (int) value, value)),
+            ClassificationConfidence.LIKELY, "Test sample.", null);
     }
 
     /** Every component under the body, depth first; a rebuilt row shows up as a new instance. */

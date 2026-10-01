@@ -14,11 +14,11 @@ public class InventoryConsumptionOptionTest
     {
         for (String option : new String[] {"bury", "scatter", "eat", "drink", "empty", "break", "cast", "release", "eat 1", "drink 1", "light", "offer", "tend-to"})
         {
-            assertTrue(option, Dw.wy(option));
+            assertTrue(option, ActionSignals.isInventoryConsumptionOption(option));
         }
-        assertFalse(Dw.wy("cook"));
-        assertTrue(Dw.xi("light"));
-        assertFalse(Dw.xi("cook"));
+        assertFalse(ActionSignals.isInventoryConsumptionOption("cook"));
+        assertTrue(ActionSignals.isLossOnlySpendOption("light"));
+        assertFalse(ActionSignals.isLossOnlySpendOption("cook"));
     }
 
     @Test
@@ -26,52 +26,52 @@ public class InventoryConsumptionOptionTest
     {
         for (String option : new String[] {"drop", "use", "wear", "wield", "deposit", ""})
         {
-            assertFalse(option, Dw.wy(option));
+            assertFalse(option, ActionSignals.isInventoryConsumptionOption(option));
         }
-        assertFalse(Dw.wy(null));
+        assertFalse(ActionSignals.isInventoryConsumptionOption(null));
     }
 
     @Test
     public void transformOptionsArmProductionBySkill()
     {
-        assertEquals("Cooking", Dw.ajx("cook"));
-        assertEquals("Smelting", Dw.ajx("smelt"));
-        assertEquals("Herblore", Dw.ajx("clean"));
-        assertEquals("Fletching", Dw.ajx("fletch"));
-        assertEquals("", Dw.ajx("eat"));
-        assertTrue(Dw.ww("use", "Tinderbox -> Willow logs"));
-        assertFalse(Dw.ww("use", "Willow logs"));
-        assertTrue(Dw.xt("use", "Dragon bones -> Altar"));
-        assertTrue(Dw.xp("cast", "Sinister Offering"));
+        assertEquals("Cooking", ActionSignals.transformSkillForOption("cook"));
+        assertEquals("Smelting", ActionSignals.transformSkillForOption("smelt"));
+        assertEquals("Herblore", ActionSignals.transformSkillForOption("clean"));
+        assertEquals("Fletching", ActionSignals.transformSkillForOption("fletch"));
+        assertEquals("", ActionSignals.transformSkillForOption("eat"));
+        assertTrue(ActionSignals.isFiremakingUsePair("use", "Tinderbox -> Willow logs"));
+        assertFalse(ActionSignals.isFiremakingUsePair("use", "Willow logs"));
+        assertTrue(ActionSignals.isPrayerAltarUsePair("use", "Dragon bones -> Altar"));
+        assertTrue(ActionSignals.xp("cast", "Sinister Offering"));
     }
 
     @Test
     public void recognisesHarvestGatherOptionsForActivityHints()
     {
-        assertTrue(Dw.xb("pick"));
-        assertTrue(Dw.xb("harvest"));
-        assertTrue(Dw.xb("chop down"));
-        assertTrue(Dw.xb("mine"));
-        assertFalse(Dw.xb("rake"));
-        assertEquals("Farming", Dw.ka("pick"));
-        assertEquals("Woodcutting", Dw.ka("chop"));
-        assertEquals("Mining", Dw.ka("mine"));
-        assertEquals("Fishing", Dw.ka("fish"));
-        assertEquals("General", Dw.ka("open"));
+        assertTrue(ActionSignals.isHarvestGatherOption("pick"));
+        assertTrue(ActionSignals.isHarvestGatherOption("harvest"));
+        assertTrue(ActionSignals.isHarvestGatherOption("chop down"));
+        assertTrue(ActionSignals.isHarvestGatherOption("mine"));
+        assertFalse(ActionSignals.isHarvestGatherOption("rake"));
+        assertEquals("Farming", ActionSignals.activityHintForGatherOption("pick"));
+        assertEquals("Woodcutting", ActionSignals.activityHintForGatherOption("chop"));
+        assertEquals("Mining", ActionSignals.activityHintForGatherOption("mine"));
+        assertEquals("Fishing", ActionSignals.activityHintForGatherOption("fish"));
+        assertEquals("General", ActionSignals.activityHintForGatherOption("open"));
     }
 
     @Test
     public void recognisesLiveConsumptionChatMessages()
     {
-        assertTrue(Dw.vy("you drink some of your prayer potion."));
-        assertTrue(Dw.vy("you dig a hole and bury the bones."));
-        assertTrue(Dw.vy("you eat the lobster."));
-        assertTrue(Dw.vy("you scatter the ashes."));
-        assertTrue(Dw.vy("the gods are very pleased with your offering."));
-        assertFalse("bone-save keeps the bone: never a spend", Dw.vy("the dark lord spares your sacrifice but still rewards you."));
-        assertTrue(Dw.vt("The Dark Lord spares your sacrifice."));
-        assertFalse(Dw.vy("you pick a potato."));
-        assertFalse(Dw.vy(""));
-        assertFalse(Dw.vy(null));
+        assertTrue(ActionSignals.isConsumptionChatMessage("you drink some of your prayer potion."));
+        assertTrue(ActionSignals.isConsumptionChatMessage("you dig a hole and bury the bones."));
+        assertTrue(ActionSignals.isConsumptionChatMessage("you eat the lobster."));
+        assertTrue(ActionSignals.isConsumptionChatMessage("you scatter the ashes."));
+        assertTrue(ActionSignals.isConsumptionChatMessage("the gods are very pleased with your offering."));
+        assertFalse("bone-save keeps the bone: never a spend", ActionSignals.isConsumptionChatMessage("the dark lord spares your sacrifice but still rewards you."));
+        assertTrue(ActionSignals.isChaosAltarBoneSaveChat("The Dark Lord spares your sacrifice."));
+        assertFalse(ActionSignals.isConsumptionChatMessage("you pick a potato."));
+        assertFalse(ActionSignals.isConsumptionChatMessage(""));
+        assertFalse(ActionSignals.isConsumptionChatMessage(null));
     }
 }

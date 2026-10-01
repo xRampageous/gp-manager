@@ -21,12 +21,12 @@ public class FreshSaveFormatTest
     {
         Path root = Files.createTempDirectory("gp-manager-fresh-format");
         TrackingIdentity identity = new TrackingIdentity("profile-key", TrackingIdentity.ACCOUNT_HASH_INVALID);
-        Path oldSave = root.resolve("accounts").resolve(identity.ajc()).resolve("sessions.json");
+        Path oldSave = root.resolve("accounts").resolve(identity.storageFolderName()).resolve("sessions.json");
         Files.createDirectories(oldSave.getParent());
         Files.writeString(oldSave, OLD_SAVE, StandardCharsets.UTF_8);
 
         SessionRepository repository = new SessionRepository(new Gson(), FilepathTestSupport.root(root), true);
-        repository.mc(identity);
+        repository.bindIdentity(identity);
         SavedState loaded = repository.load();
         assertNull("the old owner is never read", loaded.generalSession);
         assertEquals(SavedState.CURRENT_SCHEMA_VERSION, loaded.schemaVersion);

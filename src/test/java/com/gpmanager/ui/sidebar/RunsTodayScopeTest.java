@@ -17,26 +17,26 @@ public class RunsTodayScopeTest
     @Test
     public void runsTodayIncludesTheCurrentRunAndTodayStartedRunsOnly() throws Exception
     {
-        Am engine = engine("UTC");
+        Engine engine = engine("UTC");
         ZoneId zone = ZoneId.of("UTC");
         long midnight = LocalDate.of(2026, 3, 7).atStartOfDay(zone).toInstant().toEpochMilli();
         long now = midnight + 12L * 3_600_000L;
 
-        engine.ajl("Overnight", Cx.GENERAL, midnight - 300_000L);
+        engine.startCustomSession("Overnight", SessionMode.GENERAL, midnight - 300_000L);
         String overnightId = engine.getActiveSession().getId();
         book(engine, midnight - 299_000L, 1_000L);
-        engine.sx(midnight + 600_000L);
+        engine.finishCustomSession(midnight + 600_000L);
 
-        engine.ajl("Morning", Cx.GENERAL, midnight + 900_000L);
+        engine.startCustomSession("Morning", SessionMode.GENERAL, midnight + 900_000L);
         String morningId = engine.getActiveSession().getId();
         book(engine, midnight + 901_000L, 2_000L);
-        engine.sx(midnight + 1_800_000L);
+        engine.finishCustomSession(midnight + 1_800_000L);
 
-        engine.ajl("Live", Cx.GENERAL, midnight - 120_000L);
+        engine.startCustomSession("Live", SessionMode.GENERAL, midnight - 120_000L);
         book(engine, midnight - 119_000L, 3_000L);
 
-        Ao.Entry entry = Ao.Entry.current().withScope(Ao.Scope.TODAY, null, null);
-        List<Ad> sessions = Ao.aig(engine, entry, now);
+        LedgerData.Entry entry = LedgerData.Entry.current().withScope(LedgerData.Scope.TODAY, null, null);
+        List<Session> sessions = LedgerData.sessionsFor(engine, entry, now);
         assertEquals("whole runs, not calendar slices", 2, sessions.size());
         assertEquals("the current run is included in full even though it started yesterday",
             engine.getActiveSession().getId(), sessions.get(0).getId());
@@ -44,7 +44,7 @@ public class RunsTodayScopeTest
         assertTrue("the overnight run is out", sessions.stream()
             .noneMatch(session -> overnightId.equals(session.getId())));
 
-        Ao data = Ao.capture(engine, now, entry);
+        LedgerData data = LedgerData.capture(engine, now, entry);
         assertEquals("only whole-run totals: the overnight run's money stays out", 5_000L, data.net);
     }
 
@@ -53,19 +53,19 @@ public class RunsTodayScopeTest
     {
         for (String zoneId : new String[] {"UTC", "America/New_York"})
         {
-            Am engine = engine(zoneId);
+            Engine engine = engine(zoneId);
             ZoneId zone = ZoneId.of(zoneId);
             long midnight = LocalDate.of(2026, 3, 8).atStartOfDay(zone).toInstant().toEpochMilli();
             long now = midnight + 12L * 3_600_000L;
 
-            engine.ajl("JustBefore", Cx.GENERAL, midnight - 1L);
+            engine.startCustomSession("JustBefore", SessionMode.GENERAL, midnight - 1L);
             String beforeId = engine.getActiveSession().getId();
-            engine.sx(midnight + 60_000L);
+            engine.finishCustomSession(midnight + 60_000L);
 
-            engine.ajl("AtMidnight", Cx.GENERAL, midnight);
+            engine.startCustomSession("AtMidnight", SessionMode.GENERAL, midnight);
 
-            Ao.Entry entry = Ao.Entry.current().withScope(Ao.Scope.TODAY, null, null);
-            List<Ad> sessions = Ao.aig(engine, entry, now);
+            LedgerData.Entry entry = LedgerData.Entry.current().withScope(LedgerData.Scope.TODAY, null, null);
+            List<Session> sessions = LedgerData.sessionsFor(engine, entry, now);
             assertEquals("only the run started at midnight is today", 1, sessions.size());
             assertEquals(engine.getActiveSession().getId(), sessions.get(0).getId());
             assertTrue(sessions.stream().noneMatch(session -> beforeId.equals(session.getId())));
@@ -75,15 +75,15 @@ public class RunsTodayScopeTest
     @Test
     public void theScopeSaysRunsTodayAndDisclosesItsMembership() throws Exception
     {
-        Am engine = engine("UTC");
+        Engine engine = engine("UTC");
         long now = System.currentTimeMillis();
-        engine.ajl("Live", Cx.GENERAL, now);
+        engine.startCustomSession("Live", SessionMode.GENERAL, now);
 
-        Dp panel = onEdt(() -> new Dp(engine, new GpManagerConfig() {}, null));
+        SidebarPanel panel = onEdt(() -> new SidebarPanel(engine, new GpManagerConfig() {}, null));
         onEdt(() ->
         {
-            panel.ledger.apply(Ao.capture(engine, now,
-                Ao.Entry.current().withScope(Ao.Scope.TODAY, null, null)));
+            panel.ledger.apply(LedgerData.capture(engine, now,
+                LedgerData.Entry.current().withScope(LedgerData.Scope.TODAY, null, null)));
             return null;
         });
 
@@ -112,18 +112,18 @@ public class RunsTodayScopeTest
         return false;
     }
 
-    private static Ac book(Am engine, long at, long value)
+    private static Transaction book(Engine engine, long at, long value)
     {
-        Ac receipt = new Ac(at, null, Ai.LOOT, Aj.LOOT, "", "Vorkath", true,
-            Collections.singletonList(new Ab(536, "Dragon bones", 1L, (int) value, value)),
-            Bd.CONFIRMED, "fixture", null);
-        engine.getActiveSession().kf(receipt, 2_000);
+        Transaction receipt = new Transaction(at, null, TransactionType.LOOT, Context.LOOT, "", "Vorkath", true,
+            Collections.singletonList(new Flow(536, "Dragon bones", 1L, (int) value, value)),
+            ClassificationConfidence.CONFIRMED, "fixture", null);
+        engine.getActiveSession().addTransaction(receipt, 2_000);
         return receipt;
     }
 
-    private static Am engine(String zoneId)
+    private static Engine engine(String zoneId)
     {
-        Am engine = new Am(deltas -> Collections.emptyList(), new TransactionClassifier(),
+        Engine engine = new Engine(deltas -> Collections.emptyList(), new TransactionClassifier(),
             new GpManagerConfig() {});
         engine.profileTimeZoneId = zoneId;
         return engine;

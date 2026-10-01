@@ -34,19 +34,19 @@ public class MarketEconomyGateTest
     @Test
     public void ordinaryMainGameModifiersAllowAutomaticQuotes()
     {
-        assertState(Bl.Bk.NORMAL);
-        assertState(Bl.Bk.NORMAL, WorldType.MEMBERS);
-        assertState(Bl.Bk.NORMAL, WorldType.PVP);
-        assertState(Bl.Bk.NORMAL, WorldType.HIGH_RISK);
-        assertState(Bl.Bk.NORMAL, WorldType.BOUNTY);
-        assertState(Bl.Bk.NORMAL, WorldType.SKILL_TOTAL);
-        assertState(Bl.Bk.NORMAL, WorldType.MEMBERS, WorldType.PVP,
+        assertState(ItemValuationService.EconomyState.NORMAL);
+        assertState(ItemValuationService.EconomyState.NORMAL, WorldType.MEMBERS);
+        assertState(ItemValuationService.EconomyState.NORMAL, WorldType.PVP);
+        assertState(ItemValuationService.EconomyState.NORMAL, WorldType.HIGH_RISK);
+        assertState(ItemValuationService.EconomyState.NORMAL, WorldType.BOUNTY);
+        assertState(ItemValuationService.EconomyState.NORMAL, WorldType.SKILL_TOTAL);
+        assertState(ItemValuationService.EconomyState.NORMAL, WorldType.MEMBERS, WorldType.PVP,
             WorldType.HIGH_RISK, WorldType.BOUNTY, WorldType.SKILL_TOTAL);
         // Owner 2026-09-28: LMS, PvP Arena and every other main-game world share the Grand Exchange.
         for (WorldType shared : new WorldType[] {WorldType.LAST_MAN_STANDING, WorldType.PVP_ARENA,
             WorldType.FRESH_START_WORLD, WorldType.LEGACY_ONLY, WorldType.EOC_ONLY})
         {
-            assertState(Bl.Bk.NORMAL, shared);
+            assertState(ItemValuationService.EconomyState.NORMAL, shared);
         }
     }
 
@@ -57,19 +57,19 @@ public class MarketEconomyGateTest
             WorldType.DEADMAN, WorldType.SEASONAL, WorldType.QUEST_SPEEDRUNNING,
             WorldType.BETA_WORLD, WorldType.NOSAVE_MODE, WorldType.TOURNAMENT_WORLD})
         {
-            assertState(Bl.Bk.UNSUPPORTED_SPECIAL, blocked);
+            assertState(ItemValuationService.EconomyState.UNSUPPORTED_SPECIAL, blocked);
         }
-        assertState(Bl.Bk.UNSUPPORTED_SPECIAL,
+        assertState(ItemValuationService.EconomyState.UNSUPPORTED_SPECIAL,
             WorldType.MEMBERS, WorldType.DEADMAN);
     }
 
     @Test
     public void unknownEconomyFailsClosed()
     {
-        assertEquals(Bl.Bk.UNKNOWN,
-            Bl.rh(null));
-        assertEquals(Bl.Bk.UNKNOWN,
-            Bl.rh(Collections.singletonList(null)));
+        assertEquals(ItemValuationService.EconomyState.UNKNOWN,
+            ItemValuationService.economyStateFor(null));
+        assertEquals(ItemValuationService.EconomyState.UNKNOWN,
+            ItemValuationService.economyStateFor(Collections.singletonList(null)));
     }
 
     // ── the gate on real flows ─────────────────────────────────────────────────────────────────
@@ -78,22 +78,22 @@ public class MarketEconomyGateTest
     public void unsupportedWorldLeavesItemsUnpricedWithoutReviewFlood() throws Exception
     {
         Seam seam = new Seam();
-        Bl service = new Bl(new GpManagerConfig() {}, id -> null,
+        ItemValuationService service = new ItemValuationService(new GpManagerConfig() {}, id -> null,
             (id, active) -> seam.quote, id -> false,
-            Bl.Bk.UNSUPPORTED_SPECIAL);
-        Am engine = new Am(service, new TransactionClassifier(), config());
-        engine.rm(T0);
+            ItemValuationService.EconomyState.UNSUPPORTED_SPECIAL);
+        Engine engine = new Engine(service, new TransactionClassifier(), config());
+        engine.ensureSession(T0);
 
         for (int i = 0; i < 100; i++)
         {
             int itemId = 2_000 + i;
-            Ab flow = service.value(Collections.singletonMap(itemId, 1L), T0 + i).get(0);
+            Flow flow = service.value(Collections.singletonMap(itemId, 1L), T0 + i).get(0);
             assertEquals("special economies keep unknown honest, never zero truth",
-                Av.UNPRICED, flow.getPriceSource());
+                PriceSource.UNPRICED, flow.getPriceSource());
             assertEquals(0L, flow.valueDelta);
-            engine.getActiveSession().kf(new Ac(T0 + i, null,
-                Ai.GAIN, Aj.GENERIC, "", "Item " + itemId, true,
-                Collections.singletonList(flow), Bd.CONFIRMED, "", null), 200);
+            engine.getActiveSession().addTransaction(new Transaction(T0 + i, null,
+                TransactionType.GAIN, Context.GENERIC, "", "Item " + itemId, true,
+                Collections.singletonList(flow), ClassificationConfidence.CONFIRMED, "", null), 200);
         }
 
         assertTrue("the gate never queried the automatic market", seam.asked.isEmpty());
@@ -101,7 +101,7 @@ public class MarketEconomyGateTest
             0, engine.getReviewRows(T0 + 200L).size());
         assertEquals(0L, engine.getMetrics(T0 + 200L).net);
 
-        assertEquals(0, Ca.capture(engine, T0 + 200L, null).reviewCount);
+        assertEquals(0, LiveSnapshot.capture(engine, T0 + 200L, null).reviewCount);
     }
 
     @Test
@@ -114,20 +114,20 @@ public class MarketEconomyGateTest
                 return "560=150";
             }
         };
-        Bl service = new Bl(config, id -> null,
+        ItemValuationService service = new ItemValuationService(config, id -> null,
             (id, active) -> 500, id -> false,
-            Bl.Bk.UNSUPPORTED_SPECIAL);
+            ItemValuationService.EconomyState.UNSUPPORTED_SPECIAL);
 
-        Ab overridden = service.value(Collections.singletonMap(560, 2L), T0).get(0);
-        assertEquals(Av.MANUAL_OVERRIDE, overridden.getPriceSource());
+        Flow overridden = service.value(Collections.singletonMap(560, 2L), T0).get(0);
+        assertEquals(PriceSource.MANUAL_OVERRIDE, overridden.getPriceSource());
         assertEquals(300L, overridden.valueDelta);
 
-        Ab coins = service.value(Collections.singletonMap(995, 5L), T0).get(0);
-        assertEquals(Av.FACE_VALUE, coins.getPriceSource());
+        Flow coins = service.value(Collections.singletonMap(995, 5L), T0).get(0);
+        assertEquals(PriceSource.FACE_VALUE, coins.getPriceSource());
         assertEquals(5L, coins.valueDelta);
 
-        Ab ordinary = service.value(Collections.singletonMap(561, 1L), T0).get(0);
-        assertEquals(Av.UNPRICED, ordinary.getPriceSource());
+        Flow ordinary = service.value(Collections.singletonMap(561, 1L), T0).get(0);
+        assertEquals(PriceSource.UNPRICED, ordinary.getPriceSource());
         assertEquals("unknown on a special world is not zero truth", 0L, ordinary.valueDelta);
         assertFalse(service.automaticMarketQuotesAvailable());
     }
@@ -135,16 +135,16 @@ public class MarketEconomyGateTest
     @Test
     public void unknownEconomyAlsoFailsClosedUntilTheWorldIsKnown()
     {
-        Bl service = new Bl(new GpManagerConfig() {}, id -> null,
-            (id, active) -> 100, id -> false, Bl.Bk.UNKNOWN);
-        Am engine = new Am(service, new TransactionClassifier(), config());
-        engine.rm(T0);
-        assertEquals(Av.UNPRICED,
+        ItemValuationService service = new ItemValuationService(new GpManagerConfig() {}, id -> null,
+            (id, active) -> 100, id -> false, ItemValuationService.EconomyState.UNKNOWN);
+        Engine engine = new Engine(service, new TransactionClassifier(), config());
+        engine.ensureSession(T0);
+        assertEquals(PriceSource.UNPRICED,
             service.value(Collections.singletonMap(560, 1L), T0).get(0).getPriceSource());
 
-        service.setEconomyState(Bl.Bk.NORMAL);
+        service.setEconomyState(ItemValuationService.EconomyState.NORMAL);
         assertTrue(service.automaticMarketQuotesAvailable());
-        assertEquals(Av.GRAND_EXCHANGE,
+        assertEquals(PriceSource.GRAND_EXCHANGE,
             service.value(Collections.singletonMap(560, 1L), T0).get(0).getPriceSource());
     }
 
@@ -154,27 +154,27 @@ public class MarketEconomyGateTest
     public void pluginRefreshSeamTracksLoginWorldHopAndLogout() throws Exception
     {
         GpManagerPlugin plugin = new GpManagerPlugin();
-        Bl service = new Bl(new GpManagerConfig() {}, id -> null,
-            (id, active) -> 100, id -> false, Bl.Bk.UNKNOWN);
+        ItemValuationService service = new ItemValuationService(new GpManagerConfig() {}, id -> null,
+            (id, active) -> 100, id -> false, ItemValuationService.EconomyState.UNKNOWN);
         set(plugin, "valuation", service);
 
         set(plugin, "client", client(GameState.LOGGED_IN, EnumSet.of(WorldType.DEADMAN)));
         refresh(plugin);
-        assertEquals(Bl.Bk.UNSUPPORTED_SPECIAL, service.getEconomyState());
+        assertEquals(ItemValuationService.EconomyState.UNSUPPORTED_SPECIAL, service.getEconomyState());
 
         set(plugin, "client", client(GameState.LOGGED_IN, EnumSet.of(WorldType.MEMBERS)));
         refresh(plugin);
-        assertEquals(Bl.Bk.NORMAL, service.getEconomyState());
+        assertEquals(ItemValuationService.EconomyState.NORMAL, service.getEconomyState());
 
         set(plugin, "client", client(GameState.LOGIN_SCREEN, EnumSet.noneOf(WorldType.class)));
         refresh(plugin);
-        assertEquals("logout clears the snapshot to UNKNOWN", Bl.Bk.UNKNOWN,
+        assertEquals("logout clears the snapshot to UNKNOWN", ItemValuationService.EconomyState.UNKNOWN,
             service.getEconomyState());
 
         set(plugin, "client", client(GameState.HOPPING, EnumSet.of(WorldType.DEADMAN)));
         refresh(plugin);
         assertEquals("a hop has no world identity until login",
-            Bl.Bk.UNKNOWN, service.getEconomyState());
+            ItemValuationService.EconomyState.UNKNOWN, service.getEconomyState());
     }
 
     // ── fixtures ───────────────────────────────────────────────────────────────────────────────
@@ -185,9 +185,9 @@ public class MarketEconomyGateTest
         int quote = 100;
     }
 
-    private static void assertState(Bl.Bk expected, WorldType... types)
+    private static void assertState(ItemValuationService.EconomyState expected, WorldType... types)
     {
-        assertEquals(expected, Bl.rh(
+        assertEquals(expected, ItemValuationService.economyStateFor(
             types.length == 0 ? EnumSet.noneOf(WorldType.class) : EnumSet.copyOf(
                 java.util.Arrays.asList(types))));
     }

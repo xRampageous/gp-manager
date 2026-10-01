@@ -84,7 +84,7 @@ public class RetentionCompactionSoakTest
     @Test
     public void tenThousandReceiptsOverThreeYearsCompactAndReconcileAcrossEveryWindowAndReload() throws Exception
     {
-        List<Ad> fixture = fixture();
+        List<Session> fixture = fixture();
         Truth truth = truth(fixture);
         assertTrue("10k+ transaction fixture: " + truth.transactions, truth.transactions >= 10_000L);
         assertTrue("multi-year fixture: " + DAYS + " UTC days", DAYS >= 3 * 365);
@@ -113,14 +113,14 @@ public class RetentionCompactionSoakTest
         line("uncompacted_dir_bytes=" + dirSize(uncompactedDir));
 
         // Every shipping window compacts the same fixture and reconciles exactly.
-        for (Db period : Db.values())
+        for (ReceiptRetentionPeriod period : ReceiptRetentionPeriod.values())
         {
             verifyWindow(period, fullJson, truth);
         }
         // Legacy Forever migrates to 365 days (charter L); the enum read is the migration.
 
         // The default 90-day window carries the lifetime, merge, CSV and reload soak.
-        Am engine = engine(Db.DAYS_90);
+        Engine engine = engine(ReceiptRetentionPeriod.DAYS_90);
         t = System.nanoTime();
         engine.restore(copy(fullJson), NOW);
         line("restore_and_compact_90d_ms=" + ms(t));
@@ -137,10 +137,10 @@ public class RetentionCompactionSoakTest
 
     // ── windows ───────────────────────────────────────────────────────────────
 
-    private void verifyWindow(Db period, String fullJson, Truth truth)
+    private void verifyWindow(ReceiptRetentionPeriod period, String fullJson, Truth truth)
     {
         int days = period.getDays();
-        Am engine = engine(period);
+        Engine engine = engine(period);
         long t = System.nanoTime();
         engine.restore(copy(fullJson), NOW);
         long restoreMs = ms(t);
@@ -148,11 +148,11 @@ public class RetentionCompactionSoakTest
         int retained = 0;
         long compacted = 0L;
         int kept = 0;
-        for (Ad session : engine.getHistory())
+        for (Session session : engine.getHistory())
         {
             long[] money = truth.sessionMoney.get(session.getName());
             assertNotNull(session.getName(), money);
-            Bu metrics = session.metrics(NOW, WINDOW);
+            SessionMetrics metrics = session.metrics(NOW);
             assertEquals(session.getName() + " revenue " + days + "d", money[0], metrics.revenue);
             assertEquals(session.getName() + " costs " + days + "d", money[1], metrics.costs);
             assertEquals(session.getName() + " net " + days + "d", money[2], metrics.net);
@@ -160,7 +160,7 @@ public class RetentionCompactionSoakTest
             long[] pk = truth.sessionPk.get(session.getName());
             if (pk != null)
             {
-                Dt metricsPk = session.ava();
+                PkMetrics metricsPk = session.pkMetrics();
                 assertEquals(pk[0], metricsPk.kills);
                 assertEquals(pk[1], metricsPk.deaths);
                 assertEquals(session.getName() + " PK net", pk[2], metricsPk.net);
@@ -169,16 +169,16 @@ public class RetentionCompactionSoakTest
                 PkHistoryProjection projection = session.pkProjection;
                 assertNotNull(session.getName() + " PK projection exists", projection);
                 assertEquals(session.getName() + " retained detail matches the projection",
-                    projection.uj(), session.getPkEncounters().size());
+                    projection.getRetainedDetailCount(), session.getPkEncounters().size());
                 assertTrue(session.getName() + " retained detail stays bounded",
                     session.getPkEncounters().size() <= PkHistoryArchive.MAX_DETAILED_ENCOUNTERS);
                 if (session.getPkEncounters().size() < 2)
                 {
                     assertEquals(session.getName() + " detail scope stays truthful",
-                        Di.RETAINED_WINDOW, metricsPk.detailScope);
+                        PkDetailScope.RETAINED_WINDOW, metricsPk.detailScope);
                 }
             }
-            for (Ac row : session.getTransactions())
+            for (Transaction row : session.getTransactions())
             {
                 retained++;
                 if (row.getId().equals(PENDING_CLAIM_ROW))
@@ -194,26 +194,26 @@ public class RetentionCompactionSoakTest
         assertEquals("retained + compacted = every fixture row (" + days + "d)", truth.transactions, retained + compacted);
         assertTrue(days + "d window compacted nothing", compacted > 0L);
         assertEquals("the unresolved claim's audit row survives every window", 1, kept);
-        assertEquals("a second sweep is a no-op", 0, engine.pg(days, NOW));
+        assertEquals("a second sweep is a no-op", 0, engine.compactOlderThan(days, NOW));
         line(String.format(Locale.ROOT, "window_%dd retained_rows=%d compacted_rows=%d restore_ms=%d",
             days, retained, compacted, restoreMs));
     }
 
     // ── lifetime archive / records ────────────────────────────────────────────
 
-    private void verifyLifetimeArchive(Am engine, Truth truth, List<Ad> fixture)
+    private void verifyLifetimeArchive(Engine engine, Truth truth, List<Session> fixture)
     {
         // PvP lifetime facts live in the profile PvP base and survive session trimming and reload.
         AllTime pvp = new AllTime();
-        pvp.addPvp(EngineProbe.profileFacts(engine.pkHistory, engine.akf()));
+        pvp.addPvp(EngineProbe.profileFacts(engine.pkHistory, engine.uniqueProfileSessions()));
         assertEquals(truth.kills, pvp.kills);
         assertEquals(truth.deaths, pvp.deaths);
         assertEquals("best kill survives trimming", truth.bestKill, pvp.bestKill);
         assertEquals("worst death survives trimming", truth.worstDeath, pvp.worstDeath);
-        Am reloaded = engine(Db.DAYS_90);
-        reloaded.restore(copy(GSON.toJson(engine.qm())), NOW);
+        Engine reloaded = engine(ReceiptRetentionPeriod.DAYS_90);
+        reloaded.restore(copy(GSON.toJson(engine.createSavedState())), NOW);
         AllTime afterReload = new AllTime();
-        afterReload.addPvp(EngineProbe.profileFacts(reloaded.pkHistory, reloaded.akf()));
+        afterReload.addPvp(EngineProbe.profileFacts(reloaded.pkHistory, reloaded.uniqueProfileSessions()));
         assertEquals(pvp.toString(), afterReload.toString());
     }
 
@@ -248,24 +248,24 @@ public class RetentionCompactionSoakTest
 
     // ── pending claim ─────────────────────────────────────────────────────────
 
-    private void verifyPendingClaim(Am engine, Truth truth, String when)
+    private void verifyPendingClaim(Engine engine, Truth truth, String when)
     {
-        List<SavedState.By> claims = engine.getPendingClaims();
+        List<SavedState.PendingClaim> claims = engine.getPendingClaims();
         assertEquals("the unresolved claim is neither lost nor duplicated " + when, 1, claims.size());
         assertEquals(PENDING_CLAIM_ROW, claims.get(0).getClaimId());
-        Ad owner = null;
-        Ac audit = null;
+        Session owner = null;
+        Transaction audit = null;
         int settledRows = 0;
-        for (Ad session : engine.getHistory())
+        for (Session session : engine.getHistory())
         {
-            for (Ac row : session.getTransactions())
+            for (Transaction row : session.getTransactions())
             {
                 if (row.getId().equals(PENDING_CLAIM_ROW))
                 {
                     owner = session;
                     audit = row;
                 }
-                if (row.uo().equals(SETTLED_CLAIM_ID)) settledRows++;
+                if (row.getSourceClaimId().equals(SETTLED_CLAIM_ID)) settledRows++;
             }
         }
         assertNotNull("the unresolved claim's audit row stays individually inspectable " + when, audit);
@@ -273,22 +273,22 @@ public class RetentionCompactionSoakTest
         assertEquals("the audit row is not counted twice", 0L, audit.getNet());
         assertEquals("the settled claim was dropped on restore, its settlement booked once",
             0, settledRows == 0 ? 0 : settledRows - 1);
-        assertEquals(truth.sessionMoney.get("Day 3")[2], owner.metrics(NOW, WINDOW).net);
+        assertEquals(truth.sessionMoney.get("Day 3")[2], owner.metrics(NOW).net);
     }
 
     // ── performance ───────────────────────────────────────────────────────────
 
     // ── CSV ───────────────────────────────────────────────────────────────────
 
-    private void verifyCsvReconciliation(Am engine, Truth truth) throws IOException
+    private void verifyCsvReconciliation(Engine engine, Truth truth) throws IOException
     {
         // A PK session straddling the 90-day cutoff: compacted rows and retained rows in one file.
-        Ad straddling = session(engine, "PK trip " + (DAYS - 90));
+        Session straddling = session(engine, "PK trip " + (DAYS - 90));
         assertTrue(straddling.compactedTransactionCount > 0L);
         assertFalse(straddling.getTransactions().isEmpty());
         Filepath directory = FilepathTestSupport.root(folder.newFolder("csv").toPath());
-        Filepath result = new CsvExporter().si(straddling, directory);
-        Bu metrics = straddling.metrics(NOW, WINDOW);
+        Filepath result = new CsvExporter().exportSession(straddling, directory);
+        SessionMetrics metrics = straddling.metrics(NOW);
         assertEquals(truth.sessionMoney.get(straddling.getName())[2], metrics.net);
 
         long[] detailSum = reconcile(result, "projected_row_revenue", "projected_row_costs", "ITEM_FLOW", "TRANSACTION");
@@ -298,9 +298,9 @@ public class RetentionCompactionSoakTest
         assertEquals("no fabricated old item rows", straddling.getTransactions().size(), detailSum[3]);
 
         // A fully compacted session exports no detail rows and one COMPACTED row that is the total.
-        Ad old = session(engine, "Day 10");
+        Session old = session(engine, "Day 10");
         assertTrue(old.getTransactions().isEmpty());
-        Filepath oldResult = new CsvExporter().si(old, directory);
+        Filepath oldResult = new CsvExporter().exportSession(old, directory);
         long[] oldSum = reconcile(oldResult, "projected_row_revenue", "projected_row_costs", "ITEM_FLOW", "TRANSACTION");
         assertEquals(truth.sessionMoney.get("Day 10")[0], oldSum[0]);
         assertEquals(truth.sessionMoney.get("Day 10")[1], oldSum[1]);
@@ -370,12 +370,12 @@ public class RetentionCompactionSoakTest
 
     // ── repeated save / reload ────────────────────────────────────────────────
 
-    private void verifyRepeatedSaveReload(Am seed, Truth truth) throws IOException
+    private void verifyRepeatedSaveReload(Engine seed, Truth truth) throws IOException
     {
         Path directory = folder.newFolder("reload").toPath();
         SessionRepository repository = new SessionRepository(GSON,
             FilepathTestSupport.root(directory));
-        Am engine = seed;
+        Engine engine = seed;
         String fingerprint = fingerprint(engine);
         long saveNs = 0L;
         long loadNs = 0L;
@@ -386,11 +386,11 @@ public class RetentionCompactionSoakTest
         for (int round = 0; round < rounds; round++)
         {
             long t = System.nanoTime();
-            SavedState state = engine.qm();
+            SavedState state = engine.createSavedState();
             assertTrue("save round " + round, PersistenceProbe.save(repository, state));
             saveNs += System.nanoTime() - t;
             long bytes = Files.size(FilepathTestSupport.path(
-                repository.ty().joinSegment("sessions.json")));
+                repository.getDataDirectory().joinSegment("sessions.json")));
             minBytes = Math.min(minBytes, bytes);
             maxBytes = Math.max(maxBytes, bytes);
             t = System.nanoTime();
@@ -398,7 +398,7 @@ public class RetentionCompactionSoakTest
             loadNs += System.nanoTime() - t;
             assertEquals(SavedState.CURRENT_SCHEMA_VERSION, loaded.schemaVersion);
             assertEquals(round + 1L, loaded.revision);
-            engine = engine(Db.DAYS_90);
+            engine = engine(ReceiptRetentionPeriod.DAYS_90);
             t = System.nanoTime();
             engine.restore(loaded, NOW + round);
             restoreNs += System.nanoTime() - t;
@@ -418,90 +418,90 @@ public class RetentionCompactionSoakTest
     }
 
     /** Every accounting fact a reload must preserve, as one comparable string. */
-    private static String fingerprint(Am engine)
+    private static String fingerprint(Engine engine)
     {
         StringBuilder sb = new StringBuilder();
-        PkProfileBase pvp = EngineProbe.profileFacts(engine.pkHistory, engine.akf());
+        PkProfileBase pvp = EngineProbe.profileFacts(engine.pkHistory, engine.uniqueProfileSessions());
         sb.append(pvp.getKills()).append('|').append(pvp.getBestKill()).append('|');
         sb.append(engine.getHistory().size()).append('|').append(engine.getPendingClaims().size()).append('|');
-        for (Ad session : engine.getHistory())
+        for (Session session : engine.getHistory())
         {
-            Bu metrics = session.metrics(NOW, WINDOW);
+            SessionMetrics metrics = session.metrics(NOW);
             sb.append(session.getId()).append(':').append(metrics.revenue).append(':').append(metrics.costs)
                 .append(':').append(session.getTransactions().size()).append(':').append(session.compactedTransactionCount)
-                .append(':').append(session.getPkEncounters().size()).append(':').append(session.ava().bestKill).append(';');
+                .append(':').append(session.getPkEncounters().size()).append(':').append(session.pkMetrics().bestKill).append(';');
         }
         return sb.toString();
     }
 
     // ── fixture ───────────────────────────────────────────────────────────────
 
-    private static List<Ad> fixture()
+    private static List<Session> fixture()
     {
-        List<Ad> sessions = new ArrayList<>();
+        List<Session> sessions = new ArrayList<>();
         for (int day = 0; day < DAYS; day++)
         {
             // Day DAYS-90 straddles the default cutoff: its kill compacts, its later death stays retained.
             boolean pk = day % 10 == 5 || day == DAYS - 90;
             long start = BASE + day * DAY + 3_600_000L;
-            Ad session = new Ad(pk ? "PK trip " + day : "Day " + day, start,
-                pk ? Cx.PK : Cx.AUTO);
+            Session session = new Session(pk ? "PK trip " + day : "Day " + day, start,
+                pk ? SessionMode.PK : SessionMode.AUTO);
             session.setActivityHint(pk ? "PKing" : "Woodcutting", start);
             long logsQuantity = dayLogsQuantity(day);
             String splitTarget = null;
             String ignoreTarget = null;
             for (int i = 0; i < 7; i++)
             {
-                Ac loot = row(start + (i + 1) * 60_000L, Ai.LOOT, Aj.LOOT,
-                    "Woodcutting", true, Bd.CONFIRMED,
-                    new Ab(LOGS, "Logs", logsQuantity, 39, logsQuantity * 39L));
-                session.kf(loot, 100_000);
+                Transaction loot = row(start + (i + 1) * 60_000L, TransactionType.LOOT, Context.LOOT,
+                    "Woodcutting", true, ClassificationConfidence.CONFIRMED,
+                    new Flow(LOGS, "Logs", logsQuantity, 39, logsQuantity * 39L));
+                session.addTransaction(loot, 100_000);
                 if (i == 1) splitTarget = loot.getId();
                 if (i == 2) ignoreTarget = loot.getId();
-                session.aeh("Woodcutting", loot.timestampEpochMillis);
+                session.recordAction("Woodcutting", loot.timestampEpochMillis);
             }
-            session.kf(row(start + 8 * 60_000L, Ai.CONSUMPTION, Aj.GENERIC,
-                "Woodcutting", true, Bd.CONFIRMED,
-                new Ab(SHARK, "Shark", -2L, 385, -770L)), 100_000);
-            session.kf(row(start + 9 * 60_000L, Ai.UNCERTAIN, Aj.GENERIC,
-                "Woodcutting", false, Bd.UNCERTAIN,
-                new Ab(COINS, "Coins", 1_000L, 1, 1_000L)), 100_000);
-            session.kf(row(start + 10 * 60_000L, Ai.LOOT, Aj.LOOT,
-                "Woodcutting", true, Bd.LIKELY,
-                new Ab(UNPRICED, "Abyssal whip", 1L, 0, 0L)), 100_000);
-            if (day % 3 == 0) assertTrue(session.qi(ignoreTarget, Ah.IGNORE, start + 11 * 60_000L, "Not mine"));
-            if (day % 3 == 1) assertTrue(session.qi(ignoreTarget, Ah.COST, start + 11 * 60_000L, "Bought"));
-            if (day % 3 == 2) assertTrue(session.kr(splitTarget, LOGS, logsQuantity / 2, start + 11 * 60_000L, "half"));
+            session.addTransaction(row(start + 8 * 60_000L, TransactionType.CONSUMPTION, Context.GENERIC,
+                "Woodcutting", true, ClassificationConfidence.CONFIRMED,
+                new Flow(SHARK, "Shark", -2L, 385, -770L)), 100_000);
+            session.addTransaction(row(start + 9 * 60_000L, TransactionType.UNCERTAIN, Context.GENERIC,
+                "Woodcutting", false, ClassificationConfidence.UNCERTAIN,
+                new Flow(COINS, "Coins", 1_000L, 1, 1_000L)), 100_000);
+            session.addTransaction(row(start + 10 * 60_000L, TransactionType.LOOT, Context.LOOT,
+                "Woodcutting", true, ClassificationConfidence.LIKELY,
+                new Flow(UNPRICED, "Abyssal whip", 1L, 0, 0L)), 100_000);
+            if (day % 3 == 0) assertTrue(session.correctTransaction(ignoreTarget, Correction.IGNORE, start + 11 * 60_000L, "Not mine"));
+            if (day % 3 == 1) assertTrue(session.correctTransaction(ignoreTarget, Correction.COST, start + 11 * 60_000L, "Bought"));
+            if (day % 3 == 2) assertTrue(session.applyItemSplit(splitTarget, LOGS, logsQuantity / 2, start + 11 * 60_000L, "half"));
             if (day == 3)
             {
-                Ac audit = row(start + 13 * 60_000L, Ai.ADJUSTMENT, Aj.PK_LOOT,
-                    "Loot key audit", false, Bd.CONFIRMED,
-                    new Ab(KEY, "Loot key", 1L, 0, 0L));
+                Transaction audit = row(start + 13 * 60_000L, TransactionType.ADJUSTMENT, Context.PK_LOOT,
+                    "Loot key audit", false, ClassificationConfidence.CONFIRMED,
+                    new Flow(KEY, "Loot key", 1L, 0, 0L));
                 PENDING_CLAIM_ROW = audit.getId();
-                session.kf(audit, 100_000);
+                session.addTransaction(audit, 100_000);
             }
             if (day == 4)
             {
-                Ac settlement = row(start + 13 * 60_000L, Ai.PK_LOOT, Aj.PK_LOOT,
-                    "Loot key chest", true, Bd.CONFIRMED,
-                    new Ab(COINS, "Coins", 5_000L, 1, 5_000L));
-                settlement.aid(SETTLED_CLAIM_ID);
-                session.kf(settlement, 100_000);
+                Transaction settlement = row(start + 13 * 60_000L, TransactionType.PK_LOOT, Context.PK_LOOT,
+                    "Loot key chest", true, ClassificationConfidence.CONFIRMED,
+                    new Flow(COINS, "Coins", 5_000L, 1, 5_000L));
+                settlement.setSourceClaimId(SETTLED_CLAIM_ID);
+                session.addTransaction(settlement, 100_000);
             }
             if (pk)
             {
                 long killAt = start + 20 * 60_000L;
-                Bx kill = session.ke(Be.KILL, killAt, "Player kill", Bd.CONFIRMED, "Kill");
-                Ac loot = row(killAt + 1_000L, Ai.PK_LOOT, Aj.PK_LOOT, "PKing", true,
-                    Bd.CONFIRMED, new Ab(COINS, "Coins", 50_000L + (DAYS - day) * 10L, 1, 50_000L + (DAYS - day) * 10L));
-                session.kf(loot, 100_000);
-                session.ll(loot.getId(), kill.getId(), false);
+                PkEncounter kill = session.addPkEncounter(EncounterType.KILL, killAt, "Player kill", ClassificationConfidence.CONFIRMED, "Kill");
+                Transaction loot = row(killAt + 1_000L, TransactionType.PK_LOOT, Context.PK_LOOT, "PKing", true,
+                    ClassificationConfidence.CONFIRMED, new Flow(COINS, "Coins", 50_000L + (DAYS - day) * 10L, 1, 50_000L + (DAYS - day) * 10L));
+                session.addTransaction(loot, 100_000);
+                session.attachTransactionToEncounter(loot.getId(), kill.getId(), false);
                 long deathAt = start + 12L * 3_600_000L;
-                Bx death = session.ke(Be.DEATH, deathAt, "Death", Bd.CONFIRMED, "Death");
-                Ac loss = row(deathAt + 1_000L, Ai.PK_DEATH_LOSS, Aj.PK_DEATH, "PKing", true,
-                    Bd.CONFIRMED, new Ab(SHARK, "Shark", -(80L + day % 7), 385, -(80L + day % 7) * 385L));
-                session.kf(loss, 100_000);
-                session.ll(loss.getId(), death.getId(), false);
+                PkEncounter death = session.addPkEncounter(EncounterType.DEATH, deathAt, "Death", ClassificationConfidence.CONFIRMED, "Death");
+                Transaction loss = row(deathAt + 1_000L, TransactionType.PK_DEATH_LOSS, Context.PK_DEATH, "PKing", true,
+                    ClassificationConfidence.CONFIRMED, new Flow(SHARK, "Shark", -(80L + day % 7), 385, -(80L + day % 7) * 385L));
+                session.addTransaction(loss, 100_000);
+                session.attachTransactionToEncounter(loss.getId(), death.getId(), false);
             }
             session.close(pk ? start + 13L * 3_600_000L : start + 60 * 60_000L);
             sessions.add(session);
@@ -514,30 +514,30 @@ public class RetentionCompactionSoakTest
         return 20L + day % 7;
     }
 
-    private static Ac row(long at, Ai type, Aj context, String activity,
-        boolean counted, Bd confidence, Ab flow)
+    private static Transaction row(long at, TransactionType type, Context context, String activity,
+        boolean counted, ClassificationConfidence confidence, Flow flow)
     {
-        return new Ac(at, null, type, context, type.name().toLowerCase(Locale.ROOT), activity, counted,
+        return new Transaction(at, null, type, context, type.name().toLowerCase(Locale.ROOT), activity, counted,
             Collections.singletonList(flow), confidence, "soak", null);
     }
 
-    private static Truth truth(List<Ad> sessions)
+    private static Truth truth(List<Session> sessions)
     {
         Truth truth = new Truth();
         truth.sessions = sessions.size();
-        for (Ad session : sessions)
+        for (Session session : sessions)
         {
-            Bu metrics = session.metrics(NOW, WINDOW);
+            SessionMetrics metrics = session.metrics(NOW);
             truth.sessionMoney.put(session.getName(), new long[] {metrics.revenue, metrics.costs, metrics.net, metrics.elapsedMillis});
             long compactedRevenue = 0L;
             long compactedCosts = 0L;
-            long cutoff = NOW - Db.DAYS_90.getDays() * DAY;
-            for (Ac row : session.getTransactions())
+            long cutoff = NOW - ReceiptRetentionPeriod.DAYS_90.getDays() * DAY;
+            for (Transaction row : session.getTransactions())
             {
                 if (row.timestampEpochMillis >= cutoff
                     || row.getId().equals(PENDING_CLAIM_ROW)
-                    || SETTLED_CLAIM_ID.equals(row.uo())
-                    || row.getType() == Ai.TRANSFER
+                    || SETTLED_CLAIM_ID.equals(row.getSourceClaimId())
+                    || row.getType() == TransactionType.TRANSFER
                     || !row.isCounted())
                 {
                     continue;
@@ -550,15 +550,15 @@ public class RetentionCompactionSoakTest
             truth.net += metrics.net;
             truth.activeMillis += metrics.elapsedMillis;
             truth.transactions += session.getTransactions().size();
-            for (Ac row : session.getTransactions())
+            for (Transaction row : session.getTransactions())
             {
                 if (!row.isCounted()) continue;
                 String day = LocalDate.ofEpochDay(Math.floorDiv(row.timestampEpochMillis, DAY)).toString();
                 truth.dayNet.merge(day, row.getNet(), Long::sum);
             }
-            if (session.getMode() == Cx.PK)
+            if (session.getMode() == SessionMode.PK)
             {
-                Dt pk = session.ava();
+                PkMetrics pk = session.pkMetrics();
                 truth.sessionPk.put(session.getName(), new long[] {pk.kills, pk.deaths, pk.net, pk.bestKill, pk.largestDeathLoss});
                 truth.kills += pk.kills;
                 truth.deaths += pk.deaths;
@@ -570,9 +570,9 @@ public class RetentionCompactionSoakTest
         return truth;
     }
 
-    private static SavedState state(List<Ad> sessions, boolean withClaims)
+    private static SavedState state(List<Session> sessions, boolean withClaims)
     {
-        List<Ad> newestFirst = new ArrayList<>(sessions);
+        List<Session> newestFirst = new ArrayList<>(sessions);
         Collections.reverse(newestFirst);
         SavedState state = new SavedState(null, null, false, newestFirst);
         state.setSchemaVersion(SavedState.CURRENT_SCHEMA_VERSION);
@@ -580,10 +580,10 @@ public class RetentionCompactionSoakTest
         state.setSavedAtEpochMillis(NOW);
         state.setLastReceiptRetentionDayUtc(LocalDate.ofEpochDay(NOW / DAY).toString());
         if (!withClaims) return state;
-        List<SavedState.By> claims = new ArrayList<>();
-        claims.add(new SavedState.By(PENDING_CLAIM_ROW, KEY, 1L,
+        List<SavedState.PendingClaim> claims = new ArrayList<>();
+        claims.add(new SavedState.PendingClaim(PENDING_CLAIM_ROW, KEY, 1L,
             BASE + 3 * DAY));
-        claims.add(new SavedState.By(SETTLED_CLAIM_ID, KEY, 1L,
+        claims.add(new SavedState.PendingClaim(SETTLED_CLAIM_ID, KEY, 1L,
             BASE + 4 * DAY));
         state.setPendingClaims(claims);
         return state;
@@ -594,20 +594,20 @@ public class RetentionCompactionSoakTest
         return GSON.fromJson(json, SavedState.class);
     }
 
-    private static Am engine(Db period)
+    private static Engine engine(ReceiptRetentionPeriod period)
     {
         GpManagerConfig config = new GpManagerConfig()
         {
             @Override public int maxHistorySessions() { return 5_000; }
             @Override public int maxTransactionsPerSession() { return 100_000; }
-            @Override public Db receiptRetentionDays() { return period; }
+            @Override public ReceiptRetentionPeriod receiptRetentionDays() { return period; }
         };
-        return new Am(deltas -> Collections.emptyList(), new TransactionClassifier(), config);
+        return new Engine(deltas -> Collections.emptyList(), new TransactionClassifier(), config);
     }
 
-    private static Ad session(Am engine, String name)
+    private static Session session(Engine engine, String name)
     {
-        for (Ad session : engine.getHistory())
+        for (Session session : engine.getHistory())
         {
             if (session.getName().equals(name)) return session;
         }

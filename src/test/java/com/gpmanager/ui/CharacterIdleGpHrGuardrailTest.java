@@ -15,26 +15,26 @@ public class CharacterIdleGpHrGuardrailTest
     @Test
     public void characterIdleDoesNotPauseSessionOrChangeRate()
     {
-        Ad session = new Ad("Test", 0L);
-        session.kf(
+        Session session = new Session("Test", 0L);
+        session.addTransaction(
             Tx.of(
                 1_000L,
                 1_000L,
-                Ai.GAIN,
-                Aj.GENERIC,
+                TransactionType.GAIN,
+                Context.GENERIC,
                 "",
                 true,
-                Collections.singletonList(new Ab(526, "Bones", 1, 100, 100L))),
+                Collections.singletonList(new Flow(526, "Bones", 1, 100, 100L))),
             1);
 
-        Bu before = session.metrics(10_000L, 60_000L);
+        SessionMetrics before = session.metrics(10_000L);
         CharacterIdleModel idle = new CharacterIdleModel();
         idle.delayMillis = 2_000L;
         assertFalse(idle.tick(false, false, 10_000L));
         assertTrue(idle.tick(false, false, 12_000L));
         assertTrue(idle.characterIdle);
 
-        Bu after = session.metrics(10_000L, 60_000L);
+        SessionMetrics after = session.metrics(10_000L);
         assertEquals(before.elapsedMillis, after.elapsedMillis);
         assertEquals(before.profitPerHour, after.profitPerHour);
         assertEquals(before.net, after.net);
@@ -44,23 +44,23 @@ public class CharacterIdleGpHrGuardrailTest
     @Test
     public void afkPauseStillFreezesRateAndLabelsAfk()
     {
-        Ad session = new Ad("Test", 0L);
-        session.kf(
+        Session session = new Session("Test", 0L);
+        session.addTransaction(
             Tx.of(
                 1_000L,
                 1_000L,
-                Ai.GAIN,
-                Aj.GENERIC,
+                TransactionType.GAIN,
+                Context.GENERIC,
                 "",
                 true,
-                Collections.singletonList(new Ab(526, "Bones", 1, 100, 100L))),
+                Collections.singletonList(new Flow(526, "Bones", 1, 100, 100L))),
             1);
 
-        session.pause(2_000L, Ed.IDLE);
-        Bu atPause = session.metrics(2_000L, 60_000L);
-        Bu later = session.metrics(62_000L, 60_000L);
+        session.pause(2_000L, PauseReason.IDLE);
+        SessionMetrics atPause = session.metrics(2_000L);
+        SessionMetrics later = session.metrics(62_000L);
         assertEquals(atPause.elapsedMillis, later.elapsedMillis);
         assertEquals(atPause.profitPerHour, later.profitPerHour);
-        assertEquals(Ed.IDLE, session.getPauseReason());
+        assertEquals(PauseReason.IDLE, session.getPauseReason());
     }
 }

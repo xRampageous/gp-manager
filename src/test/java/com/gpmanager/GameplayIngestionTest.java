@@ -20,27 +20,27 @@ public class GameplayIngestionTest
         Client client = (Client) Proxy.newProxyInstance(Client.class.getClassLoader(), new Class<?>[] {Client.class},
             (proxy, method, args) -> "getGameState".equals(method.getName()) ? state[0] : null);
         set(plugin, "client", client);
-        set(plugin, "persistence", new Ei(null, null, null, null, null)
+        set(plugin, "persistence", new PersistenceCoordinator(null, null, null, null, null)
         {
             @Override public synchronized boolean isTrackingReady() { return ready[0]; }
         });
-        assertFalse(plugin.nh());
+        assertFalse(plugin.canIngestGameplay());
         ready[0] = true;
-        assertFalse(plugin.nh());
+        assertFalse(plugin.canIngestGameplay());
         state[0] = GameState.LOGGED_IN;
-        assertTrue(plugin.nh());
+        assertTrue(plugin.canIngestGameplay());
         ready[0] = false;
-        assertFalse("an account switch holds ingestion even while logged in", plugin.nh());
+        assertFalse("an account switch holds ingestion even while logged in", plugin.canIngestGameplay());
     }
 
     @Test
     public void missingOrUnavailableClientFailsClosed() throws Exception
     {
         GpManagerPlugin plugin = new GpManagerPlugin();
-        assertFalse(plugin.nh());
+        assertFalse(plugin.canIngestGameplay());
         set(plugin, "client", Proxy.newProxyInstance(Client.class.getClassLoader(), new Class<?>[] {Client.class},
             (proxy, method, args) -> { throw new IllegalStateException("client unavailable"); }));
-        assertFalse(plugin.nh());
+        assertFalse(plugin.canIngestGameplay());
     }
 
     private static void set(Object target, String name, Object value) throws Exception

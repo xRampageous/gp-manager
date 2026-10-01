@@ -41,7 +41,6 @@ public class GpManagerConfigLayoutTest
     {
         assertTrue(description("autoStartSession").contains("Free play"));
         assertFalse(description("autoStartSession").contains("Overall"));
-        assertTrue(description("rollingRateMinutes").contains("whole-run"));
         assertTrue(description("idlePauseEnabled").contains("idle time"));
         assertFalse(description("idlePauseEnabled").contains("wall-clock"));
         assertTrue(description("hudTimer").contains("tracked active time"));
@@ -78,7 +77,6 @@ public class GpManagerConfigLayoutTest
     {
         GpManagerConfig defaults = new GpManagerConfig() {};
         assertEquals(2_000, defaults.maxHistorySessions());
-        assertEquals(15, defaults.rollingRateMinutes());
     }
 
     @Test

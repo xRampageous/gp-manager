@@ -28,9 +28,9 @@ public class GpManagerPluginResumeBaselineTest
     public void theFirstActionAfterLoginCounts() throws Exception
     {
         Harness harness = new Harness();
-        harness.engine.rm(1_000L);
+        harness.engine.ensureSession(1_000L);
 
-        harness.plugin.ve();
+        harness.plugin.initializeLoggedInState();
 
         harness.firstActionBooks();
     }
@@ -39,10 +39,10 @@ public class GpManagerPluginResumeBaselineTest
     public void theActionThatResumesAnIdlePauseCounts() throws Exception
     {
         Harness harness = new Harness();
-        harness.engine.rm(1_000L);
-        harness.engine.setBaseline(Cc.empty());
-        harness.engine.adh(2_000L, 2_000L);
-        assertTrue("the session is idle-paused", harness.engine.yp());
+        harness.engine.ensureSession(1_000L);
+        harness.engine.setBaseline(ContainerSnapshot.empty());
+        harness.engine.pauseForIdle(2_000L, 2_000L);
+        assertTrue("the session is idle-paused", harness.engine.isIdlePaused());
 
         Method activity = GpManagerPlugin.class.getDeclaredMethod(
             "markGameplayActivity", boolean.class);
@@ -59,7 +59,7 @@ public class GpManagerPluginResumeBaselineTest
         {
             @Override public int stabilizationTicks() { return 0; }
         };
-        final Am engine = new Am(GpManagerPluginResumeBaselineTest::value,
+        final Engine engine = new Engine(GpManagerPluginResumeBaselineTest::value,
             new TransactionClassifier(), config);
         final GpManagerPlugin plugin = new GpManagerPluginProbe();
 
@@ -83,22 +83,22 @@ public class GpManagerPluginResumeBaselineTest
         void firstActionBooks()
         {
             long now = System.currentTimeMillis();
-            engine.yz();
-            Cc potato = new Cc(Collections.singletonMap(1942, 1L));
-            assertNull("the gain still stabilizes", engine.adj(potato, now + 600L));
-            Ac gain = engine.adj(potato, now + 1_200L);
+            engine.markInventoryDirty();
+            ContainerSnapshot potato = new ContainerSnapshot(Collections.singletonMap(1942, 1L));
+            assertNull("the gain still stabilizes", engine.processIfDirty(potato, now + 600L));
+            Transaction gain = engine.processIfDirty(potato, now + 1_200L);
 
             assertNotNull("the first action books, not the baseline", gain);
-            assertEquals(Ai.GAIN, gain.getType());
+            assertEquals(TransactionType.GAIN, gain.getType());
             assertEquals(50L, engine.getMetrics(now + 1_200L).revenue);
         }
     }
 
-    private static List<Ab> value(Map<Integer, Long> deltas)
+    private static List<Flow> value(Map<Integer, Long> deltas)
     {
-        List<Ab> flows = new ArrayList<>();
+        List<Flow> flows = new ArrayList<>();
         deltas.forEach((id, quantity) ->
-            flows.add(new Ab(id, "Item " + id, quantity, 50, quantity * 50)));
+            flows.add(new Flow(id, "Item " + id, quantity, 50, quantity * 50)));
         return flows;
     }
 

@@ -29,7 +29,7 @@ public class FactoryResetPresentationTest
     @Rule
     public final TemporaryFolder temporary = new TemporaryFolder();
 
-    private final AtomicReference<Dp> panel = new AtomicReference<>();
+    private final AtomicReference<SidebarPanel> panel = new AtomicReference<>();
 
     @Test
     public void appliedFactoryResetClearsTheBoundHudTrip() throws Exception
@@ -39,21 +39,21 @@ public class FactoryResetPresentationTest
         Path directory = temporary.newFolder().toPath();
         SessionRepository repository = new SessionRepository(new Gson(), FilepathTestSupport.root(directory));
         OrderedPersistenceWriter writer = new OrderedPersistenceWriter(repository);
-        Am engine = new Am(deltas -> Collections.emptyList(),
+        Engine engine = new Engine(deltas -> Collections.emptyList(),
             new TransactionClassifier(), config);
-        Ei coordinator = new Ei(null,
+        PersistenceCoordinator coordinator = new PersistenceCoordinator(null,
             IsolatedConfigManager.create("rsprofile.alice"), repository, writer, engine);
         try
         {
             coordinator.start();
-            assertTrue(coordinator.ajy(new TrackingIdentity("rsprofile.alice", TrackingIdentity.ACCOUNT_HASH_INVALID), true));
+            assertTrue(coordinator.trySwitchIdentity(new TrackingIdentity("rsprofile.alice", TrackingIdentity.ACCOUNT_HASH_INVALID), true));
 
             long now = System.currentTimeMillis();
-            engine.rm(now);
-            Cp builder = axn(config, engine, repository, coordinator);
+            engine.ensureSession(now);
+            HudBuilder builder = bindHud(config, engine, repository, coordinator);
             render(builder, engine, now);
             bookLoot(builder, now + 1L);
-            Cb before = render(builder, engine, now + 2L);
+            HudSnapshot before = render(builder, engine, now + 2L);
             assertFalse("booked loot shows before the reset", before.rows.isEmpty());
             assertTrue("the best drop shows before the reset", hasBestDrop(before));
 
@@ -63,7 +63,7 @@ public class FactoryResetPresentationTest
                 return null;
             });
 
-            Cb after = render(builder, engine, now + 12L);
+            HudSnapshot after = render(builder, engine, now + 12L);
             assertTrue("the applied reset clears the tray", after.rows.isEmpty());
             assertEquals("the applied reset clears the trip chip", "", after.trip);
             assertFalse("the applied reset clears the best drop", hasBestDrop(after));
@@ -91,16 +91,16 @@ public class FactoryResetPresentationTest
         Path directory = temporary.newFolder().toPath();
         SessionRepository repository = new SessionRepository(new Gson(), FilepathTestSupport.root(directory));
         OrderedPersistenceWriter writer = new OrderedPersistenceWriter(repository);
-        Am engine = new Am(deltas -> Collections.emptyList(),
+        Engine engine = new Engine(deltas -> Collections.emptyList(),
             new TransactionClassifier(), config);
         // No bound identity: the coordinator refuses the destructive replace.
-        Ei coordinator = new Ei(null, null, repository, writer, engine);
+        PersistenceCoordinator coordinator = new PersistenceCoordinator(null, null, repository, writer, engine);
         try
         {
             coordinator.start();
             long now = System.currentTimeMillis();
-            engine.rm(now);
-            Cp builder = axn(config, engine, repository, coordinator);
+            engine.ensureSession(now);
+            HudBuilder builder = bindHud(config, engine, repository, coordinator);
             render(builder, engine, now);
             bookLoot(builder, now + 1L);
             assertFalse(render(builder, engine, now + 2L).rows.isEmpty());
@@ -111,7 +111,7 @@ public class FactoryResetPresentationTest
                 return null;
             });
 
-            Cb after = render(builder, engine, now + 12L);
+            HudSnapshot after = render(builder, engine, now + 12L);
             assertFalse("a refused reset keeps the tray", after.rows.isEmpty());
             assertTrue("a refused reset keeps the best drop", hasBestDrop(after));
         }
@@ -121,20 +121,20 @@ public class FactoryResetPresentationTest
         }
     }
 
-    private Cp axn(GpManagerConfig config, Am engine, SessionRepository repository,
-        Ei coordinator) throws Exception
+    private HudBuilder bindHud(GpManagerConfig config, Engine engine, SessionRepository repository,
+        PersistenceCoordinator coordinator) throws Exception
     {
         return onEdt(() ->
         {
-            Dp created = new Dp(engine, config, null, null, repository, coordinator);
-            Cp builder = new Cp(config, null);
-            created.axn(builder);
+            SidebarPanel created = new SidebarPanel(engine, config, null, null, repository, coordinator);
+            HudBuilder builder = new HudBuilder(config, null);
+            created.bindHud(builder);
             panel.set(created);
             return builder;
         });
     }
 
-    private static void bookLoot(Cp builder, long now)
+    private static void bookLoot(HudBuilder builder, long now)
     {
         for (int k = 0; k < 3; k++)
         {
@@ -143,17 +143,17 @@ public class FactoryResetPresentationTest
         builder.tray().booked(receipt(now, flow(11286, "Draconic visage", 1L, 2_500_000)), now, false);
     }
 
-    private static Cb render(Cp builder, Am engine, long now) throws Exception
+    private static HudSnapshot render(HudBuilder builder, Engine engine, long now) throws Exception
     {
-        return onEdt(() -> builder.update(Ca.capture(engine, now, null), f -> true, null, now));
+        return onEdt(() -> builder.update(LiveSnapshot.capture(engine, now, null), f -> true, null, now));
     }
 
-    private static boolean hasBestDrop(Cb snapshot)
+    private static boolean hasBestDrop(HudSnapshot snapshot)
     {
         return snapshot.folio.stream().anyMatch(line -> "Best drop".equals(line.label));
     }
 
-    private static void resetThroughTheMenu(Dp panel)
+    private static void resetThroughTheMenu(SidebarPanel panel)
     {
         JMenuItem reset = find(SidebarPanelProbe.dataMenu(panel), "Factory reset current profile");
         assertNotNull("the reset action is present", reset);
@@ -190,15 +190,15 @@ public class FactoryResetPresentationTest
         return null;
     }
 
-    private static Ac receipt(long at, Ab... flows)
+    private static Transaction receipt(long at, Flow... flows)
     {
-        return new Ac(at, null, Ai.LOOT, Aj.LOOT, "", "Vorkath", true,
-            Arrays.asList(flows), Bd.CONFIRMED, "fixture", null);
+        return new Transaction(at, null, TransactionType.LOOT, Context.LOOT, "", "Vorkath", true,
+            Arrays.asList(flows), ClassificationConfidence.CONFIRMED, "fixture", null);
     }
 
-    private static Ab flow(int id, String name, long quantity, int unit)
+    private static Flow flow(int id, String name, long quantity, int unit)
     {
-        return new Ab(id, name, quantity, unit, quantity * unit, Av.GRAND_EXCHANGE);
+        return new Flow(id, name, quantity, unit, quantity * unit, PriceSource.GRAND_EXCHANGE);
     }
 
     private static GpManagerConfig testConfig()

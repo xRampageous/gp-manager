@@ -19,11 +19,11 @@ public class PvpFolioCostFallbackTest
     @Test
     public void anUnknownSplitShowsCompleteCostsNeverZeroSupplies()
     {
-        Cp builder = new Cp(new GpManagerConfig() {}, null);
-        List<Cb.Line> lines = builder.folio(pvp(-1L, -1L, 2_000L, 1_500L, false),
+        HudBuilder builder = new HudBuilder(new GpManagerConfig() {}, null);
+        List<HudSnapshot.Line> lines = builder.folio(pvp(-1L, -1L, 2_000L, 1_500L, false),
             Collections.emptyList(), null, NOW, 0);
 
-        Cb.Line costs = row(lines, "Costs");
+        HudSnapshot.Line costs = row(lines, "Costs");
         assertNotNull("the complete cost is named", costs);
         assertEquals("−2.0k", costs.value);
         assertNull("no fake zero Supplies", row(lines, "Supplies"));
@@ -33,8 +33,8 @@ public class PvpFolioCostFallbackTest
     @Test
     public void aKnownSplitKeepsSuppliesAndDeaths()
     {
-        Cp builder = new Cp(new GpManagerConfig() {}, null);
-        List<Cb.Line> lines = builder.folio(pvp(800L, 400L, 2_000L, 400L, true),
+        HudBuilder builder = new HudBuilder(new GpManagerConfig() {}, null);
+        List<HudSnapshot.Line> lines = builder.folio(pvp(800L, 400L, 2_000L, 400L, true),
             Collections.emptyList(), null, NOW, 0);
 
         assertEquals("−800", row(lines, "Supplies").value);
@@ -42,9 +42,9 @@ public class PvpFolioCostFallbackTest
         assertNull("the fallback row stays out", row(lines, "Costs"));
     }
 
-    private static Cb.Line row(List<Cb.Line> lines, String label)
+    private static HudSnapshot.Line row(List<HudSnapshot.Line> lines, String label)
     {
-        for (Cb.Line line : lines)
+        for (HudSnapshot.Line line : lines)
         {
             if (label.equals(line.label))
             {
@@ -54,10 +54,10 @@ public class PvpFolioCostFallbackTest
         return null;
     }
 
-    private static Ca pvp(long supplies, long loss, long costs, long deathLoss,
+    private static LiveSnapshot pvp(long supplies, long loss, long costs, long deathLoss,
         boolean splitAvailable)
     {
-        return new Ca("pk-run", true, "PK Trip", 3_600_000L, false, false,
+        return new LiveSnapshot("pk-run", true, "PK Trip", 3_600_000L, false, false,
             0L, 0L, loss, supplies, costs, splitAvailable,
             false, 0L, null, 0L, 0, false, "", "",
             false, false, false, 0, Collections.emptyList(), true,

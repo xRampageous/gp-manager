@@ -6,15 +6,15 @@ import net.runelite.api.Client;
 final class GpManagerPluginProbe extends GpManagerPlugin
 {
     @Override
-    boolean nh()
+    boolean canIngestGameplay()
     {
         return true;
     }
 
-    static InteractionContextTracker tracker(Client client, Am engine, GpManagerConfig config)
+    static InteractionContextTracker tracker(Client client, Engine engine, GpManagerConfig config)
     {
         InteractionContextTracker tracker = new InteractionContextTracker(client, engine, config);
-        tracker.mf(() -> true, (name, combat) -> {});
+        tracker.bindPresentation(() -> true, (name, combat) -> {});
         return tracker;
     }
 }

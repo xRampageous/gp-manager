@@ -26,7 +26,7 @@ public class PersistenceSafetyTest
 
     private SavedState named(String name, long revision)
     {
-        SavedState state = new SavedState(new Ad(name, 1_000L), null, false, Collections.emptyList());
+        SavedState state = new SavedState(new Session(name, 1_000L), null, false, Collections.emptyList());
         state.setRevision(revision);
         return state;
     }
@@ -43,7 +43,7 @@ public class PersistenceSafetyTest
         SessionRepository failing = new SessionRepository(new Gson(), FilepathTestSupport.root(directory))
         {
             @Override
-            void afl(Filepath source, Filepath target) throws IOException
+            void replaceFile(Filepath source, Filepath target) throws IOException
             {
                 if (target.getFileName().toString().equals("sessions.backup.json")
                     && backupReplacements.incrementAndGet() >= 1
@@ -56,12 +56,12 @@ public class PersistenceSafetyTest
                         throw new IOException("Simulated crash after primary reset");
                     }
                 }
-                super.afl(source, target);
+                super.replaceFile(source, target);
             }
         };
 
         SavedState reset = named("Fresh reset", 3L);
-        SessionRepository.Bm outcome = PersistenceProbe.replaceStateDetailed(failing, reset);
+        SessionRepository.ReplaceOutcome outcome = PersistenceProbe.replaceStateDetailed(failing, reset);
         assertTrue(outcome.isCommitted());
         assertEquals("Fresh reset", failing.load().getActiveSession().getName());
         // Cleared data must not reappear via backup fallback.
@@ -100,9 +100,9 @@ public class PersistenceSafetyTest
         String before = Files.readString(directory.resolve("sessions.json"));
 
         // Reset fenced on base 1 while disk is at 2: CONFLICT, disk untouched, revision not advanced.
-        SessionRepository.Bm outcome = repository.replaceStateDetailed(
-            new Cs(null, repository.scopeGeneration, 1L, named("Reset", 2L)));
-        assertEquals(SessionRepository.Bm.Kind.CONFLICT, outcome.kind);
+        SessionRepository.ReplaceOutcome outcome = repository.replaceStateDetailed(
+            new WriteIntent(null, repository.scopeGeneration, 1L, named("Reset", 2L)));
+        assertEquals(SessionRepository.ReplaceOutcome.Kind.CONFLICT, outcome.kind);
         assertFalse(outcome.isCommitted());
         assertEquals(before, Files.readString(directory.resolve("sessions.json")));
         assertEquals("Second", repository.load().getActiveSession().getName());
@@ -111,11 +111,11 @@ public class PersistenceSafetyTest
         assertFalse(Files.exists(directory.resolve("sessions.commit.stage")));
 
         // A non-advancing revision is refused even on the correct base.
-        assertFalse(repository.replaceStateDetailed(new Cs(null, repository.scopeGeneration, 2L, named("Reset", 2L))).isCommitted());
+        assertFalse(repository.replaceStateDetailed(new WriteIntent(null, repository.scopeGeneration, 2L, named("Reset", 2L))).isCommitted());
         assertEquals(before, Files.readString(directory.resolve("sessions.json")));
 
         // The same reset re-issued explicitly against the observed revision commits as 3.
-        assertTrue(repository.replaceStateDetailed(new Cs(null, repository.scopeGeneration, 2L, named("Reset", 3L))).isCommitted());
+        assertTrue(repository.replaceStateDetailed(new WriteIntent(null, repository.scopeGeneration, 2L, named("Reset", 3L))).isCommitted());
         assertEquals("Reset", repository.load().getActiveSession().getName());
         assertEquals(3L, repository.lastKnownDiskRevision);
     }
@@ -136,8 +136,8 @@ public class PersistenceSafetyTest
 
         SavedState a = named("From A", 11L);
         SavedState b = named("From B", 11L);
-        Cs intentA = new Cs(null, writerA.scopeGeneration, base, a);
-        Cs intentB = new Cs(null, writerB.scopeGeneration, base, b);
+        WriteIntent intentA = new WriteIntent(null, writerA.scopeGeneration, base, a);
+        WriteIntent intentB = new WriteIntent(null, writerB.scopeGeneration, base, b);
 
         assertTrue(writerA.save(intentA));
         assertFalse("Second writer must lose the CAS race", writerB.save(intentB));
@@ -150,24 +150,24 @@ public class PersistenceSafetyTest
         Path root = temporary.newFolder().toPath();
         SessionRepository store = new SessionRepository(new Gson(), FilepathTestSupport.root(root), true);
         TrackingIdentity alice = new TrackingIdentity("rsprofile.alice", TrackingIdentity.ACCOUNT_HASH_INVALID);
-        store.mc(alice);
+        store.bindIdentity(alice);
         assertTrue(PersistenceProbe.save(store, named("Alice-1", 1L)));
-        Path primary = FilepathTestSupport.path(store.ty().joinSegment("sessions.json"));
+        Path primary = FilepathTestSupport.path(store.getDataDirectory().joinSegment("sessions.json"));
         String before = Files.readString(primary);
 
-        Path lockPath = FilepathTestSupport.path(store.ty().joinSegment("sessions.write.lock"));
+        Path lockPath = FilepathTestSupport.path(store.getDataDirectory().joinSegment("sessions.write.lock"));
         try (java.nio.channels.FileChannel channel = java.nio.channels.FileChannel.open(lockPath,
             java.nio.file.StandardOpenOption.CREATE, java.nio.file.StandardOpenOption.WRITE);
             java.nio.channels.FileLock held = channel.tryLock())
         {
             assertTrue(held != null && held.isValid());
             assertFalse("ordinary save refused while another client holds the account lock",
-                store.save(new Cs(alice, store.scopeGeneration, 1L, named("Alice-2", 2L))));
+                store.save(new WriteIntent(alice, store.scopeGeneration, 1L, named("Alice-2", 2L))));
             assertFalse("destructive replace refused too",
-                store.replaceStateDetailed(new Cs(alice, store.scopeGeneration, 1L, named("Reset", 2L))).isCommitted());
+                store.replaceStateDetailed(new WriteIntent(alice, store.scopeGeneration, 1L, named("Reset", 2L))).isCommitted());
             assertEquals(before, Files.readString(primary));
         }
-        assertTrue(store.save(new Cs(alice, store.scopeGeneration, 1L, named("Alice-2", 2L))));
+        assertTrue(store.save(new WriteIntent(alice, store.scopeGeneration, 1L, named("Alice-2", 2L))));
         assertEquals("Alice-2", store.load().getActiveSession().getName());
     }
 
@@ -179,22 +179,22 @@ public class PersistenceSafetyTest
         TrackingIdentity alice = new TrackingIdentity("rsprofile.alice", TrackingIdentity.ACCOUNT_HASH_INVALID);
         TrackingIdentity bob = new TrackingIdentity("rsprofile.bob", TrackingIdentity.ACCOUNT_HASH_INVALID);
 
-        store.mc(alice);
+        store.bindIdentity(alice);
         assertTrue(PersistenceProbe.save(store, named("Alice-1", 1L)));
         long aliceBase = store.lastKnownDiskRevision;
         long aliceGeneration = store.scopeGeneration;
 
         SavedState pending = named("Alice-pending", aliceBase + 1L);
-        Cs aliceIntent = new Cs(alice, aliceGeneration, aliceBase, pending);
+        WriteIntent aliceIntent = new WriteIntent(alice, aliceGeneration, aliceBase, pending);
 
-        store.mc(bob);
+        store.bindIdentity(bob);
         assertTrue(PersistenceProbe.save(store, named("Bob-1", 1L)));
 
         // Delayed Alice write must still land in Alice's folder, not Bob's.
         assertTrue(store.save(aliceIntent));
-        store.mc(alice);
+        store.bindIdentity(alice);
         assertEquals("Alice-pending", store.load().getActiveSession().getName());
-        store.mc(bob);
+        store.bindIdentity(bob);
         assertEquals("Bob-1", store.load().getActiveSession().getName());
     }
 
@@ -205,7 +205,7 @@ public class PersistenceSafetyTest
         SessionRepository repository = new SessionRepository(new Gson(), FilepathTestSupport.root(directory));
         OrderedPersistenceWriter writer = new OrderedPersistenceWriter(repository);
 
-        writer.submit(new Cs(null,
+        writer.submit(new WriteIntent(null,
             repository.scopeGeneration,
             repository.lastKnownDiskRevision,
             named("Before disable", 1L)));
@@ -214,8 +214,8 @@ public class PersistenceSafetyTest
 
         writer.start();
         long base = repository.load().revision;
-        writer.aft(base);
-        writer.submit(new Cs(null,
+        writer.resetAppliedRevision(base);
+        writer.submit(new WriteIntent(null,
             repository.scopeGeneration,
             base,
             named("After enable", base + 1L)));
@@ -233,15 +233,15 @@ public class PersistenceSafetyTest
         OrderedPersistenceWriter writer = new OrderedPersistenceWriter(repository, sameThread);
 
         long generation = repository.scopeGeneration;
-        writer.submit(new Cs(null, generation, 0L, named("Old", 1L)));
-        writer.submit(new Cs(null, generation, 0L, named("New", 2L)));
+        writer.submit(new WriteIntent(null, generation, 0L, named("Old", 1L)));
+        writer.submit(new WriteIntent(null, generation, 0L, named("New", 2L)));
         assertTrue(writer.flush(Duration.ofSeconds(5)));
         assertEquals("New", repository.load().getActiveSession().getName());
-        assertEquals(2L, writer.tk());
-        assertEquals(Ci.State.OK, writer.getStatus().state);
+        assertEquals(2L, writer.getAppliedRevision());
+        assertEquals(SaveStatus.State.OK, writer.getStatus().state);
 
         long base = repository.lastKnownDiskRevision;
-        writer.submit(new Cs(null, generation, base, named("Stale again", 1L)));
+        writer.submit(new WriteIntent(null, generation, base, named("Stale again", 1L)));
         assertTrue(writer.flush(Duration.ofSeconds(5)));
         assertEquals("New", repository.load().getActiveSession().getName());
         sameThread.shutdownNow();
@@ -255,7 +255,7 @@ public class PersistenceSafetyTest
         OrderedPersistenceWriter writer = new OrderedPersistenceWriter(
             repository,
             Executors.newSingleThreadExecutor());
-        writer.submit(new Cs(null,
+        writer.submit(new WriteIntent(null,
             repository.scopeGeneration,
             0L,
             named("Shutdown save", 1L)));
@@ -263,6 +263,6 @@ public class PersistenceSafetyTest
             writer.flush(Duration.ofSeconds(5)));
         writer.shutdown(Duration.ofSeconds(5));
         assertEquals("Shutdown save", repository.load().getActiveSession().getName());
-        assertNotEquals(Ci.State.NEVER_SAVED, writer.getStatus().state);
+        assertNotEquals(SaveStatus.State.NEVER_SAVED, writer.getStatus().state);
     }
 }

@@ -36,16 +36,16 @@ public class SyntheticLongSessionPerfTest
         int committed = 0;
         for (int round = 0; round < 8; round++)
         {
-            Ad session = new Ad("General-" + round, t0, Cx.AUTO);
+            Session session = new Session("General-" + round, t0, SessionMode.AUTO);
             for (int i = 0; i < transactions; i++)
             {
-                session.kf(Tx.of(
+                session.addTransaction(Tx.of(
                     t0 + i * 1_000L,
-                    Ai.GAIN,
-                    Aj.GENERIC,
+                    TransactionType.GAIN,
+                    Context.GENERIC,
                     "Skilling",
                     true,
-                    Collections.singletonList(new Ab(1511, "Logs", 1L, 39, 39L))), transactions);
+                    Collections.singletonList(new Flow(1511, "Logs", 1L, 39, 39L))), transactions);
             }
             assertEquals("Measure retained records, not only compacted totals", transactions, session.getTransactions().size());
             SavedState state = new SavedState(session, null, false, Collections.emptyList());

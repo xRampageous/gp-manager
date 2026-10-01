@@ -16,49 +16,48 @@ long idleCandidateSinceEpochMillis;
 long lastSkillingXpEpochMillis;
 boolean characterIdle;
 /** Soft-busy for Make-X / process gaps — presentation only. */
-synchronized void abn(long now) {
-lastSkillingXpEpochMillis = Ae.nonNeg(now);
-characterIdle = false;
-idleCandidateSinceEpochMillis = 0L;
+synchronized void noteSkillingXp(long now) {
+ lastSkillingXpEpochMillis = SafeMath.nonNeg(now);
+ characterIdle = false;
+ idleCandidateSinceEpochMillis = 0L;
 }
+
 /**
 * @param animating true when local animation != -1
 * @param interacting true when local player has an interact target
 * @return true once when character idle newly becomes true
 */
 synchronized boolean tick(boolean animating, boolean interacting, long now) {
-boolean atj = lastSkillingXpEpochMillis > 0L
-&& now - lastSkillingXpEpochMillis < delayMillis;
-boolean aoj = animating || interacting;
-if (aoj || atj) {
-if (aoj) {
-// Animation / interact: full Idle delay after clear.
-idleCandidateSinceEpochMillis = 0L;
-} else {
-// XP soft-busy alone: Idle fires delayMillis after the XP drop —
-// do not stack a second full delay when the soft window ends.
-idleCandidateSinceEpochMillis = lastSkillingXpEpochMillis;
+ boolean recentXp = lastSkillingXpEpochMillis > 0L && now - lastSkillingXpEpochMillis < delayMillis;
+ boolean hardBusy = animating || interacting;
+ if (hardBusy || recentXp) {
+  if (hardBusy) {
+   // Animation / interact: full Idle delay after clear.
+   idleCandidateSinceEpochMillis = 0L;
+  } else {
+   // XP soft-busy alone: Idle fires delayMillis after the XP drop —
+   // do not stack a second full delay when the soft window ends.
+   idleCandidateSinceEpochMillis = lastSkillingXpEpochMillis;
+  }
+  characterIdle = false;
+  return false;
+ }
+ if (idleCandidateSinceEpochMillis <= 0L) idleCandidateSinceEpochMillis = now;
+ if (now - idleCandidateSinceEpochMillis < delayMillis) {
+  characterIdle = false;
+  return false;
+ }
+ if (!characterIdle) {
+  characterIdle = true;
+  return true;
+ }
+ return false;
 }
-characterIdle = false;
-return false;
-}
-if (idleCandidateSinceEpochMillis <= 0L) {
-idleCandidateSinceEpochMillis = now;
-}
-if (now - idleCandidateSinceEpochMillis < delayMillis) {
-characterIdle = false;
-return false;
-}
-if (!characterIdle) {
-characterIdle = true;
-return true;
-}
-return false;
-}
+
 /** Logout / hop — reset like Idle Notifier timers. */
 synchronized void clear() {
-idleCandidateSinceEpochMillis = 0L;
-lastSkillingXpEpochMillis = 0L;
-characterIdle = false;
+ idleCandidateSinceEpochMillis = 0L;
+ lastSkillingXpEpochMillis = 0L;
+ characterIdle = false;
 }
 }

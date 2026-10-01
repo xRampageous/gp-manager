@@ -27,7 +27,7 @@ public class GpManagerPluginAutoStartTest
         {
             @Override public int stabilizationTicks() { return 1; }
         };
-        Am engine = new Am(deltas -> value(deltas),
+        Engine engine = new Engine(deltas -> value(deltas),
             new TransactionClassifier(), config);
         ItemContainer emptyInventory = proxy(ItemContainer.class, method ->
             "getItems".equals(method) ? new Item[0] : null);
@@ -50,21 +50,21 @@ public class GpManagerPluginAutoStartTest
         assertNotNull(engine.getActiveSession());
 
         long now = System.currentTimeMillis();
-        engine.yz();
-        Cc potato = new Cc(Collections.singletonMap(1942, 1L));
-        assertNull(engine.adj(potato, now + 600L));
-        Ac gain = engine.adj(potato, now + 1_200L);
+        engine.markInventoryDirty();
+        ContainerSnapshot potato = new ContainerSnapshot(Collections.singletonMap(1942, 1L));
+        assertNull(engine.processIfDirty(potato, now + 600L));
+        Transaction gain = engine.processIfDirty(potato, now + 1_200L);
 
         assertNotNull(gain);
-        assertEquals(Ai.GAIN, gain.getType());
+        assertEquals(TransactionType.GAIN, gain.getType());
         assertEquals(50L, engine.getMetrics(now + 1_200L).revenue);
     }
 
-    private static List<Ab> value(Map<Integer, Long> deltas)
+    private static List<Flow> value(Map<Integer, Long> deltas)
     {
-        List<Ab> flows = new ArrayList<>();
+        List<Flow> flows = new ArrayList<>();
         deltas.forEach((id, quantity) ->
-            flows.add(new Ab(id, "Item " + id, quantity, 50, quantity * 50)));
+            flows.add(new Flow(id, "Item " + id, quantity, 50, quantity * 50)));
         return flows;
     }
 

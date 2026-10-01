@@ -14,17 +14,17 @@ public class LateSpriteRefreshTest
     @Test
     public void aLateSpriteLandsInTheCacheAndForcesARefresh() throws Exception
     {
-        Am engine = new Am(deltas -> Collections.emptyList(), new TransactionClassifier(),
+        Engine engine = new Engine(deltas -> Collections.emptyList(), new TransactionClassifier(),
             new GpManagerConfig() {});
-        Dp[] holder = new Dp[1];
-        SwingUtilities.invokeAndWait(() -> holder[0] = new Dp(engine, new GpManagerConfig() {}, null));
-        Dp panel = holder[0];
+        SidebarPanel[] holder = new SidebarPanel[1];
+        SwingUtilities.invokeAndWait(() -> holder[0] = new SidebarPanel(engine, new GpManagerConfig() {}, null));
+        SidebarPanel panel = holder[0];
         BufferedImage image = new BufferedImage(2, 2, BufferedImage.TYPE_INT_ARGB);
 
         SwingUtilities.invokeAndWait(() ->
         {
             panel.pageForced = false;
-            panel.axu(-4242, image);
+            panel.spriteLoaded(-4242, image);
             assertTrue("a late sprite asks the pages to rebuild their rows", panel.pageForced);
         });
 

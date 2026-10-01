@@ -7,56 +7,56 @@ package com.gpmanager;
 class ClueCostPairing {
 String activeClueEncounterId;
 String activeClueLabel;
-synchronized void aue(String encounterId, String label) {
-this.activeClueEncounterId = rk(encounterId);
-this.activeClueLabel = rk(label);
+synchronized void beginClue(String encounterId, String label) {
+ this.activeClueEncounterId = emptyToNull(encounterId);
+ this.activeClueLabel = emptyToNull(label);
 }
-synchronized void axp() {
-activeClueEncounterId = null;
-activeClueLabel = null;
+
+synchronized void endClue() {
+ activeClueEncounterId = null;
+ activeClueLabel = null;
 }
+
 synchronized boolean isActive() {
-return activeClueEncounterId != null;
+ return activeClueEncounterId != null;
 }
-synchronized String tj() {
-return activeClueEncounterId;
+
+synchronized String getActiveEncounterId() {
+ return activeClueEncounterId;
 }
+
 /**
 * Classify a spend note while a clue path may be open.
 * Dig / teleport / clue key → CLUE_COST; food / potions → UNRELATED_USED.
 */
-synchronized boolean wt(String noteOrOption) {
-String lower = Ag.norm(noteOrOption);
-return activeClueEncounterId != null && lower != null && yv(lower);
+synchronized boolean isClueCost(String noteOrOption) {
+ String lower = ModelText.norm(noteOrOption);
+ return activeClueEncounterId != null && lower != null && looksLikeClueCost(lower);
 }
-static boolean yv(String lowerNote) {
-if (Ag.empty(lowerNote)) {
-return false;
+
+static boolean looksLikeClueCost(String lowerNote) {
+ if (ModelText.empty(lowerNote)) return false;
+ return lowerNote.contains("dig") || lowerNote.contains("teleport") || lowerNote.contains("tele ")
+ || lowerNote.contains("clue") || lowerNote.contains("casket") || lowerNote.contains("spade")
+ || lowerNote.contains("key") && (ModelText.has(lowerNote, "clue", "chest"));
 }
-return lowerNote.contains("dig")
-|| lowerNote.contains("teleport")
-|| lowerNote.contains("tele ")
-|| lowerNote.contains("clue")
-|| lowerNote.contains("casket")
-|| lowerNote.contains("spade")
-|| lowerNote.contains("key") && (Ag.has(lowerNote, "clue", "chest"));
+
+static boolean looksLikeClueActivity(String name) {
+ String lower = ModelText.norm(name);
+ return lower != null && (ModelText.has(lower, "clue", "casket", "treasure trail"));
 }
-static boolean ys(String name) {
-String lower = Ag.norm(name);
-return lower != null
-&& (Ag.has(lower, "clue", "casket", "treasure trail"));
+
+synchronized String costNote() {
+ String label = activeClueLabel == null ? "clue" : activeClueLabel;
+ return "Clue cost paired to " + label;
 }
-synchronized String awb() {
-String label = activeClueLabel == null ? "clue" : activeClueLabel;
-return "Clue cost paired to " + label;
-}
+
 synchronized void clear() {
-axp();
+ endClue();
 }
-static String rk(String value) {
-if (Ag.blank(value)) {
-return null;
-}
-return value.trim();
+
+static String emptyToNull(String value) {
+ if (ModelText.blank(value)) return null;
+ return value.trim();
 }
 }

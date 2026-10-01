@@ -27,7 +27,7 @@ public class SessionRepositoryMigrationTest
 
         assertEquals("Legacy", state.getActiveSession().getName());
         assertTrue(state.getActiveSession().undoHistory.isEmpty());
-        assertNull(state.getActiveSession().agn(1_000L));
+        assertNull(state.getActiveSession().restoreLastUndo(1_000L));
     }
 
     @Test
@@ -44,6 +44,6 @@ public class SessionRepositoryMigrationTest
         SavedState state = new SessionRepository(new Gson(), FilepathTestSupport.root(current)).load();
 
         assertEquals(2, state.getActiveSession().undoHistory.size());
-        assertNull(state.getActiveSession().agn(1_000L));
+        assertNull(state.getActiveSession().restoreLastUndo(1_000L));
     }
 }

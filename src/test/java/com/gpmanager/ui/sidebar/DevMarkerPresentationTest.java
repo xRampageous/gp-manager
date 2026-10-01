@@ -18,7 +18,7 @@ public class DevMarkerPresentationTest
     @Test
     public void developmentBadgeShowsVersionAndBuildIdentityAtRealWidth() throws Exception
     {
-        Dp panel = onEdt(() -> new Dp(PresentationLifecycleTest.engine(),
+        SidebarPanel panel = onEdt(() -> new SidebarPanel(PresentationLifecycleTest.engine(),
             PresentationLifecycleTest.config(), null));
         onEdt(() ->
         {
@@ -44,7 +44,7 @@ public class DevMarkerPresentationTest
     @Test
     public void releaseBuildLeavesTheFooterCollapsed() throws Exception
     {
-        Dp panel = onEdt(() -> new Dp(PresentationLifecycleTest.engine(),
+        SidebarPanel panel = onEdt(() -> new SidebarPanel(PresentationLifecycleTest.engine(),
             PresentationLifecycleTest.config(), null));
         onEdt(() ->
         {
@@ -60,7 +60,7 @@ public class DevMarkerPresentationTest
     @Test
     public void missingMetadataDegradesToTheBareDevelopmentMarker() throws Exception
     {
-        Dp panel = onEdt(() -> new Dp(PresentationLifecycleTest.engine(),
+        SidebarPanel panel = onEdt(() -> new SidebarPanel(PresentationLifecycleTest.engine(),
             PresentationLifecycleTest.config(), null));
         onEdt(() ->
         {
@@ -77,18 +77,18 @@ public class DevMarkerPresentationTest
     @Test
     public void buildBadgeNeverTouchesSessionTruth() throws Exception
     {
-        Am engine = PresentationLifecycleTest.engine();
+        Engine engine = PresentationLifecycleTest.engine();
         long now = System.currentTimeMillis();
-        engine.ajl("Vorkath", Cx.GENERAL, now);
-        engine.getActiveSession().kf(new Ac(
-            now + 1L, null, Ai.CONSUMPTION,
-            Aj.GENERIC, "", "Vorkath", true,
-            java.util.Arrays.asList(new Ab(385, "Shark", -1L, 950, -950L)),
-            Bd.CONFIRMED, "Exact cost fixture", null), 2_000);
+        engine.startCustomSession("Vorkath", SessionMode.GENERAL, now);
+        engine.getActiveSession().addTransaction(new Transaction(
+            now + 1L, null, TransactionType.CONSUMPTION,
+            Context.GENERIC, "", "Vorkath", true,
+            java.util.Arrays.asList(new Flow(385, "Shark", -1L, 950, -950L)),
+            ClassificationConfidence.CONFIRMED, "Exact cost fixture", null), 2_000);
         long net = engine.getMetrics(now + 2L).net;
         int receipts = engine.getActiveSession().getTransactions().size();
 
-        Dp panel = onEdt(() -> new Dp(engine, PresentationLifecycleTest.config(), null));
+        SidebarPanel panel = onEdt(() -> new SidebarPanel(engine, PresentationLifecycleTest.config(), null));
         onEdt(() ->
         {
             DevBadge.apply(panel, BuildInfo.of("0.8.0", "0.8.0-dev", "105",

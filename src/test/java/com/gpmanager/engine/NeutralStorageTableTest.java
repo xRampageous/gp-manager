@@ -55,11 +55,11 @@ public class NeutralStorageTableTest
             assertEquals(String.valueOf(row[0]), row[1], kind);
             if (kind != null)
             {
-                assertEquals(String.valueOf(row[0]), row[2], NeutralStorageClassifier.ajw(kind));
+                assertEquals(String.valueOf(row[0]), row[2], NeutralStorageClassifier.transferNote(kind));
             }
         }
-        assertEquals("Ownership-neutral storage transfer", NeutralStorageClassifier.ajw(null));
+        assertEquals("Ownership-neutral storage transfer", NeutralStorageClassifier.transferNote(null));
         assertEquals("Ownership-neutral storage transfer",
-            NeutralStorageClassifier.ajw(NeutralStorageClassifier.Kind.UNKNOWN_NEUTRAL));
+            NeutralStorageClassifier.transferNote(NeutralStorageClassifier.Kind.UNKNOWN_NEUTRAL));
     }
 }

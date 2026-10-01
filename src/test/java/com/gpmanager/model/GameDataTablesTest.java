@@ -138,7 +138,7 @@ public class GameDataTablesTest
         assertEquals(Map.of("bronze dart", ItemID.BRONZE_DART, "iron dart", ItemID.IRON_DART,
             "steel dart", ItemID.STEEL_DART, "mithril dart", ItemID.MITHRIL_DART,
             "adamant dart", ItemID.ADAMANT_DART, "rune dart", ItemID.RUNE_DART,
-            "amethyst dart", ItemID.AMETHYST_DART, "dragon dart", ItemID.DRAGON_DART), Ar.DARTS);
+            "amethyst dart", ItemID.AMETHYST_DART, "dragon dart", ItemID.DRAGON_DART), ChargeRead.DARTS);
     }
 
     @Test
@@ -146,7 +146,7 @@ public class GameDataTablesTest
     {
         for (int id = -1; id < MAX_ID; id++)
         {
-            assertEquals("item " + id, GE_TAX_EXEMPT.contains(id), GeTaxRule.awj(id));
+            assertEquals("item " + id, GE_TAX_EXEMPT.contains(id), GeTaxRule.isExempt(id));
         }
     }
 
@@ -155,7 +155,7 @@ public class GameDataTablesTest
     {
         for (int id = -1; id < MAX_ID; id++)
         {
-            assertEquals("item " + id, CURRENCY_PROXIES.contains(id), CurrencyProxyCatalogue.awk(id));
+            assertEquals("item " + id, CURRENCY_PROXIES.contains(id), CurrencyProxyCatalogue.isMapped(id));
         }
     }
 
@@ -176,7 +176,7 @@ public class GameDataTablesTest
         Map<Integer, String> expected = agilityCourses();
         for (int region = -1; region < MAX_ID; region++)
         {
-            assertEquals("region " + region, expected.get(region), AgilityCourses.qp(region));
+            assertEquals("region " + region, expected.get(region), AgilityCourses.courseName(region));
         }
     }
 
@@ -185,9 +185,9 @@ public class GameDataTablesTest
     {
         for (int region = -1; region < MAX_ID; region++)
         {
-            assertEquals("lms " + region, LMS_REGIONS.contains(region), MinigameRegionHints.xh(region));
+            assertEquals("lms " + region, LMS_REGIONS.contains(region), MinigameRegionHints.isLmsRegion(region));
             assertEquals("neutral " + region, NEUTRAL_ZONE_REGIONS.contains(region),
-                MinigameRegionHints.xl(region));
+                MinigameRegionHints.isNeutralZoneRegion(region));
         }
     }
 
@@ -197,13 +197,13 @@ public class GameDataTablesTest
         for (String row : RETRIEVAL_SERVICES)
         {
             String[] f = row.split("\\|", -1);
-            BossRetrievalCatalogue.Service service = BossRetrievalCatalogue.axr("Claim", f[2]);
+            BossRetrievalCatalogue.Service service = BossRetrievalCatalogue.forMenu("Claim", f[2]);
             assertNotNull(f[2], service);
             assertEquals(row, service.key + "|" + service.activity + "|" + service.interactable + "|"
                 + service.expectedFee + "|" + service.note + "|" + service.ambiguousTarget);
         }
-        assertTrue(BossRetrievalCatalogue.axr("Claim", "Gravestone of Zezima") != null);
-        assertEquals(null, BossRetrievalCatalogue.axr("Claim", "Banker"));
+        assertTrue(BossRetrievalCatalogue.forMenu("Claim", "Gravestone of Zezima") != null);
+        assertEquals(null, BossRetrievalCatalogue.forMenu("Claim", "Banker"));
     }
 
     @Test
@@ -211,23 +211,23 @@ public class GameDataTablesTest
     {
         for (String name : REWARD_SOURCES)
         {
-            assertTrue(name, RewardChestCatalogue.xn("The " + name.toUpperCase() + " pool"));
+            assertTrue(name, RewardChestCatalogue.isPendingRewardName("The " + name.toUpperCase() + " pool"));
         }
-        assertFalse(RewardChestCatalogue.xn("Goblin"));
-        assertFalse(RewardChestCatalogue.xn("Abyssal demon"));
+        assertFalse(RewardChestCatalogue.isPendingRewardName("Goblin"));
+        assertFalse(RewardChestCatalogue.isPendingRewardName("Abyssal demon"));
     }
 
     @Test
     public void orderedTablesKeepTheirOrder()
     {
         List<String> services = new ArrayList<>();
-        for (String[] row : Ak.rows("d2"))
+        for (String[] row : GameData.rows("d2"))
         {
             services.add(String.join("|", row));
         }
         assertEquals(RETRIEVAL_SERVICES, services);
         List<String> sources = new ArrayList<>();
-        for (String[] row : Ak.rows("d3"))
+        for (String[] row : GameData.rows("d3"))
         {
             sources.add(row[0]);
         }
@@ -241,7 +241,7 @@ public class GameDataTablesTest
         int named = 0;
         for (String table : new String[]{"d4", "d1", "d11"})
         {
-            for (String[] row : Ak.rows(table))
+            for (String[] row : GameData.rows(table))
             {
                 String constant = row[row.length - 1];
                 if (constant.matches("[A-Z0-9_]+"))
@@ -281,16 +281,16 @@ public class GameDataTablesTest
             }
         }
         assertTrue(used.size() > 50);
-        assertTrue(Ak.TEXT.keySet().containsAll(used));
-        for (String key : Ak.TEXT.keySet())
+        assertTrue(GameData.TEXT.keySet().containsAll(used));
+        for (String key : GameData.TEXT.keySet())
         {
             assertTrue("unused text row " + key, used.contains(key)
                 || prefixes.stream().anyMatch(key::startsWith));
-            assertFalse(key, Ak.msg(key).trim().isEmpty());
+            assertFalse(key, GameData.msg(key).trim().isEmpty());
         }
         for (String p : prefixes)
         {
-            assertTrue("no rows for " + p, Ak.TEXT.keySet().stream().anyMatch(k -> k.startsWith(p)));
+            assertTrue("no rows for " + p, GameData.TEXT.keySet().stream().anyMatch(k -> k.startsWith(p)));
         }
     }
 }

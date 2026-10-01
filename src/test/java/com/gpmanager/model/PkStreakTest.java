@@ -9,18 +9,18 @@ public class PkStreakTest
     @Test
     public void bestStreakKeepsTheLongestRunAndCurrentResetsOnDeath()
     {
-        Ad session = new Ad("PK", 0L, Cx.PK);
-        Be[] order = {Be.KILL, Be.KILL, Be.KILL,
-            Be.DEATH, Be.KILL};
+        Session session = new Session("PK", 0L, SessionMode.PK);
+        EncounterType[] order = {EncounterType.KILL, EncounterType.KILL, EncounterType.KILL,
+            EncounterType.DEATH, EncounterType.KILL};
         long at = 1_000L;
-        for (Be type : order)
+        for (EncounterType type : order)
         {
-            session.ke(type, at += 1_000L, "fight", Bd.CONFIRMED, "");
+            session.addPkEncounter(type, at += 1_000L, "fight", ClassificationConfidence.CONFIRMED, "");
         }
-        assertEquals(1, session.ava().currentStreak);
-        assertEquals(3, session.mb());
+        assertEquals(1, session.pkMetrics().currentStreak);
+        assertEquals(3, session.bestPkStreak());
 
-        session.ke(Be.DEATH, at + 1_000L, "fight", Bd.CONFIRMED, "");
-        assertEquals(3, session.mb());
+        session.addPkEncounter(EncounterType.DEATH, at + 1_000L, "fight", ClassificationConfidence.CONFIRMED, "");
+        assertEquals(3, session.bestPkStreak());
     }
 }

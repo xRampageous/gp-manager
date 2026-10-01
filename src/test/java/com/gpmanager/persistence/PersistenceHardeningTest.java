@@ -44,7 +44,7 @@ public class PersistenceHardeningTest
 
     private static SavedState state(String name, long revision)
     {
-        SavedState s = new SavedState(new Ad(name, 1_000L), null, false, Collections.emptyList());
+        SavedState s = new SavedState(new Session(name, 1_000L), null, false, Collections.emptyList());
         s.setRevision(revision);
         return s;
     }
@@ -100,11 +100,11 @@ public class PersistenceHardeningTest
     {
         // Hub v1 replaced the perpetual unknown-field compatibility layer with one supported
         // migration: stray fields on a same-schema payload are dropped, a newer schema is read-only.
-        Am engine = engine();
+        Engine engine = engine();
         long now = 10L * DAY;
         history(engine, "Vorkath", now - DAY, 30 * 60_000L, 40L);
         Gson gson = new Gson();
-        JsonObject json = new JsonParser().parse(gson.toJson(engine.qm())).getAsJsonObject();
+        JsonObject json = new JsonParser().parse(gson.toJson(engine.createSavedState())).getAsJsonObject();
         assertEquals(SavedState.CURRENT_SCHEMA_VERSION, json.get("schemaVersion").getAsInt());
         json.addProperty("futureTopLevel", "dropped");
         JsonArray history = json.getAsJsonArray("history");
@@ -112,26 +112,26 @@ public class PersistenceHardeningTest
         session.addProperty("futureSessionField", 1);
         session.getAsJsonArray("transactions").get(0).getAsJsonObject().addProperty("futureReceiptField", 42);
 
-        SavedState loaded = SessionRepository.adc(gson, json);
+        SavedState loaded = SessionRepository.parseState(gson, json);
         assertFalse((loaded.schemaVersion > SavedState.CURRENT_SCHEMA_VERSION));
-        assertTrue(loaded.ye());
-        Am second = engine();
+        assertTrue(loaded.isSupportedSchema());
+        Engine second = engine();
         second.restore(loaded, now);
-        assertEquals(engine.getHistory().get(0).metrics(now, 60_000L).net,
-            second.getHistory().get(0).metrics(now, 60_000L).net);
-        String out = gson.toJson(second.qm());
+        assertEquals(engine.getHistory().get(0).metrics(now).net,
+            second.getHistory().get(0).metrics(now).net);
+        String out = gson.toJson(second.createSavedState());
         assertFalse(out.contains("futureTopLevel"));
         assertFalse(out.contains("futureSessionField"));
         assertFalse(out.contains("futureReceiptField"));
 
         json.addProperty("schemaVersion", SavedState.CURRENT_SCHEMA_VERSION + 1);
-        SavedState newer = SessionRepository.adc(gson, json);
+        SavedState newer = SessionRepository.parseState(gson, json);
         assertTrue((newer.schemaVersion > SavedState.CURRENT_SCHEMA_VERSION));
 
-        JsonObject preRelease = new JsonParser().parse(gson.toJson(engine.qm())).getAsJsonObject();
+        JsonObject preRelease = new JsonParser().parse(gson.toJson(engine.createSavedState())).getAsJsonObject();
         preRelease.addProperty("schemaVersion", 23);
-        SavedState preReleaseState = SessionRepository.adc(gson, preRelease);
-        assertFalse("a pre-release shape is read-only", preReleaseState.ye());
+        SavedState preReleaseState = SessionRepository.parseState(gson, preRelease);
+        assertFalse("a pre-release shape is read-only", preReleaseState.isSupportedSchema());
         assertFalse((preReleaseState.schemaVersion > SavedState.CURRENT_SCHEMA_VERSION));
     }
 
@@ -144,12 +144,12 @@ public class PersistenceHardeningTest
         SessionRepository repository = new SessionRepository(new Gson(), FilepathTestSupport.root(directory));
         SavedState version101 = state("Schema 101", 1L);
         version101.setSchemaVersion(101);
-        Path primary = FilepathTestSupport.path(repository.ty().joinSegment("sessions.json"));
+        Path primary = FilepathTestSupport.path(repository.getDataDirectory().joinSegment("sessions.json"));
         String original = new Gson().toJson(version101);
         Files.writeString(primary, original, StandardCharsets.UTF_8);
 
-        assertFalse(repository.load().ye());
-        assertFalse(repository.save(new Cs(null, repository.scopeGeneration, 1L,
+        assertFalse(repository.load().isSupportedSchema());
+        assertFalse(repository.save(new WriteIntent(null, repository.scopeGeneration, 1L,
             state("Current", 2L))));
         assertEquals(original, Files.readString(primary, StandardCharsets.UTF_8));
     }
@@ -157,7 +157,7 @@ public class PersistenceHardeningTest
     @Test
     public void backgroundSaveNeverHoldsTheEngineLock() throws Exception
     {
-        Am engine = engine();
+        Engine engine = engine();
         long now = 400L * DAY;
         for (int i = 0; i < 300; i++)
         {
@@ -170,7 +170,7 @@ public class PersistenceHardeningTest
         SessionRepository repository = new SessionRepository(new Gson(), FilepathTestSupport.root(dir))
         {
             @Override
-            public synchronized boolean save(Cs intent)
+            public synchronized boolean save(WriteIntent intent)
             {
                 // The save stays in flight until an engine read has finished. A save that held the
                 // engine lock would block that read, and this wait would time out instead. No
@@ -191,15 +191,15 @@ public class PersistenceHardeningTest
         writer.start();
         try
         {
-            SavedState detached = engine.qm();
-            writer.submit(new Cs(null,
+            SavedState detached = engine.createSavedState();
+            writer.submit(new WriteIntent(null,
                 repository.scopeGeneration, repository.lastKnownDiskRevision, detached));
             assertTrue("the save started", inSave.await(5L, TimeUnit.SECONDS));
             engine.getMetrics(now);
             readDone.countDown();
             assertTrue(writer.flush(Duration.ofSeconds(10)));
             assertTrue("an engine read finished while the save was in flight", readDuringSave.get());
-            assertEquals(Ci.State.OK, writer.getStatus().state);
+            assertEquals(SaveStatus.State.OK, writer.getStatus().state);
         }
         finally
         {
@@ -214,7 +214,7 @@ public class PersistenceHardeningTest
         int seeds = Integer.getInteger("gp.fuzz.seeds", 200);
         int[] schemas = {14, 18, 20, 22};
         Set<String> keepState = new HashSet<>(Arrays.asList("history", "generalSession", "customSession", "activeSession", "schemaVersion", "revision"));
-        Set<String> xy = new HashSet<>(Arrays.asList("name", "transactions", "id", "startedAtEpochMillis"));
+        Set<String> keepSession = new HashSet<>(Arrays.asList("name", "transactions", "id", "startedAtEpochMillis"));
         Set<String> keepReceipt = new HashSet<>(Arrays.asList("flows", "type", "timestampEpochMillis"));
         Gson gson = new Gson();
         for (int seed = 0; seed < seeds; seed++)
@@ -222,7 +222,7 @@ public class PersistenceHardeningTest
             Random random = new Random(seed);
             try
             {
-                Am source = engine();
+                Engine source = engine();
                 long now = 500L * DAY + random.nextInt(1000) * 60_000L;
                 int sessions = 1 + random.nextInt(12);
                 for (int i = 0; i < sessions; i++)
@@ -232,10 +232,10 @@ public class PersistenceHardeningTest
                     history(source, random.nextBoolean() ? "Vorkath" : "Zulrah " + i, start, length, 1 + random.nextInt(500));
                     if (random.nextInt(4) == 0)
                     {
-                        source.ua(source.getHistory().get(0).getId()).setExcludedFromAverages(true);
+                        source.getHistorySession(source.getHistory().get(0).getId()).setExcludedFromAverages(true);
                     }
                 }
-                JsonObject json = new JsonParser().parse(gson.toJson(source.qm())).getAsJsonObject();
+                JsonObject json = new JsonParser().parse(gson.toJson(source.createSavedState())).getAsJsonObject();
                 int schema = schemas[random.nextInt(schemas.length)];
                 json.addProperty("schemaVersion", schema);
                 degrade(json, keepState, random);
@@ -243,7 +243,7 @@ public class PersistenceHardeningTest
                 {
                     if (json.has(owner) && json.get(owner).isJsonObject())
                     {
-                        degradeSession(json.getAsJsonObject(owner), xy, keepReceipt, random);
+                        degradeSession(json.getAsJsonObject(owner), keepSession, keepReceipt, random);
                     }
                 }
                 if (json.has("history"))
@@ -252,18 +252,18 @@ public class PersistenceHardeningTest
                     {
                         if (e.isJsonObject())
                         {
-                            degradeSession(e.getAsJsonObject(), xy, keepReceipt, random);
+                            degradeSession(e.getAsJsonObject(), keepSession, keepReceipt, random);
                         }
                     }
                 }
 
                 SavedState degraded = gson.fromJson(json, SavedState.class);
-                Am target = engine();
+                Engine target = engine();
                 target.restore(degraded, now);
                 invariants(target, now, sessions);
                 // Whatever came out restores again without loss of the invariants.
-                Am again = engine();
-                again.restore(gson.fromJson(gson.toJson(target.qm()), SavedState.class), now);
+                Engine again = engine();
+                again.restore(gson.fromJson(gson.toJson(target.createSavedState()), SavedState.class), now);
                 invariants(again, now, sessions);
                 assertEquals(target.getHistory().size(), again.getHistory().size());
             }
@@ -286,9 +286,9 @@ public class PersistenceHardeningTest
         }
     }
 
-    private static void degradeSession(JsonObject session, Set<String> xy, Set<String> keepReceipt, Random random)
+    private static void degradeSession(JsonObject session, Set<String> keepSession, Set<String> keepReceipt, Random random)
     {
-        degrade(session, xy, random);
+        degrade(session, keepSession, random);
         if (session.has("transactions") && session.get("transactions").isJsonArray())
         {
             for (JsonElement e : session.getAsJsonArray("transactions"))
@@ -301,16 +301,16 @@ public class PersistenceHardeningTest
         }
     }
 
-    private static void invariants(Am engine, long now, int sessionsPlayed)
+    private static void invariants(Engine engine, long now, int sessionsPlayed)
     {
-        List<Ad> history = engine.getHistory();
+        List<Session> history = engine.getHistory();
         assertTrue(history.size() <= sessionsPlayed + 1);
         Set<String> ids = new HashSet<>();
-        for (Ad s : history)
+        for (Session s : history)
         {
             assertTrue("duplicate session id " + s.getId(), ids.add(s.getId()));
             assertTrue(s.getElapsedMillis(now) >= 0L);
-            assertNotNull(engine.tz(s.getId(), now));
+            assertNotNull(engine.getHistoryMetrics(s.getId(), now));
         }
         if (engine.getGeneralSession() == null && engine.getActiveSession() == null && history.isEmpty())
         {
@@ -320,41 +320,41 @@ public class PersistenceHardeningTest
 
     // ── fixture ─────────────────────────────────────────────────────────────
 
-    private static String history(Am engine, String name, long startedAt, long length, long logs)
+    private static String history(Engine engine, String name, long startedAt, long length, long logs)
     {
-        engine.ajl(name, Cx.AUTO, startedAt);
+        engine.startCustomSession(name, SessionMode.AUTO, startedAt);
         String id = engine.getActiveSession().getId();
-        engine.setBaseline(new Cc(Collections.emptyMap()));
-        settle(engine, new Cc(map(LOGS, logs)), startedAt + 60_000L);
-        assertTrue(engine.sx(startedAt + length));
+        engine.setBaseline(new ContainerSnapshot(Collections.emptyMap()));
+        settle(engine, new ContainerSnapshot(map(LOGS, logs)), startedAt + 60_000L);
+        assertTrue(engine.finishCustomSession(startedAt + length));
         return id;
     }
 
-    private static Am engine()
+    private static Engine engine()
     {
         GpManagerConfig config = new GpManagerConfig()
         {
             @Override public int stabilizationTicks() { return 0; }
         };
-        return new Am(deltas ->
+        return new Engine(deltas ->
         {
-            List<Ab> flows = new ArrayList<>();
+            List<Flow> flows = new ArrayList<>();
             for (Map.Entry<Integer, Long> delta : deltas.entrySet())
             {
                 int id = delta.getKey();
                 int price = id == LOGS ? 48 : 800;
-                flows.add(new Ab(id, id == LOGS ? "Willow logs" : "Shark", delta.getValue(), price,
-                    delta.getValue() * price, Av.GRAND_EXCHANGE));
+                flows.add(new Flow(id, id == LOGS ? "Willow logs" : "Shark", delta.getValue(), price,
+                    delta.getValue() * price, PriceSource.GRAND_EXCHANGE));
             }
             return flows;
         }, new TransactionClassifier(), config);
     }
 
-    private static Ac settle(Am engine, Cc snapshot, long now)
+    private static Transaction settle(Engine engine, ContainerSnapshot snapshot, long now)
     {
-        engine.yz();
-        Ac first = engine.adj(snapshot, now);
-        Ac settled = engine.adj(snapshot, now + 600L);
+        engine.markInventoryDirty();
+        Transaction first = engine.processIfDirty(snapshot, now);
+        Transaction settled = engine.processIfDirty(snapshot, now + 600L);
         return settled == null ? first : settled;
     }
 

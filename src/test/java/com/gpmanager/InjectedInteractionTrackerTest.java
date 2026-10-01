@@ -21,9 +21,9 @@ public class InjectedInteractionTrackerTest
     public void guiceBuildsAndReusesTheTrackerThatPublishesCombatTargets()
     {
         GpManagerConfig config = new GpManagerConfig() {};
-        Am engine = new Am(deltas -> Collections.emptyList(),
+        Engine engine = new Engine(deltas -> Collections.emptyList(),
             new TransactionClassifier(), config);
-        engine.rm(1L);
+        engine.ensureSession(1L);
         Player local = proxy(Player.class, method -> null);
         Client client = proxy(Client.class, method -> "getLocalPlayer".equals(method) ? local : null);
         NPC target = proxy(NPC.class, method -> "getName".equals(method) ? "Goblin"
@@ -34,17 +34,17 @@ public class InjectedInteractionTrackerTest
             protected void configure()
             {
                 bind(Client.class).toInstance(client);
-                bind(Am.class).toProvider(() -> engine);
+                bind(Engine.class).toProvider(() -> engine);
                 bind(GpManagerConfig.class).toInstance(config);
             }
         });
         InteractionContextTracker tracker = injector.getInstance(InteractionContextTracker.class);
         assertSame(tracker, injector.getInstance(InteractionContextTracker.class));
         String[] published = {""};
-        tracker.mf(() -> true, (name, combat) -> published[0] = name);
+        tracker.bindPresentation(() -> true, (name, combat) -> published[0] = name);
         tracker.onInteractingChanged(new InteractingChanged(local, target));
         assertEquals("Goblin", published[0]);
-        assertTrue(tracker.vi());
+        assertTrue(tracker.hasPvmContext());
     }
 
     private static <T> T proxy(Class<T> type, Function<String, Object> values)
