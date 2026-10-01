@@ -9,16 +9,16 @@ import com.google.gson.Gson;
 class JsonCodec {
 static volatile Gson gson;
 static void bind(Gson clientGson) {
- gson = clientGson;
+gson = clientGson;
 }
 
 static boolean isBound() {
- return gson != null;
+return gson != null;
 }
 
 static Gson gson() {
- Gson bound = gson;
- if (bound == null) throw new IllegalStateException(msg("c"));
- return bound;
+Gson bound = gson;
+if (bound == null) throw new IllegalStateException(msg("c"));
+return bound;
 }
 }

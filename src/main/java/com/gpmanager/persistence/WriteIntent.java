@@ -17,15 +17,15 @@ final long expectedBaseRevision;
 final SavedState state;
 final String json;
 WriteIntent(TrackingIdentity identity, long scopeGeneration, long expectedBaseRevision, SavedState state) {
- this(identity, scopeGeneration, expectedBaseRevision, state, null);
+this(identity, scopeGeneration, expectedBaseRevision, state, null);
 }
 
 WriteIntent(TrackingIdentity identity, long scopeGeneration, long expectedBaseRevision, SavedState state, String json) {
- if (state == null) throw new IllegalArgumentException("state");
- this.identity = identity;
- this.scopeGeneration = scopeGeneration;
- this.expectedBaseRevision = SafeMath.nonNeg(expectedBaseRevision);
- this.state = state;
- this.json = json;
+if (state == null) throw new IllegalArgumentException("state");
+this.identity = identity;
+this.scopeGeneration = scopeGeneration;
+this.expectedBaseRevision = SafeMath.nonNeg(expectedBaseRevision);
+this.state = state;
+this.json = json;
 }
 }

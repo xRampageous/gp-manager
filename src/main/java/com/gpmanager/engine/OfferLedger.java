@@ -18,13 +18,13 @@ final Map<Integer, Snapshot> bySlot = new LinkedHashMap<>();
 boolean loginSeed;
 /** Begin a login/relogin baseline pass; all observations are suppressed until it is finished. */
 synchronized void beginLoginSeed() {
- bySlot.clear();
- loginSeed = true;
+bySlot.clear();
+loginSeed = true;
 }
 
 /** Finish the baseline pass after the caller has received the initial offer-slot replay. */
 synchronized void finishLoginSeed() {
- loginSeed = false;
+loginSeed = false;
 }
 
 /**
@@ -32,13 +32,13 @@ synchronized void finishLoginSeed() {
 * login-seed observations return an empty Optional.
 */
 synchronized Optional<Transition> observe(Snapshot current) {
- Objects.requireNonNull(current, "current");
- Snapshot previous = bySlot.put(current.slot, current);
- if (loginSeed || current.equals(previous) || current.state == GrandExchangeOfferState.EMPTY
- && (previous == null || previous.state == GrandExchangeOfferState.EMPTY)) {
-  return Optional.empty();
- }
- return Optional.of(new Transition(previous, current));
+Objects.requireNonNull(current, "current");
+Snapshot previous = bySlot.put(current.slot, current);
+if (loginSeed || current.equals(previous) || current.state == GrandExchangeOfferState.EMPTY
+&& (previous == null || previous.state == GrandExchangeOfferState.EMPTY)) {
+return Optional.empty();
+}
+return Optional.of(new Transition(previous, current));
 }
 
 /**
@@ -46,48 +46,48 @@ synchronized Optional<Transition> observe(Snapshot current) {
 * cannot be used to mutate this ledger.
 */
 synchronized Map<Integer, Snapshot> snapshots() {
- return Collections.unmodifiableMap(new LinkedHashMap<>(bySlot));
+return Collections.unmodifiableMap(new LinkedHashMap<>(bySlot));
 }
 
 /** The offer side a state belongs to; null for an empty slot. */
 static GeRecord.Side sideOf(GrandExchangeOfferState state) {
- return state == GrandExchangeOfferState.BUYING || state == GrandExchangeOfferState.BOUGHT
- || state == GrandExchangeOfferState.CANCELLED_BUY ? GeRecord.Side.BUY
- : state == GrandExchangeOfferState.SELLING || state == GrandExchangeOfferState.SOLD
- || state == GrandExchangeOfferState.CANCELLED_SELL ? GeRecord.Side.SELL : null;
+return state == GrandExchangeOfferState.BUYING || state == GrandExchangeOfferState.BOUGHT
+|| state == GrandExchangeOfferState.CANCELLED_BUY ? GeRecord.Side.BUY
+: state == GrandExchangeOfferState.SELLING || state == GrandExchangeOfferState.SOLD
+|| state == GrandExchangeOfferState.CANCELLED_SELL ? GeRecord.Side.SELL : null;
 }
 
 static boolean isActive(GrandExchangeOfferState state) {
- return state == GrandExchangeOfferState.BUYING || state == GrandExchangeOfferState.SELLING;
+return state == GrandExchangeOfferState.BUYING || state == GrandExchangeOfferState.SELLING;
 }
 
 static boolean isTerminal(GrandExchangeOfferState state) {
- return sideOf(state) != null && !isActive(state);
+return sideOf(state) != null && !isActive(state);
 }
 
 /** Immutable copy of the API fields used by the offer ledger. */
 @EqualsAndHashCode
 @AllArgsConstructor
 static class Snapshot {
- final int slot;
- final GrandExchangeOfferState state;
- final int itemId;
- final int totalQuantity;
- /** RuneLite's quantity bought or sold so far, copied from getQuantitySold(). */
- final int quantityTraded;
- final long price;
- /** Raw getSpent() observation; the model does not assign sell-side or tax semantics. */
- final long spent;
- static Snapshot fromOffer(int slot, GrandExchangeOffer offer) {
-  return new Snapshot(slot, offer.getState(), offer.getItemId(), offer.getTotalQuantity(),
-  offer.getQuantitySold(), offer.getPrice(), offer.getSpent());
- }
+final int slot;
+final GrandExchangeOfferState state;
+final int itemId;
+final int totalQuantity;
+/** RuneLite's quantity bought or sold so far, copied from getQuantitySold(). */
+final int quantityTraded;
+final long price;
+/** Raw getSpent() observation; the model does not assign sell-side or tax semantics. */
+final long spent;
+static Snapshot fromOffer(int slot, GrandExchangeOffer offer) {
+return new Snapshot(slot, offer.getState(), offer.getItemId(), offer.getTotalQuantity(),
+offer.getQuantitySold(), offer.getPrice(), offer.getSpent());
+}
 }
 
 /** One observed slot change: the previous snapshot (null when first seen) and the current one. */
 @AllArgsConstructor
 static class Transition {
- final Snapshot previous;
- final Snapshot current;
+final Snapshot previous;
+final Snapshot current;
 }
 }

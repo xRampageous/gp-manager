@@ -31,39 +31,39 @@ long otherCosts;
 boolean costSplitComplete = true;
 /** Folds one encounter's finalized money exactly once. */
 void fold(EncounterType type, PkMoney money) {
- long encounterNet = money.netGp;
- net = safeAdd(net, encounterNet);
- costs = safeAdd(costs, money.getCostsGp());
- if (money.costSplitAvailable) {
-  suppliesCosts = safeAdd(suppliesCosts, money.getSuppliesCostsGp());
-  otherCosts = safeAdd(otherCosts, safeSubtract(money.getCostsGp(), money.getSuppliesCostsGp()));
- } else {
-  costSplitComplete = false;
- }
- if (type == EncounterType.KILL) {
-  killNet = safeAdd(killNet, encounterNet);
-  bestKill = max(bestKill, nonNeg(encounterNet));
- } else {
-  deathLoss = safeAdd(deathLoss, money.getLossGp());
-  largestDeathLoss = max(largestDeathLoss, money.getLossGp());
- }
+long encounterNet = money.netGp;
+net = safeAdd(net, encounterNet);
+costs = safeAdd(costs, money.getCostsGp());
+if (money.costSplitAvailable) {
+suppliesCosts = safeAdd(suppliesCosts, money.getSuppliesCostsGp());
+otherCosts = safeAdd(otherCosts, safeSubtract(money.getCostsGp(), money.getSuppliesCostsGp()));
+} else {
+costSplitComplete = false;
+}
+if (type == EncounterType.KILL) {
+killNet = safeAdd(killNet, encounterNet);
+bestKill = max(bestKill, nonNeg(encounterNet));
+} else {
+deathLoss = safeAdd(deathLoss, money.getLossGp());
+largestDeathLoss = max(largestDeathLoss, money.getLossGp());
+}
 }
 
 /** Folds a Session projection (or another base) exactly once. */
 void merge(PkProfileBase other) {
- if (other == null) return;
- encounters = safeAddCount(encounters, other.encounters);
- kills = safeAddCount(kills, other.kills);
- deaths = safeAddCount(deaths, other.deaths);
- net = safeAdd(net, other.net);
- costs = safeAdd(costs, other.costs);
- killNet = safeAdd(killNet, other.killNet);
- deathLoss = safeAdd(deathLoss, other.deathLoss);
- bestKill = max(bestKill, other.bestKill);
- largestDeathLoss = max(largestDeathLoss, other.largestDeathLoss);
- suppliesCosts = safeAdd(suppliesCosts, other.suppliesCosts);
- otherCosts = safeAdd(otherCosts, other.otherCosts);
- costSplitComplete &= other.costSplitComplete;
+if (other == null) return;
+encounters = safeAddCount(encounters, other.encounters);
+kills = safeAddCount(kills, other.kills);
+deaths = safeAddCount(deaths, other.deaths);
+net = safeAdd(net, other.net);
+costs = safeAdd(costs, other.costs);
+killNet = safeAdd(killNet, other.killNet);
+deathLoss = safeAdd(deathLoss, other.deathLoss);
+bestKill = max(bestKill, other.bestKill);
+largestDeathLoss = max(largestDeathLoss, other.largestDeathLoss);
+suppliesCosts = safeAdd(suppliesCosts, other.suppliesCosts);
+otherCosts = safeAdd(otherCosts, other.otherCosts);
+costSplitComplete &= other.costSplitComplete;
 }
 
 /**
@@ -72,10 +72,10 @@ void merge(PkProfileBase other) {
 * their receipts finalize.
 */
 void merge(PkProfileBase projection, List<PkMutableAttribution> anchors) {
- merge(projection);
- for (PkMutableAttribution anchor : anchors) {
-  if (anchor != null) fold(anchor.getType(), anchor.current());
- }
+merge(projection);
+for (PkMutableAttribution anchor : anchors) {
+if (anchor != null) fold(anchor.getType(), anchor.current());
+}
 }
 
 int getEncounters() { return max(0, encounters); }

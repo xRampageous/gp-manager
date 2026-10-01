@@ -69,44 +69,44 @@ SavedState() {
 * never backfills and never infers a spell name from rune recipes.
 */
 void normalizeActionLabels() {
- normalizeActionLabels(generalSession);
- normalizeActionLabels(customSession);
- for (Session session : getHistory()) normalizeActionLabels(session);
+normalizeActionLabels(generalSession);
+normalizeActionLabels(customSession);
+for (Session session : getHistory()) normalizeActionLabels(session);
 }
 
 static void normalizeActionLabels(Session session) {
- if (session == null) return;
- for (Transaction transaction : session.getTransactions()) {
-  if (transaction != null) transaction.normalizeObservedActionLabel();
- }
+if (session == null) return;
+for (Transaction transaction : session.getTransactions()) {
+if (transaction != null) transaction.normalizeObservedActionLabel();
+}
 }
 
 List<SavedGrind> getSavedGrinds() {
- if (savedGrinds == null) savedGrinds = new ArrayList<>();
- return savedGrinds;
+if (savedGrinds == null) savedGrinds = new ArrayList<>();
+return savedGrinds;
 }
 
 void setSavedGrinds(List<SavedGrind> values) {
- savedGrinds = values == null ? new ArrayList<>() : new ArrayList<>(values);
+savedGrinds = values == null ? new ArrayList<>() : new ArrayList<>(values);
 }
 
 List<GeRecord> getGeCustody() {
- if (geCustody == null) geCustody = new ArrayList<>();
- return geCustody;
+if (geCustody == null) geCustody = new ArrayList<>();
+return geCustody;
 }
 
 void setGeCustody(List<GeRecord> values) {
- geCustody = new ArrayList<>();
- if (values != null) {
-  for (GeRecord value : values) {
-   if (value != null && !value.getOfferId().isEmpty()) geCustody.add(value);
-  }
- }
+geCustody = new ArrayList<>();
+if (values != null) {
+for (GeRecord value : values) {
+if (value != null && !value.getOfferId().isEmpty()) geCustody.add(value);
+}
+}
 }
 
 TrackedBasisState getTrackedBasis() {
- if (trackedBasis == null) trackedBasis = new TrackedBasisState();
- return trackedBasis;
+if (trackedBasis == null) trackedBasis = new TrackedBasisState();
+return trackedBasis;
 }
 
 /**
@@ -116,83 +116,83 @@ TrackedBasisState getTrackedBasis() {
 */
 @Setter
 static class SavedGrind {
- String grindId;
- String name;
- Long netTargetGp;
- Long activeTimeTargetMillis;
- boolean favorite;
- boolean archived;
- SavedGrind() {
- }
- SavedGrind(String grindId, String name, Long netTargetGp, Long activeTimeTargetMillis, boolean favorite) {
-  this.grindId = grindId;
-  this.name = name;
-  this.netTargetGp = netTargetGp;
-  this.activeTimeTargetMillis = activeTimeTargetMillis;
-  this.favorite = favorite;
- }
- String getGrindId() { return orEmpty(grindId); }
- String getName() { return orEmpty(name); }
- Long getNetTargetGp() { return netTargetGp != null && netTargetGp > 0L ? netTargetGp : null; }
- Long getActiveTimeTargetMillis() {
-  return activeTimeTargetMillis != null && activeTimeTargetMillis > 0L ? activeTimeTargetMillis : null;
- }
+String grindId;
+String name;
+Long netTargetGp;
+Long activeTimeTargetMillis;
+boolean favorite;
+boolean archived;
+SavedGrind() {
+}
+SavedGrind(String grindId, String name, Long netTargetGp, Long activeTimeTargetMillis, boolean favorite) {
+this.grindId = grindId;
+this.name = name;
+this.netTargetGp = netTargetGp;
+this.activeTimeTargetMillis = activeTimeTargetMillis;
+this.favorite = favorite;
+}
+String getGrindId() { return orEmpty(grindId); }
+String getName() { return orEmpty(name); }
+Long getNetTargetGp() { return netTargetGp != null && netTargetGp > 0L ? netTargetGp : null; }
+Long getActiveTimeTargetMillis() {
+return activeTimeTargetMillis != null && activeTimeTargetMillis > 0L ? activeTimeTargetMillis : null;
+}
 }
 
 SavedState(Session generalSession, Session customSession, boolean generalSuspendedByCustom, List<Session> history) {
- this.savedAtEpochMillis = System.currentTimeMillis();
- this.generalSession = generalSession;
- this.customSession = customSession;
- this.generalSuspendedByCustom = generalSuspendedByCustom;
- this.history = new ArrayList<>(history == null ? new ArrayList<>() : history);
+this.savedAtEpochMillis = System.currentTimeMillis();
+this.generalSession = generalSession;
+this.customSession = customSession;
+this.generalSuspendedByCustom = generalSuspendedByCustom;
+this.history = new ArrayList<>(history == null ? new ArrayList<>() : history);
 }
 
 /** True only for the 1.0 schema; anything else is preserved read-only and never rewritten. */
 boolean isSupportedSchema() {
- return schemaVersion == CURRENT_SCHEMA_VERSION;
+return schemaVersion == CURRENT_SCHEMA_VERSION;
 }
 
 /** The owner that was tracking when this state was saved. */
 Session getActiveSession() {
- return customSession != null ? customSession : generalSession;
+return customSession != null ? customSession : generalSession;
 }
 
 List<Session> getHistory() {
- if (history == null) history = new ArrayList<>();
- return history;
+if (history == null) history = new ArrayList<>();
+return history;
 }
 
 String getLastReceiptRetentionDayUtc() {
- return orEmpty(lastReceiptRetentionDayUtc);
+return orEmpty(lastReceiptRetentionDayUtc);
 }
 
 void setLastReceiptRetentionDayUtc(String day) {
- lastReceiptRetentionDayUtc = day == null ? "" : day.trim();
+lastReceiptRetentionDayUtc = day == null ? "" : day.trim();
 }
 
 String getProfileTimeZoneId() {
- return orEmpty(profileTimeZoneId);
+return orEmpty(profileTimeZoneId);
 }
 
 void setProfileTimeZoneId(String value) {
- profileTimeZoneId = value == null ? "" : value.trim();
+profileTimeZoneId = value == null ? "" : value.trim();
 }
 
 PkHistoryState getPkHistory() {
- if (pkHistory == null) pkHistory = new PkHistoryState();
- return pkHistory;
+if (pkHistory == null) pkHistory = new PkHistoryState();
+return pkHistory;
 }
 
 List<PendingClaim> getPendingClaims() {
- return pendingClaims == null ? emptyList() : unmodifiableList(pendingClaims);
+return pendingClaims == null ? emptyList() : unmodifiableList(pendingClaims);
 }
 
 void setPendingClaims(List<PendingClaim> values) {
- pendingClaims = empty(values) ? null : new ArrayList<>(values);
+pendingClaims = empty(values) ? null : new ArrayList<>(values);
 }
 
 void setPendingDeathReclaim(PendingDeathReclaim value) {
- pendingDeathReclaim = value == null || value.isEmpty() ? null : value;
+pendingDeathReclaim = value == null || value.isEmpty() ? null : value;
 }
 
 /**
@@ -202,54 +202,54 @@ void setPendingDeathReclaim(PendingDeathReclaim value) {
 * coffer or presentation data. Canonical transactions remain the sole financial authority.
 */
 static class PendingDeathReclaim {
- List<DeathItem> outstandingItems;
- List<DeathItem> heldAtDeath;
- int wipeTicksRemaining;
- int gravestoneAgeTicks;
- PendingDeathReclaim() {
- }
- PendingDeathReclaim(List<DeathItem> outstandingItems, List<DeathItem> heldAtDeath, int wipeTicksRemaining,
- int gravestoneAgeTicks) {
-  this.outstandingItems = copyItems(outstandingItems);
-  this.heldAtDeath = copyItems(heldAtDeath);
-  this.wipeTicksRemaining = max(0, wipeTicksRemaining);
-  this.gravestoneAgeTicks = max(0, gravestoneAgeTicks);
- }
- List<DeathItem> getOutstandingItems() {
-  return outstandingItems == null ? emptyList() : unmodifiableList(outstandingItems);
- }
- List<DeathItem> getHeldAtDeath() {
-  return heldAtDeath == null ? emptyList() : unmodifiableList(heldAtDeath);
- }
- int getWipeTicksRemaining() { return max(0, wipeTicksRemaining); }
- int getGravestoneAgeTicks() { return max(0, gravestoneAgeTicks); }
- boolean isEmpty() {
-  return getOutstandingItems().isEmpty() && getHeldAtDeath().isEmpty();
- }
- static List<DeathItem> copyItems(List<DeathItem> values) {
-  if (empty(values)) return null;
-  var copy = new ArrayList<DeathItem>();
-  for (DeathItem value : values) {
-   if (value != null && value.isValid()) copy.add(value);
-  }
-  return copy.isEmpty() ? null : copy;
- }
+List<DeathItem> outstandingItems;
+List<DeathItem> heldAtDeath;
+int wipeTicksRemaining;
+int gravestoneAgeTicks;
+PendingDeathReclaim() {
+}
+PendingDeathReclaim(List<DeathItem> outstandingItems, List<DeathItem> heldAtDeath, int wipeTicksRemaining,
+int gravestoneAgeTicks) {
+this.outstandingItems = copyItems(outstandingItems);
+this.heldAtDeath = copyItems(heldAtDeath);
+this.wipeTicksRemaining = max(0, wipeTicksRemaining);
+this.gravestoneAgeTicks = max(0, gravestoneAgeTicks);
+}
+List<DeathItem> getOutstandingItems() {
+return outstandingItems == null ? emptyList() : unmodifiableList(outstandingItems);
+}
+List<DeathItem> getHeldAtDeath() {
+return heldAtDeath == null ? emptyList() : unmodifiableList(heldAtDeath);
+}
+int getWipeTicksRemaining() { return max(0, wipeTicksRemaining); }
+int getGravestoneAgeTicks() { return max(0, gravestoneAgeTicks); }
+boolean isEmpty() {
+return getOutstandingItems().isEmpty() && getHeldAtDeath().isEmpty();
+}
+static List<DeathItem> copyItems(List<DeathItem> values) {
+if (empty(values)) return null;
+var copy = new ArrayList<DeathItem>();
+for (DeathItem value : values) {
+if (value != null && value.isValid()) copy.add(value);
+}
+return copy.isEmpty() ? null : copy;
+}
 }
 
 /** One persisted item identity and quantity for {@link PendingDeathReclaim}. */
 static class DeathItem {
- int itemId;
- long quantity;
- DeathItem() {
- }
- DeathItem(int itemId, long quantity) {
-  this.itemId = itemId;
-  this.quantity = nonNeg(quantity);
- }
- long getQuantity() { return nonNeg(quantity); }
- boolean isValid() {
-  return itemId > 0 && getQuantity() > 0L;
- }
+int itemId;
+long quantity;
+DeathItem() {
+}
+DeathItem(int itemId, long quantity) {
+this.itemId = itemId;
+this.quantity = nonNeg(quantity);
+}
+long getQuantity() { return nonNeg(quantity); }
+boolean isValid() {
+return itemId > 0 && getQuantity() > 0L;
+}
 }
 
 /**
@@ -259,23 +259,23 @@ static class DeathItem {
 * Claims intentionally carry no cross-session ownership edge.
 */
 static class PendingClaim {
- String claimId;
- int itemOrKeyId;
- long quantity;
- long createdAtEpochMillis;
- PendingClaim() {
- }
- PendingClaim(String claimId, int itemOrKeyId, long quantity, long createdAtEpochMillis) {
-  this.claimId = claimId;
-  this.itemOrKeyId = itemOrKeyId;
-  this.quantity = nonNeg(quantity);
-  this.createdAtEpochMillis = nonNeg(createdAtEpochMillis);
- }
- String getClaimId() { return orEmpty(claimId); }
- long getQuantity() { return nonNeg(quantity); }
- long getCreatedAtEpochMillis() { return nonNeg(createdAtEpochMillis); }
- boolean isValid() {
-  return !getClaimId().isEmpty() && itemOrKeyId > 0 && getQuantity() > 0L;
- }
+String claimId;
+int itemOrKeyId;
+long quantity;
+long createdAtEpochMillis;
+PendingClaim() {
+}
+PendingClaim(String claimId, int itemOrKeyId, long quantity, long createdAtEpochMillis) {
+this.claimId = claimId;
+this.itemOrKeyId = itemOrKeyId;
+this.quantity = nonNeg(quantity);
+this.createdAtEpochMillis = nonNeg(createdAtEpochMillis);
+}
+String getClaimId() { return orEmpty(claimId); }
+long getQuantity() { return nonNeg(quantity); }
+long getCreatedAtEpochMillis() { return nonNeg(createdAtEpochMillis); }
+boolean isValid() {
+return !getClaimId().isEmpty() && itemOrKeyId > 0 && getQuantity() > 0L;
+}
 }
 }

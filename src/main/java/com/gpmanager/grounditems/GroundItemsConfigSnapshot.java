@@ -19,26 +19,26 @@ final String hiddenCsv;
 final boolean showHighlightedOnly;
 final String fingerprint;
 GroundItemsConfigSnapshot(boolean pluginEnabled, String highlightedCsv, String hiddenCsv, boolean showHighlightedOnly) {
- this.pluginEnabled = pluginEnabled;
- this.highlightedCsv = ModelText.orEmpty(highlightedCsv);
- this.hiddenCsv = ModelText.orEmpty(hiddenCsv);
- this.showHighlightedOnly = showHighlightedOnly;
- this.fingerprint = buildFingerprint();
+this.pluginEnabled = pluginEnabled;
+this.highlightedCsv = ModelText.orEmpty(highlightedCsv);
+this.hiddenCsv = ModelText.orEmpty(hiddenCsv);
+this.showHighlightedOnly = showHighlightedOnly;
+this.fingerprint = buildFingerprint();
 }
 
 /** Empty / disabled fallback — callers treat filtering as pass-through. */
 static GroundItemsConfigSnapshot disabled() {
- return new GroundItemsConfigSnapshot(false, "", msg("n"), false);
+return new GroundItemsConfigSnapshot(false, "", msg("n"), false);
 }
 
 String fingerprint() {
- return fingerprint;
+return fingerprint;
 }
 
 String buildFingerprint() {
- var sb = new StringBuilder();
- sb.append(pluginEnabled).append('|').append(highlightedCsv).append('|').append(hiddenCsv).append('|')
- .append(showHighlightedOnly);
- return sb.toString();
+var sb = new StringBuilder();
+sb.append(pluginEnabled).append('|').append(highlightedCsv).append('|').append(hiddenCsv).append('|')
+.append(showHighlightedOnly);
+return sb.toString();
 }
 }

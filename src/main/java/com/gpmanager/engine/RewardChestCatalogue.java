@@ -8,12 +8,12 @@ class RewardChestCatalogue {
 static final List<String[]> SOURCES = GameData.rows("d3");
 /** True when this LT/event name is a reward chest / raid / clue pool — not floor loot. */
 static boolean isPendingRewardName(String name) {
- if (ModelText.blank(name)) return false;
- if (KeyChestCatalogue.entryForChestMention(name) != null) return true;
- String lower = name.trim().toLowerCase(Locale.ROOT);
- for (String[] source : SOURCES) {
-  if (lower.contains(source[0])) return true;
- }
- return false;
+if (ModelText.blank(name)) return false;
+if (KeyChestCatalogue.entryForChestMention(name) != null) return true;
+String lower = name.trim().toLowerCase(Locale.ROOT);
+for (String[] source : SOURCES) {
+if (lower.contains(source[0])) return true;
+}
+return false;
 }
 }

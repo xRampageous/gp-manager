@@ -13,10 +13,10 @@ class MinigameRegionHints {
 static final Map<Integer, String> KINDS = GameData.byId("d13");
 /** True inside an instance whose inventory changes are never profit or loss. */
 static boolean isNeutralZoneRegion(int regionId) {
- return "neutral".equals(KINDS.get(regionId));
+return "neutral".equals(KINDS.get(regionId));
 }
 
 static boolean isLmsRegion(int regionId) {
- return "lms".equals(KINDS.get(regionId));
+return "lms".equals(KINDS.get(regionId));
 }
 }

@@ -19,33 +19,33 @@ import static java.lang.Math.*;
 class GeRecord {
 /** Durable offer side. */
 enum Side {
- BUY, SELL
+BUY, SELL
 }
 
 /** Durable lifecycle stage. Behavioural projection states are derived from these facts. */
 enum Stage {
- /** Placement observed; principal may still be arriving; execution may advance. */
- OPEN,
- /** Placement principal captured; awaiting a collection, return or refund observation. */
- AWAITING_SETTLEMENT,
- /** Terminal and reconciled; eligible for safe retirement. */
- CLOSED,
- /** Terminal with known execution but no observed settlement; handed to Review. */
- CLOSED_UNOBSERVED,
- /** Identity desync or unsafe quantity allocation; further realization is disabled. */
- AMBIGUOUS
+/** Placement observed; principal may still be arriving; execution may advance. */
+OPEN,
+/** Placement principal captured; awaiting a collection, return or refund observation. */
+AWAITING_SETTLEMENT,
+/** Terminal and reconciled; eligible for safe retirement. */
+CLOSED,
+/** Terminal with known execution but no observed settlement; handed to Review. */
+CLOSED_UNOBSERVED,
+/** Identity desync or unsafe quantity allocation; further realization is disabled. */
+AMBIGUOUS
 }
 
 /** Confidence in the placement/basis lineage. */
 enum Confidence {
- /** Placement and any basis were observed live under schema 104. */
- CONFIRMED,
- /** Persisted state resumed a matching offer after restart/hop. */
- RESUMED,
- /** Offer was already open when schema 104 first observed it; never receives invented basis. */
- LEGACY_UNBASED,
- /** Identity or quantity desync; no exact basis lineage. */
- AMBIGUOUS
+/** Placement and any basis were observed live under schema 104. */
+CONFIRMED,
+/** Persisted state resumed a matching offer after restart/hop. */
+RESUMED,
+/** Offer was already open when schema 104 first observed it; never receives invented basis. */
+LEGACY_UNBASED,
+/** Identity or quantity desync; no exact basis lineage. */
+AMBIGUOUS
 }
 
 String offerId;
@@ -124,20 +124,20 @@ boolean fillTaxExact;
 /** Schema-107 SELL: the part of {@link #fillTaxGp} already booked into settlements. */
 long settledTaxGp;
 GeRecord() {
- // Gson
+// Gson
 }
 
 GeRecord(String offerId, int slot, Side side, int itemId, String itemName,
 long offeredQty, long listedPrice, long placedAtEpochMillis, String originSessionId) {
- this.offerId = offerId;
- this.slot = slot;
- this.side = side.name();
- this.itemId = itemId;
- this.itemName = orEmpty(itemName);
- this.offeredQty = nonNeg(offeredQty);
- this.listedPrice = nonNeg(listedPrice);
- this.placedAtEpochMillis = nonNeg(placedAtEpochMillis);
- this.originSessionId = orEmpty(originSessionId);
+this.offerId = offerId;
+this.slot = slot;
+this.side = side.name();
+this.itemId = itemId;
+this.itemName = orEmpty(itemName);
+this.offeredQty = nonNeg(offeredQty);
+this.listedPrice = nonNeg(listedPrice);
+this.placedAtEpochMillis = nonNeg(placedAtEpochMillis);
+this.originSessionId = orEmpty(originSessionId);
 }
 
 String getOfferId() { return orEmpty(offerId); }
@@ -155,7 +155,7 @@ Stage getStage() { return parseStage(stage); }
 void setStage(Stage value) { stage = value == null ? Stage.OPEN.name() : value.name(); }
 Confidence getConfidence() { return act(confidence); }
 void setConfidence(Confidence value) {
- confidence = value == null ? Confidence.CONFIRMED.name() : value.name();
+confidence = value == null ? Confidence.CONFIRMED.name() : value.name();
 }
 
 long getFilledQty() { return nonNeg(filledQty); }
@@ -187,12 +187,12 @@ long getConsumedTrackedBasisGp() { return nonNeg(consumedTrackedBasisGp); }
 void setConsumedTrackedBasisGp(long value) { consumedTrackedBasisGp = nonNeg(value); }
 /** SELL: tracked reservation quantity still held by this lifecycle. */
 long reservedRemainingQty() {
- return nonNeg(getReservedTrackedQty() - getConsumedTrackedQty());
+return nonNeg(getReservedTrackedQty() - getConsumedTrackedQty());
 }
 
 /** SELL: tracked reservation basis still held by this lifecycle. */
 long reservedRemainingBasisGp() {
- return nonNeg(getReservedTrackedBasisGp() - getConsumedTrackedBasisGp());
+return nonNeg(getReservedTrackedBasisGp() - getConsumedTrackedBasisGp());
 }
 
 String getSettlementId() { return orEmpty(settlementId); }
@@ -201,86 +201,86 @@ long getFillTaxGp() { return nonNeg(fillTaxGp); }
 long getSettledTaxGp() { return nonNeg(settledTaxGp); }
 /** A fresh basis can still be frozen at the first matched owned movement. */
 boolean hasFrozenBasis() {
- return !getBasisSource().isEmpty() && !PriceSource.UNPRICED.name().equals(getBasisSource())
- && !PriceSource.UNKNOWN.name().equals(getBasisSource()) && getBasisUnitPrice() > 0L;
+return !getBasisSource().isEmpty() && !PriceSource.UNPRICED.name().equals(getBasisSource())
+&& !PriceSource.UNKNOWN.name().equals(getBasisSource()) && getBasisUnitPrice() > 0L;
 }
 
 /** Filled quantity not yet booked into a canonical settlement. */
 long pendingSettlementQty() {
- return nonNeg(getFilledQty() - getSettledQty());
+return nonNeg(getFilledQty() - getSettledQty());
 }
 
 /** Exact gross execution value of the quantity not yet booked. */
 long pendingExecutionGp() {
- return nonNeg(getSpentGp() - getSettledExecutionGp());
+return nonNeg(getSpentGp() - getSettledExecutionGp());
 }
 
 /** SELL: quantity still held by the exchange (captured, not returned, not filled). */
 long sellCustodyQty() {
- return nonNeg(getCapturedQty() - getReturnedQty() - getFilledQty());
+return nonNeg(getCapturedQty() - getReturnedQty() - getFilledQty());
 }
 
 /** SELL: basis value for a quantity at the frozen unit price; 0 when unbased. */
 long lo(long quantity) {
- long left = getBasisUnitPrice();
- long right = nonNeg(quantity);
- try {
-  return multiplyExact(left, right);
- } catch (ArithmeticException ex) {
-  return left >= 0L ? Long.MAX_VALUE : Long.MIN_VALUE;
- }
+long left = getBasisUnitPrice();
+long right = nonNeg(quantity);
+try {
+return multiplyExact(left, right);
+} catch (ArithmeticException ex) {
+return left >= 0L ? Long.MAX_VALUE : Long.MIN_VALUE;
+}
 }
 
 /** SELL: quantity that can be settled with an exact frozen basis. */
 long sellSettleableQty() {
- return min(pendingSettlementQty(), nonNeg(getCapturedQty() - getSettledQty()));
+return min(pendingSettlementQty(), nonNeg(getCapturedQty() - getSettledQty()));
 }
 
 /** BUY: observed inventory reserve currently held by the exchange. */
 /** BUY: reserve not yet spent on fills or returned as change; zero once the offer is done. */
 long buyReserveOutstandingGp() {
- return nonNeg(getReserveGp() - getSpentGp() - getRefundedGp());
+return nonNeg(getReserveGp() - getSpentGp() - getRefundedGp());
 }
 
 /** True when the offer's last observed state is a terminal fill/cancellation. */
 boolean isTerminalState() {
- return "SOLD".equals(getOfferState()) || "BOUGHT".equals(getOfferState())
- || "CANCELLED_SELL".equals(getOfferState()) || "CANCELLED_BUY".equals(getOfferState());
+return "SOLD".equals(getOfferState()) || "BOUGHT".equals(getOfferState())
+|| "CANCELLED_SELL".equals(getOfferState()) || "CANCELLED_BUY".equals(getOfferState());
 }
 
 /** True when the last observed state is an explicit cancellation. */
 boolean isCancelledState() {
- return "CANCELLED_SELL".equals(getOfferState()) || "CANCELLED_BUY".equals(getOfferState());
+return "CANCELLED_SELL".equals(getOfferState()) || "CANCELLED_BUY".equals(getOfferState());
 }
 
 /** True when custody is fully reconciled and the record may be retired after a durable save. */
 boolean isFullyReconciled() {
- if (getStage() == Stage.AMBIGUOUS || getStage() == Stage.CLOSED_UNOBSERVED) return true;
- if (getSide() == Side.SELL) {
-  return pendingSettlementQty() == 0L && sellCustodyQty() == 0L && (isTerminalState() || cleared);
- }
- return pendingSettlementQty() == 0L && nonNeg(getFilledQty() - getCollectedQty()) == 0L
- && buyReserveOutstandingGp() == 0L && (isTerminalState() || cleared);
+if (getStage() == Stage.AMBIGUOUS || getStage() == Stage.CLOSED_UNOBSERVED) return true;
+if (getSide() == Side.SELL) {
+return pendingSettlementQty() == 0L && sellCustodyQty() == 0L && (isTerminalState() || cleared);
+}
+return pendingSettlementQty() == 0L && nonNeg(getFilledQty() - getCollectedQty()) == 0L
+&& buyReserveOutstandingGp() == 0L && (isTerminalState() || cleared);
 }
 
 /** True when no durable basis can ever be attached (legacy-open or desync). */
 boolean isLegacyUnbased() {
- return getConfidence() == Confidence.LEGACY_UNBASED;
+return getConfidence() == Confidence.LEGACY_UNBASED;
 }
 
 static Stage parseStage(String value) {
- if (value == null) return Stage.OPEN;
- for (Stage candidate : Stage.values()) {
-  if (candidate.name().equals(value)) return candidate;
- }
- return Stage.OPEN;
+if (value == null) return Stage.OPEN;
+for (Stage candidate : Stage.values()) {
+if (candidate.name().equals(value)) return candidate;
+}
+return Stage.OPEN;
 }
 
 static Confidence act(String value) {
- if (value == null) return Confidence.CONFIRMED;
- for (Confidence candidate : Confidence.values()) {
-  if (candidate.name().equals(value)) return candidate;
- }
- return Confidence.CONFIRMED;
+if (value == null) return Confidence.CONFIRMED;
+for (Confidence candidate : Confidence.values()) {
+if (candidate.name().equals(value)) return candidate;
+}
+return Confidence.CONFIRMED;
 }
 }

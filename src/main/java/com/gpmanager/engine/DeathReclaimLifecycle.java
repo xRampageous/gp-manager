@@ -37,42 +37,42 @@ final Map<Integer, Long> deathItems = new HashMap<>();
 final Map<Integer, String> names = new HashMap<>();
 /** Local unsafe PvM death: the snapshot is ownership evidence, not presentation evidence. */
 void onLocalPvmDeath() {
- onLocalPvmDeath(null);
+onLocalPvmDeath(null);
 }
 
 /** Local unsafe PvM death: the snapshot is ownership evidence, not presentation evidence. */
 void onLocalPvmDeath(Map<Integer, Long> heldItems) {
- // A second death moves outstanding items to the new gravestone. Keep their
- // quantities and restart the single gravestone timer with the new grave.
- if (!awaitingReclaim) deathItems.clear();
- awaitingReclaim = true;
- // Missing canonical evidence is not permission to neutralize arbitrary losses.
- Map<Integer, Long> held = positiveEntries(heldItems);
- carriedAtDeath = held.isEmpty() ? null : held;
- deathWipeTicks = carriedAtDeath == null ? 0 : DEATH_WIPE_WINDOW_TICKS;
- ageTicks = 0;
- reclaimTicks = 0;
- reclaimService = null;
- completeIfEmpty();
+// A second death moves outstanding items to the new gravestone. Keep their
+// quantities and restart the single gravestone timer with the new grave.
+if (!awaitingReclaim) deathItems.clear();
+awaitingReclaim = true;
+// Missing canonical evidence is not permission to neutralize arbitrary losses.
+Map<Integer, Long> held = positiveEntries(heldItems);
+carriedAtDeath = held.isEmpty() ? null : held;
+deathWipeTicks = carriedAtDeath == null ? 0 : DEATH_WIPE_WINDOW_TICKS;
+ageTicks = 0;
+reclaimTicks = 0;
+reclaimService = null;
+completeIfEmpty();
 }
 
 /** True while waiting for the measured death inventory/equipment removal. */
 boolean isDeathWipePending() {
- return awaitingReclaim && carriedAtDeath != null;
+return awaitingReclaim && carriedAtDeath != null;
 }
 
 /** Stop the short death-wipe whitelist when stronger later evidence owns the loss. */
 void cancelDeathWipe() {
- carriedAtDeath = null;
- deathWipeTicks = 0;
- completeIfEmpty();
+carriedAtDeath = null;
+deathWipeTicks = 0;
+completeIfEmpty();
 }
 
 /** Consume death-time candidates whose later loss is explicitly action-attributed. */
 void excludeActionLosses(Map<Integer, Long> actionLosses) {
- if (carriedAtDeath == null || ModelText.empty(actionLosses)) return;
- positiveEntries(actionLosses).forEach((itemId, lost) -> take(carriedAtDeath, itemId, lost));
- endWipeIfSpent();
+if (carriedAtDeath == null || ModelText.empty(actionLosses)) return;
+positiveEntries(actionLosses).forEach((itemId, lost) -> take(carriedAtDeath, itemId, lost));
+endWipeIfSpent();
 }
 
 /**
@@ -81,27 +81,27 @@ void excludeActionLosses(Map<Integer, Long> actionLosses) {
 * ownership-neutral death transfer.
 */
 Map<Integer, Long> onDeathItemsRemoved(List<Flow> flows) {
- if (!isDeathWipePending()) return emptyMap();
- var removed = new HashMap<Integer, Long>();
- for (Flow flow : flows == null ? Collections.<Flow>emptyList() : flows) {
-  if (flow == null || flow.quantityDelta >= 0L || flow.quantityDelta == Long.MIN_VALUE
-  // A live retrieval interaction makes measured coin loss a possible
-  // fee; do not consume it as a delayed death wipe.
-  || flow.itemId == ItemID.COINS && isReclaimArmed()) {
-   continue;
-  }
-  long matched = take(carriedAtDeath, flow.itemId, -flow.quantityDelta);
-  if (matched <= 0L) continue;
-  removed.put(flow.itemId, matched);
-  // Coins can be part of the measured death wipe transfer, but they are
-  // never reclaim whitelist items: a later coin loss may be the observed fee.
-  if (flow.itemId != ItemID.COINS) {
-   deathItems.merge(flow.itemId, matched, SafeMath::safeAdd);
-   if (flow.itemName != null && !flow.itemName.trim().isEmpty()) names.put(flow.itemId, flow.itemName.trim());
-  }
- }
- endWipeIfSpent();
- return removed.isEmpty() ? emptyMap() : unmodifiableMap(removed);
+if (!isDeathWipePending()) return emptyMap();
+var removed = new HashMap<Integer, Long>();
+for (Flow flow : flows == null ? Collections.<Flow>emptyList() : flows) {
+if (flow == null || flow.quantityDelta >= 0L || flow.quantityDelta == Long.MIN_VALUE
+// A live retrieval interaction makes measured coin loss a possible
+// fee; do not consume it as a delayed death wipe.
+|| flow.itemId == ItemID.COINS && isReclaimArmed()) {
+continue;
+}
+long matched = take(carriedAtDeath, flow.itemId, -flow.quantityDelta);
+if (matched <= 0L) continue;
+removed.put(flow.itemId, matched);
+// Coins can be part of the measured death wipe transfer, but they are
+// never reclaim whitelist items: a later coin loss may be the observed fee.
+if (flow.itemId != ItemID.COINS) {
+deathItems.merge(flow.itemId, matched, SafeMath::safeAdd);
+if (flow.itemName != null && !flow.itemName.trim().isEmpty()) names.put(flow.itemId, flow.itemName.trim());
+}
+}
+endWipeIfSpent();
+return removed.isEmpty() ? emptyMap() : unmodifiableMap(removed);
 }
 
 /**
@@ -109,23 +109,23 @@ Map<Integer, Long> onDeathItemsRemoved(List<Flow> flows) {
 * Returns zero when the item was not part of the actual settled death wipe.
 */
 long matchReturnedItem(int itemId, long quantity) {
- long matched = take(deathItems, itemId, quantity);
- if (matched > 0L && deathItems.isEmpty()) {
-  // All measured grave contents have returned. Remaining stacks from the
-  // death-time snapshot were kept and can no longer be a delayed wipe.
-  cancelDeathWipe();
- }
- return matched;
+long matched = take(deathItems, itemId, quantity);
+if (matched > 0L && deathItems.isEmpty()) {
+// All measured grave contents have returned. Remaining stacks from the
+// death-time snapshot were kept and can no longer be a delayed wipe.
+cancelDeathWipe();
+}
+return matched;
 }
 
 long outstandingItemCount() {
- long count = 0L;
- for (long quantity : deathItems.values()) count = SafeMath.safeAdd(count, quantity);
- return count;
+long count = 0L;
+for (long quantity : deathItems.values()) count = SafeMath.safeAdd(count, quantity);
+return count;
 }
 
 int ageTicks() {
- return ageTicks;
+return ageTicks;
 }
 
 /**
@@ -135,48 +135,48 @@ int ageTicks() {
 * @return true only when a local PvM death is awaiting reclaim
 */
 boolean noteReclaimIntent(BossRetrievalCatalogue.Service service, int ticks) {
- if (service == null || !awaitingReclaim) return false;
- reclaimService = service;
- reclaimTicks = Math.max(MIN_RECLAIM_ARM_TICKS, ticks);
- return true;
+if (service == null || !awaitingReclaim) return false;
+reclaimService = service;
+reclaimTicks = Math.max(MIN_RECLAIM_ARM_TICKS, ticks);
+return true;
 }
 
 boolean isReclaimArmed() {
- return reclaimTicks > 0 && reclaimService != null;
+return reclaimTicks > 0 && reclaimService != null;
 }
 
 /** One inventory/game tick; defers gravestone expiry while a snapshot is unsettled. */
 String tick(boolean deferGravestoneExpiry) {
- if (awaitingReclaim && ageTicks < Integer.MAX_VALUE) ageTicks++;
- if (reclaimTicks > 0 && --reclaimTicks == 0) reclaimService = null;
- if (deathWipeTicks > 0 && --deathWipeTicks == 0) cancelDeathWipe();
- if (deferGravestoneExpiry || !awaitingReclaim || ageTicks < AWAIT_TICKS) return null;
- String expired = deathItems.isEmpty() ? null : expiredItems();
- reset();
- return expired;
+if (awaitingReclaim && ageTicks < Integer.MAX_VALUE) ageTicks++;
+if (reclaimTicks > 0 && --reclaimTicks == 0) reclaimService = null;
+if (deathWipeTicks > 0 && --deathWipeTicks == 0) cancelDeathWipe();
+if (deferGravestoneExpiry || !awaitingReclaim || ageTicks < AWAIT_TICKS) return null;
+String expired = deathItems.isEmpty() ? null : expiredItems();
+reset();
+return expired;
 }
 
 /** The expiry audit explanation: the outstanding items, sorted by name. */
 String expiredItems() {
- var labels = new ArrayList<String>();
- deathItems.forEach((itemId, quantity) -> {
-  String name = names.getOrDefault(itemId, "item #" + itemId);
-  labels.add(quantity == 1L ? name : name + " ×" + String.format(Locale.ROOT, "%,d", quantity));
- });
- labels.sort(String.CASE_INSENSITIVE_ORDER);
- return "The gravestone timer expired with " + outstandingItemCount() + " item(s) outstanding: "
- + String.join(", ", labels) + msg("aq");
+var labels = new ArrayList<String>();
+deathItems.forEach((itemId, quantity) -> {
+String name = names.getOrDefault(itemId, "item #" + itemId);
+labels.add(quantity == 1L ? name : name + " ×" + String.format(Locale.ROOT, "%,d", quantity));
+});
+labels.sort(String.CASE_INSENSITIVE_ORDER);
+return "The gravestone timer expired with " + outstandingItemCount() + " item(s) outstanding: "
++ String.join(", ", labels) + msg("aq");
 }
 
 void reset() {
- awaitingReclaim = false;
- deathWipeTicks = 0;
- ageTicks = 0;
- reclaimTicks = 0;
- reclaimService = null;
- carriedAtDeath = null;
- deathItems.clear();
- names.clear();
+awaitingReclaim = false;
+deathWipeTicks = 0;
+ageTicks = 0;
+reclaimTicks = 0;
+reclaimService = null;
+carriedAtDeath = null;
+deathItems.clear();
+names.clear();
 }
 
 /**
@@ -185,16 +185,16 @@ void reset() {
 * are deliberately not persisted.
 */
 PendingDeathReclaim snapshot() {
- List<DeathItem> outstanding = items(deathItems);
- List<DeathItem> held = items(carriedAtDeath);
- return !awaitingReclaim || outstanding.isEmpty() && held.isEmpty() ? null
- : new PendingDeathReclaim(outstanding, held, deathWipeTicks, ageTicks);
+List<DeathItem> outstanding = items(deathItems);
+List<DeathItem> held = items(carriedAtDeath);
+return !awaitingReclaim || outstanding.isEmpty() && held.isEmpty() ? null
+: new PendingDeathReclaim(outstanding, held, deathWipeTicks, ageTicks);
 }
 
 static List<DeathItem> items(Map<Integer, Long> quantities) {
- var items = new ArrayList<DeathItem>();
- positiveEntries(quantities).forEach((itemId, quantity) -> items.add(new DeathItem(itemId, quantity)));
- return items;
+var items = new ArrayList<DeathItem>();
+positiveEntries(quantities).forEach((itemId, quantity) -> items.add(new DeathItem(itemId, quantity)));
+return items;
 }
 
 /**
@@ -203,42 +203,42 @@ static List<DeathItem> items(Map<Integer, Long> quantities) {
 * gravestone timer keeps its age. A live reclaim interaction is never restored.
 */
 void restore(PendingDeathReclaim pending) {
- reset();
- if (pending == null || pending.isEmpty()) return;
- for (DeathItem item : pending.getOutstandingItems()) {
-  if (item.getQuantity() > 0L) deathItems.merge(item.itemId, item.getQuantity(), SafeMath::safeAdd);
- }
- var held = new HashMap<Integer, Long>();
- for (DeathItem item : pending.getHeldAtDeath()) {
-  held.merge(item.itemId, item.getQuantity(), SafeMath::safeAdd);
- }
- deathWipeTicks = Math.min(DEATH_WIPE_WINDOW_TICKS, pending.getWipeTicksRemaining());
- carriedAtDeath = deathWipeTicks > 0 && !held.isEmpty() ? held : null;
- deathWipeTicks = carriedAtDeath == null ? 0 : deathWipeTicks;
- ageTicks = pending.getGravestoneAgeTicks();
- awaitingReclaim = carriedAtDeath != null || !deathItems.isEmpty();
+reset();
+if (pending == null || pending.isEmpty()) return;
+for (DeathItem item : pending.getOutstandingItems()) {
+if (item.getQuantity() > 0L) deathItems.merge(item.itemId, item.getQuantity(), SafeMath::safeAdd);
+}
+var held = new HashMap<Integer, Long>();
+for (DeathItem item : pending.getHeldAtDeath()) {
+held.merge(item.itemId, item.getQuantity(), SafeMath::safeAdd);
+}
+deathWipeTicks = Math.min(DEATH_WIPE_WINDOW_TICKS, pending.getWipeTicksRemaining());
+carriedAtDeath = deathWipeTicks > 0 && !held.isEmpty() ? held : null;
+deathWipeTicks = carriedAtDeath == null ? 0 : deathWipeTicks;
+ageTicks = pending.getGravestoneAgeTicks();
+awaitingReclaim = carriedAtDeath != null || !deathItems.isEmpty();
 }
 
 /** Adopt the physical continuity of a staged engine during an owner install. */
 void adoptFrom(DeathReclaimLifecycle other) {
- reset();
- if (other == null) return;
- awaitingReclaim = other.awaitingReclaim;
- deathWipeTicks = other.deathWipeTicks;
- ageTicks = other.ageTicks;
- reclaimTicks = other.reclaimTicks;
- reclaimService = other.reclaimService;
- carriedAtDeath = other.carriedAtDeath == null ? null : new HashMap<>(other.carriedAtDeath);
- deathItems.putAll(other.deathItems);
- names.putAll(other.names);
+reset();
+if (other == null) return;
+awaitingReclaim = other.awaitingReclaim;
+deathWipeTicks = other.deathWipeTicks;
+ageTicks = other.ageTicks;
+reclaimTicks = other.reclaimTicks;
+reclaimService = other.reclaimService;
+carriedAtDeath = other.carriedAtDeath == null ? null : new HashMap<>(other.carriedAtDeath);
+deathItems.putAll(other.deathItems);
+names.putAll(other.names);
 }
 
 void endWipeIfSpent() {
- if (carriedAtDeath != null && carriedAtDeath.isEmpty()) cancelDeathWipe();
- completeIfEmpty();
+if (carriedAtDeath != null && carriedAtDeath.isEmpty()) cancelDeathWipe();
+completeIfEmpty();
 }
 
 void completeIfEmpty() {
- if (awaitingReclaim && carriedAtDeath == null && deathItems.isEmpty()) reset();
+if (awaitingReclaim && carriedAtDeath == null && deathItems.isEmpty()) reset();
 }
 }

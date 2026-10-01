@@ -8,7 +8,7 @@ List<Flow> value(Map<Integer, Long> quantityDeltas);
 * source-compatible and may ignore the timestamp until they support price provenance.
 */
 default List<Flow> value(Map<Integer, Long> quantityDeltas, long priceCapturedAtEpochMillis) {
- return value(quantityDeltas);
+return value(quantityDeltas);
 }
 
 /**
@@ -22,7 +22,7 @@ default List<Flow> value(Map<Integer, Long> quantityDeltas, long priceCapturedAt
 * basis; callers must keep the original captured flows and route the receipt to Review.
 */
 default List<Flow> normalizeConsumedFlows(List<Flow> flows, ActionKind actionKind, long priceCapturedAtEpochMillis) {
- return flows;
+return flows;
 }
 
 /**
@@ -31,6 +31,6 @@ default List<Flow> normalizeConsumedFlows(List<Flow> flows, ActionKind actionKin
 * {@link ItemValuationService} overrides this with its observed economy snapshot.
 */
 default boolean automaticMarketQuotesAvailable() {
- return true;
+return true;
 }
 }

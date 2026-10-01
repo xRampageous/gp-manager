@@ -15,21 +15,21 @@ final GpManagerConfig config;
 PvpContext context = PvpContext.NONE;
 /** The context sampled on the latest tick (or by {@link #sample}); presentation and disposition input only. */
 PvpContext context() {
- return context;
+return context;
 }
 
 /** Re-reads the client signals now (death/loot events may precede the next tick sample). */
 PvpContext sample(Player localPlayer) {
- int regionId = localPlayer == null || localPlayer.getWorldLocation() == null
- ? 0 : localPlayer.getWorldLocation().getRegionID();
- context = PvpContext.classify(client.getVarbitValue(VarbitID.INSIDE_WILDERNESS) == 1,
- client.getVarbitValue(VarbitID.PVP_AREA_CLIENT) == 1, client.getVarbitValue(VarbitID.THIS_IS_A_PVP_OR_BH_WORLD) == 1,
- client.getVarbitValue(VarbitID.THIS_IS_A_PVP_ARENA_WORLD) == 1, regionId);
- return context;
+int regionId = localPlayer == null || localPlayer.getWorldLocation() == null
+? 0 : localPlayer.getWorldLocation().getRegionID();
+context = PvpContext.classify(client.getVarbitValue(VarbitID.INSIDE_WILDERNESS) == 1,
+client.getVarbitValue(VarbitID.PVP_AREA_CLIENT) == 1, client.getVarbitValue(VarbitID.THIS_IS_A_PVP_OR_BH_WORLD) == 1,
+client.getVarbitValue(VarbitID.THIS_IS_A_PVP_ARENA_WORLD) == 1, regionId);
+return context;
 }
 
 /** Game tick: re-classify the PvP context; disposition input only. */
 void onGameTick(Player localPlayer) {
- sample(localPlayer);
+sample(localPlayer);
 }
 }

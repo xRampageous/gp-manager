@@ -17,38 +17,38 @@ static final long VARIABLE_FEE = -1L;
 static final long TIERED_FEE = -2L;
 @AllArgsConstructor
 static class Service {
- final String key;
- final String activity;
- final String interactable;
- final long expectedFee;
- final String note;
- /**
- * Target name shared with unrelated scenery (a bare "Chest", a gravestone): only
- * evidence when a local PvM death is still awaiting reclaim.
- */
- final boolean ambiguousTarget;
- /** Ledger explanation for an observed coin payment at this service. */
- String why(long observedCoins) {
-  var why = new StringBuilder("Item retrieval fee — ").append(activity).append(" (").append(interactable).append(")");
-  if (expectedFee > 0L) {
-   why.append(", published ").append(String.format(ROOT, "%,d", expectedFee));
-   if (observedCoins > 0L && observedCoins != expectedFee) {
-    why.append(", observed ").append(String.format(ROOT, "%,d", observedCoins));
-   }
-  } else if (expectedFee == VARIABLE_FEE) {
-   why.append(", fee varies");
-  }
-  if (!note.isEmpty()) why.append(". ").append(note);
-  return why.toString();
- }
+final String key;
+final String activity;
+final String interactable;
+final long expectedFee;
+final String note;
+/**
+* Target name shared with unrelated scenery (a bare "Chest", a gravestone): only
+* evidence when a local PvM death is still awaiting reclaim.
+*/
+final boolean ambiguousTarget;
+/** Ledger explanation for an observed coin payment at this service. */
+String why(long observedCoins) {
+var why = new StringBuilder("Item retrieval fee — ").append(activity).append(" (").append(interactable).append(")");
+if (expectedFee > 0L) {
+why.append(", published ").append(String.format(ROOT, "%,d", expectedFee));
+if (observedCoins > 0L && observedCoins != expectedFee) {
+why.append(", observed ").append(String.format(ROOT, "%,d", observedCoins));
+}
+} else if (expectedFee == VARIABLE_FEE) {
+why.append(", fee varies");
+}
+if (!note.isEmpty()) why.append(". ").append(note);
+return why.toString();
+}
 }
 
 static final Map<String, Service> BY_INTERACTABLE = new LinkedHashMap<>();
 static {
- for (String[] r : GameData.rows("d2")) {
-  BY_INTERACTABLE.put(r[2].toLowerCase(ROOT),
-  new Service(r[0], r[1], r[2], Long.parseLong(r[3]), r[4], Boolean.parseBoolean(r[5])));
- }
+for (String[] r : GameData.rows("d2")) {
+BY_INTERACTABLE.put(r[2].toLowerCase(ROOT),
+new Service(r[0], r[1], r[2], Long.parseLong(r[3]), r[4], Boolean.parseBoolean(r[5])));
+}
 }
 
 /**
@@ -57,18 +57,18 @@ static {
 * are returned too; the engine only acts on them while a local PvM death awaits reclaim.
 */
 static Service forMenu(String option, String target) {
- if (target == null || option == null || !option.trim().toLowerCase(ROOT).matches(msg("e"))) {
-  return null;
- }
- String lower = target.trim().toLowerCase(ROOT);
- if (lower.isEmpty()) return null;
- Service exact = BY_INTERACTABLE.get(lower);
- if (exact != null) return exact;
- for (Map.Entry<String, Service> entry : BY_INTERACTABLE.entrySet()) {
-  if (!entry.getValue().ambiguousTarget && lower.contains(entry.getKey())) return entry.getValue();
- }
- if (lower.startsWith("gravestone") || lower.startsWith("grave")) return BY_INTERACTABLE.get("gravestone");
- return null;
+if (target == null || option == null || !option.trim().toLowerCase(ROOT).matches(msg("e"))) {
+return null;
+}
+String lower = target.trim().toLowerCase(ROOT);
+if (lower.isEmpty()) return null;
+Service exact = BY_INTERACTABLE.get(lower);
+if (exact != null) return exact;
+for (Map.Entry<String, Service> entry : BY_INTERACTABLE.entrySet()) {
+if (!entry.getValue().ambiguousTarget && lower.contains(entry.getKey())) return entry.getValue();
+}
+if (lower.startsWith("gravestone") || lower.startsWith("grave")) return BY_INTERACTABLE.get("gravestone");
+return null;
 }
 
 /** Menu verbs that open or complete a reclaim. */}

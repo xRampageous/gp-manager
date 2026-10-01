@@ -21,26 +21,26 @@ static final int[] SAFE_ARENA_REGIONS = {9520, 8237, 8493, 8749, 9552};
 */
 static PvpContext classify(boolean insideWilderness, boolean pvpSpecOrb, boolean pvpOrBhWorld,
 boolean pvpArenaWorld, int regionId) {
- if (pvpArenaWorld || isSafeArenaRegion(regionId)) return SAFE_PVP_OR_MINIGAME;
- if (insideWilderness || (pvpOrBhWorld && pvpSpecOrb)) return DANGEROUS_PVP;
- return NONE;
+if (pvpArenaWorld || isSafeArenaRegion(regionId)) return SAFE_PVP_OR_MINIGAME;
+if (insideWilderness || (pvpOrBhWorld && pvpSpecOrb)) return DANGEROUS_PVP;
+return NONE;
 }
 
 static boolean isSafeArenaRegion(int regionId) {
- if (MinigameRegionHints.isLmsRegion(regionId)) return true;
- if (regionId > 0) {
-  for (int region : SAFE_ARENA_REGIONS) {
-   if (region == regionId) return true;
-  }
- }
- return false;
+if (MinigameRegionHints.isLmsRegion(regionId)) return true;
+if (regionId > 0) {
+for (int region : SAFE_ARENA_REGIONS) {
+if (region == regionId) return true;
+}
+}
+return false;
 }
 
 boolean isDangerous() {
- return this == DANGEROUS_PVP;
+return this == DANGEROUS_PVP;
 }
 
 boolean isSafe() {
- return this == SAFE_PVP_OR_MINIGAME;
+return this == SAFE_PVP_OR_MINIGAME;
 }
 }

@@ -1,5 +1,11 @@
 # GP Manager changelog
 
+## 1.0.2 — 2026-10-02
+
+- **Source layout for the Plugin Hub size limit.** Lines no longer use indentation,
+  which brings the source under the Hub's 200k review limit. Names stay readable;
+  no change in behaviour.
+
 ## 1.0.1 — 2026-10-01
 
 - **One GP/h.** GP/h is your Net over active time on Live, Grinds, HUD+ and

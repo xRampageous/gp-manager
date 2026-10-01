@@ -6,7 +6,7 @@ class ReviewEligibility {
 * Ledger may separately surface unknown pricing or provenance as review hints.
 */
 static boolean needsOwnerDecision(Transaction transaction) {
- return transaction != null && transaction.getCorrection() == Correction.AUTO
- && transaction.getConfidence() == ClassificationConfidence.UNCERTAIN;
+return transaction != null && transaction.getCorrection() == Correction.AUTO
+&& transaction.getConfidence() == ClassificationConfidence.UNCERTAIN;
 }
 }
