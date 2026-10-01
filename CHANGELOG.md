@@ -1,5 +1,24 @@
 # GP Manager changelog
 
+## 1.0.1 — 2026-10-01
+
+- **One GP/h.** GP/h is your Net over active time on Live, Grinds, HUD+ and
+  exports. The Rate window setting, the HUD+ "Last 10m" line and the "last 15m"
+  label are gone.
+- **Charging stays neutral.** Loading a weapon works whichever way round you use
+  the items, and uncharging stays a transfer even when you take your time with
+  the confirm prompt. Choosing No, then looting the same runes, still counts as loot.
+- **Pending is tidier.** A Grand Exchange offer you cancel before anything fills
+  no longer waits in Pending.
+- **Bottomless compost bucket** charges are no longer tracked.
+- **Smoother saving.** While nothing changes, the profile saves every 5 minutes
+  instead of every 30 seconds, so large profiles stutter less. Sidebar edits save
+  straight away.
+- **Fixes.** Re-enabling the plugin while logged in reads the game on the right
+  thread, and menu text matches on any system language.
+- **Readable source.** Clear names and normal layout throughout; no change in
+  behaviour.
+
 ## 1.0.0 — 2026-10-01
 
 GP Manager keeps track of what you earn and spend while you play. It observes
