@@ -14,22 +14,22 @@ public class GrindsAllTimeCardTest
     @Test
     public void sumsEveryRetainedSessionAndRanksOnlyFinishedIncludedGrinds()
     {
-        Ad vorkath = session("Vorkath", 1_000_000L, Bt.NAMED_SESSION);
+        Session vorkath = session("Vorkath", 1_000_000L, SessionOwnerKind.NAMED_SESSION);
         vorkath.close(HOUR);
-        Ad flipping = session("Flipping", 5_000_000L, Bt.NAMED_SESSION);
+        Session flipping = session("Flipping", 5_000_000L, SessionOwnerKind.NAMED_SESSION);
         flipping.close(HOUR);
         flipping.setExcludedFromAverages(true);
-        Ad vorkathAgain = session("Vorkath", 0L, Bt.NAMED_SESSION);
+        Session vorkathAgain = session("Vorkath", 0L, SessionOwnerKind.NAMED_SESSION);
         vorkathAgain.close(HOUR);
-        Ad freePlay = session("Free play", 200_000L, Bt.FREE_PLAY);
+        Session freePlay = session("Free play", 200_000L, SessionOwnerKind.FREE_PLAY);
 
-        Am engine = new Am(deltas -> Collections.emptyList(), new TransactionClassifier(),
+        Engine engine = new Engine(deltas -> Collections.emptyList(), new TransactionClassifier(),
             new GpManagerConfig()
             {
             });
         engine.restore(new SavedState(freePlay, null, false, Arrays.asList(vorkath, flipping, vorkathAgain)), HOUR);
 
-        As.AllTime card = As.allTime(engine, HOUR);
+        GrindsData.AllTime card = GrindsData.allTime(engine, HOUR);
         assertEquals("Free play and excluded Grinds still count toward all-time Net", 6_200_000L, card.net);
         assertEquals("two runs of Vorkath are one Grind", 2, card.grinds);
         assertEquals("excluded Grinds never become a best", "Vorkath", card.bestNetName);
@@ -39,22 +39,22 @@ public class GrindsAllTimeCardTest
     @Test
     public void emptyProfileHasNoBests()
     {
-        Am engine = new Am(deltas -> Collections.emptyList(), new TransactionClassifier(),
+        Engine engine = new Engine(deltas -> Collections.emptyList(), new TransactionClassifier(),
             new GpManagerConfig()
             {
             });
-        As.AllTime card = As.allTime(engine, HOUR);
+        GrindsData.AllTime card = GrindsData.allTime(engine, HOUR);
         assertEquals(0L, card.net);
         assertNull(card.bestNetName);
         assertNull(card.gpPerHour);
     }
 
-    private static Ad session(String name, long gain, Bt owner)
+    private static Session session(String name, long gain, SessionOwnerKind owner)
     {
-        Ad session = new Ad(name, 1L, Cx.GENERAL);
+        Session session = new Session(name, 1L, SessionMode.GENERAL);
         session.setOwnerKind(owner);
-        session.kf(Tx.of(1_000L, Ai.LOOT, Aj.LOOT, "Loot", true,
-            Collections.singletonList(new Ab(1, "Loot", 1L, (int) gain, gain))), 100);
+        session.addTransaction(Tx.of(1_000L, TransactionType.LOOT, Context.LOOT, "Loot", true,
+            Collections.singletonList(new Flow(1, "Loot", 1L, (int) gain, gain))), 100);
         return session;
     }
 }

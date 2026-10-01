@@ -2,14 +2,15 @@ package com.gpmanager;
 import java.util.*;
 @FunctionalInterface
 interface FlowValuator {
-List<Ab> value(Map<Integer, Long> quantityDeltas);
+List<Flow> value(Map<Integer, Long> quantityDeltas);
 /**
 * Values flows using the caller's evidence-capture time. Existing valuators remain
 * source-compatible and may ignore the timestamp until they support price provenance.
 */
-default List<Ab> value(Map<Integer, Long> quantityDeltas, long priceCapturedAtEpochMillis) {
-return value(quantityDeltas);
+default List<Flow> value(Map<Integer, Long> quantityDeltas, long priceCapturedAtEpochMillis) {
+ return value(quantityDeltas);
 }
+
 /**
 * Applies an action-aware normalization after the engine has confirmed a consumption.
 * Synthetic valuators keep their observed flows unchanged; the canonical valuator may
@@ -20,16 +21,16 @@ return value(quantityDeltas);
 * A {@code null} result means the confirmed action had an unsupported or conflicting price
 * basis; callers must keep the original captured flows and route the receipt to Review.
 */
-default List<Ab> normalizeConsumedFlows(List<Ab> flows, Au actionKind,
-long priceCapturedAtEpochMillis) {
-return flows;
+default List<Flow> normalizeConsumedFlows(List<Flow> flows, ActionKind actionKind, long priceCapturedAtEpochMillis) {
+ return flows;
 }
+
 /**
 * Whether the current world/economy permits ordinary automatic market quotes. Synthetic
 * test valuators default to the deterministic NORMAL fixture; the canonical
-* {@link Bl} overrides this with its observed economy snapshot.
+* {@link ItemValuationService} overrides this with its observed economy snapshot.
 */
 default boolean automaticMarketQuotesAvailable() {
-return true;
+ return true;
 }
 }

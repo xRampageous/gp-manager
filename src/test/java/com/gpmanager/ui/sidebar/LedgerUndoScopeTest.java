@@ -29,31 +29,31 @@ public class LedgerUndoScopeTest
     public void historicalAndTodayDisableUndoWhileCurrentEnablesIt()
     {
         Fixture fixture = new Fixture();
-        fixture.apply(Ao.Entry.current());
-        JPopupMenu current = fixture.page().awo();
+        fixture.apply(LedgerData.Entry.current());
+        JPopupMenu current = fixture.page().moreMenu();
         assertTrue(undo(current, "Undo latest correction").isEnabled());
         assertTrue(undo(current, "Undo last change").isEnabled());
         assertTrue(undo(current, "Restore last undo").isEnabled());
 
-        fixture.apply(Ao.Entry.current().withScope(Ao.Scope.HISTORY, "past-run", "Past run"));
-        JPopupMenu historical = fixture.page().awo();
+        fixture.apply(LedgerData.Entry.current().withScope(LedgerData.Scope.HISTORY, "past-run", "Past run"));
+        JPopupMenu historical = fixture.page().moreMenu();
         assertFalse(undo(historical, "Undo latest correction").isEnabled());
         assertFalse(undo(historical, "Undo last change").isEnabled());
         assertFalse(undo(historical, "Restore last undo").isEnabled());
 
-        fixture.apply(Ao.Entry.current().withScope(Ao.Scope.TODAY, null, null));
-        assertFalse(undo(fixture.page().awo(), "Undo last change").isEnabled());
+        fixture.apply(LedgerData.Entry.current().withScope(LedgerData.Scope.TODAY, null, null));
+        assertFalse(undo(fixture.page().moreMenu(), "Undo last change").isEnabled());
     }
 
     @Test
     public void aStaleMenuCannotMutateAfterAScopeSwitch()
     {
         Fixture fixture = new Fixture();
-        fixture.apply(Ao.Entry.current());
-        JMenuItem undoLast = undo(fixture.page().awo(), "Undo last change");
+        fixture.apply(LedgerData.Entry.current());
+        JMenuItem undoLast = undo(fixture.page().moreMenu(), "Undo last change");
         assertTrue(undoLast.isEnabled());
 
-        fixture.apply(Ao.Entry.current().withScope(Ao.Scope.HISTORY, "past-run", "Past run"));
+        fixture.apply(LedgerData.Entry.current().withScope(LedgerData.Scope.HISTORY, "past-run", "Past run"));
         undoLast.doClick();
 
         assertEquals("an open menu must not undo across a scope switch", 0, fixture.engine.lastChanges);
@@ -63,10 +63,10 @@ public class LedgerUndoScopeTest
     public void currentScopeStillUndoesAllThreeOperations()
     {
         Fixture fixture = new Fixture();
-        fixture.apply(Ao.Entry.current());
-        undo(fixture.page().awo(), "Undo latest correction").doClick();
-        undo(fixture.page().awo(), "Undo last change").doClick();
-        undo(fixture.page().awo(), "Restore last undo").doClick();
+        fixture.apply(LedgerData.Entry.current());
+        undo(fixture.page().moreMenu(), "Undo latest correction").doClick();
+        undo(fixture.page().moreMenu(), "Undo last change").doClick();
+        undo(fixture.page().moreMenu(), "Restore last undo").doClick();
 
         assertEquals(1, fixture.engine.corrections);
         assertEquals(1, fixture.engine.lastChanges);
@@ -77,10 +77,10 @@ public class LedgerUndoScopeTest
     public void anOwnerSwitchLeavesAnOpenMenuInert()
     {
         Fixture fixture = new Fixture();
-        fixture.apply(Ao.Entry.current());
-        JMenuItem undoLast = undo(fixture.page().awo(), "Undo last change");
+        fixture.apply(LedgerData.Entry.current());
+        JMenuItem undoLast = undo(fixture.page().moreMenu(), "Undo last change");
 
-        fixture.engine.agl("profile-b", new SavedState(), NOW + 1_000L);
+        fixture.engine.restoreForProfile("profile-b", new SavedState(), NOW + 1_000L);
         undoLast.doClick();
 
         assertEquals("an open menu must not undo another owner's run", 0, fixture.engine.lastChanges);
@@ -101,21 +101,21 @@ public class LedgerUndoScopeTest
     private static final class Fixture
     {
         final UndoSpy engine = new UndoSpy();
-        final Dp panel;
+        final SidebarPanel panel;
 
         Fixture()
         {
             try
             {
-                Dp[] holder = new Dp[1];
-                SwingUtilities.invokeAndWait(() -> holder[0] = new Dp(engine, new GpManagerConfig() {}, null));
+                SidebarPanel[] holder = new SidebarPanel[1];
+                SwingUtilities.invokeAndWait(() -> holder[0] = new SidebarPanel(engine, new GpManagerConfig() {}, null));
                 panel = holder[0];
             }
             catch (Exception ex)
             {
                 throw new AssertionError(ex);
             }
-            engine.rm(NOW);
+            engine.ensureSession(NOW);
         }
 
         LedgerPage page()
@@ -123,15 +123,15 @@ public class LedgerUndoScopeTest
             return panel.ledger;
         }
 
-        void apply(Ao.Entry entry)
+        void apply(LedgerData.Entry entry)
         {
             panel.ledgerEntry = entry;
-            panel.ledger.apply(Ao.capture(engine, NOW + 10L, entry));
+            panel.ledger.apply(LedgerData.capture(engine, NOW + 10L, entry));
         }
     }
 
     /** Counts the engine mutations the controller would perform. */
-    private static final class UndoSpy extends Am
+    private static final class UndoSpy extends Engine
     {
         int corrections;
         int lastChanges;
@@ -143,21 +143,21 @@ public class LedgerUndoScopeTest
         }
 
         @Override
-        synchronized boolean akb(long now)
+        synchronized boolean undoLastCorrection(long now)
         {
             corrections++;
             return true;
         }
 
         @Override
-        synchronized Ac akc(long now)
+        synchronized Transaction undoLastTransaction(long now)
         {
             lastChanges++;
             return null;
         }
 
         @Override
-        synchronized Ac agn(long now)
+        synchronized Transaction restoreLastUndo(long now)
         {
             restores++;
             return null;

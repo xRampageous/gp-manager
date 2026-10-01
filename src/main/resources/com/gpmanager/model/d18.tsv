@@ -6,9 +6,6 @@ ayp	.*(arrowtip|bolt tip|dart tip|javelin head|arrow shaft).*	0
 ayz	^Your Trident of the (seas|swamp)( \(e\))? has (?:((?:\d{1,3}(?:,\d{3})+|\d+)) charges|(one) charge|(no) charges)\.$	2
 ays	^Darts: (.+?)\. Scales: ((?:\d{1,3}(?:,\d{3})+|\d+)) \((?:\d+(?:\.\d+)?)%\)\.$	2
 aza	^(.+?) x ((?:\d{1,3}(?:,\d{3})+|\d+))$	2
-ayt	^Your bottomless compost bucket has ((?:\d{1,3}(?:,\d{3})+|\d+)) uses? of (compost|supercompost|ultracompost) left\.$	2
-ayv	^Your bottomless compost bucket is currently holding ((?:\d{1,3}(?:,\d{3})+|\d+)|one|a single) uses? of (compost|supercompost|ultracompost)\.$	2
-ayu	^Your (?:bottomless )?compost bucket is (?:currently )?empty\.$	2
 azb	(small|medium|large|giant|colossal) pouch	0
 ayx	^(?:Your )?(Holy sanguinesti staff|Sanguinesti staff|warped sceptre|Tumeken's shadow|echo venator bow|venator bow)(?: only)? has (?:((?:\d{1,3}(?:,\d{3})+|\d+)) charges?|(one) charge|(no) charges?)(?: (?:remaining|left))?\.$	2
 ayr	^The pendant has (?:((?:\d{1,3}(?:,\d{3})+|\d+)) charges?|(one) charge|(no) charges)\.$	2

@@ -13,24 +13,24 @@ public class LedgerItemContributionProjectionTest
     @Test
     public void doseRemainderNormalizesIntoOneSupplyAndPreservesCompanionGain()
     {
-        Ab consumedDose = new Ab(2434, "Prayer potion(4)", -1L, 100, -100L);
-        Ab remainingDose = new Ab(139, "Prayer potion(3)", 1L, 60, 60L);
-        Ab companionGain = new Ab(1942, "Potato", 1L, 25, 25L);
-        Ac transaction = new Ac(10_000L, null,
-            Ai.CONSUMPTION, Aj.GENERIC, "", "Vorkath", true,
+        Flow consumedDose = new Flow(2434, "Prayer potion(4)", -1L, 100, -100L);
+        Flow remainingDose = new Flow(139, "Prayer potion(3)", 1L, 60, 60L);
+        Flow companionGain = new Flow(1942, "Potato", 1L, 25, 25L);
+        Transaction transaction = new Transaction(10_000L, null,
+            TransactionType.CONSUMPTION, Context.GENERIC, "", "Vorkath", true,
             Arrays.asList(consumedDose, remainingDose, companionGain),
-            Bd.CONFIRMED, "Drink evidence", null);
-        transaction.setActionKind(Au.DRINK);
+            ClassificationConfidence.CONFIRMED, "Drink evidence", null);
+        transaction.setActionKind(ActionKind.DRINK);
 
-        List<Af> contributions = Af.project(transaction);
+        List<Contribution> contributions = Contribution.project(transaction);
         assertEquals("one normalized potion plus the unrelated gain", 2, contributions.size());
-        Af supply = contributions.get(0);
+        Contribution supply = contributions.get(0);
         assertTrue(supply.normalizedConsume);
         assertEquals("Prayer potion", supply.itemName);
         assertEquals(-40L, supply.effectiveValue);
         assertEquals(2, supply.rawFlows.size());
-        assertEquals(Af.Category.SUPPLY, supply.category);
-        Af companion = contributions.get(1);
+        assertEquals(Contribution.Category.SUPPLY, supply.category);
+        Contribution companion = contributions.get(1);
         assertFalse(companion.normalizedConsume);
         assertEquals("Potato", companion.itemName);
         assertEquals(25L, companion.effectiveValue);
@@ -43,80 +43,80 @@ public class LedgerItemContributionProjectionTest
     @Test
     public void partialFoodNormalizesButDecantAndAmbiguousPairsStayRaw()
     {
-        Ac pizza = transaction(new Ab(1, "Whole pizza", -1L, 500, -500L),
-            new Ab(1, "Half pizza", 1L, 250, 250L), Au.EAT);
-        List<Af> food = Af.project(pizza);
+        Transaction pizza = transaction(new Flow(1, "Whole pizza", -1L, 500, -500L),
+            new Flow(1, "Half pizza", 1L, 250, 250L), ActionKind.EAT);
+        List<Contribution> food = Contribution.project(pizza);
         assertEquals(1, food.size());
         assertTrue(food.get(0).normalizedConsume);
         assertEquals("pizza", food.get(0).itemName.toLowerCase(java.util.Locale.ROOT));
         assertEquals(-250L, food.get(0).effectiveValue);
 
-        List<Ab> decantFlows = Arrays.asList(
-            new Ab(2434, "Prayer potion(4)", -1L, 400, -400L),
-            new Ab(139, "Prayer potion(2)", 1L, 100, 100L),
-            new Ab(139, "Prayer potion(2)", 1L, 100, 100L));
+        List<Flow> decantFlows = Arrays.asList(
+            new Flow(2434, "Prayer potion(4)", -1L, 400, -400L),
+            new Flow(139, "Prayer potion(2)", 1L, 100, 100L),
+            new Flow(139, "Prayer potion(2)", 1L, 100, 100L));
         assertFalse("dose conserving changes do not form consume pairs",
-            Bn.wi(decantFlows));
-        Ac decant = transaction(decantFlows, Au.DECANT);
-        assertTrue(Af.project(decant).stream()
+            ActionEvidence.isDoseOrPartialConsumeDelta(decantFlows));
+        Transaction decant = transaction(decantFlows, ActionKind.DECANT);
+        assertTrue(Contribution.project(decant).stream()
             .noneMatch((itemData -> itemData.normalizedConsume)));
 
-        List<Ab> ambiguous = Arrays.asList(
-            new Ab(2434, "Prayer potion(4)", -1L, 400, -400L),
-            new Ab(139, "Prayer potion(3)", 1L, 300, 300L),
-            new Ab(139, "Prayer potion(3)", 1L, 300, 300L));
-        assertFalse("ambiguous remainders fail closed", Bn.wi(ambiguous));
-        Ac ambiguousDrink = transaction(ambiguous, Au.DRINK);
-        assertTrue(Af.project(ambiguousDrink).stream()
+        List<Flow> ambiguous = Arrays.asList(
+            new Flow(2434, "Prayer potion(4)", -1L, 400, -400L),
+            new Flow(139, "Prayer potion(3)", 1L, 300, 300L),
+            new Flow(139, "Prayer potion(3)", 1L, 300, 300L));
+        assertFalse("ambiguous remainders fail closed", ActionEvidence.isDoseOrPartialConsumeDelta(ambiguous));
+        Transaction ambiguousDrink = transaction(ambiguous, ActionKind.DRINK);
+        assertTrue(Contribution.project(ambiguousDrink).stream()
             .noneMatch((itemData -> itemData.normalizedConsume)));
     }
 
     @Test
     public void adjacentDecantKeepsGrossQuotesAndRawRows()
     {
-        Ac decant = transaction(Arrays.asList(
-            new Ab(2434, "Prayer potion(4)", -1L, 3600, -3600L),
-            new Ab(139, "Prayer potion(3)", 1L, 2600, 2600L),
-            new Ab(143, "Prayer potion(1)", 1L, 1000, 1000L)), Au.DECANT);
-        assertEquals(3600L, Bp.transaction(decant).revenue);
-        assertEquals(3600L, Bp.transaction(decant).costs);
-        assertTrue(Af.project(decant).stream()
+        Transaction decant = transaction(Arrays.asList(
+            new Flow(2434, "Prayer potion(4)", -1L, 3600, -3600L),
+            new Flow(139, "Prayer potion(3)", 1L, 2600, 2600L),
+            new Flow(143, "Prayer potion(1)", 1L, 1000, 1000L)), ActionKind.DECANT);
+        assertEquals(3600L, AccountingProjection.transaction(decant).revenue);
+        assertEquals(3600L, AccountingProjection.transaction(decant).costs);
+        assertTrue(Contribution.project(decant).stream()
             .noneMatch((itemData -> itemData.normalizedConsume)));
     }
 
     @Test
     public void conflictingQuoteSourcesDoNotNormalizeAPair()
     {
-        Ac mixed = transaction(
-            new Ab(2434, "Prayer potion(4)", -1L, 3600, -3600L, Av.GRAND_EXCHANGE),
-            new Ab(139, "Prayer potion(3)", 1L, 2600, 2600L, Av.MANUAL_OVERRIDE), Au.DRINK);
-        assertEquals(2600L, Bp.transaction(mixed).revenue);
-        assertEquals(3600L, Bp.transaction(mixed).costs);
-        assertTrue(Af.project(mixed).stream()
+        Transaction mixed = transaction(
+            new Flow(2434, "Prayer potion(4)", -1L, 3600, -3600L, PriceSource.GRAND_EXCHANGE),
+            new Flow(139, "Prayer potion(3)", 1L, 2600, 2600L, PriceSource.MANUAL_OVERRIDE), ActionKind.DRINK);
+        assertEquals(2600L, AccountingProjection.transaction(mixed).revenue);
+        assertEquals(3600L, AccountingProjection.transaction(mixed).costs);
+        assertTrue(Contribution.project(mixed).stream()
             .noneMatch((itemData -> itemData.normalizedConsume)));
     }
 
     @Test
     public void processingRowWithDrinkMetadataDoesNotNormalizeLastDose()
     {
-        Ac processing = new Ac(10_000L, null, Ai.PROCESSING,
-            Aj.PRODUCTION, "", "Herblore", true,
-            List.of(new Ab(143, "Prayer potion(1)", -1L, 1000, -1000L)),
-            Bd.CONFIRMED, "", null);
-        processing.setActionKind(Au.DRINK);
-        assertFalse(Af.project(processing).get(0).normalizedConsume);
+        Transaction processing = new Transaction(10_000L, null, TransactionType.PROCESSING,
+            Context.PRODUCTION, "", "Herblore", true,
+            List.of(new Flow(143, "Prayer potion(1)", -1L, 1000, -1000L)),
+            ClassificationConfidence.CONFIRMED, "", null);
+        processing.setActionKind(ActionKind.DRINK);
+        assertFalse(Contribution.project(processing).get(0).normalizedConsume);
     }
 
-    private static Ac transaction(Ab first, Ab second, Au kind)
+    private static Transaction transaction(Flow first, Flow second, ActionKind kind)
     {
         return transaction(Arrays.asList(first, second), kind);
     }
 
-    private static Ac transaction(List<Ab> flows, Au kind)
+    private static Transaction transaction(List<Flow> flows, ActionKind kind)
     {
-        Ac transaction = new Ac(10_000L, null,
-            Ai.CONSUMPTION, Aj.GENERIC, "", "Vorkath", true, flows,
-            Bd.CONFIRMED, "partial consume test", null);
+        Transaction transaction = new Transaction(10_000L, null,
+            TransactionType.CONSUMPTION, Context.GENERIC, "", "Vorkath", true, flows,
+            ClassificationConfidence.CONFIRMED, "partial consume test", null);
         transaction.setActionKind(kind);
         return transaction;
     }

@@ -14,68 +14,68 @@ public class TransactionClassifierTest
     public void transferContextAlwaysWins()
     {
         assertEquals(
-            Ai.TRANSFER,
+            TransactionType.TRANSFER,
             classifier.classify(
-                Aj.TRANSFER,
-                Collections.singletonList(new Ab(1, "Item", 1, 100, 100))));
+                Context.TRANSFER,
+                Collections.singletonList(new Flow(1, "Item", 1, 100, 100))));
     }
 
     @Test
     public void genericMixedFlowsBecomeUncertain()
     {
         assertEquals(
-            Ai.UNCERTAIN,
+            TransactionType.UNCERTAIN,
             classifier.classify(
-                Aj.GENERIC,
+                Context.GENERIC,
                 Arrays.asList(
-                    new Ab(1, "Input", -1, 100, -100),
-                    new Ab(2, "Output", 1, 150, 150))));
+                    new Flow(1, "Input", -1, 100, -100),
+                    new Flow(2, "Output", 1, 150, 150))));
     }
 
     @Test
     public void lootContextLabelsPositiveFlowAsLoot()
     {
         assertEquals(
-            Ai.LOOT,
+            TransactionType.LOOT,
             classifier.classify(
-                Aj.LOOT,
-                Collections.singletonList(new Ab(1, "Drop", 1, 100, 100))));
+                Context.LOOT,
+                Collections.singletonList(new Flow(1, "Drop", 1, 100, 100))));
     }
 
     @Test
     public void productionContextLabelsMixedFlowsAsProcessing()
     {
         assertEquals(
-            Ai.PROCESSING,
+            TransactionType.PROCESSING,
             classifier.classify(
-                Aj.PRODUCTION,
+                Context.PRODUCTION,
                 Arrays.asList(
-                    new Ab(1, "Input", -1, 100, -100),
-                    new Ab(2, "Output", 1, 150, 150))));
+                    new Flow(1, "Input", -1, 100, -100),
+                    new Flow(2, "Output", 1, 150, 150))));
     }
 
     @Test
     public void playerLootContextLabelsPositiveFlowAsPkLoot()
     {
         assertEquals(
-            Ai.PK_LOOT,
+            TransactionType.PK_LOOT,
             classifier.classify(
-                Aj.PK_LOOT,
-                Collections.singletonList(new Ab(1, "Drop", 1, 100, 100))));
+                Context.PK_LOOT,
+                Collections.singletonList(new Flow(1, "Drop", 1, 100, 100))));
     }
 
     @Test
     public void unpricedQuantityStillHasItsRealDirection()
     {
-        Ab gain = new Ab(1, "Unknown gain", 2, 0, 0, Av.UNPRICED);
-        Ab cost = new Ab(2, "Unknown cost", -1, 0, 0, Av.UNPRICED);
+        Flow gain = new Flow(1, "Unknown gain", 2, 0, 0, PriceSource.UNPRICED);
+        Flow cost = new Flow(2, "Unknown cost", -1, 0, 0, PriceSource.UNPRICED);
 
-        assertEquals(Ai.GAIN,
-            classifier.classify(Aj.GENERIC, Collections.singletonList(gain)));
-        assertEquals(Ai.CONSUMPTION,
-            classifier.classify(Aj.GENERIC, Collections.singletonList(cost)));
-        assertEquals(Ai.UNCERTAIN,
-            classifier.classify(Aj.GENERIC, Arrays.asList(gain, cost)));
+        assertEquals(TransactionType.GAIN,
+            classifier.classify(Context.GENERIC, Collections.singletonList(gain)));
+        assertEquals(TransactionType.CONSUMPTION,
+            classifier.classify(Context.GENERIC, Collections.singletonList(cost)));
+        assertEquals(TransactionType.UNCERTAIN,
+            classifier.classify(Context.GENERIC, Arrays.asList(gain, cost)));
     }
 
 }

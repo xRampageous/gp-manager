@@ -17,18 +17,18 @@ import static org.junit.Assert.assertTrue;
 public class PresentationLifecycleTest
 {
     private final RecordingNavigation navigation = new RecordingNavigation();
-    private final Dp panel = new Dp(engine(), config(), null);
+    private final SidebarPanel panel = new SidebarPanel(engine(), config(), null);
     private final BufferedImage icon = new BufferedImage(1, 1, BufferedImage.TYPE_INT_ARGB);
 
     @Test
     public void realSidebarIconLoadsAndIsCarriedByTheButton()
     {
-        BufferedImage loaded = Ec.awn();
+        BufferedImage loaded = PresentationLifecycle.loadIcon();
         assertNotNull(loaded);
         assertTrue("the real bundled icon must load, not the placeholder",
             loaded.getWidth() > 16 && loaded.getHeight() > 16);
 
-        Ec lifecycle = new Ec();
+        PresentationLifecycle lifecycle = new PresentationLifecycle();
         assertTrue(lifecycle.install(navigation, panel, loaded));
         NavigationButton button = lifecycle.button();
         assertNotNull(button);
@@ -41,7 +41,7 @@ public class PresentationLifecycleTest
     @Test
     public void installIsIdempotentWhileInstalled()
     {
-        Ec lifecycle = new Ec();
+        PresentationLifecycle lifecycle = new PresentationLifecycle();
         assertTrue(lifecycle.install(navigation, panel, icon));
         assertNotNull(lifecycle.button());
         assertFalse("second install must not register a duplicate",
@@ -52,7 +52,7 @@ public class PresentationLifecycleTest
     @Test
     public void disableAndReenableNeverDuplicatesTheButton()
     {
-        Ec lifecycle = new Ec();
+        PresentationLifecycle lifecycle = new PresentationLifecycle();
         assertTrue(lifecycle.install(navigation, panel, icon));
         NavigationButton first = lifecycle.button();
 
@@ -73,7 +73,7 @@ public class PresentationLifecycleTest
     @Test
     public void missingHostPanelOrIconDegradeWithoutRegistering()
     {
-        Ec lifecycle = new Ec();
+        PresentationLifecycle lifecycle = new PresentationLifecycle();
         assertFalse(lifecycle.install(null, panel, icon));
         assertFalse(lifecycle.install(navigation, null, icon));
         assertFalse(lifecycle.install(navigation, panel, null));
@@ -84,7 +84,7 @@ public class PresentationLifecycleTest
     @Test
     public void toolbarAdapterIsNullSafe()
     {
-        assertNull(Ec.akh(null));
+        assertNull(PresentationLifecycle.toolbarHost(null));
     }
 
     static GpManagerConfig config()
@@ -99,17 +99,17 @@ public class PresentationLifecycleTest
         };
     }
 
-    static Am engine()
+    static Engine engine()
     {
-        return new Am(deltas ->
+        return new Engine(deltas ->
         {
-            List<Ab> flows = new ArrayList<>();
-            deltas.forEach((id, quantity) -> flows.add(new Ab(id, "Item " + id, quantity, 50, quantity * 50)));
+            List<Flow> flows = new ArrayList<>();
+            deltas.forEach((id, quantity) -> flows.add(new Flow(id, "Item " + id, quantity, 50, quantity * 50)));
             return flows;
         }, new TransactionClassifier(), config());
     }
 
-    static final class RecordingNavigation implements Ec.NavigationHost
+    static final class RecordingNavigation implements PresentationLifecycle.NavigationHost
     {
         final List<NavigationButton> adds = new ArrayList<>();
         final List<NavigationButton> removes = new ArrayList<>();
@@ -127,8 +127,8 @@ public class PresentationLifecycleTest
         }
     }
 
-    static List<Ab> flow(int itemId, String name, long quantity, int unitPrice, long value)
+    static List<Flow> flow(int itemId, String name, long quantity, int unitPrice, long value)
     {
-        return Collections.singletonList(new Ab(itemId, name, quantity, unitPrice, value));
+        return Collections.singletonList(new Flow(itemId, name, quantity, unitPrice, value));
     }
 }

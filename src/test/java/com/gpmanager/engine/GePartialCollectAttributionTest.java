@@ -94,17 +94,17 @@ public class GePartialCollectAttributionTest
         long firstGain = t + 20_000L;
         withCollect(owner, ordering, firstGain, new int[] {0}, new int[] {CHICKEN}, 63L);
 
-        Bi.Row chicken = owner.row(CHICKEN);
-        assertEquals(Bi.Lifecycle.REALIZED, chicken.lifecycle);
+        MarketSettlementProjection.Row chicken = owner.row(CHICKEN);
+        assertEquals(MarketSettlementProjection.Lifecycle.REALIZED, chicken.lifecycle);
         assertEquals("Received is the actual collected cash", 63L, chicken.observedSettlementGp);
         assertEquals("the exempt item proves no tax", 0L, chicken.inferredGeTaxGp);
         assertEquals(0L, chicken.realizedResultGp);
         assertFalse(chicken.knownCostOnly);
         for (int slot = 1; slot < OWNER_ITEM.length; slot++)
         {
-            Bi.Row pending = owner.row(OWNER_ITEM[slot]);
+            MarketSettlementProjection.Row pending = owner.row(OWNER_ITEM[slot]);
             assertEquals("slot " + slot + " is untouched",
-                Bi.Lifecycle.EXECUTED_UNSETTLED, pending.lifecycle);
+                MarketSettlementProjection.Lifecycle.EXECUTED_UNSETTLED, pending.lifecycle);
             assertEquals(0L, pending.settledQty);
             assertFalse(pending.collectionAmbiguous);
         }
@@ -124,7 +124,7 @@ public class GePartialCollectAttributionTest
         assertEquals("nine booked sale settlements", 9, owner.settlementTransactions());
         // The chicken's slot was reused by the bolt listing; its settled lifecycle stays as closed
         // market history next to the bolt's, so every booked sale keeps its market row (G1).
-        assertEquals("nine market rows", 9, owner.engine.ub().size());
+        assertEquals("nine market rows", 9, owner.engine.getMarketSettlements().size());
         assertEquals("the reused slot's settled chicken keeps its row", 63L,
             owner.rowAt(0, CHICKEN).observedSettlementGp);
         assertEquals("Bolt of linen", BOLT_RECEIVED, owner.row(BOLT).observedSettlementGp);
@@ -132,11 +132,11 @@ public class GePartialCollectAttributionTest
         assertTrue(owner.row(BOLT).knownCostOnly);
         for (int slot = 1; slot < OWNER_ITEM.length; slot++)
         {
-            Bi.Row row = owner.row(OWNER_ITEM[slot]);
+            MarketSettlementProjection.Row row = owner.row(OWNER_ITEM[slot]);
             assertEquals("slot " + slot + " Received", OWNER_RECEIVED[slot],
                 row.observedSettlementGp);
             assertEquals(OWNER_TAX[slot], row.inferredGeTaxGp);
-            assertEquals(Bi.Lifecycle.REALIZED, row.lifecycle);
+            assertEquals(MarketSettlementProjection.Lifecycle.REALIZED, row.lifecycle);
             if (OWNER_TAX[slot] > 0L)
             {
                 assertTrue("a taxed sale is KNOWN_COST_ONLY", row.knownCostOnly);
@@ -166,12 +166,12 @@ public class GePartialCollectAttributionTest
         owner.collect(63L, t + 20_000L, true);
         assertEquals(63L, owner.row(CHICKEN).observedSettlementGp);
 
-        SavedState state = owner.engine.qm();
+        SavedState state = owner.engine.createSavedState();
         Owner restored = new Owner();
         restored.engine.restore(state, t + 30_000L);
-        restored.engine.resume(t + 30_100L, Ed.IDLE, Ed.RECOVERY);
+        restored.engine.resume(t + 30_100L, PauseReason.IDLE, PauseReason.RECOVERY);
         restored.inventory.putAll(owner.inventory);
-        restored.engine.setBaseline(new Cc(restored.inventory));
+        restored.engine.setBaseline(new ContainerSnapshot(restored.inventory));
 
         restored.placeAndSell(0, BOLT, BOLT_QTY, BOLT_GROSS, t + 30_000L);
         restored.collect(OWNER_SECOND_COLLECT, t + 40_000L, true);
@@ -182,7 +182,7 @@ public class GePartialCollectAttributionTest
         restored.maintenance(t + 42_000L);
 
         assertEquals(9, restored.settlementTransactions());
-        assertEquals(9, restored.engine.ub().size());
+        assertEquals(9, restored.engine.getMarketSettlements().size());
         assertEquals(BOLT_RECEIVED, restored.row(BOLT).observedSettlementGp);
         assertEquals(OWNER_RECEIVED[3], restored.row(SHARK).observedSettlementGp);
         assertEquals(-OWNER_TOTAL_TAX, restored.net(t + 42_000L));
@@ -203,8 +203,8 @@ public class GePartialCollectAttributionTest
         owner.clearSlot(3, SHARK, gain + 600L);
         owner.collect(28_710L, gain, true);
 
-        Bi.Row shark = owner.row(SHARK);
-        assertEquals(Bi.Lifecycle.REALIZED, shark.lifecycle);
+        MarketSettlementProjection.Row shark = owner.row(SHARK);
+        assertEquals(MarketSettlementProjection.Lifecycle.REALIZED, shark.lifecycle);
         assertEquals(28_710L, shark.observedSettlementGp);
         assertTrue(shark.knownCostOnly);
         assertEquals(-570L, owner.net(t + 22_000L));
@@ -214,7 +214,7 @@ public class GePartialCollectAttributionTest
             {
                 continue;
             }
-            Bi.Row pending = owner.row(OWNER_ITEM[slot]);
+            MarketSettlementProjection.Row pending = owner.row(OWNER_ITEM[slot]);
             assertEquals(0L, pending.settledQty);
             assertFalse(pending.collectionAmbiguous);
         }
@@ -249,11 +249,11 @@ public class GePartialCollectAttributionTest
         owner.placeAndSell(5, SHARK, 10L, 9_780L, t + 2_000L);
         owner.collect(9_590L, t + 20_000L, true);
         assertEquals(9_590L, EngineProbe.pendingSettlementCash(owner.engine.geCustody));
-        owner.engine.acu(t + 20_500L);
+        owner.engine.pauseForLifecycle(t + 20_500L);
         assertEquals("observed cash remains reviewable before evidence is dropped", 1, owner.unattributedCoinRows());
         assertEquals(0L, EngineProbe.pendingSettlementCash(owner.engine.geCustody));
         assertEquals(0L, owner.engine.geCollectionIntentUntil);
-        owner.engine.resume(t + 20_600L, Ed.LIFECYCLE);
+        owner.engine.resume(t + 20_600L, PauseReason.LIFECYCLE);
         owner.clearSlot(3, SHARK, t + 20_700L);
         owner.maintenance(t + 21_000L);
         assertEquals("a new login cannot settle the old held interaction", 0L,
@@ -269,17 +269,17 @@ public class GePartialCollectAttributionTest
         {
             Owner owner = new Owner();
             long t = T0 + 10_000L;
-            if (!end) owner.engine.sx(t);
+            if (!end) owner.engine.finishCustomSession(t);
             owner.placeAndSell(3, SHARK, 10L, 9_780L, t + 1_000L);
             owner.placeAndSell(5, SHARK, 10L, 9_780L, t + 3_000L);
             owner.collect(9_590L, t + 20_000L, true);
-            Ad original = owner.engine.getActiveSession();
-            if (end) owner.engine.sx(t + 20_500L);
-            else owner.engine.ajl("New", Cx.AUTO, t + 20_500L);
-            long reviews = original.getTransactions().stream().filter(row -> row.getType() == Ai.UNCERTAIN
+            Session original = owner.engine.getActiveSession();
+            if (end) owner.engine.finishCustomSession(t + 20_500L);
+            else owner.engine.startCustomSession("New", SessionMode.AUTO, t + 20_500L);
+            long reviews = original.getTransactions().stream().filter(row -> row.getType() == TransactionType.UNCERTAIN
                 && row.getNote().equals("Grand Exchange")).count();
             assertEquals("held cash is preserved on the original financial owner", 1L, reviews);
-            assertTrue(owner.engine.getActiveSession().getTransactions().stream().noneMatch(row -> row.getType() == Ai.UNCERTAIN));
+            assertTrue(owner.engine.getActiveSession().getTransactions().stream().noneMatch(row -> row.getType() == TransactionType.UNCERTAIN));
             assertEquals(0L, EngineProbe.pendingSettlementCash(owner.engine.geCustody));
         }
     }
@@ -296,7 +296,7 @@ public class GePartialCollectAttributionTest
         owner.collect(9_590L, t + 20_000L, true);
 
         assertEquals("the CLEARED offer settles", 9_590L, owner.rowAt(3, SHARK).observedSettlementGp);
-        assertEquals(Bi.Lifecycle.REALIZED, owner.rowAt(3, SHARK).lifecycle);
+        assertEquals(MarketSettlementProjection.Lifecycle.REALIZED, owner.rowAt(3, SHARK).lifecycle);
         assertEquals("the identical uncleared offer stays pending", 0L, owner.rowAt(5, owner.otherItem).settledQty);
         assertFalse(owner.rowAt(5, owner.otherItem).collectionAmbiguous);
         assertEquals(-190L, owner.net(t + 22_000L));
@@ -342,7 +342,7 @@ public class GePartialCollectAttributionTest
         assertFalse(owner.rowAt(3, SHARK).collectionAmbiguous);
         assertTrue("the slot-evidenced contradicted offer is quarantined",
             owner.rowAt(5, owner.otherItem).collectionAmbiguous);
-        assertEquals(Bi.Lifecycle.AMBIGUOUS, owner.rowAt(5, owner.otherItem).lifecycle);
+        assertEquals(MarketSettlementProjection.Lifecycle.AMBIGUOUS, owner.rowAt(5, owner.otherItem).lifecycle);
         assertEquals(1, owner.unattributedCoinRows());
         assertEquals(0L, owner.net(t + 21_000L));
     }
@@ -372,7 +372,7 @@ public class GePartialCollectAttributionTest
         owner.clearSlot(5, SILVER, t + 24_000L + 600L);
         owner.collect(7_380L, t + 24_000L, true);
         assertEquals(7_380L, owner.rowAt(5, owner.otherItem).observedSettlementGp);
-        assertEquals(Bi.Lifecycle.REALIZED, owner.rowAt(5, owner.otherItem).lifecycle);
+        assertEquals(MarketSettlementProjection.Lifecycle.REALIZED, owner.rowAt(5, owner.otherItem).lifecycle);
         assertEquals(-120L, owner.net(t + 26_000L));
     }
 
@@ -434,7 +434,7 @@ public class GePartialCollectAttributionTest
             provable[index] = true;
         }
         assertTrue("more than eight candidates are never enumerated",
-            GeCustodyLedger.aan(nets, provable, 10L, 2).isEmpty());
+            GeCustodyLedger.matchingSubsets(nets, provable, 10L, 2).isEmpty());
         assertEquals(8, GeCustodyLedger.MAX_SETTLEMENT_CANDIDATES);
 
         long[] eight = new long[8];
@@ -445,7 +445,7 @@ public class GePartialCollectAttributionTest
             eightProvable[index] = true;
         }
         assertEquals("a matching pair stops the enumeration early", 2,
-            GeCustodyLedger.aan(eight, eightProvable, 10L, 2).size());
+            GeCustodyLedger.matchingSubsets(eight, eightProvable, 10L, 2).size());
     }
 
     @Test
@@ -480,7 +480,7 @@ public class GePartialCollectAttributionTest
         owner.collect(5_256L, t + 20_000L, true);
         owner.maintenance(t + 22_500L);
 
-        Bi.Row row = owner.row(RUNE);
+        MarketSettlementProjection.Row row = owner.row(RUNE);
         assertEquals("no clean result is invented", 0L, row.settledQty);
         assertEquals("the earlier counted gain is the only Net", 5_000L, owner.net(t + 23_000L));
         assertFalse(row.collectionAmbiguous);
@@ -497,8 +497,8 @@ public class GePartialCollectAttributionTest
 
         owner.collect(5_356L, t + 20_000L, true);
 
-        Bi.Row row = owner.row(RUNE);
-        assertEquals(Bi.Coverage.FULLY_KNOWN, row.coverage);
+        MarketSettlementProjection.Row row = owner.row(RUNE);
+        assertEquals(MarketSettlementProjection.Coverage.FULLY_KNOWN, row.coverage);
         assertEquals(5_356L, row.observedSettlementGp);
         assertEquals("Result = after-tax Received - proven basis", 356L, row.realizedResultGp);
         assertEquals("the counted gain plus the sale Result", 5_356L, owner.net(t + 21_000L));
@@ -517,14 +517,14 @@ public class GePartialCollectAttributionTest
         // GE custody and the lifecycle must not be handed to Review.
         owner.unrelatedTransfer(t + 30L * 60_000L);
         assertEquals("the sold offer is still in custody",
-            Bi.Lifecycle.EXECUTED_UNSETTLED, owner.row(SHARK).lifecycle);
+            MarketSettlementProjection.Lifecycle.EXECUTED_UNSETTLED, owner.row(SHARK).lifecycle);
         assertEquals("nothing was handed to Review", 0, owner.reviewCount());
         assertTrue("the durable lifecycle survives", owner.recordCount() == 1);
 
         // The late collect still settles exactly.
         owner.clearSlot(0, SHARK, t + 31L * 60_000L + 600L);
         owner.collect(9_590L, t + 31L * 60_000L, true);
-        assertEquals(Bi.Lifecycle.REALIZED, owner.row(SHARK).lifecycle);
+        assertEquals(MarketSettlementProjection.Lifecycle.REALIZED, owner.row(SHARK).lifecycle);
         assertEquals(9_590L, owner.row(SHARK).observedSettlementGp);
         assertEquals(-190L, owner.net(t + 31L * 60_000L + 2_000L));
         assertEquals(0, owner.reviewCount());
@@ -609,8 +609,8 @@ public class GePartialCollectAttributionTest
     /** One real engine with the owner's frozen references and offline GE offer observations. */
     private static final class Owner
     {
-        final Am engine;
-        final Bj ledger = new Bj();
+        final Engine engine;
+        final OfferLedger ledger = new OfferLedger();
         final Map<Integer, Long> inventory = new HashMap<>();
         /** The item offered in the second comparison slot (scenario-specific). */
         int otherItem = SHARK;
@@ -618,24 +618,24 @@ public class GePartialCollectAttributionTest
 
         Owner()
         {
-            engine = new Am(deltas ->
+            engine = new Engine(deltas ->
             {
-                List<Ab> flows = new ArrayList<>();
+                List<Flow> flows = new ArrayList<>();
                 for (Map.Entry<Integer, Long> delta : deltas.entrySet())
                 {
                     int id = delta.getKey();
                     long unit = id == COINS ? 1L : reference(id);
-                    flows.add(new Ab(id, id == COINS ? "Coins" : name(id), delta.getValue(),
+                    flows.add(new Flow(id, id == COINS ? "Coins" : name(id), delta.getValue(),
                         (int) unit, delta.getValue() * unit,
-                        id == COINS ? Av.FACE_VALUE : Av.GRAND_EXCHANGE));
+                        id == COINS ? PriceSource.FACE_VALUE : PriceSource.GRAND_EXCHANGE));
                 }
                 return flows;
             }, new TransactionClassifier(), new GpManagerConfig()
             {
                 @Override
-                public Db receiptRetentionDays()
+                public ReceiptRetentionPeriod receiptRetentionDays()
                 {
-                    return Db.DAYS_365;
+                    return ReceiptRetentionPeriod.DAYS_365;
                 }
 
                 @Override
@@ -644,16 +644,16 @@ public class GePartialCollectAttributionTest
                     return 0;
                 }
             });
-            engine.ajl("Trading", Cx.AUTO, now);
+            engine.startCustomSession("Trading", SessionMode.AUTO, now);
             inventory.put(COINS, 1_000_000L);
-            engine.setBaseline(new Cc(inventory));
+            engine.setBaseline(new ContainerSnapshot(inventory));
         }
 
         /** Place one sell offer from unknown stock (the frozen reference is the quote). */
         void place(int slot, int item, long qty, long at)
         {
             inventory.put(item, qty);
-            engine.setBaseline(new Cc(inventory));
+            engine.setBaseline(new ContainerSnapshot(inventory));
             offer(slot, SELLING, item, (int) qty, 0, (int) reference(item), 0, at);
             inventory.put(item, 0L);
             settleAt(at + 100L);
@@ -679,7 +679,7 @@ public class GePartialCollectAttributionTest
         {
             if (collectionIntent)
             {
-                engine.abg(at);
+                engine.noteGeCollectionIntent(at);
             }
             inventory.put(COINS, inventory.getOrDefault(COINS, 0L) + amount);
             settleAt(at);
@@ -693,54 +693,54 @@ public class GePartialCollectAttributionTest
         /** Trigger the engine's own custody maintenance without inventing a movement. */
         void maintenance(long at)
         {
-            for (Ac booking : engine.geCustody.maintenance(at,
+            for (Transaction booking : engine.geCustody.maintenance(at,
                 engine.getActiveSession().getId()).countedBookings)
             {
-                engine.getActiveSession().kf(booking, 500, true);
+                engine.getActiveSession().addTransaction(booking, 500, true);
             }
         }
 
         /** An unrelated bank transfer still runs custody maintenance. */
         void unrelatedTransfer(long at)
         {
-            engine.markContext(Aj.TRANSFER, 10, "Bank transfer");
+            engine.markContext(Context.TRANSFER, 10, "Bank transfer");
             inventory.put(COINS, inventory.getOrDefault(COINS, 0L) + 1_000L);
             settleAt(at);
         }
 
         void gain(int item, long quantity, long value, long at)
         {
-            engine.getActiveSession().kf(new Ac(at, null,
-                Ai.GAIN, Aj.GENERIC, "", "Loot", true,
-                Collections.singletonList(new Ab(item, name(item), quantity,
+            engine.getActiveSession().addTransaction(new Transaction(at, null,
+                TransactionType.GAIN, Context.GENERIC, "", "Loot", true,
+                Collections.singletonList(new Flow(item, name(item), quantity,
                     (int) (quantity > 0L ? value / quantity : 0L), value,
-                    Av.GRAND_EXCHANGE)),
-                Bd.CONFIRMED, "", null), 500);
+                    PriceSource.GRAND_EXCHANGE)),
+                ClassificationConfidence.CONFIRMED, "", null), 500);
         }
 
         private void offer(int slot, GrandExchangeOfferState state, int item, int total, int traded,
             int price, int spent, long at)
         {
-            Bj.Transition transition = ledger.observe(
-                new Bj.Snapshot(slot, state, item, total, traded, price, spent))
+            OfferLedger.Transition transition = ledger.observe(
+                new OfferLedger.Snapshot(slot, state, item, total, traded, price, spent))
                 .orElse(null);
             if (transition != null)
             {
-                engine.abh(transition, name(item), at);
+                engine.noteGeOfferObservation(transition, name(item), at);
             }
         }
 
         private void settleAt(long at)
         {
-            engine.yz();
-            Cc snapshot = new Cc(inventory);
-            engine.adj(snapshot, at);
-            engine.adj(snapshot, at + 1L);
+            engine.markInventoryDirty();
+            ContainerSnapshot snapshot = new ContainerSnapshot(inventory);
+            engine.processIfDirty(snapshot, at);
+            engine.processIfDirty(snapshot, at + 1L);
         }
 
-        Bi.Row row(int itemId)
+        MarketSettlementProjection.Row row(int itemId)
         {
-            for (Bi.Row row : engine.ub())
+            for (MarketSettlementProjection.Row row : engine.getMarketSettlements())
             {
                 if (row.itemId == itemId)
                 {
@@ -750,9 +750,9 @@ public class GePartialCollectAttributionTest
             throw new AssertionError("no market row for " + itemId);
         }
 
-        Bi.Row rowAt(int slot, int itemId)
+        MarketSettlementProjection.Row rowAt(int slot, int itemId)
         {
-            for (Bi.Row row : engine.ub())
+            for (MarketSettlementProjection.Row row : engine.getMarketSettlements())
             {
                 if (row.slot == slot && row.itemId == itemId)
                 {
@@ -770,9 +770,9 @@ public class GePartialCollectAttributionTest
         int reviewCount()
         {
             int reviews = 0;
-            for (Ac transaction : engine.getActiveSession().getTransactions())
+            for (Transaction transaction : engine.getActiveSession().getTransactions())
             {
-                if (Eh.aal(transaction))
+                if (ReviewEligibility.needsOwnerDecision(transaction))
                 {
                     reviews++;
                 }
@@ -783,7 +783,7 @@ public class GePartialCollectAttributionTest
         int ambiguousCount()
         {
             int ambiguous = 0;
-            for (Aa record : engine.geCustody.aji())
+            for (GeRecord record : engine.geCustody.snapshotRecords())
             {
                 if (record.collectionAmbiguous)
                 {
@@ -795,16 +795,16 @@ public class GePartialCollectAttributionTest
 
         int recordCount()
         {
-            return engine.geCustody.aji().size();
+            return engine.geCustody.snapshotRecords().size();
         }
 
         /** One uncounted Coins-only row: the fail-closed Review evidence. */
         int unattributedCoinRows()
         {
             int rows = 0;
-            for (Ac transaction : engine.getActiveSession().getTransactions())
+            for (Transaction transaction : engine.getActiveSession().getTransactions())
             {
-                if (transaction.tm() == Ai.UNCERTAIN
+                if (transaction.getAutomaticType() == TransactionType.UNCERTAIN
                     && transaction.getFlows().size() == 1
                     && transaction.getFlows().get(0).itemId == COINS)
                 {
@@ -818,9 +818,9 @@ public class GePartialCollectAttributionTest
         int settlementTransactions()
         {
             int rows = 0;
-            for (Ac transaction : engine.getActiveSession().getTransactions())
+            for (Transaction transaction : engine.getActiveSession().getTransactions())
             {
-                if (transaction.tm() == Ai.TRADE
+                if (transaction.getAutomaticType() == TransactionType.TRADE
                     && transaction.getNote().equals("Grand Exchange"))
                 {
                     rows++;
@@ -832,7 +832,7 @@ public class GePartialCollectAttributionTest
         int adjustmentRows()
         {
             int rows = 0;
-            for (Ac transaction : engine.getActiveSession().getTransactions())
+            for (Transaction transaction : engine.getActiveSession().getTransactions())
             {
                 if (transaction.getNote().startsWith("Grand Exchange settlement adjustment"))
                 {

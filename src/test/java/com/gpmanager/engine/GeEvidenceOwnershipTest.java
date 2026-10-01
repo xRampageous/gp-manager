@@ -36,205 +36,205 @@ public class GeEvidenceOwnershipTest
     @Test
     public void realLootKeepsItsDeltaWhenARecentBuyForTheSameItemExists()
     {
-        Am engine = engine();
+        Engine engine = engine();
         long now = T0;
-        engine.ajl("Trading", Cx.AUTO, now);
-        engine.setBaseline(new Cc(inventory(COINS, 100_000L)));
+        engine.startCustomSession("Trading", SessionMode.AUTO, now);
+        engine.setBaseline(new ContainerSnapshot(inventory(COINS, 100_000L)));
 
-        Bj ledger = new Bj();
+        OfferLedger ledger = new OfferLedger();
         noteGe(engine, ledger, 0, BUYING, SHARK, 5, 0, 800, 0, now);
         noteGe(engine, ledger, 0, BOUGHT, SHARK, 5, 5, 800, 4_000, now + 600L);
 
-        engine.zk(quantities(SHARK, 1L), 100, "Loot from Goblin", "Goblin");
-        Ac loot = settle(engine, inventory(COINS, 100_000L, SHARK, 1L), now + 1_200L);
+        engine.markLootContext(quantities(SHARK, 1L), 100, "Loot from Goblin", "Goblin");
+        Transaction loot = settle(engine, inventory(COINS, 100_000L, SHARK, 1L), now + 1_200L);
 
         assertNotNull(loot);
         assertEquals("real loot owns its delta over a recent GE buy of the same item",
-            Ai.LOOT, loot.getType());
+            TransactionType.LOOT, loot.getType());
         assertEquals("Loot from Goblin", loot.getNote());
     }
 
     @Test
     public void passiveProgressCannotClaimAnUnrelatedItemDelta()
     {
-        Am engine = engine();
+        Engine engine = engine();
         long now = T0;
-        engine.ajl("Trading", Cx.AUTO, now);
-        engine.setBaseline(new Cc(inventory(COINS, 100_000L)));
+        engine.startCustomSession("Trading", SessionMode.AUTO, now);
+        engine.setBaseline(new ContainerSnapshot(inventory(COINS, 100_000L)));
 
-        Bj ledger = new Bj();
+        OfferLedger ledger = new OfferLedger();
         noteGe(engine, ledger, 0, BUYING, SHARK, 5, 0, 800, 0, now);
         noteGe(engine, ledger, 0, BUYING, SHARK, 5, 2, 800, 1_600, now + 600L);
 
-        Ac gain = settle(engine, inventory(COINS, 100_000L, LOGS, 1L), now + 1_200L);
+        Transaction gain = settle(engine, inventory(COINS, 100_000L, LOGS, 1L), now + 1_200L);
 
         assertNotNull(gain);
-        assertEquals(Ai.GAIN, gain.getType());
+        assertEquals(TransactionType.GAIN, gain.getType());
     }
 
     @Test
     public void passiveProgressAloneCannotClaimTheSameItemDelta()
     {
-        Am engine = engine();
+        Engine engine = engine();
         long now = T0;
-        engine.ajl("Trading", Cx.AUTO, now);
-        engine.setBaseline(new Cc(inventory(COINS, 100_000L)));
+        engine.startCustomSession("Trading", SessionMode.AUTO, now);
+        engine.setBaseline(new ContainerSnapshot(inventory(COINS, 100_000L)));
 
-        Bj ledger = new Bj();
+        OfferLedger ledger = new OfferLedger();
         noteGe(engine, ledger, 0, BUYING, SHARK, 5, 0, 800, 0, now);
         noteGe(engine, ledger, 0, BUYING, SHARK, 5, 2, 800, 1_600, now + 600L);
 
-        Ac gain = settle(engine, inventory(COINS, 100_000L, SHARK, 1L), now + 1_200L);
+        Transaction gain = settle(engine, inventory(COINS, 100_000L, SHARK, 1L), now + 1_200L);
 
         assertNotNull(gain);
         assertEquals("unsettled progress cannot make a same-item gain look like a collection",
-            Ai.GAIN, gain.getType());
+            TransactionType.GAIN, gain.getType());
     }
 
     @Test
     public void shopLikeMovementAfterPassiveProgressIsNotStolenAsMarket()
     {
-        Am engine = engine();
+        Engine engine = engine();
         long now = T0;
-        engine.ajl("Trading", Cx.AUTO, now);
-        engine.setBaseline(new Cc(inventory(COINS, 100_000L)));
+        engine.startCustomSession("Trading", SessionMode.AUTO, now);
+        engine.setBaseline(new ContainerSnapshot(inventory(COINS, 100_000L)));
 
-        Bj ledger = new Bj();
+        OfferLedger ledger = new OfferLedger();
         noteGe(engine, ledger, 0, BUYING, SHARK, 5, 0, 800, 0, now);
         noteGe(engine, ledger, 0, BUYING, SHARK, 5, 2, 800, 1_600, now + 600L);
 
         // A shop purchase pays coins for an item; it is not an offer settlement.
-        Ac purchase = settle(engine, inventory(COINS, 99_200L, SHARK, 1L), now + 1_200L);
+        Transaction purchase = settle(engine, inventory(COINS, 99_200L, SHARK, 1L), now + 1_200L);
 
         assertNotNull(purchase);
-        assertEquals(Ai.UNCERTAIN, purchase.getType());
+        assertEquals(TransactionType.UNCERTAIN, purchase.getType());
     }
 
     @Test
     public void cancelledSellRefundCannotExplainALaterItemLoss()
     {
-        Am engine = engine();
+        Engine engine = engine();
         long now = T0;
-        engine.ajl("Trading", Cx.AUTO, now);
-        engine.setBaseline(new Cc(inventory(COINS, 100_000L, SHARK, 5L)));
+        engine.startCustomSession("Trading", SessionMode.AUTO, now);
+        engine.setBaseline(new ContainerSnapshot(inventory(COINS, 100_000L, SHARK, 5L)));
 
-        Bj ledger = new Bj();
+        OfferLedger ledger = new OfferLedger();
         noteGe(engine, ledger, 1, CANCELLED_SELL, SHARK, 5, 0, 800, 0, now);
 
-        Ac loss = settle(engine, inventory(COINS, 100_000L, SHARK, 4L), now + 600L);
+        Transaction loss = settle(engine, inventory(COINS, 100_000L, SHARK, 4L), now + 600L);
 
         assertNotNull(loss);
         assertEquals("a cancelled sell returns items; it cannot explain a later loss",
-            Ai.CONSUMPTION, loss.getType());
+            TransactionType.CONSUMPTION, loss.getType());
     }
 
     @Test
     public void cancelledBuyRefundCannotExplainALaterCoinLoss()
     {
-        Am engine = engine();
+        Engine engine = engine();
         long now = T0;
-        engine.ajl("Trading", Cx.AUTO, now);
-        engine.setBaseline(new Cc(inventory(COINS, 100_000L)));
+        engine.startCustomSession("Trading", SessionMode.AUTO, now);
+        engine.setBaseline(new ContainerSnapshot(inventory(COINS, 100_000L)));
 
-        Bj ledger = new Bj();
+        OfferLedger ledger = new OfferLedger();
         noteGe(engine, ledger, 2, CANCELLED_BUY, SHARK, 5, 0, 800, 0, now);
 
-        Ac loss = settle(engine, inventory(COINS, 99_000L), now + 600L);
+        Transaction loss = settle(engine, inventory(COINS, 99_000L), now + 600L);
 
         assertNotNull(loss);
         assertEquals("a cancelled buy refunds coins; it cannot explain a later coin loss",
-            Ai.CONSUMPTION, loss.getType());
+            TransactionType.CONSUMPTION, loss.getType());
     }
 
     @Test
     public void profileSwitchClearsRecentGeEvidence()
     {
-        Am engine = engine();
+        Engine engine = engine();
         long now = T0;
-        engine.ajl("Trading", Cx.AUTO, now);
-        engine.setBaseline(new Cc(inventory(COINS, 100_000L)));
+        engine.startCustomSession("Trading", SessionMode.AUTO, now);
+        engine.setBaseline(new ContainerSnapshot(inventory(COINS, 100_000L)));
 
-        Bj ledger = new Bj();
+        OfferLedger ledger = new OfferLedger();
         noteGe(engine, ledger, 0, BUYING, SHARK, 5, 0, 800, 0, now);
         noteGe(engine, ledger, 0, BOUGHT, SHARK, 5, 5, 800, 4_000, now + 600L);
 
-        engine.agl("rsprofile.ge-audit-b", new SavedState(), now + 600L);
-        engine.ajl("Trading", Cx.AUTO, now + 700L);
-        engine.setBaseline(new Cc(inventory(COINS, 100_000L)));
+        engine.restoreForProfile("rsprofile.ge-audit-b", new SavedState(), now + 600L);
+        engine.startCustomSession("Trading", SessionMode.AUTO, now + 700L);
+        engine.setBaseline(new ContainerSnapshot(inventory(COINS, 100_000L)));
 
-        Ac gain = settle(engine, inventory(COINS, 100_000L, SHARK, 1L), now + 1_200L);
+        Transaction gain = settle(engine, inventory(COINS, 100_000L, SHARK, 1L), now + 1_200L);
 
         assertNotNull(gain);
         assertEquals("the previous owner's GE evidence must not classify the new owner's delta",
-            Ai.GAIN, gain.getType());
+            TransactionType.GAIN, gain.getType());
         assertTrue("the previous owner's custody lifecycles never leak across profiles",
-            engine.geCustody.aji().isEmpty());
+            engine.geCustody.snapshotRecords().isEmpty());
     }
 
     @Test
     public void destructiveResetClearsRecentGeEvidence()
     {
-        Am engine = engine();
+        Engine engine = engine();
         long now = T0;
-        engine.ajl("Trading", Cx.AUTO, now);
-        engine.setBaseline(new Cc(inventory(COINS, 100_000L)));
+        engine.startCustomSession("Trading", SessionMode.AUTO, now);
+        engine.setBaseline(new ContainerSnapshot(inventory(COINS, 100_000L)));
 
-        Bj ledger = new Bj();
+        OfferLedger ledger = new OfferLedger();
         noteGe(engine, ledger, 0, BUYING, SHARK, 5, 0, 800, 0, now);
         noteGe(engine, ledger, 0, BOUGHT, SHARK, 5, 5, 800, 4_000, now + 600L);
 
-        engine.agr(now + 600L);
+        engine.resetTrackingData(now + 600L);
         engine.togglePause(now + 700L);
-        engine.setBaseline(new Cc(inventory(COINS, 100_000L)));
+        engine.setBaseline(new ContainerSnapshot(inventory(COINS, 100_000L)));
 
-        Ac gain = settle(engine, inventory(COINS, 100_000L, SHARK, 1L), now + 1_200L);
+        Transaction gain = settle(engine, inventory(COINS, 100_000L, SHARK, 1L), now + 1_200L);
 
         assertNotNull(gain);
         assertEquals("cleared GE evidence must not reappear after a destructive reset",
-            Ai.GAIN, gain.getType());
+            TransactionType.GAIN, gain.getType());
         assertTrue("destructive reset clears schema-104 custody state",
-            engine.geCustody.aji().isEmpty());
+            engine.geCustody.snapshotRecords().isEmpty());
     }
 
     @Test
     public void recentSellPlacementClaimsTheItemLossAsOwnershipNeutralCustody()
     {
-        Am engine = engine();
+        Engine engine = engine();
         long now = T0;
-        engine.ajl("Trading", Cx.AUTO, now);
-        engine.setBaseline(new Cc(inventory(COINS, 100_000L, SHARK, 5L)));
+        engine.startCustomSession("Trading", SessionMode.AUTO, now);
+        engine.setBaseline(new ContainerSnapshot(inventory(COINS, 100_000L, SHARK, 5L)));
 
-        Bj ledger = new Bj();
+        OfferLedger ledger = new OfferLedger();
         noteGe(engine, ledger, 3, SELLING, SHARK, 5, 0, 800, 0, now);
 
-        Ac trade = settle(engine, inventory(COINS, 100_000L, SHARK, 4L), now + 600L);
+        Transaction trade = settle(engine, inventory(COINS, 100_000L, SHARK, 4L), now + 600L);
 
         assertNotNull(trade);
         assertEquals("a proven placement principal is custody, not finalized economics",
-            Ai.TRANSFER, trade.getType());
-        assertEquals(Aj.TRANSFER, trade.getContext());
+            TransactionType.TRANSFER, trade.getType());
+        assertEquals(Context.TRANSFER, trade.getContext());
         assertEquals("pending SELL custody never changes canonical Net",
             0L, engine.getMetrics(now + 1_200L).net);
-        assertEquals(1, engine.geCustody.aji().size());
+        assertEquals(1, engine.geCustody.snapshotRecords().size());
     }
 
     @Test
     public void recentBuyPlacementClaimsTheCoinLossAsOwnershipNeutralCustody()
     {
-        Am engine = engine();
+        Engine engine = engine();
         long now = T0;
-        engine.ajl("Trading", Cx.AUTO, now);
-        engine.setBaseline(new Cc(inventory(COINS, 100_000L)));
+        engine.startCustomSession("Trading", SessionMode.AUTO, now);
+        engine.setBaseline(new ContainerSnapshot(inventory(COINS, 100_000L)));
 
-        Bj ledger = new Bj();
+        OfferLedger ledger = new OfferLedger();
         noteGe(engine, ledger, 4, BUYING, SHARK, 5, 0, 800, 0, now);
 
-        Ac trade = settle(engine, inventory(COINS, 96_000L), now + 600L);
+        Transaction trade = settle(engine, inventory(COINS, 96_000L), now + 600L);
 
         assertNotNull(trade);
         assertEquals("an observed buy reserve is custody, not finalized economics",
-            Ai.TRANSFER, trade.getType());
-        assertEquals(Aj.TRANSFER, trade.getContext());
+            TransactionType.TRANSFER, trade.getType());
+        assertEquals(Context.TRANSFER, trade.getContext());
         assertEquals("pending BUY reserve never changes canonical Net",
             0L, engine.getMetrics(now + 1_200L).net);
     }
@@ -242,12 +242,12 @@ public class GeEvidenceOwnershipTest
     @Test
     public void observationsAloneNeverBookWithoutAnInventoryMovement()
     {
-        Am engine = engine();
+        Engine engine = engine();
         long now = T0;
-        engine.ajl("Trading", Cx.AUTO, now);
-        engine.setBaseline(new Cc(inventory(COINS, 100_000L)));
+        engine.startCustomSession("Trading", SessionMode.AUTO, now);
+        engine.setBaseline(new ContainerSnapshot(inventory(COINS, 100_000L)));
 
-        Bj ledger = new Bj();
+        OfferLedger ledger = new OfferLedger();
         noteGe(engine, ledger, 0, BUYING, SHARK, 5, 0, 800, 0, now);
         noteGe(engine, ledger, 0, BOUGHT, SHARK, 5, 5, 800, 4_000, now + 600L);
 
@@ -256,8 +256,8 @@ public class GeEvidenceOwnershipTest
     }
 
     private static void noteGe(
-        Am engine,
-        Bj ledger,
+        Engine engine,
+        OfferLedger ledger,
         int slot,
         GrandExchangeOfferState state,
         int itemId,
@@ -267,21 +267,21 @@ public class GeEvidenceOwnershipTest
         int spent,
         long at)
     {
-        Bj.Transition transition = ledger.observe(
-            new Bj.Snapshot(slot, state, itemId, totalQuantity, quantityTraded, price, spent))
+        OfferLedger.Transition transition = ledger.observe(
+            new OfferLedger.Snapshot(slot, state, itemId, totalQuantity, quantityTraded, price, spent))
             .orElse(null);
         if (transition != null)
         {
-            engine.abh(transition, name(itemId), at);
+            engine.noteGeOfferObservation(transition, name(itemId), at);
         }
     }
 
-    private static Ac settle(Am engine, Map<Integer, Long> next, long now)
+    private static Transaction settle(Engine engine, Map<Integer, Long> next, long now)
     {
-        engine.yz();
-        Cc snapshot = new Cc(next);
-        Ac first = engine.adj(snapshot, now);
-        Ac settled = engine.adj(snapshot, now + 600L);
+        engine.markInventoryDirty();
+        ContainerSnapshot snapshot = new ContainerSnapshot(next);
+        Transaction first = engine.processIfDirty(snapshot, now);
+        Transaction settled = engine.processIfDirty(snapshot, now + 600L);
         return settled == null ? first : settled;
     }
 
@@ -312,21 +312,21 @@ public class GeEvidenceOwnershipTest
         return id == LOGS ? 48 : id == SHARK ? 800 : id == COINS ? 1 : 0;
     }
 
-    private static Am engine()
+    private static Engine engine()
     {
         GpManagerConfig config = new GpManagerConfig()
         {
             @Override public int stabilizationTicks() { return 0; }
             @Override public boolean keepTransferAuditRows() { return true; }
         };
-        return new Am(deltas ->
+        return new Engine(deltas ->
         {
-            List<Ab> flows = new ArrayList<>();
+            List<Flow> flows = new ArrayList<>();
             for (Map.Entry<Integer, Long> delta : deltas.entrySet())
             {
                 int id = delta.getKey();
-                flows.add(new Ab(id, name(id), delta.getValue(), price(id), delta.getValue() * price(id),
-                    id == COINS ? Av.FACE_VALUE : Av.GRAND_EXCHANGE));
+                flows.add(new Flow(id, name(id), delta.getValue(), price(id), delta.getValue() * price(id),
+                    id == COINS ? PriceSource.FACE_VALUE : PriceSource.GRAND_EXCHANGE));
             }
             return flows;
         }, new TransactionClassifier(), config);

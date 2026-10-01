@@ -51,10 +51,10 @@ public class GeSlotReuseSettledHistoryTest
 
         fixture.placeAndSell(0, MITHRIL, MITHRIL_QTY, MITHRIL_GROSS, t + 30_000L);
 
-        Bi.Row retired = fixture.rowFor(shark);
+        MarketSettlementProjection.Row retired = fixture.rowFor(shark);
         assertNotNull("the settled sale keeps its market record after slot reuse", retired);
         assertEquals(SHARK, retired.itemId);
-        assertEquals(Bi.Lifecycle.REALIZED, retired.lifecycle);
+        assertEquals(MarketSettlementProjection.Lifecycle.REALIZED, retired.lifecycle);
         assertEquals("Received stays the observed cash", SHARK_RECEIVED, retired.observedSettlementGp);
         assertEquals("the proven tax stays visible", SHARK_TAX, retired.inferredGeTaxGp);
         assertEquals("the new offer is the slot's only live lifecycle", 1, fixture.openRecords(0));
@@ -71,7 +71,7 @@ public class GeSlotReuseSettledHistoryTest
             t + 30_000L);
 
         assertNotNull(fixture.rowFor(shark));
-        Bi.Row second = fixture.rowFor(mithril);
+        MarketSettlementProjection.Row second = fixture.rowFor(mithril);
         assertNotNull("the new offer in the reused slot settles through its own record", second);
         assertEquals(MITHRIL, second.itemId);
         assertEquals(MITHRIL_RECEIVED, second.observedSettlementGp);
@@ -90,14 +90,14 @@ public class GeSlotReuseSettledHistoryTest
         String shark = fixture.sellAndCollectAlone(0, SHARK, SHARK_QTY, SHARK_GROSS, SHARK_RECEIVED, t);
         fixture.placeAndSell(0, MITHRIL, MITHRIL_QTY, MITHRIL_GROSS, t + 30_000L);
 
-        SavedState state = fixture.engine.qm();
+        SavedState state = fixture.engine.createSavedState();
         Fixture restored = new Fixture();
         restored.engine.restore(state, t + 40_000L);
 
         assertNotNull("closed history is restored, not collapsed to one record per slot",
             restored.rowFor(shark));
         assertEquals(1, restored.openRecords(0));
-        Aa live = restored.openRecord(0);
+        GeRecord live = restored.openRecord(0);
         assertEquals(MITHRIL, live.itemId);
         assertEquals(MITHRIL_QTY, live.getCapturedQty());
     }
@@ -117,9 +117,9 @@ public class GeSlotReuseSettledHistoryTest
         fixture.maintenance(t + total * 20_000L);
 
         int closed = 0;
-        for (Aa record : fixture.engine.geCustody.aji())
+        for (GeRecord record : fixture.engine.geCustody.snapshotRecords())
         {
-            if (record.getStage() == Aa.Stage.CLOSED)
+            if (record.getStage() == GeRecord.Stage.CLOSED)
             {
                 closed++;
             }
@@ -144,30 +144,30 @@ public class GeSlotReuseSettledHistoryTest
 
     private static final class Fixture
     {
-        final Am engine;
-        final Bj ledger = new Bj();
+        final Engine engine;
+        final OfferLedger ledger = new OfferLedger();
         final Map<Integer, Long> inventory = new HashMap<>();
 
         Fixture()
         {
-            engine = new Am(deltas ->
+            engine = new Engine(deltas ->
             {
-                List<Ab> flows = new ArrayList<>();
+                List<Flow> flows = new ArrayList<>();
                 for (Map.Entry<Integer, Long> delta : deltas.entrySet())
                 {
                     int id = delta.getKey();
                     long unit = id == COINS ? 1L : reference(id);
-                    flows.add(new Ab(id, id == COINS ? "Coins" : name(id), delta.getValue(),
+                    flows.add(new Flow(id, id == COINS ? "Coins" : name(id), delta.getValue(),
                         (int) unit, delta.getValue() * unit,
-                        id == COINS ? Av.FACE_VALUE : Av.GRAND_EXCHANGE));
+                        id == COINS ? PriceSource.FACE_VALUE : PriceSource.GRAND_EXCHANGE));
                 }
                 return flows;
             }, new TransactionClassifier(), new GpManagerConfig()
             {
                 @Override
-                public Db receiptRetentionDays()
+                public ReceiptRetentionPeriod receiptRetentionDays()
                 {
-                    return Db.DAYS_365;
+                    return ReceiptRetentionPeriod.DAYS_365;
                 }
 
                 @Override
@@ -176,15 +176,15 @@ public class GeSlotReuseSettledHistoryTest
                     return 0;
                 }
             });
-            engine.ajl("Trading", Cx.AUTO, T0);
+            engine.startCustomSession("Trading", SessionMode.AUTO, T0);
             inventory.put(COINS, 1_000_000L);
-            engine.setBaseline(new Cc(inventory));
+            engine.setBaseline(new ContainerSnapshot(inventory));
         }
 
         void placeAndSell(int slot, int item, long qty, long gross, long at)
         {
             inventory.put(item, qty);
-            engine.setBaseline(new Cc(inventory));
+            engine.setBaseline(new ContainerSnapshot(inventory));
             offer(slot, SELLING, item, (int) qty, 0, (int) reference(item), 0, at);
             inventory.put(item, 0L);
             settleAt(at + 100L);
@@ -197,10 +197,10 @@ public class GeSlotReuseSettledHistoryTest
             placeAndSell(slot, item, qty, gross, at);
             long collectAt = at + 10_000L;
             offer(slot, EMPTY, item, 0, 0, 0, 0, collectAt - 600L);
-            engine.abg(collectAt);
+            engine.noteGeCollectionIntent(collectAt);
             inventory.put(COINS, inventory.getOrDefault(COINS, 0L) + received);
             settleAt(collectAt);
-            Aa record = openOrClosedRecord(slot, item);
+            GeRecord record = openOrClosedRecord(slot, item);
             assertNotNull("the collected offer has a record", record);
             assertFalse("the single collect settled the offer", record.getSettlementId().isEmpty());
             return record.getSettlementId();
@@ -208,35 +208,35 @@ public class GeSlotReuseSettledHistoryTest
 
         void maintenance(long at)
         {
-            for (Ac booking : engine.geCustody.maintenance(at,
+            for (Transaction booking : engine.geCustody.maintenance(at,
                 engine.getActiveSession().getId()).countedBookings)
             {
-                engine.getActiveSession().kf(booking, 500, true);
+                engine.getActiveSession().addTransaction(booking, 500, true);
             }
         }
 
         private void offer(int slot, GrandExchangeOfferState state, int item, int total, int traded,
             int price, int spent, long at)
         {
-            Bj.Transition transition = ledger.observe(
-                new Bj.Snapshot(slot, state, item, total, traded, price, spent)).orElse(null);
+            OfferLedger.Transition transition = ledger.observe(
+                new OfferLedger.Snapshot(slot, state, item, total, traded, price, spent)).orElse(null);
             if (transition != null)
             {
-                engine.abh(transition, name(item), at);
+                engine.noteGeOfferObservation(transition, name(item), at);
             }
         }
 
         private void settleAt(long at)
         {
-            engine.yz();
-            Cc snapshot = new Cc(inventory);
-            engine.adj(snapshot, at);
-            engine.adj(snapshot, at + 1L);
+            engine.markInventoryDirty();
+            ContainerSnapshot snapshot = new ContainerSnapshot(inventory);
+            engine.processIfDirty(snapshot, at);
+            engine.processIfDirty(snapshot, at + 1L);
         }
 
-        Bi.Row rowFor(String settlementId)
+        MarketSettlementProjection.Row rowFor(String settlementId)
         {
-            for (Bi.Row row : engine.ub())
+            for (MarketSettlementProjection.Row row : engine.getMarketSettlements())
             {
                 if (settlementId.equals(row.settlementId))
                 {
@@ -246,10 +246,10 @@ public class GeSlotReuseSettledHistoryTest
             return null;
         }
 
-        Aa openOrClosedRecord(int slot, int item)
+        GeRecord openOrClosedRecord(int slot, int item)
         {
-            Aa found = null;
-            for (Aa record : engine.geCustody.aji())
+            GeRecord found = null;
+            for (GeRecord record : engine.geCustody.snapshotRecords())
             {
                 if (record.slot == slot && record.itemId == item)
                 {
@@ -259,11 +259,11 @@ public class GeSlotReuseSettledHistoryTest
             return found;
         }
 
-        Aa openRecord(int slot)
+        GeRecord openRecord(int slot)
         {
-            for (Aa record : engine.geCustody.aji())
+            for (GeRecord record : engine.geCustody.snapshotRecords())
             {
-                if (record.slot == slot && record.getStage() != Aa.Stage.CLOSED)
+                if (record.slot == slot && record.getStage() != GeRecord.Stage.CLOSED)
                 {
                     return record;
                 }
@@ -274,9 +274,9 @@ public class GeSlotReuseSettledHistoryTest
         int openRecords(int slot)
         {
             int open = 0;
-            for (Aa record : engine.geCustody.aji())
+            for (GeRecord record : engine.geCustody.snapshotRecords())
             {
-                if (record.slot == slot && record.getStage() != Aa.Stage.CLOSED)
+                if (record.slot == slot && record.getStage() != GeRecord.Stage.CLOSED)
                 {
                     open++;
                 }
@@ -287,9 +287,9 @@ public class GeSlotReuseSettledHistoryTest
         int settlementTransactions()
         {
             int count = 0;
-            for (Ac transaction : engine.getActiveSession().getTransactions())
+            for (Transaction transaction : engine.getActiveSession().getTransactions())
             {
-                if (transaction.tm() == Ai.TRADE && transaction.isCounted())
+                if (transaction.getAutomaticType() == TransactionType.TRADE && transaction.isCounted())
                 {
                     count++;
                 }
@@ -300,9 +300,9 @@ public class GeSlotReuseSettledHistoryTest
         int reviewCount()
         {
             int reviews = 0;
-            for (Ac transaction : engine.getActiveSession().getTransactions())
+            for (Transaction transaction : engine.getActiveSession().getTransactions())
             {
-                if (Eh.aal(transaction))
+                if (ReviewEligibility.needsOwnerDecision(transaction))
                 {
                     reviews++;
                 }
@@ -313,9 +313,9 @@ public class GeSlotReuseSettledHistoryTest
         int unattributedCoinRows()
         {
             int rows = 0;
-            for (Ac transaction : engine.getActiveSession().getTransactions())
+            for (Transaction transaction : engine.getActiveSession().getTransactions())
             {
-                if (transaction.tm() == Ai.UNCERTAIN
+                if (transaction.getAutomaticType() == TransactionType.UNCERTAIN
                     && transaction.getFlows().size() == 1
                     && transaction.getFlows().get(0).itemId == COINS)
                 {

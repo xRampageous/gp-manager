@@ -35,10 +35,10 @@ public class LedgerOverviewModesTest
     @Test
     public void openingDetailReplacesTheOverviewAndBackRestoresIt() throws Exception
     {
-        Am engine = session();
+        Engine engine = session();
         for (int i = 0; i < 5; i++)
         {
-            engine.getActiveSession().kf(gain(T0 + 1_000L + i * 1_000L, "Item " + i,
+            engine.getActiveSession().addTransaction(gain(T0 + 1_000L + i * 1_000L, "Item " + i,
                 2_000 + i, 1L, 100, 100L), 2_000);
         }
         LedgerHarness harness = new LedgerHarness(engine, T0 + 50_000L, entry());
@@ -54,7 +54,7 @@ public class LedgerOverviewModesTest
         String groupName = harness.data().gains.groups.get(0).primaryName;
         onEdt(() ->
         {
-            harness.auz(groupId);
+            harness.openGroup(groupId);
             return null;
         });
         assertTrue(onEdt(() -> detailOpen(page)));
@@ -76,13 +76,13 @@ public class LedgerOverviewModesTest
     @Test
     public void backRestoresThePriorPageAndCostsFilter() throws Exception
     {
-        Am engine = session();
+        Engine engine = session();
         for (int i = 0; i < 15; i++)
         {
-            engine.getActiveSession().kf(food(T0 + 1_000L + i * 1_000L, "Food " + i,
+            engine.getActiveSession().addTransaction(food(T0 + 1_000L + i * 1_000L, "Food " + i,
                 3_000 + i, 50L), 2_000);
         }
-        engine.getActiveSession().kf(gain(T0 + 90_000L, "Bones", 536, 1L, 3_200, 3_200L), 2_000);
+        engine.getActiveSession().addTransaction(gain(T0 + 90_000L, "Bones", 536, 1L, 3_200, 3_200L), 2_000);
         LedgerHarness harness = new LedgerHarness(engine, T0 + 100_000L, entry());
         LedgerPage page = onEdt(() -> harness.attach(new LedgerPage(harness, id -> null)));
 
@@ -96,7 +96,7 @@ public class LedgerOverviewModesTest
         String groupId = harness.data().gains.groups.get(0).semanticGroupId;
         onEdt(() ->
         {
-            harness.auz(groupId);
+            harness.openGroup(groupId);
             return null;
         });
         assertTrue(onEdt(() -> detailOpen(page)));
@@ -108,34 +108,34 @@ public class LedgerOverviewModesTest
 
         onEdt(() ->
         {
-            harness.costViewChanged(Ao.Bs.LOSS);
+            harness.costViewChanged(LedgerData.CostView.LOSS);
             return null;
         });
-        assertEquals(Ao.Bs.LOSS, onEdt(() -> LedgerPageProbe.data(page).entry.costView));
+        assertEquals(LedgerData.CostView.LOSS, onEdt(() -> LedgerPageProbe.data(page).entry.costView));
         onEdt(() ->
         {
-            harness.auz(groupId);
+            harness.openGroup(groupId);
             return null;
         });
         assertTrue(onEdt(() -> clickButton(page.body(), "\u2039 Ledger")));
-        assertEquals("Back restores the exact prior subfilter", Ao.Bs.LOSS,
+        assertEquals("Back restores the exact prior subfilter", LedgerData.CostView.LOSS,
             onEdt(() -> LedgerPageProbe.data(page).entry.costView));
     }
 
     @Test
     public void overviewAndDrillTablesPageFiveRows() throws Exception
     {
-        Am engine = session();
+        Engine engine = session();
         for (int i = 0; i < 6; i++)
         {
-            engine.getActiveSession().kf(gain(T0 + 1_000L + i * 1_000L, "Item " + i,
+            engine.getActiveSession().addTransaction(gain(T0 + 1_000L + i * 1_000L, "Item " + i,
                 2_000 + i, 1L, 100, 100L), 2_000);
-            engine.getActiveSession().kf(food(T0 + 10_000L + i * 1_000L, "Food " + i,
+            engine.getActiveSession().addTransaction(food(T0 + 10_000L + i * 1_000L, "Food " + i,
                 3_000 + i, 50L), 2_000);
         }
         for (int i = 0; i < 12; i++)
         {
-            engine.getActiveSession().kf(iceBurst(T0 + 30_000L + i * 1_000L), 2_000);
+            engine.getActiveSession().addTransaction(iceBurst(T0 + 30_000L + i * 1_000L), 2_000);
         }
         LedgerHarness harness = new LedgerHarness(engine, T0 + 90_000L, entry());
         LedgerPage page = onEdt(() -> harness.attach(new LedgerPage(harness, id -> null)));
@@ -147,7 +147,7 @@ public class LedgerOverviewModesTest
             onEdt(() -> LedgerPageProbe.overviewRows(page, LedgerPageProbe.FinancialTable.COSTS)).size());
 
         String groupId = null;
-        for (Br.Group group : harness.data().costs.groups)
+        for (SemanticFinancialProjection.Group group : harness.data().costs.groups)
         {
             if ("Ice Burst".equals(group.primaryName))
             {
@@ -158,7 +158,7 @@ public class LedgerOverviewModesTest
         String open = groupId;
         onEdt(() ->
         {
-            harness.auz(open);
+            harness.openGroup(open);
             return null;
         });
         assertEquals("every receipt stays reachable", 12,
@@ -175,7 +175,7 @@ public class LedgerOverviewModesTest
         {
             market.sell(i, MARKET_ITEMS[i], 10);
         }
-        assertEquals("four market groups exist", 4, market.engine.ub().size());
+        assertEquals("four market groups exist", 4, market.engine.getMarketSettlements().size());
         LedgerHarness harness = new LedgerHarness(market.engine, market.now + 1_000L, entry());
         LedgerPage page = onEdt(() -> harness.attach(new LedgerPage(harness, id -> null)));
         assertTrue("nothing is settled until the coins are collected",
@@ -185,10 +185,23 @@ public class LedgerOverviewModesTest
     }
 
     @Test
+    public void anOfferCanceledBeforeAnyFillLeavesPending() throws Exception
+    {
+        MarketFixture market = new MarketFixture();
+        market.sell(0, MARKET_ITEMS[0], 10);
+        market.listAndCancel(1, MARKET_ITEMS[1], 10);
+        LedgerHarness harness = new LedgerHarness(market.engine, market.now + 1_000L, entry());
+        LedgerPage page = onEdt(() -> harness.attach(new LedgerPage(harness, id -> null)));
+        List<String> pending = onEdt(() -> TableRows.of(page.body(), "PENDING"));
+        assertEquals("only the uncollected sale waits; the canceled offer moved no money: " + pending,
+            1, pending.size());
+    }
+
+    @Test
     public void emptyMarketKeepsItsHeader() throws Exception
     {
-        Am engine = session();
-        engine.getActiveSession().kf(gain(T0 + 1_000L, "Bones", 536, 1L, 3_200, 3_200L), 2_000);
+        Engine engine = session();
+        engine.getActiveSession().addTransaction(gain(T0 + 1_000L, "Bones", 536, 1L, 3_200, 3_200L), 2_000);
         LedgerHarness harness = new LedgerHarness(engine, T0 + 50_000L, entry());
         LedgerPage page = onEdt(() -> harness.attach(new LedgerPage(harness, id -> null)));
 
@@ -201,8 +214,8 @@ public class LedgerOverviewModesTest
     @Test
     public void reviewAndCorrectedFollowCounts() throws Exception
     {
-        Am quiet = session();
-        quiet.getActiveSession().kf(gain(T0 + 1_000L, "Bones", 536, 1L, 3_200, 3_200L), 2_000);
+        Engine quiet = session();
+        quiet.getActiveSession().addTransaction(gain(T0 + 1_000L, "Bones", 536, 1L, 3_200, 3_200L), 2_000);
         LedgerHarness quietHarness = new LedgerHarness(quiet, T0 + 50_000L, entry());
         LedgerPage quietPage = onEdt(() ->
             quietHarness.attach(new LedgerPage(quietHarness, id -> null)));
@@ -219,15 +232,15 @@ public class LedgerOverviewModesTest
         assertTrue("Corrected history stays reachable through the menu",
             onEdt(() -> labels(quietPage.body())).contains("Nothing corrected in this scope"));
 
-        Am engine = session();
-        Ac uncertain = new Ac(T0 + 1_000L, null, Ai.UNCERTAIN,
-            Aj.GENERIC, "", "Vorkath", true,
-            java.util.Collections.singletonList(new Ab(777, "Unknown rune", -1L, 0, 0L)),
-            Bd.UNCERTAIN, "Awaiting a decision", null);
-        engine.getActiveSession().kf(uncertain, 2_000);
-        Ac corrected = gain(T0 + 2_000L, "Willow logs", 1519, 1L, 100, 120L);
-        corrected.ko(Ah.IGNORE, T0 + 3_000L, "excluded");
-        engine.getActiveSession().kf(corrected, 2_000);
+        Engine engine = session();
+        Transaction uncertain = new Transaction(T0 + 1_000L, null, TransactionType.UNCERTAIN,
+            Context.GENERIC, "", "Vorkath", true,
+            java.util.Collections.singletonList(new Flow(777, "Unknown rune", -1L, 0, 0L)),
+            ClassificationConfidence.UNCERTAIN, "Awaiting a decision", null);
+        engine.getActiveSession().addTransaction(uncertain, 2_000);
+        Transaction corrected = gain(T0 + 2_000L, "Willow logs", 1519, 1L, 100, 120L);
+        corrected.applyCorrection(Correction.IGNORE, T0 + 3_000L, "excluded");
+        engine.getActiveSession().addTransaction(corrected, 2_000);
         LedgerHarness harness = new LedgerHarness(engine, T0 + 50_000L, entry());
         LedgerPage page = onEdt(() -> harness.attach(new LedgerPage(harness, id -> null)));
         assertTrue("a nonzero Review count shows its table",
@@ -244,15 +257,15 @@ public class LedgerOverviewModesTest
     @Test
     public void scopeNetStaysCanonicalNotAVisiblePageSum() throws Exception
     {
-        Am engine = session();
+        Engine engine = session();
         for (int i = 0; i < 7; i++)
         {
-            engine.getActiveSession().kf(gain(T0 + 1_000L + i * 1_000L, "Item " + i,
+            engine.getActiveSession().addTransaction(gain(T0 + 1_000L + i * 1_000L, "Item " + i,
                 2_000 + i, 1L, 100, 100L), 2_000);
         }
         LedgerHarness harness = new LedgerHarness(engine, T0 + 50_000L, entry());
         LedgerPage page = onEdt(() -> harness.attach(new LedgerPage(harness, id -> null)));
-        Ao data = harness.data();
+        LedgerData data = harness.data();
         assertEquals(5, onEdt(() -> LedgerPageProbe.overviewRows(page, LedgerPageProbe.FinancialTable.GAINS)).size());
         // The canonical scope Net survives the removed bar line: the tables page, the Net does not.
         assertEquals("the scope Net is canonical, not the visible page sum", 700L, data.net);
@@ -261,14 +274,14 @@ public class LedgerOverviewModesTest
     @Test
     public void profileFenceClearsOverviewAndDetailState() throws Exception
     {
-        Am engine = session();
-        engine.getActiveSession().kf(gain(T0 + 1_000L, "Bones", 536, 1L, 3_200, 3_200L), 2_000);
+        Engine engine = session();
+        engine.getActiveSession().addTransaction(gain(T0 + 1_000L, "Bones", 536, 1L, 3_200, 3_200L), 2_000);
         LedgerHarness harness = new LedgerHarness(engine, T0 + 50_000L, entry());
         LedgerPage page = onEdt(() -> harness.attach(new LedgerPage(harness, id -> null)));
         onEdt(() ->
         {
             LedgerPageProbe.toggleCorrected(page);
-            harness.auz(harness.data().gains.groups.get(0).semanticGroupId);
+            harness.openGroup(harness.data().gains.groups.get(0).semanticGroupId);
             return null;
         });
         assertTrue(onEdt(() -> detailOpen(page)));
@@ -276,7 +289,7 @@ public class LedgerOverviewModesTest
 
         onEdt(() ->
         {
-            page.agf();
+            page.resetOwnerScope();
             return null;
         });
         assertEquals("the fence clears the open detail", "OVERVIEW", onEdt(() -> LedgerPageProbe.drill(page)));
@@ -296,55 +309,55 @@ public class LedgerOverviewModesTest
         return LedgerPageProbe.data(page) != null && LedgerPageProbe.data(page).detail != null;
     }
 
-    private static Am session()
+    private static Engine session()
     {
-        Am engine = PresentationLifecycleTest.engine();
-        engine.ajl("Vorkath", Cx.GENERAL, T0);
+        Engine engine = PresentationLifecycleTest.engine();
+        engine.startCustomSession("Vorkath", SessionMode.GENERAL, T0);
         return engine;
     }
 
-    private static Ao.Entry entry()
+    private static LedgerData.Entry entry()
     {
-        return new Ao.Entry(Ao.Scope.CURRENT_GRIND, null, null,
-            Ao.Bs.SUPPLIES, "", null, null, null, null);
+        return new LedgerData.Entry(LedgerData.Scope.CURRENT_GRIND, null, null,
+            LedgerData.CostView.SUPPLIES, "", null, null, null, null);
     }
 
-    private static Ac gain(long at, String name, int itemId, long quantity,
+    private static Transaction gain(long at, String name, int itemId, long quantity,
         int unitPrice, long value)
     {
-        return new Ac(at, null, Ai.GAIN, Aj.GENERIC, "", "Vorkath",
-            true, java.util.Collections.singletonList(new Ab(itemId, name, quantity, unitPrice, value,
-                Av.GRAND_EXCHANGE)), Bd.LIKELY, "Test gain", null);
+        return new Transaction(at, null, TransactionType.GAIN, Context.GENERIC, "", "Vorkath",
+            true, java.util.Collections.singletonList(new Flow(itemId, name, quantity, unitPrice, value,
+                PriceSource.GRAND_EXCHANGE)), ClassificationConfidence.LIKELY, "Test gain", null);
     }
 
-    private static Ac food(long at, String name, int itemId, long value)
+    private static Transaction food(long at, String name, int itemId, long value)
     {
-        Ac transaction = new Ac(at, null, Ai.CONSUMPTION,
-            Aj.GENERIC, "", "Vorkath", true,
-            java.util.Collections.singletonList(new Ab(itemId, name, -1L, (int) value, -value,
-                Av.GRAND_EXCHANGE)), Bd.CONFIRMED, "Test food", null);
-        transaction.setActionKind(Au.EAT);
+        Transaction transaction = new Transaction(at, null, TransactionType.CONSUMPTION,
+            Context.GENERIC, "", "Vorkath", true,
+            java.util.Collections.singletonList(new Flow(itemId, name, -1L, (int) value, -value,
+                PriceSource.GRAND_EXCHANGE)), ClassificationConfidence.CONFIRMED, "Test food", null);
+        transaction.setActionKind(ActionKind.EAT);
         return transaction;
     }
 
-    private static Ac iceBurst(long at)
+    private static Transaction iceBurst(long at)
     {
-        Ac transaction = new Ac(at, null, Ai.CONSUMPTION,
-            Aj.GENERIC, "", "Vorkath", true, Arrays.asList(
-                new Ab(562, "Chaos rune", -4L, 106, -424L, Av.GRAND_EXCHANGE),
-                new Ab(560, "Death rune", -2L, 188, -376L, Av.GRAND_EXCHANGE),
-                new Ab(555, "Water rune", -4L, 5, -20L, Av.GRAND_EXCHANGE)),
-            Bd.CONFIRMED, "Exact fixture", null);
-        transaction.setActionKind(Au.CAST);
-        transaction.ahu(Bb.of("Ice Burst"));
+        Transaction transaction = new Transaction(at, null, TransactionType.CONSUMPTION,
+            Context.GENERIC, "", "Vorkath", true, Arrays.asList(
+                new Flow(562, "Chaos rune", -4L, 106, -424L, PriceSource.GRAND_EXCHANGE),
+                new Flow(560, "Death rune", -2L, 188, -376L, PriceSource.GRAND_EXCHANGE),
+                new Flow(555, "Water rune", -4L, 5, -20L, PriceSource.GRAND_EXCHANGE)),
+            ClassificationConfidence.CONFIRMED, "Exact fixture", null);
+        transaction.setActionKind(ActionKind.CAST);
+        transaction.setObservedActionLabel(ActionLabel.of("Ice Burst"));
         return transaction;
     }
 
     /** Engine-level GE custody fixture that produces one realized market settlement per item. */
     private static final class MarketFixture
     {
-        final Am engine;
-        final Bj ledger = new Bj();
+        final Engine engine;
+        final OfferLedger ledger = new OfferLedger();
         final Map<Integer, Long> inventory = new HashMap<>();
         long now = T0;
 
@@ -355,27 +368,27 @@ public class LedgerOverviewModesTest
                 @Override public int stabilizationTicks() { return 0; }
                 @Override public boolean keepTransferAuditRows() { return true; }
             };
-            engine = new Am(deltas ->
+            engine = new Engine(deltas ->
             {
-                List<Ab> flows = new ArrayList<>();
+                List<Flow> flows = new ArrayList<>();
                 for (Map.Entry<Integer, Long> delta : deltas.entrySet())
                 {
                     int id = delta.getKey();
                     int unit = id == COINS ? 1 : 7;
-                    Av source = id == COINS ? Av.FACE_VALUE
-                        : Av.GRAND_EXCHANGE;
-                    flows.add(new Ab(id, marketName(id), delta.getValue(), unit,
+                    PriceSource source = id == COINS ? PriceSource.FACE_VALUE
+                        : PriceSource.GRAND_EXCHANGE;
+                    flows.add(new Flow(id, marketName(id), delta.getValue(), unit,
                         delta.getValue() * unit, source));
                 }
                 return flows;
             }, new TransactionClassifier(), PresentationLifecycleTest.config());
-            engine.ajl("Trading", Cx.AUTO, now);
+            engine.startCustomSession("Trading", SessionMode.AUTO, now);
             inventory.put(COINS, 100_000L);
             for (int item : MARKET_ITEMS)
             {
                 inventory.put(item, 10L);
             }
-            engine.setBaseline(new Cc(inventory));
+            engine.setBaseline(new ContainerSnapshot(inventory));
         }
 
         void sell(int slot, int item, int price)
@@ -384,24 +397,49 @@ public class LedgerOverviewModesTest
             observe(slot, GrandExchangeOfferState.SELLING, item, 10, 0, price, 0);
             now += 600L;
             inventory.remove(item);
-            engine.yz();
-            Cc snapshot = new Cc(inventory);
+            engine.markInventoryDirty();
+            ContainerSnapshot snapshot = new ContainerSnapshot(inventory);
             for (int i = 0; i < 3; i++)
             {
-                engine.adj(snapshot, now);
+                engine.processIfDirty(snapshot, now);
                 now += 600L;
             }
             observe(slot, GrandExchangeOfferState.SOLD, item, 10, 10, price, 10 * price);
         }
 
+        /** Lists the stack, cancels before anything sells, and collects the items back. */
+        void listAndCancel(int slot, int item, int price)
+        {
+            now += 600L;
+            observe(slot, GrandExchangeOfferState.SELLING, item, 10, 0, price, 0);
+            now += 600L;
+            inventory.remove(item);
+            settle();
+            observe(slot, GrandExchangeOfferState.CANCELLED_SELL, item, 10, 0, price, 0);
+            now += 600L;
+            inventory.put(item, 10L);
+            settle();
+        }
+
+        private void settle()
+        {
+            engine.markInventoryDirty();
+            ContainerSnapshot snapshot = new ContainerSnapshot(inventory);
+            for (int i = 0; i < 3; i++)
+            {
+                engine.processIfDirty(snapshot, now);
+                now += 600L;
+            }
+        }
+
         private void observe(int slot, GrandExchangeOfferState state, int item, int total, int traded,
             int price, int spent)
         {
-            Bj.Transition transition = ledger.observe(
-                new Bj.Snapshot(slot, state, item, total, traded, price, spent)).orElse(null);
+            OfferLedger.Transition transition = ledger.observe(
+                new OfferLedger.Snapshot(slot, state, item, total, traded, price, spent)).orElse(null);
             if (transition != null)
             {
-                engine.abh(transition, marketName(transition.current.itemId),
+                engine.noteGeOfferObservation(transition, marketName(transition.current.itemId),
                     now);
             }
         }
@@ -415,12 +453,12 @@ public class LedgerOverviewModesTest
     /** Host-faithful actions: selection/pages/filters re-capture and re-apply the page. */
     private static final class LedgerHarness implements LedgerPage.Actions
     {
-        private final Am engine;
+        private final Engine engine;
         private final long now;
-        private Ao.Entry entry;
+        private LedgerData.Entry entry;
         private LedgerPage page;
 
-        LedgerHarness(Am engine, long now, Ao.Entry entry)
+        LedgerHarness(Engine engine, long now, LedgerData.Entry entry)
         {
             this.engine = engine;
             this.now = now;
@@ -434,12 +472,12 @@ public class LedgerOverviewModesTest
             return created;
         }
 
-        Ao data()
+        LedgerData data()
         {
-            return Ao.capture(engine, now, entry);
+            return LedgerData.capture(engine, now, entry);
         }
 
-        void auz(String groupId)
+        void openGroup(String groupId)
         {
             selectionChanged(null, null, groupId);
         }
@@ -452,7 +490,7 @@ public class LedgerOverviewModesTest
         }
 
         @Override
-        public void costViewChanged(Ao.Bs view)
+        public void costViewChanged(LedgerData.CostView view)
         {
             entry = entry.withCostView(view);
             page.apply(data());
@@ -469,23 +507,23 @@ public class LedgerOverviewModesTest
         @Override public void openScopeMenu(JComponent anchor) { }
 
         @Override
-        public Ao.Ef preview(String id, Ah correction)
+        public LedgerData.CorrectionPreview preview(String id, Correction correction)
         {
             return null;
         }
 
         @Override
-        public LedgerPage.Ea correct(String id, Ah correction,
+        public LedgerPage.CorrectionOutcome correct(String id, Correction correction,
             long previewRevision)
         {
-            return LedgerPage.Ea.REFUSED;
+            return LedgerPage.CorrectionOutcome.REFUSED;
         }
 
         @Override public void split(String id) { }
 
         @Override public void undoCorrection() { }
 
-        @Override public void decideAll(Cl decision) { }
+        @Override public void decideAll(ReviewDecision decision) { }
 
         @Override public void refresh() { }
     }

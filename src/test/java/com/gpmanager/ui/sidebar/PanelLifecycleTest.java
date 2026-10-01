@@ -16,30 +16,30 @@ public class PanelLifecycleTest
     @Test
     public void ownerScopeChangeDropsThePreviousOwnersMarks() throws Exception
     {
-        Am engine = PresentationLifecycleTest.engine();
+        Engine engine = PresentationLifecycleTest.engine();
         long now = System.currentTimeMillis();
-        engine.ajl("Vorkath", Cx.GENERAL, now);
+        engine.startCustomSession("Vorkath", SessionMode.GENERAL, now);
         String sessionId = engine.getActiveSession().getId();
-        Dp panel = onEdt(() -> new Dp(engine, PresentationLifecycleTest.config(), null));
+        SidebarPanel panel = onEdt(() -> new SidebarPanel(engine, PresentationLifecycleTest.config(), null));
 
-        panel.ot();
+        panel.clearOwnerScope();
 
-        panel.ahd();
+        panel.resumeOwnerScope();
         assertNotNull(SidebarPanelProbe.live(panel));
     }
 
     @Test
     public void captureIsAReadAndNeverBooks() throws Exception
     {
-        Am engine = PresentationLifecycleTest.engine();
+        Engine engine = PresentationLifecycleTest.engine();
         long now = System.currentTimeMillis();
-        engine.ajl("Vorkath", Cx.GENERAL, now);
-        engine.getActiveSession().kf(Tx.of(now + 1_000L, null, Ai.GAIN,
-            Aj.GENERIC, "", "Vorkath", true,
-            Collections.singletonList(new Ab(1, "Dragon bones", 2, 3_200, 6_400L))), 2_000);
+        engine.startCustomSession("Vorkath", SessionMode.GENERAL, now);
+        engine.getActiveSession().addTransaction(Tx.of(now + 1_000L, null, TransactionType.GAIN,
+            Context.GENERIC, "", "Vorkath", true,
+            Collections.singletonList(new Flow(1, "Dragon bones", 2, 3_200, 6_400L))), 2_000);
         long bookedNet = engine.getMetrics(now + 2_000L).net;
 
-        Dp panel = onEdt(() -> new Dp(engine, PresentationLifecycleTest.config(), null));
+        SidebarPanel panel = onEdt(() -> new SidebarPanel(engine, PresentationLifecycleTest.config(), null));
         onEdt(() ->
         {
             SidebarPanelProbe.refresh(panel);
@@ -56,7 +56,7 @@ public class PanelLifecycleTest
     @Test
     public void repeatedRefreshesStayCoalescedAndKeepExactlyOneShell() throws Exception
     {
-        Dp panel = onEdt(() -> new Dp(PresentationLifecycleTest.engine(),
+        SidebarPanel panel = onEdt(() -> new SidebarPanel(PresentationLifecycleTest.engine(),
             PresentationLifecycleTest.config(), null));
         for (int i = 0; i < 50; i++)
         {
@@ -75,17 +75,17 @@ public class PanelLifecycleTest
     @Test
     public void neutralTransfersNeverFabricateAValue() throws Exception
     {
-        Ac neutral = Tx.of(System.currentTimeMillis(), null,
-            Ai.TRANSFER, Aj.TRANSFER, "Bank transfer", "Vorkath", true,
-            Collections.singletonList(new Ab(995, "Coins", -1_000, 1, -1_000L)));
-        Ca.Recent row = LiveProbe.toRecent(neutral);
+        Transaction neutral = Tx.of(System.currentTimeMillis(), null,
+            TransactionType.TRANSFER, Context.TRANSFER, "Bank transfer", "Vorkath", true,
+            Collections.singletonList(new Flow(995, "Coins", -1_000, 1, -1_000L)));
+        LiveSnapshot.Recent row = LiveProbe.toRecent(neutral);
         assertNotNull(row);
         assertTrue("a transfer row is neutral", row.neutral);
         assertEquals("neutral rows carry the booked zero", 0L, row.value);
         assertFalse("a transfer is never marked unpriced", row.unpriced);
     }
 
-    private static int railTabs(Dp panel)
+    private static int railTabs(SidebarPanel panel)
     {
         return ShellProbe.tabLabels(panel.shell()).length;
     }

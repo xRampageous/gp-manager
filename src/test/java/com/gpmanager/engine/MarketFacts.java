@@ -14,14 +14,14 @@ public final class MarketFacts
     }
 
     /** The read-model row for one record (the projection's own constructor is private). */
-    public static Bi.Row row(Aa record)
+    public static MarketSettlementProjection.Row row(GeRecord record)
     {
-        return Bi.rows(Collections.singletonList(record), null, null).get(0);
+        return MarketSettlementProjection.rows(Collections.singletonList(record), null, null).get(0);
     }
 
-    public static Aa record(Am engine, Bi.Row row)
+    public static GeRecord record(Engine engine, MarketSettlementProjection.Row row)
     {
-        for (Aa record : engine.geCustody.aji())
+        for (GeRecord record : engine.geCustody.snapshotRecords())
         {
             if (record.getOfferId().equals(row.presentationId))
             {
@@ -31,55 +31,55 @@ public final class MarketFacts
         throw new AssertionError("no custody record for " + row.presentationId);
     }
 
-    private static boolean sell(Aa r)
+    private static boolean sell(GeRecord r)
     {
-        return r.getSide() == Aa.Side.SELL;
+        return r.getSide() == GeRecord.Side.SELL;
     }
 
-    private static boolean basisKnown(Aa r)
+    private static boolean basisKnown(GeRecord r)
     {
-        return r.vf() && !r.wx();
+        return r.hasFrozenBasis() && !r.isLegacyUnbased();
     }
 
-    public static long basisValueGp(Aa r)
+    public static long basisValueGp(GeRecord r)
     {
         return !basisKnown(r) ? -1L : !sell(r) && r.collectedValueGp != 0L
-            ? Ae.abs(r.collectedValueGp) : r.lo(r.getFilledQty());
+            ? SafeMath.abs(r.collectedValueGp) : r.lo(r.getFilledQty());
     }
 
-    public static long realizedGrossGp(Aa r)
+    public static long realizedGrossGp(GeRecord r)
     {
         long settled = r.getSettledQty();
         long adjustment = sell(r) && settled > 0L ? r.settledCashGp - r.getSettledExecutionGp() : 0L;
-        return settled <= 0L ? 0L : sell(r) ? r.settledCashGp - adjustment : Ae.abs(r.settledCashGp);
+        return settled <= 0L ? 0L : sell(r) ? r.settledCashGp - adjustment : SafeMath.abs(r.settledCashGp);
     }
 
-    public static long trackedQtyConsumed(Aa r)
+    public static long trackedQtyConsumed(GeRecord r)
     {
         long settled = r.getSettledQty();
         return settled <= 0L ? 0L : sell(r) ? Math.min(r.getConsumedTrackedQty(), settled) : settled;
     }
 
-    public static long unknownQtyRealized(Aa r)
+    public static long unknownQtyRealized(GeRecord r)
     {
         long settled = r.getSettledQty();
         return settled <= 0L ? 0L : Math.max(0L, settled - trackedQtyConsumed(r));
     }
 
-    public static long knownProceedsGp(Aa r)
+    public static long knownProceedsGp(GeRecord r)
     {
         long settled = r.getSettledQty();
         long observed = Math.abs(r.settledCashGp);
         return settled <= 0L ? 0L : sell(r)
-            ? Df.yl(observed, settled, trackedQtyConsumed(r)) : observed;
+            ? TrackedBasisMath.knownProceedsOf(observed, settled, trackedQtyConsumed(r)) : observed;
     }
 
-    public static long unknownLiquidationGp(Aa r)
+    public static long unknownLiquidationGp(GeRecord r)
     {
         return r.getSettledQty() <= 0L ? 0L : Math.max(0L, Math.abs(r.settledCashGp) - knownProceedsGp(r));
     }
 
-    public static long grossGeReferenceGp(Aa r)
+    public static long grossGeReferenceGp(GeRecord r)
     {
         long settled = r.getSettledQty();
         return settled <= 0L || !basisKnown(r) ? -1L : r.lo(settled);

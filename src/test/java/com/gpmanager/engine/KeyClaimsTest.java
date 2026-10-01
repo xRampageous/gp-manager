@@ -1,7 +1,7 @@
 package com.gpmanager;
 
 import com.google.gson.Gson;
-import com.gpmanager.SavedState.By;
+import com.gpmanager.SavedState.PendingClaim;
 import java.lang.reflect.Proxy;
 import java.util.Arrays;
 import java.util.Collections;
@@ -22,7 +22,7 @@ import static org.junit.Assert.assertTrue;
 
 /**
  * Loot-key runtime evidence is transient (container removal window); only the
- * minimal {@link By} survives restart. Tests cover settlement, death and idempotency.
+ * minimal {@link PendingClaim} survives restart. Tests cover settlement, death and idempotency.
  */
 public class KeyClaimsTest
 {
@@ -50,16 +50,16 @@ public class KeyClaimsTest
 
         for (int index = 0; index < keyIds.length; index++)
         {
-            assertEquals(index, Da.yc(keyIds[index]));
-            assertEquals(keyIds[index], Da.yb(index));
-            assertEquals(containerIds[index], Da.ya(index));
-            assertTrue(Da.xa(keyIds[index]));
+            assertEquals(index, KeyClaims.keyIndexForItemId(keyIds[index]));
+            assertEquals(keyIds[index], KeyClaims.keyItemIdForIndex(index));
+            assertEquals(containerIds[index], KeyClaims.keyContainerIdForIndex(index));
+            assertTrue(KeyClaims.isLootKeyItem(keyIds[index]));
         }
-        assertEquals(-1, Da.yc(-1));
-        assertEquals(-1, Da.yb(5));
-        assertEquals(-1, Da.ya(5));
+        assertEquals(-1, KeyClaims.keyIndexForItemId(-1));
+        assertEquals(-1, KeyClaims.keyItemIdForIndex(5));
+        assertEquals(-1, KeyClaims.keyContainerIdForIndex(5));
 
-        Map<Integer, Long> heldKeys = Da.keyQuantities(itemContainer(
+        Map<Integer, Long> heldKeys = KeyClaims.keyQuantities(itemContainer(
             new Item(keyIds[0], 1), new Item(keyIds[1], 2), new Item(keyIds[2], 1),
             new Item(keyIds[3], 1), new Item(keyIds[4], 1), new Item(MANIFEST_ITEM, 10)));
         assertEquals(5, heldKeys.size());
@@ -76,7 +76,7 @@ public class KeyClaimsTest
             new Item(MANIFEST_ITEM, 2),
             new Item(CRATE_ITEM, 1));
 
-        Map<Integer, Long> manifest = Da.manifestFromContainer(container, id -> id == CRATE_ITEM);
+        Map<Integer, Long> manifest = KeyClaims.manifestFromContainer(container, id -> id == CRATE_ITEM);
 
         Map<Integer, Long> expected = new LinkedHashMap<>();
         expected.put(MANIFEST_ITEM, 14L);
@@ -88,9 +88,9 @@ public class KeyClaimsTest
     @Test
     public void emptyOrInvalidContainerContentsDoNotBecomeEvidence()
     {
-        assertTrue(Da.manifestFromContainer(null, id -> false).isEmpty());
-        assertTrue(Da.manifestFromContainer(itemContainer((Item[]) null), id -> false).isEmpty());
-        assertTrue(Da.manifestFromContainer(
+        assertTrue(KeyClaims.manifestFromContainer(null, id -> false).isEmpty());
+        assertTrue(KeyClaims.manifestFromContainer(itemContainer((Item[]) null), id -> false).isEmpty());
+        assertTrue(KeyClaims.manifestFromContainer(
             itemContainer(new Item(-1, 1), new Item(MANIFEST_ITEM, 0), new Item(CRATE_ITEM, 1)),
             id -> id == CRATE_ITEM).isEmpty());
 
@@ -99,26 +99,26 @@ public class KeyClaimsTest
     @Test
     public void pendingClaimOpensOnceCarriesTheCharterFieldsAndRoundTripsThroughSavedState()
     {
-        Da claims = new Da();
+        KeyClaims claims = new KeyClaims();
         claims.open("audit-1", ItemID.WILDY_LOOT_KEY2, 1L, 5_000L);
         claims.open("audit-1", ItemID.WILDY_LOOT_KEY2, 1L, 5_000L);
         claims.open("", ItemID.WILDY_LOOT_KEY2, 1L, 5_000L);
         claims.open("bad-qty", ItemID.WILDY_LOOT_KEY2, 0L, 5_000L);
         assertEquals("duplicate and invalid opens are ignored", 1, claims.all().size());
 
-        By claim = find(claims, "audit-1");
+        PendingClaim claim = find(claims, "audit-1");
         assertNotNull(claim);
         assertEquals(ItemID.WILDY_LOOT_KEY2, claim.itemOrKeyId);
         assertEquals(1L, claim.getQuantity());
         assertEquals(5_000L, claim.getCreatedAtEpochMillis());
 
         SavedState state = new SavedState();
-        claims.ayc(state);
+        claims.writeTo(state);
         Gson gson = new Gson();
         SavedState reloaded = gson.fromJson(gson.toJson(state), SavedState.class);
-        Da restored = new Da();
+        KeyClaims restored = new KeyClaims();
         restored.restore(reloaded, Collections.emptyList());
-        By persisted = find(restored, "audit-1");
+        PendingClaim persisted = find(restored, "audit-1");
         assertNotNull("a durable claim never expires on its own", persisted);
         assertEquals(claim.itemOrKeyId, persisted.itemOrKeyId);
         assertEquals(claim.getCreatedAtEpochMillis(), persisted.getCreatedAtEpochMillis());
@@ -130,40 +130,40 @@ public class KeyClaimsTest
     @Test
     public void unrelatedPendingManifestDoesNotBlockUniqueCompatibleClaim()
     {
-        Da claims = new Da();
+        KeyClaims claims = new KeyClaims();
         claims.open("compatible", ItemID.WILDY_LOOT_KEY0, 1L, 2_000L);
         claims.open("unrelated", ItemID.WILDY_LOOT_KEY1, 1L, 2_000L);
 
         claims.setLootChestVisible(true);
-        claims.abq(ItemID.WILDY_LOOT_KEY0,
+        claims.observeKeyContainerContents(ItemID.WILDY_LOOT_KEY0,
             Collections.singletonMap(MANIFEST_ITEM, 2L));
-        claims.abq(ItemID.WILDY_LOOT_KEY0,
+        claims.observeKeyContainerContents(ItemID.WILDY_LOOT_KEY0,
             Collections.singletonMap(MANIFEST_ITEM, 1L));
 
         assertEquals("the unrelated manifest is not a second candidate", "compatible",
-            claims.aiq(Collections.singletonMap(MANIFEST_ITEM, 1L), Collections.emptyMap()));
+            claims.settleLootKey(Collections.singletonMap(MANIFEST_ITEM, 1L), Collections.emptyMap()));
         assertNotNull(find(claims, "unrelated"));
     }
 
     @Test
     public void ambiguousCompatibleClaimCandidatesSettleNothing()
     {
-        Da claims = new Da();
+        KeyClaims claims = new KeyClaims();
         claims.open("first", ItemID.WILDY_LOOT_KEY0, 1L, 2_000L);
         claims.open("second", ItemID.WILDY_LOOT_KEY1, 1L, 2_000L);
 
         claims.setLootChestVisible(true);
-        claims.abq(ItemID.WILDY_LOOT_KEY0,
+        claims.observeKeyContainerContents(ItemID.WILDY_LOOT_KEY0,
             Collections.singletonMap(MANIFEST_ITEM, 3L));
-        claims.abq(ItemID.WILDY_LOOT_KEY1,
+        claims.observeKeyContainerContents(ItemID.WILDY_LOOT_KEY1,
             Collections.singletonMap(MANIFEST_ITEM, 7L));
-        claims.abq(ItemID.WILDY_LOOT_KEY0,
+        claims.observeKeyContainerContents(ItemID.WILDY_LOOT_KEY0,
             Collections.singletonMap(MANIFEST_ITEM, 2L));
-        claims.abq(ItemID.WILDY_LOOT_KEY1,
+        claims.observeKeyContainerContents(ItemID.WILDY_LOOT_KEY1,
             Collections.singletonMap(MANIFEST_ITEM, 6L));
 
         assertNull("the settled gain has two compatible key candidates",
-            claims.aiq(Collections.singletonMap(MANIFEST_ITEM, 1L), Collections.emptyMap()));
+            claims.settleLootKey(Collections.singletonMap(MANIFEST_ITEM, 1L), Collections.emptyMap()));
         assertEquals(1L, find(claims, "first").getQuantity());
         assertEquals(1L, find(claims, "second").getQuantity());
     }
@@ -171,24 +171,24 @@ public class KeyClaimsTest
     @Test
     public void partialSettlementKeepsAStackedClaimOpenUntilTheKeyIsConsumed()
     {
-        Da claims = new Da();
+        KeyClaims claims = new KeyClaims();
         claims.open("k4", ItemID.WILDY_LOOT_KEY4, 2L, 100_000L);
         Map<Integer, Long> manifest = new LinkedHashMap<>();
         manifest.put(MANIFEST_ITEM, 5L);
         manifest.put(SECOND_MANIFEST_ITEM, 3L);
 
         claims.setLootChestVisible(true);
-        claims.abq(ItemID.WILDY_LOOT_KEY4, manifest);
+        claims.observeKeyContainerContents(ItemID.WILDY_LOOT_KEY4, manifest);
         Map<Integer, Long> remainingContainer = new LinkedHashMap<>(manifest);
         remainingContainer.put(MANIFEST_ITEM, 3L);
-        claims.abq(ItemID.WILDY_LOOT_KEY4, remainingContainer);
+        claims.observeKeyContainerContents(ItemID.WILDY_LOOT_KEY4, remainingContainer);
 
         assertNull("one matched manifest settles one key of the stack",
-            claims.aiq(Collections.singletonMap(MANIFEST_ITEM, 2L), Collections.emptyMap()));
+            claims.settleLootKey(Collections.singletonMap(MANIFEST_ITEM, 2L), Collections.emptyMap()));
         assertEquals("a partially settled claim keeps its remainder", 1L, find(claims, "k4").getQuantity());
 
-        claims.abq(ItemID.WILDY_LOOT_KEY4, Collections.<Integer, Long>emptyMap());
-        assertEquals("the consumed key closes the claim", "k4", claims.aiq(remainingContainer,
+        claims.observeKeyContainerContents(ItemID.WILDY_LOOT_KEY4, Collections.<Integer, Long>emptyMap());
+        assertEquals("the consumed key closes the claim", "k4", claims.settleLootKey(remainingContainer,
             Collections.singletonMap(ItemID.WILDY_LOOT_KEY4, 1L)));
         assertTrue(claims.all().isEmpty());
     }
@@ -196,31 +196,31 @@ public class KeyClaimsTest
     @Test
     public void emptyContainerWithdrawalAndConsumedKeySettleOnce()
     {
-        Da claims = new Da();
+        KeyClaims claims = new KeyClaims();
         claims.open("k0", ItemID.WILDY_LOOT_KEY0, 1L, 2_000L);
         claims.setLootChestVisible(true);
-        claims.abq(ItemID.WILDY_LOOT_KEY0,
+        claims.observeKeyContainerContents(ItemID.WILDY_LOOT_KEY0,
             Collections.singletonMap(MANIFEST_ITEM, 1L));
-        claims.abq(ItemID.WILDY_LOOT_KEY0,
+        claims.observeKeyContainerContents(ItemID.WILDY_LOOT_KEY0,
             Collections.<Integer, Long>emptyMap());
 
-        assertEquals("k0", claims.aiq(
+        assertEquals("k0", claims.settleLootKey(
             Collections.singletonMap(MANIFEST_ITEM, 1L), Collections.singletonMap(ItemID.WILDY_LOOT_KEY0, 1L)));
         assertNull(find(claims, "k0"));
-        assertNull("the same gain can never settle twice", claims.aiq(
+        assertNull("the same gain can never settle twice", claims.settleLootKey(
             Collections.singletonMap(MANIFEST_ITEM, 1L), Collections.emptyMap()));
     }
 
     @Test
     public void aGainWithoutObservedContainerRemovalSettlesNothing()
     {
-        Da claims = new Da();
+        KeyClaims claims = new KeyClaims();
         claims.open("k1", ItemID.WILDY_LOOT_KEY1, 1L, 2_000L);
         claims.setLootChestVisible(true);
-        claims.abq(ItemID.WILDY_LOOT_KEY1,
+        claims.observeKeyContainerContents(ItemID.WILDY_LOOT_KEY1,
             Collections.singletonMap(MANIFEST_ITEM, 1L));
 
-        assertNull(claims.aiq(Collections.singletonMap(MANIFEST_ITEM, 1L), Collections.emptyMap()));
+        assertNull(claims.settleLootKey(Collections.singletonMap(MANIFEST_ITEM, 1L), Collections.emptyMap()));
         assertNotNull(find(claims, "k1"));
     }
 
@@ -234,18 +234,18 @@ public class KeyClaimsTest
     @Test
     public void localDeathClosesOnlyMatchingKeyAndNeverBooksKeyAsLoss()
     {
-        Ad session = new Ad("PK", 1_000L);
-        Ac row = keyAuditRow(ItemID.WILDY_LOOT_KEY0, 1L, session);
-        Da claims = new Da();
+        Session session = new Session("PK", 1_000L);
+        Transaction row = keyAuditRow(ItemID.WILDY_LOOT_KEY0, 1L, session);
+        KeyClaims claims = new KeyClaims();
         claims.open(row.getId(), ItemID.WILDY_LOOT_KEY0, 1L, 2_000L);
         claims.open("other", ItemID.WILDY_LOOT_KEY3, 1L, 2_000L);
         long beforeCosts = row.getCosts();
         long beforeRevenue = row.getRevenue();
-        List<Ab> originalAuditFlows = new java.util.ArrayList<>(row.getFlows());
-        claims.ly(Collections.singletonMap(ItemID.WILDY_LOOT_KEY0, 1L));
+        List<Flow> originalAuditFlows = new java.util.ArrayList<>(row.getFlows());
+        claims.beginLocalDeath(Collections.singletonMap(ItemID.WILDY_LOOT_KEY0, 1L));
 
-        claims.aet(
-            Collections.singletonList(new Ab(ItemID.WILDY_LOOT_KEY0, "Loot key", -1L, 0, 0L)),
+        claims.recordDeathLosses(
+            Collections.singletonList(new Flow(ItemID.WILDY_LOOT_KEY0, "Loot key", -1L, 0, 0L)),
             Collections.<Integer, Long>emptyMap());
 
         assertNull("the lost key's claim is closed", find(claims, row.getId()));
@@ -259,34 +259,34 @@ public class KeyClaimsTest
     @Test
     public void unrelatedFirstDeathSettlementKeepsKeyEvidenceForLaterBatch()
     {
-        Da claims = new Da();
+        KeyClaims claims = new KeyClaims();
         claims.open("k2", ItemID.WILDY_LOOT_KEY2, 1L, 2_000L);
-        claims.ly(Collections.singletonMap(ItemID.WILDY_LOOT_KEY2, 1L));
+        claims.beginLocalDeath(Collections.singletonMap(ItemID.WILDY_LOOT_KEY2, 1L));
 
-        claims.aet(
-            Collections.singletonList(new Ab(995, "Coins", -1L, 1, -1L)),
+        claims.recordDeathLosses(
+            Collections.singletonList(new Flow(995, "Coins", -1L, 1, -1L)),
             Collections.singletonMap(ItemID.WILDY_LOOT_KEY2, 1L));
         assertTrue("first unrelated inventory/equipment settle must not consume the bounded death snapshot",
-            claims.vo());
+            claims.isAwaitingLocalDeathSettle());
         assertNotNull(find(claims, "k2"));
 
-        claims.aet(
-            Collections.singletonList(new Ab(ItemID.WILDY_LOOT_KEY2, "Loot key", -1L, 0, 0L)),
+        claims.recordDeathLosses(
+            Collections.singletonList(new Flow(ItemID.WILDY_LOOT_KEY2, "Loot key", -1L, 0, 0L)),
             Collections.<Integer, Long>emptyMap());
 
         assertNull(find(claims, "k2"));
-        assertFalse(claims.vo());
+        assertFalse(claims.isAwaitingLocalDeathSettle());
     }
 
     @Test
     public void keyReceiptAuditNoteRemainsValueDeferred()
     {
-        assertEquals("Loot key received - value deferred", Da.LOOT_KEY_NOTE);
+        assertEquals("Loot key received - value deferred", KeyClaims.LOOT_KEY_NOTE);
     }
 
-    private static By find(Da claims, String claimId)
+    private static PendingClaim find(KeyClaims claims, String claimId)
     {
-        for (By claim : claims.all())
+        for (PendingClaim claim : claims.all())
         {
             if (claim.getClaimId().equals(claimId))
             {
@@ -296,26 +296,26 @@ public class KeyClaimsTest
         return null;
     }
 
-    private static Ac keyAuditRow(int keyItemId, long quantity, Ad session)
+    private static Transaction keyAuditRow(int keyItemId, long quantity, Session session)
     {
-        Ac row = new Ac(2_000L, null, Ai.ADJUSTMENT,
-            Aj.PK_LOOT, Da.LOOT_KEY_NOTE, "PKing", false,
-            Collections.singletonList(new Ab(keyItemId, "Loot key", quantity, 0, 0L)),
-            Bd.LIKELY, "Deferred loot-key value", null);
-        session.kf(row, 2_000);
+        Transaction row = new Transaction(2_000L, null, TransactionType.ADJUSTMENT,
+            Context.PK_LOOT, KeyClaims.LOOT_KEY_NOTE, "PKing", false,
+            Collections.singletonList(new Flow(keyItemId, "Loot key", quantity, 0, 0L)),
+            ClassificationConfidence.LIKELY, "Deferred loot-key value", null);
+        session.addTransaction(row, 2_000);
         return row;
     }
 
     private static void assertDeathRemainsPending(boolean hasNegativeFlow, long currentQuantity)
     {
-        Da claims = new Da();
+        KeyClaims claims = new KeyClaims();
         claims.open("k1", ItemID.WILDY_LOOT_KEY1, 1L, 2_000L);
-        claims.ly(Collections.singletonMap(ItemID.WILDY_LOOT_KEY1, 1L));
-        List<Ab> flows = hasNegativeFlow
-            ? Collections.singletonList(new Ab(ItemID.WILDY_LOOT_KEY1, "Loot key", -1L, 0, 0L))
+        claims.beginLocalDeath(Collections.singletonMap(ItemID.WILDY_LOOT_KEY1, 1L));
+        List<Flow> flows = hasNegativeFlow
+            ? Collections.singletonList(new Flow(ItemID.WILDY_LOOT_KEY1, "Loot key", -1L, 0, 0L))
             : Collections.emptyList();
 
-        claims.aet(flows, currentQuantity > 0L
+        claims.recordDeathLosses(flows, currentQuantity > 0L
             ? Collections.singletonMap(ItemID.WILDY_LOOT_KEY1, currentQuantity)
             : Collections.<Integer, Long>emptyMap());
 

@@ -40,7 +40,7 @@ public class LedgerGroupReceiptNavigationTest
     {
         Market market = new Market();
         market.sell(0, LAW, 5L, 122, 610L, 610L);
-        Ao grouped = captureWithGroup(market, groupIdOf(market));
+        LedgerData grouped = captureWithGroup(market, groupIdOf(market));
         assertTrue(grouped.detail.group.market);
 
         RecordingActions actions = new RecordingActions();
@@ -57,13 +57,13 @@ public class LedgerGroupReceiptNavigationTest
         String[] parts = rows.get(0).split("\\|", 3);
         assertEquals("Law rune  " + Fmt.times(5L), parts[0]);
         assertTrue("secondary carries the side and the Market Result: " + parts[1],
-            parts[1].startsWith("Sold \u00b7 Result " + Fmt.ru(5L) + " gp \u00b7 "));
+            parts[1].startsWith("Sold \u00b7 Result " + Fmt.exactSigned(5L) + " gp \u00b7 "));
         assertEquals("primary is the observed settlement, never the Market Result",
-            Fmt.ru(610L) + " gp", parts[2]);
+            Fmt.exactSigned(610L) + " gp", parts[2]);
         assertFalse("the Market Result is never the primary row value",
-            parts[2].equals(Fmt.ru(5L) + " gp"));
+            parts[2].equals(Fmt.exactSigned(5L) + " gp"));
 
-        Br.Receipt receipt = grouped.detail.receipts.get(0);
+        SemanticFinancialProjection.Receipt receipt = grouped.detail.receipts.get(0);
         onEdt(() ->
         {
             LedgerPageProbe.clickReceipt(page, receipt.transactionId);
@@ -80,11 +80,11 @@ public class LedgerGroupReceiptNavigationTest
     {
         Market market = new Market();
         market.sell(0, LAW, 5L, 122, 610L, 610L);
-        Ao grouped = captureWithGroup(market, groupIdOf(market));
-        Br.Receipt receipt = grouped.detail.receipts.get(0);
-        Ao selected = Ao.capture(market.engine, market.now + 1_000L,
-            new Ao.Entry(Ao.Scope.CURRENT_GRIND, null, null,
-                Ao.Bs.SUPPLIES, "", receipt.transactionId, receipt.contributionId, null, null));
+        LedgerData grouped = captureWithGroup(market, groupIdOf(market));
+        SemanticFinancialProjection.Receipt receipt = grouped.detail.receipts.get(0);
+        LedgerData selected = LedgerData.capture(market.engine, market.now + 1_000L,
+            new LedgerData.Entry(LedgerData.Scope.CURRENT_GRIND, null, null,
+                LedgerData.CostView.SUPPLIES, "", receipt.transactionId, receipt.contributionId, null, null));
         RecordingActions actions = new RecordingActions();
         LedgerPage page = onEdt(() ->
         {
@@ -114,7 +114,7 @@ public class LedgerGroupReceiptNavigationTest
     {
         Market market = new Market();
         market.sell(0, LAW, 5L, 122, 610L, 610L);
-        Ao grouped = captureWithGroup(market, groupIdOf(market));
+        LedgerData grouped = captureWithGroup(market, groupIdOf(market));
         RecordingActions actions = new RecordingActions();
         LedgerPage page = onEdt(() ->
         {
@@ -136,12 +136,12 @@ public class LedgerGroupReceiptNavigationTest
     {
         Market market = new Market();
         market.sell(0, LAW, 5L, 122, 610L, 610L);
-        Ao grouped = captureWithGroup(market, groupIdOf(market));
-        Br.Receipt receipt = grouped.detail.receipts.get(0);
+        LedgerData grouped = captureWithGroup(market, groupIdOf(market));
+        SemanticFinancialProjection.Receipt receipt = grouped.detail.receipts.get(0);
 
-        Ao deepLinked = Ao.capture(market.engine, market.now + 1_000L,
-            new Ao.Entry(Ao.Scope.CURRENT_GRIND, null, null,
-                Ao.Bs.SUPPLIES, "", receipt.transactionId, receipt.contributionId,
+        LedgerData deepLinked = LedgerData.capture(market.engine, market.now + 1_000L,
+            new LedgerData.Entry(LedgerData.Scope.CURRENT_GRIND, null, null,
+                LedgerData.CostView.SUPPLIES, "", receipt.transactionId, receipt.contributionId,
                 grouped.detail.group.semanticGroupId, null));
         assertNotNull("the group detail resolves", deepLinked.detail);
         assertNotNull("the deep link resolves the exact receipt", deepLinked.detail.exact);
@@ -156,9 +156,9 @@ public class LedgerGroupReceiptNavigationTest
         Market market = new Market();
         market.sell(0, LAW, 5L, 122, 610L, 610L);
         String groupId = groupIdOf(market);
-        Ao searched = Ao.capture(market.engine, market.now + 1_000L,
-            new Ao.Entry(Ao.Scope.CURRENT_GRIND, null, null,
-                Ao.Bs.SUPPLIES, "Law rune", null, null, groupId, null));
+        LedgerData searched = LedgerData.capture(market.engine, market.now + 1_000L,
+            new LedgerData.Entry(LedgerData.Scope.CURRENT_GRIND, null, null,
+                LedgerData.CostView.SUPPLIES, "Law rune", null, null, groupId, null));
         assertNotNull(searched.detail);
         assertEquals(groupId, searched.detail.group.semanticGroupId);
     }
@@ -183,18 +183,18 @@ public class LedgerGroupReceiptNavigationTest
     public void actionGroupCountsItsReceipts() throws Exception
     {
         Market market = new Market();
-        Ac eat = new Ac(market.now - 5_000L, null,
-            Ai.CONSUMPTION, Aj.GENERIC, "", "Vorkath", true,
-            Collections.singletonList(new Ab(CHAOS, "Chaos rune", -2L, 100, -200L,
-                Av.GRAND_EXCHANGE)),
-            Bd.CONFIRMED, "", null);
-        eat.setActionKind(Au.EAT);
-        market.engine.getActiveSession().kf(eat, 100);
-        Ao base = Ao.capture(market.engine, market.now + 1_000L,
-            Ao.Entry.current());
-        Br.Group group = null;
+        Transaction eat = new Transaction(market.now - 5_000L, null,
+            TransactionType.CONSUMPTION, Context.GENERIC, "", "Vorkath", true,
+            Collections.singletonList(new Flow(CHAOS, "Chaos rune", -2L, 100, -200L,
+                PriceSource.GRAND_EXCHANGE)),
+            ClassificationConfidence.CONFIRMED, "", null);
+        eat.setActionKind(ActionKind.EAT);
+        market.engine.getActiveSession().addTransaction(eat, 100);
+        LedgerData base = LedgerData.capture(market.engine, market.now + 1_000L,
+            LedgerData.Entry.current());
+        SemanticFinancialProjection.Group group = null;
         List<String> names = new ArrayList<>();
-        for (Br.Group candidate : base.costs.groups)
+        for (SemanticFinancialProjection.Group candidate : base.costs.groups)
         {
             names.add(candidate.primaryName + "/" + candidate.itemId + "/market=" + candidate.market
                 + "/receipts=" + candidate.receiptCount);
@@ -218,10 +218,10 @@ public class LedgerGroupReceiptNavigationTest
     {
         Market market = new Market();
         market.pendingSell(0, LAW, 200L, 122);
-        Ao base = Ao.capture(market.engine, market.now + 1_000L,
-            Ao.Entry.current());
-        Br.Group group = null;
-        for (Br.Group candidate : base.market.groups)
+        LedgerData base = LedgerData.capture(market.engine, market.now + 1_000L,
+            LedgerData.Entry.current());
+        SemanticFinancialProjection.Group group = null;
+        for (SemanticFinancialProjection.Group candidate : base.market.groups)
         {
             if (candidate.market)
             {
@@ -243,12 +243,12 @@ public class LedgerGroupReceiptNavigationTest
     public void multipleReceiptsAreIndividuallySelectableWithExactIdentity() throws Exception
     {
         Market market = new Market();
-        Ac first = gain(market, LAW, 1L, 121, market.now - 8_000L);
-        Ac second = gain(market, LAW, 2L, 121, market.now - 4_000L);
-        Ao base = Ao.capture(market.engine, market.now + 1_000L,
-            Ao.Entry.current());
-        Br.Group group = null;
-        for (Br.Group candidate : base.gains.groups)
+        Transaction first = gain(market, LAW, 1L, 121, market.now - 8_000L);
+        Transaction second = gain(market, LAW, 2L, 121, market.now - 4_000L);
+        LedgerData base = LedgerData.capture(market.engine, market.now + 1_000L,
+            LedgerData.Entry.current());
+        SemanticFinancialProjection.Group group = null;
+        for (SemanticFinancialProjection.Group candidate : base.gains.groups)
         {
             if (candidate.primaryName.equals("Law rune"))
             {
@@ -256,7 +256,7 @@ public class LedgerGroupReceiptNavigationTest
             }
         }
         assertNotNull(group);
-        Ao grouped = captureWithGroup(market, group.semanticGroupId);
+        LedgerData grouped = captureWithGroup(market, group.semanticGroupId);
         RecordingActions actions = new RecordingActions();
         LedgerPage page = onEdt(() ->
         {
@@ -284,7 +284,7 @@ public class LedgerGroupReceiptNavigationTest
         market.sell(0, LAW, 5L, 122, 610L, 610L);
         long netBefore = market.engine.getMetrics(market.now).net;
         long revisionBefore = market.engine.getRevision();
-        Ao grouped = captureWithGroup(market, groupIdOf(market));
+        LedgerData grouped = captureWithGroup(market, groupIdOf(market));
         LedgerPage page = page(grouped);
         onEdt(() ->
         {
@@ -296,22 +296,22 @@ public class LedgerGroupReceiptNavigationTest
         assertEquals(netBefore, market.engine.getMetrics(market.now).net);
         assertEquals(revisionBefore, market.engine.getRevision());
         assertEquals(108, SavedState.CURRENT_SCHEMA_VERSION);
-        assertEquals("RuneLite market", Av.GRAND_EXCHANGE.toString());
+        assertEquals("RuneLite market", PriceSource.GRAND_EXCHANGE.toString());
     }
 
     /** Owner 2026-10-01 (F07): the group-detail pager survives refreshes and clamps on shrink. */
     @Test
     public void theDetailPagerSurvivesRefreshesAndClampsWhenRowsShrink() throws Exception
     {
-        Am engine = new Am(deltas -> Collections.emptyList(), new TransactionClassifier(),
+        Engine engine = new Engine(deltas -> Collections.emptyList(), new TransactionClassifier(),
             new GpManagerConfig() {});
-        engine.ajl("Vorkath", Cx.GENERAL, T0);
+        engine.startCustomSession("Vorkath", SessionMode.GENERAL, T0);
         for (int i = 0; i < 8; i++)
         {
-            engine.getActiveSession().kf(new Ac(T0 + 10_000L + i * 1_000L, null, Ai.LOOT, Aj.LOOT,
+            engine.getActiveSession().addTransaction(new Transaction(T0 + 10_000L + i * 1_000L, null, TransactionType.LOOT, Context.LOOT,
                 "", "Vorkath", true,
-                Collections.singletonList(new Ab(536, "Dragon bones", 1L, 2_000, 2_000L)),
-                Bd.CONFIRMED, "", null), 500);
+                Collections.singletonList(new Flow(536, "Dragon bones", 1L, 2_000, 2_000L)),
+                ClassificationConfidence.CONFIRMED, "", null), 500);
         }
         String groupId = lootGroupId(engine);
         LedgerPage page = page(lootCapture(engine, groupId));
@@ -335,12 +335,12 @@ public class LedgerGroupReceiptNavigationTest
         page.apply(lootCapture(engine, groupId));
         assertEquals("selecting a receipt keeps the list's page", 1, page.detailReceipts.page);
 
-        Am other = new Am(deltas -> Collections.emptyList(), new TransactionClassifier(),
+        Engine other = new Engine(deltas -> Collections.emptyList(), new TransactionClassifier(),
             new GpManagerConfig() {});
-        other.ajl("Zulrah", Cx.GENERAL, T0);
-        other.getActiveSession().kf(new Ac(T0 + 10_000L, null, Ai.LOOT, Aj.LOOT, "", "Zulrah",
-            true, Collections.singletonList(new Ab(1753, "Blue dragonhide", 1L, 2_000, 2_000L)),
-            Bd.CONFIRMED, "", null), 500);
+        other.startCustomSession("Zulrah", SessionMode.GENERAL, T0);
+        other.getActiveSession().addTransaction(new Transaction(T0 + 10_000L, null, TransactionType.LOOT, Context.LOOT, "", "Zulrah",
+            true, Collections.singletonList(new Flow(1753, "Blue dragonhide", 1L, 2_000, 2_000L)),
+            ClassificationConfidence.CONFIRMED, "", null), 500);
         page.apply(lootCapture(other, lootGroupId(other)));
         assertEquals("a different group starts at the first page", 0, page.detailReceipts.page);
 
@@ -353,7 +353,7 @@ public class LedgerGroupReceiptNavigationTest
         assertEquals(1, page.detailReceipts.page);
         onEdt(() ->
         {
-            page.agf();
+            page.resetOwnerScope();
             return null;
         });
         assertEquals("an account reset starts clean", 0, page.detailReceipts.page);
@@ -365,22 +365,22 @@ public class LedgerGroupReceiptNavigationTest
             return null;
         });
         assertEquals(1, page.detailReceipts.page);
-        engine.getActiveSession().pj(T0 + 13_000L, null);
+        engine.getActiveSession().compactTransactionsBefore(T0 + 13_000L, null);
         page.apply(lootCapture(engine, groupId));
         assertEquals("shrunken rows clamp the page", 0, page.detailReceipts.page);
     }
 
-    private static String lootGroupId(Am engine)
+    private static String lootGroupId(Engine engine)
     {
-        Ao data = Ao.capture(engine, T0 + 30_000L, Ao.Entry.current());
+        LedgerData data = LedgerData.capture(engine, T0 + 30_000L, LedgerData.Entry.current());
         assertFalse("the loot group exists", data.gains.groups.isEmpty());
         return data.gains.groups.get(0).semanticGroupId;
     }
 
-    private static Ao lootCapture(Am engine, String groupId)
+    private static LedgerData lootCapture(Engine engine, String groupId)
     {
-        Ao data = Ao.capture(engine, T0 + 30_000L,
-            new Ao.Entry(Ao.Scope.CURRENT_GRIND, null, null, Ao.Bs.ALL, "", null, null,
+        LedgerData data = LedgerData.capture(engine, T0 + 30_000L,
+            new LedgerData.Entry(LedgerData.Scope.CURRENT_GRIND, null, null, LedgerData.CostView.ALL, "", null, null,
                 groupId, null));
         assertNotNull("the group detail exists", data.detail);
         return data;
@@ -388,23 +388,23 @@ public class LedgerGroupReceiptNavigationTest
 
     // ── fixtures ───────────────────────────────────────────────────────────────────────────────
 
-    private static Ac gain(Market market, int itemId, long quantity, int unitPrice, long at)
+    private static Transaction gain(Market market, int itemId, long quantity, int unitPrice, long at)
     {
-        Ac transaction = new Ac(at, null, Ai.GAIN,
-            Aj.GENERIC, "", itemId == LAW ? "Law rune" : "Item", true,
-            Collections.singletonList(new Ab(itemId, "Law rune", quantity, unitPrice,
-                quantity * unitPrice, Av.GRAND_EXCHANGE)),
-            Bd.CONFIRMED, "", null);
-        market.engine.getActiveSession().kf(transaction, 200);
+        Transaction transaction = new Transaction(at, null, TransactionType.GAIN,
+            Context.GENERIC, "", itemId == LAW ? "Law rune" : "Item", true,
+            Collections.singletonList(new Flow(itemId, "Law rune", quantity, unitPrice,
+                quantity * unitPrice, PriceSource.GRAND_EXCHANGE)),
+            ClassificationConfidence.CONFIRMED, "", null);
+        market.engine.getActiveSession().addTransaction(transaction, 200);
         return transaction;
     }
 
     private static String groupIdOf(Market market)
     {
-        Ao data = Ao.capture(market.engine, market.now + 1_000L,
-            Ao.Entry.current());
-        Br.Group group = null;
-        for (Br.Group candidate : data.market.groups)
+        LedgerData data = LedgerData.capture(market.engine, market.now + 1_000L,
+            LedgerData.Entry.current());
+        SemanticFinancialProjection.Group group = null;
+        for (SemanticFinancialProjection.Group candidate : data.market.groups)
         {
             if (candidate.market)
             {
@@ -415,16 +415,16 @@ public class LedgerGroupReceiptNavigationTest
         return group.semanticGroupId;
     }
 
-    private static Ao captureWithGroup(Market market, String groupId)
+    private static LedgerData captureWithGroup(Market market, String groupId)
     {
-        Ao data = Ao.capture(market.engine, market.now + 1_000L,
-            new Ao.Entry(Ao.Scope.CURRENT_GRIND, null, null,
-                Ao.Bs.SUPPLIES, "", null, null, groupId, null));
+        LedgerData data = LedgerData.capture(market.engine, market.now + 1_000L,
+            new LedgerData.Entry(LedgerData.Scope.CURRENT_GRIND, null, null,
+                LedgerData.CostView.SUPPLIES, "", null, null, groupId, null));
         assertNotNull(data.detail);
         return data;
     }
 
-    private static LedgerPage page(Ao data) throws Exception
+    private static LedgerPage page(LedgerData data) throws Exception
     {
         return onEdt(() ->
         {
@@ -482,21 +482,21 @@ public class LedgerGroupReceiptNavigationTest
         final List<String[]> selections = new ArrayList<>();
 
         @Override public void openScopeMenu(javax.swing.JComponent anchor) { }
-        @Override public void costViewChanged(Ao.Bs view) { }
+        @Override public void costViewChanged(LedgerData.CostView view) { }
         @Override public void searchChanged(String text) { }
-        @Override public Ao.Ef preview(String id,
-            Ah correction)
+        @Override public LedgerData.CorrectionPreview preview(String id,
+            Correction correction)
         {
             return null;
         }
-        @Override public LedgerPage.Ea correct(String id,
-            Ah correction, long previewRevision)
+        @Override public LedgerPage.CorrectionOutcome correct(String id,
+            Correction correction, long previewRevision)
         {
-            return LedgerPage.Ea.REFUSED;
+            return LedgerPage.CorrectionOutcome.REFUSED;
         }
         @Override public void split(String id) { }
         @Override public void undoCorrection() { }
-        @Override public void decideAll(Cl decision) { }
+        @Override public void decideAll(ReviewDecision decision) { }
         @Override public void refresh() { }
         @Override public void selectionChanged(String transactionId, String contributionId,
             String groupId)
@@ -508,52 +508,52 @@ public class LedgerGroupReceiptNavigationTest
     private static final class Market
     {
         final int[] quote = {121};
-        final Am engine;
-        final Bj ledger = new Bj();
+        final Engine engine;
+        final OfferLedger ledger = new OfferLedger();
         final Map<Integer, Long> inventory = new HashMap<>();
         long now = T0;
 
         Market()
         {
-            engine = new Am(deltas ->
+            engine = new Engine(deltas ->
             {
-                List<Ab> flows = new ArrayList<>();
+                List<Flow> flows = new ArrayList<>();
                 for (Map.Entry<Integer, Long> delta : deltas.entrySet())
                 {
                     int id = delta.getKey();
                     int unit = id == COINS ? 1 : quote[0];
-                    Av source = id == COINS ? Av.FACE_VALUE
-                        : Av.GRAND_EXCHANGE;
-                    flows.add(new Ab(id, id == COINS ? "Coins" : "Law rune", delta.getValue(),
+                    PriceSource source = id == COINS ? PriceSource.FACE_VALUE
+                        : PriceSource.GRAND_EXCHANGE;
+                    flows.add(new Flow(id, id == COINS ? "Coins" : "Law rune", delta.getValue(),
                         unit, delta.getValue() * unit, source));
                 }
                 return flows;
             }, new TransactionClassifier(), new GpManagerConfig()
             {
-                @Override public Db receiptRetentionDays()
+                @Override public ReceiptRetentionPeriod receiptRetentionDays()
                 {
-                    return Db.DAYS_365;
+                    return ReceiptRetentionPeriod.DAYS_365;
                 }
                 @Override public boolean keepTransferAuditRows()
                 {
                     return true;
                 }
             });
-            engine.ajl("Trading", Cx.AUTO, now);
+            engine.startCustomSession("Trading", SessionMode.AUTO, now);
             inventory.put(COINS, 1_000_000L);
-            engine.setBaseline(new Cc(inventory));
+            engine.setBaseline(new ContainerSnapshot(inventory));
         }
 
         void sell(int slot, int item, long qty, int limit, long spent, long cash)
         {
             // Known coverage at the observed quote, so the receipt carries a proven Result.
-            engine.getActiveSession().kf(new Ac(now - 1_000L, null,
-                Ai.GAIN, Aj.GENERIC, "", "Law rune", true,
-                Collections.singletonList(new Ab(item, "Law rune", qty, quote[0],
-                    qty * quote[0], Av.GRAND_EXCHANGE)),
-                Bd.CONFIRMED, "", null), 500);
+            engine.getActiveSession().addTransaction(new Transaction(now - 1_000L, null,
+                TransactionType.GAIN, Context.GENERIC, "", "Law rune", true,
+                Collections.singletonList(new Flow(item, "Law rune", qty, quote[0],
+                    qty * quote[0], PriceSource.GRAND_EXCHANGE)),
+                ClassificationConfidence.CONFIRMED, "", null), 500);
             inventory.put(item, qty);
-            engine.setBaseline(new Cc(inventory));
+            engine.setBaseline(new ContainerSnapshot(inventory));
             offer(slot, GrandExchangeOfferState.SELLING, item, (int) qty, 0, limit, 0);
             inventory.remove(item);
             settle();
@@ -565,7 +565,7 @@ public class LedgerGroupReceiptNavigationTest
         void pendingSell(int slot, int item, long offered, int limit)
         {
             inventory.put(item, offered);
-            engine.setBaseline(new Cc(inventory));
+            engine.setBaseline(new ContainerSnapshot(inventory));
             offer(slot, GrandExchangeOfferState.SELLING, item, (int) offered, 0, limit, 0);
             inventory.remove(item);
             settle();
@@ -574,11 +574,11 @@ public class LedgerGroupReceiptNavigationTest
         private void settle()
         {
             now += 5_000L;
-            engine.yz();
-            Cc snapshot = new Cc(inventory);
+            engine.markInventoryDirty();
+            ContainerSnapshot snapshot = new ContainerSnapshot(inventory);
             for (int i = 0; i < 3; i++)
             {
-                engine.adj(snapshot, now);
+                engine.processIfDirty(snapshot, now);
                 now += 5_000L;
             }
         }
@@ -587,11 +587,11 @@ public class LedgerGroupReceiptNavigationTest
             int price, int spent)
         {
             now += 5_000L;
-            Bj.Transition transition = ledger.observe(
-                new Bj.Snapshot(slot, state, item, total, traded, price, spent)).orElse(null);
+            OfferLedger.Transition transition = ledger.observe(
+                new OfferLedger.Snapshot(slot, state, item, total, traded, price, spent)).orElse(null);
             if (transition != null)
             {
-                engine.abh(transition, "Law rune", now);
+                engine.noteGeOfferObservation(transition, "Law rune", now);
             }
         }
     }

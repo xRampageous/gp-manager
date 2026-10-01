@@ -532,7 +532,8 @@ tasks.register('configurationStabilityAudit') {
             'keyName = "useCurrencyProxies"',
             'keyName = "applyGeSellTax"',
             'keyName = "geBookingObserved"',
-            'keyName = "geSellSpentIsNet"'
+            'keyName = "geSellSpentIsNet"',
+            'keyName = "rollingRateMinutes"'
         ].each { marker ->
             if (configSource.contains(marker)) {
                 throw new GradleException("config audit failed: retired pre-release setting remains: ${marker}")

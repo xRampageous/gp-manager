@@ -1,5 +1,5 @@
 package com.gpmanager;
-import static com.gpmanager.Ak.msg;
+import static com.gpmanager.GameData.msg;
 import com.google.gson.Gson;
 /**
 * The one JSON codec the plugin uses outside the injected {@link SessionRepository}: RuneLite's
@@ -9,16 +9,16 @@ import com.google.gson.Gson;
 class JsonCodec {
 static volatile Gson gson;
 static void bind(Gson clientGson) {
-gson = clientGson;
+ gson = clientGson;
 }
+
 static boolean isBound() {
-return gson != null;
+ return gson != null;
 }
+
 static Gson gson() {
-Gson bound = gson;
-if (bound == null) {
-throw new IllegalStateException(msg("c"));
-}
-return bound;
+ Gson bound = gson;
+ if (bound == null) throw new IllegalStateException(msg("c"));
+ return bound;
 }
 }

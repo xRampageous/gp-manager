@@ -19,44 +19,44 @@ public class SmeltingSupplyTest
     @Test
     public void aFailedSmeltInsideTheRunIsASupplyAndNeverReview()
     {
-        Am engine = engine();
-        engine.ajl("Smithing", Cx.GENERAL, T0);
+        Engine engine = engine();
+        engine.startCustomSession("Smithing", SessionMode.GENERAL, T0);
         Map<Integer, Long> held = new HashMap<>();
         held.put(IRON_ORE, 7L);
-        engine.setBaseline(new Cc(new HashMap<>(held)));
+        engine.setBaseline(new ContainerSnapshot(new HashMap<>(held)));
 
         // The furnace's Smelt click (or a failed-smelt message) keeps the run in PRODUCTION.
-        engine.markContext(Aj.PRODUCTION, 6, "Smelting");
+        engine.markContext(Context.PRODUCTION, 6, "Smelting");
         held.put(IRON_ORE, 6L);
-        Ac failed = settle(engine, held, T0 + 600L);
+        Transaction failed = settle(engine, held, T0 + 600L);
 
         assertNotNull(failed);
-        assertFalse("a failed smelt is not a Review decision", Eh.aal(failed));
+        assertFalse("a failed smelt is not a Review decision", ReviewEligibility.needsOwnerDecision(failed));
         assertEquals("the ore it used is a supply", CostKind.SUPPLIES, CostKind.of(failed, failed.getFlows().get(0)));
     }
 
     @Test
     public void anOreGoneWithoutAnyRunStaysALoss()
     {
-        Am engine = engine();
-        engine.ajl("Smithing", Cx.GENERAL, T0);
+        Engine engine = engine();
+        engine.startCustomSession("Smithing", SessionMode.GENERAL, T0);
         Map<Integer, Long> held = new HashMap<>();
         held.put(IRON_ORE, 7L);
-        engine.setBaseline(new Cc(new HashMap<>(held)));
+        engine.setBaseline(new ContainerSnapshot(new HashMap<>(held)));
 
         held.put(IRON_ORE, 6L);
-        Ac gone = settle(engine, held, T0 + 600L);
+        Transaction gone = settle(engine, held, T0 + 600L);
         assertNotNull(gone);
         assertEquals(CostKind.LOSS, CostKind.of(gone, gone.getFlows().get(0)));
     }
 
-    private static Ac settle(Am engine, Map<Integer, Long> held, long now)
+    private static Transaction settle(Engine engine, Map<Integer, Long> held, long now)
     {
-        engine.yz();
-        Ac result = null;
+        engine.markInventoryDirty();
+        Transaction result = null;
         for (int i = 0; i < 3; i++)
         {
-            Ac settled = engine.adj(new Cc(new HashMap<>(held)), now + i * 600L);
+            Transaction settled = engine.processIfDirty(new ContainerSnapshot(new HashMap<>(held)), now + i * 600L);
             if (settled != null)
             {
                 result = settled;
@@ -65,7 +65,7 @@ public class SmeltingSupplyTest
         return result;
     }
 
-    private static Am engine()
+    private static Engine engine()
     {
         GpManagerConfig config = new GpManagerConfig()
         {
@@ -75,13 +75,13 @@ public class SmeltingSupplyTest
                 return 1;
             }
         };
-        return new Am(deltas ->
+        return new Engine(deltas ->
         {
-            List<Ab> flows = new ArrayList<>();
+            List<Flow> flows = new ArrayList<>();
             for (Map.Entry<Integer, Long> delta : deltas.entrySet())
             {
-                flows.add(new Ab(delta.getKey(), "Iron ore", delta.getValue(), 71, delta.getValue() * 71L,
-                    Av.GRAND_EXCHANGE));
+                flows.add(new Flow(delta.getKey(), "Iron ore", delta.getValue(), 71, delta.getValue() * 71L,
+                    PriceSource.GRAND_EXCHANGE));
             }
             return flows;
         }, new TransactionClassifier(), config);

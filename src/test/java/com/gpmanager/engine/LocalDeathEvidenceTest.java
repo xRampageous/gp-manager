@@ -20,19 +20,19 @@ public class LocalDeathEvidenceTest
         Widget child = widget(-1, 0, new Widget[] {duplicate}, new Widget[] {nested});
         Widget root = widget(-1, 0, new Widget[] {child, coins}, null);
 
-        Ch evidence = Ch.capture(
+        LocalDeathEvidence evidence = LocalDeathEvidence.capture(
             root,
             true,
             SkullIcon.LOOT_KEYS_TWO,
             id -> id == 19_553 ? 19_553 : id,
             id -> id == 19_553 ? "Amulet of torture" : id == 995 ? "Coins" : null);
 
-        String explanation = evidence.avy(
+        String explanation = evidence.appendTo(
             "Ownership-neutral transfer: Death.",
             Arrays.asList(
-                new Ab(4151, "Abyssal whip", -1, 2_000_000, -2_000_000),
-                new Ab(385, "Shark", -2, 800, -1_600),
-                new Ab(526, "Bones", 1, 35, 35)));
+                new Flow(4151, "Abyssal whip", -1, 2_000_000, -2_000_000),
+                new Flow(385, "Shark", -2, 800, -1_600),
+                new Flow(526, "Bones", 1, 35, 35)));
 
         assertTrue(explanation, explanation.contains("Kept: "));
         assertTrue(explanation.contains("Amulet of torture ×2"));
@@ -46,8 +46,8 @@ public class LocalDeathEvidenceTest
     @Test
     public void absentDeathKeepWidgetIsReportedAsUnavailable()
     {
-        Ch evidence = Ch.capture(null, false, SkullIcon.NONE, null, null);
-        String explanation = evidence.avy("Death loss.", null);
+        LocalDeathEvidence evidence = LocalDeathEvidence.capture(null, false, SkullIcon.NONE, null, null);
+        String explanation = evidence.appendTo("Death loss.", null);
         assertTrue(explanation.contains("Kept: unavailable"));
         assertTrue(explanation.contains("lost: none observed"));
         assertTrue(explanation.contains("Protect Item off"));

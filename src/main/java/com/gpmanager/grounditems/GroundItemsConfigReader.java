@@ -1,5 +1,5 @@
 package com.gpmanager;
-import static com.gpmanager.Ak.msg;
+import static com.gpmanager.GameData.msg;
 import lombok.RequiredArgsConstructor;
 import javax.inject.*;
 import net.runelite.client.config.ConfigManager;
@@ -18,35 +18,28 @@ final ConfigManager configManager;
 final PluginManager pluginManager;
 /** Test constructor without PluginManager. */
 GroundItemsConfigReader(ConfigManager configManager) {
-this(configManager, null);
+ this(configManager, null);
 }
-Bc read() {
-boolean enabled = wz();
-GroundItemsConfig config;
-try {
-config = configManager.getConfig(GroundItemsConfig.class);
-} catch (RuntimeException ex) {
-log.debug(msg("bd"), ex);
-return Bc.disabled();
+
+GroundItemsConfigSnapshot read() {
+ boolean enabled = isGroundItemsEnabled();
+ GroundItemsConfig config;
+ try {
+  config = configManager.getConfig(GroundItemsConfig.class);
+ } catch (RuntimeException ex) {
+  log.debug(msg("bd"), ex);
+  return GroundItemsConfigSnapshot.disabled();
+ }
+ if (config == null) return GroundItemsConfigSnapshot.disabled();
+ return new GroundItemsConfigSnapshot(enabled, config.getHighlightItems(), config.getHiddenItems(),
+ config.showHighlightedOnly());
 }
-if (config == null) {
-return Bc.disabled();
-}
-return new Bc(
-enabled,
-config.getHighlightItems(),
-config.getHiddenItems(),
-config.showHighlightedOnly());
-}
-boolean wz() {
-if (pluginManager == null) {
-return false;
-}
-for (Plugin plugin : pluginManager.getPlugins()) {
-if (plugin instanceof GroundItemsPlugin) {
-return pluginManager.isPluginEnabled(plugin);
-}
-}
-return false;
+
+boolean isGroundItemsEnabled() {
+ if (pluginManager == null) return false;
+ for (Plugin plugin : pluginManager.getPlugins()) {
+  if (plugin instanceof GroundItemsPlugin) return pluginManager.isPluginEnabled(plugin);
+ }
+ return false;
 }
 }

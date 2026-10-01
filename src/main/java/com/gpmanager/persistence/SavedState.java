@@ -1,8 +1,8 @@
 package com.gpmanager;
 import java.util.*;
 import lombok.*;
-import static com.gpmanager.Ae.nonNeg;
-import static com.gpmanager.Ag.*;
+import static com.gpmanager.SafeMath.nonNeg;
+import static com.gpmanager.ModelText.*;
 import static java.lang.Math.*;
 import static java.util.Collections.*;
 /**
@@ -25,24 +25,24 @@ long revision;
 /** RS profile key that owns this file; null/empty means unbound. */
 @Setter
 String ownerKey;
-Ad generalSession;
-Ad customSession;
+Session generalSession;
+Session customSession;
 boolean generalSuspendedByCustom;
-List<Ad> history = new ArrayList<>();
+List<Session> history = new ArrayList<>();
 /** UTC date of the last receipt-retention sweep, empty before the first tick. */
 String lastReceiptRetentionDayUtc = "";
 /** IANA timezone captured for this profile's local-date analytics. Empty means uninitialized. */
 String profileTimeZoneId = "";
 /** Bounded PvP retention state. */
-Cf pkHistory = new Cf();
+PkHistoryState pkHistory = new PkHistoryState();
 /** Reusable My Grinds definitions: setup metadata only, never financial history. */
-List<Ap> savedGrinds = new ArrayList<>();
+List<SavedGrind> savedGrinds = new ArrayList<>();
 /**
 * Bounded GE custody continuity: the minimum durable state that keeps exact economics across
 * restart for offers whose placement was observed. Physical custody is ownership-neutral; a
 * realized Market settlement is canonical once.
 */
-List<Aa> geCustody = new ArrayList<>();
+List<GeRecord> geCustody = new ArrayList<>();
 /**
 * Pooled tracked-basis continuity: available per-item previously-counted value, reserved totals
 * held by open SELL custody, the per-item realization fence and the basis epoch.
@@ -54,236 +54,228 @@ TrackedBasisState trackedBasis;
 * canonical retained transactions (for example an exact "Ice Burst" name). It is revalidated
 * on load, never a financial input, and disappears with its retained receipt.
 */
-List<By> pendingClaims;
+List<PendingClaim> pendingClaims;
 /**
 * Schema-101 physical continuity for an unresolved local PvM death; null on schema-100 files
 * and whenever no death awaits reclaim. Evidence only — never valuation, fees or labels.
 */
-Bw pendingDeathReclaim;
+PendingDeathReclaim pendingDeathReclaim;
 SavedState() {
 }
+
 /**
 * Revalidates optional schema-105 action-label presentation metadata after a load. Malformed,
 * oversized or non-compatible values degrade to null; a malformed label never fails the load,
 * never backfills and never infers a spell name from rune recipes.
 */
-void aar() {
-aar(generalSession);
-aar(customSession);
-for (Ad session : getHistory()) {
-aar(session);
+void normalizeActionLabels() {
+ normalizeActionLabels(generalSession);
+ normalizeActionLabels(customSession);
+ for (Session session : getHistory()) normalizeActionLabels(session);
 }
+
+static void normalizeActionLabels(Session session) {
+ if (session == null) return;
+ for (Transaction transaction : session.getTransactions()) {
+  if (transaction != null) transaction.normalizeObservedActionLabel();
+ }
 }
-static void aar(Ad session) {
-if (session == null) {
-return;
+
+List<SavedGrind> getSavedGrinds() {
+ if (savedGrinds == null) savedGrinds = new ArrayList<>();
+ return savedGrinds;
 }
-for (Ac transaction : session.getTransactions()) {
-if (transaction != null) {
-transaction.aax();
+
+void setSavedGrinds(List<SavedGrind> values) {
+ savedGrinds = values == null ? new ArrayList<>() : new ArrayList<>(values);
 }
+
+List<GeRecord> getGeCustody() {
+ if (geCustody == null) geCustody = new ArrayList<>();
+ return geCustody;
 }
+
+void setGeCustody(List<GeRecord> values) {
+ geCustody = new ArrayList<>();
+ if (values != null) {
+  for (GeRecord value : values) {
+   if (value != null && !value.getOfferId().isEmpty()) geCustody.add(value);
+  }
+ }
 }
-List<Ap> getSavedGrinds() {
-if (savedGrinds == null) {
-savedGrinds = new ArrayList<>();
-}
-return savedGrinds;
-}
-void setSavedGrinds(List<Ap> values) {
-savedGrinds = values == null ? new ArrayList<>() : new ArrayList<>(values);
-}
-List<Aa> getGeCustody() {
-if (geCustody == null) {
-geCustody = new ArrayList<>();
-}
-return geCustody;
-}
-void setGeCustody(List<Aa> values) {
-geCustody = new ArrayList<>();
-if (values != null) {
-for (Aa value : values) {
-if (value != null && !value.getOfferId().isEmpty()) {
-geCustody.add(value);
-}
-}
-}
-}
+
 TrackedBasisState getTrackedBasis() {
-if (trackedBasis == null) {
-trackedBasis = new TrackedBasisState();
+ if (trackedBasis == null) trackedBasis = new TrackedBasisState();
+ return trackedBasis;
 }
-return trackedBasis;
-}
+
 /**
 * One reusable My Grind definition: setup metadata and default targets only. It never owns
 * transactions, Net, Recent Loot, Active-Time progress or correction state; those stay in the
 * canonical Session history linked through the stable {@code grindId}.
 */
 @Setter
-static class Ap {
-String grindId;
-String name;
-Long netTargetGp;
-Long activeTimeTargetMillis;
-boolean favorite;
-boolean archived;
-Ap() {
+static class SavedGrind {
+ String grindId;
+ String name;
+ Long netTargetGp;
+ Long activeTimeTargetMillis;
+ boolean favorite;
+ boolean archived;
+ SavedGrind() {
+ }
+ SavedGrind(String grindId, String name, Long netTargetGp, Long activeTimeTargetMillis, boolean favorite) {
+  this.grindId = grindId;
+  this.name = name;
+  this.netTargetGp = netTargetGp;
+  this.activeTimeTargetMillis = activeTimeTargetMillis;
+  this.favorite = favorite;
+ }
+ String getGrindId() { return orEmpty(grindId); }
+ String getName() { return orEmpty(name); }
+ Long getNetTargetGp() { return netTargetGp != null && netTargetGp > 0L ? netTargetGp : null; }
+ Long getActiveTimeTargetMillis() {
+  return activeTimeTargetMillis != null && activeTimeTargetMillis > 0L ? activeTimeTargetMillis : null;
+ }
 }
-Ap(String grindId, String name, Long netTargetGp, Long activeTimeTargetMillis,
-boolean favorite) {
-this.grindId = grindId;
-this.name = name;
-this.netTargetGp = netTargetGp;
-this.activeTimeTargetMillis = activeTimeTargetMillis;
-this.favorite = favorite;
+
+SavedState(Session generalSession, Session customSession, boolean generalSuspendedByCustom, List<Session> history) {
+ this.savedAtEpochMillis = System.currentTimeMillis();
+ this.generalSession = generalSession;
+ this.customSession = customSession;
+ this.generalSuspendedByCustom = generalSuspendedByCustom;
+ this.history = new ArrayList<>(history == null ? new ArrayList<>() : history);
 }
-String getGrindId() { return axw(grindId); }
-String getName() { return axw(name); }
-Long getNetTargetGp() { return netTargetGp != null && netTargetGp > 0L ? netTargetGp : null; }
-Long getActiveTimeTargetMillis() {
-return activeTimeTargetMillis != null && activeTimeTargetMillis > 0L ? activeTimeTargetMillis : null;
-}
-}
-SavedState(
-Ad generalSession,
-Ad customSession,
-boolean generalSuspendedByCustom,
-List<Ad> history) {
-this.savedAtEpochMillis = System.currentTimeMillis();
-this.generalSession = generalSession;
-this.customSession = customSession;
-this.generalSuspendedByCustom = generalSuspendedByCustom;
-this.history = new ArrayList<>(history == null ? new ArrayList<>() : history);
-}
+
 /** True only for the 1.0 schema; anything else is preserved read-only and never rewritten. */
-boolean ye() {
-return schemaVersion == CURRENT_SCHEMA_VERSION;
+boolean isSupportedSchema() {
+ return schemaVersion == CURRENT_SCHEMA_VERSION;
 }
+
 /** The owner that was tracking when this state was saved. */
-Ad getActiveSession() {
-return customSession != null ? customSession : generalSession;
+Session getActiveSession() {
+ return customSession != null ? customSession : generalSession;
 }
-List<Ad> getHistory() {
-if (history == null) {
-history = new ArrayList<>();
+
+List<Session> getHistory() {
+ if (history == null) history = new ArrayList<>();
+ return history;
 }
-return history;
-}
+
 String getLastReceiptRetentionDayUtc() {
-return axw(lastReceiptRetentionDayUtc);
+ return orEmpty(lastReceiptRetentionDayUtc);
 }
+
 void setLastReceiptRetentionDayUtc(String day) {
-lastReceiptRetentionDayUtc = day == null ? "" : day.trim();
+ lastReceiptRetentionDayUtc = day == null ? "" : day.trim();
 }
+
 String getProfileTimeZoneId() {
-return axw(profileTimeZoneId);
+ return orEmpty(profileTimeZoneId);
 }
+
 void setProfileTimeZoneId(String value) {
-profileTimeZoneId = value == null ? "" : value.trim();
+ profileTimeZoneId = value == null ? "" : value.trim();
 }
-Cf getPkHistory() {
-if (pkHistory == null) pkHistory = new Cf();
-return pkHistory;
+
+PkHistoryState getPkHistory() {
+ if (pkHistory == null) pkHistory = new PkHistoryState();
+ return pkHistory;
 }
-List<By> getPendingClaims() {
-return pendingClaims == null ? emptyList() : unmodifiableList(pendingClaims);
+
+List<PendingClaim> getPendingClaims() {
+ return pendingClaims == null ? emptyList() : unmodifiableList(pendingClaims);
 }
-void setPendingClaims(List<By> values) {
-pendingClaims = empty(values) ? null : new ArrayList<>(values);
+
+void setPendingClaims(List<PendingClaim> values) {
+ pendingClaims = empty(values) ? null : new ArrayList<>(values);
 }
-void setPendingDeathReclaim(Bw value) {
-pendingDeathReclaim = value == null || value.isEmpty() ? null : value;
+
+void setPendingDeathReclaim(PendingDeathReclaim value) {
+ pendingDeathReclaim = value == null || value.isEmpty() ? null : value;
 }
+
 /**
 * The durable physical continuity of an unresolved local PvM death: the exact quantities the
 * gravestone/retrieval service holds, the still-unsettled held-at-death whitelist, and the
 * bounded lifecycle counters. Identity and quantity only — no GP valuation, quote, fee,
 * coffer or presentation data. Canonical transactions remain the sole financial authority.
 */
-static class Bw {
-List<Bg> outstandingItems;
-List<Bg> heldAtDeath;
-int wipeTicksRemaining;
-int gravestoneAgeTicks;
-Bw() {
+static class PendingDeathReclaim {
+ List<DeathItem> outstandingItems;
+ List<DeathItem> heldAtDeath;
+ int wipeTicksRemaining;
+ int gravestoneAgeTicks;
+ PendingDeathReclaim() {
+ }
+ PendingDeathReclaim(List<DeathItem> outstandingItems, List<DeathItem> heldAtDeath, int wipeTicksRemaining,
+ int gravestoneAgeTicks) {
+  this.outstandingItems = copyItems(outstandingItems);
+  this.heldAtDeath = copyItems(heldAtDeath);
+  this.wipeTicksRemaining = max(0, wipeTicksRemaining);
+  this.gravestoneAgeTicks = max(0, gravestoneAgeTicks);
+ }
+ List<DeathItem> getOutstandingItems() {
+  return outstandingItems == null ? emptyList() : unmodifiableList(outstandingItems);
+ }
+ List<DeathItem> getHeldAtDeath() {
+  return heldAtDeath == null ? emptyList() : unmodifiableList(heldAtDeath);
+ }
+ int getWipeTicksRemaining() { return max(0, wipeTicksRemaining); }
+ int getGravestoneAgeTicks() { return max(0, gravestoneAgeTicks); }
+ boolean isEmpty() {
+  return getOutstandingItems().isEmpty() && getHeldAtDeath().isEmpty();
+ }
+ static List<DeathItem> copyItems(List<DeathItem> values) {
+  if (empty(values)) return null;
+  var copy = new ArrayList<DeathItem>();
+  for (DeathItem value : values) {
+   if (value != null && value.isValid()) copy.add(value);
+  }
+  return copy.isEmpty() ? null : copy;
+ }
 }
-Bw(
-List<Bg> outstandingItems,
-List<Bg> heldAtDeath,
-int wipeTicksRemaining,
-int gravestoneAgeTicks) {
-this.outstandingItems = copyItems(outstandingItems);
-this.heldAtDeath = copyItems(heldAtDeath);
-this.wipeTicksRemaining = max(0, wipeTicksRemaining);
-this.gravestoneAgeTicks = max(0, gravestoneAgeTicks);
+
+/** One persisted item identity and quantity for {@link PendingDeathReclaim}. */
+static class DeathItem {
+ int itemId;
+ long quantity;
+ DeathItem() {
+ }
+ DeathItem(int itemId, long quantity) {
+  this.itemId = itemId;
+  this.quantity = nonNeg(quantity);
+ }
+ long getQuantity() { return nonNeg(quantity); }
+ boolean isValid() {
+  return itemId > 0 && getQuantity() > 0L;
+ }
 }
-List<Bg> getOutstandingItems() {
-return outstandingItems == null ? emptyList()
-: unmodifiableList(outstandingItems);
-}
-List<Bg> getHeldAtDeath() {
-return heldAtDeath == null ? emptyList()
-: unmodifiableList(heldAtDeath);
-}
-int getWipeTicksRemaining() { return max(0, wipeTicksRemaining); }
-int getGravestoneAgeTicks() { return max(0, gravestoneAgeTicks); }
-boolean isEmpty() {
-return getOutstandingItems().isEmpty() && getHeldAtDeath().isEmpty();
-}
-static List<Bg> copyItems(List<Bg> values) {
-if (empty(values)) {
-return null;
-}
-var copy = new ArrayList<Bg>();
-for (Bg value : values) {
-if (value != null && value.isValid()) {
-copy.add(value);
-}
-}
-return copy.isEmpty() ? null : copy;
-}
-}
-/** One persisted item identity and quantity for {@link Bw}. */
-static class Bg {
-int itemId;
-long quantity;
-Bg() {
-}
-Bg(int itemId, long quantity) {
-this.itemId = itemId;
-this.quantity = nonNeg(quantity);
-}
-long getQuantity() { return nonNeg(quantity); }
-boolean isValid() {
-return itemId > 0 && getQuantity() > 0L;
-}
-}
+
 /**
 * The one durable evidence exception: an unresolved key/chest claim that must survive restart.
 * Idempotent by {@code claimId}; a claim-closing transaction carries the same id as
 * {@code sourceClaimId}, while a partly settled claim keeps its reduced {@code quantity}.
 * Claims intentionally carry no cross-session ownership edge.
 */
-static class By {
-String claimId;
-int itemOrKeyId;
-long quantity;
-long createdAtEpochMillis;
-By() {
-}
-By(String claimId, int itemOrKeyId, long quantity,
-long createdAtEpochMillis) {
-this.claimId = claimId;
-this.itemOrKeyId = itemOrKeyId;
-this.quantity = nonNeg(quantity);
-this.createdAtEpochMillis = nonNeg(createdAtEpochMillis);
-}
-String getClaimId() { return axw(claimId); }
-long getQuantity() { return nonNeg(quantity); }
-long getCreatedAtEpochMillis() { return nonNeg(createdAtEpochMillis); }
-boolean isValid() {
-return !getClaimId().isEmpty() && itemOrKeyId > 0 && getQuantity() > 0L;
-}
+static class PendingClaim {
+ String claimId;
+ int itemOrKeyId;
+ long quantity;
+ long createdAtEpochMillis;
+ PendingClaim() {
+ }
+ PendingClaim(String claimId, int itemOrKeyId, long quantity, long createdAtEpochMillis) {
+  this.claimId = claimId;
+  this.itemOrKeyId = itemOrKeyId;
+  this.quantity = nonNeg(quantity);
+  this.createdAtEpochMillis = nonNeg(createdAtEpochMillis);
+ }
+ String getClaimId() { return orEmpty(claimId); }
+ long getQuantity() { return nonNeg(quantity); }
+ long getCreatedAtEpochMillis() { return nonNeg(createdAtEpochMillis); }
+ boolean isValid() {
+  return !getClaimId().isEmpty() && itemOrKeyId > 0 && getQuantity() > 0L;
+ }
 }
 }

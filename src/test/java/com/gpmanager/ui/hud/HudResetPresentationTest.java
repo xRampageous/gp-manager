@@ -19,28 +19,27 @@ public class HudResetPresentationTest
     public void aFactoryResetStartsTheHudTripClean()
     {
         GpManagerConfig config = config(false, 4);
-        Cp builder = new Cp(config, null);
+        HudBuilder builder = new HudBuilder(config, null);
         builder.update(grind(150_000L, null), f -> true, null, NOW);
-        builder.tray().booked(receipt(NOW, Ai.LOOT, flow(11286, "Draconic visage", 1L, 2_500_000)),
+        builder.tray().booked(receipt(NOW, TransactionType.LOOT, flow(11286, "Draconic visage", 1L, 2_500_000)),
             NOW, false);
         for (int k = 0; k < 3; k++)
         {
             builder.tray().kill("Vorkath", NOW + k, false);
         }
-        assertEquals("Last 10m: −100k",
-            builder.update(grind(50_000L, null), f -> true, null, NOW + 600_000L).context);
+        builder.update(grind(50_000L, null), f -> true, null, NOW + 600_000L);
         assertTrue(!builder.tray().entries.isEmpty());
         assertTrue(builder.tray().bestDrop().startsWith("Draconic visage"));
 
-        builder.agj();
+        builder.resetPresentation();
 
-        Am free = engine();
-        free.rm(NOW + 700_000L);
-        Cb after = builder.update(Ca.capture(free, NOW + 700_000L, null), f -> true,
+        Engine free = engine();
+        free.ensureSession(NOW + 700_000L);
+        HudSnapshot after = builder.update(LiveSnapshot.capture(free, NOW + 700_000L, null), f -> true,
             null, NOW + 700_000L);
         assertTrue("the reset tray is empty", after.rows.isEmpty());
         assertEquals("no trip chip survives", "", after.trip);
-        assertEquals("no stale losing-money baseline", "", after.context);
+        assertEquals("no stale context line", "", after.context);
         assertTrue("no end card survives", after.recap.isEmpty());
         assertFalse("no per-kill line from before the reset", after.folio.stream()
             .anyMatch(line -> "Per kill".equals(line.label)));
@@ -52,23 +51,23 @@ public class HudResetPresentationTest
     public void aFactoryResetHidesHudLikeANewInstallUntilPlay()
     {
         GpManagerConfig config = config(true, 4);
-        Cp builder = new Cp(config, null);
-        Am engine = engine();
-        engine.rm(NOW);
-        builder.tray().booked(receipt(NOW, Ai.LOOT, flow(11286, "Draconic visage", 1L, 2_500_000)),
+        HudBuilder builder = new HudBuilder(config, null);
+        Engine engine = engine();
+        engine.ensureSession(NOW);
+        builder.tray().booked(receipt(NOW, TransactionType.LOOT, flow(11286, "Draconic visage", 1L, 2_500_000)),
             NOW, false);
         assertTrue("the running profile shows",
-            builder.update(Ca.capture(engine, NOW + 10L, null), f -> true, null, NOW + 10L).visible);
+            builder.update(LiveSnapshot.capture(engine, NOW + 10L, null), f -> true, null, NOW + 10L).visible);
 
-        builder.agj();
-        engine.agr(NOW + 20L);
+        builder.resetPresentation();
+        engine.resetTrackingData(NOW + 20L);
         assertFalse("after a reset HUD+ waits, as on a new install",
-            builder.update(Ca.capture(engine, NOW + 20L, null), f -> true, null, NOW + 20L).visible);
+            builder.update(LiveSnapshot.capture(engine, NOW + 20L, null), f -> true, null, NOW + 20L).visible);
 
-        engine.rm(NOW + 30L);
-        builder.tray().booked(receipt(NOW + 30L, Ai.LOOT, flow(536, "Dragon bones", 1L, 2_000)),
+        engine.ensureSession(NOW + 30L);
+        builder.tray().booked(receipt(NOW + 30L, TransactionType.LOOT, flow(536, "Dragon bones", 1L, 2_000)),
             NOW + 30L, false);
-        Cb back = builder.update(Ca.capture(engine, NOW + 30L, null), f -> true, null,
+        HudSnapshot back = builder.update(LiveSnapshot.capture(engine, NOW + 30L, null), f -> true, null,
             NOW + 30L);
         assertTrue("play brings it back", back.visible);
         assertEquals("only the new loot", 1, back.rows.size());

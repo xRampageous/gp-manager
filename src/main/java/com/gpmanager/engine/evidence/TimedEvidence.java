@@ -9,16 +9,18 @@ import static java.lang.Math.*;
 abstract class TimedEvidence {
 int ticksRemaining;
 protected TimedEvidence(int ticks) {
-this.ticksRemaining = max(1, ticks);
+ this.ticksRemaining = max(1, ticks);
 }
+
 /**
 * Extends this evidence's remaining lifetime. Never shortens it — a
 * fresh, weaker refresh must not cut short evidence armed with a
 * longer window by an earlier, stronger signal.
 */
 final void refresh(int ticks) {
-ticksRemaining = max(ticksRemaining, max(1, ticks));
+ ticksRemaining = max(ticksRemaining, max(1, ticks));
 }
+
 /**
 * Advances this evidence by one game tick.
 *
@@ -26,13 +28,15 @@ ticksRemaining = max(ticksRemaining, max(1, ticks));
 *         (the caller should discard/null out its reference now).
 */
 final boolean tick() {
-return --ticksRemaining <= 0;
+ return --ticksRemaining <= 0;
 }
+
 /** True once {@link #tick()} has exhausted the lifetime. */
 final boolean isExpired() {
-return ticksRemaining <= 0;
+ return ticksRemaining <= 0;
 }
+
 final int ticksRemaining() {
-return ticksRemaining;
+ return ticksRemaining;
 }
 }

@@ -16,29 +16,29 @@ import net.runelite.client.game.ItemManager;
 import net.runelite.client.ui.PluginPanel;
 import net.runelite.client.util.AsyncBufferedImage;
 
-/** Test-side access to Dp state; moved out of production to keep the plugin small. */
+/** Test-side access to SidebarPanel state; moved out of production to keep the plugin small. */
 public final class SidebarPanelProbe
 {
     private SidebarPanelProbe()
     {
     }
 
-    public static void bindSprites(Dp p, @Nullable java.util.function.Function<Integer, BufferedImage> source)
+    public static void bindSprites(SidebarPanel p, @Nullable java.util.function.Function<Integer, BufferedImage> source)
     {
         p.spriteOverride = source;
     }
 
-    public static JLabel buildBadge(Dp p)
+    public static JLabel buildBadge(SidebarPanel p)
     {
         return ShellProbe.badge(p.shell) instanceof JLabel ? (JLabel) ShellProbe.badge(p.shell) : null;
     }
 
-    public static void refresh(Dp p)
+    public static void refresh(SidebarPanel p)
     {
         if (SwingUtilities.isEventDispatchThread())
         {
             p.active = true;
-            p.avz();
+            p.applyNow();
         }
         else
         {
@@ -46,14 +46,14 @@ public final class SidebarPanelProbe
         }
     }
 
-    private static final java.util.Map<Dp, javax.swing.JFrame> FRAMES = new java.util.WeakHashMap<>();
+    private static final java.util.Map<SidebarPanel, javax.swing.JFrame> FRAMES = new java.util.WeakHashMap<>();
 
-    public static void frame(Dp p, javax.swing.JFrame frame)
+    public static void frame(SidebarPanel p, javax.swing.JFrame frame)
     {
         FRAMES.put(p, frame);
     }
 
-    public static void disposeFrame(Dp p)
+    public static void disposeFrame(SidebarPanel p)
     {
         javax.swing.JFrame frame = FRAMES.remove(p);
         if (frame != null)
@@ -62,41 +62,41 @@ public final class SidebarPanelProbe
         }
     }
 
-    public static Ca live(Dp p)
+    public static LiveSnapshot live(SidebarPanel p)
     {
         return p.lastSnapshot;
     }
 
-    public static LivePage livePage(Dp p)
+    public static LivePage livePage(SidebarPanel p)
     {
         return p.live;
     }
 
-    public static void openGrindsDetail(Dp p, @javax.annotation.Nullable String sessionId)
+    public static void openGrindsDetail(SidebarPanel p, @javax.annotation.Nullable String sessionId)
     {
         p.grindsDetailId = sessionId;
         p.shell.show(Shell.GRINDS);
         p.refresh();
     }
 
-    public static JPanel startWithChangesForm(Dp p, String grindId)
+    public static JPanel startWithChangesForm(SidebarPanel p, String grindId)
     {
-        SavedState.Ap definition = p.engine.um(grindId);
-        return definition == null ? null : new GrindsController(p).nb(definition);
+        SavedState.SavedGrind definition = p.engine.getSavedGrind(grindId);
+        return definition == null ? null : new GrindsController(p).buildStartWithChangesForm(definition);
     }
 
-    public static JPopupMenu dataMenu(Dp p)
+    public static JPopupMenu dataMenu(SidebarPanel p)
     {
-        return new GrindsController(p).mv();
+        return new GrindsController(p).buildDataMenu();
     }
 
-    public static LedgerPage ledgerPage(Dp p)
+    public static LedgerPage ledgerPage(SidebarPanel p)
     {
         return p.ledger;
     }
 
-    public static void openLedger(Dp p, Ao.Entry entry)
+    public static void openLedger(SidebarPanel p, LedgerData.Entry entry)
     {
-        p.acg(entry);
+        p.openLedgerEntry(entry);
     }
 }

@@ -22,30 +22,30 @@ import static org.junit.Assert.assertTrue;
  */
 public class GeOfferBaselineTest
 {
-    private final Bj offers = new Bj();
+    private final OfferLedger offers = new OfferLedger();
     private final GeCustodyLedger custody = new GeCustodyLedger();
     private long now = 1_000L;
 
-    private static Bj.Snapshot snap(int slot, GrandExchangeOfferState state, int item,
+    private static OfferLedger.Snapshot snap(int slot, GrandExchangeOfferState state, int item,
         int total, int traded, int price, int spent)
     {
-        return new Bj.Snapshot(slot, state, item, total, traded, price, spent);
+        return new OfferLedger.Snapshot(slot, state, item, total, traded, price, spent);
     }
 
     /** Feed one snapshot through the offer ledger into custody; returns any Review handoffs. */
-    private List<Ac> step(Bj.Snapshot snapshot)
+    private List<Transaction> step(OfferLedger.Snapshot snapshot)
     {
         now += 600L;
-        Bj.Transition transition = offers.observe(snapshot).orElse(null);
+        OfferLedger.Transition transition = offers.observe(snapshot).orElse(null);
         return transition == null ? Collections.emptyList()
-            : custody.ack(transition, "Item", now, "s1");
+            : custody.observeTransition(transition, "Item", now, "s1");
     }
 
     /** The slot's newest lifecycle. */
-    private Aa record(int slot)
+    private GeRecord record(int slot)
     {
-        Aa newest = null;
-        for (Aa record : custody.aji())
+        GeRecord newest = null;
+        for (GeRecord record : custody.snapshotRecords())
         {
             if (record.slot == slot && (newest == null
                 || record.getPlacedAtEpochMillis() >= newest.getPlacedAtEpochMillis()))
@@ -81,7 +81,7 @@ public class GeOfferBaselineTest
         step(snap(0, SELLING, 10, 10, 3, 7, 21));
         assertEquals(3L, record(0).getFilledQty());
         assertEquals(21L, record(0).getSpentGp());
-        assertEquals(1, custody.aji().size());
+        assertEquals(1, custody.snapshotRecords().size());
     }
 
     @Test
@@ -92,7 +92,7 @@ public class GeOfferBaselineTest
 
         step(snap(0, BUYING, 10, 10, 2, 7, 14));
         assertEquals("backwards counters are never a fill", 6L, record(0).getFilledQty());
-        assertEquals(Aa.Confidence.AMBIGUOUS, record(0).getConfidence());
+        assertEquals(GeRecord.Confidence.AMBIGUOUS, record(0).getConfidence());
 
         // Later progress counts from the desynced baseline, not the old one.
         step(snap(0, BUYING, 10, 10, 5, 7, 35));
@@ -107,7 +107,7 @@ public class GeOfferBaselineTest
 
         step(snap(0, SELLING, 10, 10, 2, 7, 20));
         assertEquals(14L, record(0).getSpentGp());
-        assertEquals(Aa.Confidence.AMBIGUOUS, record(0).getConfidence());
+        assertEquals(GeRecord.Confidence.AMBIGUOUS, record(0).getConfidence());
         assertFalse(record(0).fillTaxExact);
     }
 
@@ -149,7 +149,7 @@ public class GeOfferBaselineTest
     {
         step(snap(0, SELLING, 10, 5, 0, 7, 0));
         step(snap(0, SOLD, 10, 5, 5, 7, 35));
-        Aa first = record(0);
+        GeRecord first = record(0);
         step(snap(0, EMPTY, 0, 0, 0, 0, 0));
         assertTrue(first.cleared);
 
@@ -163,13 +163,13 @@ public class GeOfferBaselineTest
     {
         step(snap(0, SELLING, 10, 5, 0, 7, 0));
         step(snap(0, SELLING, 10, 5, 3, 7, 21));
-        Aa old = record(0);
+        GeRecord old = record(0);
 
         step(snap(0, SELLING, 11, 5, 3, 7, 21));
-        assertFalse("the replaced lifecycle is handed off", custody.aji().contains(old));
-        Aa replacement = record(0);
+        assertFalse("the replaced lifecycle is handed off", custody.snapshotRecords().contains(old));
+        GeRecord replacement = record(0);
         assertEquals(11, replacement.itemId);
-        assertEquals("the replacement is quarantined", Aa.Confidence.AMBIGUOUS,
+        assertEquals("the replacement is quarantined", GeRecord.Confidence.AMBIGUOUS,
             replacement.getConfidence());
         assertEquals(3L, replacement.getFilledQty());
     }
@@ -177,10 +177,10 @@ public class GeOfferBaselineTest
     @Test
     public void seedBaselineNeverReplaysExistingProgress()
     {
-        offers.lu();
+        offers.beginLoginSeed();
         offers.observe(snap(0, SELLING, 10, 100, 40, 7, 280));
-        offers.tg();
-        custody.avh(offers.snapshots(), now, "s1");
+        offers.finishLoginSeed();
+        custody.seedSlots(offers.snapshots(), now, "s1");
         assertEquals(40L, record(0).getFilledQty());
 
         step(snap(0, SELLING, 10, 100, 45, 7, 315));
@@ -195,7 +195,7 @@ public class GeOfferBaselineTest
         offers.observe(snap(0, SELLING, 10, 100, 40, 7, 280));
 
         step(snap(0, SELLING, 10, 100, 45, 7, 315));
-        assertEquals(Aa.Confidence.LEGACY_UNBASED, record(0).getConfidence());
+        assertEquals(GeRecord.Confidence.LEGACY_UNBASED, record(0).getConfidence());
         assertEquals(0L, record(0).getFilledQty());
     }
 }

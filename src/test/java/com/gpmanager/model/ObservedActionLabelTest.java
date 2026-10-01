@@ -20,7 +20,7 @@ public class ObservedActionLabelTest
         int widgetId = SPELLBOOK_GROUP << 16 | 17;
         for (String spell : new String[] {"Ice Burst", "Ice Barrage", "Vengeance", "High Level Alchemy"})
         {
-            Bb label = Bb.tv("Cast", widgetId,
+            ActionLabel label = ActionLabel.fromSpellMenu("Cast", widgetId,
                 SPELLBOOK_GROUP, "<col=ff9040>  " + spell + "  </col>", "Cast");
             assertNotNull(spell, label);
             assertEquals(spell, label.value());
@@ -31,33 +31,33 @@ public class ObservedActionLabelTest
     public void genericCastTargetsAndAutocastNeverBecomeExactSpellNames()
     {
         int spellWidget = SPELLBOOK_GROUP << 16 | 17;
-        assertNull(Bb.tv("Cast", spellWidget, SPELLBOOK_GROUP,
+        assertNull(ActionLabel.fromSpellMenu("Cast", spellWidget, SPELLBOOK_GROUP,
             "Cast", "Autocast"));
         assertNull("target text is not supplied to the spell-name extractor",
-            Bb.tv("Cast", spellWidget, SPELLBOOK_GROUP,
+            ActionLabel.fromSpellMenu("Cast", spellWidget, SPELLBOOK_GROUP,
                 "Cast", "Cast"));
         assertNull("NPC/player/item widgets are not spellbook evidence",
-            Bb.tv("Cast", 413 << 16 | 17, SPELLBOOK_GROUP,
+            ActionLabel.fromSpellMenu("Cast", 413 << 16 | 17, SPELLBOOK_GROUP,
                 "Ice Burst", "Goblin"));
         assertNull("Autocast selection is not correlated to later rune loss",
-            Bb.tv("Autocast", spellWidget, SPELLBOOK_GROUP,
+            ActionLabel.fromSpellMenu("Autocast", spellWidget, SPELLBOOK_GROUP,
                 "Ice Burst", "Ice Burst"));
-        assertNull(Bb.tv("Use", spellWidget, SPELLBOOK_GROUP,
+        assertNull(ActionLabel.fromSpellMenu("Use", spellWidget, SPELLBOOK_GROUP,
             "Ice Burst", "Ice Burst"));
     }
 
     @Test
     public void exactActionLabelIsBackwardCompatibleAndFinanciallyNeutral()
     {
-        Ac transaction = new Ac(10L, null,
-            Ai.CONSUMPTION, Aj.GENERIC, "", "Vorkath", true,
-            Arrays.asList(new Ab(560, "Death rune", -1L, 100, -100L)),
-            Bd.CONFIRMED, "Exact rune cost", null);
-        transaction.setActionKind(Au.CAST);
+        Transaction transaction = new Transaction(10L, null,
+            TransactionType.CONSUMPTION, Context.GENERIC, "", "Vorkath", true,
+            Arrays.asList(new Flow(560, "Death rune", -1L, 100, -100L)),
+            ClassificationConfidence.CONFIRMED, "Exact rune cost", null);
+        transaction.setActionKind(ActionKind.CAST);
         long netBefore = transaction.getNet();
         boolean countedBefore = transaction.isCounted();
-        Ai typeBefore = transaction.getType();
-        transaction.ahu(Bb.of("Ice Burst"));
+        TransactionType typeBefore = transaction.getType();
+        transaction.setObservedActionLabel(ActionLabel.of("Ice Burst"));
 
         assertEquals(netBefore, transaction.getNet());
         assertEquals(countedBefore, transaction.isCounted());
@@ -68,9 +68,9 @@ public class ObservedActionLabelTest
         String json = gson.toJson(transaction);
         assertTrue("the bounded exact label persists as schema-105 presentation metadata",
             json.contains("\"observedActionLabel\":\"Ice Burst\""));
-        Ac loaded = gson.fromJson(json, Ac.class);
-        assertNotNull("a schema-105 receipt keeps its exact label", loaded.uc());
-        assertEquals("Ice Burst", loaded.uc().value());
+        Transaction loaded = gson.fromJson(json, Transaction.class);
+        assertNotNull("a schema-105 receipt keeps its exact label", loaded.getObservedActionLabel());
+        assertEquals("Ice Burst", loaded.getObservedActionLabel().value());
         assertEquals(netBefore, loaded.getNet());
         assertEquals(countedBefore, loaded.isCounted());
         assertEquals(typeBefore, loaded.getType());

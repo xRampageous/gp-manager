@@ -49,14 +49,14 @@ public class GpManagerPluginGeEvidenceTest
         set(plugin, "engine", engine);
         set(plugin, "config", new GpManagerConfig() {});
 
-        Bj ledger = new Bj();
-        ledger.observe(new Bj.Snapshot(0, GrandExchangeOfferState.BUYING, SHARK, 5, 0, 800, 0));
-        Bj.Transition progress = ledger.observe(
-            new Bj.Snapshot(0, GrandExchangeOfferState.BUYING, SHARK, 5, 2, 800, 1_600))
+        OfferLedger ledger = new OfferLedger();
+        ledger.observe(new OfferLedger.Snapshot(0, GrandExchangeOfferState.BUYING, SHARK, 5, 0, 800, 0));
+        OfferLedger.Transition progress = ledger.observe(
+            new OfferLedger.Snapshot(0, GrandExchangeOfferState.BUYING, SHARK, 5, 2, 800, 1_600))
             .orElseThrow(() -> new AssertionError("expected a progress transition"));
 
         Method handler = GpManagerPlugin.class.getDeclaredMethod(
-            "handleGeOfferTransition", Bj.Transition.class);
+            "handleGeOfferTransition", OfferLedger.Transition.class);
         handler.setAccessible(true);
         handler.invoke(plugin, progress);
 
@@ -112,26 +112,26 @@ public class GpManagerPluginGeEvidenceTest
                 @Override public int stabilizationTicks() { return 0; }
                 @Override public boolean keepTransferAuditRows() { return true; }
             };
-            Am engine = new Am(deltas ->
+            Engine engine = new Engine(deltas ->
             {
-                List<Ab> flows = new ArrayList<>();
-                deltas.forEach((id, quantity) -> flows.add(new Ab(id, "Law rune", quantity,
+                List<Flow> flows = new ArrayList<>();
+                deltas.forEach((id, quantity) -> flows.add(new Flow(id, "Law rune", quantity,
                     122, quantity * 122L)));
                 return flows;
             }, new TransactionClassifier(), config);
-            engine.ajl("Trading", Cx.AUTO, T0);
-            engine.setBaseline(Cc.empty());
+            engine.startCustomSession("Trading", SessionMode.AUTO, T0);
+            engine.setBaseline(ContainerSnapshot.empty());
             GpManagerPlugin plugin = plugin(engine, bankVisibleClient());
-            if (observedBankTick) engine.ze(6);
+            if (observedBankTick) engine.markBankInterfaceOpen(6);
             plugin.onMenuOptionClicked(menu(option, "Law rune"));
 
             // Close before inventory stabilization, without relying on a BANK callback.
             set(plugin, "client", emptyClient());
             plugin.onItemContainerChanged(new ItemContainerChanged(InventoryID.INV, null));
-            Ac withdrawn = settleProduction(engine, inventory(ItemID.LAWRUNE, 200L), T0 + 600L);
+            Transaction withdrawn = settleProduction(engine, inventory(ItemID.LAWRUNE, 200L), T0 + 600L);
 
             assertNotNull(withdrawn);
-            assertEquals("a bank withdrawal is ownership movement", Ai.TRANSFER, withdrawn.getType());
+            assertEquals("a bank withdrawal is ownership movement", TransactionType.TRANSFER, withdrawn.getType());
             assertTrue("a withdrawal never counts as revenue", !withdrawn.isCounted());
             assertEquals(0L, engine.getMetrics(T0 + 1_800L).net);
             assertEquals(0L, engine.getMetrics(T0 + 1_800L).revenue);
@@ -150,18 +150,18 @@ public class GpManagerPluginGeEvidenceTest
     @Test
     public void cancelledWithdrawXPromptDoesNotHideTheNextHarvest() throws Exception
     {
-        Am engine = productionEngine();
-        engine.ajl("Gathering", Cx.AUTO, T0);
-        engine.setBaseline(Cc.empty());
+        Engine engine = productionEngine();
+        engine.startCustomSession("Gathering", SessionMode.AUTO, T0);
+        engine.setBaseline(ContainerSnapshot.empty());
         GpManagerPlugin plugin = plugin(engine, bankVisibleClient());
-        engine.ze(6);
+        engine.markBankInterfaceOpen(6);
         plugin.onMenuOptionClicked(menu("Withdraw-X", "Law rune"));
         // No quantity was confirmed and no bank ownership movement occurred.
         set(plugin, "client", emptyClient());
         plugin.onItemContainerChanged(new ItemContainerChanged(InventoryID.INV, null));
-        Ac harvested = settleProduction(engine, inventory(ItemID.LOGS, 1L), T0 + 600L);
+        Transaction harvested = settleProduction(engine, inventory(ItemID.LOGS, 1L), T0 + 600L);
         assertNotNull(harvested);
-        assertEquals(Ai.GAIN, harvested.getType());
+        assertEquals(TransactionType.GAIN, harvested.getType());
         assertEquals(200L, engine.getMetrics(T0 + 1_800L).net);
     }
 
@@ -170,10 +170,10 @@ public class GpManagerPluginGeEvidenceTest
     @Test
     public void geSellOfferClickOwnsTheRuneLossAsNeutralCustody() throws Exception
     {
-        Am engine = productionEngine();
+        Engine engine = productionEngine();
         long now = T0;
-        engine.ajl("Trading", Cx.AUTO, now);
-        engine.setBaseline(new Cc(inventory(COINS, 100_000L, NATURE_RUNE, 5L)));
+        engine.startCustomSession("Trading", SessionMode.AUTO, now);
+        engine.setBaseline(new ContainerSnapshot(inventory(COINS, 100_000L, NATURE_RUNE, 5L)));
         GpManagerPlugin plugin = gePlugin(engine);
 
         // The player opens a GE sell offer and clicks the rune in the inventory ("Offer").
@@ -181,22 +181,22 @@ public class GpManagerPluginGeEvidenceTest
         // The server confirms the placement: the slot reports SELLING.
         plugin.onGrandExchangeOfferChanged(offerChanged(0, GrandExchangeOfferState.SELLING, NATURE_RUNE, 5, 0, 200, 0));
 
-        Ac sale = settleProduction(engine, inventory(COINS, 100_000L, NATURE_RUNE, 4L), now);
+        Transaction sale = settleProduction(engine, inventory(COINS, 100_000L, NATURE_RUNE, 4L), now);
         assertNotNull("the rune loss settles", sale);
         assertEquals("a proven GE sale placement is ownership-neutral custody",
-            Ai.TRANSFER, sale.getType());
-        assertEquals(Aj.TRANSFER, sale.getContext());
+            TransactionType.TRANSFER, sale.getType());
+        assertEquals(Context.TRANSFER, sale.getContext());
         assertTrue("custody never counts money", !sale.isCounted());
         assertEquals("pending custody never changes Net", 0L, engine.getMetrics(now + 1_800L).net);
-        assertEquals(1, engine.ub().size());
+        assertEquals(1, engine.getMarketSettlements().size());
     }
 
     @Test
     public void sequentialGeSellOfferClicksAllSettleAsNeutralCustody() throws Exception
     {
-        Am engine = productionEngine();
+        Engine engine = productionEngine();
         long now = T0;
-        engine.ajl("Trading", Cx.AUTO, now);
+        engine.startCustomSession("Trading", SessionMode.AUTO, now);
         Map<Integer, Long> inventory = inventory(COINS, 100_000L);
         int[] runes = {AIR_RUNE, NATURE_RUNE, FIRE_RUNE, ASTRAL_RUNE, LAVA_RUNE, STEAM_RUNE};
         String[] names = {"Air rune", "Nature rune", "Fire rune", "Astral rune", "Lava rune", "Steam rune"};
@@ -204,7 +204,7 @@ public class GpManagerPluginGeEvidenceTest
         {
             inventory.put(rune, 5L);
         }
-        engine.setBaseline(new Cc(inventory));
+        engine.setBaseline(new ContainerSnapshot(inventory));
         GpManagerPlugin plugin = gePlugin(engine);
 
         for (int i = 0; i < runes.length; i++)
@@ -213,10 +213,10 @@ public class GpManagerPluginGeEvidenceTest
             plugin.onMenuOptionClicked(menuWithItem("Offer", names[i], rune));
             plugin.onGrandExchangeOfferChanged(offerChanged(i, GrandExchangeOfferState.SELLING, rune, 5, 0, 200, 0));
             inventory.put(rune, inventory.get(rune) - 1L);
-            Ac sale = settleProduction(engine, inventory, now + i * 10_000L);
+            Transaction sale = settleProduction(engine, inventory, now + i * 10_000L);
             assertNotNull("sale settles: " + names[i], sale);
             assertEquals("every genuine sell placement is custody: " + names[i],
-                Ai.TRANSFER, sale.getType());
+                TransactionType.TRANSFER, sale.getType());
             assertEquals("custody is never counted: " + names[i], false, sale.isCounted());
         }
         assertEquals("no placement fell through to a counted cost",
@@ -238,41 +238,41 @@ public class GpManagerPluginGeEvidenceTest
             engine.consumptionArms.contains(536));
     }
 
-    private static Am productionEngine()
+    private static Engine productionEngine()
     {
         GpManagerConfig config = new GpManagerConfig()
         {
             @Override public int stabilizationTicks() { return 2; }
             @Override public boolean keepTransferAuditRows() { return true; }
         };
-        return new Am(deltas ->
+        return new Engine(deltas ->
         {
-            java.util.List<Ab> flows = new java.util.ArrayList<>();
+            java.util.List<Flow> flows = new java.util.ArrayList<>();
             for (java.util.Map.Entry<Integer, Long> delta : deltas.entrySet())
             {
                 int id = delta.getKey();
-                flows.add(new Ab(id, runeName(id), delta.getValue(), 200, delta.getValue() * 200));
+                flows.add(new Flow(id, runeName(id), delta.getValue(), 200, delta.getValue() * 200));
             }
             return flows;
         }, new TransactionClassifier(), config);
     }
 
-    private static GpManagerPlugin gePlugin(Am engine) throws Exception
+    private static GpManagerPlugin gePlugin(Engine engine) throws Exception
     {
         GpManagerPlugin plugin = plugin(engine, geVisibleClient());
         set(plugin, "activity", new ActivityDetector(new GpManagerConfig() {}, engine));
-        set(plugin, "geOfferLedger", new Bj());
+        set(plugin, "geOfferLedger", new OfferLedger());
         return plugin;
     }
 
-    private static Ac settleProduction(Am engine, Map<Integer, Long> next, long now)
+    private static Transaction settleProduction(Engine engine, Map<Integer, Long> next, long now)
     {
-        engine.yz();
-        Cc snapshot = new Cc(next);
-        Ac result = null;
+        engine.markInventoryDirty();
+        ContainerSnapshot snapshot = new ContainerSnapshot(next);
+        Transaction result = null;
         for (int i = 0; i < 3; i++)
         {
-            Ac settled = engine.adj(snapshot, now + i * 600L);
+            Transaction settled = engine.processIfDirty(snapshot, now + i * 600L);
             if (settled != null)
             {
                 result = settled;
@@ -344,7 +344,7 @@ public class GpManagerPluginGeEvidenceTest
         return "Item " + id;
     }
 
-    private static GpManagerPlugin plugin(Am engine, Client client) throws Exception
+    private static GpManagerPlugin plugin(Engine engine, Client client) throws Exception
     {
         GpManagerConfig config = new GpManagerConfig() {};
         GpManagerPlugin plugin = new GpManagerPluginProbe();
@@ -413,8 +413,8 @@ public class GpManagerPluginGeEvidenceTest
             {
                 if ("getWidget".equals(method.getName()))
                 {
-                    boolean geRoot = args != null && args.length == 2
-                        && Integer.valueOf(InterfaceID.GE_OFFERS).equals(args[0]);
+                    boolean geRoot = args != null && args.length == 1
+                        && Integer.valueOf(InterfaceID.GeOffers.UNIVERSE).equals(args[0]);
                     return geRoot ? visible : hidden;
                 }
                 if (method.getReturnType() == boolean.class) return false;
@@ -437,7 +437,7 @@ public class GpManagerPluginGeEvidenceTest
             });
     }
 
-    static final class RecordingEngine extends Am
+    static final class RecordingEngine extends Engine
     {
         final List<String> marketArms = new ArrayList<>();
         final List<String> transferArms = new ArrayList<>();
@@ -445,17 +445,17 @@ public class GpManagerPluginGeEvidenceTest
 
         RecordingEngine()
         {
-            super(deltas -> Collections.<Ab>emptyList(), new TransactionClassifier(), new GpManagerConfig() {});
+            super(deltas -> Collections.<Flow>emptyList(), new TransactionClassifier(), new GpManagerConfig() {});
         }
 
         @Override
-        public synchronized void markContext(Aj newContext, int ticks, String note)
+        public synchronized void markContext(Context newContext, int ticks, String note)
         {
-            if (newContext == Aj.MARKET)
+            if (newContext == Context.MARKET)
             {
                 marketArms.add(note == null ? "" : note);
             }
-            if (newContext == Aj.TRANSFER)
+            if (newContext == Context.TRANSFER)
             {
                 transferArms.add(note == null ? "" : note);
             }
@@ -464,7 +464,7 @@ public class GpManagerPluginGeEvidenceTest
 
         @Override
         public synchronized void noteConsumptionIntent(int itemId, int ticks, boolean destroy,
-            @javax.annotation.Nullable Au actionKind)
+            @javax.annotation.Nullable ActionKind actionKind)
         {
             consumptionArms.add(itemId);
             super.noteConsumptionIntent(itemId, ticks, destroy, actionKind);
@@ -472,8 +472,8 @@ public class GpManagerPluginGeEvidenceTest
 
         @Override
         public synchronized void noteConsumptionIntent(int itemId, int ticks, boolean destroy,
-            @javax.annotation.Nullable Au actionKind,
-            @javax.annotation.Nullable Bb actionLabel)
+            @javax.annotation.Nullable ActionKind actionKind,
+            @javax.annotation.Nullable ActionLabel actionLabel)
         {
             consumptionArms.add(itemId);
             super.noteConsumptionIntent(itemId, ticks, destroy, actionKind, actionLabel);

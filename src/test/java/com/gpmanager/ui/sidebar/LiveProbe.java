@@ -11,17 +11,17 @@ public final class LiveProbe
     }
 
     /** The bounded Live preview for these receipts. */
-    public static List<Ca.Recent> recent(List<Ac> transactions, Dz ctx)
+    public static List<LiveSnapshot.Recent> recent(List<Transaction> transactions, LiveContext ctx)
     {
-        Dz context = ctx == null ? Dz.NONE : ctx;
-        return Ca.afa(Br.capture(transactions, Collections.emptyList(),
-            "", context::td), Collections.emptyMap(), context.filter);
+        LiveContext context = ctx == null ? LiveContext.NONE : ctx;
+        return LiveSnapshot.recentRows(SemanticFinancialProjection.capture(transactions, Collections.emptyList(),
+            "", context::flowVisible), Collections.emptyMap(), context.filter);
     }
 
     /** The first Live row one receipt produces; null when it produces none. */
-    public static Ca.Recent toRecent(Ac transaction)
+    public static LiveSnapshot.Recent toRecent(Transaction transaction)
     {
-        List<Ca.Recent> rows = recent(Collections.singletonList(transaction), Dz.NONE);
+        List<LiveSnapshot.Recent> rows = recent(Collections.singletonList(transaction), LiveContext.NONE);
         return rows.isEmpty() ? null : rows.get(0);
     }
 }

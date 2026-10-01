@@ -45,7 +45,7 @@ public class TrackedBasisKnownCoverageTest
     {
         Harness h = new Harness(159);
         h.inventory = with(h.inventory, LOGS, 5L);
-        h.engine.setBaseline(new Cc(h.inventory));
+        h.engine.setBaseline(new ContainerSnapshot(h.inventory));
 
         h.offer(0, SELLING, LOGS, 5, 0, 159, 0);
         h.settle(with(h.inventory, LOGS, 0L));
@@ -56,14 +56,14 @@ public class TrackedBasisKnownCoverageTest
         assertEquals("no known coverage is invented", 0L, EngineProbe.knownCoverageQty(h.engine, LOGS));
         assertEquals(0L, EngineProbe.knownCoverageBasisGp(h.engine, LOGS));
 
-        Bi.Row row = h.rows().get(0);
+        MarketSettlementProjection.Row row = h.rows().get(0);
         assertEquals(5L, row.settledQty);
         assertEquals("known coverage absent", 0L, MarketFacts.trackedQtyConsumed(MarketFacts.record(h.engine, row)));
         assertEquals(5L, MarketFacts.unknownQtyRealized(MarketFacts.record(h.engine, row)));
         assertEquals(0L, MarketFacts.knownProceedsGp(MarketFacts.record(h.engine, row)));
         assertEquals("received cash is liquidation evidence", 790L, MarketFacts.unknownLiquidationGp(MarketFacts.record(h.engine, row)));
         assertEquals(790L, Math.abs(row.observedSettlementGp));
-        assertEquals(Bi.Coverage.FULLY_UNKNOWN, row.coverage);
+        assertEquals(MarketSettlementProjection.Coverage.FULLY_UNKNOWN, row.coverage);
         assertTrue(row.geDifferenceAvailable);
         assertEquals("frozen gross reference 5 x 159", 795L, MarketFacts.grossGeReferenceGp(MarketFacts.record(h.engine, row)));
         assertEquals("tax-adjusted reference carries the expected per-item tax", 780L,
@@ -71,7 +71,7 @@ public class TrackedBasisKnownCoverageTest
         assertEquals("GE difference compares after-tax cash with the net reference", 10L,
             row.geDifferenceGp);
 
-        Ac settlement = h.ajs(row.settlementId);
+        Transaction settlement = h.transactionById(row.settlementId);
         assertNotNull(settlement);
         assertFalse("an unknown-basis settlement is Net-neutral evidence", settlement.isCounted());
     }
@@ -87,8 +87,8 @@ public class TrackedBasisKnownCoverageTest
         h.sell(0, LOGS, 5L, 159, 790L);
 
         assertEquals("known zero basis legitimately realizes the proceeds", 790L, h.net());
-        Bi.Row row = h.rows().get(0);
-        assertEquals(Bi.Coverage.FULLY_KNOWN, row.coverage);
+        MarketSettlementProjection.Row row = h.rows().get(0);
+        assertEquals(MarketSettlementProjection.Coverage.FULLY_KNOWN, row.coverage);
         assertEquals(5L, MarketFacts.trackedQtyConsumed(MarketFacts.record(h.engine, row)));
         assertEquals(0L, MarketFacts.unknownQtyRealized(MarketFacts.record(h.engine, row)));
         assertEquals(790L, MarketFacts.knownProceedsGp(MarketFacts.record(h.engine, row)));
@@ -119,8 +119,8 @@ public class TrackedBasisKnownCoverageTest
         h.sell(0, LOGS, 5L, 159, 790L);
 
         assertEquals("earlier counted value plus sale result", 775L + 15L, h.net());
-        Bi.Row row = h.rows().get(0);
-        assertEquals(Bi.Coverage.FULLY_KNOWN, row.coverage);
+        MarketSettlementProjection.Row row = h.rows().get(0);
+        assertEquals(MarketSettlementProjection.Coverage.FULLY_KNOWN, row.coverage);
         assertEquals(775L, row.trackedBasisConsumedGp);
         assertEquals(790L, MarketFacts.knownProceedsGp(MarketFacts.record(h.engine, row)));
         assertEquals(15L, row.realizedResultGp);
@@ -145,7 +145,7 @@ public class TrackedBasisKnownCoverageTest
         Harness h = new Harness(100);
         h.gain(LOGS, 4L, 380L, h.now - 60_000L);
         h.inventory = with(h.inventory, LOGS, 10L);
-        h.engine.setBaseline(new Cc(h.inventory));
+        h.engine.setBaseline(new ContainerSnapshot(h.inventory));
 
         h.offer(0, SELLING, LOGS, 10, 0, 100, 0);
         h.settle(with(h.inventory, LOGS, 0L));
@@ -153,8 +153,8 @@ public class TrackedBasisKnownCoverageTest
         h.settle(with(h.inventory, COINS, 1_001_000L));
 
         assertEquals("only the known portion contributes", 380L + 20L, h.net());
-        Bi.Row row = h.rows().get(0);
-        assertEquals(Bi.Coverage.PARTIALLY_KNOWN, row.coverage);
+        MarketSettlementProjection.Row row = h.rows().get(0);
+        assertEquals(MarketSettlementProjection.Coverage.PARTIALLY_KNOWN, row.coverage);
         assertEquals(4L, MarketFacts.trackedQtyConsumed(MarketFacts.record(h.engine, row)));
         assertEquals(6L, MarketFacts.unknownQtyRealized(MarketFacts.record(h.engine, row)));
         assertEquals(380L, row.trackedBasisConsumedGp);
@@ -175,10 +175,10 @@ public class TrackedBasisKnownCoverageTest
         h.sell(1, LOGS, 5L, 170, 850L);
 
         assertEquals("proven trading profit", 150L, h.net());
-        Bi.Row row = h.rows().stream()
-            .filter(candidate -> candidate.side == Aa.Side.SELL)
+        MarketSettlementProjection.Row row = h.rows().stream()
+            .filter(candidate -> candidate.side == GeRecord.Side.SELL)
             .findFirst().orElseThrow(AssertionError::new);
-        assertEquals(Bi.Coverage.FULLY_KNOWN, row.coverage);
+        assertEquals(MarketSettlementProjection.Coverage.FULLY_KNOWN, row.coverage);
         assertEquals(700L, row.trackedBasisConsumedGp);
         assertEquals(150L, row.realizedResultGp);
     }
@@ -188,21 +188,21 @@ public class TrackedBasisKnownCoverageTest
     @Test
     public void weightedBasisRoundingLosesNothing()
     {
-        assertEquals(3L, Df.ayb(3L, 10L, 1L));
-        assertEquals(3L, Df.ayb(2L, 7L, 1L));
-        assertEquals("the last unit absorbs the remainder", 4L, Df.ayb(1L, 4L, 1L));
-        assertEquals(0L, Df.ayb(0L, 0L, 1L));
+        assertEquals(3L, TrackedBasisMath.shareOf(3L, 10L, 1L));
+        assertEquals(3L, TrackedBasisMath.shareOf(2L, 7L, 1L));
+        assertEquals("the last unit absorbs the remainder", 4L, TrackedBasisMath.shareOf(1L, 4L, 1L));
+        assertEquals(0L, TrackedBasisMath.shareOf(0L, 0L, 1L));
     }
 
     @Test
     public void mixedProceedsAllocationKeepsExactSum()
     {
-        assertEquals(3L, Df.yl(10L, 3L, 1L));
-        long known = Df.yl(10L, 3L, 1L);
+        assertEquals(3L, TrackedBasisMath.knownProceedsOf(10L, 3L, 1L));
+        long known = TrackedBasisMath.knownProceedsOf(10L, 3L, 1L);
         assertEquals("unknown receives the integer remainder", 10L, known + (10L - known));
         assertEquals("all-known takes the exact settlement", 10L,
-            Df.yl(10L, 3L, 3L));
-        assertEquals(0L, Df.yl(10L, 3L, 0L));
+            TrackedBasisMath.knownProceedsOf(10L, 3L, 3L));
+        assertEquals(0L, TrackedBasisMath.knownProceedsOf(10L, 3L, 0L));
     }
 
     // ---- reservation ------------------------------------------------------------------------
@@ -213,7 +213,7 @@ public class TrackedBasisKnownCoverageTest
         Harness h = new Harness(100);
         h.gain(LOGS, 100L, 10_000L, h.now - 60_000L);
         h.inventory = with(h.inventory, LOGS, 120L);
-        h.engine.setBaseline(new Cc(h.inventory));
+        h.engine.setBaseline(new ContainerSnapshot(h.inventory));
 
         h.offer(0, SELLING, LOGS, 60, 0, 100, 0);
         h.settle(with(h.inventory, LOGS, 60L));
@@ -227,8 +227,8 @@ public class TrackedBasisKnownCoverageTest
         assertEquals(10_000L, EngineProbe.reservedBasisGp(h.engine, LOGS));
         assertEquals(0L, EngineProbe.availableQty(h.engine, LOGS));
         assertEquals("20 offered units are unknown, never zero basis", 20L,
-            h.engine.geCustody.aji().get(1).getOfferedQty()
-                - h.engine.geCustody.aji().get(1).getReservedTrackedQty());
+            h.engine.geCustody.snapshotRecords().get(1).getOfferedQty()
+                - h.engine.geCustody.snapshotRecords().get(1).getReservedTrackedQty());
 
         h.offer(0, CANCELLED_SELL, LOGS, 60, 0, 100, 0);
         h.settle(with(h.inventory, LOGS, 60L));
@@ -245,7 +245,7 @@ public class TrackedBasisKnownCoverageTest
         Harness h = new Harness(100);
         h.gain(LOGS, 100L, 10_000L, h.now - 60_000L);
         h.inventory = with(h.inventory, LOGS, 200L);
-        h.engine.setBaseline(new Cc(h.inventory));
+        h.engine.setBaseline(new ContainerSnapshot(h.inventory));
 
         h.offer(0, SELLING, LOGS, 200, 0, 100, 0);
         h.settle(with(h.inventory, LOGS, 0L));
@@ -255,9 +255,9 @@ public class TrackedBasisKnownCoverageTest
         h.offer(0, SOLD, LOGS, 200, 30, 100, 3_000);
         h.settle(with(h.inventory, COINS, 1_003_000L));
         assertEquals("only the realized 30 consume reserved basis", 30L,
-            h.engine.geCustody.aji().get(0).getConsumedTrackedQty());
+            h.engine.geCustody.snapshotRecords().get(0).getConsumedTrackedQty());
         assertEquals(3_000L,
-            h.engine.geCustody.aji().get(0).getConsumedTrackedBasisGp());
+            h.engine.geCustody.snapshotRecords().get(0).getConsumedTrackedBasisGp());
         assertEquals("the earlier counted value plus a zero sale result", 10_000L, h.net());
 
         h.offer(0, CANCELLED_SELL, LOGS, 200, 30, 100, 3_000);
@@ -294,19 +294,19 @@ public class TrackedBasisKnownCoverageTest
         Harness h = new Harness(100);
         h.gain(LOGS, 100L, 10_000L, h.now - 60_000L);
         h.inventory = with(h.inventory, LOGS, 60L);
-        h.engine.setBaseline(new Cc(h.inventory));
+        h.engine.setBaseline(new ContainerSnapshot(h.inventory));
         h.offer(0, SELLING, LOGS, 60, 0, 100, 0);
         h.settle(with(h.inventory, LOGS, 0L));
         assertEquals(60L, EngineProbe.reservedQty(h.engine, LOGS));
 
-        SavedState state = h.engine.qm();
+        SavedState state = h.engine.createSavedState();
         assertEquals(108, state.schemaVersion);
-        Am restarted = engine(new int[] {100});
+        Engine restarted = engine(new int[] {100});
         restarted.restore(state, h.now);
-        restarted.setBaseline(new Cc(with(h.inventory, LOGS, 0L)));
+        restarted.setBaseline(new ContainerSnapshot(with(h.inventory, LOGS, 0L)));
         restarted.getActiveSession().resume(h.now);
-        restarted.ahy(Collections.singletonMap(0,
-            new Bj.Snapshot(0, SELLING, LOGS, 60, 0, 100, 0)), h.now + 500L);
+        restarted.seedGeOfferSlots(Collections.singletonMap(0,
+            new OfferLedger.Snapshot(0, SELLING, LOGS, 60, 0, 100, 0)), h.now + 500L);
 
         assertEquals("available coverage survives restart", 40L, EngineProbe.knownCoverageQty(restarted, LOGS)
             - EngineProbe.reservedQty(restarted, LOGS));
@@ -314,18 +314,18 @@ public class TrackedBasisKnownCoverageTest
         assertEquals("the open reservation survives restart", 60L,
             EngineProbe.reservedQty(restarted, LOGS));
         assertEquals(6_000L, EngineProbe.reservedBasisGp(restarted, LOGS));
-        assertEquals(1, restarted.geCustody.aji().size());
+        assertEquals(1, restarted.geCustody.snapshotRecords().size());
 
-        Bj ledger = new Bj();
-        Bj.Transition cancel = ledger.observe(
-            new Bj.Snapshot(0, CANCELLED_SELL, LOGS, 60, 0, 100, 0)).orElse(null);
+        OfferLedger ledger = new OfferLedger();
+        OfferLedger.Transition cancel = ledger.observe(
+            new OfferLedger.Snapshot(0, CANCELLED_SELL, LOGS, 60, 0, 100, 0)).orElse(null);
         assertNotNull(cancel);
-        restarted.abh(cancel, "Logs", h.now + 1_000L);
-        restarted.yz();
-        Cc back = new Cc(with(h.inventory, LOGS, 60L));
+        restarted.noteGeOfferObservation(cancel, "Logs", h.now + 1_000L);
+        restarted.markInventoryDirty();
+        ContainerSnapshot back = new ContainerSnapshot(with(h.inventory, LOGS, 60L));
         for (int i = 0; i < 3; i++)
         {
-            restarted.adj(back, h.now + 1_000L + i * 600L);
+            restarted.processIfDirty(back, h.now + 1_000L + i * 600L);
         }
         assertEquals("cancelling after restart releases the exact reservation", 100L,
             EngineProbe.knownCoverageQty(restarted, LOGS));
@@ -339,11 +339,11 @@ public class TrackedBasisKnownCoverageTest
         Harness h = new Harness(159);
         h.gain(LOGS, 5L, 775L, h.now - 60_000L);
         long historicalNet = h.net();
-        SavedState legacy = h.engine.qm();
+        SavedState legacy = h.engine.createSavedState();
         legacy.setSchemaVersion(105);
         legacy.setTrackedBasis(null);
 
-        Am migrated = engine(new int[] {159});
+        Engine migrated = engine(new int[] {159});
         migrated.restore(legacy, h.now + 1_000L);
 
         assertEquals("no bank or history backfill", 0L, EngineProbe.knownCoverageQty(migrated, LOGS));
@@ -352,12 +352,12 @@ public class TrackedBasisKnownCoverageTest
             migrated.getMetrics(h.now + 1_000L).net);
 
         // New post-migration acquisitions still create known coverage.
-        Ac gain = new Ac(h.now + 2_000L, null, Ai.GAIN,
-            Aj.GENERIC, "", "Loot", true,
-            Collections.singletonList(new Ab(LOGS, "Logs", 3L, 100, 300L,
-                Av.GRAND_EXCHANGE)),
-            Bd.CONFIRMED, "", null);
-        migrated.getActiveSession().kf(gain, 500);
+        Transaction gain = new Transaction(h.now + 2_000L, null, TransactionType.GAIN,
+            Context.GENERIC, "", "Loot", true,
+            Collections.singletonList(new Flow(LOGS, "Logs", 3L, 100, 300L,
+                PriceSource.GRAND_EXCHANGE)),
+            ClassificationConfidence.CONFIRMED, "", null);
+        migrated.getActiveSession().addTransaction(gain, 500);
         assertEquals(3L, EngineProbe.knownCoverageQty(migrated, LOGS));
         assertEquals(300L, EngineProbe.knownCoverageBasisGp(migrated, LOGS));
     }
@@ -386,8 +386,8 @@ public class TrackedBasisKnownCoverageTest
     private static final class Harness
     {
         final int[] quote;
-        final Am engine;
-        final Bj ledger = new Bj();
+        final Engine engine;
+        final OfferLedger ledger = new OfferLedger();
         long now = T0;
         Map<Integer, Long> inventory = new HashMap<>();
 
@@ -395,65 +395,65 @@ public class TrackedBasisKnownCoverageTest
         {
             quote = new int[] { initialQuote };
             engine = engine(quote);
-            engine.ajl("Trading", Cx.AUTO, now);
+            engine.startCustomSession("Trading", SessionMode.AUTO, now);
             inventory.put(COINS, 1_000_000L);
-            engine.setBaseline(new Cc(inventory));
+            engine.setBaseline(new ContainerSnapshot(inventory));
         }
 
         void gain(int item, long qty, long value, long at)
         {
-            book(new Ac(at, null, Ai.GAIN, Aj.GENERIC, "",
+            book(new Transaction(at, null, TransactionType.GAIN, Context.GENERIC, "",
                 "Loot", true,
-                Collections.singletonList(new Ab(item, name(item), qty,
-                    (int) (qty > 0L ? value / qty : 0L), value, Av.GRAND_EXCHANGE)),
-                Bd.CONFIRMED, "", null));
+                Collections.singletonList(new Flow(item, name(item), qty,
+                    (int) (qty > 0L ? value / qty : 0L), value, PriceSource.GRAND_EXCHANGE)),
+                ClassificationConfidence.CONFIRMED, "", null));
         }
 
         void zeroGain(int item, long qty, long at)
         {
-            book(new Ac(at, null, Ai.GAIN, Aj.GENERIC, "",
+            book(new Transaction(at, null, TransactionType.GAIN, Context.GENERIC, "",
                 "Loot", true,
-                Collections.singletonList(new Ab(item, name(item), qty, 0, 0L,
-                    Av.GRAND_EXCHANGE)),
-                Bd.CONFIRMED, "", null));
+                Collections.singletonList(new Flow(item, name(item), qty, 0, 0L,
+                    PriceSource.GRAND_EXCHANGE)),
+                ClassificationConfidence.CONFIRMED, "", null));
         }
 
         void unpricedGain(int item, long qty, long at)
         {
-            book(new Ac(at, null, Ai.GAIN, Aj.GENERIC, "",
+            book(new Transaction(at, null, TransactionType.GAIN, Context.GENERIC, "",
                 "Loot", true,
-                Collections.singletonList(new Ab(item, name(item), qty, 0, 0L,
-                    Av.UNPRICED)),
-                Bd.CONFIRMED, "", null));
+                Collections.singletonList(new Flow(item, name(item), qty, 0, 0L,
+                    PriceSource.UNPRICED)),
+                ClassificationConfidence.CONFIRMED, "", null));
         }
 
         void sink(int item, long qty, long at)
         {
-            book(new Ac(at, null, Ai.CONSUMPTION, Aj.GENERIC,
+            book(new Transaction(at, null, TransactionType.CONSUMPTION, Context.GENERIC,
                 "", "Used", true,
-                Collections.singletonList(new Ab(item, name(item), -qty, 100, -qty * 100L,
-                    Av.GRAND_EXCHANGE)),
-                Bd.CONFIRMED, "", null));
+                Collections.singletonList(new Flow(item, name(item), -qty, 100, -qty * 100L,
+                    PriceSource.GRAND_EXCHANGE)),
+                ClassificationConfidence.CONFIRMED, "", null));
         }
 
         void transfer(int item, long qty, long at)
         {
-            book(new Ac(at, null, Ai.TRANSFER, Aj.TRANSFER,
+            book(new Transaction(at, null, TransactionType.TRANSFER, Context.TRANSFER,
                 "Bank deposit", "Transfer", false,
-                Collections.singletonList(new Ab(item, name(item), -qty, 100, -qty * 100L,
-                    Av.GRAND_EXCHANGE)),
-                Bd.CONFIRMED, "", null));
+                Collections.singletonList(new Flow(item, name(item), -qty, 100, -qty * 100L,
+                    PriceSource.GRAND_EXCHANGE)),
+                ClassificationConfidence.CONFIRMED, "", null));
         }
 
-        void book(Ac transaction)
+        void book(Transaction transaction)
         {
-            engine.getActiveSession().kf(transaction, 500);
+            engine.getActiveSession().addTransaction(transaction, 500);
         }
 
         void sell(int slot, int item, long qty, int limit, long cash)
         {
             inventory = with(inventory, item, qty);
-            engine.setBaseline(new Cc(inventory));
+            engine.setBaseline(new ContainerSnapshot(inventory));
             offer(slot, SELLING, item, (int) qty, 0, limit, 0);
             inventory = with(inventory, item, 0L);
             settle(inventory);
@@ -476,24 +476,24 @@ public class TrackedBasisKnownCoverageTest
             int price, int spent)
         {
             now += 600L;
-            Bj.Transition transition = ledger.observe(
-                new Bj.Snapshot(slot, state, item, total, traded, price, spent)).orElse(null);
+            OfferLedger.Transition transition = ledger.observe(
+                new OfferLedger.Snapshot(slot, state, item, total, traded, price, spent)).orElse(null);
             if (transition != null)
             {
-                engine.abh(transition, name(transition.current.itemId), now);
+                engine.noteGeOfferObservation(transition, name(transition.current.itemId), now);
             }
         }
 
-        Ac settle(Map<Integer, Long> next)
+        Transaction settle(Map<Integer, Long> next)
         {
             now += 600L;
             inventory = new HashMap<>(next);
-            engine.yz();
-            Cc snapshot = new Cc(inventory);
-            Ac result = null;
+            engine.markInventoryDirty();
+            ContainerSnapshot snapshot = new ContainerSnapshot(inventory);
+            Transaction result = null;
             for (int i = 0; i < 3; i++)
             {
-                Ac settled = engine.adj(snapshot, now);
+                Transaction settled = engine.processIfDirty(snapshot, now);
                 if (settled != null)
                 {
                     result = settled;
@@ -508,14 +508,14 @@ public class TrackedBasisKnownCoverageTest
             return engine.getMetrics(now).net;
         }
 
-        List<Bi.Row> rows()
+        List<MarketSettlementProjection.Row> rows()
         {
-            return engine.ub();
+            return engine.getMarketSettlements();
         }
 
-        Ac ajs(String id)
+        Transaction transactionById(String id)
         {
-            for (Ac transaction : engine.getActiveSession().getTransactions())
+            for (Transaction transaction : engine.getActiveSession().getTransactions())
             {
                 if (transaction != null && transaction.getId().equals(id))
                 {
@@ -549,23 +549,23 @@ public class TrackedBasisKnownCoverageTest
         return map;
     }
 
-    private static Am engine(int[] quote)
+    private static Engine engine(int[] quote)
     {
         GpManagerConfig config = new GpManagerConfig()
         {
             @Override public int stabilizationTicks() { return 0; }
             @Override public boolean keepTransferAuditRows() { return true; }
         };
-        return new Am(deltas ->
+        return new Engine(deltas ->
         {
-            List<Ab> flows = new ArrayList<>();
+            List<Flow> flows = new ArrayList<>();
             for (Map.Entry<Integer, Long> delta : deltas.entrySet())
             {
                 int id = delta.getKey();
                 int unit = id == COINS ? 1 : quote[0];
-                Av source = id == COINS ? Av.FACE_VALUE
-                    : unit > 0 ? Av.GRAND_EXCHANGE : Av.UNPRICED;
-                flows.add(new Ab(id, name(id), delta.getValue(), unit, delta.getValue() * unit,
+                PriceSource source = id == COINS ? PriceSource.FACE_VALUE
+                    : unit > 0 ? PriceSource.GRAND_EXCHANGE : PriceSource.UNPRICED;
+                flows.add(new Flow(id, name(id), delta.getValue(), unit, delta.getValue() * unit,
                     source));
             }
             return flows;
