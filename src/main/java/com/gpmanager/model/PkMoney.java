@@ -10,32 +10,32 @@ long costsGp;
 long suppliesCostsGp;
 boolean costSplitAvailable = true;
 PkMoney() {
- // Gson
+// Gson
 }
 
 PkMoney(long netGp, long costsGp, long suppliesCostsGp, boolean costSplitAvailable) {
- this.netGp = netGp;
- this.costsGp = nonNeg(costsGp);
- this.suppliesCostsGp = nonNeg(suppliesCostsGp);
- this.costSplitAvailable = costSplitAvailable;
+this.netGp = netGp;
+this.costsGp = nonNeg(costsGp);
+this.suppliesCostsGp = nonNeg(suppliesCostsGp);
+this.costSplitAvailable = costSplitAvailable;
 }
 
 /** A receipt's correction-aware PvP money; an excluded or unavailable receipt is zero. */
 static PkMoney of(Transaction transaction) {
- AccountingProjection.TransactionAmounts amounts = AccountingProjection.transaction(transaction);
- if (!amounts.available || !amounts.included) return new PkMoney(0L, 0L, 0L, true);
- if (amounts.costs <= 0L) return new PkMoney(amounts.getNet(), 0L, 0L, true);
- AccountingProjection.CostSplit split = AccountingProjection.costSplit(transaction);
- return new PkMoney(amounts.getNet(), amounts.costs, split.supplies, split.available);
+AccountingProjection.TransactionAmounts amounts = AccountingProjection.transaction(transaction);
+if (!amounts.available || !amounts.included) return new PkMoney(0L, 0L, 0L, true);
+if (amounts.costs <= 0L) return new PkMoney(amounts.getNet(), 0L, 0L, true);
+AccountingProjection.CostSplit split = AccountingProjection.costSplit(transaction);
+return new PkMoney(amounts.getNet(), amounts.costs, split.supplies, split.available);
 }
 
 /** Adds another amount; its supplies count only when its own split is known. */
 PkMoney plus(PkMoney other) {
- netGp = safeAdd(netGp, other.netGp);
- costsGp = safeAdd(costsGp, other.getCostsGp());
- if (other.costSplitAvailable) suppliesCostsGp = safeAdd(suppliesCostsGp, other.getSuppliesCostsGp());
- else costSplitAvailable = false;
- return this;
+netGp = safeAdd(netGp, other.netGp);
+costsGp = safeAdd(costsGp, other.getCostsGp());
+if (other.costSplitAvailable) suppliesCostsGp = safeAdd(suppliesCostsGp, other.getSuppliesCostsGp());
+else costSplitAvailable = false;
+return this;
 }
 
 long getCostsGp() { return nonNeg(costsGp); }

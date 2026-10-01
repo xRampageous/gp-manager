@@ -21,42 +21,42 @@ boolean financialCostSplitComplete = true;
 /** Profile-wide monotonic detail-retention position; -1 until explicitly assigned. */
 long completionSequence = -1L;
 PkEncounter() {
- // Gson
+// Gson
 }
 
 PkEncounter(EncounterType type, long timestampEpochMillis, String label, ClassificationConfidence confidence,
 String explanation) {
- this.id = UUID.randomUUID().toString();
- this.type = type;
- this.timestampEpochMillis = timestampEpochMillis;
- this.label = label == null || label.trim().isEmpty() ? (type == EncounterType.DEATH ? "Player death" : "Player kill")
- : label.trim();
- this.confidence = confidence == null ? ClassificationConfidence.UNCERTAIN : confidence;
- this.explanation = orEmpty(explanation);
+this.id = UUID.randomUUID().toString();
+this.type = type;
+this.timestampEpochMillis = timestampEpochMillis;
+this.label = label == null || label.trim().isEmpty() ? (type == EncounterType.DEATH ? "Player death" : "Player kill")
+: label.trim();
+this.confidence = confidence == null ? ClassificationConfidence.UNCERTAIN : confidence;
+this.explanation = orEmpty(explanation);
 }
 
 void addTransactionId(String transactionId) {
- if (empty(transactionId)) return;
- if (!transactionIds.contains(transactionId)) transactionIds.add(transactionId);
+if (empty(transactionId)) return;
+if (!transactionIds.contains(transactionId)) transactionIds.add(transactionId);
 }
 
 void removeTransactionId(String transactionId) {
- transactionIds.remove(transactionId);
+transactionIds.remove(transactionId);
 }
 
 String getId() {
- if (empty(id)) id = UUID.randomUUID().toString();
- return id;
+if (empty(id)) id = UUID.randomUUID().toString();
+return id;
 }
 
 EncounterType getType() { return type == null ? EncounterType.KILL : type; }
 ClassificationConfidence getConfidence() {
- return confidence == null ? ClassificationConfidence.UNCERTAIN : confidence;
+return confidence == null ? ClassificationConfidence.UNCERTAIN : confidence;
 }
 
 String getExplanation() { return orEmpty(explanation); }
 List<String> getTransactionIds() {
- return Collections.unmodifiableList(transactionIds);
+return Collections.unmodifiableList(transactionIds);
 }
 
 /**
@@ -65,16 +65,16 @@ List<String> getTransactionIds() {
 * same transaction id therefore update rather than double count it.
 */
 void setFinancialContribution(Transaction transaction) {
- if (transaction == null) return;
- String transactionId = transaction.getId();
- if (blank(transactionId)) return;
- financialContributions.put(transactionId, PkMoney.of(transaction));
+if (transaction == null) return;
+String transactionId = transaction.getId();
+if (blank(transactionId)) return;
+financialContributions.put(transactionId, PkMoney.of(transaction));
 }
 
 /** Removes one un-compacted receipt contribution, for correction undo. */
 boolean removeFinancialContribution(String transactionId) {
- if (transactionId == null) return false;
- return financialContributions.remove(transactionId) != null;
+if (transactionId == null) return false;
+return financialContributions.remove(transactionId) != null;
 }
 
 /**
@@ -84,33 +84,33 @@ boolean removeFinancialContribution(String transactionId) {
 * have left the correction/undo window.
 */
 boolean compactFinancialContribution(String transactionId) {
- if (transactionId == null) return false;
- PkMoney contribution = financialContributions.remove(transactionId);
- if (contribution == null) return false;
- retainedFinancialNetGp = safeAdd(retainedFinancialNetGp, contribution.netGp);
- retainedFinancialCostsGp = safeAdd(retainedFinancialCostsGp, contribution.getCostsGp());
- if (contribution.costSplitAvailable) {
-  retainedFinancialSuppliesCostsGp = safeAdd(retainedFinancialSuppliesCostsGp, contribution.getSuppliesCostsGp());
- } else {
-  financialCostSplitComplete = false;
- }
- return true;
+if (transactionId == null) return false;
+PkMoney contribution = financialContributions.remove(transactionId);
+if (contribution == null) return false;
+retainedFinancialNetGp = safeAdd(retainedFinancialNetGp, contribution.netGp);
+retainedFinancialCostsGp = safeAdd(retainedFinancialCostsGp, contribution.getCostsGp());
+if (contribution.costSplitAvailable) {
+retainedFinancialSuppliesCostsGp = safeAdd(retainedFinancialSuppliesCostsGp, contribution.getSuppliesCostsGp());
+} else {
+financialCostSplitComplete = false;
+}
+return true;
 }
 
 /** Net GP across retained and per-transaction contributions. */
 long getFinancialNetGp() {
- return total().netGp;
+return total().netGp;
 }
 
 /** Encounter loss follows the existing PK metric definition: max(0, costs - revenue). */
 long getFinancialLossGp() {
- return total().getLossGp();
+return total().getLossGp();
 }
 
 PkMoney total() {
- var total = new PkMoney(retainedFinancialNetGp, retainedFinancialCostsGp,
- retainedFinancialSuppliesCostsGp, financialCostSplitComplete);
- financialContributions.values().forEach(total::plus);
- return total;
+var total = new PkMoney(retainedFinancialNetGp, retainedFinancialCostsGp,
+retainedFinancialSuppliesCostsGp, financialCostSplitComplete);
+financialContributions.values().forEach(total::plus);
+return total;
 }
 }

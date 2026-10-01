@@ -19,49 +19,49 @@ PkMutableAttribution() {
 }
 
 PkMutableAttribution(String encounterId, EncounterType type) {
- this.encounterId = encounterId;
- this.type = type == null ? EncounterType.KILL : type;
+this.encounterId = encounterId;
+this.type = type == null ? EncounterType.KILL : type;
 }
 
 String getEncounterId() { return ModelText.orEmpty(encounterId); }
 EncounterType getType() { return type == null ? EncounterType.KILL : type; }
 /** The finalized subtotal plus every receipt still open to correction. */
 PkMoney current() {
- var total = new PkMoney(finalizedNet, finalizedCosts, finalizedSupplies, finalizedCostSplitAvailable);
- children().values().forEach(total::plus);
- return total;
+var total = new PkMoney(finalizedNet, finalizedCosts, finalizedSupplies, finalizedCostSplitAvailable);
+children().values().forEach(total::plus);
+return total;
 }
 
 boolean holds(String transactionId) {
- return children().containsKey(transactionId);
+return children().containsKey(transactionId);
 }
 
 boolean hasChildren() {
- return !children().isEmpty();
+return !children().isEmpty();
 }
 
 void putChild(String transactionId, PkMoney money) {
- if (transactionId != null && !transactionId.isEmpty()) children().put(transactionId, money);
+if (transactionId != null && !transactionId.isEmpty()) children().put(transactionId, money);
 }
 
 boolean removeChild(String transactionId) {
- return children().remove(transactionId) != null;
+return children().remove(transactionId) != null;
 }
 
 /** Folds one receipt child into the durable finalized subtotal exactly once. */
 boolean finalizeChild(String transactionId) {
- PkMoney child = children().remove(transactionId);
- if (child == null) return false;
- var finalized = new PkMoney(finalizedNet, finalizedCosts, finalizedSupplies, finalizedCostSplitAvailable).plus(child);
- finalizedNet = finalized.netGp;
- finalizedCosts = finalized.getCostsGp();
- finalizedSupplies = finalized.getSuppliesCostsGp();
- finalizedCostSplitAvailable = finalized.costSplitAvailable;
- return true;
+PkMoney child = children().remove(transactionId);
+if (child == null) return false;
+var finalized = new PkMoney(finalizedNet, finalizedCosts, finalizedSupplies, finalizedCostSplitAvailable).plus(child);
+finalizedNet = finalized.netGp;
+finalizedCosts = finalized.getCostsGp();
+finalizedSupplies = finalized.getSuppliesCostsGp();
+finalizedCostSplitAvailable = finalized.costSplitAvailable;
+return true;
 }
 
 Map<String, PkMoney> children() {
- if (children == null) children = new LinkedHashMap<>();
- return children;
+if (children == null) children = new LinkedHashMap<>();
+return children;
 }
 }

@@ -8,6 +8,6 @@ final String label;
 @Getter
 final int days;
 public String toString() {
- return label;
+return label;
 }
 }

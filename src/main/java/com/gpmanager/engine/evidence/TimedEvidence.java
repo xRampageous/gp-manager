@@ -9,7 +9,7 @@ import static java.lang.Math.*;
 abstract class TimedEvidence {
 int ticksRemaining;
 protected TimedEvidence(int ticks) {
- this.ticksRemaining = max(1, ticks);
+this.ticksRemaining = max(1, ticks);
 }
 
 /**
@@ -18,7 +18,7 @@ protected TimedEvidence(int ticks) {
 * longer window by an earlier, stronger signal.
 */
 final void refresh(int ticks) {
- ticksRemaining = max(ticksRemaining, max(1, ticks));
+ticksRemaining = max(ticksRemaining, max(1, ticks));
 }
 
 /**
@@ -28,15 +28,15 @@ final void refresh(int ticks) {
 *         (the caller should discard/null out its reference now).
 */
 final boolean tick() {
- return --ticksRemaining <= 0;
+return --ticksRemaining <= 0;
 }
 
 /** True once {@link #tick()} has exhausted the lifetime. */
 final boolean isExpired() {
- return ticksRemaining <= 0;
+return ticksRemaining <= 0;
 }
 
 final int ticksRemaining() {
- return ticksRemaining;
+return ticksRemaining;
 }
 }

@@ -12,24 +12,24 @@ int streak;
 long compactedDetailCount;
 /** Records one encounter's exact non-financial facts; money enters only at finalization. */
 void recordEncounter(EncounterType type) {
- encounters++;
- if (type == EncounterType.KILL) {
-  kills++;
-  streak = streak < 0 ? 1 : streak + 1;
- } else {
-  deaths++;
-  streak = streak > 0 ? -1 : streak - 1;
- }
+encounters++;
+if (type == EncounterType.KILL) {
+kills++;
+streak = streak < 0 ? 1 : streak + 1;
+} else {
+deaths++;
+streak = streak > 0 ? -1 : streak - 1;
+}
 }
 
 /** Marks one detailed encounter row as compacted away; exact facts are already retained. */
 void markDetailCompacted() {
- compactedDetailCount++;
+compactedDetailCount++;
 }
 
 long getCompactedDetailCount() { return nonNeg(compactedDetailCount); }
 long getRetainedDetailCount() { return nonNeg(getEncounters() - getCompactedDetailCount()); }
 PkDetailScope getDetailScope() {
- return getCompactedDetailCount() == 0L ? PkDetailScope.COMPLETE_HISTORY : PkDetailScope.RETAINED_WINDOW;
+return getCompactedDetailCount() == 0L ? PkDetailScope.COMPLETE_HISTORY : PkDetailScope.RETAINED_WINDOW;
 }
 }

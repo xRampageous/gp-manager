@@ -16,7 +16,7 @@ List<BasisPool> pools = new ArrayList<>();
 long getBasisEpochMillis() { return nonNeg(basisEpochMillis); }
 /** Never null: a pre-106 file upgrades with an empty pool. */
 List<BasisPool> getPools() {
- if (pools == null) pools = new ArrayList<>();
- return pools;
+if (pools == null) pools = new ArrayList<>();
+return pools;
 }
 }

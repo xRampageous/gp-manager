@@ -22,30 +22,30 @@ static final long MAX_TAX_PER_ITEM_GP = 5_000_000L;
 static final Set<Integer> EXEMPT_IDS = GameData.byId("d4").keySet();
 /** True when the wiki exemption list pays no GE tax on this item at any price. */
 static boolean isExempt(int itemId) {
- return EXEMPT_IDS.contains(itemId);
+return EXEMPT_IDS.contains(itemId);
 }
 
 /** Tax on one item sold at {@code unitPrice}; 0 when the price is unknown or below the floor. */
 static long perItemTax(long unitPrice) {
- if (unitPrice <= 0L) return 0L;
- return Math.min(MAX_TAX_PER_ITEM_GP, unitPrice / 50L);
+if (unitPrice <= 0L) return 0L;
+return Math.min(MAX_TAX_PER_ITEM_GP, unitPrice / 50L);
 }
 
 /** Item-aware per-item tax; an exempt item pays nothing at any price. */
 static long perItemTax(int itemId, long unitPrice) {
- return isExempt(itemId) ? 0L : perItemTax(unitPrice);
+return isExempt(itemId) ? 0L : perItemTax(unitPrice);
 }
 
 /** Tax for a whole stack sold at one unit price; long-safe, 0 when unpriceable. */
 static long stackTax(long unitPrice, long quantity) {
- long perItem = perItemTax(unitPrice);
- if (perItem <= 0L || quantity <= 0L || perItem > Long.MAX_VALUE / quantity) return 0L;
- return perItem * quantity;
+long perItem = perItemTax(unitPrice);
+if (perItem <= 0L || quantity <= 0L || perItem > Long.MAX_VALUE / quantity) return 0L;
+return perItem * quantity;
 }
 
 /** Item-aware stack tax; an exempt item pays nothing at any price. */
 static long stackTax(int itemId, long unitPrice, long quantity) {
- return isExempt(itemId) ? 0L : stackTax(unitPrice, quantity);
+return isExempt(itemId) ? 0L : stackTax(unitPrice, quantity);
 }
 
 /**
@@ -54,13 +54,13 @@ static long stackTax(int itemId, long unitPrice, long quantity) {
 * per-item price cannot be proven (including genuinely tax-free stacks).
 */
 static long uniformStackTax(long grossGp, long quantity) {
- if (grossGp <= 0L || quantity <= 0L || grossGp % quantity != 0L) return 0L;
- return stackTax(grossGp / quantity, quantity);
+if (grossGp <= 0L || quantity <= 0L || grossGp % quantity != 0L) return 0L;
+return stackTax(grossGp / quantity, quantity);
 }
 
 /** Item-aware uniform-execution tax; an exempt item pays nothing at any price. */
 static long uniformStackTax(int itemId, long grossGp, long quantity) {
- return isExempt(itemId) ? 0L : uniformStackTax(grossGp, quantity);
+return isExempt(itemId) ? 0L : uniformStackTax(grossGp, quantity);
 }
 
 /** Sentinel: no proven per-item price exists, so no tax can be asserted for an execution. */
@@ -73,12 +73,12 @@ static final long UNPROVABLE_TAX = -1L;
 * integer only, per-item floor, 5,000,000 gp/item cap, current exemption IDs.
 */
 static long provableStackTax(int itemId, long grossGp, long quantity) {
- if (grossGp <= 0L || quantity <= 0L) return UNPROVABLE_TAX;
- if (isExempt(itemId)) return 0L;
- if (grossGp % quantity != 0L) return UNPROVABLE_TAX;
- long perItem = perItemTax(grossGp / quantity);
- if (perItem > 0L && quantity > Long.MAX_VALUE / perItem) return UNPROVABLE_TAX;
- return perItem * quantity;
+if (grossGp <= 0L || quantity <= 0L) return UNPROVABLE_TAX;
+if (isExempt(itemId)) return 0L;
+if (grossGp % quantity != 0L) return UNPROVABLE_TAX;
+long perItem = perItemTax(grossGp / quantity);
+if (perItem > 0L && quantity > Long.MAX_VALUE / perItem) return UNPROVABLE_TAX;
+return perItem * quantity;
 }
 
 /**
@@ -92,10 +92,10 @@ static long provableStackTax(int itemId, long grossGp, long quantity) {
 * prior tracked value of the sold units.</p>
 */
 static long acceptedStackTax(int itemId, long grossGp, long quantity, long receivedGp) {
- if (grossGp <= 0L || quantity <= 0L || receivedGp < 0L) return 0L;
- long gap = grossGp - receivedGp;
- if (gap <= 0L) return 0L;
- long expected = uniformStackTax(itemId, grossGp, quantity);
- return expected > 0L && gap == expected ? gap : 0L;
+if (grossGp <= 0L || quantity <= 0L || receivedGp < 0L) return 0L;
+long gap = grossGp - receivedGp;
+if (gap <= 0L) return 0L;
+long expected = uniformStackTax(itemId, grossGp, quantity);
+return expected > 0L && gap == expected ? gap : 0L;
 }
 }

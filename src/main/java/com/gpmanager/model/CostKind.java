@@ -27,25 +27,25 @@ static final int GE_TAX_ITEM_ID = -99502;
 * {@link #NONE}.
 */
 static CostKind of(Transaction transaction, Flow flow) {
- if (transaction == null || flow == null || transaction.getActionKind() == ActionKind.DEFERRED_CLAIM) {
-  return NONE;
- }
- AccountingProjection.TransactionAmounts effective = AccountingProjection.flow(transaction, flow);
- if (!effective.available || !effective.included || effective.costs <= 0L) return NONE;
- if (flow.itemId == GE_TAX_ITEM_ID || transaction.getAutomaticType() == PK_FEE
- || transaction.getAutomaticType() == PK_DEATH_LOSS) {
-  return LOSS;
- }
- if (transaction.getAutomaticType() == TRADE) return MARKET;
- TransactionType type = transaction.getAutomaticType();
- // Supplies are consumables the player used (eat / drink / cast / fire / charges / processing
- // inputs), which the engine evidences with an action kind or a supply-shaped type. A plain
- // "value decreased" consumption with no evidence is an item gone, i.e. a loss.
- // A production run's input is a supply even when that action made nothing (a failed smelt).
- if (type == PK_SUPPLY_COST || type == PROCESSING || transaction.getActionKind() != null
- || transaction.getContext() == Context.PRODUCTION) {
-  return SUPPLIES;
- }
- return LOSS;
+if (transaction == null || flow == null || transaction.getActionKind() == ActionKind.DEFERRED_CLAIM) {
+return NONE;
+}
+AccountingProjection.TransactionAmounts effective = AccountingProjection.flow(transaction, flow);
+if (!effective.available || !effective.included || effective.costs <= 0L) return NONE;
+if (flow.itemId == GE_TAX_ITEM_ID || transaction.getAutomaticType() == PK_FEE
+|| transaction.getAutomaticType() == PK_DEATH_LOSS) {
+return LOSS;
+}
+if (transaction.getAutomaticType() == TRADE) return MARKET;
+TransactionType type = transaction.getAutomaticType();
+// Supplies are consumables the player used (eat / drink / cast / fire / charges / processing
+// inputs), which the engine evidences with an action kind or a supply-shaped type. A plain
+// "value decreased" consumption with no evidence is an item gone, i.e. a loss.
+// A production run's input is a supply even when that action made nothing (a failed smelt).
+if (type == PK_SUPPLY_COST || type == PROCESSING || transaction.getActionKind() != null
+|| transaction.getContext() == Context.PRODUCTION) {
+return SUPPLIES;
+}
+return LOSS;
 }
 }

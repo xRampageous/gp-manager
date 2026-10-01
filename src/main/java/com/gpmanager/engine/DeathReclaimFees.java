@@ -7,6 +7,6 @@ import static com.gpmanager.GameData.msg;
 */
 class DeathReclaimFees {
 static String graveFeeWhy(boolean ironman) {
- return ironman ? msg("ap") : msg("ca");
+return ironman ? msg("ap") : msg("ca");
 }
 }

@@ -11,12 +11,12 @@ import static java.lang.Math.*;
 class TrackedBasisMath {
 /** Floor-share of a pooled quantity/basis pair; consuming everything takes the exact remainder. */
 static long shareOf(long totalQty, long totalBasisGp, long consumeQty) {
- long qty = nonNeg(totalQty);
- long basis = nonNeg(totalBasisGp);
- long consume = nonNeg(consumeQty);
- if (qty <= 0L || basis <= 0L || consume <= 0L) return 0L;
- if (consume >= qty) return basis;
- return multiplyDivide(basis, consume, qty);
+long qty = nonNeg(totalQty);
+long basis = nonNeg(totalBasisGp);
+long consume = nonNeg(consumeQty);
+if (qty <= 0L || basis <= 0L || consume <= 0L) return 0L;
+if (consume >= qty) return basis;
+return multiplyDivide(basis, consume, qty);
 }
 
 /**
@@ -24,20 +24,20 @@ static long shareOf(long totalQty, long totalBasisGp, long consumeQty) {
 * the unknown remainder receives the integer difference, so both always sum to the settlement.
 */
 static long knownProceedsOf(long totalSettlementGp, long realizedQty, long knownQty) {
- long total = nonNeg(totalSettlementGp);
- long realized = nonNeg(realizedQty);
- long known = nonNeg(min(knownQty, realized));
- if (realized <= 0L || known <= 0L) return 0L;
- if (known >= realized) return total;
- return multiplyDivide(total, known, realized);
+long total = nonNeg(totalSettlementGp);
+long realized = nonNeg(realizedQty);
+long known = nonNeg(min(knownQty, realized));
+if (realized <= 0L || known <= 0L) return 0L;
+if (known >= realized) return total;
+return multiplyDivide(total, known, realized);
 }
 
 /** Long-safe floor(value × numerator / denominator) for non-negative inputs. */
 static long multiplyDivide(long value, long numerator, long denominator) {
- if (denominator <= 0L || numerator <= 0L || value <= 0L) return 0L;
- if (numerator >= denominator) return value;
- BigInteger product = BigInteger.valueOf(value).multiply(BigInteger.valueOf(numerator));
- BigInteger share = product.divide(BigInteger.valueOf(denominator));
- return share.compareTo(BigInteger.valueOf(Long.MAX_VALUE)) > 0 ? Long.MAX_VALUE : share.longValue();
+if (denominator <= 0L || numerator <= 0L || value <= 0L) return 0L;
+if (numerator >= denominator) return value;
+BigInteger product = BigInteger.valueOf(value).multiply(BigInteger.valueOf(numerator));
+BigInteger share = product.divide(BigInteger.valueOf(denominator));
+return share.compareTo(BigInteger.valueOf(Long.MAX_VALUE)) > 0 ? Long.MAX_VALUE : share.longValue();
 }
 }

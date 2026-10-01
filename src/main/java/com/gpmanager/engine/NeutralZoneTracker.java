@@ -14,34 +14,34 @@ import lombok.Getter;
 @Getter
 class NeutralZoneTracker {
 enum Signal {
- /** Not in a neutral zone and nothing to close. */
- NONE,
- /** First tick inside a neutral zone. */
- ENTERED,
- /** Inside a neutral zone: keep the transfer window open this tick. */
- INSIDE,
- /** Just left a neutral zone: open one closing window for the gear restore. */
- LEFT
+/** Not in a neutral zone and nothing to close. */
+NONE,
+/** First tick inside a neutral zone. */
+ENTERED,
+/** Inside a neutral zone: keep the transfer window open this tick. */
+INSIDE,
+/** Just left a neutral zone: open one closing window for the gear restore. */
+LEFT
 }
 
 boolean inside;
 /** Feed the current region id (0 or negative when unknown). */
 Signal onRegion(int regionId) {
- boolean now = MinigameRegionHints.isNeutralZoneRegion(regionId);
- if (now) {
-  boolean entered = !inside;
-  inside = true;
-  return entered ? Signal.ENTERED : Signal.INSIDE;
- }
- if (inside && regionId > 0) {
-  inside = false;
-  return Signal.LEFT;
- }
- // Unknown region (loading screens) keeps the previous state without signalling.
- return Signal.NONE;
+boolean now = MinigameRegionHints.isNeutralZoneRegion(regionId);
+if (now) {
+boolean entered = !inside;
+inside = true;
+return entered ? Signal.ENTERED : Signal.INSIDE;
+}
+if (inside && regionId > 0) {
+inside = false;
+return Signal.LEFT;
+}
+// Unknown region (loading screens) keeps the previous state without signalling.
+return Signal.NONE;
 }
 
 void reset() {
- inside = false;
+inside = false;
 }
 }

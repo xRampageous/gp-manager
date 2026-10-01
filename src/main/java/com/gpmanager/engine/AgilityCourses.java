@@ -9,13 +9,13 @@ class AgilityCourses {
 static final Map<Integer, String> BY_REGION = GameData.byId("d14");
 /** Course name for a region, or null when the region is not a known course. */
 static String courseName(int regionId) {
- return BY_REGION.get(regionId);
+return BY_REGION.get(regionId);
 }
 
 /** The Wilderness course's reward dispenser and the Brimhaven ticket dispenser. */
 static boolean isDispenser(String target) {
- if (target == null) return false;
- String lower = target.trim().toLowerCase(Locale.ROOT);
- return ModelText.has(lower, "agility dispenser", "ticket dispenser");
+if (target == null) return false;
+String lower = target.trim().toLowerCase(Locale.ROOT);
+return ModelText.has(lower, "agility dispenser", "ticket dispenser");
 }
 }

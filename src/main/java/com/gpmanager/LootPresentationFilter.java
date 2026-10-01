@@ -10,6 +10,6 @@ public enum LootPresentationFilter {
 ALL_ITEMS("All items"), FOLLOW_GROUND_ITEMS("Follow Ground Items"), HIGHLIGHTED_LIST_ONLY(msg("eo"));
 final String label;
 public String toString() {
- return label;
+return label;
 }
 }

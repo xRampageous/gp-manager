@@ -11,6 +11,6 @@ FACE_VALUE("face value"),
 HIGH_ALCHEMY("high alchemy"), DEFERRED_CLAIM("Claim on open"), UNPRICED("unpriced"), UNKNOWN("unknown");
 final String label;
 public String toString() {
- return label;
+return label;
 }
 }

@@ -25,7 +25,7 @@ BasisPool() {
 }
 
 BasisPool(int itemId) {
- this.itemId = itemId;
+this.itemId = itemId;
 }
 
 long getAvailableQty() { return nonNeg(availableQty); }
@@ -38,11 +38,11 @@ long getReservedBasisGp() { return nonNeg(reservedBasisGp); }
 void setReservedBasisGp(long value) { reservedBasisGp = nonNeg(value); }
 long getRealizationFenceEpochMillis() { return nonNeg(realizationFenceEpochMillis); }
 void setRealizationFenceEpochMillis(long value) {
- realizationFenceEpochMillis = nonNeg(value);
+realizationFenceEpochMillis = nonNeg(value);
 }
 
 long getLatestAcquisitionEpochMillis() { return nonNeg(latestAcquisitionEpochMillis); }
 void setLatestAcquisitionEpochMillis(long value) {
- latestAcquisitionEpochMillis = nonNeg(value);
+latestAcquisitionEpochMillis = nonNeg(value);
 }
 }

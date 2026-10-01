@@ -12,6 +12,6 @@ default boolean showRecent(String name, long quantity) { return true; }
 default void hideRecent(String name) { }
 /** Changes whenever the decisions may change, so the Live list is rebuilt only then. */
 default String version() {
- return "";
+return "";
 }
 }

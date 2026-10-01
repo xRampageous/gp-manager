@@ -28,29 +28,29 @@ final boolean offline;
 final boolean hopping;
 LiveContext(boolean idle, RecentFilter filter, long minimumDisplayedLootValue, PvpState pvp, String activity,
 boolean offline, String target) {
- this(idle, filter, minimumDisplayedLootValue, pvp, activity, offline, target, false);
+this(idle, filter, minimumDisplayedLootValue, pvp, activity, offline, target, false);
 }
 
 LiveContext(boolean idle, RecentFilter filter, long minimumDisplayedLootValue, PvpState pvp, String activity,
 boolean offline, String target, boolean hopping) {
- this.idle = idle;
- this.filter = filter;
- this.minimumDisplayedLootValue = SafeMath.nonNeg(minimumDisplayedLootValue);
- this.pvp = pvp == null ? PvpState.NONE : pvp;
- this.activity = ModelText.orEmpty(activity);
- this.offline = offline;
- this.target = ModelText.orEmpty(target);
- this.hopping = hopping;
+this.idle = idle;
+this.filter = filter;
+this.minimumDisplayedLootValue = SafeMath.nonNeg(minimumDisplayedLootValue);
+this.pvp = pvp == null ? PvpState.NONE : pvp;
+this.activity = ModelText.orEmpty(activity);
+this.offline = offline;
+this.target = ModelText.orEmpty(target);
+this.hopping = hopping;
 }
 
 /** Whether one flow stays on a presentation row under the current visibility settings. */
 boolean flowVisible(Flow flow) {
- if (flow == null) return false;
- // Costs, fees and deaths are never hidden by the display loot filter.
- if (flow.quantityDelta <= 0L) return true;
- // Unknown / unpriced gains remain discoverable for Review; the minimum is
- // compared against the unit price so quantity cannot defeat it.
- if (flow.unitPrice > 0 && flow.unitPrice < minimumDisplayedLootValue) return false;
- return filter == null || filter.isFlowIncluded(flow);
+if (flow == null) return false;
+// Costs, fees and deaths are never hidden by the display loot filter.
+if (flow.quantityDelta <= 0L) return true;
+// Unknown / unpriced gains remain discoverable for Review; the minimum is
+// compared against the unit price so quantity cannot defeat it.
+if (flow.unitPrice > 0 && flow.unitPrice < minimumDisplayedLootValue) return false;
+return filter == null || filter.isFlowIncluded(flow);
 }
 }

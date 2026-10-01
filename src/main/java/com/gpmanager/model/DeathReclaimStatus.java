@@ -10,9 +10,9 @@ final boolean armed;
 final long outstandingItemCount;
 final long ageTicks;
 DeathReclaimStatus(boolean awaiting, boolean armed, long outstandingItemCount, long ageTicks) {
- this.awaiting = awaiting;
- this.armed = awaiting && armed;
- this.outstandingItemCount = nonNeg(outstandingItemCount);
- this.ageTicks = nonNeg(ageTicks);
+this.awaiting = awaiting;
+this.armed = awaiting && armed;
+this.outstandingItemCount = nonNeg(outstandingItemCount);
+this.ageTicks = nonNeg(ageTicks);
 }
 }

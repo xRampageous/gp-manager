@@ -38,19 +38,19 @@ SUPPLIES("supplies");
 final String wireName;
 /** Stable persisted identifier. */
 String wireName() {
- return wireName;
+return wireName;
 }
 
 static ActionKind fromWireName(String value) {
- return ModelText.blank(value) ? null : BY_WIRE.get(value.trim().toLowerCase(Locale.ROOT));
+return ModelText.blank(value) ? null : BY_WIRE.get(value.trim().toLowerCase(Locale.ROOT));
 }
 
 /** Wire and constant names, lowercased, read on every getActionKind() (a hot path). */
 static final Map<String, ActionKind> BY_WIRE = new HashMap<>();
 static {
- for (ActionKind kind : values()) {
-  BY_WIRE.put(kind.wireName, kind);
-  BY_WIRE.put(kind.name().toLowerCase(Locale.ROOT), kind);
- }
+for (ActionKind kind : values()) {
+BY_WIRE.put(kind.wireName, kind);
+BY_WIRE.put(kind.name().toLowerCase(Locale.ROOT), kind);
+}
 }
 }

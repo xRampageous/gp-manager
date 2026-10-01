@@ -14,33 +14,33 @@ static final HudSnapshot HIDDEN = new HudSnapshot(false, Gem.OFF, "", "", "", Co
 "", Color.WHITE, 0L, "", "", Color.WHITE, false, "", emptyList(), "", 0, 0L, 0L, emptyList(), emptyList(), 0L);
 /** Tracking state dot: live, paused, away, not tracking, PvP. */
 enum Gem {
- LIVE, PAUSED, AWAY, OFF, PVP
+LIVE, PAUSED, AWAY, OFF, PVP
 }
 
 /** One tray row: sprite, "Copper ore ×1", value and its colour; gold for a big drop. */
 @RequiredArgsConstructor
 static class Row {
- final BufferedImage icon;
- final String name;
- final String tag;
- final String value;
- final Color color;
- final boolean gold;
- /** When the row first appeared, for its fade-in. */
- final long born;
+final BufferedImage icon;
+final String name;
+final String tag;
+final String value;
+final Color color;
+final boolean gold;
+/** When the row first appeared, for its fade-in. */
+final long born;
 }
 
 /** One folio line: a section header, a label/value pair, a progress bar or an item row. */
 @RequiredArgsConstructor
 static class Line {
- enum Kind { HEADER, PAIR, BAR, ITEM }
- final Kind kind;
- final String label;
- final String value;
- final Color color;
- /** Bar fill 0..1 for {@link Kind#BAR}. */
- final double fill;
- final BufferedImage icon;
+enum Kind { HEADER, PAIR, BAR, ITEM }
+final Kind kind;
+final String label;
+final String value;
+final Color color;
+/** Bar fill 0..1 for {@link Kind#BAR}. */
+final double fill;
+final BufferedImage icon;
 }
 
 final boolean visible;
