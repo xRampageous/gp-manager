@@ -52,11 +52,11 @@ public class CalibratingCueTest
         assertTrue(during.calibrating);
         assertEquals("CALIBRATING", LivePage.wordOf(during));
         Cp builder = new Cp(new GpManagerConfig() {}, null);
-        assertEquals("Calibrating\u2026", builder.update(during, f -> true, null, NOW + 2_500L).context);
+        assertEquals("Calibrating\u2026", builder.update(during, f -> true, NOW + 2_500L).context);
 
         Ca after = Ca.capture(engine, NOW + 5_000L, null);
         assertFalse(after.calibrating);
         assertEquals("plain running needs no status word", "", LivePage.wordOf(after));
-        assertEquals("", builder.update(after, f -> true, null, NOW + 5_000L).context);
+        assertEquals("", builder.update(after, f -> true, NOW + 5_000L).context);
     }
 }

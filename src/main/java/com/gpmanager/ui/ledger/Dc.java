@@ -124,7 +124,7 @@ static List<String> zs(Row market, boolean corrected) {
   lines.add("Previously counted|" + (unknown ? "Unknown" : exact(market.trackedBasisConsumedGp) + " gp"));
   lines.add("Result|" + (unknown && !market.manualFinancialResult ? "\u2014" : market.realizedResultCorrectionAware
   ? ru(market.realizedResultGp) + " gp" + (market.coverage == Bi.Coverage.PARTIALLY_KNOWN
-  ? " \u00b7 Partial" : "") + (corrected ? " \u00b7 Corrected" : "") : "\u2014"));
+  ? " \u00b7 Partial" : "") + (corrected ? msg("cy") : "") : "\u2014"));
   if (market.knownCostOnly) {
    // Only the BOOKED state with an AUTO correction earns this row: the tax is a real
    // market cost here. Uncounted/pre-change, corrected and fully known sales never
@@ -134,7 +134,7 @@ static List<String> zs(Row market, boolean corrected) {
  } else {
   lines.add("Tracked value|" + exact(market.trackedBasisConsumedGp) + " gp");
   lines.add("Result|" + (market.realizedResultCorrectionAware ? ru(market.realizedResultGp) + " gp"
-  + (corrected ? " \u00b7 Corrected" : "") : "0 gp"));
+  + (corrected ? msg("cy") : "") : "0 gp"));
  }
  if (market.settlementAdjustmentGp != 0L && market.inferredGeTaxGp <= 0L) {
   // An unexplained gap is the receipt's own answer and must stay visible.

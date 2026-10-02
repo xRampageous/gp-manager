@@ -46,6 +46,8 @@ final MaterialTabGroup tabs = new MaterialTabGroup();
 final Map<String, MaterialTab> tabById = new LinkedHashMap<>();
 final JPanel bar = new JPanel(new BorderLayout());
 final JPanel sheet = stack(CARD, GAP);
+/** Holds the sheet with its margin; hidden with it, so no gap sits under the toolbar (owner 1.1). */
+final JPanel sheetHolder = new JPanel(new BorderLayout());
 String sheetTitle = "";
 final CardLayout cards = new CardLayout();
 final JPanel bodies = new JPanel(cards);
@@ -83,8 +85,9 @@ Shell() {
  // Four equal cells: the stock centred flow wraps the fourth tab at sidebar width.
  tabs.setLayout(new GridLayout(1, TABS.length));
  bar.setOpaque(false);
- // Owner 2026-10-01: the page toolbar attaches to the tab strip and shares one band shape.
- pad(bar, 0, GAP, GAP, GAP);
+ // Owner 2026-10-01: the page toolbar attaches to the tab strip and shares one band shape;
+ // owner 1.1: it sits close to the first table.
+ pad(bar, 0, GAP, 2, GAP);
  var top = new JPanel(new BorderLayout());
  top.setOpaque(false);
  // The gear beside the tabs holds profile-wide data actions, reachable from any page.
@@ -103,11 +106,11 @@ Shell() {
  top.add(strip, BorderLayout.NORTH);
  top.add(bar, BorderLayout.CENTER);
  sheet.setVisible(false);
- var amz = new JPanel(new BorderLayout());
- amz.setOpaque(false);
- pad(amz, GAP, GAP, 0, GAP);
- amz.add(sheet, BorderLayout.CENTER);
- top.add(amz, BorderLayout.SOUTH);
+ sheetHolder.setOpaque(false);
+ sheetHolder.setVisible(false);
+ pad(sheetHolder, GAP, GAP, 0, GAP);
+ sheetHolder.add(sheet, BorderLayout.CENTER);
+ top.add(sheetHolder, BorderLayout.SOUTH);
  add(top, BorderLayout.NORTH);
  bodies.setOpaque(false);
  add(bodies, BorderLayout.CENTER);
@@ -280,6 +283,7 @@ void sheet(String title, String message, JComponent content, Choice... choices) 
  buttons.add(button("Cancel", false, this::pc));
  sheet.add(buttons);
  sheet.setVisible(true);
+ sheetHolder.setVisible(true);
  revalidate();
  repaint();
 }
@@ -310,6 +314,7 @@ void confirm(String title, String message, String action, Runnable onConfirm) {
 void pc() {
  if (sheet.isVisible()) {
   sheet.setVisible(false);
+  sheetHolder.setVisible(false);
   sheet.removeAll();
   sheetTitle = "";
   revalidate();

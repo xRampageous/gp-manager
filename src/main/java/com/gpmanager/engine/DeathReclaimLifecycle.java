@@ -10,7 +10,7 @@ import static com.gpmanager.Dv.*;
 * PvM death → reclaim lifecycle. A separate held-stack snapshot is intersected with
 * measured negative inventory flows to establish which items actually left the player.
 * Those exact quantities remain ownership-neutral until reclaimed or the gravestone timer
-* expires. The explanatory {@link Ch} is intentionally not used here.
+* expires.
 *
 * <p>Fees are never inferred here; the engine can book only an observed carried-coin loss.
 * A timer expiry records an informational audit event and never creates an item loss.

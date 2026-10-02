@@ -69,7 +69,6 @@ final Clue active = new Clue();
 int contextTicks;
 final Clue pending = new Clue();
 /** One-shot display-only snapshot captured at the local death event. */
-Ch pendingLocalDeathEvidence;
 /*
 * --- Per-source bank-transfer evidence lifetimes ---
 *
@@ -128,6 +127,10 @@ int neutralZoneEntryCaptureTicks;
 int neutralZoneRestoreTicks;
 DropIntent dropIntent;
 final Deque<OwnDropRecord> ownDrops = new ArrayDeque<>();
+/** Ammo fired in the running session, newest last: picking it back up recovers it (owner 1.1). */
+final Deque<OwnDropRecord> firedAmmo = new ArrayDeque<>();
+/** Item ids a ground Take was clicked for, with the ticks the click stays evidence. */
+final Map<Integer, Integer> takes = new HashMap<>();
 static final int MAX_OWN_DROPS = 32;
 /** One counted LOOT/PK_LOOT revenue per encounter id. */
 /** Active clue path for dig/tele/key cost pairing. */
@@ -539,6 +542,11 @@ synchronized void abz(int itemId, int ticks, int worldX, int worldY, int worldPl
  dropIntent = new DropIntent(itemId, max(1, ticks), worldX, worldY, worldPlane, hasLocation);
 }
 
+/** A ground-item Take: for 50 ticks a gain of that item may be fired ammo coming back. */
+synchronized void noteTake(int itemId) {
+ if (itemId > 0) takes.put(itemId, 50);
+}
+
 /** Latest local-player tile for conservative own-drop recovery matching; never a PvP place fact. */
 synchronized void aki(int worldX, int worldY, int worldPlane) {
  playerWorldX = worldX;
@@ -803,8 +811,7 @@ synchronized void zn(Map<Integer, Long> expectedLoot, int ticks, String label, l
 * snapshot. The snapshot is reconciled against measured negative flows; presentation
 * evidence remains explanation-only.
 */
-synchronized void zi(int ticks, Ch evidence, Map<Integer, Long> heldItemsAtDeath) {
- pendingLocalDeathEvidence = evidence;
+synchronized void zi(int ticks, Map<Integer, Long> heldItemsAtDeath) {
  markContext(Aj.TRANSFER, max(1, ticks), msg("fw"));
  // Start after the transfer marker so this new death cannot cancel its own
  // bounded whitelist when strong-context supersession is evaluated.
@@ -815,9 +822,8 @@ synchronized void zi(int ticks, Ch evidence, Map<Integer, Long> heldItemsAtDeath
 * Local death with no confident PvM / PK classification. Drop stale transfer and
 * action evidence so its inventory wipe is booked from ordinary loss evidence.
 */
-synchronized void zj(Ch evidence) {
+synchronized void zj() {
  claims.nk();
- pendingLocalDeathEvidence = evidence;
  deathReclaim.reset();
  consumptionIntent = null;
  dropIntent = null;
@@ -877,7 +883,7 @@ boolean allowObservedFee) {
  if (!returned.isEmpty()) {
   String source = service == null ? msg("az") : service.interactable;
   recovered = mp(now, msg("bj"), "Death reclaim", returned,
-  "Items recovered from " + source + " after a death; ownership never changed.", null);
+  "Items recovered from " + source + msg("bm"), null);
   audit(recovered);
  }
  boolean ase = service != null || !returned.isEmpty();
@@ -890,15 +896,12 @@ boolean allowObservedFee) {
 }
 
 /** Create a neutral audit receipt for the measured negative portion of the death wipe. */
-Ac sf(List<Ab> flows, Map<Integer, Long> measuredLosses, long now,
-Ch deathEvidence) {
+Ac sf(List<Ab> flows, Map<Integer, Long> measuredLosses, long now) {
  if (empty(flows) || empty(measuredLosses)) return null;
  var outstanding = new HashMap<Integer, Long>(measuredLosses);
  List<Ab> anc = claim(flows, Ab::isCost, (flow, quantity) -> take(outstanding, flow.itemId, quantity));
  if (anc.isEmpty()) return null;
- String explanation = msg("fx");
- if (deathEvidence != null) explanation = deathEvidence.avy(explanation, anc);
- Ac transfer = mp(now, msg("fw"), "Death reclaim", anc, explanation, null);
+ Ac transfer = mp(now, msg("fw"), "Death reclaim", anc, msg("fx"), null);
  audit(transfer);
  return transfer;
 }
@@ -930,12 +933,11 @@ Ac aih(List<Ab> flows, Map<Integer, Long> observedLootQuantities, long now) {
  return mp(now, msg("cg"), "Gauntlet", restored, msg("gw"), null);
 }
 
-synchronized void zo(String label, long now, Ch evidence) {
+synchronized void zo(String label, long now) {
  claims.nk();
  deathReclaim.reset();
  if (activeSession == null && !ait(now)) return;
  if (!live()) return;
- pendingLocalDeathEvidence = evidence;
  Bx encounter = activeSession.ke(Be.DEATH, now, label,
  Bd.CONFIRMED, msg("ic"));
  pkHistory.aeu(encounter);
@@ -1595,7 +1597,6 @@ static class Settle extends Clue {
  final long now;
  final Cc committed;
  List<Ab> flows;
- Ch deathEvidence;
  /** A local death with no confident PvM/PK classification: routine spends stay unlabelled. */
  boolean suppressActionEvidence;
  boolean localDeath;
@@ -1603,7 +1604,6 @@ static class Settle extends Clue {
  boolean ambiguousDeathCoinLoss;
  Map<Integer, Long> deathWipeLosses = emptyMap();
  Map<Integer, Long> keyLosses = emptyMap();
- List<Ab> deathEvidenceFlows = emptyList();
  String settledClaimId;
  Ac keyAudit;
  Cy loot = Cy.NONE;
@@ -1742,7 +1742,6 @@ List<Ac> mu(Settle s) {
 /** Commits the stabilized snapshot: its measured deltas, valued, under the pending claim. */
 Settle commit(Cc committed, long now) {
  var s = new Settle(pending, committed, now);
- s.deathEvidence = pendingLocalDeathEvidence;
  s.suppressActionEvidence = UNCLASSIFIED_LOCAL_DEATH_NOTE.equals(s.note);
  s.localDeath = s.suppressActionEvidence || s.context == PK_DEATH;
  if (s.suppressActionEvidence) {
@@ -1832,12 +1831,11 @@ void aip(Settle s) {
 
 /** Held items: keys lost on death, the measured death wipe, key-token losses and charge loads. */
 Ac aio(Settle s) {
- s.deathEvidenceFlows = s.localDeath ? new ArrayList<>(s.flows) : emptyList();
  if (s.localDeath || claims.vo()) {
   claims.aet(s.flows, Da.keyQuantities(s.committed.quantities));
  }
  Ac wipe = s.deathWipeLosses.isEmpty() ? null
- : sf(s.flows, s.deathWipeLosses, s.now, s.deathEvidence);
+ : sf(s.flows, s.deathWipeLosses, s.now);
  if (s.deathWipe && (wipe != null || wd(s.note))) {
   // The measured death-owned quantities have their own neutral receipt. Any
   // residual item changes in this settle must follow their own evidence.
@@ -2070,11 +2068,6 @@ Ac book(Settle s) {
  ? "Ownership-neutral transfer: " + s.note + "." : sc(s.context, type, counted);
  Ac transaction = mr(s.now, type, s.context, s.note, s.activity, counted,
  s.flows, confidence, explanation, s.encounterId);
- if (s.localDeath && s.deathEvidence != null && axs(s.deathEvidenceFlows)) {
-  // Evidence enriches the explanation only; the already-final flows,
-  // classification, valuation and counted state remain untouched.
-  transaction.agt(s.deathEvidence.avy(transaction.getExplanation(), s.deathEvidenceFlows));
- }
  if (!s.dropped && !s.destroy && !s.suppressActionEvidence) {
   // Presentation-only evidence; type/valuation/counted above are unchanged.
   transaction.setActionKind(Bn.resolve(s.actionIntent, s.flows, type, s.activity));
@@ -2092,13 +2085,22 @@ Ac book(Settle s) {
    s.settledClaimId = closed != null ? closed : s.settledClaimId;
   }
   if (s.settledClaimId != null) transaction.aid(s.settledClaimId);
-  if (aob) transaction.zd();
+  // Fired ammo is recoverable like an own drop: a pickup may shrink it (owner 1.1).
+  if (aob || counted && transaction.getActionKind() == FIRE) transaction.zd();
   add(transaction, false);
   if (s.encounterId != null && !s.encounterId.isEmpty()) {
    activeSession.ll(transaction.getId(), s.encounterId, false);
   }
  }
  if (aob) afm(transaction, s.flows);
+ if (atm && counted && transaction.getActionKind() == FIRE) {
+  for (Ab flow : s.flows) {
+   if (flow != null && flow.isCost()) {
+    firedAmmo.addLast(new OwnDropRecord(transaction.getId(), flow.itemId, Ae.abs(flow.quantityDelta), false, 0, 0, 0, 0));
+   }
+  }
+  while (firedAmmo.size() > 256) firedAmmo.removeFirst();
+ }
  if (s.dropped) dropIntent = null;
  return transaction;
 }
@@ -2296,7 +2298,6 @@ void ow() {
  pendingSnapshot = null;
  pendingStableTicks = 0;
  pending.clear();
- pendingLocalDeathEvidence = null;
  pending.transfer = false;
  pending.hard = false;
 }
@@ -2397,12 +2398,34 @@ OwnDropMatch aak(List<Ab> flows) {
 boolean ku(OwnDropMatch match, long now) {
  if (match == null || match.record == null || activeSession == null) return false;
  OwnDropRecord record = match.record;
+ boolean ammo = firedAmmo.contains(record);
  boolean recovered = activeSession.afc(record.transactionId, record.itemId, match.quantity, now,
- "Own-drop recovery");
+ ammo ? "Ammo recovery" : "Own-drop recovery");
  if (!recovered) return false;
  record.remainingQuantity -= match.quantity;
- if (record.remainingQuantity <= 0L) ownDrops.remove(record);
+ if (record.remainingQuantity <= 0L) {
+  ownDrops.remove(record);
+  firedAmmo.remove(record);
+ }
  return true;
+}
+
+/**
+* Fired ammo a Take picks back up, newest shot first: it shrinks that Supplies receipt instead of
+* booking loot. More than was fired and not yet recovered stays loot.
+*/
+OwnDropMatch ammo(Ab gain) {
+ if (gain == null || !takes.containsKey(gain.itemId)) return null;
+ for (var records = firedAmmo.descendingIterator(); records.hasNext();) {
+  OwnDropRecord record = records.next();
+  if (record.itemId != gain.itemId) continue;
+  Ac fired = activeSession.sw(record.transactionId);
+  if (fired != null && fired.isCounted() && fired.getCorrection() == Ah.AUTO) {
+   return new OwnDropMatch(record, min(gain.quantityDelta, record.remainingQuantity));
+  }
+  records.remove();
+ }
+ return null;
 }
 
 /** Reverse only a successfully recovered quantity; other measured gains keep their authority. */
@@ -2413,6 +2436,7 @@ Ac aff(Settle s) {
   Ab left = gain;
   while (left != null) {
    OwnDropMatch match = aak(singletonList(left));
+   if (match == null) match = ammo(left);
    if (match == null || !ku(match, s.now)) break;
    recovered.add(left.part(match.quantity));
    left = left.rest(match.quantity);
@@ -2430,6 +2454,8 @@ Ac aff(Settle s) {
 void os() {
  dropIntent = null;
  ownDrops.clear();
+ firedAmmo.clear();
+ takes.clear();
  playerLocationKnown = false;
 }
 
@@ -2519,6 +2545,8 @@ Ac ki(long now) {
  }
  if (consumptionIntent != null && consumptionIntent.tick()) consumptionIntent = null;
  if (dropIntent != null && dropIntent.tick()) dropIntent = null;
+ takes.replaceAll((id, ticks) -> ticks - 1);
+ takes.values().removeIf(ticks -> ticks <= 0);
  if (!ownDrops.isEmpty()) {
   ownDrops.removeIf(record -> record == null || record.tick());
  }

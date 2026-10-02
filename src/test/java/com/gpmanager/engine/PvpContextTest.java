@@ -71,7 +71,7 @@ public class PvpContextTest
 
         // Aj is bookkeeping only: it never creates, renames or splits the manual session.
         engine.zn(Collections.singletonMap(4151, 1L), 10, "Player kill", 3_000L);
-        engine.zo("Player death", 4_000L, null);
+        engine.zo("Player death", 4_000L);
 
         assertEquals(tripId, engine.getActiveSession().getId());
         assertEquals("PK Trip", engine.getActiveSession().getName());
@@ -86,7 +86,7 @@ public class PvpContextTest
         Am engine = engine();
         engine.rm(1_000L);
         engine.zn(Collections.emptyMap(), 10, "Player kill", 2_000L);
-        engine.zo("Player death", 3_000L, null);
+        engine.zo("Player death", 3_000L);
         for (Bx encounter : engine.getActiveSession().getPkEncounters())
         {
             assertFalse(encounter.label.contains(":"));
@@ -118,7 +118,7 @@ public class PvpContextTest
         assertTrue(engine.qi(loot.getId(), Ah.REVENUE, 3_500L, "counted again"));
         assertEquals(1_000_000L, engine.getActiveSession().ava().bestKill);
 
-        engine.zo("Player death", 4_000L, null);
+        engine.zo("Player death", 4_000L);
         Dt afterDeath = engine.getActiveSession().ava();
         assertEquals(1, afterDeath.deaths);
         assertEquals("a death without a settled loss is not a guessed worst death", 0L, afterDeath.largestDeathLoss);
@@ -132,7 +132,7 @@ public class PvpContextTest
         engine.zn(Collections.emptyMap(), 10, "Player kill", 2_000L);
         engine.acu(3_000L);
         engine.resume(4_000L, Ed.LIFECYCLE);
-        engine.zo("Player death", 5_000L, null);
+        engine.zo("Player death", 5_000L);
         assertEquals(1, engine.getActiveSession().ava().kills);
         assertEquals(1, engine.getActiveSession().ava().deaths);
         assertEquals("relog never closes the owner", 0L, engine.getActiveSession().endedAtEpochMillis);

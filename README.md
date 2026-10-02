@@ -19,11 +19,11 @@ An empty, untitled run uses one compact row:
 
 - **Live** – your Net, gains, supplies, losses and GP/h as you go, and the last few drops. Click the Net to set a target; Start and End a Grind right there, and click its name to rename it.
 - **Ledger** – every gain, loss, trade and death, with the reason it was counted. Losses split into Supplies, Items and Charges. Spells you autocast show by name. Open a row to see its receipts; fix any of them from one Correct menu (count it as revenue or a cost, mark it a transfer, exclude it, split it, or undo your latest correction). Anything it wasn't sure about waits in Review for your decision.
-- **Grinds** – start a named Grind for what you're doing (Vorkath, Zulrah, a skilling spot), save it with targets, and see every run and how it compares with the last, with its loot by the monster that dropped it. Between Grinds it tracks Free play on its own.
+- **Grinds** – start a named Grind for what you're doing (Vorkath, Zulrah, a skilling spot), save it with targets, and see every run with its biggest gain and cost and its loot by the monster that dropped it. Between Grinds it tracks Free play on its own.
 - **All time** – on the Grinds tab: your total Net, GP/h, active time, Grinds played, supplies and losses, and your best Grind by Net and by GP/h.
-- **HUD+** – a compact box in the game window: what you're fighting, Net, GP/h, and a loot tray for the current kill streak. Hover it for the full breakdown; a Grind ends with a short recap.
-- **PvP** – kills, deaths, K/D and player loot, only in confidently dangerous areas.
-- **Exports** – one CSV per Grind (retained item receipts and compacted totals) or of your whole history (one row per Grind), and a copy of your save file you can keep. Older receipts and detail beyond the receipt limit fold into exact totals. The selected retention window governs age-based compaction of closed runs; CSV marks compacted history as `COMPACTED` instead of inventing rows.
+- **HUD+** – a compact box in the game window: your Grind (or KC while you fight), Net, GP/h, and a loot tray naming the current kill streak with its Net per kill. When a Grind ends it shows its Net and time.
+- **PvP** – kills, deaths, K/D and player loot, only in confidently dangerous areas, and what a death there would risk.
+- **Backups** – a copy of your save file you can keep or restore. Older receipts and detail beyond the receipt limit fold into exact totals; the selected retention window governs age-based compaction of closed runs.
 
 ## How it counts
 
@@ -50,4 +50,4 @@ gradlew run
 
 `releaseBundle -PpublicRelease=true` prepares the public package without development build metadata.
 
-`releaseCheck` runs the tests, the accounting simulations and the safety audit. Contributions and bug reports: open an issue, with a CSV export of the Grind if you can.
+`releaseCheck` runs the tests, the accounting simulations and the safety audit. Contributions and bug reports: open an issue, with a screenshot of the Ledger receipt if you can.

@@ -19,7 +19,9 @@ static final int PAD = 5;
 /** HUD+ fits its content between these; the Max width setting lowers the top. */
 static final int MIN_WIDTH = 72;
 static final int MAX_WIDTH = 320;
-static final int ICON = 24;
+static final int ICON = 20;
+int rowHeight = ICON;
+int indent = ICON + 4;
 static final Color TEAL = new Color(0, 200, 180);
 static final Color CORAL = new Color(255, 127, 80);
 static final Color GOLD_ROW = new Color(255, 200, 40, 50);
@@ -169,14 +171,15 @@ long now, float open) {
  // The tray slides: clipped to the height it has opened to, and fading with it.
  g.clipRect(0, 0, width, size.height);
  fade(g, plain, open);
- text(g, body, s.trayLabel, PAD, y + 2 + fb.getAscent(), LABEL);
- y += 2 + fb.getHeight();
+ // The heading sits tight on its rows: no leading, no gap (owner 1.1).
+ text(g, body, s.trayLabel, PAD, y + fb.getAscent(), LABEL);
+ y += fb.getAscent() + fb.getDescent();
  for (int i = 0; i < names.length; i++) {
   Row row = s.rows.get(i);
   fade(g, plain, motion ? min(open, (now - row.born) / (float) FADE_IN_MILLIS) : open);
   if (row.gold) {
    g.setColor(GOLD_ROW);
-   g.fillRect(0, y, width, ICON);
+   g.fillRect(0, y, width, rowHeight);
   }
   if (row.icon != null && crops[i] != null) {
    Rectangle c = crops[i];
@@ -190,12 +193,12 @@ long now, float open) {
    int dy = y + (ICON - h) / 2;
    g.drawImage(row.icon, dx, dy, dx + w, dy + h, c.x, c.y, c.x + c.width, c.y + c.height, null);
   }
-  int axl = y + (ICON + fb.getAscent()) / 2 - 1;
+  int axl = y + (rowHeight + fb.getAscent()) / 2 - 1;
   int avw = right - width(fb, row.value);
-  text(g, body, names[i], PAD + ICON + 4, axl, Color.WHITE);
+  text(g, body, names[i], PAD + indent, axl, Color.WHITE);
   text(g, body, row.value, avw, axl, row.color);
   text(g, body, row.tag, avw - 4 - width(fb, row.tag), axl, LABEL);
-  y += ICON;
+  y += rowHeight;
  }
  fade(g, plain, open);
  text(g, body, s.more, PAD, y + fb.getAscent(), LABEL);
@@ -219,7 +222,11 @@ void measure(Cb s, FontMetrics fb, FontMetrics fh, FontMetrics fg) {
  int header = 11 + 8 + steady(fb, s.timer) + (rateUp ? steady(fb, s.rate) : 0);
  int content = compact ? header : max(width(fb, s.context), steady(fg, s.net) + steady(fb, s.target)
  + (s.trip.isEmpty() ? 0 : 6 + steady(fb, s.trip)) + (rateUp ? 0 : 8 + steady(fb, s.rate)));
- for (Row row : s.rows) content = max(content, ICON + 12 + width(fb, row.name) + right(fb, row));
+ // Owner 1.1: with item icons off a row is text-high and starts at the edge.
+ boolean icons = config.showItemIcons();
+ rowHeight = icons ? ICON : fb.getAscent() + fb.getDescent() + 2;
+ indent = icons ? ICON + 4 : 0;
+ for (Row row : s.rows) content = max(content, indent + 8 + width(fb, row.name) + right(fb, row));
  content = max(content, width(fb, s.more));
  int ceiling = max(MIN_WIDTH, min(MAX_WIDTH, config.hudMaxWidth()));
  int width = max(MIN_WIDTH, min(ceiling, max(content, width(fh, s.title) + header) + PAD * 2));
@@ -239,12 +246,12 @@ void measure(Cb s, FontMetrics fb, FontMetrics fh, FontMetrics fg) {
  crops = new Rectangle[rows];
  for (int i = 0; i < rows; i++) {
   Row row = s.rows.get(i);
-  names[i] = fit(fb, row.name, inner - ICON - 12 - right(fb, row));
-  crops[i] = row.icon == null ? null : visible(row.icon);
+  names[i] = fit(fb, row.name, inner - indent - 8 - right(fb, row));
+  crops[i] = row.icon == null ? null : Kit.visible(row.icon);
  }
  restHeight = PAD * 2 + fh.getHeight() + (compact ? 0 : 1 + moneyHeight + (s.progress >= 0d ? 5 : 0)
  + (context.isEmpty() ? 0 : fb.getHeight()));
- trayHeight = !tray ? 0 : 2 + fb.getHeight() + rows * ICON + (s.more.isEmpty() ? 0 : fb.getHeight());
+ trayHeight = !tray ? 0 : fb.getAscent() + fb.getDescent() + rows * rowHeight + (s.more.isEmpty() ? 0 : fb.getHeight());
  size = new Dimension(width, restHeight + trayHeight);
 }
 
@@ -288,25 +295,6 @@ static int right(FontMetrics fb, Row row) {
 }
 
 /** Bounds of a sprite's visible pixels; the whole image while it is still loading (blank). */
-static Rectangle visible(BufferedImage image) {
- int w = image.getWidth();
- int h = image.getHeight();
- int[] ayd = image.getRGB(0, 0, w, h, null, 0, w);
- int ayi = w;
- int ayj = h;
- int ayg = -1;
- int ayh = -1;
- for (int i = 0; i < ayd.length; i++) {
-  if (ayd[i] >>> 24 != 0) {
-   ayi = min(ayi, i % w);
-   ayg = max(ayg, i % w);
-   ayj = min(ayj, i / w);
-   ayh = i / w;
-  }
- }
- return ayg < 0 ? new Rectangle(w, h) : new Rectangle(ayi, ayj, ayg - ayi + 1, ayh - ayj + 1);
-}
-
 /** The text, or its longest start that fits {@code room} pixels followed by "…". */
 static String fit(FontMetrics metrics, String value, int room) {
  if (width(metrics, value) <= room) return value;

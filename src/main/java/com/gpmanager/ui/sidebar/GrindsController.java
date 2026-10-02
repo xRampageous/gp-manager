@@ -10,14 +10,12 @@ class GrindsController implements GrindsPage.Actions {
 final Dp panel;
 final Am engine;
 final Shell shell;
-final CsvExporter csvExporter;
 final SessionRepository repository;
 final Ei persistence;
 GrindsController(Dp panel) {
  this.panel = panel;
  this.engine = panel.engine;
  this.shell = panel.shell();
- this.csvExporter = panel.csvExporter;
  this.repository = panel.repository;
  this.persistence = panel.persistence;
 }
@@ -57,7 +55,7 @@ public void endGrind() {
   Bu ended = engine.tz(endedId, System.currentTimeMillis());
   // Owner 2026-10-01 (F14): the ended run stays one click from its recap.
   shell.notify(endedName + " ended", ended == null ? "View recap"
-  : signed(ended.net) + " \u00b7 View recap", false, "View recap", () -> {
+  : signed(ended.net) + msg("kh"), false, "View recap", () -> {
    panel.grindsDetailId = endedId;
    shell.show(Shell.GRINDS);
    refresh();
@@ -114,7 +112,7 @@ public void saveThisGrind(String sessionId) {
   if (now == null || !identity.equals(now.getId())) return;
   Ap created = engine.avg(cleanName, net, time, false, identity);
   if (created != null) {
-   shell.tell("Saved as My Grind", cleanName + " \u00b7 future defaults only", false);
+   shell.tell("Saved as My Grind", cleanName + msg("ki"), false);
   }
  }));
 }
@@ -308,13 +306,12 @@ public void openDataMenu(JComponent anchor) {
 /** The gear menu beside the tabs: profile-wide data actions, from any page. */
 JPopupMenu mv() {
  var menu = new JPopupMenu();
- menu.add(item("Export history summaries\u2026", csvExporter != null && repository != null, () -> sd()));
  menu.add(item("Back up profile", persistence != null, () -> lq()));
  menu.add(item("Restore backup\u2026", persistence != null, () -> agm()));
  menu.add(item("Clear old backups", persistence != null, this::qw));
  menu.add(item(msg("fg"), () -> qr()));
  menu.addSeparator();
- menu.add(item("Factory reset current profile\u2026", persistence != null, () -> ti()));
+ menu.add(item(msg("kj"), persistence != null, () -> ti()));
  return menu;
 }
 
@@ -400,26 +397,6 @@ void ako(String nextName, Runnable start) {
  });
 }
 
-/** One canonical summary row per retained Grind; reporting only, never a restore format. */
-void sd() {
- try {
-  java.util.List<Ad> history = engine.getHistory();
-  // Owner 2026-10-01 (F15): an empty export is said, never an unexplained success file.
-  if (history.isEmpty()) {
-   shell.tell("Nothing to export", "0 retained runs", false);
-   return;
-  }
-  net.runelite.client.util.Filepath file = csvExporter.sh(history,
-  repository.exportDirectory, System.currentTimeMillis());
-  if (file == null) return;
-  // Owner 2026-10-01 (F15): the notice names the file; the exact path sits behind Copy.
-  shell.notify(msg("cr"), String.valueOf(file.getFileName()), false, "Copy file path",
-  () -> copyPath(String.valueOf(file)));
- } catch (java.io.IOException | RuntimeException ex) {
-  shell.failed("Export failed", ex);
- }
-}
-
 /** Puts a path on the system clipboard. */
 static void copyPath(String path) {
  java.awt.datatransfer.StringSelection selection = new java.awt.datatransfer.StringSelection(path);
@@ -455,7 +432,7 @@ void agm() {
    long at = modified.get(i);
    JButton row = button(whenSeconds(at, now), false, () -> shell.confirm("Restore backup",
    "Replace this profile with the " + whenSeconds(at, now)
-   + " backup? Your current data is backed up first.", "Restore", () -> {
+   + msg("kk"), "Restore", () -> {
     Ei.Ds outcome = persistence.agm(file, System.currentTimeMillis());
     if (outcome.isApplied()) panel.afx();
     shell.tell(outcome.isApplied() ? "Backup restored" : "Restore refused",

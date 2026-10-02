@@ -148,7 +148,7 @@ void apply(Ca s) {
  }
  // Owner 2026-10-01 (F12): the hero names the rate basis and the tracked-time policy.
  hero.rate.setToolTipText(s.rateEstablished ? "GP/h over active time" : null);
- hero.clock.setToolTipText(s.hasSession ? "Tracked active time; manual and login pauses are excluded" : null);
+ hero.clock.setToolTipText(s.hasSession ? msg("fu") : null);
  hero.strips(strips(s));
  la(s);
  var rows = new ArrayList<Row>();
@@ -157,7 +157,7 @@ void apply(Ca s) {
  offers.setTitle("OFFERS · " + open.size()).setRows(open);
  offers.setVisible(!open.isEmpty());
  // Owner 2026-10-01 (F13): the empty card says which event starts tracking, never a fake start.
- String empty = s.loggedOut ? "Tracking waits until you log back in" : !s.freePlay ? "Nothing booked yet"
+ String empty = s.loggedOut ? msg("fv") : !s.freePlay ? "Nothing booked yet"
  : actions.autoStartArmed() ? "Tracking starts with your first gameplay" : "Press Grind to start tracking";
  if (!empty.equals(emptyRecent)) {
   emptyRecent = empty;
@@ -227,14 +227,21 @@ List<List<Cell>> strips(Ca s) {
  if (s.marketResult != 0L || s.marketPending > 0) {
   money.add(new Cell("MARKET", s.marketResult == 0L ? "open" : signed(s.marketResult), MARKET, msg("gt"), ledger));
  }
- if (!s.pvpSession) return singletonList(money);
- List<Cell> pvp = Arrays.asList(new Cell("BEST KILL", s.bestKill == 0L ? "—" : signed(s.bestKill), GAIN,
- s.kills + " kills · " + s.deaths + " deaths", null),
- new Cell("STREAK", String.valueOf(s.streak), s.streak > 0 ? GAIN : DIM,
- "Kills since your last death · best " + s.bestStreak + " this Grind", null),
- new Cell("SKULL", s.skulled ? "On" : "Off", s.skulled ? LOSS : DIM, msg("he"), null),
- new Cell("PROTECT", s.protectItem ? "On" : "Off", s.protectItem ? PLAIN : DIM, "Protect Item prayer", null));
- return Arrays.asList(money, pvp);
+ var rows = new ArrayList<List<Cell>>(singletonList(money));
+ if (s.pvpSession) {
+  rows.add(Arrays.asList(new Cell("BEST KILL", s.bestKill == 0L ? "—" : signed(s.bestKill), GAIN,
+  s.kills + " kills · " + s.deaths + " deaths", null),
+  new Cell("STREAK", String.valueOf(s.streak), s.streak > 0 ? GAIN : DIM,
+  msg("gp") + s.bestStreak + " this Grind", null)));
+ }
+ // Owner 1.1: where a death can be lost, its risk and the skull live here, not on HUD+.
+ if (s.pvpPossible || s.pvpSession) {
+  rows.add(Arrays.asList(new Cell("RISK", s.pvpPossible ? compact(s.risk) : "—", s.risk > 0L ? LOSS : DIM,
+  "What a death here would lose: all but your 3 most valuable items (none skulled), +1 with Protect Item", null),
+  new Cell("SKULL", s.skulled ? "On" : "Off", s.skulled ? LOSS : DIM, msg("he"), null),
+  new Cell("PROTECT", s.protectItem ? "On" : "Off", s.protectItem ? PLAIN : DIM, "Protect Item prayer", null)));
+ }
+ return rows;
 }
 
 List<Cell> ajq(Ca s) {
@@ -339,7 +346,7 @@ static String awx(boolean established, long gpPerHour) {
 static String tipOf(Recent row) {
  var tip = new StringBuilder(row.name).append(" · ").append(metaOf(row));
  if ("review".equals(row.tag)) tip.append(" · needs review");
- if (row.unpriced) tip.append(" · value incomplete; no price known");
+ if (row.unpriced) tip.append(msg("jw"));
  if (row.market && !row.valueAvailable && !row.marketSettlementValue)
  tip.append(" · Market result is not realized");
  if (row.market && row.marketSettlementValue)
@@ -389,7 +396,7 @@ static String wordOf(Ca s) {
 
 /** The shared activity label: fresh NPC target, else the session activity, else the Grind name. */
 static String wf(Ca s) {
- return ActivityLabel.resolve(s.target, s.activityLabel, s.ownerLabel, s.hasSession, s.freePlay);
+ return ActivityLabel.resolve(!s.target.isEmpty(), s.activityLabel, s.ownerLabel, s.hasSession, s.freePlay);
 }
 
 static String ajn(Ca s) {

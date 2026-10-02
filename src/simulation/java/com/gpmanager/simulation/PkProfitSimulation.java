@@ -318,12 +318,10 @@ public final class PkProfitSimulation
         session.ll(loss.getId(), death.getId(), false);
         session.close(61_000L);
 
-        // One file per export (owner 2026-09-28): the Grind CSV carries the PvP loot and death rows.
-        Filepath export = SimulationSupport.export(session, output.resolve("pk-example"));
-        String pkCsv = new String(Files.readAllBytes(Filepath.Unchecked.getPath(export)),
-            java.nio.charset.StandardCharsets.UTF_8);
-        SimulationSupport.check(pkCsv.contains("PK_LOOT"), "PvP loot rows");
-        SimulationSupport.check(pkCsv.contains("PK_DEATH_LOSS"), "PvP death rows");
+        SimulationSupport.check(session.getTransactions().stream().anyMatch(t -> t.getType() == Ai.PK_LOOT),
+            "PvP loot rows");
+        SimulationSupport.check(session.getTransactions().stream().anyMatch(t -> t.getType() == Ai.PK_DEATH_LOSS),
+            "PvP death rows");
 
 
     }

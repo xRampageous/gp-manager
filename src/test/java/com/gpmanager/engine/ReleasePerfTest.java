@@ -67,7 +67,7 @@ public class ReleasePerfTest
         Ca snapshot = Ca.capture(engine, now, Dz.NONE);
         report("HUD+ update + render", () ->
         {
-            builder.update(snapshot, f -> true, null, now);
+            builder.update(snapshot, f -> true, now);
             return overlay.render(g).width;
         });
         Gson gson = new Gson();
@@ -84,6 +84,11 @@ public class ReleasePerfTest
         Ei coordinator = new Ei(null, null, repository,
             new OrderedPersistenceWriter(repository, null), engine);
         report("save intent (client thread)", () -> coordinator.qn().expectedBaseRevision);
+        // 1.1: the periodic gameplay save reuses closed sessions' JSON; every 10th is full.
+        report("quick save intent (client thread)", () -> coordinator.qn(true).expectedBaseRevision);
+        System.out.println("PERF quick save identical to one toJson: "
+            + coordinator.aiw(null, true).replaceFirst("\"savedAtEpochMillis\":\\d+", "")
+                .equals(gson.toJson(engine.qm()).replaceFirst("\"savedAtEpochMillis\":\\d+", "")));
     }
 
     private static Ac receipt(long at)

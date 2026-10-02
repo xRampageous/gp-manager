@@ -111,6 +111,54 @@ public class LedgerSplitScopeTest
         assertEquals(2L, transaction.quantity(536, true));
     }
 
+    /** Owner 1.1: Split shows Keep, Others and the Net it leaves before anything changes. */
+    @Test
+    public void theSplitPreviewsItsNetFirstAndTheResultMatches() throws Exception
+    {
+        Fixture fixture = new Fixture();
+        Ac transaction = fixture.book(new Ab(536, "Dragon bones", 4L, 2_000, 8_000L));
+        long before = fixture.engine.getMetrics(NOW + 2_000L).net;
+        fixture.confirm = false;
+
+        fixture.split(transaction.getId());
+        fixture.type("1");
+        fixture.press("OK");
+
+        assertEquals("keep one of four", Arrays.asList(536L, 1L, 4L),
+            Arrays.asList(fixture.pending[0], fixture.pending[1], fixture.pending[2]));
+        assertEquals("the preview changes nothing", 4L, transaction.quantity(536, true));
+        assertEquals(before - 6_000L, fixture.previewed.afterNet);
+
+        onEdt(() ->
+        {
+            fixture.controller.applySplit(transaction.getId(), fixture.pending, fixture.previewed.revision);
+            return null;
+        });
+        assertEquals(1L, transaction.quantity(536, true));
+        assertEquals("the result is what the preview said", fixture.previewed.afterNet,
+            fixture.engine.getMetrics(NOW + 2_000L).net);
+    }
+
+    @Test
+    public void aBookingAfterThePreviewSplitsNothing() throws Exception
+    {
+        Fixture fixture = new Fixture();
+        Ac transaction = fixture.book(new Ab(536, "Dragon bones", 4L, 2_000, 8_000L));
+        fixture.confirm = false;
+        fixture.split(transaction.getId());
+        fixture.type("1");
+        fixture.press("OK");
+        fixture.book(new Ab(995, "Coins", 10L, 1, 10L));
+
+        onEdt(() ->
+        {
+            fixture.controller.applySplit(transaction.getId(), fixture.pending, fixture.previewed.revision);
+            return null;
+        });
+        assertTrue(ShellProbe.noticeText(fixture.shell()).startsWith("Not split"));
+        assertEquals(4L, transaction.quantity(536, true));
+    }
+
     private static final class Fixture
     {
         final Am engine;
@@ -126,6 +174,7 @@ public class LedgerSplitScopeTest
         Fixture(Am engine) throws Exception
         {
             this.engine = engine;
+            JsonCodec.bind(new com.google.gson.Gson());
             panel = onEdt(() -> new Dp(engine, new GpManagerConfig() {}, null));
             controller = new LedgerController(panel);
             engine.ajl("Vorkath", Cx.GENERAL, NOW);
@@ -144,11 +193,21 @@ public class LedgerSplitScopeTest
             return transaction;
         }
 
+        Ao.Ef previewed;
+        long[] pending;
+        boolean confirm = true;
+
         void split(String transactionId) throws Exception
         {
             onEdt(() ->
             {
-                controller.split(transactionId);
+                // Owner 1.1: the split previews first; this harness confirms at once.
+                controller.split(transactionId, (split, preview) ->
+                {
+                    previewed = preview;
+                    pending = split;
+                    if (confirm) controller.applySplit(transactionId, split, preview.revision);
+                });
                 return null;
             });
         }

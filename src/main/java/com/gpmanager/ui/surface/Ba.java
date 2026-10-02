@@ -5,7 +5,7 @@ import lombok.*;
 import static java.lang.Math.*;
 import static com.gpmanager.Fmt.*;
 /**
-* Derived recap / previous-Grind comparison / personal-best facts for one canonical Grind,
+* Derived recap facts (biggest gain and cost, loot by source) for one canonical Grind,
 * computed from retained history only. Same-Grind identity is the stable {@code grindId}; display
 * names never participate. Nothing here books, prices, persists or feeds accounting.
 */
@@ -43,40 +43,6 @@ static class Run {
  }
 }
 
-/**
-* One Grind's completed runs for HUD+: best Net, best GP/h and average GP/h, with
-* {@code Long.MIN_VALUE} for a rate no run established. Null with no runs.
-*/
-static long[] bests(Am engine, String grindId, long now) {
- List<Run> runs = lineage(engine, grindId, now);
- if (runs.isEmpty()) return null;
- long net = Long.MIN_VALUE;
- long rate = Long.MIN_VALUE;
- long ath = 0L;
- int axj = 0;
- for (Run run : runs) {
-  net = Math.max(net, run.net());
-  if (run.gpPerHour != null) {
-   rate = Math.max(rate, run.gpPerHour);
-   ath += run.gpPerHour;
-   axj++;
-  }
- }
- return new long[] {net, rate, axj == 0 ? Long.MIN_VALUE : ath / axj};
-}
-
-/** Completed, counted, retained runs of one Grind; identity is the stable grindId, never the name. */
-static List<Run> lineage(Am engine, String grindId, long now) {
- var runs = new ArrayList<Run>();
- if (grindId != null && !grindId.isEmpty()) {
-  for (Ad session : engine.pp(grindId)) {
-   Run run = session == null || session.excludedFromAverages ? null : new Run(engine, session, now);
-   if (run != null && run.retained) runs.add(run);
-  }
- }
- return runs;
-}
-
 /** One retained receipt with the largest correction-aware contribution in its direction. */
 static class Highlight {
  final String name;
@@ -101,44 +67,11 @@ static class Recap {
  final List<Highlight> sources;
 }
 
-/** Factual current-minus-previous arithmetic; no causal explanation, no analysis. */
-@AllArgsConstructor
-static class Comparison {
- final boolean excluded;
- final boolean available;
- final long netDelta;
- final Long rateDelta;
- final Long suppliesDelta;
- final long activeDelta;
-}
-
-/** Strict personal-best facts over the same-Grind lineage; derivation only, never persisted. */
-@AllArgsConstructor
-static class PBs {
- final boolean excluded;
- final Long bestNet;
- final boolean newBestNet;
- final boolean matchesBestNet;
- final Long bestGpPerHour;
- final boolean newBestGpPerHour;
- final boolean matchesBestGpPerHour;
-}
-
 final Recap recap;
-final Comparison comparison;
-final PBs pbs;
-static Ba of(Am engine, Ad selected, long now) {
- var run = new Run(engine, selected, now);
- Long rate = selected.isClosed() ? run.gpPerHour : null;
+static Ba of(Ad selected) {
  boolean amn = selected.compactedTransactionCount > 0L;
- var recap = new Recap(amn ? null : biggest(selected, true), amn ? null : lz(selected),
- amn, amn ? Collections.emptyList() : sources(selected));
- if (selected.excludedFromAverages) {
-  return new Ba(recap, new Comparison(true, false, 0L, null, null, 0L),
-  new PBs(true, null, false, false, null, false, false));
- }
- List<Run> lineage = lineage(engine, selected.getGrindId(), now);
- return new Ba(recap, comparison(lineage, run, rate), pbs(lineage, run, rate));
+ return new Ba(new Recap(amn ? null : biggest(selected, true), amn ? null : lz(selected),
+ amn, amn ? Collections.emptyList() : sources(selected)));
 }
 
 // ---- recap ---------------------------------------------------------------------------
@@ -146,8 +79,8 @@ static Ba of(Am engine, Ad selected, long now) {
 static String aay(Long netTargetGp, long net, boolean closed) {
  if (netTargetGp == null) return "No Net target";
  if (net >= netTargetGp) return "Reached " + compact(netTargetGp) + " Net";
- return closed ? "Ended before target \u00b7 " + signed(netTargetGp - net) + " remaining"
- : "Not reached yet \u00b7 " + signed(netTargetGp - net) + " remaining";
+ return closed ? msg("kr") + signed(netTargetGp - net) + " remaining"
+ : msg("ks") + signed(netTargetGp - net) + " remaining";
 }
 
 /** Factual Active-Time target wording; never "Failed". Shared with the Grinds detail. */
@@ -220,46 +153,6 @@ static boolean kl(Ac transaction) {
   if (flow.valueDelta > 0L) return false;
  }
  return any;
-}
-
-// ---- previous comparison ---------------------------------------------------------------
-static Comparison comparison(List<Run> lineage, Run selected, Long rate) {
- long ato = selected.completionAt();
- Run previous = null;
- for (Run candidate : lineage) {
-  long at = candidate.completionAt();
-  if (!candidate.session.getId().equals(selected.session.getId())
-  && at < ato && (previous == null || at > previous.completionAt())) {
-   previous = candidate;
-  }
- }
- if (previous == null) return new Comparison(false, false, 0L, null, null, 0L);
- Bu metrics = selected.metrics;
- Bu before = previous.metrics;
- return new Comparison(false, true, metrics.net - before.net,
- rate != null && previous.gpPerHour != null ? rate - previous.gpPerHour : null,
- metrics.costSplitAvailable && before.costSplitAvailable ? metrics.suppliesCosts - before.suppliesCosts : null,
- metrics.elapsedMillis - before.elapsedMillis);
-}
-
-// ---- same-Grind PBs --------------------------------------------------------------------
-static PBs pbs(List<Run> lineage, Run selected, Long rate) {
- long net = selected.net();
- Long apl = null;
- Long amq = null;
- for (Run other : lineage) {
-  if (!other.session.getId().equals(selected.session.getId())) {
-   apl = max(apl, other.net());
-   amq = max(amq, other.gpPerHour);
-  }
- }
- boolean rates = rate != null && amq != null;
- return new PBs(false, max(net, apl), apl != null && net > apl, apl != null && net == apl,
- max(rate, amq), rates && rate > amq, rates && rate.longValue() == amq);
-}
-
-static Long max(Long a, Long b) {
- return a == null ? b : b == null ? a : Long.valueOf(Math.max(a, b));
 }
 
 /** Full-session rate: Net over canonical Active Time; zero Active Time has no rate. */

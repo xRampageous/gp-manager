@@ -1,5 +1,43 @@
 # GP Manager changelog
 
+## 1.1.0 — 2026-10-02
+
+- **No save stutter.** The periodic save while you play reuses the saved form of finished
+  Grinds that have not changed, so a large history no longer hitches the game every 30 s.
+- **A cleaner HUD+ header.** It shows your Grind's name, or "KC: 3" while a kill streak runs;
+  never an NPC's name. Activity names (Combat, Woodcutting, a raid) stay on the sidebar's Live
+  page, which no longer says "Hitpoints" either.
+- **Tighter loot tray.** Its heading sits right on its rows, and rows are a little shorter.
+- **Icons.** Every item and spell icon is cropped, fitted to one size and centred, on HUD+ and
+  in the sidebar. A new **Item icons** setting turns them off.
+- **Ledger and Grinds sit closer to their toolbar,** and the Losses table picks All, Supplies,
+  Items or Charges from a dropdown beside its header.
+- **The loot tray names the fight.** A kill streak's heading names its NPCs ("Guard",
+  "Guard & Man", "Guard, Man +1") with its Net per kill. Going back to an NPC you just left
+  joins both streaks into one.
+- **Split shows a preview.** After you choose how many to keep, the receipt shows Keep, Others
+  and the Net it leaves before you confirm.
+- **Picked-up ammo comes back.** Picking up ammo you fired lowers Supplies instead of counting
+  as loot. More than you fired still counts as loot.
+- **Wilderness risk.** In dangerous areas the Live page shows what a death would lose
+  (everything but your three most valuable items, none when skulled, one more with Protect
+  Item) beside your skull and Protect Item. HUD+ drops its PvP line and stays short; its gem
+  still turns PvP.
+- **Smaller for the Plugin Hub's 200k review limit** (the review counted 1.0.3 at 202,333):
+  - CSV export is removed; backups stay.
+  - The HUD+ hover panel is removed; its figures are on Live, and Net per kill is on the tray.
+  - The HUD+ End card, "vs your average" and "New best" moments, and the Grind detail's VS
+    PREVIOUS RUN and PERSONAL BESTS are removed. A Grind keeps its outcome, biggest gain and
+    cost and loot by source, and HUD+ still says "<Grind> ended" with its Net and time.
+  - Death receipts no longer carry the kept/lost explanation text; death accounting is
+    unchanged.
+- **Blowpipe darts count.** Each shot spends its dart unless an Ava's device saves it (an
+  assembler or Dizana's quiver saves 80%, the accumulator 72%, the attractor 60%), booked as
+  Supplies like arrows once a Check or a load has shown the dart type; a later Check corrects
+  the estimate. The blowpipe's Charges row is now its Zulrah's scales, and blood fury reads as
+  one "Blood fury" row.
+- **Fixes.** Charged-weapon casts are read from the current game API.
+
 ## 1.0.3 — 2026-10-02
 
 - **Source size for the Plugin Hub limit.** Internal names are shortened again and

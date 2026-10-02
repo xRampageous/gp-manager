@@ -24,6 +24,8 @@ Cx mode;
 Bt ownerKind = Bt.UNKNOWN;
 /** Runtime-only signal/revision for profile totals derived from session-day summaries. */
 transient Runnable ayl;
+/** Runtime-only change count; a quick save reuses a closed session's JSON while it holds. */
+transient long saveStamp;
 /** Runtime-only narrow live-clock patch; avoids rebuilding historical rollups on each tick. */
 /** Runtime-only pooled known-basis observer; the engine wires the tracked-basis ledger. */
 transient Dj ownedValueObserver;
@@ -228,6 +230,7 @@ Ed getPauseReason() {
 
 void close(long now) {
  if (endedAtEpochMillis != 0L) return;
+ saveStamp++;
  endedAtEpochMillis = max(now, startedAtEpochMillis);
 }
 
@@ -512,6 +515,7 @@ void ll(String transactionId, String encounterId, boolean asPkSupplyCost) {
  Ac transaction = sw(transactionId);
  Bx encounter = tf(encounterId);
  if (transaction == null || encounter == null) return;
+ saveStamp++;
  transaction.lf(encounterId, asPkSupplyCost);
  encounter.kg(transactionId);
  aes(transaction);
@@ -713,6 +717,7 @@ void sn(Ay attribution) {
 /** Removes one compacted detailed encounter row; exact facts are already retained. */
 boolean afw(Bx encounter) {
  if (encounter == null || !pkEncounters.remove(encounter)) return false;
+ saveStamp++;
  if (pkProjection != null) pkProjection.zf();
  return true;
 }
@@ -795,6 +800,7 @@ void setOwnerKind(Bt value) {
 
 void setChangeListener(Runnable listener) { ayl = listener; }
 void abk() {
+ saveStamp++;
  Runnable listener = ayl;
  if (listener != null) listener.run();
 }
@@ -831,6 +837,7 @@ int pj(long cutoffEpochMillis, Predicate<Ac> keep) {
   folded.add(transaction);
  }
  if (folded.isEmpty()) return 0;
+ saveStamp++;
  var foldedIds = new HashSet<String>();
  for (Ac transaction : folded) {
   foldedIds.add(transaction.getId());

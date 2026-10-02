@@ -5,13 +5,13 @@ import java.awt.image.BufferedImage;
 import java.util.*;
 import static java.util.Collections.*;
 /**
-* Everything HUD+ and its folio paint, built once per game tick by {@link Cp}. Strings are
+* Everything HUD+ paints, built once per game tick by {@link Cp}. Strings are
 * already formatted and colours already chosen, so painting only reads fields.
 */
 @RequiredArgsConstructor
 class Cb {
 static final Cb HIDDEN = new Cb(false, Gem.OFF, "", "", "", Color.WHITE, "", -1d,
-"", Color.WHITE, 0L, "", "", Color.WHITE, false, "", emptyList(), "", 0, 0L, 0L, emptyList(), emptyList(), 0L);
+"", Color.WHITE, 0L, "", "", Color.WHITE, false, "", emptyList(), "", 0, 0L, 0L, 0L);
 /** Tracking state dot: live, paused, away, not tracking, PvP. */
 enum Gem {
  LIVE, PAUSED, AWAY, OFF, PVP
@@ -28,19 +28,6 @@ static class Row {
  final boolean gold;
  /** When the row first appeared, for its fade-in. */
  final long born;
-}
-
-/** One folio line: a section header, a label/value pair, a progress bar or an item row. */
-@RequiredArgsConstructor
-static class Line {
- enum Kind { HEADER, PAIR, BAR, ITEM }
- final Kind kind;
- final String label;
- final String value;
- final Color color;
- /** Bar fill 0..1 for {@link Kind#BAR}. */
- final double fill;
- final BufferedImage icon;
 }
 
 final boolean visible;
@@ -74,9 +61,6 @@ final int tripId;
 final long foldAt;
 /** When the tray opened; it slides open over the next moment. */
 final long openedAt;
-final List<Line> folio;
-/** The End card, shown in the folio's place for a few seconds after a Grind ends; else empty. */
-final List<Line> recap;
 /** The builder's clock when this snapshot was made; HUD+ animates on it. */
 final long builtAt;
 }

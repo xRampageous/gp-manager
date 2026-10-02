@@ -56,7 +56,7 @@ public class PersistentSaveStatusTest
     public void theSidebarFollowsTheBackendStatusUntilRecovery() throws Exception
     {
         FakePersist persist = new FakePersist();
-        Dp panel = onEdt(() -> new Dp(engine(), new GpManagerConfig() {}, null, null, null, persist));
+        Dp panel = onEdt(() -> new Dp(engine(), new GpManagerConfig() {}, null, null, persist));
         Shell shell = panel.shell();
         onEdt(() ->
         {

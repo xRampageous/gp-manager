@@ -105,6 +105,7 @@ final String target;
 final boolean pvpPossible;
 final boolean skulled;
 final boolean protectItem;
+final long risk;
 final int reviewCount;
 final List<Recent> recent;
 /** True for PK-mode sessions or any session that has booked a fight. */
@@ -170,7 +171,7 @@ final boolean hopping;
  aky(metrics, zl), aku(metrics, zl), metrics.costSplitAvailable,
  RateReadiness.wn(elapsed), metrics.profitPerHour,
  goal(active, metrics, elapsed), marketResult, marketPending, freePlay, ctx.activity, ctx.target, ctx.pvp.pvpPossible,
- ctx.pvp.skulled, ctx.pvp.protectItem, review,
+ ctx.pvp.skulled, ctx.pvp.protectItem, ctx.pvp.risk, review,
  recent(engine, active, transactions, marketRows, marketByPresentation, ctx), pvpSession, pk == null ? 0 : pk.kills,
  pk == null ? 0 : pk.deaths, pk == null ? 0L : pk.totalKillNet, pk == null ? 0L : pk.totalDeathLoss,
  pk == null ? 0L : pk.bestKill, engine.getPendingClaims().size(), engine.tt().awaiting
@@ -254,7 +255,7 @@ List<Ac> transactions, List<Row> marketRows, Map<String, Row> marketByPresentati
 }
 
 static List<Recent> afa(Br.Result projection,
-java.util.Map<String, Row> marketRows, RecentFilter filter) {
+Map<String, Row> marketRows, RecentFilter filter) {
  var rows = new ArrayList<Recent>();
  for (Group group : projection.groups) {
   // Charges live in the Ledger only.

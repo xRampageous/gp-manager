@@ -47,10 +47,8 @@ public class StackedLedgerTablesTest
         assertFalse("no multi-line Total block remains", labels.contains("TOTAL"));
         assertFalse("no global All/Gains/Costs/Market/Review/Corrected tab strip",
             onEdt(() -> containsNav(page.body())));
-        assertTrue("Losses selector is All / Supplies n / Items n / Charges n", labels.contains("All")
-            && labels.stream().anyMatch(label -> label.startsWith("Supplies "))
-            && labels.stream().anyMatch(label -> label.startsWith("Items "))
-            && labels.stream().anyMatch(label -> label.startsWith("Charges ")));
+        // Owner 1.1: the Losses view is one dropdown beside its header.
+        assertTrue("the Losses picker reads its view: " + labels, labels.contains("All ▾"));
     }
 
     @Test
@@ -394,7 +392,7 @@ public class StackedLedgerTablesTest
         @Override public LedgerPage.Ea correct(String id,
             Ah correction, long previewRevision)
         { return LedgerPage.Ea.REFUSED; }
-        @Override public void split(String id) { }
+        @Override public void split(String id, java.util.function.BiConsumer<long[], Ao.Ef> previewed) { }
         @Override public void undoCorrection() { }
         @Override public void decideAll(Cl decision) { }
         @Override public void refresh() { }

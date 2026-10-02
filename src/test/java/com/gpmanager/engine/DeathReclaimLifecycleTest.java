@@ -138,7 +138,7 @@ public class DeathReclaimLifecycleTest
     public void missingEngineDeathSnapshotLeavesMeasuredLossCounted()
     {
         Am engine = started(gear(1L, 0L, 0L, 0L));
-        engine.zi(20, null, null);
+        engine.zi(20, null);
         engine.yz();
 
         Ac loss = settle(engine, Cc.empty(), 1_600L);
@@ -154,7 +154,7 @@ public class DeathReclaimLifecycleTest
     {
         Cc carried = gear(1L, 1L, 0L, 0L);
         Am engine = started(carried);
-        engine.zi(1, null, carried.quantities);
+        engine.zi(1, carried.quantities);
 
         // Let the short-lived transfer context expire before the post-respawn inventory
         // removal settles. The separate captured-stack evidence remains live.
@@ -190,7 +190,7 @@ public class DeathReclaimLifecycleTest
     {
         Cc baseline = gear(1L, 1L, 0L, 0L);
         Am engine = started(baseline);
-        engine.zi(1, null, gear(1L, 0L, 0L, 0L).quantities);
+        engine.zi(1, gear(1L, 0L, 0L, 0L).quantities);
         engine.yz();
         Ac residualLoss = settle(engine, Cc.empty(), 1_600L);
 
@@ -212,7 +212,7 @@ public class DeathReclaimLifecycleTest
     {
         Cc carried = gear(1L, 1L, 0L, 0L);
         Am engine = started(carried);
-        engine.zi(1, null, carried.quantities);
+        engine.zi(1, carried.quantities);
 
         engine.yz();
         Ac firstWipe = settle(engine, gear(0L, 1L, 0L, 0L), 1_600L);
@@ -236,7 +236,7 @@ public class DeathReclaimLifecycleTest
     {
         Cc carried = gear(0L, 0L, 75_000L, 0L);
         Am engine = started(carried);
-        engine.zi(1, null, carried.quantities);
+        engine.zi(1, carried.quantities);
         for (int i = 0; i < 5; i++)
         {
             assertNull(engine.adj(carried, 1_100L + i * 600L));
@@ -257,7 +257,7 @@ public class DeathReclaimLifecycleTest
     {
         Cc carried = gear(1L, 0L, 200_000L, 0L);
         Am engine = started(carried);
-        engine.zi(20, null, carried.quantities);
+        engine.zi(20, carried.quantities);
         assertTrue(engine.abe(
             BossRetrievalCatalogue.axr("Talk-to", "Torfinn"), 40));
         engine.yz();
@@ -288,7 +288,7 @@ public class DeathReclaimLifecycleTest
     {
         Cc carried = gear(1L, 0L, 0L, 0L);
         Am engine = started(carried);
-        engine.zi(1, null, carried.quantities);
+        engine.zi(1, carried.quantities);
         for (int i = 0; i < 3; i++)
         {
             assertNull(engine.adj(carried, 1_100L + i * 600L));
@@ -312,7 +312,7 @@ public class DeathReclaimLifecycleTest
     {
         Cc carried = gear(1L, 0L, 0L, 0L);
         Am engine = started(carried);
-        engine.zi(1, null, carried.quantities);
+        engine.zi(1, carried.quantities);
         for (int i = 0; i < 3; i++)
         {
             assertNull(engine.adj(carried, 1_100L + i * 600L));
@@ -333,7 +333,7 @@ public class DeathReclaimLifecycleTest
     {
         Cc carried = gear(1L, 0L, 0L, 1L);
         Am engine = started(carried);
-        engine.zi(1, null, carried.quantities);
+        engine.zi(1, carried.quantities);
         engine.noteConsumptionIntent(SHARK, 30);
         engine.yz();
 
@@ -355,7 +355,7 @@ public class DeathReclaimLifecycleTest
     {
         Cc carried = gear(1L, 0L, 0L, 0L);
         Am engine = started(carried);
-        engine.zi(1, null, carried.quantities);
+        engine.zi(1, carried.quantities);
         engine.yz();
         assertNotNull(settle(engine, Cc.empty(), 1_600L));
         engine.setBaseline(Cc.empty());
@@ -410,7 +410,7 @@ public class DeathReclaimLifecycleTest
         };
         Cc carried = gear(1L, 0L, 0L, 1L);
         Am engine = started(carried, changingConfig);
-        engine.zi(1, null, carried.quantities);
+        engine.zi(1, carried.quantities);
         engine.yz();
         assertNotNull(settle(engine, Cc.empty(), 1_600L));
         assertEquals(2L, engine.tt().outstandingItemCount);
@@ -450,7 +450,7 @@ public class DeathReclaimLifecycleTest
     {
         Cc carried = gear(1L, 0L, 150_000L, 0L);
         Am engine = started(carried);
-        engine.zi(1, null, carried.quantities);
+        engine.zi(1, carried.quantities);
         engine.yz();
         assertNotNull(settle(engine, Cc.empty(), 1_600L));
         engine.setBaseline(gear(0L, 0L, 150_000L, 0L));
@@ -492,7 +492,7 @@ public class DeathReclaimLifecycleTest
         };
         Cc carried = gear(0L, 0L, 0L, 1L);
         Am engine = started(carried, minimum);
-        engine.zi(1, null, carried.quantities);
+        engine.zi(1, carried.quantities);
         engine.yz();
         Ac wipe = settle(engine, Cc.empty(), 1_600L);
 
@@ -515,7 +515,7 @@ public class DeathReclaimLifecycleTest
     {
         Cc carried = gear(1L, 1L, 0L, 0L);
         Am engine = started(carried);
-        engine.zi(1, null, carried.quantities);
+        engine.zi(1, carried.quantities);
         engine.yz();
         assertNotNull(settle(engine, Cc.empty(), 1_600L));
         engine.setBaseline(Cc.empty());
@@ -554,13 +554,13 @@ public class DeathReclaimLifecycleTest
     {
         Cc firstHeld = gear(1L, 0L, 0L, 0L);
         Am engine = started(firstHeld);
-        engine.zi(1, null, firstHeld.quantities);
+        engine.zi(1, firstHeld.quantities);
         engine.yz();
         assertNotNull(settle(engine, Cc.empty(), 1_600L));
 
         Cc secondHeld = gear(0L, 1L, 0L, 0L);
         engine.setBaseline(secondHeld);
-        engine.zi(1, null, secondHeld.quantities);
+        engine.zi(1, secondHeld.quantities);
         engine.yz();
         assertNotNull(settle(engine, Cc.empty(), 4_000L));
         assertTrue(engine.tt().awaiting);
@@ -583,9 +583,7 @@ public class DeathReclaimLifecycleTest
         long before = engine.getMetrics(1_000L).net;
 
         // Death: everything leaves the inventory in one settle.
-        engine.zi(20,
-            Ch.capture(null, false, SkullIcon.NONE, null, null),
-            gear(1L, 1L, 150_000L, 0L).quantities);
+        engine.zi(20, gear(1L, 1L, 150_000L, 0L).quantities);
         engine.yz();
         Ac wipe = settle(engine, Cc.empty(), 1_600L);
         assertNotNull(wipe);
@@ -593,7 +591,6 @@ public class DeathReclaimLifecycleTest
         assertFalse(wipe.isCounted());
         assertTrue(wipe.getNote(), wipe.getNote().startsWith("Death: items held"));
         assertTrue(wipe.getExplanation(), wipe.getExplanation().startsWith("Ownership-neutral transfer: Death"));
-        assertTrue(wipe.getExplanation().contains("Death evidence"));
         assertTrue(EngineProbe.isAwaitingDeathReclaim(engine));
 
         // Respawn with the coins for the fee (coins are kept on death in this fixture).
@@ -636,76 +633,10 @@ public class DeathReclaimLifecycleTest
     }
 
     @Test
-    public void localDeathEvidenceOnlyChangesTheSettledExplanation()
-    {
-        Cc carried = gear(1L, 1L, 150_000L, 0L);
-        Am plain = started(carried);
-        Am annotated = started(carried);
-        Ch evidence = Ch.capture(
-            null, true, SkullIcon.SKULL, null, null);
-
-        plain.zi(20, null, carried.quantities);
-        annotated.zi(20, evidence, carried.quantities);
-        plain.yz();
-        annotated.yz();
-        Ac plainWipe = settle(plain, Cc.empty(), 1_600L);
-        Ac annotatedWipe = settle(annotated, Cc.empty(), 1_600L);
-
-        assertNotNull(plainWipe);
-        assertNotNull(annotatedWipe);
-        assertEquals(plainWipe.getType(), annotatedWipe.getType());
-        assertEquals(plainWipe.getContext(), annotatedWipe.getContext());
-        assertEquals(plainWipe.isCounted(), annotatedWipe.isCounted());
-        assertEquals(plainWipe.getFlows(), annotatedWipe.getFlows());
-        assertEquals(plainWipe.getRevenue(), annotatedWipe.getRevenue());
-        assertEquals(plainWipe.getCosts(), annotatedWipe.getCosts());
-        assertEquals(plainWipe.getNet(), annotatedWipe.getNet());
-        assertFalse(plainWipe.getExplanation().contains("Death evidence"));
-        assertTrue(annotatedWipe.getExplanation().contains("Kept: unavailable"));
-        assertTrue(annotatedWipe.getExplanation(), annotatedWipe.getExplanation().contains("lost: "));
-        assertTrue(annotatedWipe.getExplanation().contains("Abyssal whip"));
-        assertTrue(annotatedWipe.getExplanation().contains("Amulet of torture"));
-        assertTrue(annotatedWipe.getExplanation().contains("Coins ×150,000"));
-        assertTrue(annotatedWipe.getExplanation().contains("Protect Item on; skull: skulled"));
-        assertEquals(0L, plain.getMetrics(5_000L).net);
-        assertEquals(0L, annotated.getMetrics(5_000L).net);
-    }
-
-    @Test
-    public void unclassifiedLocalDeathEvidenceOnlyChangesTheSettledExplanation()
-    {
-        Cc carried = gear(1L, 0L, 150_000L, 0L);
-        Am plain = started(carried);
-        Am annotated = started(carried);
-        Ch evidence = Ch.capture(
-            null, false, SkullIcon.NONE, null, null);
-
-        plain.zj(null);
-        annotated.zj(evidence);
-        plain.yz();
-        annotated.yz();
-        Ac plainLoss = settle(plain, Cc.empty(), 1_600L);
-        Ac annotatedLoss = settle(annotated, Cc.empty(), 1_600L);
-
-        assertNotNull(plainLoss);
-        assertNotNull(annotatedLoss);
-        assertEquals(plainLoss.getType(), annotatedLoss.getType());
-        assertEquals(plainLoss.getContext(), annotatedLoss.getContext());
-        assertEquals(plainLoss.isCounted(), annotatedLoss.isCounted());
-        assertEquals(plainLoss.getFlows(), annotatedLoss.getFlows());
-        assertEquals(plainLoss.getRevenue(), annotatedLoss.getRevenue());
-        assertEquals(plainLoss.getCosts(), annotatedLoss.getCosts());
-        assertEquals(plainLoss.getNet(), annotatedLoss.getNet());
-        assertFalse(plainLoss.getExplanation().contains("Death evidence"));
-        assertTrue(annotatedLoss.getExplanation().contains("Death evidence"));
-        assertEquals(plain.getMetrics(5_000L).net, annotated.getMetrics(5_000L).net);
-    }
-
-    @Test
     public void reclaimWindowLeavesUnrelatedConsumptionToNormalClassification()
     {
         Am engine = started(gear(0L, 0L, 0L, 2L));
-        engine.zi(20, null, gear(0L, 0L, 0L, 2L).quantities);
+        engine.zi(20, gear(0L, 0L, 0L, 2L).quantities);
         engine.yz();
         Ac wipe = settle(engine, Cc.empty(), 1_600L);
         assertNotNull(wipe);
@@ -726,7 +657,7 @@ public class DeathReclaimLifecycleTest
     public void unrelatedLootDoesNotConsumeReclaimWindowOrBecomeRecoveredDeathGear()
     {
         Am engine = started(gear(1L, 0L, 150_000L, 0L));
-        engine.zi(20, null, gear(1L, 0L, 150_000L, 0L).quantities);
+        engine.zi(20, gear(1L, 0L, 150_000L, 0L).quantities);
         engine.yz();
         Ac wipe = settle(engine, gear(0L, 0L, 150_000L, 0L), 1_600L);
         assertNotNull(wipe);
@@ -768,7 +699,7 @@ public class DeathReclaimLifecycleTest
     public void observedLootWithSameItemIdAsDeathGearStaysCounted()
     {
         Am engine = started(gear(1L, 0L, 0L, 0L));
-        engine.zi(20, null, gear(1L, 0L, 0L, 0L).quantities);
+        engine.zi(20, gear(1L, 0L, 0L, 0L).quantities);
         engine.yz();
         Ac wipe = settle(engine, Cc.empty(), 1_600L);
         assertNotNull(wipe);
@@ -792,7 +723,7 @@ public class DeathReclaimLifecycleTest
     public void sameIdLootAndReclaimedGearPartitionByMatchedQuantity()
     {
         Am engine = started(gear(1L, 0L, 0L, 0L));
-        engine.zi(20, null, gear(1L, 0L, 0L, 0L).quantities);
+        engine.zi(20, gear(1L, 0L, 0L, 0L).quantities);
         engine.yz();
         assertNotNull(settle(engine, Cc.empty(), 1_600L));
         assertTrue(engine.abe(
@@ -828,7 +759,7 @@ public class DeathReclaimLifecycleTest
     public void hardBankTransferDuringReclaimDoesNotBecomeADeathFee()
     {
         Am engine = started(gear(0L, 0L, 150_000L, 0L));
-        engine.zi(20, null, gear(0L, 0L, 150_000L, 0L).quantities);
+        engine.zi(20, gear(0L, 0L, 150_000L, 0L).quantities);
         assertTrue(engine.abe(
             BossRetrievalCatalogue.axr("Talk-to", "Torfinn"), 40));
         engine.markContext(Aj.TRANSFER, 20, "Bank deposit");
@@ -848,7 +779,7 @@ public class DeathReclaimLifecycleTest
     public void laterExplicitMarketContextSupersedesDeathWipeMarker()
     {
         Am engine = started(gear(1L, 0L, 0L, 0L));
-        engine.zi(20, null,
+        engine.zi(20,
             java.util.Collections.singletonMap(WHIP, 1L));
         engine.markContext(Aj.MARKET, 20, "Market sale");
         engine.yz();
@@ -869,7 +800,7 @@ public class DeathReclaimLifecycleTest
     public void mixedReclaimAndLootPartitionsReturnsAndKeepsWindowOpen()
     {
         Am engine = started(gear(1L, 1L, 150_000L, 0L));
-        engine.zi(20, null, gear(1L, 1L, 150_000L, 0L).quantities);
+        engine.zi(20, gear(1L, 1L, 150_000L, 0L).quantities);
         engine.yz();
         Ac wipe = settle(engine, gear(0L, 0L, 150_000L, 0L), 1_600L);
         assertNotNull(wipe);
@@ -909,13 +840,13 @@ public class DeathReclaimLifecycleTest
     public void unclassifiedLocalDeathClearsEarlierReclaimEvidence()
     {
         Am engine = started(gear(1L, 0L, 150_000L, 0L));
-        engine.zi(20, null, gear(1L, 0L, 150_000L, 0L).quantities);
+        engine.zi(20, gear(1L, 0L, 150_000L, 0L).quantities);
         engine.yz();
         Ac wipe = settle(engine, gear(0L, 0L, 150_000L, 0L), 1_600L);
         assertNotNull(wipe);
         assertTrue(EngineProbe.isAwaitingDeathReclaim(engine));
 
-        engine.zj(null);
+        engine.zj();
 
         assertFalse(EngineProbe.isAwaitingDeathReclaim(engine));
         assertFalse("unclassified death must not arm retrieval accounting", engine.abe(
@@ -932,7 +863,7 @@ public class DeathReclaimLifecycleTest
     public void partialDeathItemReturnKeepsRemainingItemsEligibleForReclaim()
     {
         Am engine = started(gear(1L, 1L, 150_000L, 0L));
-        engine.zi(20, null, gear(1L, 1L, 150_000L, 0L).quantities);
+        engine.zi(20, gear(1L, 1L, 150_000L, 0L).quantities);
         engine.yz();
         Ac wipe = settle(engine, gear(0L, 0L, 150_000L, 0L), 1_600L);
         assertNotNull(wipe);
@@ -957,7 +888,7 @@ public class DeathReclaimLifecycleTest
     public void reclaimStateIsClearedWhenAnotherIdentityIsRestored()
     {
         Am engine = started(gear(1L, 0L, 0L, 0L));
-        engine.zi(20, null, gear(1L, 0L, 0L, 0L).quantities);
+        engine.zi(20, gear(1L, 0L, 0L, 0L).quantities);
         engine.yz();
         Ac wipe = settle(engine, Cc.empty(), 1_600L);
         assertNotNull(wipe);
@@ -983,7 +914,7 @@ public class DeathReclaimLifecycleTest
     public void reclaimStateSurvivesPauseAndResumeAfterTheDeathWipeSettles()
     {
         Am engine = started(gear(1L, 0L, 0L, 0L));
-        engine.zi(20, null, gear(1L, 0L, 0L, 0L).quantities);
+        engine.zi(20, gear(1L, 0L, 0L, 0L).quantities);
         engine.yz();
         Ac wipe = settle(engine, Cc.empty(), 1_600L);
         assertNotNull(wipe);
@@ -1011,7 +942,7 @@ public class DeathReclaimLifecycleTest
     public void persistedDeathEvidenceKeepsReclaimNeutralAcrossRestart()
     {
         Am first = started(gear(1L, 0L, 0L, 0L));
-        first.zi(20, null, gear(1L, 0L, 0L, 0L).quantities);
+        first.zi(20, gear(1L, 0L, 0L, 0L).quantities);
         first.yz();
         assertNotNull(settle(first, Cc.empty(), 1_600L));
         assertTrue(EngineProbe.isAwaitingDeathReclaim(first));
@@ -1048,7 +979,7 @@ public class DeathReclaimLifecycleTest
     {
         Cc carried = gear(1L, 0L, 0L, 0L);
         Am first = started(carried);
-        first.zi(20, null, carried.quantities);
+        first.zi(20, carried.quantities);
 
         SavedState persisted = roundTrip(first.qm());
         assertNotNull("death evidence is persisted before the inventory wipe", persisted.pendingDeathReclaim);
@@ -1070,7 +1001,7 @@ public class DeathReclaimLifecycleTest
     public void partialReclaimRemainderSurvivesRestart()
     {
         Am first = started(gear(1L, 1L, 0L, 0L));
-        first.zi(20, null, gear(1L, 1L, 0L, 0L).quantities);
+        first.zi(20, gear(1L, 1L, 0L, 0L).quantities);
         first.yz();
         assertNotNull(settle(first, Cc.empty(), 1_600L));
         assertTrue(first.abe(
@@ -1106,7 +1037,7 @@ public class DeathReclaimLifecycleTest
     public void closedReclaimCannotReclassifyLaterGainsAfterRestart()
     {
         Am first = started(gear(1L, 0L, 0L, 0L));
-        first.zi(20, null, gear(1L, 0L, 0L, 0L).quantities);
+        first.zi(20, gear(1L, 0L, 0L, 0L).quantities);
         first.yz();
         assertNotNull(settle(first, Cc.empty(), 1_600L));
         assertTrue(first.abe(
@@ -1135,7 +1066,7 @@ public class DeathReclaimLifecycleTest
     public void ownerSwitchAndDestructiveResetClearPersistedDeathEvidence()
     {
         Am engine = started(gear(1L, 0L, 0L, 0L));
-        engine.zi(20, null, gear(1L, 0L, 0L, 0L).quantities);
+        engine.zi(20, gear(1L, 0L, 0L, 0L).quantities);
         engine.yz();
         assertNotNull(settle(engine, Cc.empty(), 1_600L));
         assertNotNull(engine.qm().pendingDeathReclaim);
@@ -1146,7 +1077,7 @@ public class DeathReclaimLifecycleTest
         assertNull(engine.qm().pendingDeathReclaim);
 
         Am reset = started(gear(1L, 0L, 0L, 0L));
-        reset.zi(20, null, gear(1L, 0L, 0L, 0L).quantities);
+        reset.zi(20, gear(1L, 0L, 0L, 0L).quantities);
         reset.yz();
         assertNotNull(settle(reset, Cc.empty(), 1_600L));
         reset.agr(3_000L);
@@ -1158,7 +1089,7 @@ public class DeathReclaimLifecycleTest
     public void observedReclaimFeeAfterRestartBooksOnce()
     {
         Am first = started(gear(1L, 0L, 150_000L, 0L));
-        first.zi(20, null, gear(1L, 0L, 150_000L, 0L).quantities);
+        first.zi(20, gear(1L, 0L, 150_000L, 0L).quantities);
         first.yz();
         assertNotNull(settle(first, Cc.empty(), 1_600L));
 

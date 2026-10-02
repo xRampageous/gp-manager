@@ -40,7 +40,10 @@ interface Actions {
  }
  Ef preview(String transactionId, Ah correction);
  Ea correct(String transactionId, Ah correction, long previewRevision);
- void split(String transactionId);
+ /** Asks how many to keep, then hands back {itemId, keep, total} and its Net preview. */
+ void split(String transactionId, java.util.function.BiConsumer<long[], Ef> previewed);
+ default void applySplit(String transactionId, long[] split, long previewRevision) {
+ }
  void undoCorrection();
  /** Pins an open mutation menu to the live session; empty when none can be mutated. */
  default String pinMenuTarget() {
@@ -50,9 +53,6 @@ interface Actions {
  default void undoLast() {
  }
  default void restoreUndo() {
- }
- /** Exports the one Grind in scope as CSV. */
- default void exportCsv() {
  }
  void decideAll(Cl decision);
  default void decide(String transactionId, Cl decision) {
@@ -90,6 +90,8 @@ String anchored = "";
 Ah pendingCorrection;
 String pendingTransaction;
 Ef pendingPreview;
+/** A split waiting for Confirm: {itemId, keep, total}; null for a correction. */
+long[] pendingSplit;
 LedgerPage(Actions actions, Function<Integer, BufferedImage> sprites) {
  this.actions = actions;
  this.sprites = sprites == null ? id -> null : sprites;
@@ -122,7 +124,7 @@ LedgerPage(Actions actions, Function<Integer, BufferedImage> sprites) {
   table.setFoldable(true).setRowsPerPage(ROWS);
  }
  detailReceipts.setRowsPerPage(ROWS);
- costs.setExtra(auf(Bs.ALL, new int[4]));
+ costs.setPicker(auf(Bs.ALL, new int[4]));
  pending.setEmptyText("Nothing waiting");
  review.setEmptyText(msg("cp"));
  pad(body, 0, GAP, GAP, 0);
@@ -178,7 +180,7 @@ void apply(Ao next) {
  scope.setText(next.scopeName + " \u25be");
  // Owner 2026-10-01 (F03): Runs today is whole runs that started today, never calendar-day money.
  scope.setToolTipText(next.entry.scope == Ao.Scope.TODAY
- ? "Current run + runs started today; whole-run totals" : null);
+ ? msg("es") : null);
  if (atn) {
   for (Table table : new Table[] {gains, costs, market, deaths, pending, review, corrected}) table.avd();
  }
@@ -190,7 +192,7 @@ void apply(Ao next) {
  }
  if (next.entry.scope == Ao.Scope.TODAY) {
   // Owner 2026-10-01 (F03): whole runs that started today, never calendar-day money.
-  body.add(note("Runs today · Current run + runs started today; whole-run totals.", LABEL));
+  body.add(note(msg("fn"), LABEL));
  }
  if (next.readOnly) body.add(note(msg("jb"), LABEL));
  if (next.compacted && !next.detailedHistoryAvailable) body.add(note(msg("fq"), LABEL));
@@ -207,7 +209,7 @@ void apply(Ao next) {
 // ── overview ─────────────────────────────────────────────────────────────────────────────
 void overview(Ao d) {
  fill(gains, "GAINS", d.gains.groups, d.gains.total, d.gains.incomplete, Tone.GAIN);
- costs.setExtra(auf(d.entry.costView, d.costCounts));
+ costs.setPicker(auf(d.entry.costView, d.costCounts));
  fill(costs, "LOSSES", d.costs.groups, d.costs.total, d.costs.incomplete,
  d.entry.costView == Bs.LOSS ? LOSS : SUPPLY);
  var settled = new ArrayList<Group>();
@@ -240,7 +242,7 @@ void overview(Ao d) {
     apply(data);
    };
    rows.add(new Row("death|" + death.transactionId, null, death.place, when(death.at, d.capturedAt),
-   signed(death.value), LOSS, death.place + " · also counted in Costs · Loss",
+   signed(death.value), LOSS, death.place + msg("fr"),
    ru(death.value) + " gp", selected, apk,
    Arrays.asList(new Menu("Details", apk), new Menu("Open receipt",
    () -> actions.selectionChanged(death.transactionId, null, null)))));
@@ -281,22 +283,28 @@ void fill(Table table, String title, List<Group> groups, long total, boolean inc
  table.setToolTipText(incomplete ? msg("ae") : null);
 }
 
-JPanel auf(Bs selected, int[] counts) {
- // Owner 2026-10-01 (F17): four day-to-day chips read two-by-two at the 225px sidebar width.
- var chips = new JPanel(new java.awt.GridLayout(0, 2, 2, 2));
- chips.setOpaque(false);
+/** Owner 1.1: the Losses view is a dropdown beside the header (All, Supplies, Items, Charges). */
+JButton auf(Bs selected, int[] counts) {
+ var pick = new JButton(selected.label + " \u25be");
+ pick.setFont(small());
+ pick.setForeground(selected == Bs.ALL ? LABEL : ACCENT);
+ pick.setBorder(BorderFactory.createEmptyBorder());
+ pick.setContentAreaFilled(false);
+ pick.setFocusPainted(false);
+ pick.getAccessibleContext().setAccessibleName("Losses filter: " + selected.label);
+ pick.addActionListener(e -> menu(selected, counts).show(pick, 0, pick.getHeight()));
+ return pick;
+}
+
+JPopupMenu menu(Bs selected, int[] counts) {
+ var menu = new JPopupMenu();
  for (Bs view : Bs.values()) {
-  String label = view == Bs.ALL ? view.label : view.label + " " + counts[view.ordinal()];
-  JButton chip = button(label, view == selected, () -> {
+  menu.add(item((view == selected ? "\u2713 " : "") + view.label
+  + (view == Bs.ALL ? "" : " " + exact(counts[view.ordinal()])), () -> {
    if (view != selected) actions.costViewChanged(view);
-  });
-  chip.getAccessibleContext().setAccessibleName("Losses filter: " + view.label);
-  // Four chips share one sidebar row, so they pad less than a full button.
-  chip.setBorder(BorderFactory.createCompoundBorder(((javax.swing.border.CompoundBorder) chip.getBorder())
-  .getOutsideBorder(), BorderFactory.createEmptyBorder(3, 4, 3, 4)));
-  chips.add(chip);
+  }));
  }
- return chips;
+ return menu;
 }
 
 Row awh(Group group, Tone tone) {
@@ -466,9 +474,6 @@ JPopupMenu qv() {
 
 JPopupMenu awo() {
  var menu = new JPopupMenu();
- JMenuItem export = item(msg("cq"), data != null && data.entry.scope != Ao.Scope.TODAY, actions::exportCsv);
- export.setToolTipText(msg("bm"));
- menu.add(export);
  menu.add(item(showCorrected ? "Hide corrected" : "Show corrected"
  + (data == null ? "" : " (" + data.corrected.size() + ")"), () -> {
   showCorrected = !showCorrected;
@@ -605,8 +610,13 @@ JComponent receipt(Ao d, Receipt row) {
  if (d.readOnly) {
   panel.add(note(msg("je"), LABEL));
  } else if (pendingPreview != null && row.transactionId.equals(pendingTransaction)) {
-  panel.add(new Dd("PREVIEW").put("Current Net", ru(pendingPreview.currentNet) + " gp", PLAIN)
-  .put("After correction", ru(pendingPreview.afterNet) + " gp", PLAIN)
+  var preview = new Dd("PREVIEW");
+  if (pendingSplit != null) {
+   preview.put("Keep", "×" + exact(pendingSplit[1]), PLAIN)
+   .put("Others", "×" + exact(pendingSplit[2] - pendingSplit[1]), PLAIN);
+  }
+  panel.add(preview.put("Current Net", ru(pendingPreview.currentNet) + " gp", PLAIN)
+  .put(pendingSplit != null ? "After split" : "After correction", ru(pendingPreview.afterNet) + " gp", PLAIN)
   .put("Change", ru(pendingPreview.change) + " gp", sign(pendingPreview.change)));
   panel.add(note(pendingPreview.note(), LABEL));
   JButton confirm = button("Confirm", true, this::confirm);
@@ -687,7 +697,13 @@ Map<String, Runnable> corrections(String transactionId, String contributionId, b
   });
  }
  if (splittable) {
-  list.put("Split…", () -> actions.split(transactionId));
+  list.put("Split…", () -> actions.split(transactionId, (split, preview) -> {
+   ou();
+   pendingTransaction = transactionId;
+   pendingSplit = split;
+   pendingPreview = preview;
+   auy(transactionId, contributionId);
+  }));
  }
  list.put(msg("fb"), actions::undoCorrection);
  return list;
@@ -697,9 +713,16 @@ void ou() {
  pendingCorrection = null;
  pendingTransaction = null;
  pendingPreview = null;
+ pendingSplit = null;
 }
 
 void confirm() {
+ if (pendingSplit != null && pendingPreview != null) {
+  actions.applySplit(pendingTransaction, pendingSplit, pendingPreview.revision);
+  ou();
+  actions.refresh();
+  return;
+ }
  if (pendingCorrection == null || pendingPreview == null || pendingTransaction == null) return;
  Ea outcome = actions.correct(pendingTransaction, pendingCorrection, pendingPreview.revision);
  ou();

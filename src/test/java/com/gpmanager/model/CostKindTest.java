@@ -22,6 +22,18 @@ public class CostKindTest
         assertEquals(CostKind.MARKET, kind(Ai.TRADE, "GE buy", 7, -100L));
     }
 
+    /** Owner 1.1: burying, scattering and offering are Supplies, like eating; never a loss. */
+    @Test
+    public void buryScatterAndOfferAreSupplies()
+    {
+        for (Au kind : new Au[] {Au.BURY, Au.SCATTER, Au.OFFER})
+        {
+            Ac spend = transaction(Ai.CONSUMPTION, "Prayer", 526, -100L);
+            spend.setActionKind(kind);
+            assertEquals(kind.name(), CostKind.SUPPLIES, CostKind.of(spend, spend.getFlows().get(0)));
+        }
+    }
+
     @Test
     public void actionTaxAndCorrectionsUseEffectiveContribution()
     {

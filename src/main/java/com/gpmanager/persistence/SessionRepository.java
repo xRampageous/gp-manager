@@ -25,7 +25,6 @@ static final String ACCOUNTS_DIRECTORY = "profiles";
 static final String UNASSIGNED_MARKER = "unbound";
 final Gson gson;
 Filepath rootDirectory;
-Filepath exportDirectory;
 /** Profile backups, one folder, newest 10 per account (owner 2026-09-28). */
 Filepath backupDirectory;
 final boolean accountAware;
@@ -59,7 +58,6 @@ synchronized void initialize(Filepath pluginDirectory) {
   return;
  }
  this.rootDirectory = rooted;
- this.exportDirectory = rooted.joinSegment("exports");
  this.backupDirectory = rooted.joinSegment("backups");
  this.initialized = true;
  if (accountAware) {

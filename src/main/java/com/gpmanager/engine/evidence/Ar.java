@@ -67,7 +67,7 @@ enum V {
  /** Shard-fed blade: one charge per attack, hit or miss; the Check text is not pinned yet. */
  SAELDOR("Blade of Saeldor", false, new int[]{ItemID.BLADE_OF_SAELDOR, ItemID.BLADE_OF_SAELDOR_INACTIVE}),
  /** Blood-shard amulet: one charge per successful melee hit, whether it heals or not. */
- BLOOD_FURY("Amulet of blood fury", true, new int[]{ItemID.BLOOD_AMULET});
+ BLOOD_FURY("Blood fury", true, new int[]{ItemID.BLOOD_AMULET});
  final String displayName;
  final boolean implemented;
  @Getter(AccessLevel.NONE)
@@ -183,9 +183,9 @@ static V surface(String lower) {
  if (lower.startsWith("darts:") && lower.contains("scales:")) return V.V1b;
  if (lower.startsWith("the pendant has ")) return V.ATES;
  if (lower.startsWith("your tome has been charged with ")) return V.V3;
- if (lower.startsWith("your amulet of blood fury will work for ")) return V.BLOOD_FURY;
- if (lower.startsWith("the eye of ayak has been charged with demon tears.")
- || lower.startsWith("the eye of ayak has been charged with runes.")) {
+ if (lower.startsWith(msg("br"))) return V.BLOOD_FURY;
+ if (lower.startsWith(msg("bx"))
+ || lower.startsWith(msg("cj"))) {
   return V.EYE_OF_AYAK;
  }
  for (V variant : V.values()) {

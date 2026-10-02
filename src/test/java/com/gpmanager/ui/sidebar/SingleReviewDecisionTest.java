@@ -69,7 +69,7 @@ public class SingleReviewDecisionTest
         @Override public Ao.Ef preview(String id, Ah correction) { return null; }
         @Override public LedgerPage.Ea correct(String id, Ah correction, long revision)
         { return LedgerPage.Ea.REFUSED; }
-        @Override public void split(String id) { }
+        @Override public void split(String id, java.util.function.BiConsumer<long[], Ao.Ef> previewed) { }
         @Override public void undoCorrection() { }
         @Override public void decideAll(Cl decision)
         {

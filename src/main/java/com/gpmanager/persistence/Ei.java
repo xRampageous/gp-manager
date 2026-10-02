@@ -303,6 +303,11 @@ synchronized void acd(boolean persistHistory) {
 }
 
 void ahe() {
+ ahe(false);
+}
+
+/** {@code quick}: a gameplay save, which may reuse unchanged closed sessions' JSON. */
+void ahe(boolean quick) {
  // A lifecycle worker may hold this monitor while it waits for a disk
  // flush or loads the next account scope. Gameplay ingestion is already
  // fenced at this point, so a callback request must return without
@@ -310,13 +315,17 @@ void ahe() {
  // explicit snapshot path.
  if (lifecyclePending) return;
  synchronized (this) {
-  if (!lifecyclePending) ahf();
+  if (!lifecyclePending) ahf(quick);
  }
 }
 
 /** Caller holds this coordinator monitor; used by lifecycle boundary snapshots. */
 void ahf() {
- Cs intent = qn();
+ ahf(false);
+}
+
+void ahf(boolean quick) {
+ Cs intent = qn(quick);
  if (intent == null) return;
  writer.submit(intent);
 }
@@ -414,7 +423,7 @@ Ds afz(long now, SavedState from) {
   String why = outcome.kind == Bm.Kind.CONFLICT ? msg("hb") + " " : "";
   // Owner 2026-10-01 (F25): the shared outcome names the operation that was refused.
   return new Ds(false, (from == null ? "Factory reset" : "Restore")
-  + " was not applied: " + why + outcome.message + (from == null ? "" : " \u00b7 the old profile is unchanged"), backup);
+  + " was not applied: " + why + outcome.message + (from == null ? "" : msg("cq")), backup);
  }
  engine.lp();
  return new Ds(true, msg("bp"), backup);
@@ -432,7 +441,8 @@ Filepath akt(long now) throws IOException {
 
 private Filepath aktLocked(long now) throws IOException {
  repository.backupDirectory.createDirectories();
- String name = account() + "-" + CsvExporter.FILE_TIME.format(Instant.ofEpochMilli(now));
+ String name = account() + "-" + java.time.format.DateTimeFormatter.ofPattern("yyyyMMdd-HHmmss").withZone(ZoneId.systemDefault())
+ .format(Instant.ofEpochMilli(now));
  Filepath file = repository.backupDirectory.joinSegment(name + ".json");
  for (int n = 2; file.exists() && n < 1_000; n++) {
   file = repository.backupDirectory.joinSegment(name + "-" + n + ".json");
@@ -561,7 +571,7 @@ SavedState yq(TrackingIdentity identity) {
 * A save {@code header}'s revision and savedAt, and the bound owner, are stamped on the fresh
 * container first, so this one pass is the payload; the schema is the new container's current one.
 */
-String aiw(SavedState header) {
+String aiw(SavedState header, boolean quick) {
  synchronized (engine) {
   SavedState state = engine.qm();
   if (header != null) {
@@ -569,16 +579,55 @@ String aiw(SavedState header) {
    state.setSavedAtEpochMillis(header.savedAtEpochMillis);
    if (activeIdentity != null) state.setOwnerKey(activeIdentity.rsProfileKey);
   }
-  return repository.gson.toJson(state);
+  // History is most of the save and closed sessions rarely change: each session is written on
+  // its own and spliced into the same bytes one toJson would give; a quick save reuses the
+  // JSON of a closed session whose saveStamp has not moved since.
+  var gson = repository.gson;
+  var history = state.history;
+  state.history = new java.util.ArrayList<>();
+  String rest = gson.toJson(state);
+  String hole = "\"generalSuspendedByCustom\":" + state.generalSuspendedByCustom + ",\"history\":[";
+  int at = rest.indexOf(hole) + hole.length();
+  if (at < hole.length() || rest.charAt(at) != ']') {
+   state.history = history;
+   return gson.toJson(state);
+  }
+  var json = new StringBuilder(rest.length() + closedJsonChars + 4_096).append(rest, 0, at);
+  var next = new java.util.IdentityHashMap<Ad, Object[]>();
+  long chars = 0;
+  for (Ad session : history) {
+   if (json.length() > at) json.append(',');
+   Object[] cached = session == null ? null : closedJson.get(session);
+   String one = quick && cached != null && (long) cached[0] == session.saveStamp ? (String) cached[1]
+   : gson.toJson(session);
+   if (session != null && session.isClosed()) {
+    next.put(session, new Object[] {session.saveStamp, one});
+    chars += one.length();
+   }
+   json.append(one);
+  }
+  closedJson = next;
+  closedJsonChars = (int) min(chars, 1 << 28);
+  return json.append(rest, at, rest.length()).toString();
  }
 }
 
+/** Closed history sessions' last JSON by identity: {saveStamp, json}. */
+java.util.Map<Ad, Object[]> closedJson = new java.util.IdentityHashMap<>();
+int closedJsonChars;
+/** Every 10th quick save writes everything afresh. */
+int quickSaves;
+
 /** A detached copy of the engine's state; agl normalizes its labels as a load does. */
 SavedState snapshot() {
- return repository.gson.fromJson(aiw(null), SavedState.class);
+ return repository.gson.fromJson(aiw(null, false), SavedState.class);
 }
 
 Cs qn() {
+ return qn(false);
+}
+
+Cs qn(boolean quick) {
  if (!repository.isBound() || readOnlyReason != null || writer.vw(repository.scopeGeneration)) {
   return null;
  }
@@ -589,6 +638,6 @@ Cs qn() {
  header.setRevision(max(nextRevision, anl + 1L));
  nextRevision = header.revision + 1L;
  header.setSavedAtEpochMillis(System.currentTimeMillis());
- return new Cs(activeIdentity, repository.scopeGeneration, anl, header, aiw(header));
+ return new Cs(activeIdentity, repository.scopeGeneration, anl, header, aiw(header, quick && ++quickSaves % 10 != 0));
 }
 }

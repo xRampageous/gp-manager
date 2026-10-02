@@ -20,10 +20,6 @@ void mutate(Runnable domain) {
  panel.mutate(domain);
 }
 
-void se(Ad session) {
- panel.se(session);
-}
-
 public void openScopeMenu(JComponent anchor) {
  panel.historyScopeMenuPage = 0;
  ail(anchor, panel.historyScopeMenuPage);
@@ -55,7 +51,7 @@ void ail(JComponent anchor, int pageIndex) {
    menu.addSeparator();
   }
   for (Ad session : history.subList(from, to)) {
-   menu.add(item("Recent Grind \u00b7 " + session.getName(), () -> aia(HISTORY,
+   menu.add(item(msg("kl") + session.getName(), () -> aia(HISTORY,
    session.getId(), session.getName())));
   }
  }
@@ -97,7 +93,7 @@ public Ea correct(String transactionId, Ah correction, long previewRevision) {
  return applied ? Ea.APPLIED : Ea.REFUSED;
 }
 
-public void split(String transactionId) {
+public void split(String transactionId, java.util.function.BiConsumer<long[], Ao.Ef> previewed) {
  Ad session = engine.getActiveSession();
  Ac transaction = session == null ? null : session.sw(transactionId);
  int itemId = -1;
@@ -119,7 +115,7 @@ public void split(String transactionId) {
  if (itemId <= 0 || total < 2L) {
   // Owner 2026-10-01 (F02): only one kind of item in two or more units can be split.
   panel.shell().tell("Not split", transaction == null ? "that receipt is no longer here"
-  : "split needs one item with at least two units", true);
+  : msg("km"), true);
   return;
  }
  int splitItem = itemId;
@@ -135,22 +131,37 @@ public void split(String transactionId) {
    keep = -1L;
   }
   if (keep <= 0L || keep >= splitTotal) {
-   panel.shell().tell("Not split", "enter a number from 1 to " + (splitTotal - 1), true);
+   panel.shell().tell("Not split", msg("kn") + (splitTotal - 1), true);
    return;
   }
-  long atq = keep;
-  mutate(() -> {
-   // The sheet may be stale: re-check the session and the exact receipt before mutating.
-   Ad now = engine.getActiveSession();
-   Ac current = now == null || !owner.equals(now.getId()) ? null : now.sw(transactionId);
-   if (!splittableSplit(current, splitItem, splitTotal)) {
-    panel.shell().tell("Not split", "that receipt changed; nothing was split", true);
-    return;
-   }
-   if (!engine.kr(transactionId, splitItem, atq, System.currentTimeMillis(), "Ledger split")) {
-    panel.shell().tell("Not split", "that split was not applied", true);
-   }
-  });
+  Ad now = engine.getActiveSession();
+  if (now == null || !owner.equals(now.getId()) || !splittableSplit(now.sw(transactionId), splitItem, splitTotal)) {
+   panel.shell().tell("Not split", msg("ko"), true);
+   return;
+  }
+  // Owner 1.1: the split shows its Net preview first, like every other correction.
+  previewed.accept(new long[] {splitItem, keep, splitTotal},
+  Ao.splitPreview(engine, transactionId, splitItem, keep, System.currentTimeMillis()));
+ });
+}
+
+public void applySplit(String transactionId, long[] split, long previewRevision) {
+ String owner = engine.getActiveSession() == null ? "" : engine.getActiveSession().getId();
+ mutate(() -> {
+  // The sheet may be stale: re-check the session and the exact receipt before mutating.
+  Ad now = engine.getActiveSession();
+  Ac current = now == null || !owner.equals(now.getId()) ? null : now.sw(transactionId);
+  if (engine.getRevision() != previewRevision) {
+   panel.shell().tell("Not split", msg("gz"), true);
+   return;
+  }
+  if (!splittableSplit(current, (int) split[0], split[2])) {
+   panel.shell().tell("Not split", msg("ko"), true);
+   return;
+  }
+  if (!engine.kr(transactionId, (int) split[0], split[1], System.currentTimeMillis(), "Ledger split")) {
+   panel.shell().tell("Not split", "that split was not applied", true);
+  }
  });
 }
 
@@ -217,18 +228,12 @@ void decide(Cl decision, java.util.function.Predicate<Cu> rows, boolean single) 
  if (count == 0 || single && count != 1) return;
  String message = qj(decision.ajo())
  + (single ? " for this receipt" : " for " + count + (count == 1 ? " receipt" : " receipts"))
- + ". Net changes by " + Fmt.signed(preview.netDelta) + " gp." + (single ? "" : " One Undo reverts the whole batch.");
+ + ". Net changes by " + Fmt.signed(preview.netDelta) + " gp." + (single ? "" : msg("kp"));
  panel.shell().confirm(single ? "Review decision" : "Decide all", message, "Apply", () -> mutate(() -> {
   if (engine.kp(preview, System.currentTimeMillis()) < 0) {
    SwingUtilities.invokeLater(() -> panel.ledger.aiu(msg("gz")));
   }
  }));
-}
-
-@Override
-public void exportCsv() {
- se(panel.ledgerEntry.scope == HISTORY
- ? engine.ua(panel.ledgerEntry.historySessionId) : engine.getActiveSession());
 }
 
 public void refresh() {
