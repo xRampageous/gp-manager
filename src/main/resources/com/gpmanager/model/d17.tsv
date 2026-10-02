@@ -2,7 +2,13 @@
 mining	Mined
 woodcutting	Chopped
 fishing	Fished
-smithing	Smelted
+smelting	Smelted
+smithing	Smithed
+cooking	Cooked
+fletching	Fletched
+herblore	Made
+runecraft	Crafted
+hunter	Caught
 crafting	Crafted
 farming	Harvested
 thieving	Stole

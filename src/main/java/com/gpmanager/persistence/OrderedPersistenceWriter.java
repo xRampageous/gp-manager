@@ -159,7 +159,6 @@ boolean flush(Duration timeout) {
    try {
     flushMonitor.wait(min(TimeUnit.NANOSECONDS.toMillis(remaining) + 1L, 250L));
    } catch (InterruptedException ex) {
-    Thread.currentThread().interrupt();
     return false;
    }
   }

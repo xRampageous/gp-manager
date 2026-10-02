@@ -19,7 +19,7 @@ def pluginMainClass = 'com.gpmanager.GpManagerPluginTest'
 
 group = 'com.gpmanager'
 // Plugin metadata and build version must agree; development identity is generated below.
-version = '1.1.0'
+version = '1.1.1'
 
 
 

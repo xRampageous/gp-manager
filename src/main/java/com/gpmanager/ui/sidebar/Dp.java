@@ -331,7 +331,6 @@ static void ahk(Runnable task) {
  try {
   SwingUtilities.invokeAndWait(task);
  } catch (InterruptedException ex) {
-  Thread.currentThread().interrupt();
   SwingUtilities.invokeLater(task);
  } catch (Exception ex) {
   throw new IllegalStateException(msg("an"), ex);

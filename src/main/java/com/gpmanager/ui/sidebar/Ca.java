@@ -8,6 +8,7 @@ import lombok.*;
 import static java.lang.Math.*;
 import static com.gpmanager.Ae.*;
 import static com.gpmanager.Fmt.*;
+import static com.gpmanager.Ak.msg;
 /**
 * Everything the Live page paints, captured in one read from the current schema-102 engine so
 * the page never holds engine references while laying out. Pure data; built by {@link #capture}.
@@ -272,6 +273,7 @@ Map<String, Row> marketRows, RecentFilter filter) {
  return Collections.unmodifiableList(rows);
 }
 
+
 /** One semantic group as the Live row the page paints, with proven Market value semantics. */
 static Recent toRecent(Group group, Row marketRow) {
  if (group == null) return null;
@@ -310,9 +312,13 @@ static Recent toRecent(Group group, Row marketRow) {
   qty = !group.primaryName.equalsIgnoreCase(group.actionLabel) ? casts
   : casts == null ? group.qe : group.qe + " · " + casts;
   actionLabel = group.actionLabel;
+ } else if (!group.failedOf().isEmpty()) {
+  qty = group.failedOf();
+  actionLabel = group.failedTip();
  } else {
   qty = quantity;
-  actionLabel = group.actionLabel;
+  // A run whose every unit failed so far reads as failed, whichever receipt came first.
+  actionLabel = group.failed > 0L ? msg("zz") : group.actionLabel;
  }
  Bs ledgerCostView = group.table == Br.Table.COSTS_SUPPLIES
  ? group.chargeUse ? Bs.CHARGES : Bs.SUPPLIES : group.table == Br.Table.COSTS_LOSS

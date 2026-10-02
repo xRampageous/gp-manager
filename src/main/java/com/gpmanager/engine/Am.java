@@ -1955,6 +1955,10 @@ void aif(Settle s) {
   s.activity = jz(s.note);
  } else if (s.context == PK_LOOT || s.context == PK_DEATH) {
   s.activity = "PKing";
+ } else if (s.context == Aj.PRODUCTION && Dw.TRANSFORM.containsValue(s.note)) {
+  // A run names its own skill: the session hint waits for a second XP drop, so a first
+  // item would carry the last activity (or none).
+  s.activity = "Smelting".equals(s.note) ? "Smithing" : s.note;
  }
 }
 

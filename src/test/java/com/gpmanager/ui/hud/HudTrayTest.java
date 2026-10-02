@@ -383,6 +383,86 @@ public class HudTrayTest
     }
 
     @Test
+    public void aRunsFirstItemBookedBeforeItsSkillXpStaysInTheRun()
+    {
+        HudTray tray = new HudTray();
+        for (int i = 0; i < 3; i++)
+        {
+            Ac bar = Tx.of(T0 + i * 3_000L, null, Ai.PROCESSING, Aj.PRODUCTION, "Smithing",
+                i == 0 ? "General" : "Smithing", true,
+                Arrays.asList(flow(2351, "Iron bar", 1L, 187), flow(440, "Iron ore", -1L, 72)));
+            tray.booked(bar, T0 + i * 3_000L, false);
+        }
+        assertEquals("Smelted", tray.label());
+        assertEquals(3L, tray.entries().get(0).quantity);
+    }
+
+    @Test
+    public void theFirstItemAfterAnotherSkillJoinsTheNewRun()
+    {
+        // From the mine to the furnace: the first bar still carries the old activity.
+        HudTray tray = new HudTray();
+        tray.booked(Tx.of(T0, null, Ai.GAIN, Aj.GENERIC, "", "Mining", true,
+            Arrays.asList(flow(440, "Iron ore", 1L, 72))), T0, false);
+        for (int i = 1; i <= 3; i++)
+        {
+            tray.booked(Tx.of(T0 + i * 3_000L, null, Ai.PROCESSING, Aj.PRODUCTION, "Smithing",
+                i == 1 ? "Mining" : "Smithing", true,
+                Arrays.asList(flow(2351, "Iron bar", 1L, 187), flow(440, "Iron ore", -1L, 72))),
+                T0 + i * 3_000L, false);
+        }
+        assertEquals("Smelted", tray.label());
+        assertEquals(1, tray.entries().size());
+        assertEquals(3L, tray.entries().get(0).quantity);
+    }
+
+    @Test
+    public void skillXpNamesTheFirstItemsWork()
+    {
+        // A stall, a trap, a cooked fish: the XP arrives with the item, before any activity name.
+        String[][] runs = {{"Thieving", "Stole", "Cake"}, {"Hunter", "Caught", "Chinchompa"},
+            {"Fishing", "Fished", "Raw lobster"}, {"Smithing", "Smithed", "Iron dagger"}};
+        for (String[] run : runs)
+        {
+            HudTray tray = new HudTray();
+            for (int i = 0; i < 3; i++)
+            {
+                long at = T0 + i * 4_000L;
+                tray.xp(run[0], at - 1_200L);
+                tray.booked(Tx.of(at, null, Ai.GAIN, Aj.GENERIC, "", i == 0 ? "General" : run[0], true,
+                    Arrays.asList(flow(1891, run[2], 1L, 50))), at, false);
+            }
+            assertEquals(run[0], run[1], tray.label());
+            assertEquals(run[0], 3L, tray.entries().get(0).quantity);
+        }
+    }
+
+    @Test
+    public void aDeathReadsLostAndATradeKeepsNoSkillVerb()
+    {
+        HudTray tray = new HudTray();
+        tray.booked(receipt(T0, Ai.PK_DEATH_LOSS, flow(4151, "Abyssal whip", -1L, 1_500_000)), T0, false);
+        assertEquals("Lost", tray.label());
+
+        HudTray market = new HudTray();
+        market.xp("Smithing", T0);
+        market.booked(Tx.of(T0 + 600L, null, Ai.TRADE, Aj.MARKET, "Grand Exchange", "Market", true,
+            Arrays.asList(flow(995, "Coins", 500L, 1))), T0 + 600L, false);
+        assertEquals("Looted", market.label());
+    }
+
+    @Test
+    public void combatXpNeverNamesTheTray()
+    {
+        HudTray tray = new HudTray();
+        tray.xp("Strength", T0);
+        tray.xp("Magic", T0);
+        tray.booked(Tx.of(T0 + 600L, null, Ai.GAIN, Aj.GENERIC, "", "General", true,
+            Arrays.asList(flow(536, "Dragon bones", 1L, 2_000))), T0 + 600L, false);
+        assertEquals("Looted", tray.label());
+    }
+
+    @Test
     public void anotherKindOfWorkStartsANewStreakUnlessRowsKeepForTheSession()
     {
         HudTray streak = new HudTray();

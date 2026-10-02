@@ -665,9 +665,9 @@ public void onMenuOptionClicked(MenuOptionClicked event) {
   : AgilityCourses.qp(local.getWorldLocation().getRegionID());
   activity.abm(course == null ? "Agility" : course, true);
  }
- // Farming / gather object actions: activity label only (accounting is inventory GAIN).
+ // Farming / gather object actions: their skill's first XP names the activity (accounting is inventory GAIN).
  if (gather) {
-  activity.abm(Dw.ka(option), true);
+  activity.gatherSkill = Dw.ka(option);
  } else if (!consumption) {
   // Transform/production options (station or inventory) arm PRODUCTION context so the
   // paired receipt settles without double count; XP re-arms it inside the window.
@@ -933,6 +933,8 @@ public void onStatChanged(StatChanged event) {
  String course = skill != Skill.AGILITY || local == null || local.getWorldLocation() == null ? null
  : AgilityCourses.qp(local.getWorldLocation().getRegionID());
  activity.acj(skill.getName(), course, interactionContextTracker.vi(), now);
+ Cp builder = hud;
+ if (builder != null) builder.tray().xp(skill.getName(), now);
  charges.aks(skill, client.getTickCount(), now);
 }
 

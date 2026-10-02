@@ -55,7 +55,6 @@ public class WriterLineageAndIdentityTest
                     }
                     catch (InterruptedException ex)
                     {
-                        Thread.currentThread().interrupt();
                         return false;
                     }
                 }

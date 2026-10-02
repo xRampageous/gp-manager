@@ -58,7 +58,6 @@ public class PersistenceLifecycleC0aTest
                 }
                 catch (InterruptedException ex)
                 {
-                    Thread.currentThread().interrupt();
                     return false;
                 }
                 return false;
@@ -96,7 +95,6 @@ public class PersistenceLifecycleC0aTest
                 }
                 catch (InterruptedException ex)
                 {
-                    Thread.currentThread().interrupt();
                     return false;
                 }
                 return super.save(intent);
@@ -129,7 +127,7 @@ public class PersistenceLifecycleC0aTest
         {
             release.countDown();
             writer.shutdown(Duration.ofSeconds(5));
-            caller.shutdownNow();
+            caller.shutdown();
         }
     }
 
@@ -154,7 +152,6 @@ public class PersistenceLifecycleC0aTest
                 }
                 catch (InterruptedException ex)
                 {
-                    Thread.currentThread().interrupt();
                     throw new AssertionError(ex);
                 }
                 return super.load();
@@ -187,7 +184,7 @@ public class PersistenceLifecycleC0aTest
         {
             release.countDown();
             coordinator.shutdown(false);
-            caller.shutdownNow();
+            caller.shutdown();
         }
     }
 
@@ -215,7 +212,6 @@ public class PersistenceLifecycleC0aTest
                     }
                     catch (InterruptedException ex)
                     {
-                        Thread.currentThread().interrupt();
                         throw new AssertionError(ex);
                     }
                 }
@@ -255,7 +251,7 @@ public class PersistenceLifecycleC0aTest
         {
             release.countDown();
             coordinator.shutdown(false);
-            caller.shutdownNow();
+            caller.shutdown();
         }
     }
 
@@ -283,7 +279,6 @@ public class PersistenceLifecycleC0aTest
                     }
                     catch (InterruptedException ex)
                     {
-                        Thread.currentThread().interrupt();
                         throw new AssertionError(ex);
                     }
                 }
@@ -340,7 +335,7 @@ public class PersistenceLifecycleC0aTest
         {
             release.countDown();
             coordinator.shutdown(false);
-            caller.shutdownNow();
+            caller.shutdown();
         }
     }
 

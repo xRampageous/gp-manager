@@ -182,7 +182,6 @@ public class PersistenceHardeningTest
                 }
                 catch (InterruptedException ex)
                 {
-                    Thread.currentThread().interrupt();
                 }
                 return super.save(intent);
             }
