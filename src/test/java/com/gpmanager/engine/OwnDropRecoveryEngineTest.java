@@ -304,7 +304,7 @@ public class OwnDropRecoveryEngineTest
         engine.aki(10, 10, 0);
         engine.abz(526, 6, 10, 10, 0, true);
         Ac drop = settle(engine, Cc.empty(), 1_600L);
-        engine.zo("Death", 3_000L, null);
+        engine.zo("Death", 3_000L);
         engine.yz();
         settle(engine, snapshot(526, 1L), 3_400L);
         assertEquals(35L, drop.getCosts());

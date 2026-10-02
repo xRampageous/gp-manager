@@ -17,9 +17,10 @@ static final Color LABEL = ColorScheme.LIGHT_GRAY_COLOR;
 static final Color OFF = ColorScheme.MEDIUM_GRAY_COLOR;
 static final Color ACCENT = ColorScheme.BRAND_ORANGE;
 static final int ROW = 20;
-/** Rows that carry an item icon are as tall as RuneLite's 36 x 32 item image, so it never spills. */
-static final int ICON_ROW = 32;
-static final int ICON_WIDTH = 36;
+/** Icon rows: every sprite is cropped and fitted into one ICON_BOX square (owner 1.1). */
+static final int ICON_ROW = 28;
+static final int ICON_WIDTH = 28;
+static final int ICON_BOX = 24;
 static final int HEADER = 22;
 static final int GAP = 6;
 static final int VALUE_WIDTH = 46;
@@ -200,5 +201,45 @@ static JButton button(String text, boolean primary, Runnable action) {
 /** Padding of {@code top, left, bottom, right}. */
 static void pad(JComponent component, int top, int left, int bottom, int right) {
  component.setBorder(BorderFactory.createEmptyBorder(top, left, bottom, right));
+}
+
+/** The sprite's visible pixels: transparent margins cut away. */
+static Rectangle visible(java.awt.image.BufferedImage image) {
+ int w = image.getWidth();
+ int h = image.getHeight();
+ int[] argb = image.getRGB(0, 0, w, h, null, 0, w);
+ int left = w;
+ int top = h;
+ int right = -1;
+ int bottom = -1;
+ for (int i = 0; i < argb.length; i++) {
+  if (argb[i] >>> 24 != 0) {
+   left = Math.min(left, i % w);
+   right = Math.max(right, i % w);
+   top = Math.min(top, i / w);
+   bottom = i / w;
+  }
+ }
+ return right < 0 ? new Rectangle(w, h) : new Rectangle(left, top, right - left + 1, bottom - top + 1);
+}
+
+/**
+* A sprite cropped to its visible pixels, scaled down (never up, so pixel art stays sharp) to fit
+* a {@code box} square, and centred: every icon sits the same way in every row.
+*/
+static java.awt.image.BufferedImage fitIcon(java.awt.image.BufferedImage image, int box) {
+ Rectangle c = visible(image);
+ double scale = Math.min(1d, box / (double) Math.max(c.width, c.height));
+ int w = Math.max(1, (int) Math.round(c.width * scale));
+ int h = Math.max(1, (int) Math.round(c.height * scale));
+ var out = new java.awt.image.BufferedImage(box, box, java.awt.image.BufferedImage.TYPE_INT_ARGB);
+ Graphics2D g = out.createGraphics();
+ g.setRenderingHint(RenderingHints.KEY_INTERPOLATION, scale < 1d
+ ? RenderingHints.VALUE_INTERPOLATION_BILINEAR : RenderingHints.VALUE_INTERPOLATION_NEAREST_NEIGHBOR);
+ int x = (box - w) / 2;
+ int y = (box - h) / 2;
+ g.drawImage(image, x, y, x + w, y + h, c.x, c.y, c.x + c.width, c.y + c.height, null);
+ g.dispose();
+ return out;
 }
 }

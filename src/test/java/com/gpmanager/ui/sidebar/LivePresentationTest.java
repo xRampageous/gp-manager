@@ -427,11 +427,15 @@ public class LivePresentationTest
         engine.ajl("Vorkath", Cx.GENERAL, now);
 
         Dz target = new Dz(false, null, 0L, Bo.NONE, "Woodcutting", false, "Goblin");
-        assertEquals("Goblin", LivePage.wf(Ca.capture(engine, now + 1_000L, target)));
+        assertEquals("the named run, never the target", "Vorkath",
+            LivePage.wf(Ca.capture(engine, now + 1_000L, target)));
 
+        Am free = PresentationLifecycleTest.engine();
+        free.rm(now);
+        Dz fight = new Dz(false, null, 0L, Bo.NONE, "Greater Nechryael", false, "Goblin");
+        assertEquals("Combat", LivePage.wf(Ca.capture(free, now + 1_000L, fight)));
         Dz placeholder = new Dz(false, null, 0L, Bo.NONE, "NPC loot", false, "");
-        assertEquals("a fallback leaves the named run",
-            "Vorkath", LivePage.wf(Ca.capture(engine, now + 1_000L, placeholder)));
+        assertEquals("a fallback names nothing", "", LivePage.wf(Ca.capture(free, now + 1_000L, placeholder)));
     }
 
     @Test
@@ -508,7 +512,7 @@ public class LivePresentationTest
         Dp panel = onEdt(() -> new Dp(engine, PresentationLifecycleTest.config(), null));
         onEdt(() ->
         {
-            panel.axo(() -> new Bo(true, true, true));
+            panel.axo(() -> new Bo(true, true, true, 0L));
             SidebarPanelProbe.refresh(panel);
             return null;
         });
@@ -520,7 +524,7 @@ public class LivePresentationTest
 
         onEdt(() ->
         {
-            panel.axo(() -> new Bo(false, false, false));
+            panel.axo(() -> new Bo(false, false, false, 0L));
             SidebarPanelProbe.refresh(panel);
             return null;
         });

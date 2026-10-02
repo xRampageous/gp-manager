@@ -57,7 +57,7 @@ public class HudTrayTest
         tray.kill("Greater Nechryael", T0, false);
         tray.kill("Greater Nechryael", T0 + 20_000L, false);
         tray.kill("Greater Nechryael", T0 + 40_000L, false);
-        assertEquals("Greater Nechryael", tray.streak(T0 + 41_000L).getKey());
+        assertEquals("G. Nechryael", tray.streak(T0 + 41_000L).getKey());
         assertEquals(3, (int) tray.streak(T0 + 41_000L).getValue());
         tray.kill("Abyssal demon", T0 + 60_000L, false);
         assertEquals("a kill of another NPC starts its own streak", 1, (int) tray.streak(T0 + 61_000L).getValue());
@@ -285,7 +285,7 @@ public class HudTrayTest
         tray.engage("Skeleton", false);
         tray.kill("Skeleton", T0, false);
         tray.booked(receipt(T0 + 600L, Ai.LOOT, flow(526, "Bones", 1L, 50)), T0 + 600L, false);
-        assertEquals("the tray says what the streak did", "Looted", tray.label());
+        assertEquals("a kill streak's heading names its NPC", "Skeleton", tray.label());
 
         tray.engage("Guard", false);
         assertFalse("the Skeleton's loot stays while the Guard is only attacked", tray.entries().isEmpty());
@@ -400,5 +400,45 @@ public class HudTrayTest
         session.booked(receipt(T0 + 1_000L, Ai.LOOT, flow(1753, "Green dragonhide", 1L, 1_500)),
             T0 + 1_000L, true);
         assertEquals("the whole session keeps every row", 2, session.entries().size());
+    }
+
+    /** Owner 1.1: switching back inside the quiet gap makes one mixed streak of both. */
+    @Test
+    public void switchingBackToAnNpcMergesBothStreaksIntoOne()
+    {
+        HudTray tray = new HudTray();
+        tray.kill("Guard", T0, false);
+        tray.booked(npcLoot(T0 + 600L, "Guard", flow(995, "Coins", 30L, 1)), T0 + 600L, false);
+        int guardTrip = tray.tripId();
+        tray.kill("Man", T0 + 5_000L, false);
+        assertEquals("Man", tray.label());
+        tray.booked(npcLoot(T0 + 5_600L, "Man", flow(526, "Bones", 1L, 50)), T0 + 5_600L, false);
+        assertEquals(1, tray.entries().size());
+
+        tray.kill("Guard", T0 + 10_000L, false);
+        assertEquals("Guard & Man", tray.label());
+        assertEquals("both streaks' kills", 3, (int) tray.streak(T0 + 10_000L).getValue());
+        assertEquals("both streaks' rows", 2, tray.entries().size());
+        assertEquals("the merged streak keeps the first one's identity", guardTrip, tray.tripId());
+        tray.booked(npcLoot(T0 + 10_600L, "Man", flow(995, "Coins", 5L, 1)), T0 + 10_600L, false);
+        assertEquals("either NPC's loot joins it", 35L, tray.entries().stream()
+            .filter(entry -> entry.itemId == 995).findFirst().get().quantity);
+
+        tray.kill("Cow", T0 + 15_000L, false);
+        assertEquals("Cow", tray.label());
+        tray.kill("Man", T0 + 20_000L, false);
+        assertEquals("Guard, Man +1", tray.label());
+        assertEquals(5, (int) tray.streak(T0 + 20_000L).getValue());
+    }
+
+    @Test
+    public void switchingBackAfterTheQuietGapStartsAfresh()
+    {
+        HudTray tray = new HudTray();
+        tray.kill("Guard", T0, false);
+        tray.kill("Man", T0 + 5_000L, false);
+        tray.kill("Guard", T0 + 70_000L, false);
+        assertEquals("Guard", tray.label());
+        assertEquals(1, (int) tray.streak(T0 + 70_000L).getValue());
     }
 }

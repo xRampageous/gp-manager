@@ -484,7 +484,7 @@ public class GpManagerEngineTest
         engine.aki(100, 200, 0);
         engine.zn(Collections.emptyMap(), 10, "Player kill", now + 1L);
         engine.aki(300, 400, 0);
-        engine.zo("Player death", now + 2L, null);
+        engine.zo("Player death", now + 2L);
 
         java.util.List<Bx> encounters = engine.getActiveSession().getPkEncounters();
         assertEquals(2, encounters.size());
@@ -527,16 +527,13 @@ public class GpManagerEngineTest
         engine.rm(now);
         engine.setBaseline(snapshot(1265, 1L));
 
-        engine.zo("Player death", now + 600L,
-            Ch.capture(null, false, SkullIcon.SKULL, null, null));
+        engine.zo("Player death", now + 600L);
         engine.yz();
         Ac loss = settle(engine, Cc.empty(), now + 1_200L);
 
         assertEquals(Ai.PK_DEATH_LOSS, loss.getType());
         assertEquals(Bd.CONFIRMED, loss.getConfidence());
         assertEquals(-100L, loss.getNet());
-        assertTrue(loss.getExplanation().contains("Death evidence"));
-        assertTrue(loss.getExplanation(), loss.getExplanation().contains("lost: Item 1265"));
         assertEquals(1, engine.vl().deaths);
         assertEquals(100L, engine.vl().largestDeathLoss);
     }

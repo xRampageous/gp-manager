@@ -699,7 +699,7 @@ public class GrindsPresentationTest
         }
         Am engine = PresentationLifecycleTest.engine();
         Dp panel = onEdt(() -> new Dp(engine, PresentationLifecycleTest.config(), null,
-            null, null, new FakeBackups(files)));
+            null, new FakeBackups(files)));
         GrindsController controller = new GrindsController(panel);
         onEdt(() ->
         {
@@ -831,70 +831,6 @@ public class GrindsPresentationTest
         }
     }
 
-    /** Owner 2026-10-01 (F15): exports name their scope and put the exact path behind Copy. */
-    @Test
-    public void historyExportSaysZeroRunsAndOffersThePath() throws Exception
-    {
-        Am engine = PresentationLifecycleTest.engine();
-        Path root = temporary.newFolder().toPath();
-        SessionRepository repository = new SessionRepository(new com.google.gson.Gson(),
-            FilepathTestSupport.root(root), true);
-        Dp panel = onEdt(() -> new Dp(engine, PresentationLifecycleTest.config(), null,
-            new CsvExporter(), repository, null));
-        GrindsController controller = new GrindsController(panel);
-        onEdt(() ->
-        {
-            controller.sd();
-            return null;
-        });
-        String empty = ShellProbe.noticeText(panel.shell());
-        assertTrue("an empty export says 0 retained runs: " + empty,
-            empty.contains("0 retained runs"));
-
-        long now = System.currentTimeMillis();
-        engine.ajl("Vorkath", Cx.GENERAL, now);
-        engine.getActiveSession().kf(booked(now + 1_000L, "Dragon bones", 1, 1, 3_200, 3_200), 2_000);
-        engine.sx(now + 2_000L);
-        onEdt(() ->
-        {
-            controller.sd();
-            return null;
-        });
-        String notice = ShellProbe.noticeText(panel.shell());
-        assertTrue("the notice names the file: " + notice, notice.endsWith(".csv"));
-        assertFalse("never the full path", notice.contains(root.toString()));
-        javax.swing.JButton copy = null;
-        for (java.awt.Component component : panel.shell().noticeAction.getComponents())
-        {
-            if (component instanceof javax.swing.JButton)
-            {
-                copy = (javax.swing.JButton) component;
-            }
-        }
-        assertNotNull("Copy file path is offered", copy);
-        assertEquals("Copy file path", copy.getText());
-        javax.swing.JButton action = copy;
-        onEdt(() ->
-        {
-            action.doClick();
-            return null;
-        });
-        String copied = onEdt(() ->
-        {
-            try
-            {
-                return (String) java.awt.Toolkit.getDefaultToolkit().getSystemClipboard()
-                    .getData(java.awt.datatransfer.DataFlavor.stringFlavor);
-            }
-            catch (Exception ex)
-            {
-                throw new RuntimeException(ex);
-            }
-        });
-        assertTrue("the copied path points at the written file: " + copied,
-            java.nio.file.Files.isRegularFile(Path.of(copied)));
-    }
-
     /** Owner 2026-10-01 (F26): reset offers Back up first; a failed backup refuses the reset. */
     @Test
     public void factoryResetBacksUpFirstAndFailsClosed() throws Exception
@@ -904,7 +840,7 @@ public class GrindsPresentationTest
         Filepath backup = FilepathTestSupport.root(dir).joinSegment("profile-backup.json");
         FakeReset fake = new FakeReset(backup);
         Dp panel = onEdt(() -> new Dp(engine, PresentationLifecycleTest.config(), null,
-            null, null, fake));
+            null, fake));
         GrindsController controller = new GrindsController(panel);
 
         onEdt(() ->
@@ -952,7 +888,7 @@ public class GrindsPresentationTest
         }
         FakeBackups fake = new FakeBackups(files);
         Dp panel = onEdt(() -> new Dp(engine, PresentationLifecycleTest.config(), null,
-            null, null, fake));
+            null, fake));
         GrindsController controller = new GrindsController(panel);
         onEdt(() ->
         {
@@ -1075,7 +1011,7 @@ public class GrindsPresentationTest
                 gear.add(((javax.swing.JMenuItem) item).getText());
             }
         }
-        assertEquals(java.util.Arrays.asList("Export history summaries…", "Back up profile", "Restore backup\u2026", "Clear old backups", "Copy data folder path",
+        assertEquals(java.util.Arrays.asList("Back up profile", "Restore backup\u2026", "Clear old backups", "Copy data folder path",
             "Factory reset current profile…"), gear);
         assertTrue("no standalone Search page", java.util.Arrays.stream(ShellProbe.tabLabels(panel.shell()))
             .noneMatch(label -> label.equalsIgnoreCase("Search") || label.equalsIgnoreCase("Tools")));

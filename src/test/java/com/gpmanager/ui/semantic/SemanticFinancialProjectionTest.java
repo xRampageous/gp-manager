@@ -10,6 +10,7 @@ import org.junit.Test;
 import static org.junit.Assert.assertEquals;
 import static org.junit.Assert.assertFalse;
 import static org.junit.Assert.assertNotNull;
+import static org.junit.Assert.assertNull;
 import static org.junit.Assert.assertTrue;
 
 /**
@@ -195,20 +196,20 @@ public class SemanticFinancialProjectionTest
         }
     }
 
+    /** Owner 1.1: a shard covers 10,000 hits, so blood fury reads as one "Blood fury" charge row. */
     @Test
-    public void bloodFuryEstimateBooksTheShardRowItsCheckWould()
+    public void bloodFuryIsOneBloodFuryChargeRow()
     {
-        Ac estimate = estimatedCharge(T0 + 1_000L, "Amulet of blood fury",
+        Ac estimate = estimatedCharge(T0 + 1_000L, "Blood fury",
             new Ab(ItemID.BLOOD_SHARD, "Blood shard", -1L, 12, -12L, Av.GRAND_EXCHANGE));
-
-        Br.Group shard = named(capture(estimate).groups, "Blood shard");
-        assertNotNull(shard);
-        assertEquals("Amulet of blood fury", shard.usedBy);
-        assertTrue("the estimate rides the Charges chip", shard.chargeUse);
-        for (Br.Group group : capture(estimate).groups)
+        Ac measured = measuredCharge(T0 + 2_000L, Au.CAST, "Blood fury",
+            new Ab(ItemID.BLOOD_SHARD, "Blood shard", -1L, 12, -12L, Av.GRAND_EXCHANGE));
+        for (Ac receipt : new Ac[] {estimate, measured})
         {
-            assertFalse("the amulet is never a row of its own",
-                "Amulet of blood fury".equals(group.primaryName));
+            Br.Group fury = named(capture(receipt).groups, "Blood fury");
+            assertNotNull(fury);
+            assertTrue("it rides the Charges chip", fury.chargeUse);
+            assertNull("never a Blood shard row", named(capture(receipt).groups, "Blood shard"));
         }
     }
 
@@ -277,7 +278,9 @@ public class SemanticFinancialProjectionTest
         assertEquals(1L, scales.quantity);
         assertEquals(-200L, darts.value);
         assertEquals(2L, darts.quantity);
-        assertEquals("Toxic blowpipe", darts.usedBy);
+        assertEquals("owner 1.1: darts are Supplies like any ammo", "", darts.usedBy);
+        assertFalse(darts.chargeUse);
+        assertTrue("the scales stay on the Charges chip", scales.chargeUse);
         assertEquals("no component carries the whole parent Net",
             blowpipe.getNet(), scales.value + darts.value);
         assertEquals("the resources are supply costs",

@@ -27,8 +27,6 @@ static final Color GOLD = new Color(255, 200, 40);
 static final long FADE_MILLIS = 300L;
 /** The chip beside Net shows each booking's change this long, independent of the tray. */
 static final long CHIP_MILLIS = 4_000L;
-/** The losing-money line compares Net with about ten minutes ago: 21 samples 30 s apart. */
-static final long RECAP_MILLIS = 10_000L;
 /** Item sprites by id and stack size, so coins show their pile rather than one coin. */
 interface Icons {
  BufferedImage of(int itemId, int quantity);
@@ -41,15 +39,14 @@ final Icons icons;
 final HudTray tray = new HudTray();
 final HudMoments moments = new HudMoments();
 String sessionOwner = "";
-/** The running Grind's average GP/h over its completed runs, kept for its recap. */
-Long grindAverage;
-List<Line> recap = Collections.emptyList();
-long recapUntil;
 Color lineColor = DIM.color;
 long trayOpenedAt;
 /** The streak the per-kill line measures, and Net just before it began. */
 String baseKey;
 long streakBase;
+/** The streak before, so a merged mixed streak measures from where it first began. */
+String prevKey;
+long prevBase;
 long lastNet;
 /** The streak that just ended: its final count holds the context line for a few seconds. */
 boolean streakLive;
@@ -71,9 +68,6 @@ Cb current() {
 void agj() {
  tray.clear();
  moments.reset();
- recap = Collections.emptyList();
- recapUntil = 0L;
- grindAverage = null;
  sessionOwner = "";
  lineColor = DIM.color;
  trayOpenedAt = 0L;
@@ -91,69 +85,59 @@ boolean xy() {
  return config.hudTrayKeeps() == GpManagerConfig.HudTrayKeeps.SESSION;
 }
 
-/** What the player is interacting with ("Oak tree"); empty when released. */
-void interaction(String name) {
- interaction = name == null ? "" : name.trim();
+/** The NPC the player is fighting; empty when released or not a fight. */
+void interaction(String name, boolean combat) {
+ interaction = name == null || !combat ? "" : name.trim();
 }
 
-/** The freshest client-thread interaction target; the shared activity label reads it. */
+/** The fight target; the shared activity label reads only whether there is one. */
 String vx() {
  return interaction;
 }
 
 /**
 * @param visible the display loot filter; hidden rows stay unnamed, and only their count shows
-* @param history the running Grind's completed runs: best Net, best GP/h and average GP/h
-*     ({@code Long.MIN_VALUE} when unknown), or null without history
 */
-Cb update(Ca s, Predicate<Ab> visible, long[] history, long now) {
+Cb update(Ca s, Predicate<Ab> visible, long now) {
  String owner = s.sessionId;
- // Preserve the ended run's detail before resetting its tray for the next owner.
- String asb = tray.bestDrop();
  if (!owner.equals(sessionOwner)) {
   // Free play to a Grind (or back) starts a clean tray; the first sighting keeps what is there.
-  if (sessionOwner.isEmpty()) tray.agk();
-  else tray.clear();
+  if (!sessionOwner.isEmpty()) tray.clear();
   sessionOwner = owner;
    baseKey = null;
   trayOpenedAt = 0L;
  }
- Long average = known(history, 2);
- String moment = moments.update(s, known(history, 0), known(history, 1), tray.bigDrop(now, HudMoments.SHOW_MILLIS), now);
- String ended = moments.avn();
- if (!ended.isEmpty()) {
-  recap = recap(ended, moments.endedNet, moments.endedMillis, asb, grindAverage);
-  recapUntil = now + RECAP_MILLIS;
- }
+ String moment = moments.update(s, tray.bigDrop(now, HudMoments.SHOW_MILLIS), now);
  boolean grind = s.hasSession && !s.freePlay;
  // A new streak measures its Net from the last tick before its first event.
  String avk = tray.avk();
  if (!avk.equals(baseKey)) {
-  streakBase = baseKey == null ? s.net : lastNet;
+  long base = avk.equals(prevKey) ? prevBase : baseKey == null ? s.net : lastNet;
+  prevKey = baseKey;
+  prevBase = streakBase;
+  streakBase = base;
   baseKey = avk;
  }
  lastNet = s.net;
- if (grind) grindAverage = average;
  // Nothing booked yet reads as a dash, never a zero (the sidebar's first-run rule).
  boolean booked = s.hasSession && (s.gains != 0L || s.costs != 0L || s.marketResult != 0L || !s.recent.isEmpty());
  tray.keepMillis(config.streakEndSeconds() * 1_000L);
  // Owner 2026-10-01: a streak that just ended says so with its final count, and the folio
  // keeps it as "Last streak" until the next streak refreshes the tray.
- java.util.Map.Entry<String, Integer> liveStreak = tray.streak(now);
- if (liveStreak == null && streakLive && tray.kills > 0 && !tray.source.isEmpty()) {
+ Map.Entry<String, Integer> liveStreak = tray.streak(now);
+ if (liveStreak == null && streakLive && tray.kills > 0 && !tray.npcs.isEmpty()) {
   streakEndedUntil = now + HudMoments.SHOW_MILLIS;
  }
  streakLive = liveStreak != null;
  if (moment.isEmpty() && !streakLive && now < streakEndedUntil && tray.kills > 0) {
-  moment = "Streak ended · " + Fmt.activity(tray.source) + " ×" + tray.kills;
+  moment = "Streak ended · " + tray.names() + " ×" + tray.kills;
  }
- List<Line> card = now < recapUntil ? recap : Collections.<Line>emptyList();
  // "Hide when not tracking": nothing to track, logged out or paused hides HUD+; Free play shows
- // once something is booked (observed, unbooked tray activity does not count). A Grind's
- // closing recap card still shows.
+ // once something is booked (observed, unbooked tray activity does not count). A moment, such as
+ // "<Grind> ended", still shows for its few seconds.
  boolean live = s.hasSession && !s.loggedOut && !s.paused && !s.idle;
- boolean shown = config.showHud() && (!config.hudHideWhenIdle() || !card.isEmpty()
- || live && (grind || booked || tray.aup() || !moment.isEmpty()));
+ boolean shown = config.showHud() && (!config.hudHideWhenIdle() || !moment.isEmpty()
+ || live && (grind || booked || tray.aup()));
  if (!shown) {
   current = Cb.HIDDEN;
   return current;
@@ -173,20 +157,12 @@ Cb update(Ca s, Predicate<Ab> visible, long[] history, long now) {
  trayOpenedAt = !open ? 0L : trayOpenedAt == 0L ? now : trayOpenedAt;
  List<Entry> entries = tray.entries();
  var rows = new ArrayList<Row>();
- var visibleEntries = new ArrayList<Entry>();
  int aqm = 0;
- int aok = 0;
  // The chip beside Net is the newest item's change; the tray row keeps the running total.
  long chipUntil = tray.lastDeltaAt() == 0L ? 0L : tray.lastDeltaAt() + CHIP_MILLIS;
  long trip = now < chipUntil ? tray.lastDelta() : 0L;
  for (Entry entry : entries) {
-  if (!visible.test(flowOf(entry))) {
-   if (entry.state == State.RECEIVED || entry.state == State.CLAIMED || entry.state == State.PENDING) aok++;
-  } else {
-   // Owner 2026-10-01 (F16): the folio shares the tray's filter, so hidden names never leak.
-   visibleEntries.add(entry);
-   if (open && aqm++ < config.hudTrayRows()) rows.add(row(entry));
-  }
+  if (visible.test(flowOf(entry)) && open && aqm++ < config.hudTrayRows()) rows.add(row(entry));
  }
  int more = aqm - rows.size();
  String context = moment.isEmpty() ? qe(s) : moment;
@@ -196,25 +172,26 @@ Cb update(Ca s, Predicate<Ab> visible, long[] history, long now) {
  current = new Cb(true, gem, title(s, now), s.hasSession ? timer(s.elapsedMillis) : "",
  booked ? signed(s.net) : "—", booked ? tone(s.net) : DIM.color,
  target, progress, trip != 0L ? signed(trip) : "", tone(trip), chipUntil, rate, context,
- contextColor, moment.startsWith("Big drop"), tray.label(), rows, more > 0 ? "+" + more + " more" : "",
+ contextColor, moment.startsWith("Big drop"), trayLabel(s, now), rows, more > 0 ? "+" + more + " more" : "",
  tray.tripId(), always ? 0L : tray.foldAt(aix()), trayOpenedAt,
- folio(s, visibleEntries, average, now, aok), card, now);
+ now);
  return current;
 }
 
-/** The shared activity label: fresh NPC target, else the session activity, else the Grind name. */
+/**
+* Owner 1.1: HUD+ stays clean. A running kill streak reads "KC: 12" (spawns and side targets
+* aside, and only while the fight is fresh); otherwise a named Grind shows its name and Free play
+* shows nothing. Activity names (Combat, Woodcutting) are for the sidebar.
+*/
 String title(Ca s, long now) {
- String name = ActivityLabel.resolve(interaction, s.activityLabel, s.ownerLabel, s.hasSession, s.freePlay);
- // A running kill streak names the title, spawns and side targets aside: "G. Nechryael ×12".
- // Only while the target is still fresh: a stale streak must not outlive the activity label.
- java.util.Map.Entry<String, Integer> streak = tray.streak(now);
- return streak != null && streak.getValue() >= 2 && s.hasSession && !interaction.isEmpty()
- ? Fmt.activity(streak.getKey()) + " ×" + streak.getValue() : name;
+ Map.Entry<String, Integer> streak = tray.streak(now);
+ if (streak != null && s.hasSession && !interaction.isEmpty()) return "KC: " + streak.getValue();
+ return s.hasSession && !s.freePlay ? Fmt.activity(s.ownerLabel) : "";
 }
 
 /**
-* Needs review, else Reclaim waiting, else the PvP line. Pace
-* lives only in the sidebar (owner 2026-09-28); kills show in the title and the folio. Sets {@link #lineColor}.
+* Needs review, else Reclaim waiting. Pace, PvP streak, skull and risk live in the sidebar
+* (owner 2026-09-28, 1.1); the PvP gem marks danger. Sets {@link #lineColor}.
 */
 String qe(Ca s) {
  lineColor = DIM.color;
@@ -225,39 +202,8 @@ String qe(Ca s) {
  if (s.reclaimItems > 0L) {
   return "Reclaim waiting · " + s.reclaimItems + (s.reclaimItems == 1L ? " item" : " items");
  }
- if (s.pvpPossible) {
-  lineColor = s.skulled ? LOSS.color : lineColor;
-  return "Streak " + s.streak + " · " + (s.skulled ? "Skulled" : "No skull") + (s.protectItem ? " · Protect on" : "");
- }
  if (s.calibrating) return "Calibrating\u2026";
  return "";
-}
-
-static Long known(long[] history, int index) {
- return history == null || history.length <= index || history[index] == Long.MIN_VALUE ? null : history[index];
-}
-
-/** The End card: Net, time, GP/h, best drop and how the run compares with the Grind's average. */
-static List<Line> recap(String name, long net, long millis, String bestDrop, Long average) {
- var lines = new ArrayList<Line>();
- header(lines, name.toUpperCase(ROOT) + " \u00b7 ENDED");
- pair(lines, "Net", signed(net), tone(net));
- pair(lines, "Active time", ra(millis), PLAIN.color);
- if (millis >= 60_000L) {
-  long rate = hourly(net, millis);
-  pair(lines, "GP/h", Fmt.rate(rate) + "/h", tone(rate));
-  if (average != null && average != 0L) {
-   pair(lines, "vs your average", percent(rate, average), tone(rate - average));
-  }
- }
- if (!bestDrop.isEmpty()) pair(lines, "Best drop", bestDrop, GOLD);
- return unmodifiableList(lines);
-}
-
-/** "+12%" / "−8%" of a value against a reference. */
-static String percent(long value, long reference) {
- long pct = round((value - reference) * 100d / Math.abs(reference));
- return (pct >= 0L ? "+" : "\u2212") + Math.abs(pct) + "%";
 }
 
 static boolean counted(Entry entry) {
@@ -284,104 +230,16 @@ static Color color(Entry entry) {
  : counted(entry) ? GAIN.color : DIM.color;
 }
 
-/** One composer for the Standard and PvP folio; unset targets collapse. */
-List<Line> folio(Ca s, List<Entry> trip, Long average, long now, int hiddenLoot) {
- var lines = new ArrayList<Line>();
- if (s.pvpSession) {
-  header(lines, "PVP GRIND · " + (s.activityLabel.isEmpty() ? s.ownerLabel : s.activityLabel));
-  pair(lines, "Net", signed(s.net), tone(s.net));
-  pair(lines, msg("ex"), s.kills + " · " + s.deaths + " · "
-  + String.format(ROOT, "%.2f", s.deaths == 0 ? s.kills : s.kills / (double) s.deaths), PLAIN.color);
-  pair(lines, "Player loot", signed(s.killNet), GAIN.color);
-  if (s.gains > s.killNet) pair(lines, "Other revenue", signed(s.gains - s.killNet), GAIN.color);
-  if (s.costSplitAvailable) {
-   pair(lines, "Supplies", signed(-Math.abs(s.supplies)), SUPPLY.color);
-   pair(lines, "Deaths / losses", signed(-Math.abs(s.deathLoss)), LOSS.color);
-  } else {
-   // Owner 2026-10-01 (F19): an unknown split shows the complete Costs, never a zero Supplies.
-   pair(lines, "Costs", signed(-Math.abs(s.costs)), SUPPLY.color);
-  }
-  pair(lines, "Best kill", signed(s.bestKill), GAIN.color);
-  pair(lines, "Streak", s.streak + " (best " + s.bestStreak + ")", PLAIN.color);
-  pair(lines, "Skull · Protect", (s.skulled ? "Skulled" : "No skull") + " · "
-  + (s.protectItem ? "on" : "off"), s.skulled ? LOSS.color : DIM.color);
- } else {
-  header(lines, s.freePlay ? "FREE PLAY" : "GRIND · " + s.ownerLabel);
-  pair(lines, "Gains", signed(s.gains), GAIN.color);
-  if (s.costSplitAvailable) {
-   pair(lines, "Supplies", signed(-Math.abs(s.supplies)), SUPPLY.color);
-   pair(lines, "Losses", signed(-Math.abs(s.loss)), LOSS.color);
-  } else {
-   pair(lines, "Costs", signed(-Math.abs(s.costs)), SUPPLY.color);
-  }
-  if (s.marketResult != 0L) pair(lines, "Market", signed(s.marketResult), MARKET.color);
- }
- if (s.rateEstablished) {
-  pair(lines, "GP/h", Fmt.rate(s.gpPerHour) + "/h", tone(s.gpPerHour));
- }
- if (s.rateEstablished && average != null && average != 0L && !s.freePlay) {
-  pair(lines, "vs your average", percent(s.gpPerHour, average) + " (" + Fmt.rate(average) + "/h)",
-  tone(s.gpPerHour - average));
- }
- java.util.Map.Entry<String, Integer> streak = tray.streak(now);
- String kills = streak == null || streak.getValue() < 2 || !s.hasSession ? ""
- : signed((s.net - streakBase) / streak.getValue()) + " · " + streak.getValue() + " kills";
- if (!kills.isEmpty()) pair(lines, "Per kill", kills, PLAIN.color);
- if (streak == null && tray.kills > 0 && !tray.source.isEmpty()) {
-  pair(lines, "Last streak", Fmt.activity(tray.source) + " ×" + tray.kills, PLAIN.color);
- }
- String best = tray.bestDrop();
- if (!best.isEmpty()) pair(lines, "Best drop", best, GOLD);
- if (s.elapsedMillis >= 60_000L && s.costSplitAvailable && s.supplies != 0L) {
-  pair(lines, "Supplies/h", signed(hourly(-Ae.abs(s.supplies), s.elapsedMillis)) + "/h", SUPPLY.color);
- }
- targets(lines, s);
- if (!trip.isEmpty()) {
-  // Owner 2026-10-01 (F16): the scope is the retention mode's own label; hidden names never leak.
-  header(lines, s.freePlay ? "RECENT" : config.hudTrayKeeps().toString().toUpperCase(ROOT));
-  if (hiddenLoot > 0) pair(lines, "Hidden loot:", Integer.toString(hiddenLoot), DIM.color);
-  for (Entry entry : trip.subList(0, min(8, trip.size()))) {
-   String tag = entry.state.tag.isEmpty() ? "" : entry.state.tag + " ";
-   lines.add(new Line(Line.Kind.ITEM, entry.name + " " + times(entry.quantity),
-   tag + value(entry), color(entry), 0d, icon(entry)));
-  }
-  // Owner 2026-10-01 (F16): a truncated list names what it left out.
-  if (trip.size() > 8) pair(lines, "+" + (trip.size() - 8) + " more", "", DIM.color);
- } else if (hiddenLoot > 0) {
-  // Disclosed even when every row is hidden: the count survives, the names do not.
-  pair(lines, "Hidden loot:", Integer.toString(hiddenLoot), DIM.color);
- }
- return unmodifiableList(lines);
-}
-
-static void targets(List<Line> lines, Ca s) {
- if (s.goal == null && s.timeTargetMillis <= 0L) return;
- header(lines, "TARGETS");
- if (s.goal != null) {
-  lines.add(new Line(Line.Kind.BAR, "Net " + s.goal.label, s.goal.progress,
-  s.goal.reached ? GAIN.color : ACCENT, s.net <= 0L ? 0d : s.goal.fraction, null));
- }
- if (s.timeTargetMillis > 0L) {
-  double fill = s.elapsedMillis / (double) s.timeTargetMillis;
-  lines.add(new Line(Line.Kind.BAR, "Time " + ra(s.timeTargetMillis),
-  fill >= 1d ? "reached" : ra(s.elapsedMillis), fill >= 1d ? GAIN.color : ACCENT, fill, null));
- }
- if (s.timeTargetMillis > s.elapsedMillis && s.rateEstablished) {
-  long projected = safeAdd(s.net, round(s.gpPerHour * ((s.timeTargetMillis - s.elapsedMillis) / 3_600_000d)));
-  pair(lines, "At " + ra(s.timeTargetMillis), "~" + signed(projected), tone(projected));
- }
-}
-
-static void header(List<Line> lines, String text) {
- lines.add(new Line(Line.Kind.HEADER, text, "", LABEL, 0d, null));
-}
-
-static void pair(List<Line> lines, String label, String value, Color color) {
- lines.add(new Line(Line.Kind.PAIR, label, value, color, 0d, null));
+/** The tray heading; a kill streak adds its Net per kill (owner 1.1: the hover panel is gone). */
+String trayLabel(Ca s, long now) {
+ Map.Entry<String, Integer> streak = tray.streak(now);
+ return streak == null || streak.getValue() < 2 || !s.hasSession ? tray.label()
+ : tray.label() + " \u00b7 " + signed((s.net - streakBase) / streak.getValue()) + "/kill";
 }
 
 BufferedImage icon(Entry entry) {
- return icons == null || entry.itemId <= 0 ? null : icons.of(entry.itemId, stack(entry.quantity));
+ return icons == null || entry.itemId <= 0 || !config.showItemIcons() ? null
+ : icons.of(entry.itemId, stack(entry.quantity));
 }
 
 static int stack(long quantity) {

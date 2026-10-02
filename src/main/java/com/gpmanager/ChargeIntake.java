@@ -32,7 +32,11 @@ final Map<String, Long> chargeCarry = new HashMap<>();
 /** Exact cumulative value per fractional component: units consumed and value already booked. */
 final Map<String, long[]> valueCarry = new HashMap<>();
 int lastCastTick = -1;
+/** The blowpipe's loaded dart from its last Check or load; -1 until one says. */
+int blowpipeDart = -1;
 int lastCastGraphic;
+/** The player's spot anims at the last change, by id and start cycle. */
+Set<Long> playingAnims = new HashSet<>();
 int lastAttackTick = -1;
 /** Learnable eye cast triggers: local graphics or animations proven by same-tick magic XP. */
 final Set<Integer> eyeGraphics = new HashSet<>();
@@ -72,6 +76,7 @@ void ags() {
  eyeCandidateIdentity = null;
  pendingFuryHitTick = -1;
  eyeRunes.clear();
+ blowpipeDart = -1;
  returnVariant = null;
  lastAttackTick = -1;
  engine.afu();
@@ -88,6 +93,7 @@ void ags() {
 boolean abt(String message, long now) {
  Ar read = acs(message);
  if (read == null) return false;
+ if (read.variant == V.V1b) blowpipeDart = read.dartItemId;
  String targetIdentity = checkIntent.consume(read, client.getTickCount());
  if (targetIdentity == null && read.variant == V.BLOOD_FURY) {
   // The amulet's count arrives on its own, without a Check click: bind it to the
@@ -280,6 +286,20 @@ static final Set<String> LOCATIONS = Set.of("darkfrost", "twilight temple", "ral
 * measured Check reconciles it at the captured prices. Any unpriced component fails the whole
 * estimate closed. A repeated graphic in one tick is one use.
 */
+/**
+* Spot anims play on for several ticks and the player can hold several, so only one that was not
+* playing at the last change is a new cast.
+*/
+void spotAnims(Iterable<ActorSpotAnim> anims, long now) {
+ var playing = new HashSet<Long>();
+ for (ActorSpotAnim anim : anims) {
+  if (anim == null) continue;
+  long key = (long) anim.getId() << 32 | anim.getStartCycle() & 0xFFFFFFFFL;
+  if (playing.add(key) && !playingAnims.contains(key)) ach(anim.getId(), now);
+ }
+ playingAnims = playing;
+}
+
 void ach(int graphicId, long now) {
  Item weapon = ala();
  V variant = weapon == null ? null : aja(weapon.getId());
@@ -497,6 +517,24 @@ static long[] tw(V variant) {
  return null;
 }
 
+/**
+* Darts a blowpipe shot spends, as {numerator, denominator}, by the cape slot (OSRS wiki): an
+* assembler or Dizana's quiver saves 80%, the accumulator 72%, the attractor 60%; none saves none.
+*/
+static long[] dartLoss(String capeName) {
+ String cape = capeName == null ? "" : capeName.toLowerCase(Locale.ROOT);
+ if (cape.contains("assembler") || cape.contains("dizana")) return new long[] {1L, 5L};
+ if (cape.contains("accumulator")) return new long[] {7L, 25L};
+ if (cape.contains("attractor")) return new long[] {2L, 5L};
+ return new long[] {1L, 1L};
+}
+
+String wornCapeName() {
+ ItemContainer worn = client == null ? null : client.getItemContainer(InventoryID.WORN);
+ Item cape = worn == null ? null : worn.getItem(EquipmentInventorySlot.CAPE.getSlotIdx());
+ return cape == null || cape.getId() <= 0 ? "" : itemName(cape.getId());
+}
+
 /** Whole units to book now and the remainder to keep, for a fractional component. */
 static long[] accrue(long carry, long numerator, long denominator) {
  long total = carry + numerator;
@@ -531,6 +569,15 @@ List<Ab> rx(V variant, String identity, long now) {
   long[] arf = accrue(chargeCarry.getOrDefault(key, 0L), fraction[1], fraction[2]);
   chargeCarry.put(key, arf[1]);
   if (arf[0] > 0L) recipe.put((int) fraction[0], arf[0]);
+ }
+ if (variant == V.V1b && blowpipeDart > 0) {
+  // Owner 1.1: each shot spends its dart unless an Ava's device saves it; the expected share
+  // accrues like the scales, and a Check reconciles it.
+  long[] loss = dartLoss(wornCapeName());
+  String key = "V1b:" + blowpipeDart;
+  long[] darts = accrue(chargeCarry.getOrDefault(key, 0L), loss[0], loss[1]);
+  chargeCarry.put(key, darts[1]);
+  if (darts[0] > 0L) recipe.put(blowpipeDart, darts[0]);
  }
  var flows = new ArrayList<Ab>();
  for (Map.Entry<Integer, Long> entry : recipe.entrySet()) {
@@ -657,6 +704,7 @@ void lc(MenuOptionClicked event, String target) {
   engine.oh();
   return;
  }
+ if (variant == V.V1b && Ar.DARTS.containsValue(aqo)) blowpipeDart = aqo;
  int ticks = Math.max(4, config.stabilizationTicks() + 2);
  String targetIdentity = weaponIdentity(weapon.getId(), weapon.getIndex(), weapon.getItemId(), variant);
  engine.yx(variant, aqo, name, targetIdentity, ticks);

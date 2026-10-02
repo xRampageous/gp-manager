@@ -408,7 +408,7 @@ public class UnknownBasisTaxReceiptTest
         {
             return LedgerPage.Ea.REFUSED;
         }
-        @Override public void split(String id) { }
+        @Override public void split(String id, java.util.function.BiConsumer<long[], Ao.Ef> previewed) { }
         @Override public void undoCorrection() { }
         @Override public void decideAll(Cl decision) { }
         @Override public void refresh() { }

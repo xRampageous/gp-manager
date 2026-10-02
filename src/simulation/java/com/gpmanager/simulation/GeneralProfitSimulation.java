@@ -421,7 +421,6 @@ public final class GeneralProfitSimulation
             100);
         session.close(61_000L);
 
-        Filepath export = SimulationSupport.export(session, output.resolve("general-example"));
-        SimulationSupport.check(export.size() > 100L, "the Grind CSV should contain data");
+        SimulationSupport.check(!session.getTransactions().isEmpty(), "the Grind keeps its receipts");
     }
 }

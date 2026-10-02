@@ -51,9 +51,19 @@ static class DropReceipt {
 final Map<String, Entry> entries = new LinkedHashMap<>();
 /** Receipt references are presentation-only and live no longer than the tray streak/session. */
 final List<DropReceipt> dropReceipts = new ArrayList<>();
-/** The NPC this streak is killing ("" before its first kill), and its kills. */
+/** The NPC this streak first killed ("" before its first kill), every NPC it killed, and its kills. */
 String source = "";
+final Set<String> npcs = new LinkedHashSet<>();
 int kills;
+/** The streak a switch of target ended, kept through its quiet gap: switching back merges it. */
+Map<String, Entry> prevEntries = new LinkedHashMap<>();
+List<DropReceipt> prevDrops = new ArrayList<>();
+Set<String> prevNpcs = new LinkedHashSet<>();
+String prevSource = "";
+int prevKills;
+int prevTrip;
+long prevFirstKillAt;
+long prevEventAt;
 long firstKillAt;
 long lastKillAt;
 long lastEventAt;
@@ -66,9 +76,6 @@ String bigDrop = "";
 /** What the newest booking added (counted rows only): the chip beside Net. */
 long lastDelta;
 long lastDeltaAt;
-/** The session's most valuable single received drop. */
-String bestDrop = "";
-long bestDropValue;
 long bigDropAt;
 /** A booking settled; mirror its visible item flows onto the tray. */
 synchronized void booked(Ac transaction, long now, boolean xy) {
@@ -82,8 +89,8 @@ synchronized void booked(Ac transaction, long now, boolean xy) {
  }
  boolean market = transaction.getContext() == Aj.MARKET || transaction.getType() == TRADE;
  boolean claimed = transaction.getActionKind() == Au.DEFERRED_CLAIM || !transaction.uo().isEmpty();
- if (!source.isEmpty() && transaction.getNote().startsWith("Loot from ")
- && !transaction.getActivityName().equalsIgnoreCase(source)) {
+ if (!npcs.isEmpty() && transaction.getNote().startsWith("Loot from ")
+ && !has(npcs, transaction.getActivityName())) {
   // Another NPC's leftover drop, picked up after this streak began: it counts in Net, not here.
   return;
  }
@@ -124,10 +131,6 @@ synchronized void booked(Ac transaction, long now, boolean xy) {
   }
   Entry entry = add(id, flow.itemName, state, flow.unitPrice, quantity, flow.valueDelta, now, born);
   delta += state == State.TRADED ? 0L : flow.valueDelta;
-  if (gain && state != State.TRADED && flow.valueDelta > bestDropValue) {
-   bestDropValue = flow.valueDelta;
-   bestDrop = flow.itemName;
-  }
   if (gain && state != State.TRADED && flow.valueDelta >= BIG_DROP) {
    entry.gold = true;
    bigDrop = flow.itemName;
@@ -163,17 +166,53 @@ synchronized void engage(String npc, boolean xy) {
  // first kill refreshes it to the new streak (owner 2026-10-01).
 }
 
-/** One NPC loot event is one kill; a kill of another NPC starts that NPC's streak. */
+/**
+* One NPC loot event is one kill; a kill of another NPC starts that NPC's streak, unless it was
+* killed in the streak before, still inside that streak's quiet gap: then both are one mixed
+* streak again (owner 1.1).
+*/
 synchronized void kill(String npc, long now, boolean xy) {
  String name = npc == null ? "" : npc.trim();
  if (name.isEmpty() || "NPC loot".equals(name)) return;
- if (!name.equalsIgnoreCase(source)) {
+ if (!has(npcs, name)) {
   if (kills > 0) {
    // The new target's first kill refreshes the tray to its own streak; loot already
    // booked before any kill stays (owner 2026-10-01).
+   boolean back = has(prevNpcs, name) && now - prevEventAt < aef();
+   var rows = new LinkedHashMap<String, Entry>(entries);
+   var drops = new ArrayList<DropReceipt>(dropReceipts);
+   var was = new LinkedHashSet<String>(npcs);
+   int had = kills;
+   int trip = tripId;
+   long first = firstKillAt;
+   long last = lastEventAt;
+   String from = source;
    restart(xy);
+   if (back) {
+    if (!xy) {
+     merge(prevEntries.values());
+     merge(rows.values());
+     dropReceipts.addAll(prevDrops);
+     dropReceipts.addAll(drops);
+    }
+    npcs.addAll(prevNpcs);
+    npcs.addAll(was);
+    kills = prevKills + had;
+    firstKillAt = prevFirstKillAt;
+    tripId = prevTrip;
+    source = prevSource;
+    prevNpcs = new LinkedHashSet<>();
+   } else {
+    prevEntries = rows;
+    prevDrops = drops;
+    prevNpcs = was;
+    prevKills = had;
+    prevTrip = trip;
+    prevFirstKillAt = first;
+    prevEventAt = last;
+    prevSource = from;
+   }
   }
-  source = name;
   label = "Looted";
  }
  event(now, xy, "Looted", name);
@@ -181,29 +220,35 @@ synchronized void kill(String npc, long now, boolean xy) {
  lastKillAt = now;
 }
 
-/** A new session: the best drop starts again; the streak ends on its own. */
-synchronized void agk() {
- bestDrop = "";
- bestDropValue = 0L;
-}
-
-/** "Draconic visage +10.4M", or empty before any drop. */
-synchronized String bestDrop() {
- return bestDrop.isEmpty() ? "" : bestDrop + " " + Fmt.signed(bestDropValue);
-}
-
-/** The live kill streak ("Guard", 5), or null before a kill or once the streak went quiet. */
+/** The live kill streak ("Guard & Man", 5), or null before a kill or once the streak went quiet. */
 synchronized Map.Entry<String, Integer> streak(long now) {
- return kills == 0 || now - lastEventAt >= aef() ? null : new AbstractMap.SimpleImmutableEntry<>(source, kills);
+ return kills == 0 || now - lastEventAt >= aef() ? null : new AbstractMap.SimpleImmutableEntry<>(names(), kills);
+}
+
+/** The streak's NPCs: "Guard", "Guard & Man", "Guard, Man +1"; empty before a kill. */
+synchronized String names() {
+ var list = new ArrayList<String>();
+ for (String npc : npcs) list.add(Fmt.activity(npc));
+ int n = list.size();
+ return n == 0 ? "" : n == 1 ? list.get(0) : n == 2 ? list.get(0) + " & " + list.get(1)
+ : list.get(0) + ", " + list.get(1) + " +" + (n - 2);
+}
+
+static boolean has(Set<String> names, String name) {
+ for (String each : names) {
+  if (each.equalsIgnoreCase(name)) return true;
+ }
+ return false;
 }
 
 /** Owner or Grind changed: start clean. */
 synchronized void clear() {
  entries.clear();
  dropReceipts.clear();
- agk();
  tripId++;
  source = "";
+ npcs.clear();
+ prevNpcs = new LinkedHashSet<>();
  kills = 0;
  lastEventAt = 0L;
  shownAt = 0L;
@@ -247,9 +292,9 @@ synchronized int tripId() {
  return tripId;
 }
 
-/** The tray heading: what the streak did ("Looted", "Stole", "Claimed", "Mined" ...). */
+/** The tray heading: a kill streak's NPCs, else what the streak did ("Stole", "Claimed", "Mined" ...). */
 synchronized String label() {
- return label;
+ return "Looted".equals(label) && !npcs.isEmpty() ? names() : label;
 }
 
 /** The newest big drop's name while it is fresh (moments show it a few seconds). */
@@ -264,11 +309,14 @@ synchronized String bigDrop(long now, long forMillis) {
 */
 void event(long now, boolean xy, String kind, String npc) {
  if (lastEventAt > 0L && now - lastEventAt >= aef() || kind != null && !kind.equals(label)
- || npc != null && !source.isEmpty() && !npc.equalsIgnoreCase(source)) {
+ || npc != null && !npcs.isEmpty() && !has(npcs, npc)) {
   restart(xy);
  }
  if (kind != null) label = kind;
- if (npc != null) source = npc;
+ if (npc != null) {
+  if (source.isEmpty()) source = npc;
+  npcs.add(npc);
+ }
  lastEventAt = now;
 }
 
@@ -279,6 +327,7 @@ void restart(boolean xy) {
  }
  tripId++;
  source = "";
+ npcs.clear();
  kills = 0;
  lastEventAt = 0L;
 }
@@ -307,6 +356,12 @@ long take(State from, int itemId, long quantity) {
  source.value = source.unitPrice * source.quantity;
  if (source.quantity <= 0L) entries.remove(key(from, itemId));
  return moved;
+}
+
+void merge(Collection<Entry> rows) {
+ for (Entry row : rows) {
+  add(row.itemId, row.name, row.state, row.unitPrice, row.quantity, row.value, 0L, row.born).gold |= row.gold;
+ }
 }
 
 Entry add(int itemId, String name, State state, long unitPrice, long quantity, long value, long now, long born) {

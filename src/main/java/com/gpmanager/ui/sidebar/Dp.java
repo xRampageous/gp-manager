@@ -26,7 +26,6 @@ final Shell shell = new Shell();
 final LivePage live;
 final LedgerPage ledger;
 final GrindsPage grinds;
-final CsvExporter csvExporter;
 final SessionRepository repository;
 final Ei persistence;
 String grindsDetailId;
@@ -39,8 +38,6 @@ final ConcurrentHashMap<Integer, BufferedImage> sprites = new ConcurrentHashMap<
 volatile Supplier<Bo> pvpSource = () -> Bo.NONE;
 /** HUD+ reads the same per-tick Live snapshot; null in previews and tests. */
 volatile Cp hud;
-String bestsFor;
-long[] bests;
 volatile BooleanSupplier loggedInSource = () -> true;
 /** True while a world hop is in flight; presentation only. */
 volatile BooleanSupplier hoppingSource = () -> false;
@@ -61,17 +58,16 @@ final java.util.Map<String, String> pageKeys = new java.util.HashMap<>();
 boolean suspended;
 Ca lastSnapshot;
 Dp(Am engine, GpManagerConfig config, ItemManager itemManager) {
- this(engine, config, itemManager, null, null, null);
+ this(engine, config, itemManager, null, null);
 }
 
 /** The plugin supplies the current export/backup/recovery services; tests and previews may not. */
 Dp(Am engine, GpManagerConfig config, ItemManager itemManager,
-CsvExporter csvExporter, SessionRepository repository, Ei persistence) {
+SessionRepository repository, Ei persistence) {
  super(false);
  this.engine = engine;
  this.config = config;
  this.itemManager = itemManager;
- this.csvExporter = csvExporter;
  this.repository = repository;
  this.persistence = persistence;
  setLayout(new BorderLayout());
@@ -213,14 +209,6 @@ void avz() {
   Fmt.axx(config.minimumDisplayedLootValue()), pvp, activityLabel(),
   !loggedInSource.getAsBoolean(), ann == null ? "" : ann.vx(), hoppingSource.getAsBoolean());
   snapshot = Ca.capture(engine, now, context);
-  Ad running = engine.getActiveSession();
-  String grindId = running == null ? "" : running.getGrindId();
-  // Owner 2026-10-01 (F04): restore, delete and mutation all recompute the cached bests.
-  String bestsKey = grindId + ":" + engine.getRevision() + ":" + engine.getHistory().size();
-  if (hud != null && !bestsKey.equals(bestsFor)) {
-   bestsFor = bestsKey;
-   bests = Ba.bests(engine, grindId, now);
-  }
   if (pageForced) {
    // A setting, search or scope change can alter a page without a new revision.
    pageKeys.clear();
@@ -232,7 +220,7 @@ void avz() {
    ama = As.capture(engine, now, grindsShowArchived, grindsDetailId);
   }
  }
- if (hud != null) hud.update(snapshot, context::td, bests, now);
+ if (hud != null) hud.update(snapshot, context::td, now);
  if (!showing) return;
  pageForced = false;
  lastSnapshot = snapshot;
@@ -272,6 +260,8 @@ String activityLabel() {
 }
 
 BufferedImage sprite(int itemId) {
+ // Owner 1.1: item icons can be turned off everywhere.
+ if (!config.showItemIcons()) return null;
  if (itemId < -1 && spriteManager != null && !sprites.containsKey(itemId)) {
   // A named spell's row shows its spellbook icon; the sprite id arrives negated.
   spriteManager.getSpriteAsync(-itemId, 0, image -> {
@@ -303,7 +293,7 @@ BufferedImage sprite(int itemId) {
 
 /** A sprite that arrived after its row was drawn: cache it and force the rows to rebuild. */
 void axu(int itemId, BufferedImage image) {
- sprites.put(itemId, image);
+ sprites.put(itemId, Kit.fitIcon(image, Kit.ICON_BOX));
  refresh();
 }
 
@@ -391,19 +381,6 @@ void acg(Entry entry) {
  ledgerSearch = entry.search;
  shell.show(Shell.LEDGER);
  refresh();
-}
-
-/** Exports one Grind as canonical CSV and says where it went. */
-void se(Ad session) {
- if (session == null || csvExporter == null || repository == null) return;
- try {
-  net.runelite.client.util.Filepath file = csvExporter.si(session, engine.tx(), repository.exportDirectory);
-  // Owner 2026-10-01 (F15): filename in the notice; the exact path behind Copy.
-  shell.notify("Exported " + session.getName(), String.valueOf(file.getFileName()), false, "Copy file path",
-  () -> GrindsController.copyPath(String.valueOf(file)));
- } catch (java.io.IOException | RuntimeException ex) {
-  shell.failed("Export failed", ex);
- }
 }
 
 void mutate(Runnable domain) {

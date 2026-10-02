@@ -117,7 +117,7 @@ public final class SidebarPreview
         engine.ajl("Wilderness", Cx.PK, now);
         engine.getActiveSession().kf(booked(now + 1_000L, "Dragon bones", 1, 1, 3_200, 3_200), 2_000);
         engine.getActiveSession().kf(pkDeath(now + 2_000L), 2_000);
-        liveShot(out, "d-live-pvp-context.png", engine, new Bo(true, true, true));
+        liveShot(out, "d-live-pvp-context.png", engine, new Bo(true, true, true, 0L));
     }
 
     // ---- Ledger ------------------------------------------------------------------------------

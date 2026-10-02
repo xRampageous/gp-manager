@@ -161,7 +161,7 @@ public class KeyChestClaimTest
     {
         Am engine = engine(Cc.empty());
         Ac received = settle(engine, snapshot(ItemID.KONAR_KEY, 1L), 1_000L);
-        engine.zj(null);
+        engine.zj();
 
         Ac closed = settle(engine, Cc.empty(), 2_800L);
 

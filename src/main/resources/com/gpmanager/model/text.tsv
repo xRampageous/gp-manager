@@ -28,8 +28,6 @@ counted-as.COST	Counted as Cost
 counted-as.IGNORE	Excluded
 counted-as.REVENUE	Counted as Revenue
 counted-as.TRANSFER	Transfer
-fu	record_kind,session_id,session_name,session_mode,transaction_id,timestamp,active_elapsed_millis,type,automatic_type,context,activity_name,confidence,correction,correction_reason,counted,note,explanation,encounter_id,pricing_summary,item_id,item_name,quantity_delta,unit_price,price_source,value_delta,projected_row_revenue,projected_row_costs,projected_row_net,automatic_row_revenue,automatic_row_costs,automatic_row_net
-fv	grind_name,grind_id,session_id,started_at,ended_at,end_reason,active_millis,net_gp,revenue_gp,costs_gp,supplies_gp,losses_gp,cost_split,detail_state
 fw	Death: items held by gravestone / retrieval service
 fx	Ownership-neutral transfer: Death: items held by gravestone / retrieval service. Measured inventory/equipment stacks moved while ownership stayed with the player.
 fy	Kept items are not counted. A reclaimed item stays neutral apart from the fee.
@@ -217,18 +215,15 @@ bi	offer changed while unobserved
 bj	Death reclaim: items recovered
 bk	sessions.backup.reset.json.tmp
 bl	Detailed highlight unavailable
-bm	Export the Grind in this scope
 bn	Live tracking · click to pause
 bo	custody record bound exceeded
 bp	Fresh General owner committed
 bq	Not tracking · click to start
-br	No account history to export
 bs	Save failed; retry available
 bt	sessions.backup.invalidated-
 bu	uncharged toxic trident (e)
 bv	ambiguous custody lifecycle
 bw	stays uncounted for review.
-bx	No active session to export
 by	Finished Grinds appear here
 bz	Backups could not be listed
 ca	Grave reclaim fee (tiered)
@@ -240,15 +235,12 @@ cf	1 item needs your decision
 cg	Neutral zone exit restore
 ch	minimumDisplayedLootValue
 ci	No account identity bound
-cj	Excluded from comparisons
 ck	Export, backups and reset
 cl	No collected receipts yet
 cm	Unreadable session state
 cn	sessions.backup.json.tmp
 co	<html><div style='width:
 cp	Nothing needs a decision
-cq	Export run receipts (CSV)…
-cr	Exported history summaries
 cs	/profit_manager_icon.png
 ct	light|tend-to|tend to
 cu	Charge load transfer
@@ -300,12 +292,10 @@ eo	Highlighted list only
 ep	charge-load-ambiguous
 eq	Bulk review decision
 er	Charge load transfer
-es	SUMMARY_ONLY_COMPACTED
 et	gp-manager-lifecycle
 eu	gp-manager-lifecycle
 ev	sessions.backup.json
 ew	sessions.commit.stage
-ex	Kills · Deaths · K/D
 ey	config_edit_icon.png
 ez	Undo latest correction
 fa	Correct this receipt
@@ -324,3 +314,38 @@ zy	Failed: the inputs were used and nothing was produced.
 m1	Holy sanguinesti staff
 jv	Charge unload
 m2	Charge load
+bm	 after a death; ownership never changed.
+br	your amulet of blood fury will work for 
+bx	the eye of ayak has been charged with demon tears.
+cj	the eye of ayak has been charged with runes.
+cq	 · the old profile is unchanged
+cr	<html><font color='#6ee16e'>●</font> 
+cy	 · Corrected
+es	Current run + runs started today; whole-run totals
+fn	Runs today · Current run + runs started today; whole-run totals.
+fr	 · also counted in Costs · Loss
+fu	Tracked active time; manual and login pauses are excluded
+fv	Tracking waits until you log back in
+gp	Kills since your last death · best 
+jw	 · value incomplete; no price known
+jx	Estimated charge use · 
+jy	 · tax counted
+jz	 · result unavailable
+ka	Estimated from the local cast or hit graphic; a measured Check reconciles it.
+kb	Measured charge spend · 
+kc	Measured from the exact charge Check difference.
+kd	 gp each · 
+ke	Sold · collect
+kf	Bought · collect
+kh	 · View recap
+ki	 · future defaults only
+kj	Factory reset current profile…
+kk	 backup? Your current data is backed up first.
+kl	Recent Grind · 
+km	split needs one item with at least two units
+kn	enter a number from 1 to 
+ko	that receipt changed; nothing was split
+kp	 One Undo reverts the whole batch.
+kq	 not opened yet · books normally when it is opened
+kr	Ended before target · 
+ks	Not reached yet · 

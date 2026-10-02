@@ -115,15 +115,16 @@ public class LiveSemanticGroupsTest
 
         // Owner 2026-09-29: charge use never shows in Recent; it lives in the Ledger's Charges chip.
         assertNull("scales stay out of Recent", rowNamed(snapshot.recent, "Zulrah's scales"));
-        assertNull("darts stay out of Recent", rowNamed(snapshot.recent, "Dragon dart"));
-        assertEquals("only the gain remains in Recent", 1, snapshot.recent.size());
-        assertEquals("Older gain", snapshot.recent.get(0).name);
+        assertNotNull("owner 1.1: darts are Supplies like arrows", rowNamed(snapshot.recent, "Dragon dart"));
+        assertEquals("the darts and the gain are in Recent", 2, snapshot.recent.size());
+        assertNotNull(rowNamed(snapshot.recent, "Older gain"));
 
         Ao ledger = Ao.capture(engine, T0 + 3_000L,
             new Ao.Entry(Ao.Scope.CURRENT_GRIND, null, null,
                 Ao.Bs.CHARGES, "", null, null, null, null));
-        assertEquals("both measured resources live in Charges",
-            2, ledger.costCounts[Ao.Bs.CHARGES.ordinal()]);
+        assertEquals("only the scales live in Charges",
+            1, ledger.costCounts[Ao.Bs.CHARGES.ordinal()]);
+        assertEquals("the darts are Supplies", 1, ledger.costCounts[Ao.Bs.SUPPLIES.ordinal()]);
     }
 
     @Test

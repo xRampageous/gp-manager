@@ -84,18 +84,18 @@ public class SidebarWidthStressTest
     }
 
     @Test
-    public void costChipsWrapTwoByTwoWithRoomForEveryCount() throws Exception
+    public void theLossesPickerOffersEveryViewWithItsCount() throws Exception
     {
         Dp panel = onEdt(() -> new Dp(PresentationLifecycleTest.engine(),
             PresentationLifecycleTest.config(), null));
-        javax.swing.JPanel chips = onEdt(() -> panel.ledger.auf(Ao.Bs.ALL,
+        javax.swing.JPopupMenu menu = onEdt(() -> panel.ledger.menu(Ao.Bs.SUPPLIES,
             new int[] {2_000, 2_000, 2_000, 2_000}));
-        assertTrue("every choice stays present", onEdt(() -> chips.getComponentCount()) == 4);
-        Object layout = onEdt(() -> chips.getLayout());
-        assertTrue("two columns, two rows: " + layout, layout instanceof java.awt.GridLayout
-            && ((java.awt.GridLayout) layout).getColumns() == 2);
-        assertTrue("the chips fit the sidebar: " + onEdt(() -> chips.getPreferredSize()),
-            onEdt(() -> chips.getPreferredSize().width) <= SIDEBAR);
+        assertTrue("every choice stays present", onEdt(() -> menu.getComponentCount()) == 4);
+        assertTrue(onEdt(() -> ((javax.swing.JMenuItem) menu.getComponent(1)).getText())
+            .equals("\u2713 Supplies 2,000"));
+        javax.swing.JButton pick = onEdt(() -> panel.ledger.auf(Ao.Bs.SUPPLIES, new int[4]));
+        assertTrue("the picker stays short: " + onEdt(() -> pick.getPreferredSize()),
+            onEdt(() -> pick.getPreferredSize().width) <= 80);
     }
 
     @Test

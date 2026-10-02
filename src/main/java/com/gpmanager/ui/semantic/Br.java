@@ -411,16 +411,18 @@ static List<Group> akl(Ac transaction, Predicate<Ab> td) {
  }
  // An estimated charge use is one row named by the weapon.
  String note = transaction.getNote();
- String prefix = "Estimated charge use \u00b7 ";
+ String prefix = msg("jx");
  String ano = note.startsWith(prefix) ? note.substring(prefix.length()).trim() : "";
  if (!ano.isEmpty()) {
   // A worn charge feeder (blood fury) is no cast: its estimate books the charged
   // resource "Used by" it — the same shape its measured Check produces (owner 2026-09-29).
   Ar.V feeder = Ar.ajt(ano);
-  if (feeder == Ar.V.BLOOD_FURY || feeder == Ar.V.EYE_OF_AYAK) {
+  // Owner 1.1: the blowpipe's rows are its Zulrah's scales (Charges) and darts (Supplies);
+  // blood fury stays one "Blood fury" row, as a shard covers 10,000 hits.
+  if (feeder == Ar.V.EYE_OF_AYAK || feeder == Ar.V.V1b) {
    var feasted = new ArrayList<Group>(visible.size());
    for (Af contribution : visible) {
-    feasted.add(agx(transaction, contribution, ano, neutral, review, corrected, source, at));
+    feasted.add(agx(transaction, contribution, dartFree(ano, contribution), neutral, review, corrected, source, at));
    }
    return feasted;
   }
@@ -429,14 +431,20 @@ static List<Group> akl(Ac transaction, Predicate<Ab> td) {
  // A measured charge spend books its resources as rows "Used by" the weapon, never a composite.
  String weapon = transaction.getActionKind() == Au.FIRE || transaction.getActionKind() == Au.CAST
  ? aai(transaction) : "";
+ if (Ar.ajt(weapon) == Ar.V.BLOOD_FURY) return singletonList(nw(transaction, visible, weapon, source, at, neutral, review, corrected));
  if (weapon.isEmpty() && vz(transaction, visible, neutral, review, corrected, split, alj)) {
   return singletonList(jx(transaction, visible, source, at));
  }
  var units = new ArrayList<Group>(visible.size());
  for (Af contribution : visible) {
-  units.add(agx(transaction, contribution, weapon, neutral, review, corrected, source, at));
+  units.add(agx(transaction, contribution, dartFree(weapon, contribution), neutral, review, corrected, source, at));
  }
  return units;
+}
+
+/** A blowpipe's darts are Supplies like any ammo, never a charge "used by" the weapon. */
+static String dartFree(String weapon, Af contribution) {
+ return Ar.DARTS.containsValue(contribution.itemId) ? "" : weapon;
 }
 
 /**
@@ -562,8 +570,8 @@ static Group aap(Row market, Ac settlement) {
  || market.lifecycle == Lifecycle.CLOSED_UNOBSERVED
  || market.isRealizedIncluded() && !market.realizedResultCorrectionAware;
  String side = market.side.name().equals("SELL") ? "Sell" : "Buy";
- String status = knownResult ? side : aot ? side + " \u00b7 tax counted"
- : market.isRealizedIncluded() ? side + " \u00b7 result unavailable" : yo(market);
+ String status = knownResult ? side : aot ? side + msg("jy")
+ : market.isRealizedIncluded() ? side + msg("jz") : yo(market);
  long quantity = market.isRealizedIncluded() ? market.settledQty : market.filledQty;
  String presentationId = market.presentationId;
  String key = "market:" + presentationId;
@@ -633,11 +641,11 @@ static String why(Ac transaction, boolean unpriced, boolean neutral) {
  if (unpriced) return msg("ho");
  String note = transaction.getNote();
  // Owner 2026-10-01 (F11): a Charges receipt names its retained confidence.
- if (note.startsWith("Estimated charge use \u00b7 ")) {
-  return "Estimated from the local cast or hit graphic; a measured Check reconciles it.";
+ if (note.startsWith(msg("jx"))) {
+  return msg("ka");
  }
- if (note.startsWith("Measured charge spend \u00b7 ")) {
-  return "Measured from the exact charge Check difference.";
+ if (note.startsWith(msg("kb"))) {
+  return msg("kc");
  }
  if (Eh.aal(transaction)) return msg("fd");
  if (transaction.getType() == CONSUMPTION && transaction.getContext() == Aj.PRODUCTION) return msg("zy");
@@ -650,14 +658,14 @@ static String why(Ac transaction, boolean unpriced, boolean neutral) {
 */
 static String chargeBasis(Ac transaction, Af contribution) {
  String note = transaction.getNote();
- if (!note.startsWith("Estimated charge use \u00b7 ") && !note.startsWith("Measured charge spend \u00b7 ")) {
+ if (!note.startsWith(msg("jx")) && !note.startsWith(msg("kb"))) {
   return "";
  }
  if (contribution.isUnpriced() || contribution.rawFlows.isEmpty() || contribution.rawFlows.get(0).unitPrice <= 0) {
   return "unpriced";
  }
  Ab flow = contribution.rawFlows.get(0);
- return Fmt.exact(flow.unitPrice) + " gp each \u00b7 " + flow.getPriceSource();
+ return Fmt.exact(flow.unitPrice) + msg("kd") + flow.getPriceSource();
 }
 
 static String qj(Ah correction) {
@@ -703,7 +711,7 @@ String weapon, String source, long at, boolean neutral, boolean review, boolean 
 
 static String aai(Ac transaction) {
  String note = transaction.getNote();
- String prefix = "Measured charge spend \u00b7 ";
+ String prefix = msg("kb");
  if (!note.startsWith(prefix)) return "";
  String weapon = note.substring(prefix.length()).trim();
  return weapon.length() > 80 ? weapon.substring(0, 80).trim() : weapon;
@@ -813,7 +821,7 @@ static String yo(Row market) {
   case PARTIALLY_EXECUTED:
   return (sell ? "Part sold " : "Part bought ") + market.filledQty + "/" + market.offeredQty;
   case EXECUTED_UNSETTLED:
-  return sell ? "Sold \u00b7 collect" : "Bought \u00b7 collect";
+  return sell ? msg("ke") : msg("kf");
   case PARTIALLY_REALIZED: return "Partially realized";
   case CANCELLED_RETURNED: return "Returned";
   case RESUMED: return "Resumed";

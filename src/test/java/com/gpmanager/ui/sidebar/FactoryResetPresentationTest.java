@@ -55,7 +55,6 @@ public class FactoryResetPresentationTest
             bookLoot(builder, now + 1L);
             Cb before = render(builder, engine, now + 2L);
             assertFalse("booked loot shows before the reset", before.rows.isEmpty());
-            assertTrue("the best drop shows before the reset", hasBestDrop(before));
 
             onEdt(() ->
             {
@@ -66,7 +65,6 @@ public class FactoryResetPresentationTest
             Cb after = render(builder, engine, now + 12L);
             assertTrue("the applied reset clears the tray", after.rows.isEmpty());
             assertEquals("the applied reset clears the trip chip", "", after.trip);
-            assertFalse("the applied reset clears the best drop", hasBestDrop(after));
 
             onEdt(() ->
             {
@@ -113,7 +111,6 @@ public class FactoryResetPresentationTest
 
             Cb after = render(builder, engine, now + 12L);
             assertFalse("a refused reset keeps the tray", after.rows.isEmpty());
-            assertTrue("a refused reset keeps the best drop", hasBestDrop(after));
         }
         finally
         {
@@ -126,7 +123,7 @@ public class FactoryResetPresentationTest
     {
         return onEdt(() ->
         {
-            Dp created = new Dp(engine, config, null, null, repository, coordinator);
+            Dp created = new Dp(engine, config, null, repository, coordinator);
             Cp builder = new Cp(config, null);
             created.axn(builder);
             panel.set(created);
@@ -145,12 +142,7 @@ public class FactoryResetPresentationTest
 
     private static Cb render(Cp builder, Am engine, long now) throws Exception
     {
-        return onEdt(() -> builder.update(Ca.capture(engine, now, null), f -> true, null, now));
-    }
-
-    private static boolean hasBestDrop(Cb snapshot)
-    {
-        return snapshot.folio.stream().anyMatch(line -> "Best drop".equals(line.label));
+        return onEdt(() -> builder.update(Ca.capture(engine, now, null), f -> true, now));
     }
 
     private static void resetThroughTheMenu(Dp panel)

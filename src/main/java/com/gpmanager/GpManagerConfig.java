@@ -32,14 +32,20 @@ default Dl lootPresentationFilter() {
 
 @ConfigItem(
 keyName = "minimumDisplayedLootValue", name = "Minimum displayed loot value",
-description = "Hide gains below this unit GE value on tray and Live lists. Does not change Net. 0 shows all",
+description = "Hide gains worth less than this each on the tray and Live. 0 shows all",
 position = 1, section = lootSection)
 default String minimumDisplayedLootValue() {
  return "0";
 }
 
+@ConfigItem(keyName = "showItemIcons", name = "Item icons",
+description = "Show item and spell icons on the tray, Live and Ledger", position = 3, section = lootSection)
+default boolean showItemIcons() {
+ return true;
+}
+
 @ConfigItem(keyName = "hiddenRecentItems", name = "Hidden Recent items",
-description = "Names hidden from Recent only, comma separated. Remove a name to show it again. Net and Ledger stay unchanged",
+description = "Comma-separated names hidden from Recent. Net is unchanged",
 position = 2, section = lootSection)
 default String hiddenRecentItems() {
  return "";
@@ -61,7 +67,6 @@ enum HudTrayKeeps {
  public String toString() { return label; }
 }
 
-enum HudDetail { Hover, Off }
 @ConfigItem(keyName = "showHud", name = "Show HUD+", description = "Show the HUD+ overlay",
 position = 2, section = hudLiveSection)
 default boolean showHud() {
@@ -122,7 +127,7 @@ default int hudTrayRows() {
 }
 
 @ConfigItem(keyName = "hudTrayKeeps", name = "Tray keeps rows for",
-description = "Keep this streak's items (another NPC, other work or a quiet spell starts the next), or the whole session's",
+description = "Keep this streak's items, or the whole session's",
 position = 11, section = hudLiveSection)
 default HudTrayKeeps hudTrayKeeps() {
  return HudTrayKeeps.STREAK;
@@ -135,12 +140,6 @@ default int streakEndSeconds() {
  return 60;
 }
 
-@ConfigItem(keyName = "hudDetail", name = "Detail panel", description = "Open the detail panel when hovering HUD+",
-position = 12, section = hudLiveSection)
-default HudDetail hudDetail() {
- return HudDetail.Hover;
-}
-
 @ConfigItem(
 keyName = "reducedMotion", name = "Reduced motion", description = "Skip HUD+ tray entry animation; loot still shows.",
 position = 13, section = hudLiveSection)
@@ -150,7 +149,7 @@ default boolean reducedMotion() {
 
 @ConfigItem(
 keyName = "autoStartSession", name = "Automatic tracking",
-description = "Start Free play tracking when gameplay is detected. Login alone does not start a session.", position = 0,
+description = "Start Free play when gameplay is seen; logging in alone does not", position = 0,
 section = generalSection)
 default boolean autoStartSession() {
  return true;
@@ -166,7 +165,7 @@ default boolean includeEquipment() {
 
 @ConfigItem(
 keyName = "includeRunePouch", name = "Include rune pouch",
-description = "Count runes stored in the rune pouch so filling it stays neutral and casting from it is a cost",
+description = "Count rune pouch runes, so casting from it is a cost",
 position = 1, section = accountingSection)
 default boolean includeRunePouch() {
  return true;
@@ -196,7 +195,7 @@ default int maxHistorySessions() {
 
 @ConfigItem(
 keyName = "receiptRetentionDays", name = "Receipt detail retention",
-description = "Compact closed sessions older than this window; session summaries remain saved", position = 1,
+description = "Compact closed sessions older than this; their totals stay", position = 1,
 section = grindsSection)
 default Db receiptRetentionDays() {
  return Db.DAYS_90;
@@ -232,7 +231,7 @@ default String manualPriceOverrides() {
 
 @ConfigItem(
 keyName = "autoActivityDetection", name = "Automatic activity detection",
-description = "Passively infer PvM, skilling, trading, PKing, or general activity in Auto mode", position = 1,
+description = "Name the activity from what you do", position = 1,
 section = generalSection)
 default boolean autoActivityDetection() {
  return true;
@@ -240,7 +239,7 @@ default boolean autoActivityDetection() {
 
 @ConfigItem(
 keyName = "idlePauseEnabled", name = "AFK pause",
-description = "Pause active time after the AFK timeout and exclude it from GP/h. Off counts idle time as active; manual and login pauses stay excluded.",
+description = "Pause active time when AFK, so GP/h leaves idle time out",
 position = 2, section = generalSection)
 default boolean idlePauseEnabled() {
  return false;
@@ -257,7 +256,7 @@ default int idleTimeoutSeconds() {
 @Range(min = 5, max = 300)
 @ConfigItem(
 keyName = "activityLabelSeconds", name = "Activity label timeout",
-description = "Seconds without an attack click before the activity label and HUD+ header blank.", position = 5,
+description = "Seconds without an attack before the activity label clears", position = 5,
 section = generalSection)
 default int activityLabelSeconds() {
  return 15;

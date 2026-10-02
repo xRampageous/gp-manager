@@ -109,7 +109,9 @@ public class LiveActionWordingTest
             new Ab(11230, "Dragon dart", -2L, 100, -200L),
             new Ab(12934, "Zulrah's scales", -1L, 110, -110L));
         blowpipe.note = "Measured charge spend \u00b7 Toxic blowpipe";
-        assertTrue("charge use stays out of Recent (owner 2026-09-29)", recents(blowpipe).isEmpty());
+        List<Ca.Recent> blowpipeRows = recents(blowpipe);
+        assertEquals("owner 1.1: only the darts, as Supplies; the scales stay a charge", 1, blowpipeRows.size());
+        assertEquals("Dragon dart", blowpipeRows.get(0).name);
 
         Ac trident = action(10L, Au.CAST,
             rune("Death rune", 560, -1L, -100L), rune("Chaos rune", 562, -1L, -50L),

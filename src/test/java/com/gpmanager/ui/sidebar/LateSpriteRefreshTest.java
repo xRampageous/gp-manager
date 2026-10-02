@@ -5,7 +5,8 @@ import java.util.Collections;
 import javax.swing.SwingUtilities;
 import org.junit.Test;
 
-import static org.junit.Assert.assertSame;
+import static org.junit.Assert.assertEquals;
+import static org.junit.Assert.assertNotNull;
 import static org.junit.Assert.assertTrue;
 
 /** Owner 2026-10-01 (F27): a sprite that arrives after its row was drawn must rebuild the rows. */
@@ -28,6 +29,9 @@ public class LateSpriteRefreshTest
             assertTrue("a late sprite asks the pages to rebuild their rows", panel.pageForced);
         });
 
-        assertSame("the arrived sprite serves the row lookup", image, panel.sprite(-4242));
+        BufferedImage served = panel.sprite(-4242);
+        assertNotNull("the arrived sprite serves the row lookup", served);
+        assertEquals("owner 1.1: every sidebar icon is fitted to one box", Kit.ICON_BOX, served.getWidth());
+        assertEquals(Kit.ICON_BOX, served.getHeight());
     }
 }

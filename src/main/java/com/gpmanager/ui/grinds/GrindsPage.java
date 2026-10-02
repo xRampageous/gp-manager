@@ -139,7 +139,7 @@ void ky(As d) {
  menu.add(new Act("Targets…", actions::openTargets));
  menu.add(d.activeGrindId.isEmpty() ? new Act("Save This Grind", () -> actions.saveThisGrind(d.activeSessionId))
  : new Act("Update Saved Grind", () -> actions.updateSavedGrind(d.activeGrindId, d.activeSessionId)));
- runningName.setText("<html><font color='#6ee16e'>●</font> " + d.activeName.replace("<", "&lt;") + "</html>");
+ runningName.setText(msg("cr") + d.activeName.replace("<", "&lt;") + "</html>");
  runningNet.setText(signed(d.activeNet));
  runningNet.setForeground(sign(d.activeNet).color);
  running.setToolTipText(aww(d.activeRateEstablished, d.activeGpPerHour) + " · "
@@ -303,7 +303,6 @@ void mw(As d) {
   detail.add(sources);
  }
  if (g.compacted) detail.add(note(msg("fs"), LABEL));
- if (g.closed && g.history != null) ne(g.history);
  var buttons = new JPanel(new FlowLayout(FlowLayout.LEFT, 4, 2));
  buttons.setOpaque(false);
  buttons.add(button("Start again", true, () -> actions.startAgain(g.sessionId)));
@@ -325,33 +324,6 @@ static void highlights(Dd kv, Ba.Recap recap) {
  if (recap.highlightsUnavailable) kv.put(msg("bl"), "", DIM);
  if (recap.biggestGain != null) kv.put(recap.biggestGain.name, recap.biggestGain.avo(), GAIN);
  if (recap.lz != null) kv.put(recap.lz.name, recap.lz.avo(), LOSS);
-}
-
-void ne(Ba history) {
- Ba.Comparison c = history.comparison;
- var vs = new Dd("VS PREVIOUS RUN");
- if (c.excluded) {
-  vs.put(msg("cj"), "", DIM);
- } else if (!c.available) {
-  vs.put("No previous run yet", "", DIM);
- } else {
-  vs.put("Net", signed(c.netDelta), sign(c.netDelta));
-  if (c.rateDelta != null) vs.put("GP/h", signed(c.rateDelta) + "/h", sign(c.rateDelta));
-  if (c.suppliesDelta != null) vs.put("Supplies", signed(c.suppliesDelta), SUPPLY);
-  // Time is not money: a shorter run is neither a gain nor a loss.
-  vs.put("Active time", auh(c.activeDelta), PLAIN);
- }
- detail.add(vs);
- Ba.PBs pbs = history.pbs;
- if (!pbs.excluded && pbs.bestNet != null) {
-  var best = new Dd("PERSONAL BESTS");
-  best.put("Best Net", pbText(pbs.newBestNet, pbs.matchesBestNet, signed(pbs.bestNet)), pbs.newBestNet ? GAIN : PLAIN);
-  if (pbs.bestGpPerHour != null) {
-   best.put("Best GP/h", pbText(pbs.newBestGpPerHour, pbs.matchesBestGpPerHour,
-   rate(pbs.bestGpPerHour) + "/h"), pbs.newBestGpPerHour ? GAIN : PLAIN);
-  }
-  detail.add(best);
- }
 }
 
 /** A menu entry usable both as a row's right-click menu and a ⋯ popup. */
@@ -378,16 +350,6 @@ static JPopupMenu popup(List<Act> items) {
 }
 
 // ---- text ---------------------------------------------------------------------------------
-static String pbText(boolean newBest, boolean matches, String value) {
- return newBest ? "NEW PB · " + value : matches ? "Matches PB · " + value : value;
-}
-
-/** Signed Active-Time delta in the compact duration language. */
-static String auh(long deltaMillis) {
- if (deltaMillis == 0L) return "0m";
- return (deltaMillis > 0L ? "+" : "−") + ra(Math.abs(deltaMillis));
-}
-
 /** Date and duration context: Today/Yesterday/date plus Active Time, never internal ids. */
 static String qe(Recent recent, long now) {
  return qe(recent, now, ZoneId.systemDefault());

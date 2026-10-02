@@ -280,68 +280,30 @@ public class RetentionCompactionSoakTest
 
     // ── CSV ───────────────────────────────────────────────────────────────────
 
-    private void verifyCsvReconciliation(Am engine, Truth truth) throws IOException
+    /** Retained receipts plus the one compacted contribution reconcile exactly to the session. */
+    private void verifyCsvReconciliation(Am engine, Truth truth)
     {
-        // A PK session straddling the 90-day cutoff: compacted rows and retained rows in one file.
-        Ad straddling = session(engine, "PK trip " + (DAYS - 90));
-        assertTrue(straddling.compactedTransactionCount > 0L);
-        assertFalse(straddling.getTransactions().isEmpty());
-        Filepath directory = FilepathTestSupport.root(folder.newFolder("csv").toPath());
-        Filepath result = new CsvExporter().si(straddling, directory);
-        Bu metrics = straddling.metrics(NOW);
-        assertEquals(truth.sessionMoney.get(straddling.getName())[2], metrics.net);
-
-        long[] detailSum = reconcile(result, "projected_row_revenue", "projected_row_costs", "ITEM_FLOW", "TRANSACTION");
-        assertEquals("details: retained rows + COMPACTED row = session revenue", metrics.revenue, detailSum[0]);
-        assertEquals("details: retained rows + COMPACTED row = session costs", metrics.costs, detailSum[1]);
-        assertEquals("exactly one COMPACTED row", 1L, detailSum[2]);
-        assertEquals("no fabricated old item rows", straddling.getTransactions().size(), detailSum[3]);
-
-        // A fully compacted session exports no detail rows and one COMPACTED row that is the total.
-        Ad old = session(engine, "Day 10");
-        assertTrue(old.getTransactions().isEmpty());
-        Filepath oldResult = new CsvExporter().si(old, directory);
-        long[] oldSum = reconcile(oldResult, "projected_row_revenue", "projected_row_costs", "ITEM_FLOW", "TRANSACTION");
-        assertEquals(truth.sessionMoney.get("Day 10")[0], oldSum[0]);
-        assertEquals(truth.sessionMoney.get("Day 10")[1], oldSum[1]);
-        assertEquals(1L, oldSum[2]);
-        assertEquals(0L, oldSum[3]);
-        line("csv_straddling_retained_rows=" + straddling.getTransactions().size()
-            + " compacted_rows=" + straddling.compactedTransactionCount);
-    }
-
-    /** Sums the revenue/costs columns over detail rows plus the COMPACTED row: {revenue, costs, compactedRows, detailRows}. */
-    private static long[] reconcile(Filepath csv, String revenueColumn, String costsColumn, String... detailKinds) throws IOException
-    {
-        List<String> lines = Files.readAllLines(FilepathTestSupport.path(csv), StandardCharsets.UTF_8);
-        List<String> header = Arrays.asList(lines.get(0).split(","));
-        int kind = header.indexOf("record_kind");
-        int revenue = header.indexOf(revenueColumn);
-        int costs = header.indexOf(costsColumn);
-        int explanation = header.indexOf("explanation");
-        long[] sum = new long[4];
-        List<String> kinds = Arrays.asList(detailKinds);
-        for (String line : lines.subList(1, lines.size()))
+        for (String name : new String[] {"PK trip " + (DAYS - 90), "Day 10"})
         {
-            String[] cells = splitCsv(line);
-            if (cells.length != header.size()) throw new AssertionError("column count " + cells.length + " != " + header.size() + ": " + line);
-            if (cells[kind].equals("COMPACTED"))
+            Ad session = session(engine, name);
+            assertTrue(session.compactedTransactionCount > 0L);
+            Bu metrics = session.metrics(NOW);
+            assertEquals(truth.sessionMoney.get(name)[2], metrics.net);
+            Ad.CompactedContribution compacted = session.pl();
+            long revenue = compacted.revenue;
+            long costs = compacted.costs;
+            for (Ac row : session.getTransactions())
             {
-                sum[2]++;
-                assertEquals("COMPACTED", cells[explanation]);
+                Bp.Ax amounts = Bp.transaction(row);
+                if (amounts.available && amounts.included)
+                {
+                    revenue += amounts.revenue;
+                    costs += amounts.costs;
+                }
             }
-            else if (kinds.contains(cells[kind]))
-            {
-                sum[3]++;
-            }
-            else
-            {
-                continue;
-            }
-            sum[0] += cells[revenue].isEmpty() ? 0L : Long.parseLong(cells[revenue]);
-            sum[1] += cells[costs].isEmpty() ? 0L : Long.parseLong(cells[costs]);
+            assertEquals(name + ": retained + compacted revenue", metrics.revenue, revenue);
+            assertEquals(name + ": retained + compacted costs", metrics.costs, costs);
         }
-        return sum;
     }
 
     private static String[] splitCsv(String line)

@@ -58,11 +58,9 @@ ContainerSnapshotFactory snapshotFactory;
 @Inject
 ItemManager itemManager;
 @Inject
-net.runelite.client.game.SpriteManager spriteManager;
+SpriteManager spriteManager;
 @Inject
 Am engine;
-@Inject
-CsvExporter csvExporter;
 @Inject
 SessionRepository repository;
 @Inject
@@ -91,7 +89,6 @@ OverlayManager overlayManager;
 /** HUD+ overlay, its folio and the builder the sidebar feeds each tick; null while not installed. */
 volatile Cp hud;
 De hudOverlay;
-HudFolio hudFolio;
 @Inject
 ClientToolbar clientToolbar;
 /** Existing Ground Items preference authority; the sidebar reads its decision, never re-derives it. */
@@ -105,6 +102,8 @@ volatile Dp activityPanel;
 * reaches accounting.
 */
 volatile Bo currentPvp = Bo.NONE;
+/** Inventory and worn items priced every other tick while a death can be lost; risk reads them. */
+List<Ab> held = Collections.emptyList();
 /** Read by the sidebar on the EDT; written from startup and game-state events. */
 volatile boolean loggedIn;
 final Ec navigation = new Ec();
@@ -115,7 +114,7 @@ final Ec navigation = new Ec();
 */
 void installPresentation() {
  try {
-  var panel = new Dp(engine, config, itemManager, csvExporter, repository, persistence);
+  var panel = new Dp(engine, config, itemManager, repository, persistence);
   panel.spriteManager = spriteManager;
   panel.mutationOwner = clientThread::invoke;
   panel.axo(() -> currentPvp);
@@ -124,9 +123,7 @@ void installPresentation() {
   var builder = new Cp(config, (id, quantity) -> itemManager.getImage(id, quantity, false));
   panel.axn(builder);
   hudOverlay = new De(builder, config);
-  hudFolio = new HudFolio(builder, hudOverlay, config, client::getMouseCanvasPosition, client::getCanvasWidth, client::getCanvasHeight);
   overlayManager.add(hudOverlay);
-  overlayManager.add(hudFolio);
   hud = builder;
   lootPresentationFilter.refresh();
   panel.mh(new RecentFilter() {
@@ -164,9 +161,7 @@ void afe() {
  hud = null;
  if (hudOverlay != null) {
   overlayManager.remove(hudOverlay);
-  overlayManager.remove(hudFolio);
   hudOverlay = null;
-  hudFolio = null;
  }
  activityPanel = null;
  navigation.uninstall(Ec.akh(clientToolbar));
@@ -178,9 +173,15 @@ void afe() {
 */
 void ahp() {
  Player local = client.getLocalPlayer();
- int skull = local == null ? net.runelite.api.SkullIcon.NONE : local.getSkullIcon();
- currentPvp = new Bo(pvp.context().ws(), skull != net.runelite.api.SkullIcon.NONE,
- client.getVarbitValue(VarbitID.PRAYER_PROTECTITEM) == 1);
+ int skull = local == null ? SkullIcon.NONE : local.getSkullIcon();
+ boolean possible = pvp.context().ws();
+ boolean skulled = skull != SkullIcon.NONE;
+ boolean protect = client.getVarbitValue(VarbitID.PRAYER_PROTECTITEM) == 1;
+ if (!possible) held = Collections.emptyList();
+ else if (client.getTickCount() % 2 == 0 && valuation != null && snapshotFactory != null) {
+  held = valuation.value(snapshotFactory.nr(true).quantities);
+ }
+ currentPvp = new Bo(possible, skulled, protect, possible ? Bo.risk(held, skulled, protect) : 0L);
 }
 
 void transactionBooked(Ac transaction, long now) {
@@ -222,7 +223,7 @@ void interactionChanged(String name, boolean combat) {
  // and fighting another NPC starts that NPC's tray streak.
  Cp builder = hud;
  if (builder != null && !HudTray.minion(name)) {
-  builder.interaction(name);
+  builder.interaction(name, combat);
   if (combat) builder.tray().engage(name, builder.xy());
  }
 }
@@ -532,7 +533,7 @@ public void onVarbitChanged(VarbitChanged event) {
 @Subscribe
 public void onGraphicChanged(GraphicChanged event) {
  if (!nh() || event == null || event.getActor() != client.getLocalPlayer()) return;
- charges.ach(event.getActor().getGraphic(), System.currentTimeMillis());
+ charges.spotAnims(event.getActor().getSpotAnims(), System.currentTimeMillis());
 }
 
 @Subscribe
@@ -640,6 +641,10 @@ public void onMenuOptionClicked(MenuOptionClicked event) {
     engine.abz(itemId, vh(), 0, 0, 0, false);
    }
   }
+ } else if ("take".equals(option) && event.getMenuAction() != null
+ && event.getMenuAction().name().startsWith("GROUND_ITEM_")) {
+  // A ground item's id is the entry's identifier; a pickup of fired ammo is recovery.
+  engine.noteTake(itemManager == null ? event.getId() : itemManager.canonicalize(event.getId()));
  } else if ("destroy".equals(option)) {
   // Irreversible loss — consume-style intent, never recoverable own-drop.
   engine.noteConsumptionIntent(agh(event), vh(), true);
@@ -847,18 +852,8 @@ public void onActorDeath(ActorDeath event) {
  // the unowned manifest as a loss.
  engine.lv(Da.keyQuantities(client.getItemContainer(InventoryID.INV)));
  ajg(localPlayer);
- // DeathKeep, Protect Item, and skull state are a one-time explanation
- // snapshot. They are never consumed by disposition or accounting logic.
- Ch deathEvidence = Ch.capture(client.getWidget(InterfaceID.DEATHKEEP),
- client.getVarbitValue(VarbitID.PRAYER_PROTECTITEM) == 1, localPlayer.getSkullIcon(),
- itemManager == null ? null : itemManager::canonicalize, itemId -> {
-  if (itemManager == null) return null;
-  ItemComposition composition = itemManager.getItemComposition(itemId);
-  return composition == null ? null : composition.getName();
- });
- // Separate ownership input: this canonical INV/WORN read is intersected with
- // settled negative item flows by the engine. DeathKeep/Protect Item/skull remain
- // explanation-only and never determine a flow or its counted state.
+ // Ownership input: this canonical INV/WORN read is intersected with settled negative
+ // item flows by the engine.
  Cc anv = snapshotFactory == null ? null
  : snapshotFactory.nr(config.includeEquipment());
  // Only a confident dangerous context plus recent player combat is a PvP death; a
@@ -874,7 +869,7 @@ public void onActorDeath(ActorDeath event) {
  if (disposition == Cn.TRACK_PK) {
   zb();
   activity.abm("PKing", true);
-  engine.zo("Player death", System.currentTimeMillis(), deathEvidence);
+  engine.zo("Player death", System.currentTimeMillis());
   persist();
   recentPlayerCombatTicks = 0;
   return;
@@ -882,7 +877,7 @@ public void onActorDeath(ActorDeath event) {
  if (disposition == Cn.UNCLASSIFIED) {
   // Missing PvP evidence alone cannot prove this was a PvM death. Let the
   // inventory delta use ordinary loss classification rather than hiding a loss.
-  engine.zj(deathEvidence);
+  engine.zj();
   zb();
   recentPlayerCombatTicks = 0;
   return;
@@ -891,7 +886,7 @@ public void onActorDeath(ActorDeath event) {
  // still owns. The wipe is an ownership-neutral transfer; the reclaim window
  // later returns the items and books observed coins as the fee.
  zb();
- engine.zi(max(CORRELATION_TICKS * 2, config.stabilizationTicks() + 16), deathEvidence,
+ engine.zi(max(CORRELATION_TICKS * 2, config.stabilizationTicks() + 16),
  anv == null ? null : anv.quantities);
  // Persist the physical death whitelist immediately. A restart before the first
  // inventory wipe must still be able to classify the later loss as a transfer.
@@ -937,7 +932,7 @@ public void onStatChanged(StatChanged event) {
  Player local = client.getLocalPlayer();
  String course = skill != Skill.AGILITY || local == null || local.getWorldLocation() == null ? null
  : AgilityCourses.qp(local.getWorldLocation().getRegionID());
- activity.acj(skill.getName(), course, now);
+ activity.acj(skill.getName(), course, interactionContextTracker.vi(), now);
  charges.aks(skill, client.getTickCount(), now);
 }
 
@@ -1019,7 +1014,7 @@ public void onGameTick(GameTick event) {
  }
  if (saveDue(++ticksSinceSave, engine.getRevision(), savedRevision)) {
   ticksSinceSave = 0;
-  persist();
+  persist(true);
  }
  pulse();
 }
@@ -1223,8 +1218,13 @@ int xx(int slot) {
 }
 
 void persist() {
+ persist(false);
+}
+
+/** {@code quick}: the periodic gameplay save, which reuses unchanged closed sessions' JSON. */
+void persist(boolean quick) {
  savedRevision = engine.getRevision();
- if (config.persistHistory()) persistence.ahe();
+ if (config.persistHistory()) persistence.ahe(quick);
 }
 
 String itemName(int itemId) {

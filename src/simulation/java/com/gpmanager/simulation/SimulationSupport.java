@@ -144,12 +144,6 @@ final class SimulationSupport
             quantity * unitPrice);
     }
 
-    static Filepath export(Ad session, Path output) throws IOException
-    {
-        Filepath exportDirectory = Filepath.Unchecked.getRooted(output.resolve("exports"));
-        return new CsvExporter().si(session, exportDirectory);
-    }
-
     static void equal(long expected, long actual, String message)
     {
         if (expected != actual)

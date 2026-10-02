@@ -67,6 +67,9 @@ final JLabel pageLabel = label("", small(), LABEL);
 final JPanel right = new JPanel(new GridBagLayout());
 final JPanel body = stack(CARD, 0);
 JComponent extra;
+/** A small control beside the title, such as the Losses view picker (owner 1.1). */
+JComponent picker;
+final JPanel left = new JPanel(new FlowLayout(FlowLayout.LEFT, 4, 4));
 JComponent action;
 List<Row> rows = emptyList();
 List<Row> drawn = null;
@@ -87,7 +90,6 @@ Table(String title) {
  header.setBorder(BorderFactory.createCompoundBorder(
  BorderFactory.createMatteBorder(0, 0, 1, 0, LINE), BorderFactory.createEmptyBorder(0, 6, 0, 2)));
  header.setPreferredSize(new Dimension(0, HEADER));
- var left = new JPanel(new FlowLayout(FlowLayout.LEFT, 4, 4));
  left.setOpaque(false);
  left.add(chevron);
  left.add(this.title);
@@ -105,6 +107,14 @@ Table(String title) {
  next.addActionListener(e -> axa(page + 1));
  add(header, BorderLayout.NORTH);
  add(body, BorderLayout.CENTER);
+}
+
+Table setPicker(JComponent component) {
+ if (picker != null) left.remove(picker);
+ picker = component;
+ if (component != null) left.add(component);
+ left.revalidate();
+ return this;
 }
 
 Table setTitle(String text) {

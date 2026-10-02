@@ -94,9 +94,11 @@ void agp(boolean resetHold) {
 * Positive XP for {@code skill}: names the activity (Agility prefers the course) and, inside
 * an open PRODUCTION window, re-arms the context so the processing receipt can settle.
 */
-void acj(String skillName, String agilityCourse, long now) {
+void acj(String skillName, String agilityCourse, boolean fighting, long now) {
  if ("Agility".equalsIgnoreCase(skillName) && agilityCourse != null) abm(agilityCourse, true);
- else if (!"Prayer".equalsIgnoreCase(skillName)) abm(skillName.trim(), false);
+ // Combat XP, and Magic in a fight, names nothing: the NPC's loot does. Alching is Magic.
+ else if (!"Prayer".equalsIgnoreCase(skillName) && !ActivityLabel.COMBAT.contains(skillName)
+ && !(fighting && "Magic".equals(skillName))) abm(skillName.trim(), false);
  // A Make-X run has actions with no XP (a failed iron smelt), so a production skill's XP
  // re-arms the context for 30 s after the last one, not only inside the six-tick window.
  if (now <= productionWindowExpiresAtEpochMillis

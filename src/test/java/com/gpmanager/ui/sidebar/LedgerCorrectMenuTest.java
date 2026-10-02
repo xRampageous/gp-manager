@@ -50,6 +50,34 @@ public class LedgerCorrectMenuTest
             .getCorrection());
     }
 
+    /** Owner 1.1: Split shows the same preview card, with Keep and Others, before it applies. */
+    @Test
+    public void aSplitPreviewsOnItsReceiptThenApplies() throws Exception
+    {
+        JsonCodec.bind(new com.google.gson.Gson());
+        Am engine = PresentationLifecycleTest.engine();
+        engine.ajl("Vorkath", Cx.GENERAL, T0);
+        Ac bones = loot(T0 + 1_000L, 536, "Dragon bones", 2L, 3_000);
+        engine.getActiveSession().kf(bones, 2_000);
+        Harness harness = new Harness(engine, bones.getId());
+        LedgerPage page = harness.page;
+
+        onEdt(() ->
+        {
+            LedgerPageProbe.chooseCorrection(page, "Split…");
+            return null;
+        });
+        List<String> preview = onEdt(() -> LedgerPageProbe.detailTexts(page));
+        assertTrue("the split preview: " + preview, preview.contains("PREVIEW") && preview.contains("Keep")
+            && preview.contains("Others") && preview.contains("After split")
+            && preview.contains(Fmt.ru(-3_000L) + " gp"));
+        assertEquals("nothing changes before Confirm", 2L, bones.quantity(536, true));
+
+        assertTrue(onEdt(() -> click(page.body(), "Confirm")));
+        assertEquals(1L, bones.quantity(536, true));
+        assertEquals(3_000L, engine.getMetrics(T0 + 5_000L).net);
+    }
+
     @Test
     public void historyReceiptsAreReadOnly() throws Exception
     {
@@ -145,7 +173,19 @@ public class LedgerCorrectMenuTest
         @Override public void openScopeMenu(javax.swing.JComponent anchor) { }
         @Override public void costViewChanged(Ao.Bs view) { }
         @Override public void searchChanged(String text) { }
-        @Override public void split(String id) { }
+        /** Keeps one: the sidebar's prompt is the controller's; this answers it. */
+        @Override
+        public void split(String id, java.util.function.BiConsumer<long[], Ao.Ef> previewed)
+        {
+            previewed.accept(new long[] {536, 1, 2}, Ao.splitPreview(engine, id, 536, 1L, T0 + 5_000L));
+        }
+
+        @Override
+        public void applySplit(String id, long[] split, long revision)
+        {
+            engine.kr(id, (int) split[0], split[1], T0 + 5_000L, "test");
+        }
+
         @Override public void undoCorrection() { }
         @Override public void decideAll(Cl decision) { }
 

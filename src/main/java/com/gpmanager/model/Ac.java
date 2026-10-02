@@ -42,7 +42,7 @@ String observedActionLabel;
 /** Exact remaining known-pool shares for recoverable counted item removals. Supporting state. */
 List<Cd> trackedSinkShares;
 Boolean trackedSinkObserved;
-/** Explicit confirmed own-drop proof, never inferred from editable presentation text. */
+/** Explicit proof a pickup may recover this loss (an own drop, fired ammo); never inferred from text. */
 Boolean ownDropRecoveryEligible;
 /** Transient icon hint for an estimated charge cast: the weapon's item id; never saved. */
 transient int aym;

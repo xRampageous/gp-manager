@@ -333,7 +333,7 @@ static As capture(Am engine, long now, boolean includeArchived, String detailSes
    RateReadiness.wn(metrics.elapsedMillis), Ba.hourly(metrics.net, metrics.elapsedMillis),
    selected.getProfitTargetGp(), selected.getActiveTimeTargetMillis(),
    selected.isClosed(), selected.tp() != 0L || selected.tn() != 0L, ask,
-   selected.isClosed() ? Ba.of(engine, selected, now) : null);
+   selected.isClosed() ? Ba.of(selected) : null);
   }
  }
  ZoneId profileZone = engine.uf();

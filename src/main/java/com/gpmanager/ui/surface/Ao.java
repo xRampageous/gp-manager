@@ -427,7 +427,7 @@ static List<PendingItem> pendingItems(Am engine, Entry e) {
   String name = chest != null ? chest.getChestName() + " key" : claim.itemOrKeyId >= ItemID.WILDY_LOOT_KEY0
   && claim.itemOrKeyId <= ItemID.WILDY_LOOT_KEY4 ? "Loot key" : "Key or chest";
   items.add(new PendingItem(claim.itemOrKeyId, name, claim.getQuantity(),
-  name + " not opened yet · books normally when it is opened"));
+  name + msg("kq")));
  }
  DeathReclaimStatus reclaim = engine.tt();
  if (reclaim.awaiting) {
@@ -537,6 +537,25 @@ static class Ef {
   this.revision = revision;
  }
  String note() { return change == 0L ? msg("fk") : "Net changes by " + Fmt.signed(change) + " gp."; }
+}
+
+/**
+* Net if a split keeps {@code keep} of {@code itemId}: the split itself runs on a detached copy of
+* the receipt, so the preview and the applied split cannot differ.
+*/
+static Ef splitPreview(Am engine, String transactionId, int itemId, long keep, long now) {
+ synchronized (engine) {
+  long currentNet = engine.getMetrics(now).net;
+  Ad session = engine.getActiveSession();
+  Ac transaction = session == null ? null : session.sw(transactionId);
+  if (transaction == null) return new Ef(currentNet, currentNet, engine.getRevision());
+  var gson = JsonCodec.gson();
+  Ac copy = gson.fromJson(gson.toJson(transaction), Ac.class);
+  copy.afg(itemId, true, copy.quantity(itemId, true) - keep);
+  long before = transaction.isCounted() ? transaction.getNet() : 0L;
+  long after = copy.isCounted() ? copy.getNet() : 0L;
+  return new Ef(currentNet, currentNet - before + after, engine.getRevision());
+ }
 }
 
 static Ef preview(Am engine, String transactionId, Ah correction, long now) {
