@@ -38,9 +38,6 @@ static class Run {
  long net() {
   return metrics.net;
  }
- long completionAt() {
-  return session.endedAtEpochMillis > 0L ? session.endedAtEpochMillis : session.startedAtEpochMillis;
- }
 }
 
 /** One retained receipt with the largest correction-aware contribution in its direction. */

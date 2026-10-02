@@ -53,7 +53,6 @@ public class HudTrayTest
         assertFalse(HudTray.minion("Greater Nechryael"));
         assertFalse(HudTray.minion(null));
         HudTray tray = new HudTray();
-        tray.engage("Greater Nechryael", false);
         tray.kill("Greater Nechryael", T0, false);
         tray.kill("Greater Nechryael", T0 + 20_000L, false);
         tray.kill("Greater Nechryael", T0 + 40_000L, false);
@@ -282,12 +281,10 @@ public class HudTrayTest
     public void aNewNpcsFirstKillRefreshesTheTrayToItsOwnStreak()
     {
         HudTray tray = new HudTray();
-        tray.engage("Skeleton", false);
         tray.kill("Skeleton", T0, false);
         tray.booked(receipt(T0 + 600L, Ai.LOOT, flow(526, "Bones", 1L, 50)), T0 + 600L, false);
         assertEquals("a kill streak's heading names its NPC", "Skeleton", tray.label());
 
-        tray.engage("Guard", false);
         assertFalse("the Skeleton's loot stays while the Guard is only attacked", tray.entries().isEmpty());
         int trip = tray.tripId();
         tray.kill("Guard", T0 + 2_000L, false);
@@ -299,7 +296,6 @@ public class HudTrayTest
     public void anotherNpcsLeftoverLootNeverJoinsTheNewStreak()
     {
         HudTray tray = new HudTray();
-        tray.engage("Skeleton", false);
         tray.kill("Skeleton", T0, false);
         tray.booked(npcLoot(T0 + 600L, "Guard", flow(995, "Coins", 30L, 1)), T0 + 600L, false);
         assertTrue("the Guard's coins, picked up late, stay off the Skeleton's tray", tray.entries().isEmpty());

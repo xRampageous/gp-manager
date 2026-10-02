@@ -1,5 +1,10 @@
 # GP Manager changelog
 
+## 1.1.2 — 2026-10-02
+
+- **Plugin Hub listing.** The description no longer mentions CSV export, which 1.1.0 removed.
+- **Cleanup.** Unused code left over from removed features is gone; nothing you see changes.
+
 ## 1.1.1 — 2026-10-02
 
 - **Plugin Hub review.** No thread is interrupted any more; the save worker finishes its

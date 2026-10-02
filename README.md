@@ -8,7 +8,7 @@ A RuneLite plugin that works out what you actually made. It watches your invento
   <img src="docs/screenshots/grinds.png" width="242" alt="Grinds tab: the running Grind, all-time totals, saved Grinds and recent runs (preview render)">
 </p>
 <p>
-  <img src="docs/screenshots/hud.png" width="360" alt="HUD+ in the game window with its hover detail panel (preview render)">
+  <img src="docs/screenshots/hud.png" width="360" alt="HUD+ in the game window (preview render)">
 </p>
 
 An empty, untitled run uses one compact row:

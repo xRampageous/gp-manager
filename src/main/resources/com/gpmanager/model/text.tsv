@@ -152,7 +152,6 @@ jo	Pick a saved Grind, or name a new one.
 jp	For this run only; the saved Grind is unchanged.
 jq	GP Manager icon resource missing or unreadable; using a placeholder sidebar icon
 jr	GP Manager icon resource failed to load; using a placeholder sidebar icon
-b	Charge load: quantity unconfirmed — confirmed by the next Check, or decide
 c	JsonCodec.bind(gson) must run at plugin start-up before any JSON work
 d	GP Manager sidebar button was not registered (toolbar={} icon={})
 e	(claim|reclaim|retrieve|loot|collect|talk|check|search|open).*

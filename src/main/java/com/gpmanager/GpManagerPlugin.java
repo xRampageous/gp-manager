@@ -31,7 +31,7 @@ import static java.lang.Math.*;
 import static com.gpmanager.Aj.*;
 @PluginDescriptor(
 name = "GP Manager", internalName = "gp-manager", legacyDataDirectory = "profit-manager",
-description = "Passive profit tracking: profit per Grind and per hour, a ledger you can correct, all-time totals, PvP results, a loot HUD and CSV export.",
+description = "Passive profit tracking: profit per Grind and per hour, a ledger you can correct, all-time totals, PvP results and a loot HUD.",
 tags = {"profit", "gp", "loot", "costs", "supplies", "sessions", "pking", "pk", "hud"})
 public class GpManagerPlugin extends Plugin {
 /** Idle ticks a bank, market or loot context stays available. */
@@ -86,7 +86,7 @@ PvpContextReader pvp;
 ClientThread clientThread;
 @Inject
 OverlayManager overlayManager;
-/** HUD+ overlay, its folio and the builder the sidebar feeds each tick; null while not installed. */
+/** HUD+ overlay and the builder the sidebar feeds each tick; null while not installed. */
 volatile Cp hud;
 De hudOverlay;
 @Inject
@@ -224,7 +224,6 @@ void interactionChanged(String name, boolean combat) {
  Cp builder = hud;
  if (builder != null && !HudTray.minion(name)) {
   builder.interaction(name, combat);
-  if (combat) builder.tray().engage(name, builder.xy());
  }
 }
 

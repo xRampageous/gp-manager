@@ -28,7 +28,6 @@ public class HudInsightTest
         builder.interaction("Greater Nechryael", true);
         for (int i = 0; i < 3; i++)
         {
-            builder.tray().engage("Greater Nechryael", false);
             builder.tray().kill("Greater Nechryael", NOW - 1L + i, false);
         }
         assertEquals("KC: 3", builder.update(grind(100_000L, null), f -> true, NOW).title);
@@ -42,7 +41,6 @@ public class HudInsightTest
         builder.interaction("Guard", true);
         for (int i = 0; i < 2; i++)
         {
-            builder.tray().engage("Guard", false);
             builder.tray().kill("Guard", NOW - 1L + i, false);
         }
         builder.interaction("", false);
