@@ -62,10 +62,7 @@ Set<String> prevNpcs = new LinkedHashSet<>();
 String prevSource = "";
 int prevKills;
 int prevTrip;
-long prevFirstKillAt;
 long prevEventAt;
-long firstKillAt;
-long lastKillAt;
 long lastEventAt;
 /** When an item last arrived: the tray opens on items only, never on a kill or an attack. */
 long shownAt;
@@ -160,12 +157,6 @@ synchronized long foldAt(long aix) {
  return shownAt + aix;
 }
 
-/** Attacking another NPC starts its streak at once; the tray stays folded until loot arrives. */
-synchronized void engage(String npc, boolean xy) {
- // Switching targets keeps the previous streak's loot on the tray; the new target's
- // first kill refreshes it to the new streak (owner 2026-10-01).
-}
-
 /**
 * One NPC loot event is one kill; a kill of another NPC starts that NPC's streak, unless it was
 * killed in the streak before, still inside that streak's quiet gap: then both are one mixed
@@ -184,7 +175,6 @@ synchronized void kill(String npc, long now, boolean xy) {
    var was = new LinkedHashSet<String>(npcs);
    int had = kills;
    int trip = tripId;
-   long first = firstKillAt;
    long last = lastEventAt;
    String from = source;
    restart(xy);
@@ -198,7 +188,6 @@ synchronized void kill(String npc, long now, boolean xy) {
     npcs.addAll(prevNpcs);
     npcs.addAll(was);
     kills = prevKills + had;
-    firstKillAt = prevFirstKillAt;
     tripId = prevTrip;
     source = prevSource;
     prevNpcs = new LinkedHashSet<>();
@@ -208,7 +197,6 @@ synchronized void kill(String npc, long now, boolean xy) {
     prevNpcs = was;
     prevKills = had;
     prevTrip = trip;
-    prevFirstKillAt = first;
     prevEventAt = last;
     prevSource = from;
    }
@@ -216,8 +204,7 @@ synchronized void kill(String npc, long now, boolean xy) {
   label = "Looted";
  }
  event(now, xy, "Looted", name);
- if (kills++ == 0) firstKillAt = now;
- lastKillAt = now;
+ kills++;
 }
 
 /** The live kill streak ("Guard & Man", 5), or null before a kill or once the streak went quiet. */

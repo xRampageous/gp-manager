@@ -1,5 +1,4 @@
 package com.gpmanager;
-import static com.gpmanager.Ak.msg;
 import java.util.*;
 import lombok.*;
 /**
@@ -9,7 +8,6 @@ import lombok.*;
 * flows and separately own charge-use costs.
 */
 class ChargeLoadTransferEvidence {
-static final String AMBIGUOUS_QUANTITY_NOTE = msg("b");
 Ar.V variant;
 int selectedItemId = -1;
 String targetIdentity;

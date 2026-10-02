@@ -310,31 +310,6 @@ String getExplanation() {
  return axw(explanation);
 }
 
-/**
-* Short, human-readable pricing provenance for transaction tooltips and
-* diagnostics. It is derived from the persisted item flows so old sessions
-* remain readable even when they predate provenance tracking.
-*/
-String uu() {
- var counts = new EnumMap<Av, Integer>(Av.class);
- for (Ab flow : getFlows()) {
-  if (flow == null) continue;
-  Av source = flow.getPriceSource();
-  counts.put(source, counts.getOrDefault(source, 0) + 1);
- }
- if (counts.isEmpty()) return "Pricing: none";
- var summary = new StringBuilder("Pricing: ");
- boolean first = true;
- for (Av source : Av.values()) {
-  Integer count = counts.get(source);
-  if (count == null || count == 0) continue;
-  if (!first) summary.append(", ");
-  summary.append(source).append(" (").append(count).append(")");
-  first = false;
- }
- return summary.toString();
-}
-
 Ah getCorrection() {
  return correction == null ? Ah.AUTO : correction;
 }
