@@ -204,7 +204,9 @@ Row rowOf(Recent row) {
  menu.add(new Table.Menu("Open in Ledger", () -> actions.openLedger(entry)));
  if (!row.open && row.itemId > 0 && !row.composite)
  menu.add(new Table.Menu("Hide from recent", () -> actions.hideRecent(row.name)));
- return new Row(row.contributionId + "|" + row.receiptId, icon, row.name, row.qty,
+ // Ore a failed smelt lost sits beside the ore the bars used: say which is which.
+ String name = msg("zz").equals(row.actionLabel) ? row.name + " (failed)" : row.name;
+ return new Row(row.contributionId + "|" + row.receiptId, icon, name, row.qty,
  avo(row), toneOf(row), tipOf(row), numeric(row) ? ru(row.value) + " gp" : "", false,
  () -> actions.openLedger(entry), menu);
 }

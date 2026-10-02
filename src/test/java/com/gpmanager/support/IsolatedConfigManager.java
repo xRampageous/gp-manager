@@ -50,7 +50,7 @@ public final class IsolatedConfigManager
         }
         finally
         {
-            executor.shutdownNow();
+            executor.shutdown();
         }
     }
 

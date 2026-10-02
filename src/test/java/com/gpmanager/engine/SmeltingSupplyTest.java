@@ -33,6 +33,15 @@ public class SmeltingSupplyTest
         assertNotNull(failed);
         assertFalse("a failed smelt is not a Review decision", Eh.aal(failed));
         assertEquals("the ore it used is a supply", CostKind.SUPPLIES, CostKind.of(failed, failed.getFlows().get(0)));
+        assertEquals("the run's first receipt names its skill before any XP", "Smithing", failed.getActivityName());
+    }
+
+    @Test
+    public void takingOffWornEquipmentStartsNoProductionRun()
+    {
+        // "Remove" is the worn-equipment option; removing furniture returns nothing to book.
+        assertEquals("", Dw.ajx("Remove"));
+        assertEquals("Construction", Dw.ajx("Build"));
     }
 
     @Test

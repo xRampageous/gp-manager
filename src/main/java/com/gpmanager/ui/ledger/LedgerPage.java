@@ -334,10 +334,12 @@ Row awh(Group group, Tone tone) {
   value = signed(group.value);
  }
  String qty = group.claim < 0 ? "\u2212" + Math.max(1L, group.quantity)
+ : !group.failedOf().isEmpty() ? group.failedOf()
  : group.quantity > 1L && (!group.actionGroup() || group.chargeUse) ? times(group.quantity) : "";
+ if (group.failed > 0L) tip = group.primaryName + " · " + group.failedTip();
  Runnable open = () -> auz(group.semanticGroupId);
  return new Row(group.semanticGroupId, icon(group.itemId), group.primaryName
- + (group.corrected ? " •" : ""), qty, value, shown, tip,
+ + (group.failed > 0L && group.failedOf().isEmpty() ? " (failed)" : "") + (group.corrected ? " •" : ""), qty, value, shown, tip,
  group.incomplete() || group.market ? "" : ru(group.value) + " gp", false, open,
  singletonList(new Menu("Open", open)));
 }

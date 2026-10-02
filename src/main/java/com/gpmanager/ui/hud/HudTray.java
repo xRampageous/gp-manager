@@ -110,8 +110,8 @@ synchronized void booked(Ac transaction, long now, boolean xy) {
   if (!gain && (market || !lost)) continue;
   if (!any) {
    // A drop joins the running trip; on an empty tray it reads "Dropped" (owner 2026-09-28).
-   event(now, xy, claimed ? "Claimed" : !dropped.isEmpty() ? null
-   : awl(transaction.getActivityName()), null);
+   event(now, xy, claimed ? "Claimed" : !dropped.isEmpty() ? null : lost ? "Lost"
+   : verb(transaction, flow.itemName, now), null);
    if (!dropped.isEmpty() && entries.isEmpty()) label = dropped;
    shownAt = now;
    any = true;
@@ -448,6 +448,34 @@ static {
 /** A boss's spawn (Greater Nechryael's death spawns): no header, streak, kill or activity of its own. */
 static boolean minion(String npc) {
  return npc != null && MINIONS.contains(npc.trim().toLowerCase(ROOT));
+}
+
+/** The newest skilling XP's tray verb ("Mined") and when it arrived. */
+String xpVerb = "Looted";
+long xpAt;
+
+/** Skill XP arrived: an item booked moments later is that skill's work. */
+synchronized void xp(String skill, long now) {
+ String kind = awl(skill);
+ if ("Looted".equals(kind)) return;
+ xpVerb = kind;
+ xpAt = now;
+}
+
+/**
+* The tray verb for a receipt: a production run's own skill, else the skill whose XP came with
+* the item, else the activity. The activity names a skill only after its second XP drop, so it
+* can still be General, or the last skill, on a run's first item: every run stays one streak.
+*/
+String verb(Ac transaction, String item, long now) {
+ String kind = transaction.getContext() == Aj.PRODUCTION ? awl(transaction.getNote()) : "Looted";
+ if ("Looted".equals(kind) && (transaction.getType() == GAIN || transaction.getType() == PROCESSING)
+ && now - xpAt < 6_000L) {
+  kind = xpVerb;
+ }
+ if ("Looted".equals(kind)) kind = awl(transaction.getActivityName());
+ // Smithing XP makes bars at a furnace and items at an anvil.
+ return "Smithed".equals(kind) && item != null && item.endsWith(" bar") ? "Smelted" : kind;
 }
 
 static String awl(String activity) {

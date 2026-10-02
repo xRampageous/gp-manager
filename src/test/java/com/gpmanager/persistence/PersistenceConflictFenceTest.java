@@ -133,7 +133,7 @@ public class PersistenceConflictFenceTest
                 {
                     entered.countDown();
                     try { assertTrue(release.await(5, TimeUnit.SECONDS)); }
-                    catch (InterruptedException ex) { Thread.currentThread().interrupt(); throw new AssertionError(ex); }
+                    catch (InterruptedException ex) { throw new AssertionError(ex); }
                 }
                 return ok;
             }

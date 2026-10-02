@@ -138,6 +138,8 @@ static class Group {
  public final List<Receipt> receipts = new ArrayList<>();
  public final Set<String> searchTerms = new LinkedHashSet<>();
  int units = 1;
+ /** Units of a production run's input its failures lost (a failed iron smelt's ore). */
+ long failed;
  Group(String mergeKey, int itemId, Table table, String primaryName, String qe, String actionLabel,
  String usedBy, boolean chargeUse, long at, long value, Coverage coverage, long quantity, boolean normalizedConsume,
  boolean composite, boolean neutral, boolean market, boolean reviewRequired, boolean corrected,
@@ -180,7 +182,15 @@ static class Group {
   receiptCount = receiptIds.isEmpty() ? units : receiptIds.size();
   receipts.addAll(unit.receipts);
   searchTerms.addAll(unit.searchTerms);
+  failed += unit.failed;
   return this;
+ }
+ /** Owner 1.1: "16/28" when 16 of a run's 28 units failed; "" when none or all did. */
+ String failedOf() {
+  return failed > 0L && failed < quantity ? failed + "/" + quantity : "";
+ }
+ String failedTip() {
+  return failed + " of " + quantity + " failed";
  }
  boolean incomplete() {
   return coverage == Coverage.INCOMPLETE;
@@ -516,7 +526,11 @@ boolean neutral, boolean review, boolean corrected, String source, long at) {
  String label = contribution.actionDisplayName;
  String actionLabel = weapon.isEmpty() ? label.isEmpty() ? verb : verb + " \u00b7 " + label : "";
  String context = weapon.isEmpty() ? actionLabel : "Used by " + weapon;
- String key = (weapon.isEmpty() ? "res:" : "charge:" + weapon + ":") + axd(category) + ":"
+ // Owner 1.1: a production run's input and the same item its failures lost are one row.
+ boolean run = transaction.getContext() == Aj.PRODUCTION && weapon.isEmpty() && contribution.quantityDelta < 0L;
+ String key = run ? "run:" + axd(category) + ":" + contribution.itemId + ":" + ql(unpriced) + ":"
+ + review + ":" + corrected + ":" + neutral
+ : (weapon.isEmpty() ? "res:" : "charge:" + weapon + ":") + axd(category) + ":"
  // Doses of one potion share a row whichever dose each came from (owner 2026-09-28).
  + (contribution.normalizedConsume ? contribution.itemName : contribution.itemId)
  + ":" + Long.signum(value) + ":" + ql(unpriced) + ":"
@@ -529,6 +543,7 @@ boolean neutral, boolean review, boolean corrected, String source, long at) {
  coverage(unpriced), ahn(contribution), contribution.normalizedConsume, false,
  neutral || claimSign != 0, false, review, corrected, "", transaction.getId(), contribution.contributionId, claimSign);
  unit.receipts.add(receipt(transaction, contribution, weapon, null));
+ if (run && verb.equals(msg("zz", "Failed"))) unit.failed = nonNeg(unit.quantity);
  for (String term : new String[] {contribution.itemName, context, verb, label, weapon, source, transaction.getId()}) {
   unit.searchTerms.add(term);
  }

@@ -530,7 +530,7 @@ void shutdown(boolean persistHistory) {
  if (persistHistory && repository.isBound()) ahe();
  writer.shutdown(Duration.ofSeconds(5));
  synchronized (lifecycleExecutorLock) {
-  if (lifecycleExecutor != null) lifecycleExecutor.shutdownNow();
+  if (lifecycleExecutor != null) lifecycleExecutor.shutdown();
  }
 }
 
@@ -545,7 +545,7 @@ void sq() {
  } finally {
   writer.shutdown(Duration.ofSeconds(5));
   synchronized (lifecycleExecutorLock) {
-   if (lifecycleExecutor != null && !lifecycleExecutor.isShutdown()) lifecycleExecutor.shutdownNow();
+   if (lifecycleExecutor != null && !lifecycleExecutor.isShutdown()) lifecycleExecutor.shutdown();
   }
  }
 }

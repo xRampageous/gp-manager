@@ -244,7 +244,7 @@ public class PersistenceSafetyTest
         writer.submit(new Cs(null, generation, base, named("Stale again", 1L)));
         assertTrue(writer.flush(Duration.ofSeconds(5)));
         assertEquals("New", repository.load().getActiveSession().getName());
-        sameThread.shutdownNow();
+        sameThread.shutdown();
     }
 
     @Test

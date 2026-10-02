@@ -58,6 +58,52 @@ public class RecentVisibilityTest
     }
 
     @Test
+    public void aSmeltingRunsOreIsOneRowOfFailedOverAll()
+    {
+        Am engine = PresentationLifecycleTest.engine();
+        long now = 1_700_000_000_000L;
+        engine.ajl("Smithing", Cx.GENERAL, now);
+        engine.getActiveSession().kf(Tx.of(now, Ai.PROCESSING, Aj.PRODUCTION, "Smithing", true,
+            List.of(new Ab(2351, "Iron bar", 1L, 187, 187L), new Ab(440, "Iron ore", -1L, 72, -72L))), 2_000);
+        engine.getActiveSession().kf(Tx.of(now + 3_000L, Ai.CONSUMPTION, Aj.PRODUCTION, "Smelting", true,
+            List.of(new Ab(440, "Iron ore", -1L, 72, -72L))), 2_000);
+        Ca live = Ca.capture(engine, now + 3_600L, new Dz(false, null, 0L, Bo.NONE, "", false, ""));
+        LivePage page = new LivePage(new LivePage.Actions()
+        {
+            public void togglePause() { }
+            public void editTarget() { }
+            public void openLedger(Ao.Entry entry) { }
+        }, id -> null);
+        var ore = new ArrayList<Ca.Recent>();
+        for (Ca.Recent recent : live.recent) if (recent.itemId == 440) ore.add(recent);
+        assertEquals("one ore row", 1, ore.size());
+        assertEquals("Iron ore", page.rowOf(ore.get(0)).name);
+        assertEquals("1 of the 2 ores failed", "1/2", ore.get(0).qty);
+        assertEquals(-144L, ore.get(0).value);
+        assertTrue(LivePage.tipOf(ore.get(0)), LivePage.tipOf(ore.get(0)).contains("1 of 2 failed"));
+
+        // Before any bar, failed ore stands alone and says so.
+        Am alone = PresentationLifecycleTest.engine();
+        alone.ajl("Smithing", Cx.GENERAL, now);
+        alone.getActiveSession().kf(Tx.of(now, Ai.CONSUMPTION, Aj.PRODUCTION, "Smelting", true,
+            List.of(new Ab(440, "Iron ore", -1L, 72, -72L))), 2_000);
+        Ca first = Ca.capture(alone, now + 600L, new Dz(false, null, 0L, Bo.NONE, "", false, ""));
+        assertEquals("Iron ore (failed)", page.rowOf(first.recent.get(0)).name);
+
+        // The Ledger shows the same single row, and its detail keeps both kinds of receipt.
+        Br.Result ledger = Br.capture(engine.getActiveSession().getTransactions(), List.of(), "", null);
+        var oreGroups = new ArrayList<Br.Group>();
+        for (Br.Group group : ledger.groups) if (group.itemId == 440) oreGroups.add(group);
+        assertEquals("one Ledger ore row", 1, oreGroups.size());
+        assertEquals("1/2", oreGroups.get(0).failedOf());
+        assertEquals(2, oreGroups.get(0).receipts.size());
+        Dp panel = new Dp(PresentationLifecycleTest.engine(), PresentationLifecycleTest.config(), null);
+        Table.Row row = panel.ledger.awh(oreGroups.get(0), Kit.Tone.SUPPLY);
+        assertEquals("Iron ore", row.name);
+        assertEquals("1/2", row.qty);
+    }
+
+    @Test
     public void coinPouchesMergeInRecentAndTheOpenCarriesItsNet()
     {
         Ab pouchPickup = new Ab(ItemID.PICKPOCKET_COIN_POUCH_ELF, "Coin pouch", 1L, 0, 0L,

@@ -19,6 +19,11 @@ int activityEvidence;
 String detectedActivity = "General";
 String activitySessionId;
 long productionWindowExpiresAtEpochMillis;
+/**
+* The skill a gather click asked for ("Chop down": Woodcutting). A click proves nothing (no axe,
+* still walking), so the skill's first XP names it at once instead (owner 1.1).
+*/
+String gatherSkill = "";
 /** How long a Make-X run stays open for its skill's XP after the last production evidence. */
 long productionRunUntilEpochMillis;
 void abm(String activity, boolean immediate) {
@@ -98,7 +103,7 @@ void acj(String skillName, String agilityCourse, boolean fighting, long now) {
  if ("Agility".equalsIgnoreCase(skillName) && agilityCourse != null) abm(agilityCourse, true);
  // Combat XP, and Magic in a fight, names nothing: the NPC's loot does. Alching is Magic.
  else if (!"Prayer".equalsIgnoreCase(skillName) && !ActivityLabel.COMBAT.contains(skillName)
- && !(fighting && "Magic".equals(skillName))) abm(skillName.trim(), false);
+ && !(fighting && "Magic".equals(skillName))) abm(skillName.trim(), skillName.equalsIgnoreCase(gatherSkill));
  // A Make-X run has actions with no XP (a failed iron smelt), so a production skill's XP
  // re-arms the context for 30 s after the last one, not only inside the six-tick window.
  if (now <= productionWindowExpiresAtEpochMillis

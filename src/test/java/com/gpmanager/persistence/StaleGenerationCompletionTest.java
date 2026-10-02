@@ -61,7 +61,6 @@ public class StaleGenerationCompletionTest
                 }
                 catch (InterruptedException ex)
                 {
-                    Thread.currentThread().interrupt();
                     throw new AssertionError(ex);
                 }
             }
@@ -122,7 +121,7 @@ public class StaleGenerationCompletionTest
         {
             repository.release.countDown();
             writer.shutdown(Duration.ofSeconds(5));
-            executor.shutdownNow();
+            executor.shutdown();
         }
     }
 

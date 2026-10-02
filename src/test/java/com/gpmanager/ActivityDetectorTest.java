@@ -32,6 +32,33 @@ public class ActivityDetectorTest
         assertEquals("a fallback is not an activity", "Woodcutting", engine.getMetrics(1_200L).activityHint);
     }
 
+    @Test
+    public void aGatherClickNamesNothingUntilItsSkillsFirstXp()
+    {
+        GpManagerConfig config = new GpManagerConfig()
+        {
+            @Override
+            public int stabilizationTicks()
+            {
+                return 0;
+            }
+        };
+        Am engine = new Am(deltas -> Collections.emptyList(),
+            new TransactionClassifier(), config);
+        engine.rm(1_000L);
+        ActivityDetector detector = new ActivityDetector(config, engine);
+
+        // Clicking a tree with no axe, or before reaching it.
+        detector.gatherSkill = Dw.ka("chop down");
+        assertEquals("General", engine.getMetrics(1_100L).activityHint);
+        // Other XP still needs its second drop.
+        detector.acj("Mining", null, false, 1_200L);
+        assertEquals("General", engine.getMetrics(1_300L).activityHint);
+        // The first log's XP names the run at once.
+        detector.acj("Woodcutting", null, false, 1_400L);
+        assertEquals("Woodcutting", engine.getMetrics(1_500L).activityHint);
+    }
+
     /**
      * Owner report 2026-09-28: iron smelting fails about half the time with no XP, so the six-tick
      * window lapsed between successes and the next ore-to-bar change became a Review row. A

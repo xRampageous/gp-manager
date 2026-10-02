@@ -1,5 +1,22 @@
 # GP Manager changelog
 
+## 1.1.1 — 2026-10-02
+
+- **Plugin Hub review.** No thread is interrupted any more; the save worker finishes its
+  current write and stops.
+- **One tray streak per skilling run.** The tray names a run from the XP that comes with each
+  item, so the first bar, log or catch no longer starts a streak of its own and the HUD+ count
+  matches Recent. New headings: Cooked, Fletched, Made (Herblore), Caught (Hunter), Crafted
+  (Runecraft) and Smithed (anvil); bars still read Smelted.
+- **Gathering starts with its first XP.** Clicking a tree, rock, fishing spot or crop no
+  longer names the activity until that skill's XP arrives, so a click without an axe, or on the
+  way to the tree, changes nothing.
+- **One ore row per smelting run.** Recent and the Ledger show "Iron ore 16/28": 16 of the
+  run's 28 ores failed. The row's receipts still tell used and failed ore apart.
+- **Fixes.** A death's lost items read "Lost" on the tray. A production run's first receipt
+  names its own skill in the Ledger. Taking off worn equipment no longer counts as a
+  Construction run.
+
 ## 1.1.0 — 2026-10-02
 
 - **No save stutter.** The periodic save while you play reuses the saved form of finished
