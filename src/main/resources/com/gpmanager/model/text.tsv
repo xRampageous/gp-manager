@@ -37,6 +37,8 @@ gb	Grand Exchange purchase settled: actual spend becomes tracked value; acquisit
 gc	Grand Exchange collection could not be attributed to exact sell executions; the observed cash stays uncounted for review.
 gd	Ownership-neutral Grand Exchange custody movement: principal entering or returning from the exchange is a transfer, not realized economics.
 ge	This lifecycle could not be settled exactly; it needs your review.
+rchk	 Rechecked by 1.2.1: its items alone show what it was, so it no longer waits in Review.
+gbank	 Collected to the bank after filling at several prices: it counts the highest tax it could have paid, so its result is never overstated.
 gf	Filled quantity is not collected yet; nothing is realized.
 gg	Grand Exchange sale settled: known proceeds against consumed tracked basis.
 gh	Grand Exchange sale settled: observed cash retained as liquidation evidence; the prior tracked value of these units is unknown, so no profit is booked automatically.

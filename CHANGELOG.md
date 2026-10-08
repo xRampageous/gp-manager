@@ -1,5 +1,17 @@
 # GP Manager changelog
 
+## 1.2.1 — 2026-10-09
+
+- **Collect to bank counts.** A Grand Exchange offer collected straight to the bank never showed
+  its coins or items in your inventory, so after ten minutes it went to Review uncounted. The offer
+  itself shows what it traded, so it now settles within half a minute: a purchase exactly, a sale
+  with its exact tax, or, for a sale filled at several prices, the highest tax it could have paid,
+  so its result is never overstated. Anything unsold or unspent went to the bank with it.
+- **Old Review entries are rechecked once.** Entries already waiting in Review that 1.2.0 would now
+  book from their items alone (an opened reward casket, clue scroll or impling jar, a clue step,
+  combined potions) are booked that way when your profile loads. Your own corrections, and every
+  other entry, stay exactly as they were.
+
 ## 1.2.0 — 2026-10-09
 
 - **Loot that goes straight into a bag counts.** Items you pick up into an open looting bag

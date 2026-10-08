@@ -42,6 +42,8 @@ class GeCustodyLedger {
 static final long PLACEMENT_WINDOW_MILLIS = 90_000L;
 /** How long a terminal lifecycle may await an unobserved settlement before Review handoff. */
 static final long UNOBSERVED_GRACE_MILLIS = 10L * 60L * 1000L;
+/** A cleared slot whose cash or items never reached the inventory went to the bank by now. */
+static final long BANK_COLLECT_MILLIS = 30_000L;
 /**
 * Slot-clear evidence window: at most 3 game ticks either side of the coin gain. A slot that
 * cleared in this window proves its offer's coins were the ones collected.
@@ -490,6 +492,12 @@ void prune(long /* now */b, String /* sessionId */c, List<Ac> /* reviews */d) {
   // still in GE custody: its coins may be collected much later, so it must not expire by
   // time. BUY keeps its existing pattern (reported, not changed).
   boolean /* cleared */j = i.cleared;
+  // Owner 2026-10-09: Collect to bank (or a collect while GP Manager was away) settles from
+  // the offer itself instead of waiting for Review; held collect cash may still be its own.
+  if (j && b - i.getLastSeenAtEpochMillis() > BANK_COLLECT_MILLIS && pendingSettlementCashGp <= 0L
+  && banked(i, b, c, d)) {
+   continue;
+  }
   boolean /* buyTerminal */k = i.getSide() != SELL && i.xs();
   if ((j || k) && b - i.getLastSeenAtEpochMillis() > UNOBSERVED_GRACE_MILLIS) {
    ut(i, b, c, msg("dc"), d);
@@ -1290,6 +1298,45 @@ Aa touch(int /* slot */a, Snapshot /* offer */b, long /* now */c) {
 boolean xo(Aa /* record */a, Side /* side */b, int /* itemId */c, long /* totalQty */d, long /* price */e) {
  return a.getSide() == b && a.itemId == c
  && a.getOfferedQty() == d && a.getListedPrice() == e;
+}
+
+/**
+* The slot cleared but its cash or items never reached the inventory: they went to the bank.
+* The offer itself proves what filled and what it cost, so it settles as if collected. A buy is
+* exact; a sale pays its proven tax or, filled at several prices, the highest tax it could have
+* paid, so its result is never overstated. What never sold, or was never spent, went too.
+* False leaves an untrusted or unobserved lifecycle to the Review handoff.
+*/
+boolean banked(Aa /* record */a, long /* now */b, String /* sessionId */c, List<Ac> /* counted */d) {
+ boolean /* sell */e = a.getSide() == SELL;
+ if (!e && a.getBasisSource().isEmpty() && a.ada() > 0L) {
+  // A bought item never seen has no market quote: its own execution is its basis.
+  a.setBasisUnitPrice(a.acx() / a.ada());
+  a.setBasisSource(Av.GRAND_EXCHANGE.name());
+  a.setBasisCapturedAtEpochMillis(b);
+ }
+ if (e && a.getCapturedQty() <= 0L || !vu(a, c)) return false;
+ if (e) {
+  long[] /* net */f = net(a);
+  if (f != null) {
+   boolean /* estimated */g = acz(a) < 0L;
+   if (g) {
+    a.fillTaxExact = true;
+    a.fillTaxGp = safeAdd(a.getSettledTaxGp(), a.acx() - f[0]);
+   }
+   mq(a, a.ada(), f[0], a.acx(), b, c, true, d);
+   if (g) d.get(d.size() - 1).explanation += msg("gbank");
+  }
+  long /* unsold */h = a.aib();
+  aez(a, h);
+  a.setReturnedQty(safeAdd(a.getReturnedQty(), h));
+ } else {
+  a.collectedQty = nonNeg(a.getFilledQty());
+  mi(a, b, c, d);
+  a.refundedGp = nonNeg(safeAdd(a.getRefundedGp(), a.nd()));
+ }
+ if (a.wo()) a.setStage(CLOSED);
+ return true;
 }
 
 void ut(Aa /* record */a, long /* now */b, String /* sessionId */c, String /* reason */d, List<Ac> /* handoffs */e) {

@@ -605,8 +605,9 @@ public class GeCustodyEngineTest
 
     // ---- terminal / unobserved ------------------------------------------------------------
 
+    /** Owner 2026-10-09: collect to bank settles from the offer itself, never Review. */
     @Test
-    public void collectToBankEndsInUncountedReview()
+    public void collectToBankSettlesFromTheOffer()
     {
         Harness h = new Harness(6);
         h.inventory = with(h.inventory, RUNE, 10L);
@@ -622,9 +623,10 @@ public class GeCustodyEngineTest
         h.engine.markContext(Aj.TRANSFER, 6, "Bank transfer");
         h.settle(with(h.inventory, COINS, 99_000L));
 
-        assertEquals("no invented cash", 0L, h.net());
-        assertTrue("known facts are handed to Review", h.reviews().size() >= 1);
-        assertTrue(h.engine.geCustody.aji().isEmpty());
+        assertEquals("7 each pays no tax and its prior value is unknown: Net-neutral", 0L, h.net());
+        assertEquals("nothing is handed to Review", 0, h.reviews().size());
+        assertTrue("the sale is settled and closed", h.engine.geCustody.aji().stream()
+            .allMatch(record -> record.getStage() == Aa.Stage.CLOSED && record.ada() == 0L));
     }
 
     @Test
@@ -647,7 +649,10 @@ public class GeCustodyEngineTest
         assertEquals("the new offer is a fresh identity beside the waiting sale", 2,
             h.engine.geCustody.aji().size());
         h.engine.ajv(h.now + GeCustodyLedger.UNOBSERVED_GRACE_MILLIS + 1_000L);
-        assertEquals("coins never seen: the unresolved lifecycle becomes a Review row", 1, h.reviews().size());
+        assertEquals("coins never seen: they went to the bank and the sale settles from its offer",
+            0, h.reviews().size());
+        assertEquals("the waiting sale settled; the new offer stays open", 1, h.engine.geCustody.aji().stream()
+            .filter(record -> record.getStage() != Aa.Stage.CLOSED).count());
     }
 
     // ---- derived projection ---------------------------------------------------------------

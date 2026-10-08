@@ -225,6 +225,30 @@ synchronized void restore(SavedState /* state */b, long /* now */c) {
   claims.restore(b, akf());
   archive.pr(c);
   pkHistory.ri(akf(), receiptRetentionDays(), c);
+  recheck();
+ }
+}
+
+/**
+* Owner 2026-10-09 (1.2.1): an automatic Review entry whose items alone show what 1.2.1 books
+* is booked that way on load. An opened casket, clue scroll or impling jar (every cost is one)
+* is a gain; a clue step (every item is one) or combined potions move nothing. Corrections and
+* every other entry stay exactly as saved; a rechecked entry is no longer Review, so this runs
+* once in effect.
+*/
+void recheck() {
+ for (Ad /* session */a : akf()) {
+  for (Ac /* entry */b : a.getTransactions()) {
+   List<Ab> /* flows */c = b.getFlows();
+   if (!Eh.aal(b) || b.getContext() == Aj.MARKET) continue;
+   boolean /* neutral */d = Bn.all(c, 0, Bn::e1) || Bn.isDecant(c);
+   if (!d && !Bn.all(c, -1, Bn::e1)) continue;
+   b.type = d ? Ai.TRANSFER : GAIN;
+   b.counted = !d;
+   b.confidence = Bd.LIKELY;
+   if (Bn.isDecant(c)) b.note = "Decanted";
+   b.explanation += msg("rchk");
+  }
  }
 }
 
