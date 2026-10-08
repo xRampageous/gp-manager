@@ -5,8 +5,8 @@ class Eh {
 * Only unresolved automatic classifier decisions belong in the decision inbox.
 * Ledger may separately surface unknown pricing or provenance as review hints.
 */
-static boolean aal(Ac transaction) {
- return transaction != null && transaction.getCorrection() == Ah.AUTO
- && transaction.getConfidence() == Bd.UNCERTAIN;
+static boolean aal(Ac /* transaction */a) {
+ return a != null && a.getCorrection() == Ah.AUTO
+ && a.getConfidence() == Bd.UNCERTAIN;
 }
 }

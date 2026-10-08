@@ -11,21 +11,21 @@ package com.gpmanager;
 * is then only its header (revision, savedAt), already final and never serialized.
 */
 class Cs {
-final TrackingIdentity identity;
-final long scopeGeneration;
-final long expectedBaseRevision;
-final SavedState state;
-final String json;
-Cs(TrackingIdentity identity, long scopeGeneration, long expectedBaseRevision, SavedState state) {
- this(identity, scopeGeneration, expectedBaseRevision, state, null);
+TrackingIdentity identity;
+long scopeGeneration;
+long expectedBaseRevision;
+SavedState state;
+String json;
+Cs(TrackingIdentity /* identity */a, long /* scopeGeneration */b, long /* expectedBaseRevision */c, SavedState /* state */d) {
+ this(a, b, c, d, null);
 }
 
-Cs(TrackingIdentity identity, long scopeGeneration, long expectedBaseRevision, SavedState state, String json) {
- if (state == null) throw new IllegalArgumentException("state");
- this.identity = identity;
- this.scopeGeneration = scopeGeneration;
- this.expectedBaseRevision = Ae.nonNeg(expectedBaseRevision);
- this.state = state;
- this.json = json;
+Cs(TrackingIdentity /* identity */a, long /* scopeGeneration */b, long /* expectedBaseRevision */c, SavedState /* state */d, String /* json */e) {
+ if (d == null) throw new IllegalArgumentException("state");
+ this.identity = a;
+ this.scopeGeneration = b;
+ this.expectedBaseRevision = Ae.nonNeg(c);
+ this.state = d;
+ this.json = e;
 }
 }

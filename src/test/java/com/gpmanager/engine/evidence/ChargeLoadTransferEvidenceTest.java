@@ -15,8 +15,8 @@ public final class ChargeLoadTransferEvidenceTest
     @Test
     public void itemOnItemIntentCannotPartitionWithoutQuantity()
     {
-        ChargeLoadTransferEvidence evidence = new ChargeLoadTransferEvidence();
-        assertTrue(evidence.arm(
+        Am evidence = ReviewFixesTest.engine();
+        assertTrue(evidence.yx(
             Ar.V.V1b,
             12934,
             "Zulrah's scales",
@@ -25,7 +25,7 @@ public final class ChargeLoadTransferEvidenceTest
 
         Ab scales = new Ab(12934, "Zulrah's scales", -50L, 100, -5_000L);
         Ab darts = new Ab(ItemID.RUNE_DART, "Rune dart", -1L, 500, -500L);
-        ChargeLoadTransferEvidence.Partition partition = evidence.partition(Arrays.asList(scales, darts));
+        El partition = evidence.cp(Arrays.asList(scales, darts));
 
         assertTrue(partition.remaining.isEmpty());
         assertEquals(Arrays.asList(scales, darts), partition.ambiguousCandidates);
@@ -34,13 +34,13 @@ public final class ChargeLoadTransferEvidenceTest
     @Test
     public void allSupportedSameIdCandidatesStayInReview()
     {
-        ChargeLoadTransferEvidence evidence = new ChargeLoadTransferEvidence();
-        assertTrue(evidence.arm(
+        Am evidence = ReviewFixesTest.engine();
+        assertTrue(evidence.yx(
             Ar.V.V1b, 12934, "Zulrah's scales", null, 5));
         Ab first = new Ab(12934, "Zulrah's scales", -20L, 100, -2_000L);
         Ab second = new Ab(12934, "Zulrah's scales", -30L, 100, -3_000L);
 
-        ChargeLoadTransferEvidence.Partition partition = evidence.partition(Arrays.asList(first, second));
+        El partition = evidence.cp(Arrays.asList(first, second));
 
         assertTrue(partition.remaining.isEmpty());
         assertEquals(Arrays.asList(first, second), partition.ambiguousCandidates);
@@ -49,14 +49,14 @@ public final class ChargeLoadTransferEvidenceTest
     @Test
     public void secondSameIdLossInWindowAlsoFailsClosed()
     {
-        ChargeLoadTransferEvidence evidence = new ChargeLoadTransferEvidence();
-        assertTrue(evidence.arm(
+        Am evidence = ReviewFixesTest.engine();
+        assertTrue(evidence.yx(
             Ar.V.V1b, 12934, "Zulrah's scales", null, 5));
         Ab first = new Ab(12934, "Zulrah's scales", -3L, 100, -300L);
         Ab second = new Ab(12934, "Zulrah's scales", -2L, 100, -200L);
 
-        ChargeLoadTransferEvidence.Partition firstPartition = evidence.partition(Collections.singletonList(first));
-        ChargeLoadTransferEvidence.Partition secondPartition = evidence.partition(Collections.singletonList(second));
+        El firstPartition = evidence.cp(Collections.singletonList(first));
+        El secondPartition = evidence.cp(Collections.singletonList(second));
 
         assertEquals(Collections.singletonList(first), firstPartition.ambiguousCandidates);
         assertEquals(Collections.singletonList(second), secondPartition.ambiguousCandidates);
@@ -65,14 +65,14 @@ public final class ChargeLoadTransferEvidenceTest
     @Test
     public void anotherWeaponComponentAndMismatchedIdentityCannotArm()
     {
-        ChargeLoadTransferEvidence evidence = new ChargeLoadTransferEvidence();
-        assertFalse(evidence.arm(
+        Am evidence = ReviewFixesTest.engine();
+        assertFalse(evidence.yx(
             Ar.V.V1b,
             ItemID.RUNE_DART,
             "Adamant dart",
             null,
             5));
-        assertTrue(evidence.arm(
+        assertTrue(evidence.yx(
             Ar.V.V1b,
             ItemID.RUNE_DART,
             "Rune dart",
@@ -80,22 +80,22 @@ public final class ChargeLoadTransferEvidenceTest
             5));
 
         Ab scales = new Ab(12934, "Zulrah's scales", -2L, 100, -200L);
-        ChargeLoadTransferEvidence.Partition partition = evidence.partition(Collections.singletonList(scales));
+        El partition = evidence.cp(Collections.singletonList(scales));
         assertEquals(Collections.singletonList(scales), partition.remaining);
     }
 
     @Test
     public void intentExpiresOnTickWithoutInventorySettlement()
     {
-        ChargeLoadTransferEvidence evidence = new ChargeLoadTransferEvidence();
-        assertTrue(evidence.arm(
+        Am evidence = ReviewFixesTest.engine();
+        assertTrue(evidence.yx(
             Ar.V.TRIDENT_SEAS,
             560,
             "Death rune",
             null,
             2));
-        evidence.tick();
-        evidence.tick();
+        evidence.eb.tick(evidence.eb.now + 1);
+        evidence.eb.tick(evidence.eb.now + 1);
     }
 
 }

@@ -19,17 +19,17 @@ Dh context() {
 }
 
 /** Re-reads the client signals now (death/loot events may precede the next tick sample). */
-Dh sample(Player localPlayer) {
- int regionId = localPlayer == null || localPlayer.getWorldLocation() == null
- ? 0 : localPlayer.getWorldLocation().getRegionID();
+Dh sample(Player /* localPlayer */a) {
+ int /* regionId */b = a == null || a.getWorldLocation() == null
+ ? 0 : a.getWorldLocation().getRegionID();
  context = Dh.classify(client.getVarbitValue(VarbitID.INSIDE_WILDERNESS) == 1,
  client.getVarbitValue(VarbitID.PVP_AREA_CLIENT) == 1, client.getVarbitValue(VarbitID.THIS_IS_A_PVP_OR_BH_WORLD) == 1,
- client.getVarbitValue(VarbitID.THIS_IS_A_PVP_ARENA_WORLD) == 1, regionId);
+ client.getVarbitValue(VarbitID.THIS_IS_A_PVP_ARENA_WORLD) == 1, b);
  return context;
 }
 
 /** Game tick: re-classify the PvP context; disposition input only. */
-void onGameTick(Player localPlayer) {
- sample(localPlayer);
+void onGameTick(Player /* localPlayer */a) {
+ sample(a);
 }
 }

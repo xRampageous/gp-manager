@@ -164,7 +164,7 @@ public class LedgerOverviewModesTest
         assertEquals("every receipt stays reachable", 12,
             onEdt(() -> LedgerPageProbe.receiptCardTransactionIds(page)).size());
         assertEquals("the receipt list pages at five rows", 5,
-            (int) onEdt(() -> TableRows.names(TableRows.tables(page.body(), "RECEIPTS").get(0)).size()));
+            (int) onEdt(() -> TableRows.names(TableRows.tables(page.body(), "ENTRIES").get(0)).size()));
     }
 
     @Test

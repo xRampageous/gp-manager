@@ -127,17 +127,17 @@ Aa() {
  // Gson
 }
 
-Aa(String offerId, int slot, Side side, int itemId, String itemName,
-long offeredQty, long listedPrice, long placedAtEpochMillis, String originSessionId) {
- this.offerId = offerId;
- this.slot = slot;
- this.side = side.name();
- this.itemId = itemId;
- this.itemName = axw(itemName);
- this.offeredQty = nonNeg(offeredQty);
- this.listedPrice = nonNeg(listedPrice);
- this.placedAtEpochMillis = nonNeg(placedAtEpochMillis);
- this.originSessionId = axw(originSessionId);
+Aa(String /* offerId */a, int /* slot */b, Side /* side */c, int /* itemId */d, String /* itemName */e,
+long /* offeredQty */f, long /* listedPrice */g, long /* placedAtEpochMillis */h, String /* originSessionId */i) {
+ this.offerId = a;
+ this.slot = b;
+ this.side = c.name();
+ this.itemId = d;
+ this.itemName = axw(e);
+ this.offeredQty = nonNeg(f);
+ this.listedPrice = nonNeg(g);
+ this.placedAtEpochMillis = nonNeg(h);
+ this.originSessionId = axw(i);
 }
 
 String getOfferId() { return axw(offerId); }
@@ -147,44 +147,44 @@ long getOfferedQty() { return nonNeg(offeredQty); }
 long getListedPrice() { return nonNeg(listedPrice); }
 long getPlacedAtEpochMillis() { return nonNeg(placedAtEpochMillis); }
 long getLastSeenAtEpochMillis() { return nonNeg(lastSeenAtEpochMillis); }
-void setLastSeenAtEpochMillis(long value) { lastSeenAtEpochMillis = nonNeg(value); }
+void setLastSeenAtEpochMillis(long /* value */a) { lastSeenAtEpochMillis = nonNeg(a); }
 String getOriginSessionId() { return axw(originSessionId); }
 String getOfferState() { return axw(offerState); }
-void setOfferState(String value) { offerState = axw(value); }
+void setOfferState(String /* value */a) { offerState = axw(a); }
 Stage getStage() { return adb(stage); }
-void setStage(Stage value) { stage = value == null ? Stage.OPEN.name() : value.name(); }
+void setStage(Stage /* value */a) { stage = a == null ? Stage.OPEN.name() : a.name(); }
 Confidence getConfidence() { return act(confidence); }
-void setConfidence(Confidence value) {
- confidence = value == null ? Confidence.CONFIRMED.name() : value.name();
+void setConfidence(Confidence /* value */a) {
+ confidence = a == null ? Confidence.CONFIRMED.name() : a.name();
 }
 
 long getFilledQty() { return nonNeg(filledQty); }
-void setFilledQty(long value) { filledQty = nonNeg(value); }
+void setFilledQty(long /* value */a) { filledQty = nonNeg(a); }
 long getSpentGp() { return nonNeg(spentGp); }
-void setSpentGp(long value) { spentGp = nonNeg(value); }
+void setSpentGp(long /* value */a) { spentGp = nonNeg(a); }
 long getSettledQty() { return nonNeg(settledQty); }
-void setSettledQty(long value) { settledQty = nonNeg(value); }
+void setSettledQty(long /* value */a) { settledQty = nonNeg(a); }
 long getSettledExecutionGp() { return nonNeg(settledExecutionGp); }
-void setSettledExecutionGp(long value) { settledExecutionGp = nonNeg(value); }
+void setSettledExecutionGp(long /* value */a) { settledExecutionGp = nonNeg(a); }
 long getCapturedQty() { return nonNeg(capturedQty); }
-void setCapturedQty(long value) { capturedQty = nonNeg(value); }
+void setCapturedQty(long /* value */a) { capturedQty = nonNeg(a); }
 long getReturnedQty() { return nonNeg(returnedQty); }
-void setReturnedQty(long value) { returnedQty = nonNeg(value); }
+void setReturnedQty(long /* value */a) { returnedQty = nonNeg(a); }
 long getReserveGp() { return nonNeg(reserveGp); }
 long getRefundedGp() { return nonNeg(refundedGp); }
 long getBasisUnitPrice() { return nonNeg(basisUnitPrice); }
-void setBasisUnitPrice(long value) { basisUnitPrice = nonNeg(value); }
+void setBasisUnitPrice(long /* value */a) { basisUnitPrice = nonNeg(a); }
 String getBasisSource() { return axw(basisSource); }
-void setBasisSource(String value) { basisSource = axw(value); }
+void setBasisSource(String /* value */a) { basisSource = axw(a); }
 long getBasisCapturedAtEpochMillis() { return nonNeg(basisCapturedAtEpochMillis); }
-void setBasisCapturedAtEpochMillis(long value) { basisCapturedAtEpochMillis = nonNeg(value); }
+void setBasisCapturedAtEpochMillis(long /* value */a) { basisCapturedAtEpochMillis = nonNeg(a); }
 long getCollectedQty() { return nonNeg(collectedQty); }
 long getReservedTrackedQty() { return nonNeg(reservedTrackedQty); }
 long getReservedTrackedBasisGp() { return nonNeg(reservedTrackedBasisGp); }
 long getConsumedTrackedQty() { return nonNeg(consumedTrackedQty); }
-void setConsumedTrackedQty(long value) { consumedTrackedQty = nonNeg(value); }
+void setConsumedTrackedQty(long /* value */a) { consumedTrackedQty = nonNeg(a); }
 long getConsumedTrackedBasisGp() { return nonNeg(consumedTrackedBasisGp); }
-void setConsumedTrackedBasisGp(long value) { consumedTrackedBasisGp = nonNeg(value); }
+void setConsumedTrackedBasisGp(long /* value */a) { consumedTrackedBasisGp = nonNeg(a); }
 /** SELL: tracked reservation quantity still held by this lifecycle. */
 long afs() {
  return nonNeg(getReservedTrackedQty() - getConsumedTrackedQty());
@@ -196,7 +196,7 @@ long afr() {
 }
 
 String getSettlementId() { return axw(settlementId); }
-void setSettlementId(String value) { settlementId = axw(value); }
+void setSettlementId(String /* value */a) { settlementId = axw(a); }
 long getFillTaxGp() { return nonNeg(fillTaxGp); }
 long getSettledTaxGp() { return nonNeg(settledTaxGp); }
 /** A fresh basis can still be frozen at the first matched owned movement. */
@@ -221,13 +221,13 @@ long aib() {
 }
 
 /** SELL: basis value for a quantity at the frozen unit price; 0 when unbased. */
-long lo(long quantity) {
- long left = getBasisUnitPrice();
- long right = nonNeg(quantity);
+long lo(long /* quantity */a) {
+ long /* left */b = getBasisUnitPrice();
+ long /* right */c = nonNeg(a);
  try {
-  return multiplyExact(left, right);
- } catch (ArithmeticException ex) {
-  return left >= 0L ? Long.MAX_VALUE : Long.MIN_VALUE;
+  return multiplyExact(b, c);
+ } catch (ArithmeticException /* ex */d) {
+  return b >= 0L ? Long.MAX_VALUE : Long.MIN_VALUE;
  }
 }
 
@@ -268,18 +268,18 @@ boolean wx() {
  return getConfidence() == Confidence.LEGACY_UNBASED;
 }
 
-static Stage adb(String value) {
- if (value == null) return Stage.OPEN;
- for (Stage candidate : Stage.values()) {
-  if (candidate.name().equals(value)) return candidate;
+static Stage adb(String /* value */a) {
+ if (a == null) return Stage.OPEN;
+ for (Stage /* candidate */b : Stage.values()) {
+  if (b.name().equals(a)) return b;
  }
  return Stage.OPEN;
 }
 
-static Confidence act(String value) {
- if (value == null) return Confidence.CONFIRMED;
- for (Confidence candidate : Confidence.values()) {
-  if (candidate.name().equals(value)) return candidate;
+static Confidence act(String /* value */a) {
+ if (a == null) return Confidence.CONFIRMED;
+ for (Confidence /* candidate */b : Confidence.values()) {
+  if (b.name().equals(a)) return b;
  }
  return Confidence.CONFIRMED;
 }

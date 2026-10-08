@@ -12,11 +12,11 @@ class MinigameRegionHints {
 */
 static final Map<Integer, String> KINDS = Ak.byId("d13");
 /** True inside an instance whose inventory changes are never profit or loss. */
-static boolean xl(int regionId) {
- return "neutral".equals(KINDS.get(regionId));
+static boolean xl(int /* regionId */a) {
+ return "neutral".equals(KINDS.get(a));
 }
 
-static boolean xh(int regionId) {
- return "lms".equals(KINDS.get(regionId));
+static boolean xh(int /* regionId */a) {
+ return "lms".equals(KINDS.get(a));
 }
 }

@@ -853,6 +853,7 @@ public class GrindsPresentationTest
             ShellProbe.pressSheet(panel.shell(), "Back up first");
             return null;
         });
+        PersistenceProbe.drain(fake, 2);
         assertEquals("the backup ran first", java.util.Arrays.asList("backup"), fake.calls);
         assertTrue("a failed backup refuses the reset: " + ShellProbe.noticeText(panel.shell()),
             ShellProbe.noticeText(panel.shell()).startsWith("Backup failed"));
@@ -864,6 +865,7 @@ public class GrindsPresentationTest
             ShellProbe.pressSheet(panel.shell(), "Back up first");
             return null;
         });
+        PersistenceProbe.drain(fake, 2);
         assertEquals("the backup precedes the reset",
             java.util.Arrays.asList("backup", "backup", "reset"), fake.calls);
     }
@@ -906,6 +908,7 @@ public class GrindsPresentationTest
             ShellProbe.pressSheet(panel.shell(), "Remove");
             return null;
         });
+        PersistenceProbe.drain(fake, 1);
         assertTrue("the confirm runs the existing deletion", fake.adzCalled);
     }
 

@@ -7,7 +7,7 @@ import static com.gpmanager.Kit.*;
 * key on the left and the value right-aligned in its tone. Hovering a value shows its exact form.
 */
 class Dd extends JPanel {
-final JPanel body = stack(CARD, 0);
+JPanel body = stack(CARD, 0);
 Dd(String title) {
  super(new BorderLayout());
  setBackground(CARD);

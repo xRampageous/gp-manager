@@ -8,25 +8,25 @@ import static java.lang.Math.*;
 class Dm {
 static final String SPLIT_SHARE_MARK = "Split share";
 static final String SPLIT_KEEP_PREFIX = "Split keep ";
-static String reason(long keepQuantity, long totalQuantity, String optionalNote) {
- long total = nonNeg(totalQuantity);
- long keep = nonNeg(min(keepQuantity, total));
- var sb = new StringBuilder(SPLIT_KEEP_PREFIX).append(keep).append('/').append(total)
+static String reason(long /* keepQuantity */a, long /* totalQuantity */b, String /* optionalNote */c) {
+ long /* total */d = nonNeg(b);
+ long /* keep */e = nonNeg(min(a, d));
+ var /* sb */f = new StringBuilder(SPLIT_KEEP_PREFIX).append(e).append('/').append(d)
  .append(" · ").append(SPLIT_SHARE_MARK);
- if (optionalNote != null) {
-  String trimmed = optionalNote.trim();
-  if (!trimmed.isEmpty()) sb.append(" · ").append(trimmed.length() > 80 ? trimmed.substring(0, 80) : trimmed);
+ if (c != null) {
+  String /* trimmed */g = c.trim();
+  if (!g.isEmpty()) f.append(" · ").append(g.length() > 80 ? g.substring(0, 80) : g);
  }
- String value = sb.toString();
- return value.length() > 200 ? value.substring(0, 200) : value;
+ String /* value */h = f.toString();
+ return h.length() > 200 ? h.substring(0, 200) : h;
 }
 
 static final java.util.Map<String, Boolean> SPLIT_TEXT = new java.util.concurrent.ConcurrentHashMap<>();
-static boolean xr(String reasonOrExplanation) {
- if (Ag.empty(reasonOrExplanation)) return false;
+static boolean xr(String /* reasonOrExplanation */a) {
+ if (Ag.empty(a)) return false;
  // Receipt texts are shared strings read on every tick: decide each distinct text once.
  if (SPLIT_TEXT.size() > 10_000) SPLIT_TEXT.clear();
- return SPLIT_TEXT.computeIfAbsent(reasonOrExplanation,
- text -> Ag.has(text.toLowerCase(java.util.Locale.ROOT), "split keep", "split share"));
+ return SPLIT_TEXT.computeIfAbsent(a,
+ /* text */b -> Ag.has(b.toLowerCase(java.util.Locale.ROOT), "split keep", "split share"));
 }
 }

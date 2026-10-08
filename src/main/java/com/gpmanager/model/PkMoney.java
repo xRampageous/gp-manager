@@ -13,27 +13,27 @@ PkMoney() {
  // Gson
 }
 
-PkMoney(long netGp, long costsGp, long suppliesCostsGp, boolean costSplitAvailable) {
- this.netGp = netGp;
- this.costsGp = nonNeg(costsGp);
- this.suppliesCostsGp = nonNeg(suppliesCostsGp);
- this.costSplitAvailable = costSplitAvailable;
+PkMoney(long /* netGp */a, long /* costsGp */b, long /* suppliesCostsGp */c, boolean /* costSplitAvailable */d) {
+ this.netGp = a;
+ this.costsGp = nonNeg(b);
+ this.suppliesCostsGp = nonNeg(c);
+ this.costSplitAvailable = d;
 }
 
 /** A receipt's correction-aware PvP money; an excluded or unavailable receipt is zero. */
-static PkMoney of(Ac transaction) {
- Bp.Ax amounts = Bp.transaction(transaction);
- if (!amounts.available || !amounts.included) return new PkMoney(0L, 0L, 0L, true);
- if (amounts.costs <= 0L) return new PkMoney(amounts.getNet(), 0L, 0L, true);
- Bp.Du split = Bp.costSplit(transaction);
- return new PkMoney(amounts.getNet(), amounts.costs, split.supplies, split.available);
+static PkMoney of(Ac /* transaction */a) {
+ Bp.Ax /* amounts */b = Bp.transaction(a);
+ if (!b.available || !b.included) return new PkMoney(0L, 0L, 0L, true);
+ if (b.costs <= 0L) return new PkMoney(b.getNet(), 0L, 0L, true);
+ Bp.Du /* split */c = Bp.costSplit(a);
+ return new PkMoney(b.getNet(), b.costs, c.supplies, c.available);
 }
 
 /** Adds another amount; its supplies count only when its own split is known. */
-PkMoney plus(PkMoney other) {
- netGp = safeAdd(netGp, other.netGp);
- costsGp = safeAdd(costsGp, other.tr());
- if (other.costSplitAvailable) suppliesCostsGp = safeAdd(suppliesCostsGp, other.uq());
+PkMoney plus(PkMoney /* other */a) {
+ netGp = safeAdd(netGp, a.netGp);
+ costsGp = safeAdd(costsGp, a.tr());
+ if (a.costSplitAvailable) suppliesCostsGp = safeAdd(suppliesCostsGp, a.uq());
  else costSplitAvailable = false;
  return this;
 }

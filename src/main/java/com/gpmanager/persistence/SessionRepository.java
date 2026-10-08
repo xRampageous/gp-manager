@@ -23,11 +23,11 @@ static final Logger log = LoggerFactory.getLogger(SessionRepository.class);
 /** 1.0 folders: saves written before 1.0 live elsewhere and are never read or rewritten. */
 static final String ACCOUNTS_DIRECTORY = "profiles";
 static final String UNASSIGNED_MARKER = "unbound";
-final Gson gson;
+Gson gson;
 Filepath rootDirectory;
 /** Profile backups, one folder, newest 10 per account (owner 2026-09-28). */
 Filepath backupDirectory;
-final boolean accountAware;
+boolean accountAware;
 /** The bound scope's save files. */
 ScopeFiles bound;
 boolean initialized;
@@ -35,19 +35,19 @@ TrackingIdentity boundIdentity;
 long lastKnownDiskRevision;
 long scopeGeneration;
 @Inject
-SessionRepository(Gson gson) {
- this.gson = gson;
+SessionRepository(Gson /* gson */a) {
+ this.gson = a;
  this.accountAware = true;
 }
 
-SessionRepository(Gson gson, Filepath dataDirectory) {
- this(gson, dataDirectory, false);
+SessionRepository(Gson /* gson */a, Filepath /* dataDirectory */b) {
+ this(a, b, false);
 }
 
-SessionRepository(Gson gson, Filepath dataDirectory, boolean accountAware) {
- this.gson = gson;
- this.accountAware = accountAware;
- initialize(dataDirectory);
+SessionRepository(Gson /* gson */a, Filepath /* dataDirectory */b, boolean /* accountAware */c) {
+ this.gson = a;
+ this.accountAware = c;
+ initialize(b);
 }
 
 synchronized void initialize(Filepath pluginDirectory) {
@@ -76,34 +76,34 @@ void afp() {
 
 /** One scope directory's primary, backup, next, commit-stage and write-lock files. */
 static class ScopeFiles {
- final Filepath dir;
- final Filepath state;
- final Filepath backup;
- final Filepath next;
- final Filepath stage;
- final Filepath lock;
- ScopeFiles(Filepath dir) {
-  this.dir = dir;
-  state = dir.joinSegment("sessions.json");
-  backup = dir.joinSegment(msg("ev"));
-  next = dir.joinSegment("sessions.next.json");
-  stage = dir.joinSegment(msg("ew"));
-  lock = dir.joinSegment("sessions.write.lock");
+ Filepath dir;
+ Filepath state;
+ Filepath backup;
+ Filepath next;
+ Filepath stage;
+ Filepath lock;
+ ScopeFiles(Filepath /* dir */c) {
+  this.dir = c;
+  state = c.joinSegment("sessions.json");
+  backup = c.joinSegment(msg("ev"));
+  next = c.joinSegment("sessions.next.json");
+  stage = c.joinSegment(msg("ew"));
+  lock = c.joinSegment("sessions.write.lock");
  }
 }
 
-void mg(Filepath directory, TrackingIdentity identity) {
- this.bound = new ScopeFiles(directory);
- this.boundIdentity = identity;
+void mg(Filepath /* directory */a, TrackingIdentity /* identity */b) {
+ this.bound = new ScopeFiles(a);
+ this.boundIdentity = b;
  this.lastKnownDiskRevision = 0L;
  this.scopeGeneration++;
 }
 
 /** Directory for an account identity without changing the live bind. */
-Filepath ahw(TrackingIdentity identity) {
+Filepath ahw(TrackingIdentity /* identity */a) {
  afp();
- if (identity == null) return accountAware ? rootDirectory.joinSegment(UNASSIGNED_MARKER) : rootDirectory;
- return rootDirectory.joinSegment(ACCOUNTS_DIRECTORY).joinSegment(identity.ajc());
+ if (a == null) return accountAware ? rootDirectory.joinSegment(UNASSIGNED_MARKER) : rootDirectory;
+ return rootDirectory.joinSegment(ACCOUNTS_DIRECTORY).joinSegment(a.ajc());
 }
 
 /** The backup file the last {@link #load()} had to fall back to; empty when the primary loaded. */
@@ -121,11 +121,11 @@ boolean isBound() {
 /**
 * Bind writes/loads to an account scope. Does not migrate unassigned data.
 */
-synchronized void mc(TrackingIdentity identity) {
+synchronized void mc(TrackingIdentity /* identity */a) {
  afp();
- if (identity == null) throw new IllegalArgumentException("identity");
- Filepath ard = rootDirectory.joinSegment(ACCOUNTS_DIRECTORY).joinSegment(identity.ajc());
- mg(ard, identity);
+ if (a == null) throw new IllegalArgumentException("identity");
+ Filepath /* ard */b = rootDirectory.joinSegment(ACCOUNTS_DIRECTORY).joinSegment(a.ajc());
+ mg(b, a);
 }
 
 /** Leave any account scope; subsequent saves refuse until rebound. */
@@ -140,77 +140,80 @@ synchronized SavedState load() {
  po();
  if (bound.state.exists()) {
   try {
-   SavedState state = avc(bound.state);
+   SavedState /* state */b = avc(bound.state);
    // Load establishes disk truth; do not retain a stale in-memory
    // high-water mark from a primary that was later discarded.
-   lastKnownDiskRevision = nonNeg(state.revision);
-   return state;
-  } catch (Exception ex) {
-   log.warn(msg("io"), ex);
+   lastKnownDiskRevision = nonNeg(b.revision);
+   return b;
+  } catch (Exception /* ex */c) {
+   log.warn(msg("io"), c);
    adf(bound);
   }
  }
- if (ln(bound.backup).stream().anyMatch(Filepath::exists)) {
+ if (bound.backup.exists()) {
   // After a committed reset, backup must not resurrect cleared data.
   // If a stage file says PRIMARY_COMMITTED, prefer repairing from
   // primary/next rather than falling back to an older backup.
-  Cv stage = avb();
-  if (stage == Cv.PRIMARY_COMMITTED && bound.next.exists()) {
+  Cv /* stage */d = avb();
+  if (d == Cv.PRIMARY_COMMITTED && bound.next.exists()) {
    try {
-    SavedState fromNext = avc(bound.next);
+    SavedState /* fromNext */e = avc(bound.next);
     afl(bound.next, bound.state);
-    lastKnownDiskRevision = nonNeg(fromNext.revision);
+    lastKnownDiskRevision = nonNeg(e.revision);
     try {
      bound.state.copyTo(bound.backup, StandardCopyOption.REPLACE_EXISTING);
      akv(bound.stage, Cv.COMPLETE);
      bound.stage.deleteIfExists();
-    } catch (IOException backupEx) {
+    } catch (IOException /* backupEx */f) {
      vj(bound, msg("ip"));
     }
-    return fromNext;
-   } catch (Exception ex) {
-    log.warn(msg("u"), ex);
+    return e;
+   } catch (Exception /* ex */g) {
+    log.warn(msg("u"), g);
    }
   }
-  for (Filepath candidate : ln(bound.backup)) {
-   try {
-    SavedState recovered = avc(candidate);
-    log.warn(msg("ay"), candidate.getFileName());
-    lastKnownDiskRevision = nonNeg(recovered.revision);
-    lastRecoveredFrom = candidate.getFileName().toString();
-    return recovered;
-   } catch (Exception ex) { log.warn(msg("au"), candidate, ex); }
-  }
+  try {
+   SavedState i = avc(bound.backup);
+   log.warn(msg("ay"), bound.backup.getFileName());
+   lastKnownDiskRevision = nonNeg(i.revision);
+   lastRecoveredFrom = bound.backup.getFileName().toString();
+   return i;
+  } catch (Exception j) { log.warn(msg("au"), bound.backup, j); }
  }
  lastKnownDiskRevision = 0L;
  return new SavedState();
 }
 
-SavedState avc(Filepath path) throws IOException {
- try (Reader reader = path.openReader(StandardOpenOption.READ)) {
-  return adc(gson, new JsonParser().parse(reader));
- } catch (RuntimeException ex) {
-  throw new IOException(msg("cm"), ex);
+SavedState avc(Filepath /* path */a) throws IOException {
+ try (Reader /* reader */b = a.openReader(StandardOpenOption.READ)) {
+  return adc(gson, new JsonParser().parse(b));
+ } catch (RuntimeException /* ex */c) {
+  throw new IOException(msg("cm"), c);
  }
 }
 
 /** Parses one payload. */
-static SavedState adc(Gson gson, JsonElement json) throws IOException {
- if (json == null || !json.isJsonObject()) throw new IOException("Empty session state");
- SavedState state = gson.fromJson(json, SavedState.class);
- if (state == null) throw new IOException("Empty session state");
+static SavedState adc(Gson /* gson */a, JsonElement /* json */b) throws IOException {
+ if (b == null || !b.isJsonObject()) throw new IOException(msg("b9"));
+ SavedState /* state */c = a.fromJson(b, SavedState.class);
+ if (c == null) throw new IOException(msg("b9"));
  // Schema-105 presentation labels are revalidated on every load; invalid text degrades to
  // generic presentation instead of failing the profile.
- state.aar();
- return state;
+ c.aar();
+ return c;
+}
+
+/** Backup parse/validation with the caller's existing Gson policy and error behavior. */
+static SavedState r1(Gson a, Filepath b) throws IOException {
+ return adc(a, new JsonParser().parse(awy(b)));
 }
 
 /**
 * Save using an immutable write intent. Destination and owner key come from
 * the intent, not from a later account bind.
 */
-synchronized boolean save(Cs intent) {
- return pq(intent, false).isCommitted();
+synchronized boolean save(Cs /* intent */a) {
+ return pq(a, false).isCommitted();
 }
 
 /**
@@ -221,9 +224,9 @@ synchronized boolean save(Cs intent) {
 * revision, because that would be the stale overwrite the fence exists to
 * prevent.
 */
-synchronized Bm replaceStateDetailed(Cs intent) {
- if (intent == null || intent.state == null) return Bm.failedUnchanged("state was null");
- return pq(intent, true);
+synchronized Bm replaceStateDetailed(Cs /* intent */a) {
+ if (a == null || a.state == null) return Bm.failedUnchanged("state was null");
+ return pq(a, true);
 }
 
 /**
@@ -232,122 +235,111 @@ synchronized Bm replaceStateDetailed(Cs intent) {
 * when the primary was replaced but a later step faulted, {@code CONFLICT}
 * when disk no longer matches the expected base, else {@code FAILED_UNCHANGED}.
 */
-Bm pq(Cs intent, boolean destructiveReset) {
- if (intent == null || intent.state == null) throw new IllegalArgumentException("intent");
- SavedState state = intent.state;
- TrackingIdentity targetIdentity = intent.identity;
- if (accountAware && targetIdentity == null) {
+Bm pq(Cs /* intent */b, boolean /* destructiveReset */c) {
+ if (b == null || b.state == null) throw new IllegalArgumentException("intent");
+ SavedState /* state */d = b.state;
+ TrackingIdentity /* targetIdentity */e = b.identity;
+ if (accountAware && e == null) {
   log.warn(msg("iq"));
   return Bm.failedUnchanged(msg("af"));
  }
- var target = new ScopeFiles(ahw(targetIdentity));
+ var /* target */f = new ScopeFiles(ahw(e));
  // Owner key is taken from the intent, never from a later live bind.
- if (targetIdentity != null) state.setOwnerKey(targetIdentity.rsProfileKey);
- state.setSchemaVersion(SavedState.CURRENT_SCHEMA_VERSION);
- if (state.savedAtEpochMillis <= 0L) state.setSavedAtEpochMillis(System.currentTimeMillis());
- FileLock lock = null;
+ if (e != null) d.setOwnerKey(e.rsProfileKey);
+ d.setSchemaVersion(SavedState.CURRENT_SCHEMA_VERSION);
+ if (d.savedAtEpochMillis <= 0L) d.setSavedAtEpochMillis(Ae.now());
+ FileLock /* lock */g = null;
  // Set once the primary replacement has been attempted; a fault after that
  // point is classified by inspecting the primary under the still-held lock.
- boolean app = false;
+ boolean /* app */h = false;
  try {
-  target.dir.createDirectories();
-  lock = jw(target.lock);
-  if (lock == null) {
+  f.dir.createDirectories();
+  g = jw(f.lock);
+  if (g == null) {
    log.warn(msg("ir"));
    return Bm.failedUnchanged(msg("v"));
   }
-  Optional<Integer> alr = peek(target.state).map(object -> object.has("schemaVersion")
-  && object.get("schemaVersion").isJsonPrimitive() ? object.get("schemaVersion").getAsInt() : 0);
-  if (alr.isPresent() && alr.get() != SavedState.CURRENT_SCHEMA_VERSION) {
+  Optional<Integer> /* alr */i = peek(f.state).map(/* object */j -> j.has("schemaVersion")
+  && j.get("schemaVersion").isJsonPrimitive() ? j.get("schemaVersion").getAsInt() : 0);
+  if (i.isPresent() && i.get() != SavedState.CURRENT_SCHEMA_VERSION) {
    // Any other schema (a newer version) is preserved read-only.
-   log.warn(msg("is"), alr.get());
-   return Bm.failedUnchanged("Disk state uses unsupported data schema " + alr.get());
+   log.warn(msg("is"), i.get());
+   return Bm.failedUnchanged(msg("b8") + i.get());
   }
-  long alq = ado(target.state).orElse(adm(target.backup).orElse(0L));
+  long /* alq */k = ado(f.state).orElse(adm(f.backup).orElse(0L));
   // Compare-and-swap against the base revision observed when the
   // snapshot was created. Equal competing writers both claiming base N
   // must not both succeed — and a destructive reset is no exception:
   // a newer revision written by another client wins and the reset aborts.
-  if (alq != intent.expectedBaseRevision) {
-   log.warn(msg("it"), destructiveReset ? "reset" : "save", alq, intent.expectedBaseRevision);
-   if (ahb(targetIdentity)) lastKnownDiskRevision = alq;
-   return Bm.conflict("Disk revision changed (expected base "
-   + intent.expectedBaseRevision + ", found " + alq + ")");
+  if (k != b.expectedBaseRevision) {
+   log.warn(msg("it"), c ? "reset" : "save", k, b.expectedBaseRevision);
+   if (ahb(e)) lastKnownDiskRevision = k;
+   return Bm.conflict(msg("b6")
+   + b.expectedBaseRevision + ", found " + k + ")");
   }
-  if (state.revision <= 0L) {
-   state.setRevision(alq + 1L);
-  } else if (state.revision <= alq) {
-   log.warn(msg("iu"), state.revision, alq);
-   return Bm.failedUnchanged("Revision " + state.revision + " does not advance disk revision " + alq);
+  if (d.revision <= 0L) {
+   d.setRevision(k + 1L);
+  } else if (d.revision <= k) {
+   log.warn(msg("iu"), d.revision, k);
+   return Bm.failedUnchanged("Revision " + d.revision + msg("b7") + k);
   }
-  try (Writer writer = target.next.openWriter(StandardOpenOption.CREATE, StandardOpenOption.TRUNCATE_EXISTING,
+  try (Writer /* writer */m = f.next.openWriter(StandardOpenOption.CREATE, StandardOpenOption.TRUNCATE_EXISTING,
   StandardOpenOption.WRITE)) {
-   if (intent.json == null) gson.toJson(state, writer);
-   else writer.write(intent.json);
+   if (b.json == null) gson.toJson(d, m);
+   else m.write(b.json);
   }
-  SavedState validated = avc(target.next);
-  akv(target.stage, Cv.NEXT_READY);
-  if (!destructiveReset && target.state.exists()) {
-   boolean valid = false;
+  SavedState /* validated */n = avc(f.next);
+  akv(f.stage, Cv.NEXT_READY);
+  if (!c && f.state.exists()) {
+   boolean /* valid */o = false;
    try {
-    avc(target.state);
-    valid = true;
-   } catch (Exception ex) {
-    adf(target);
-    if (target.state.exists()) throw new IOException(msg("iv"), ex);
+    avc(f.state);
+    o = true;
+   } catch (Exception /* ex */p) {
+    adf(f);
+    if (f.state.exists()) throw new IOException(msg("iv"), p);
    }
-   if (valid) {
-    Filepath aqv = target.dir.joinSegment(msg("cn"));
-    target.state.copyTo(aqv, StandardCopyOption.REPLACE_EXISTING);
-    afl(aqv, target.backup);
+   if (o) {
+    b1(f, msg("cn"));
    }
   }
-  app = true;
-  afl(target.next, target.state);
-  akv(target.stage, Cv.PRIMARY_COMMITTED);
-  if (ahb(targetIdentity)) lastKnownDiskRevision = validated.revision;
-  if (destructiveReset) {
+  h = true;
+  afl(f.next, f.state);
+  akv(f.stage, Cv.PRIMARY_COMMITTED);
+  if (ahb(e)) lastKnownDiskRevision = n.revision;
+  if (c) {
    try {
-    Filepath ank = target.dir.joinSegment(msg("bk"));
-    target.state.copyTo(ank, StandardCopyOption.REPLACE_EXISTING);
-    afl(ank, target.backup);
-    akv(target.stage, Cv.COMPLETE);
-    target.stage.deleteIfExists();
-    target.next.deleteIfExists();
-   } catch (IOException backupEx) {
-    vj(target, msg("iw"));
-    akv(target.stage, Cv.PRIMARY_COMMITTED);
-    log.warn(msg("ix"), backupEx);
+    b1(f, msg("bk"));
+    c1(f);
+   } catch (IOException /* backupEx */s) {
+    vj(f, msg("iw"));
+    akv(f.stage, Cv.PRIMARY_COMMITTED);
+    log.warn(msg("ix"), s);
     return Bm.committedPrimaryOnly(msg("l"));
    }
    return Bm.committed(msg("ai"));
   }
-  akv(target.stage, Cv.COMPLETE);
-  target.stage.deleteIfExists();
-  target.next.deleteIfExists();
+  c1(f);
   return Bm.committed("Save committed");
- } catch (IOException ex) {
-  log.warn(destructiveReset ? msg("ad") : msg("be"), ex);
+ } catch (IOException /* ex */t) {
+  log.warn(c ? msg("ad") : msg("be"), t);
   // Still under the account lock, so a primary holding our revision can
   // only be ours: classify, never re-issue the write.
-  if (app && ado(target.state).orElse(-1L) == state.revision) {
-   if (ahb(targetIdentity)) lastKnownDiskRevision = state.revision;
+  if (h && ado(f.state).orElse(-1L) == d.revision) {
+   if (ahb(e)) lastKnownDiskRevision = d.revision;
    return Bm.committedPrimaryOnly(msg("iy"));
   }
-  return Bm.failedUnchanged(destructiveReset ? msg("iz") : msg("ja"));
+  return Bm.failedUnchanged(c ? msg("iz") : msg("ja"));
  } finally {
-  afv(lock);
+  afv(g);
  }
 }
 
-/** One crash copy: the previous good save (owner 2026-09-28: not four near-identical ones). */
-static List<Filepath> ln(Filepath primaryBackup) {
- return List.of(primaryBackup);
-}
 
-boolean ahb(TrackingIdentity targetIdentity) {
- if (boundIdentity == null && targetIdentity == null) return true;
- return boundIdentity != null && boundIdentity.equals(targetIdentity);
+
+boolean ahb(TrackingIdentity /* targetIdentity */a) {
+ if (boundIdentity == null && a == null) return true;
+ return boundIdentity != null && boundIdentity.equals(a);
 }
 
 @AllArgsConstructor
@@ -357,19 +349,19 @@ static class Bm {
   /** Disk advanced past the expected base; nothing was written. */
   CONFLICT, FAILED_UNCHANGED
  }
- final Kind kind;
- final String message;
- static Bm committed(String message) {
-  return new Bm(Kind.COMMITTED, message);
+ Kind kind;
+ String message;
+ static Bm committed(String /* message */c) {
+  return new Bm(Kind.COMMITTED, c);
  }
- static Bm committedPrimaryOnly(String message) {
-  return new Bm(Kind.COMMITTED_PRIMARY_ONLY, message);
+ static Bm committedPrimaryOnly(String /* message */c) {
+  return new Bm(Kind.COMMITTED_PRIMARY_ONLY, c);
  }
- static Bm failedUnchanged(String message) {
-  return new Bm(Kind.FAILED_UNCHANGED, message);
+ static Bm failedUnchanged(String /* message */c) {
+  return new Bm(Kind.FAILED_UNCHANGED, c);
  }
- static Bm conflict(String message) {
-  return new Bm(Kind.CONFLICT, message);
+ static Bm conflict(String /* message */c) {
+  return new Bm(Kind.CONFLICT, c);
  }
  boolean isCommitted() {
   return kind == Kind.COMMITTED || kind == Kind.COMMITTED_PRIMARY_ONLY;
@@ -377,136 +369,147 @@ static class Bm {
 }
 
 void po() {
- Cv stage = avb();
- if (stage == Cv.NONE || stage == Cv.COMPLETE) return;
+ Cv /* stage */a = avb();
+ if (a == Cv.NONE || a == Cv.COMPLETE) return;
  try {
-  if (stage == Cv.NEXT_READY && bound.next.exists()) {
+  if (a == Cv.NEXT_READY && bound.next.exists()) {
    // Primary not replaced yet — next is aspirational; leave disk.
    return;
   }
-  if (stage == Cv.PRIMARY_COMMITTED && (bound.state.exists() || bound.next.exists())) {
+  if (a == Cv.PRIMARY_COMMITTED && (bound.state.exists() || bound.next.exists())) {
    // A primary lost mid-commit is restored from next first; then align the backup.
    if (!bound.state.exists()) bound.next.copyTo(bound.state, StandardCopyOption.REPLACE_EXISTING);
    try {
     bound.state.copyTo(bound.backup, StandardCopyOption.REPLACE_EXISTING);
     bound.stage.deleteIfExists();
     bound.next.deleteIfExists();
-   } catch (IOException ex) {
+   } catch (IOException /* ex */b) {
     vj(bound, msg("p"));
    }
   }
- } catch (IOException ex) {
-  log.warn(msg("r"), ex);
+ } catch (IOException /* ex */c) {
+  log.warn(msg("r"), c);
  }
 }
 
-void vj(ScopeFiles files, String reason) throws IOException {
- if (files.backup.exists()) {
-  Filepath aqx = files.dir.joinSegment(msg("bt") + System.currentTimeMillis() + ".json");
-  files.backup.moveTo(aqx, StandardCopyOption.REPLACE_EXISTING);
-  log.warn("{} ({})", reason, aqx.getFileName());
+void vj(ScopeFiles /* files */a, String /* reason */b) throws IOException {
+ if (a.backup.exists()) {
+  Filepath /* aqx */c = a.dir.joinSegment(msg("bt") + Ae.now() + ".json");
+  a.backup.moveTo(c, StandardCopyOption.REPLACE_EXISTING);
+  log.warn("{} ({})", b, c.getFileName());
  }
 }
 
-/** The newest readable revision across the backup and its rotated copies. */
-Optional<Long> adm(Filepath primaryBackup) {
- for (Filepath candidate : ln(primaryBackup)) {
-  Optional<Long> revision = ado(candidate);
-  if (revision.isPresent()) return revision;
- }
- return Optional.empty();
-}
+/** The existing single crash copy's readable revision. */
+Optional<Long> adm(Filepath a) { return ado(a); }
 
 /** A stored payload's top-level object; empty when the file is missing, empty or unreadable. */
-Optional<JsonObject> peek(Filepath path) {
+Optional<JsonObject> peek(Filepath /* path */a) {
  try {
-  return path.exists() ? Optional.of(new JsonParser().parse(awy(path)).getAsJsonObject()) : Optional.empty();
- } catch (Exception ex) {
+  return a.exists() ? Optional.of(new JsonParser().parse(awy(a)).getAsJsonObject()) : Optional.empty();
+ } catch (Exception /* ex */b) {
   return Optional.empty();
  }
 }
 
-Optional<Long> ado(Filepath path) {
- return peek(path).map(object -> object.has("revision") && object.get("revision").isJsonPrimitive()
- ? object.get("revision").getAsLong() : 0L);
+Optional<Long> ado(Filepath /* path */a) {
+ return peek(a).map(/* object */b -> b.has("revision") && b.get("revision").isJsonPrimitive()
+ ? b.get("revision").getAsLong() : 0L);
 }
 
-void akv(Filepath stagePath, Cv stage) throws IOException {
- stagePath.write(stage.name(), StandardOpenOption.CREATE, StandardOpenOption.TRUNCATE_EXISTING,
+void akv(Filepath /* stagePath */a, Cv /* stage */b) throws IOException {
+ a.write(b.name(), StandardOpenOption.CREATE, StandardOpenOption.TRUNCATE_EXISTING,
  StandardOpenOption.WRITE);
 }
 
 Cv avb() {
  if (!bound.stage.exists()) return Cv.NONE;
  try {
-  String raw = awy(bound.stage).trim();
-  return Cv.valueOf(raw);
- } catch (Exception ex) {
+  String /* raw */a = awy(bound.stage).trim();
+  return Cv.valueOf(a);
+ } catch (Exception /* ex */b) {
   return Cv.NONE;
  }
 }
 
 // Package visibility permits deterministic disk-failure tests without
 // introducing production fault switches.
-void afl(Filepath source, Filepath target) throws IOException {
+void afl(Filepath /* source */b, Filepath /* target */c) throws IOException {
  try {
-  ma(source, target);
- } catch (AtomicMoveNotSupportedException ex) {
+  ma(b, c);
+ } catch (AtomicMoveNotSupportedException /* ex */d) {
   // Windows/network volumes without atomic rename: plain replace of a validated file.
-  source.moveTo(target, StandardCopyOption.REPLACE_EXISTING);
+  b.moveTo(c, StandardCopyOption.REPLACE_EXISTING);
+ } catch (AccessDeniedException /* ex */e) {
+  // Antivirus or Windows Search can hold a just-written file for a moment; one more try
+  // often clears it, and the writer retries later without alarming anyone (owner 1.2).
+  ma(b, c);
  }
 }
 
-static String awy(Filepath path) throws IOException {
- try (Reader reader = path.openReader(StandardOpenOption.READ)) {
-  var text = new StringBuilder();
-  char[] buffer = new char[4096];
-  int count;
-  while ((count = reader.read(buffer)) >= 0) text.append(buffer, 0, count);
-  return text.toString();
+static String awy(Filepath /* path */a) throws IOException {
+ try (Reader /* reader */b = a.openReader(StandardOpenOption.READ)) {
+  var /* text */c = new StringBuilder();
+  char[] /* buffer */d = new char[4096];
+  int /* count */e;
+  while ((e = b.read(d)) >= 0) c.append(d, 0, e);
+  return c.toString();
  }
 }
 
-void ma(Filepath source, Filepath target) throws IOException {
- source.moveTo(target, StandardCopyOption.REPLACE_EXISTING, StandardCopyOption.ATOMIC_MOVE);
+void ma(Filepath /* source */a, Filepath /* target */b) throws IOException {
+ a.moveTo(b, StandardCopyOption.REPLACE_EXISTING, StandardCopyOption.ATOMIC_MOVE);
 }
 
-FileLock jw(Filepath lockPath) throws IOException {
- lockPath.getParent().createDirectories();
- FileChannel channel = lockPath.openFileChannel(StandardOpenOption.CREATE, StandardOpenOption.WRITE);
- FileLock lock;
+FileLock jw(Filepath /* lockPath */b) throws IOException {
+ b.getParent().createDirectories();
+ FileChannel /* channel */c = b.openFileChannel(StandardOpenOption.CREATE, StandardOpenOption.WRITE);
+ FileLock /* lock */d;
  try {
-  lock = channel.tryLock();
- } catch (OverlappingFileLockException heldInThisProcess) {
+  d = c.tryLock();
+ } catch (OverlappingFileLockException /* heldInThisProcess */e) {
   // Another repository instance in this JVM (or a test) holds the account lock.
-  lock = null;
+  d = null;
  }
- if (lock == null) {
-  channel.close();
+ if (d == null) {
+  c.close();
   return null;
  }
- return lock;
+ return d;
 }
 
-void afv(FileLock lock) {
- if (lock == null) return;
+void afv(FileLock /* lock */a) {
+ if (a == null) return;
  try {
-  FileChannel channel = lock.channel();
-  lock.release();
-  channel.close();
- } catch (IOException ex) {
-  log.debug(msg("ag"), ex);
+  FileChannel /* channel */b = a.channel();
+  a.release();
+  b.close();
+ } catch (IOException /* ex */c) {
+  log.debug(msg("ag"), c);
  }
 }
 
-void adf(ScopeFiles files) {
+void adf(ScopeFiles /* files */a) {
  try {
-  if (files.state.exists()) {
-   Filepath backup = files.dir.joinSegment("sessions.corrupt-" + System.currentTimeMillis() + ".json");
-   files.state.moveTo(backup, StandardCopyOption.REPLACE_EXISTING);
+  if (a.state.exists()) {
+   Filepath /* backup */b = a.dir.joinSegment("sessions.corrupt-" + Ae.now() + ".json");
+   a.state.moveTo(b, StandardCopyOption.REPLACE_EXISTING);
   }
- } catch (IOException backupError) {
-  log.warn(msg("w"), backupError);
+ } catch (IOException /* backupError */c) {
+  log.warn(msg("w"), c);
  }
+}
+/** Atomic backup replacement, using each operation's original temporary file name. */
+void b1(ScopeFiles a, String b) throws IOException {
+ Filepath c = a.dir.joinSegment(b);
+ a.state.copyTo(c, StandardCopyOption.REPLACE_EXISTING);
+ afl(c, a.backup);
+}
+
+/** Finish an already committed write in the original stage/delete order. */
+void c1(ScopeFiles a) throws IOException {
+ akv(a.stage, Cv.COMPLETE);
+ a.stage.deleteIfExists();
+ a.next.deleteIfExists();
 }
 }

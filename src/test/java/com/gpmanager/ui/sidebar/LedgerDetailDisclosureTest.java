@@ -55,13 +55,19 @@ public class LedgerDetailDisclosureTest
         List<String> cards = onEdt(() -> LedgerPageProbe.receiptCardTransactionIds(page));
         assertEquals("one row per canonical transaction, not per contribution", 3, cards.size());
         assertTrue(cards.contains(first.getId()));
-        List<String> cardTexts = onEdt(() -> TableRows.of(page.body(), "RECEIPTS"));
+        List<String> cardTexts = onEdt(() -> TableRows.of(page.body(), "ENTRIES"));
         assertEquals(3, cardTexts.size());
         assertTrue("each row keeps the selected action total: " + cardTexts,
             cardTexts.stream().allMatch(text -> text.contains(Fmt.ru(-820) + " gp")));
         assertTrue("each row keeps its compact resource summary: " + cardTexts,
             cardTexts.stream().allMatch(text -> text.contains("Chaos rune") && text.contains("Death rune")
                 && text.contains("Water rune")));
+        List<String> used = onEdt(() -> TableRows.of(page.body(), "USED"));
+        assertEquals("the group sums what its casts used, item by item: " + used, 3, used.size());
+        assertTrue(used.get(0), used.get(0).startsWith("Chaos rune|" + Fmt.times(12) + "|"));
+        assertTrue(used.get(1), used.get(1).startsWith("Death rune|" + Fmt.times(6) + "|"));
+        assertTrue(used.get(2), used.get(2).startsWith("Water rune|" + Fmt.times(12) + "|"));
+        assertTrue(used.get(0), used.get(0).contains(Fmt.ru(-1_272) + " gp"));
         assertTrue("rows hide canonical UUIDs",
             cardTexts.stream().noneMatch(text -> text.matches(".*[0-9a-fA-F]{8}(-[0-9a-fA-F]{4}){3}-[0-9a-fA-F]{12}.*")));
 
@@ -180,6 +186,30 @@ public class LedgerDetailDisclosureTest
     }
 
     // ── fixtures ───────────────────────────────────────────────────────────────────────────────
+
+    /** Owner 1.2: one scythe hit spends only blood runes, and still names them. */
+    @Test
+    public void aChargedWeaponListsWhatItSpentEvenOneRuneType() throws Exception
+    {
+        Am engine = session();
+        Ac hit = engine.mn("worn:scythe", "Scythe of vitur", Au.SUPPLIES,
+            List.of(new Ab(565, "Blood rune", -2L, 333, -666L, Av.GRAND_EXCHANGE)), T0 + 1_000L);
+        assertNotNull(hit);
+        Ao data = capture(engine, T0 + 10_000L, entry(Ao.Bs.CHARGES, hit.getId()));
+        assertNotNull(data.detail);
+        assertTrue("a charged weapon's row", data.detail.group.chargeUse);
+        LedgerPage page = onEdt(() ->
+        {
+            LedgerPage created = new LedgerPage(new NoopActions(), id -> null);
+            created.apply(data);
+            return created;
+        });
+        List<String> used = onEdt(() -> TableRows.of(page.body(), "USED"));
+        assertEquals("one rune type is still listed: " + used, 1, used.size());
+        assertTrue(used.get(0), used.get(0).startsWith("Blood rune|" + Fmt.times(2) + "|"));
+        List<String> entries = onEdt(() -> TableRows.of(page.body(), "ENTRIES"));
+        assertTrue("the entry names its spend: " + entries, entries.get(0).startsWith("Blood rune " + Fmt.times(2) + "|"));
+    }
 
     private static Am session()
     {

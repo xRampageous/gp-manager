@@ -19,30 +19,32 @@ import static java.lang.Math.*;
 class OrderedPersistenceWriter {
 static final Logger log = LoggerFactory.getLogger(OrderedPersistenceWriter.class);
 static final Duration DEFAULT_SHUTDOWN_FLUSH = Duration.ofSeconds(5);
-final SessionRepository repository;
-final Object executorLock = new Object();
+SessionRepository repository;
+Object executorLock = new Object();
 ExecutorService executor;
-final boolean externalExecutor;
-final AtomicLong appliedRevision = new AtomicLong(0L);
+/** Ordinary saves that failed in a row; the warning waits for the third. */
+int failures;
+boolean externalExecutor;
+AtomicLong appliedRevision = new AtomicLong(0L);
 /** Disk truth diverged from this scope's in-memory state; retries must never rebase it. */
-final AtomicLong conflictedGeneration = new AtomicLong(-1L);
-final AtomicReference<PendingWrite> coalesced = new AtomicReference<>();
-final AtomicReference<Ci> status = new AtomicReference<>(Ci.abd());
-final AtomicBoolean drainScheduled = new AtomicBoolean(false);
-final Object flushMonitor = new Object();
+AtomicLong conflictedGeneration = new AtomicLong(-1L);
+AtomicReference<PendingWrite> coalesced = new AtomicReference<>();
+AtomicReference<Ci> status = new AtomicReference<>(Ci.abd());
+AtomicBoolean drainScheduled = new AtomicBoolean(false);
+Object flushMonitor = new Object();
 volatile boolean acceptingWork = true;
 @Inject
-OrderedPersistenceWriter(SessionRepository repository) {
- this.repository = repository;
+OrderedPersistenceWriter(SessionRepository /* repository */a) {
+ this.repository = a;
  this.externalExecutor = false;
  this.executor = qq("gp-manager-persist");
 }
 
 /** Visible for tests that supply a same-thread or controlled executor. */
-OrderedPersistenceWriter(SessionRepository repository, ExecutorService executor) {
- this.repository = repository;
+OrderedPersistenceWriter(SessionRepository /* repository */a, ExecutorService /* executor */b) {
+ this.repository = a;
  this.externalExecutor = true;
- this.executor = executor;
+ this.executor = b;
 }
 
 void start() {
@@ -54,11 +56,11 @@ void start() {
 }
 
 /** One named daemon worker thread; persistence never keeps the client alive. */
-static ExecutorService qq(String name) {
- return Executors.newSingleThreadExecutor(runnable -> {
-  var thread = new Thread(runnable, name);
-  thread.setDaemon(true);
-  return thread;
+static ExecutorService qq(String /* name */a) {
+ return Executors.newSingleThreadExecutor(/* runnable */b -> {
+  var /* thread */c = new Thread(b, a);
+  c.setDaemon(true);
+  return c;
  });
 }
 
@@ -70,51 +72,51 @@ long tk() {
  return appliedRevision.get();
 }
 
-void aft(long revision) {
- appliedRevision.set(Ae.nonNeg(revision));
+void aft(long /* revision */a) {
+ appliedRevision.set(Ae.nonNeg(a));
  if (status.get().state == State.CONFLICT && !vw(repository.scopeGeneration)) {
   status.set(Ci.abd());
  }
 }
 
-boolean vw(long generation) {
- return conflictedGeneration.get() == generation;
+boolean vw(long /* generation */a) {
+ return conflictedGeneration.get() == a;
 }
 
 /**
 * Enqueue an ordinary save bound to an immutable write intent.
 */
-void submit(Cs intent) {
- if (intent == null || intent.state == null) return;
- if (vw(intent.scopeGeneration)) return;
+void submit(Cs /* intent */b) {
+ if (b == null || b.state == null) return;
+ if (vw(b.scopeGeneration)) return;
  if (!acceptingWork) {
   status.set(new Ci(State.FAILED, "Writer is shut down", true, ""));
   return;
  }
- SavedState detached = intent.state;
- long revision = detached.revision;
- if (revision <= 0L) {
-  revision = intent.expectedBaseRevision + 1L;
-  detached.setRevision(revision);
+ SavedState /* detached */c = b.state;
+ long /* revision */d = c.revision;
+ if (d <= 0L) {
+  d = b.expectedBaseRevision + 1L;
+  c.setRevision(d);
  }
- var next = new PendingWrite(intent);
+ var /* next */e = new PendingWrite(b);
  while (true) {
-  PendingWrite current = coalesced.get();
-  if (current != null) {
+  PendingWrite /* current */f = coalesced.get();
+  if (f != null) {
    // Prefer newer revision within the same scope generation.
-   if (current.intent.scopeGeneration == next.intent.scopeGeneration && current.revision > next.revision) {
+   if (f.intent.scopeGeneration == e.intent.scopeGeneration && f.revision > e.revision) {
     return;
    }
    // A newer scope generation supersedes older pending work for a
    // previous account — but only after the coordinator drained or
    // abandoned that scope. Drop stale-scope work if a newer scope
    // is already queued.
-   if (current.intent.scopeGeneration > next.intent.scopeGeneration) {
+   if (f.intent.scopeGeneration > e.intent.scopeGeneration) {
     status.set(new Ci(State.FAILED, msg("h"), false, ""));
     return;
    }
   }
-  if (coalesced.compareAndSet(current, next)) break;
+  if (coalesced.compareAndSet(f, e)) break;
  }
  ahg();
 }
@@ -126,39 +128,38 @@ void submit(Cs intent) {
 * here — after reloading, the user re-runs the reset against the newer state if they still
 * want it.
 */
-Bm aic(Cs intent) {
+Bm aic(Cs /* intent */b) {
  flush(DEFAULT_SHUTDOWN_FLUSH);
- if (vw(intent.scopeGeneration)) return Bm.conflict(status.get().detail);
- SavedState detached = intent.state;
+ if (vw(b.scopeGeneration)) return Bm.conflict(status.get().detail);
+ SavedState /* detached */c = b.state;
  // A pre-serialized payload already carries a revision past its expected base.
- if (intent.json == null) {
-  detached.setRevision(max(intent.expectedBaseRevision, appliedRevision.get()) + 1L);
-  detached.setSavedAtEpochMillis(System.currentTimeMillis());
+ if (b.json == null) {
+  c.setRevision(max(b.expectedBaseRevision, appliedRevision.get()) + 1L);
+  c.setSavedAtEpochMillis(Ae.now());
  }
- Bm outcome = repository.replaceStateDetailed(intent);
- if (outcome.isCommitted()) {
-  appliedRevision.set(detached.revision);
-  status.set(new Ci(State.OK, outcome.message, false, ""));
-  return outcome;
+ Bm /* outcome */d = repository.replaceStateDetailed(b);
+ if (d.isCommitted()) {
+  k1(c.revision, d.message, "");
+  return d;
  }
- boolean conflict = outcome.kind == Bm.Kind.CONFLICT;
- if (conflict) conflictedGeneration.accumulateAndGet(intent.scopeGeneration, Math::max);
- status.set(new Ci(conflict ? State.CONFLICT : State.FAILED,
- conflict ? qa(outcome.message) : outcome.message, false, ""));
- return outcome;
+ boolean /* conflict */e = d.kind == Bm.Kind.CONFLICT;
+ if (e) conflictedGeneration.accumulateAndGet(b.scopeGeneration, Math::max);
+ status.set(new Ci(e ? State.CONFLICT : State.FAILED,
+ e ? qa(d.message) : d.message, false, ""));
+ return d;
 }
 
-boolean flush(Duration timeout) {
- Duration wait = timeout == null ? DEFAULT_SHUTDOWN_FLUSH : timeout;
+boolean flush(Duration /* timeout */a) {
+ Duration /* wait */b = a == null ? DEFAULT_SHUTDOWN_FLUSH : a;
  ahg();
- long arv = System.nanoTime() + wait.toNanos();
+ long /* arv */c = System.nanoTime() + b.toNanos();
  synchronized (flushMonitor) {
   while (coalesced.get() != null || drainScheduled.get()) {
-   long remaining = arv - System.nanoTime();
-   if (remaining <= 0L) return coalesced.get() == null && !drainScheduled.get();
+   long /* remaining */d = c - System.nanoTime();
+   if (d <= 0L) return coalesced.get() == null && !drainScheduled.get();
    try {
-    flushMonitor.wait(min(TimeUnit.NANOSECONDS.toMillis(remaining) + 1L, 250L));
-   } catch (InterruptedException ex) {
+    flushMonitor.wait(min(TimeUnit.NANOSECONDS.toMillis(d) + 1L, 250L));
+   } catch (InterruptedException /* ex */e) {
     return false;
    }
   }
@@ -166,7 +167,7 @@ boolean flush(Duration timeout) {
  return true;
 }
 
-void shutdown(Duration timeout) {
+void shutdown(Duration /* timeout */b) {
  acceptingWork = false;
  // Plugin lifecycle callbacks must return without waiting for disk work.
  // The single writer is allowed to drain the already captured intent in
@@ -181,7 +182,7 @@ void shutdown(Duration timeout) {
 
 void ahg() {
  if (!drainScheduled.compareAndSet(false, true)) return;
- ExecutorService active;
+ ExecutorService /* active */a;
  synchronized (executorLock) {
   if (!externalExecutor && (executor == null || executor.isShutdown())) {
    if (!acceptingWork) {
@@ -190,13 +191,13 @@ void ahg() {
    }
    executor = qq("gp-manager-persist");
   }
-  active = executor;
+  a = executor;
  }
  try {
-  active.execute(this::drain);
- } catch (RuntimeException ex) {
+  a.execute(this::drain);
+ } catch (RuntimeException /* ex */b) {
   drainScheduled.set(false);
-  log.warn(msg("o"), ex);
+  log.warn(msg("o"), b);
   status.set(new Ci(State.FAILED, msg("av"), true, ""));
  }
 }
@@ -204,38 +205,41 @@ void ahg() {
 void drain() {
  try {
   while (true) {
-   PendingWrite work = coalesced.getAndSet(null);
-   if (work == null) return;
-   if (vw(work.intent.scopeGeneration)) continue;
-   Cs intent = aei(work.intent);
-   boolean ok;
+   PendingWrite /* work */b = coalesced.getAndSet(null);
+   if (b == null) return;
+   if (vw(b.intent.scopeGeneration)) continue;
+   Cs /* intent */c = aei(b.intent);
+   boolean /* ok */d;
    try {
-    ok = repository.save(intent);
-   } catch (RuntimeException ex) {
-    log.warn(msg("aw"), ex);
-    ok = false;
+    d = repository.save(c);
+   } catch (RuntimeException /* ex */e) {
+    log.warn(msg("aw"), e);
+    d = false;
    }
-   if (ok) {
+   if (d) {
     // Late completions for an abandoned scope must not rewrite
     // the live applied revision or OK status for the new scope.
-    if (intent.scopeGeneration == repository.scopeGeneration) {
-     appliedRevision.set(work.revision);
-     status.set(new Ci(State.OK, "", false, repository.lastRecoveredFrom));
+    failures = 0;
+    if (c.scopeGeneration == repository.scopeGeneration) {
+     k1(b.revision, "", repository.lastRecoveredFrom);
     } else {
-     log.debug(msg("ie"), intent.scopeGeneration, repository.scopeGeneration);
+     log.debug(msg("ie"), c.scopeGeneration, repository.scopeGeneration);
     }
    } else {
-    State state = State.FAILED;
-    String detail = msg("bs");
-    long disk = repository.lastKnownDiskRevision;
-    if (disk != intent.expectedBaseRevision) {
-     state = State.CONFLICT;
-     conflictedGeneration.accumulateAndGet(intent.scopeGeneration, Math::max);
-     detail = qa("Disk revision changed (expected base "
-     + intent.expectedBaseRevision + ", found " + disk + ").");
+    State /* state */f = State.FAILED;
+    String /* detail */g = msg("bs");
+    long /* disk */h = repository.lastKnownDiskRevision;
+    if (h != c.expectedBaseRevision) {
+     f = State.CONFLICT;
+     conflictedGeneration.accumulateAndGet(c.scopeGeneration, Math::max);
+     g = qa(msg("b6")
+     + c.expectedBaseRevision + ", found " + h + ").");
     }
-    if (intent.scopeGeneration == repository.scopeGeneration) {
-     status.set(new Ci(state, detail, state == State.FAILED, status.get().recoveredFrom));
+    // A one-off failure (a scanner briefly holding the file) is silent: the old save is intact
+    // and the next save, within minutes and always at logout, writes the full state. Only a
+    // failure that keeps happening is shown (owner 1.2).
+    if (c.scopeGeneration == repository.scopeGeneration && (f != State.FAILED || ++failures >= 3)) {
+     status.set(new Ci(f, g, f == State.FAILED, status.get().recoveredFrom));
     }
    }
   }
@@ -248,8 +252,14 @@ void drain() {
  }
 }
 
-private static String qa(String detail) {
- return detail + msg("if");
+/** Publish a successful write only after the caller's existing scope/generation guard. */
+void k1(long a, String b, String c) {
+ appliedRevision.set(a);
+ status.set(new Ci(State.OK, b, false, c));
+}
+
+private static String qa(String /* detail */a) {
+ return a + msg("if");
 }
 
 /**
@@ -259,22 +269,22 @@ private static String qa(String detail) {
 * If disk diverged from our applied revision, leave the intent alone so CAS
 * surfaces a real external conflict.
 */
-Cs aei(Cs intent) {
- if (intent == null) return null;
- long own = appliedRevision.get();
- if (own <= 0L || intent.expectedBaseRevision >= own) return intent;
- if (intent.scopeGeneration != repository.scopeGeneration) return intent;
- long disk = repository.lastKnownDiskRevision;
- if (disk != own) return intent;
- return new Cs(intent.identity, intent.scopeGeneration, own, intent.state, intent.json);
+Cs aei(Cs /* intent */a) {
+ if (a == null) return null;
+ long /* own */b = appliedRevision.get();
+ if (b <= 0L || a.expectedBaseRevision >= b) return a;
+ if (a.scopeGeneration != repository.scopeGeneration) return a;
+ long /* disk */c = repository.lastKnownDiskRevision;
+ if (c != b) return a;
+ return new Cs(a.identity, a.scopeGeneration, b, a.state, a.json);
 }
 
 static class PendingWrite {
- final long revision;
- final Cs intent;
- PendingWrite(Cs intent) {
-  this.intent = intent;
-  this.revision = intent.state.revision;
+ long revision;
+ Cs intent;
+ PendingWrite(Cs /* intent */b) {
+  this.intent = b;
+  this.revision = b.state.revision;
  }
 }
 }

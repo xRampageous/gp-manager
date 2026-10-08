@@ -1,6 +1,5 @@
 package com.gpmanager;
 import static com.gpmanager.Ak.msg;
-import lombok.AllArgsConstructor;
 /**
 * Ownership-neutral world / coin storages — treat like bank TRANSFER.
 * Never invent profit/loss on deposit or withdraw.
@@ -10,30 +9,32 @@ class NeutralStorageClassifier {
 * Each storage with its transfer note and its phrases, checked in this order: {@code |}
 * separates alternatives and {@code +} joins words that must all appear.
 */
-@AllArgsConstructor
 enum Kind {
- SEED_VAULT("Seed vault transfer", "seed vault"), TOOL_LEPRECHAUN(msg("dq"), msg("dp")),
- NMZ_COFFER("NMZ coffer transfer", msg("dr")), BLAST_FURNACE_COFFER(msg("dt"), msg("ds")),
- LMS_COFFER("LMS coffer transfer", msg("du")), MLM_HOPPER(msg("dw"), msg("dv")), GIM_SHARED(msg("dy"), msg("dx")),
- RAID_PRIVATE_BAG(msg("ea"), msg("dz")), RAID_SHARED_BAG(msg("ec"), msg("eb")),
- STASH_UNIT("STASH unit transfer", "stash unit|stash "), POH_COSTUME(msg("ee"), msg("ed")),
- DEPOSIT_BOX(msg("ef"), "deposit box"), UNKNOWN_NEUTRAL(msg("eg"), "");
- final String note;
- final String phrases;
+ SEED_VAULT, TOOL_LEPRECHAUN, NMZ_COFFER, BLAST_FURNACE_COFFER, LMS_COFFER, MLM_HOPPER, GIM_SHARED, RAID_PRIVATE_BAG, RAID_SHARED_BAG, STASH_UNIT, POH_COSTUME, DEPOSIT_BOX, UNKNOWN_NEUTRAL;
+ String note;
+ String phrases;
+ Kind() {
+  String[] a = Ak.v("d26", name());
+  note = Ak.t(a[3]); phrases = Ak.t(a[1]);
+ }
 }
 
 /** @return storage kind, or null when not a neutral storage signal. */
-static Kind classify(String noteOrTarget) {
- String lower = Ag.norm(noteOrTarget);
- for (Kind kind : Kind.values()) {
-  for (String phrase : kind.phrases.split("\\|")) {
-   if (lower != null && !phrase.isEmpty() && Ag.qk(lower, phrase.split("\\+"))) return kind;
-  }
- }
+
+
+static String ajw(Kind /* kind */a) {
+ return (a == null ? Kind.UNKNOWN_NEUTRAL : a).note;
+}
+/** The original enum order is stored in d26; compiled clauses retain norm normalization. */
+static final java.util.Map<String, Ag.P[][]> P = Ak.r("d26");
+static final java.util.Map<String, Kind> R = new java.util.LinkedHashMap<>();
+static {
+ for (String[] a : Ak.x("d26")) if (!a[0].startsWith("m")) R.put(a[0], Kind.valueOf(a[2]));
+}
+static Kind a1(String a) {
+ String b = Ag.norm(a);
+ for (var c : R.entrySet()) if (Ag.has(b, P.get(c.getKey()))) return c.getValue();
  return null;
 }
 
-static String ajw(Kind kind) {
- return (kind == null ? Kind.UNKNOWN_NEUTRAL : kind).note;
-}
 }

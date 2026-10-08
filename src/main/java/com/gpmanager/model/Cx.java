@@ -4,7 +4,7 @@ import lombok.*;
 enum Cx {
 AUTO("Auto"), GENERAL("General"), PK("PK"), MIXED("Mixed");
 @Getter
-final String displayName;
+String displayName;
 public String toString() {
  return displayName;
 }

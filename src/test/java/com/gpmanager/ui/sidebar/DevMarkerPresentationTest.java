@@ -22,17 +22,17 @@ public class DevMarkerPresentationTest
             PresentationLifecycleTest.config(), null));
         onEdt(() ->
         {
-            DevBadge.apply(panel, BuildInfo.of("0.8.0", "0.8.0-dev", "105",
+            DevBadge.apply(panel, BuildInfo.of("1.2.0", "1.2.0-dev", "105",
                 "2026-09-23T01:24:37Z", "2929696", "1.12.39", true));
             return null;
         });
 
         JLabel badge = onEdt(() -> SidebarPanelProbe.buildBadge(panel));
         assertNotNull("development builds must identify themselves", badge);
-        assertEquals("DEV \u00b7 0.8.0 \u00b7 01:24Z", badge.getText());
+        assertEquals("DEV \u00b7 1.2.0 \u00b7 01:24Z", badge.getText());
         assertNotNull(ShellProbe.badge(panel.shell()));
         assertTrue("full identity belongs in the tooltip",
-            badge.getToolTipText().contains("Version: 0.8.0-dev"));
+            badge.getToolTipText().contains("Version: 1.2.0-dev"));
         assertTrue(badge.getToolTipText().contains("Schema: 105"));
         assertTrue(badge.getToolTipText().contains("Built: 2026-09-23 01:24:37 UTC"));
         assertNotNull(badge.getAccessibleContext().getAccessibleDescription());
@@ -91,7 +91,7 @@ public class DevMarkerPresentationTest
         Dp panel = onEdt(() -> new Dp(engine, PresentationLifecycleTest.config(), null));
         onEdt(() ->
         {
-            DevBadge.apply(panel, BuildInfo.of("0.8.0", "0.8.0-dev", "105",
+            DevBadge.apply(panel, BuildInfo.of("1.2.0", "1.2.0-dev", "105",
                 "2026-09-23T01:24:37Z", "2929696", "1.12.39", true));
             SidebarPanelProbe.refresh(panel);
             return null;

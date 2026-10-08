@@ -68,7 +68,7 @@ public class PlayerCombatLifecycleTest
         plugin.engine.geCustody.agq(100L, 1_200L);
         Ad previous = plugin.engine.getActiveSession();
         plugin.lx();
-        assertEquals(0L, plugin.engine.geCollectionIntentUntil);
+        assertNull(plugin.engine.eb.peek(Eb.GE));
         assertEquals(0L, plugin.engine.geCustody.pendingSettlementCashGp);
         assertEquals(1, previous.getTransactions().size());
         Ac held = previous.getTransactions().get(0);

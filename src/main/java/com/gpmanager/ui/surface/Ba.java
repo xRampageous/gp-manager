@@ -17,23 +17,14 @@ class Ba {
 * and the All time card all read sessions through this, so the pages cannot disagree.
 */
 static class Run {
- final Ad session;
- final Bu metrics;
- final boolean retained;
- final Long gpPerHour;
- Run(Am engine, Ad session, long now) {
-  Bu amx = engine.tz(session.getId(), now);
-  this.session = session;
-  this.retained = amx != null;
-  if (amx != null) {
-   this.metrics = amx;
-  } else {
-   Ad.CompactedContribution money = session.pl();
-   this.metrics = new Bu(session.getActivityHint(), session.paused, session.getElapsedMillis(now),
-   money.revenue, money.costs, money.getNet(), 0L);
-  }
-  long active = metrics.elapsedMillis;
-  this.gpPerHour = RateReadiness.wn(active) ? hourly(metrics.net, active) : null;
+ Ad session;
+ Bu metrics;
+ boolean retained;
+ Long gpPerHour;
+ /** Detached metrics supplied by the revision summary; fields keep their existing names. */
+ Run(Ad a, Bu b, boolean c) {
+  session = a; metrics = b; retained = c;
+  gpPerHour = RateReadiness.wn(b.elapsedMillis) ? hourly(b.net, b.elapsedMillis) : null;
  }
  long net() {
   return metrics.net;
@@ -42,11 +33,11 @@ static class Run {
 
 /** One retained receipt with the largest correction-aware contribution in its direction. */
 static class Highlight {
- final String name;
- final long net;
- Highlight(String name, long net) {
-  this.name = Ag.empty(name) ? "Unknown item" : name;
-  this.net = net;
+ String name;
+ long net;
+ Highlight(String /* name */c, long /* net */d) {
+  this.name = Ag.empty(c) ? "Unknown item" : c;
+  this.net = d;
  }
  String avo() {
   return signed(net);
@@ -56,104 +47,104 @@ static class Highlight {
 /** The biggest gain and cost of one Grind; unavailable once compaction drops the detail. */
 @AllArgsConstructor
 static class Recap {
- final Highlight biggestGain;
- final Highlight lz;
+ Highlight biggestGain;
+ Highlight lz;
  /** True when compacted detail can no longer prove the exact winners. */
- final boolean highlightsUnavailable;
+ boolean highlightsUnavailable;
  /** Loot by source (owner 2026-09-28): counted loot gains by the NPC that dropped them, top five. */
- final List<Highlight> sources;
+ List<Highlight> sources;
 }
 
-final Recap recap;
-static Ba of(Ad selected) {
- boolean amn = selected.compactedTransactionCount > 0L;
- return new Ba(new Recap(amn ? null : biggest(selected, true), amn ? null : lz(selected),
- amn, amn ? Collections.emptyList() : sources(selected)));
+Recap recap;
+static Ba of(Ad /* selected */a) {
+ boolean /* amn */b = a.compactedTransactionCount > 0L;
+ return new Ba(new Recap(b ? null : biggest(a, true), b ? null : lz(a),
+ b, b ? Collections.emptyList() : sources(a)));
 }
 
 // ---- recap ---------------------------------------------------------------------------
 /** Factual target wording; never "Failed". Shared with the Grinds detail. */
-static String aay(Long netTargetGp, long net, boolean closed) {
- if (netTargetGp == null) return "No Net target";
- if (net >= netTargetGp) return "Reached " + compact(netTargetGp) + " Net";
- return closed ? msg("kr") + signed(netTargetGp - net) + " remaining"
- : msg("ks") + signed(netTargetGp - net) + " remaining";
+static String aay(Long /* netTargetGp */a, long /* net */b, boolean /* closed */c) {
+ if (a == null) return "No Net target";
+ if (b >= a) return "Reached " + compact(a) + " Net";
+ return c ? msg("kr") + signed(a - b) + " remaining"
+ : msg("ks") + signed(a - b) + " remaining";
 }
 
 /** Factual Active-Time target wording; never "Failed". Shared with the Grinds detail. */
-static String akd(Long activeTimeTargetMillis, long activeMillis) {
- if (activeTimeTargetMillis == null) return msg("fj");
- if (activeMillis >= activeTimeTargetMillis) return "Time target reached";
- return duration(activeTimeTargetMillis - activeMillis) + " of Active Time remaining";
+static String akd(Long /* activeTimeTargetMillis */a, long /* activeMillis */b) {
+ if (a == null) return msg("fj");
+ if (b >= a) return msg("f3");
+ return duration(a - b) + msg("f2");
 }
 
-static List<Highlight> sources(Ad session) {
- var gains = new HashMap<String, Long>();
- for (Ac transaction : session.getTransactions()) {
-  Ai type = transaction.getType();
-  if (transaction.isCounted() && (type == Ai.LOOT || type == Ai.PK_LOOT)) {
-   gains.merge(transaction.getActivityName(), transaction.getRevenue(), Long::sum);
+static List<Highlight> sources(Ad /* session */c) {
+ var /* gains */d = new HashMap<String, Long>();
+ for (Ac /* transaction */e : c.getTransactions()) {
+  Ai /* type */f = e.getType();
+  if (e.isCounted() && (f == Ai.LOOT || f == Ai.PK_LOOT)) {
+   d.merge(e.getActivityName(), e.getRevenue(), Long::sum);
   }
  }
- var sources = new ArrayList<Highlight>();
- gains.forEach((name, value) -> sources.add(new Highlight(name, value)));
- sources.sort((a, b) -> Long.compare(b.net, a.net));
- return sources.subList(0, min(5, sources.size()));
+ var /* sources */g = new ArrayList<Highlight>();
+ d.forEach((/* name */h, /* value */i) -> g.add(new Highlight(h, i)));
+ g.sort((a, b) -> Long.compare(b.net, a.net));
+ return g.subList(0, min(5, g.size()));
 }
 
-static Highlight lz(Ad session) {
- return biggest(session, false);
+static Highlight lz(Ad /* session */a) {
+ return biggest(a, false);
 }
 
-static Highlight biggest(Ad session, boolean gain) {
- Highlight best = null;
- for (Ac transaction : session.getTransactions()) {
-  if (transaction == null || !transaction.isCounted() || transaction.getType() == Ai.TRANSFER) {
+static Highlight biggest(Ad /* session */a, boolean /* gain */b) {
+ Highlight /* best */c = null;
+ for (Ac /* transaction */d : a.getTransactions()) {
+  if (d == null || !d.isCounted() || d.getType() == Ai.TRANSFER) {
    continue;
   }
-  long net = transaction.getNet();
-  if (gain ? net <= 0L : net >= 0L) continue;
-  if (best == null || (gain ? net > best.net : net < best.net)) {
-   best = new Highlight(awm(transaction), net);
+  long /* net */e = d.getNet();
+  if (b ? e <= 0L : e >= 0L) continue;
+  if (c == null || (b ? e > c.net : e < c.net)) {
+   c = new Highlight(awm(d), e);
   }
  }
- return best;
+ return c;
 }
 
-static String awm(Ac transaction) {
+static String awm(Ac /* transaction */a) {
  // A proven exact all-cost action reads as the action, not as its largest rune.
- if (!transaction.spellName().isEmpty() && kl(transaction)) return transaction.spellName();
- String name = "";
- long lead = -1L;
- for (Ab flow : transaction.getFlows()) {
-  if (flow == null) continue;
-  long abs = abs(flow.valueDelta);
-  if (abs > lead) {
-   lead = abs;
+ if (!a.spellName().isEmpty() && kl(a)) return a.spellName();
+ String /* name */b = "";
+ long /* lead */c = -1L;
+ for (Ab /* flow */d : a.getFlows()) {
+  if (d == null) continue;
+  long /* abs */e = abs(d.valueDelta);
+  if (e > c) {
+   c = e;
    // A sip reads as its potion, as the Ledger pairs it: "Prayer potion", not "(4)".
-   name = Bp.qb(transaction).isEmpty() ? flow.itemName
-   : Af.abb(flow.itemName);
+   b = Bp.qb(a).isEmpty() ? d.itemName
+   : Af.abb(d.itemName);
   }
  }
- if (Ag.empty(name)) {
-  name = transaction.getNote().isEmpty() ? transaction.getActivityName() : transaction.getNote();
+ if (Ag.empty(b)) {
+  b = a.getNote().isEmpty() ? a.getActivityName() : a.getNote();
  }
- return name;
+ return b;
 }
 
 /** True when every flow is a cost leg, so the receipt is one unambiguous cost action. */
-static boolean kl(Ac transaction) {
- boolean any = false;
- for (Ab flow : transaction.getFlows()) {
-  if (flow == null) continue;
-  any = true;
-  if (flow.valueDelta > 0L) return false;
+static boolean kl(Ac /* transaction */a) {
+ boolean /* any */b = false;
+ for (Ab /* flow */c : a.getFlows()) {
+  if (c == null) continue;
+  b = true;
+  if (c.valueDelta > 0L) return false;
  }
- return any;
+ return b;
 }
 
 /** Full-session rate: Net over canonical Active Time; zero Active Time has no rate. */
-static long hourly(long net, long millis) {
- return millis <= 0L ? 0L : round(net * 3_600_000d / millis);
+static long hourly(long /* net */a, long /* millis */b) {
+ return b <= 0L ? 0L : round(a * 3_600_000d / b);
 }
 }

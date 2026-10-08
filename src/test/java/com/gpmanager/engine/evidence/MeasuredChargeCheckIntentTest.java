@@ -12,29 +12,29 @@ public final class MeasuredChargeCheckIntentTest
     @Test
     public void exactChatReadConsumesOnlyItsFreshMenuTargetOnce()
     {
-        MeasuredChargeCheckIntent intent = new MeasuredChargeCheckIntent();
-        assertTrue(intent.arm(Ar.V.TRIDENT_SEAS, "inventory:3:11907", 100, 2));
+        ChargeIntake intent = new ChargeIntake(null, null, ReviewFixesTest.CONFIG, ReviewFixesTest.engine(), null);
+        assertTrue(intent.ck(Ar.V.TRIDENT_SEAS, "inventory:3:11907", 100, 2));
         Ar read = Ar.acs(
             "Your Trident of the seas has 1,234 charges.");
 
-        assertEquals("inventory:3:11907", intent.consume(read, 101));
-        assertNull(intent.consume(read, 101));
+        assertEquals("inventory:3:11907", intent.ck(read, 101));
+        assertNull(intent.ck(read, 101));
     }
 
     @Test
     public void wrongVariantMissingTargetAndExpiredTargetFailClosed()
     {
-        MeasuredChargeCheckIntent intent = new MeasuredChargeCheckIntent();
-        assertTrue(intent.arm(Ar.V.TRIDENT_SEAS, "inventory:3", 100, 2));
-        assertNull(intent.consume(Ar.acs(
+        ChargeIntake intent = new ChargeIntake(null, null, ReviewFixesTest.CONFIG, ReviewFixesTest.engine(), null);
+        assertTrue(intent.ck(Ar.V.TRIDENT_SEAS, "inventory:3", 100, 2));
+        assertNull(intent.ck(Ar.acs(
             "Your Trident of the swamp has 1 charge."), 101));
 
-        assertTrue(intent.arm(Ar.V.TRIDENT_SEAS, "inventory:3", 100, 2));
-        assertNull(intent.consume(Ar.acs(
+        assertTrue(intent.ck(Ar.V.TRIDENT_SEAS, "inventory:3", 100, 2));
+        assertNull(intent.ck(Ar.acs(
             "Your Trident of the seas has 1 charge."), 103));
 
-        assertFalse(intent.arm(Ar.V.TRIDENT_SEAS, " ", 100, 2));
-        assertNull(intent.consume(Ar.acs(
+        assertFalse(intent.ck(Ar.V.TRIDENT_SEAS, " ", 100, 2));
+        assertNull(intent.ck(Ar.acs(
             "Your Trident of the seas has 1 charge."), 101));
     }
 }

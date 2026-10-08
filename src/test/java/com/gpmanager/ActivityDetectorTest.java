@@ -75,16 +75,16 @@ public class ActivityDetectorTest
         long now = 1_000_000L;
 
         detector.le("Smelting", now);
-        engine.contextTicks = 0; // two failed smelts: the six-tick window has lapsed
+        engine.eb.drop(Eb.CT); // two failed smelts: the six-tick window has lapsed
         detector.acj("Smithing", null, false, now + 12_000L);
-        assertEquals(Aj.PRODUCTION, engine.active.context);
-        assertTrue("Smithing XP re-arms the run", engine.contextTicks > 0);
+        assertEquals(Aj.PRODUCTION, engine.ac().context);
+        assertTrue("Smithing XP re-arms the run", engine.ct() > 0);
 
-        engine.contextTicks = 0;
+        engine.eb.drop(Eb.CT);
         detector.acj("Attack", null, false, now + 17_000L);
-        assertEquals("combat XP never opens production", 0, engine.contextTicks);
+        assertEquals("combat XP never opens production", 0, engine.ct());
 
         detector.acj("Smithing", null, false, now + 12_000L + 31_000L);
-        assertEquals("past the run window XP no longer re-arms", 0, engine.contextTicks);
+        assertEquals("past the run window XP no longer re-arms", 0, engine.ct());
     }
 }

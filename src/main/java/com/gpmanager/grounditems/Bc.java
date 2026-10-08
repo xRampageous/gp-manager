@@ -13,16 +13,18 @@ import lombok.*;
 class Bc {
 /** The Ground Items config group whose changes invalidate this snapshot. */
 static final String GROUP = "grounditems";
-final boolean pluginEnabled;
-final String highlightedCsv;
-final String hiddenCsv;
-final boolean showHighlightedOnly;
-final String fingerprint;
-Bc(boolean pluginEnabled, String highlightedCsv, String hiddenCsv, boolean showHighlightedOnly) {
- this.pluginEnabled = pluginEnabled;
- this.highlightedCsv = Ag.axw(highlightedCsv);
- this.hiddenCsv = Ag.axw(hiddenCsv);
- this.showHighlightedOnly = showHighlightedOnly;
+boolean pluginEnabled;
+String highlightedCsv;
+String hiddenCsv;
+boolean showHighlightedOnly;
+/** Ground Items' insane value: HUD+'s big-drop line while the loot display follows Ground Items. */
+long insane = HudTray.BIG_DROP;
+String fingerprint;
+Bc(boolean /* pluginEnabled */a, String /* highlightedCsv */b, String /* hiddenCsv */c, boolean /* showHighlightedOnly */d) {
+ this.pluginEnabled = a;
+ this.highlightedCsv = Ag.axw(b);
+ this.hiddenCsv = Ag.axw(c);
+ this.showHighlightedOnly = d;
  this.fingerprint = mx();
 }
 
@@ -36,9 +38,9 @@ String fingerprint() {
 }
 
 String mx() {
- var sb = new StringBuilder();
- sb.append(pluginEnabled).append('|').append(highlightedCsv).append('|').append(hiddenCsv).append('|')
+ var /* sb */a = new StringBuilder();
+ a.append(pluginEnabled).append('|').append(highlightedCsv).append('|').append(hiddenCsv).append('|')
  .append(showHighlightedOnly);
- return sb.toString();
+ return a.toString();
 }
 }

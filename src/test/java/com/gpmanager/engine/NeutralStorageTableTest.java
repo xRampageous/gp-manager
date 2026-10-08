@@ -51,7 +51,7 @@ public class NeutralStorageTableTest
     {
         for (Object[] row : CASES)
         {
-            NeutralStorageClassifier.Kind kind = NeutralStorageClassifier.classify((String) row[0]);
+            NeutralStorageClassifier.Kind kind = NeutralStorageClassifier.a1((String) row[0]);
             assertEquals(String.valueOf(row[0]), row[1], kind);
             if (kind != null)
             {

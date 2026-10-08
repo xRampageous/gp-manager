@@ -30,9 +30,9 @@ interface Page {
 /** One button on a sheet. */
 @AllArgsConstructor
 static class Choice {
- final String label;
- final boolean primary;
- final Runnable action;
+ String label;
+ boolean primary;
+ Runnable action;
 }
 
 static final String LIVE = "live";
@@ -42,22 +42,22 @@ static final String[][] TABS = {{LIVE, "Live"}, {LEDGER, "Ledger"}, {GRINDS, "Gr
 static final javax.swing.border.Border SELECTED = BorderFactory.createCompoundBorder(
 BorderFactory.createMatteBorder(0, 0, 1, 0, ACCENT), BorderFactory.createEmptyBorder(5, 2, 4, 2));
 static final javax.swing.border.Border UNSELECTED = BorderFactory.createEmptyBorder(5, 2, 5, 2);
-final MaterialTabGroup tabs = new MaterialTabGroup();
-final Map<String, MaterialTab> tabById = new LinkedHashMap<>();
-final JPanel bar = new JPanel(new BorderLayout());
-final JPanel sheet = stack(CARD, GAP);
+MaterialTabGroup tabs = new MaterialTabGroup();
+Map<String, MaterialTab> tabById = new LinkedHashMap<>();
+JPanel bar = new JPanel(new BorderLayout());
+JPanel sheet = stack(CARD, GAP);
 /** Holds the sheet with its margin; hidden with it, so no gap sits under the toolbar (owner 1.1). */
-final JPanel sheetHolder = new JPanel(new BorderLayout());
+JPanel sheetHolder = new JPanel(new BorderLayout());
 String sheetTitle = "";
-final CardLayout cards = new CardLayout();
-final JPanel bodies = new JPanel(cards);
-final Map<String, Page> pages = new LinkedHashMap<>();
-final Map<String, JScrollPane> scrolls = new LinkedHashMap<>();
-final Map<String, Integer> scrollMemory = new LinkedHashMap<>();
-final JPanel notice = new JPanel(new BorderLayout(GAP, 0));
-final JLabel noticeText = label("", small(), TEXT);
-final JPanel noticeAction = new JPanel(new BorderLayout());
-final Timer noticeTimer = new Timer(4_000, e -> dismiss());
+CardLayout cards = new CardLayout();
+JPanel bodies = new JPanel(cards);
+Map<String, Page> pages = new LinkedHashMap<>();
+Map<String, JScrollPane> scrolls = new LinkedHashMap<>();
+Map<String, Integer> scrollMemory = new LinkedHashMap<>();
+JPanel notice = new JPanel(new BorderLayout(GAP, 0));
+JLabel noticeText = label("", small(), TEXT);
+JPanel noticeAction = new JPanel(new BorderLayout());
+Timer noticeTimer = new Timer(4_000, e -> dismiss());
 /** A data-status failure stays until clearSticky; it ignores the timer and text clicks. */
 boolean noticeSticky;
 String current = LIVE;

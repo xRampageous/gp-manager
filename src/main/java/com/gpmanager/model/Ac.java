@@ -50,23 +50,23 @@ Ac() {
  // Gson
 }
 
-Ac(long timestampEpochMillis, Long activeElapsedMillis, Ai type, Aj context, String note,
-String activityName, boolean counted, List<Ab> flows, Bd confidence, String explanation,
-String encounterId) {
+Ac(long /* timestampEpochMillis */a, Long /* activeElapsedMillis */b, Ai /* type */c, Aj /* context */d, String /* note */e,
+String /* activityName */f, boolean /* counted */g, List<Ab> /* flows */h, Bd /* confidence */i, String /* explanation */j,
+String /* encounterId */k) {
  this.id = UUID.randomUUID().toString();
- this.timestampEpochMillis = timestampEpochMillis;
- this.activeElapsedMillis = activeElapsedMillis;
- this.type = type;
- this.context = context;
- this.note = axw(note);
- this.activityName = aas(activityName);
- this.counted = counted;
- this.flows = flows == null ? new ArrayList<>() : new ArrayList<>(flows);
- this.confidence = confidence == null ? Bd.UNCERTAIN : confidence;
- this.explanation = axw(explanation);
+ this.timestampEpochMillis = a;
+ this.activeElapsedMillis = b;
+ this.type = c;
+ this.context = d;
+ this.note = axw(e);
+ this.activityName = aas(f);
+ this.counted = g;
+ this.flows = h == null ? new ArrayList<>() : new ArrayList<>(h);
+ this.confidence = i == null ? Bd.UNCERTAIN : i;
+ this.explanation = axw(j);
  this.correction = Ah.AUTO;
  this.correctionReason = "";
- this.encounterId = encounterId;
+ this.encounterId = k;
  recalculate();
 }
 
@@ -74,52 +74,52 @@ void recalculate() {
  revenue = 0L;
  costs = 0L;
  if (flows == null) flows = new ArrayList<>();
- for (Ab flow : flows) {
-  if (flow.valueDelta > 0) revenue = safeAdd(revenue, flow.valueDelta);
-  else if (flow.valueDelta < 0) costs = safeAdd(costs, abs(flow.valueDelta));
+ for (Ab /* flow */a : flows) {
+  if (a.valueDelta > 0) revenue = safeAdd(revenue, a.valueDelta);
+  else if (a.valueDelta < 0) costs = safeAdd(costs, abs(a.valueDelta));
  }
 }
 
-void ko(Ah newCorrection, long now) {
- ko(newCorrection, now, "Manual correction");
+void ko(Ah /* newCorrection */a, long /* now */b) {
+ ko(a, b, "Manual correction");
 }
 
-void ko(Ah newCorrection, long now, String reason) {
- correction = newCorrection == null ? Ah.AUTO : newCorrection;
- correctionReason = aat(reason);
+void ko(Ah /* newCorrection */a, long /* now */b, String /* reason */c) {
+ correction = a == null ? Ah.AUTO : a;
+ correctionReason = aat(c);
 }
 
 /**
 * Takes {@code amount} of one item's gains (newest flow first) or costs (oldest first) out of
 * the flows, each remainder keeping its own unit value, and returns the quantity left.
 */
-long afg(int itemId, boolean gains, long amount) {
- var ordered = new ArrayList<Ab>(getFlows());
- if (gains) reverse(ordered);
- var next = new ArrayList<Ab>();
- for (Ab flow : ordered) {
-  long magnitude = flow == null ? 0L : abs(flow.quantityDelta);
-  long take = flow != null && flow.itemId == itemId && (gains ? flow.isGain() : flow.isCost())
-  ? Math.min(nonNeg(amount), magnitude) : 0L;
-  amount -= take;
-  long left = magnitude - take;
-  if (take <= 0L) {
-   next.add(flow);
-  } else if (left > 0L) {
-   long unit = flow.unitPrice;
-   long signed = gains ? left : -left;
-   next.add(new Ab(itemId, flow.itemName, signed, flow.unitPrice,
-   unit == 0L ? flow.valueDelta / magnitude * left : signed * unit,
-   flow.getPriceSource(), flow.getPriceCapturedAtEpochMillis()));
+long afg(int /* itemId */a, boolean /* gains */b, long /* amount */c) {
+ var /* ordered */d = new ArrayList<Ab>(getFlows());
+ if (b) reverse(d);
+ var /* next */e = new ArrayList<Ab>();
+ for (Ab /* flow */f : d) {
+  long /* magnitude */g = f == null ? 0L : abs(f.quantityDelta);
+  long /* take */h = f != null && f.itemId == a && (b ? f.isGain() : f.isCost())
+  ? Math.min(nonNeg(c), g) : 0L;
+  c -= h;
+  long /* left */i = g - h;
+  if (h <= 0L) {
+   e.add(f);
+  } else if (i > 0L) {
+   long /* unit */j = f.unitPrice;
+   long /* signed */k = b ? i : -i;
+   e.add(new Ab(a, f.itemName, k, f.unitPrice,
+   j == 0L ? f.valueDelta / g * i : k * j,
+   f.getPriceSource(), f.getPriceCapturedAtEpochMillis()));
   }
  }
- if (gains) reverse(next);
- afj(next);
- return quantity(itemId, gains);
+ if (b) reverse(e);
+ afj(e);
+ return quantity(a, b);
 }
 
-void afj(List<Ab> nextFlows) {
- flows = nextFlows == null ? new ArrayList<>() : new ArrayList<>(nextFlows);
+void afj(List<Ab> /* nextFlows */a) {
+ flows = a == null ? new ArrayList<>() : new ArrayList<>(a);
  recalculate();
 }
 
@@ -127,9 +127,9 @@ void afj(List<Ab> nextFlows) {
 * Resolve an automatic charge-load Review row as a neutral transfer after
 * a same-target measured Check confirms its component quantities.
 */
-boolean agg(List<Ab> confirmedFlows) {
+boolean agg(List<Ab> /* confirmedFlows */a) {
  if (tm() != UNCERTAIN || getCorrection() != Ah.AUTO || getActionKind() != CHARGE_LOAD_AMBIGUOUS
- || empty(confirmedFlows)) {
+ || empty(a)) {
   return false;
  }
  type = Ai.TRANSFER;
@@ -139,7 +139,7 @@ boolean agg(List<Ab> confirmedFlows) {
  counted = false;
  confidence = Bd.CONFIRMED;
  explanation = msg("fm");
- afj(confirmedFlows);
+ afj(a);
  return true;
 }
 
@@ -147,36 +147,36 @@ boolean agg(List<Ab> confirmedFlows) {
 * Stamps split provenance on explanation/reason without changing the
 * correction enum (partial keep stays counted).
 */
-void ajk(String reason, long now) {
- String mark = reason == null ? Dm.SPLIT_SHARE_MARK : reason.trim();
- if (mark.isEmpty()) mark = Dm.SPLIT_SHARE_MARK;
- correctionReason = aat(mark);
- String current = getExplanation();
- if (!Dm.xr(current)) {
-  explanation = current.isEmpty() ? mark : current + " — " + mark;
- } else if (!current.contains(mark)) {
-  explanation = current + " — " + mark;
+void ajk(String /* reason */a, long /* now */b) {
+ String /* mark */c = a == null ? Dm.SPLIT_SHARE_MARK : a.trim();
+ if (c.isEmpty()) c = Dm.SPLIT_SHARE_MARK;
+ correctionReason = aat(c);
+ String /* current */d = getExplanation();
+ if (!Dm.xr(d)) {
+  explanation = d.isEmpty() ? c : d + " — " + c;
+ } else if (!d.contains(c)) {
+  explanation = d + " — " + c;
  }
 }
 
-void agt(String next) {
- explanation = axw(next);
+void agt(String /* next */a) {
+ explanation = axw(a);
 }
 
 /** Total gained ({@code gains}) or lost quantity of one item across the remaining flows. */
-long quantity(int itemId, boolean gains) {
- long total = 0L;
- for (Ab flow : flows == null ? Collections.<Ab>emptyList() : flows) {
-  if (flow != null && flow.itemId == itemId && (gains ? flow.isGain() : flow.isCost())) {
-   total = safeAdd(total, abs(flow.quantityDelta));
+long quantity(int /* itemId */a, boolean /* gains */b) {
+ long /* total */c = 0L;
+ for (Ab /* flow */d : flows == null ? Collections.<Ab>emptyList() : flows) {
+  if (d != null && d.itemId == a && (b ? d.isGain() : d.isCost())) {
+   c = safeAdd(c, abs(d.quantityDelta));
   }
  }
- return total;
+ return c;
 }
 
-void lf(String newEncounterId, boolean asPkSupplyCost) {
- encounterId = newEncounterId;
- if (asPkSupplyCost && tm() == CONSUMPTION) {
+void lf(String /* newEncounterId */a, boolean /* asPkSupplyCost */b) {
+ encounterId = a;
+ if (b && tm() == CONSUMPTION) {
   type = PK_SUPPLY_COST;
   activityName = "PKing";
   confidence = Bd.LIKELY;
@@ -218,16 +218,16 @@ String getNote() { return axw(note); }
 /** Presentation-only audit-row note update; accounting fields are untouched. */
 String getActivityName() {
  if (activityName != null && !activityName.trim().isEmpty()) return activityName.trim();
- String aqf = getNote();
- String prefix = "Loot from ";
- return aqf.startsWith(prefix) && aqf.length() > prefix.length() ? aqf.substring(prefix.length()).trim()
+ String /* aqf */a = getNote();
+ String /* prefix */b = "Loot from ";
+ return a.startsWith(b) && a.length() > b.length() ? a.substring(b.length()).trim()
  : "General";
 }
 
 boolean isCounted() {
- Ah safeCorrection = getCorrection();
- return safeCorrection == Ah.REVENUE || safeCorrection == Ah.COST
- || (safeCorrection == Ah.AUTO && counted);
+ Ah /* safeCorrection */a = getCorrection();
+ return a == Ah.REVENUE || a == Ah.COST
+ || (a == Ah.AUTO && counted);
 }
 
 /** Raw automatic counted flag, before any correction makes the row count. */
@@ -243,8 +243,8 @@ List<Cd> va() {
  return trackedSinkShares;
 }
 
-void aie(List<Cd> shares) {
- trackedSinkShares = shares == null ? new ArrayList<>() : new ArrayList<>(shares);
+void aie(List<Cd> /* shares */a) {
+ trackedSinkShares = a == null ? new ArrayList<>() : new ArrayList<>(a);
  trackedSinkObserved = true;
 }
 
@@ -287,8 +287,8 @@ long getNet() {
 }
 
 /** Personal-Net contribution this row would have under {@code hypothetical} (0 when it would not count). */
-long awp(Ah hypothetical) {
- switch (hypothetical == null ? Ah.AUTO : hypothetical) {
+long awp(Ah /* hypothetical */a) {
+ switch (a == null ? Ah.AUTO : a) {
   case REVENUE:
   return gross();
   case COST:
@@ -318,8 +318,8 @@ String tq() { return correctionReason == null ? "" : correctionReason.trim(); }
 String getEncounterId() { return axw(encounterId); }
 String uo() { return axw(sourceClaimId); }
 /** Links this settlement to the claim it resolved; set once, in the same revision the claim is removed. */
-void aid(String claimId) {
- sourceClaimId = awq(claimId, null);
+void aid(String /* claimId */a) {
+ sourceClaimId = awq(a, null);
 }
 
 /** Observed action behind this change, or null when no honest verb was evidenced. */
@@ -328,8 +328,8 @@ Au getActionKind() {
 }
 
 /** Presentation-only stamp; never alters type, valuation, counted state or ownership. */
-void setActionKind(Au kind) {
- this.actionKind = kind == null ? null : kind.wireName();
+void setActionKind(Au /* kind */a) {
+ this.actionKind = a == null ? null : a.wireName();
 }
 
 /** Exact action text captured from a trusted client widget, or null for generic/legacy rows. */
@@ -345,9 +345,9 @@ String spellName() {
  return memo(7, () -> {
   // Runes that identify a spell win over a click queued behind an autocast (owner 2026-09-28);
   // otherwise the clicked name stands (a staff-covered or non-combat spell).
-  String spell = getActionKind() == CAST ? Spells.named(getFlows()) : null;
-  Bb label = uc();
-  return spell != null ? spell : label == null ? "" : label.value();
+  String /* spell */b = getActionKind() == CAST ? Spells.a1(getFlows()) : null;
+  Bb /* label */c = uc();
+  return b != null ? b : c == null ? "" : c.value();
  });
 }
 
@@ -358,20 +358,20 @@ transient Object[] memo;
 * action or label change (each is replaced, never edited in place).
 */
 @SuppressWarnings("unchecked")
-<T> T memo(int slot, java.util.function.Supplier<T> build) {
+<T> T memo(int /* slot */a, java.util.function.Supplier<T> /* build */b) {
  Object[] m = memo;
  if (m == null || m[0] != flows || m[1] != correction || m[2] != type || m[3] != (Boolean) counted
  || m[4] != actionKind || m[5] != observedActionLabel) {
   m = new Object[] {flows, correction, type, counted, actionKind, observedActionLabel, null, null, null, null, null};
   memo = m;
  }
- if (m[slot] == null) m[slot] = build.get();
- return (T) m[slot];
+ if (m[a] == null) m[a] = b.get();
+ return (T) m[a];
 }
 
 /** Presentation only. Stores only the normalized bounded label text. */
-void ahu(Bb label) {
- observedActionLabel = label == null ? null : label.value();
+void ahu(Bb /* label */a) {
+ observedActionLabel = a == null ? null : a.value();
 }
 
 /**
@@ -389,13 +389,13 @@ void aax() {
 String aaz() {
  if (empty(observedActionLabel)) return null;
  if (getActionKind() != CAST) return null;
- Bb normalized = Bb.of(observedActionLabel);
- return normalized == null ? null : normalized.value();
+ Bb /* normalized */a = Bb.of(observedActionLabel);
+ return a == null ? null : a.value();
 }
 
-static String aat(String value) {
- if (blank(value)) return "Manual correction";
- String trimmed = value.trim();
- return trimmed.length() > 200 ? trimmed.substring(0, 200) : trimmed;
+static String aat(String /* value */a) {
+ if (blank(a)) return "Manual correction";
+ String /* trimmed */b = a.trim();
+ return b.length() > 200 ? b.substring(0, 200) : b;
 }
 }

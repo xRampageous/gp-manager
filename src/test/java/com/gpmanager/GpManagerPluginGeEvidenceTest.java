@@ -463,20 +463,20 @@ public class GpManagerPluginGeEvidenceTest
         }
 
         @Override
-        public synchronized void noteConsumptionIntent(int itemId, int ticks, boolean destroy,
+        public synchronized void ci(int itemId, int ticks, boolean destroy,
             @javax.annotation.Nullable Au actionKind)
         {
             consumptionArms.add(itemId);
-            super.noteConsumptionIntent(itemId, ticks, destroy, actionKind);
+            super.ci(itemId, ticks, destroy, actionKind);
         }
 
         @Override
-        public synchronized void noteConsumptionIntent(int itemId, int ticks, boolean destroy,
+        public synchronized void ci(int itemId, int ticks, boolean destroy,
             @javax.annotation.Nullable Au actionKind,
             @javax.annotation.Nullable Bb actionLabel)
         {
             consumptionArms.add(itemId);
-            super.noteConsumptionIntent(itemId, ticks, destroy, actionKind, actionLabel);
+            super.ci(itemId, ticks, destroy, actionKind, actionLabel);
         }
     }
 

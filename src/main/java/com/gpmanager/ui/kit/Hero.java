@@ -18,11 +18,11 @@ class Hero extends JPanel {
 /** One strip cell or status icon. Equality covers what is drawn. */
 @EqualsAndHashCode(exclude = "open")
 static class Cell {
- final String label;
- final String value;
- final Kit.Tone tone;
- final String tip;
- final Runnable open;
+ String label;
+ String value;
+ Kit.Tone tone;
+ String tip;
+ Runnable open;
  Cell(String label, String value, Kit.Tone tone, String tip, Runnable open) {
   this.label = axw(label);
   this.value = axw(value);
@@ -32,17 +32,17 @@ static class Cell {
  }
 }
 
-final JLabel dot = label("●", body(), OFF);
-final JLabel name = label("", bold(), Color.WHITE);
-final JLabel word = label("", small(), LABEL);
-final JPanel icons = new JPanel(new FlowLayout(FlowLayout.RIGHT, 4, 0));
+JLabel dot = label("●", body(), OFF);
+JLabel name = label("", bold(), Color.WHITE);
+JLabel word = label("", small(), LABEL);
+JPanel icons = new JPanel(new FlowLayout(FlowLayout.RIGHT, 4, 0));
 /** Net in the GP/h face at its own size: RuneLite's pixel fonts blur when scaled. */
-final JLabel net = label("", bold(), TEXT);
-final JLabel rate = label("", bold(), TEXT);
-final JLabel clock = label("", small(), LABEL);
-final JPanel strips = stack(CARD, 0);
-final JPanel controls = new JPanel(new FlowLayout(FlowLayout.RIGHT, 2, 0));
-final JPanel big = new JPanel(new BorderLayout(GAP, 0));
+JLabel net = label("", bold(), TEXT);
+JLabel rate = label("", bold(), TEXT);
+JLabel clock = label("", small(), LABEL);
+JPanel strips = stack(CARD, 0);
+JPanel controls = new JPanel(new FlowLayout(FlowLayout.RIGHT, 2, 0));
+JPanel big = new JPanel(new BorderLayout(GAP, 0));
 List<Cell> drawnIcons = emptyList();
 List<List<Cell>> drawnStrips = emptyList();
 Runnable onDot;

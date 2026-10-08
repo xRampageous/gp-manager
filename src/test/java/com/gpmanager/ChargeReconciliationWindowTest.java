@@ -12,19 +12,19 @@ public class ChargeReconciliationWindowTest
     private static final long T0 = 10_000L;
 
     @Test
-    public void clearingAFamilyKeepsTheReceiptBoundHonest()
+    public void clearingATargetKeepsTheReceiptBoundHonest()
     {
         ChargeEstimateJournal journal = new ChargeEstimateJournal();
         for (int i = 0; i < ChargeEstimateJournal.MAX_RECEIPTS; i++)
         {
             journal.record("s1", "slot", "seas", "tx" + i, 1, 1L);
         }
-        journal.clearFamily("s1", "seas");
+        journal.clearTarget("s1", "slot");
         for (int i = 0; i < ChargeEstimateJournal.MAX_RECEIPTS; i++)
         {
             journal.record("s1", "slot", "seas", "ty" + i, 1, 1L);
         }
-        assertEquals("a cleared family must not evict its replacements early",
+        assertEquals("a cleared target must not evict its replacements early",
             ChargeEstimateJournal.MAX_RECEIPTS, journal.receipts("s1", "slot", 1).size());
     }
 
@@ -38,7 +38,7 @@ public class ChargeReconciliationWindowTest
         }
         assertEquals("evicted quantities stay visible to reconciliation", 6L,
             journal.evictedOverlap("s1", "slot", 1));
-        journal.clearFamily("s1", "seas");
+        journal.clearTarget("s1", "slot");
         assertEquals(0L, journal.evictedOverlap("s1", "slot", 1));
     }
 
@@ -62,7 +62,7 @@ public class ChargeReconciliationWindowTest
         assertEquals(0L, third.quantity(ItemID.DEATHRUNE, false));
         assertEquals(Ah.IGNORE, second.getCorrection());
         assertEquals(Ah.IGNORE, third.getCorrection());
-        assertEquals(0L, engine.chargeEstimateJournal.adp(
+        assertEquals(0L, ChargeProbes.adp(engine.chargeEstimateJournal, 
             engine.getActiveSession().getId(), "slot-a", "seas", ItemID.DEATHRUNE));
     }
 
@@ -80,7 +80,7 @@ public class ChargeReconciliationWindowTest
         assertEquals(0L, second.quantity(ItemID.DEATHRUNE, false));
         assertEquals(Ah.IGNORE, first.getCorrection());
         assertEquals(Ah.IGNORE, second.getCorrection());
-        assertEquals(0L, engine.chargeEstimateJournal.adp(
+        assertEquals(0L, ChargeProbes.adp(engine.chargeEstimateJournal, 
             engine.getActiveSession().getId(), "slot-a", "seas", ItemID.DEATHRUNE));
     }
 

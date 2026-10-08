@@ -16,28 +16,28 @@ enum Category {
  GAIN, SUPPLY, LOSS, FEE, MARKET, AUDIT
 }
 
-final String contributionId;
-final long timestampEpochMillis;
-final int flowOrdinal;
-final int itemId;
-final String itemName;
-final long quantityDelta;
+String contributionId;
+long timestampEpochMillis;
+int flowOrdinal;
+int itemId;
+String itemName;
+long quantityDelta;
 /** Raw automatic Ab value, retained for audit and correction comparison. */
-final long valueDelta;
+long valueDelta;
 /** Effective, correction-aware additive value used by financial presentation. */
-final long effectiveValue;
-final Av priceSource;
-final boolean counted;
-final Category category;
+long effectiveValue;
+Av priceSource;
+boolean counted;
+Category category;
 /** Transient exact action label captured from trusted client evidence; display/search only. */
-final String actionDisplayName;
-final boolean needsReview;
-final boolean corrected;
-final boolean split;
-final boolean auditOnly;
-final boolean normalizedConsume;
-final long normalizedQuantity;
-final List<Ab> rawFlows;
+String actionDisplayName;
+boolean needsReview;
+boolean corrected;
+boolean split;
+boolean auditOnly;
+boolean normalizedConsume;
+long normalizedQuantity;
+List<Ab> rawFlows;
 Af(Ac transaction, int flowOrdinal, int itemId, String itemName, long quantityDelta, long valueDelta,
 long effectiveValue, Av priceSource, Category category, boolean needsReview,
 boolean auditOnly, boolean normalizedConsume, long normalizedQuantity, List<Ab> rawFlows) {
@@ -132,7 +132,7 @@ static String abb(String name) {
  if (name == null) return "Unknown item";
  String anz = Bn.qz(name);
  if (!anz.equals(name.trim())) return anz;
- String lower = name.trim().toLowerCase(Locale.ROOT);
+ String lower = Ag.lower(name);
  if (has(lower, "pizza", "cake", "pie")) {
   for (String prefix : new String[] {"whole ", "full ", "half ", "1/2 "})
   if (lower.startsWith(prefix)) return name.trim().substring(prefix.length()).trim();

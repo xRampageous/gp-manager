@@ -12,7 +12,7 @@ import static com.gpmanager.Ak.msg;
 */
 @AllArgsConstructor
 class ChargeLoadReviews {
-final Am engine;
+Am engine;
 /**
 * What explains each open ambiguous-load Review row, keyed by transaction id. Transient: a
 * same-target Check can only reconcile a row within the same client run (the measured read
@@ -22,9 +22,9 @@ final Am engine;
 final Map<String, LoadEvidence> evidence = new HashMap<>();
 @AllArgsConstructor
 static class LoadEvidence {
- final String variantWireName;
- final String matchedTargetIdentity;
- final long observedAtEpochMillis;
+ String variantWireName;
+ String matchedTargetIdentity;
+ long observedAtEpochMillis;
 }
 
 /** Drops every transient explanation; called when the bound profile changes. */
@@ -32,85 +32,85 @@ void clear() {
  evidence.clear();
 }
 
-Ac aeg(ChargeLoadTransferEvidence.Partition partition, long now) {
- if (partition == null || partition.ambiguousCandidates.isEmpty() || !engine.live()) {
+Ac aeg(El /* partition */b, long /* now */c) {
+ if (b == null || b.ambiguousCandidates.isEmpty() || !engine.live()) {
   return null;
  }
  // A validated recharge moves value into charges: neutral by law, never a cost and
  // never an incomplete Review (owner 2026-09-29). The loss is the use, not the load.
- Ac transfer = engine.mp(now, msg("cu"), "Charge load",
- partition.ambiguousCandidates, msg("fo"), null);
- transfer.setActionKind(Au.CHARGE_LOAD_AMBIGUOUS);
- engine.add(transfer, false);
- return transfer;
+ Ac /* transfer */d = engine.mp(c, msg("cu"), "Charge load",
+ b.ambiguousCandidates, msg("fo"), null);
+ d.setActionKind(Au.CHARGE_LOAD_AMBIGUOUS);
+ engine.add(d, false);
+ return d;
 }
 
-void aed(Ar.V variant, String targetIdentity,
-Map<Integer, Long> exactLoadQuantities, long previousReadAt, long now) {
- if (variant == null || targetIdentity == null || targetIdentity.trim().isEmpty()
- || exactLoadQuantities == null || exactLoadQuantities.isEmpty() || !engine.live()) {
+void aed(Ar.V /* variant */a, String /* targetIdentity */b,
+Map<Integer, Long> /* exactLoadQuantities */c, long /* previousReadAt */d, long /* now */e) {
+ if (a == null || b == null || b.trim().isEmpty()
+ || c == null || c.isEmpty() || !engine.live()) {
   return;
  }
- long windowMillis = 600_000L;
- var matches = new ArrayList<Ac>();
- String asd = variant.name();
- for (Ac transaction : engine.activeSession.getTransactions()) {
-  if (transaction == null || transaction.tm() != UNCERTAIN || transaction.getCorrection() != AUTO) {
+ long /* windowMillis */f = 600_000L;
+ var /* matches */g = new ArrayList<Ac>();
+ String /* asd */h = a.name();
+ for (Ac /* transaction */i : engine.activeSession.getTransactions()) {
+  if (i == null || i.tm() != UNCERTAIN || i.getCorrection() != AUTO) {
    continue;
   }
-  LoadEvidence provenance = evidence.get(transaction.getId());
-  if (provenance == null || !asd.equalsIgnoreCase(provenance.variantWireName)
-  || !targetIdentity.equals(provenance.matchedTargetIdentity)) {
+  LoadEvidence /* provenance */j = evidence.get(i.getId());
+  if (j == null || !h.equalsIgnoreCase(j.variantWireName)
+  || !b.equals(j.matchedTargetIdentity)) {
    continue;
   }
-  long amo = provenance.observedAtEpochMillis;
-  if (amo <= now && now - amo <= windowMillis && previousReadAt > 0L && previousReadAt <= amo
-  && amo - previousReadAt <= windowMillis) {
-   matches.add(transaction);
+  long /* amo */k = j.observedAtEpochMillis;
+  if (k <= e && e - k <= f && d > 0L && d <= k
+  && k - d <= f) {
+   g.add(i);
   }
  }
  // Multiple matching losses have ambiguous source attribution. Leave all
  // of them in Review instead of assigning one measured load arbitrarily.
- if (matches.size() != 1) return;
- Ac review = matches.get(0);
- if (uw(review.getFlows())) return;
- var remaining = new ArrayList<Ab>(review.getFlows());
- var measured = new HashMap<Integer, Long>(exactLoadQuantities);
- List<Ab> confirmed = Dv.claim(remaining, flow -> flow.isCost() && flow.unitPrice >= 0
- && Ae.agz(flow.quantityDelta, flow.unitPrice) == flow.valueDelta,
- (flow, quantity) -> Dv.take(measured, flow.itemId, quantity));
- if (confirmed.isEmpty()) return;
- engine.activeSession.pz(review, confirmed, remaining);
- evidence.remove(review.getId());
- if (remaining.isEmpty()) return;
- Ac transfer = engine.mp(now, msg("cu"), "Charge load", confirmed, msg("fo"), null);
- transfer.setActionKind(Au.CHARGE_LOAD_AMBIGUOUS);
- engine.add(transfer, false);
+ if (g.size() != 1) return;
+ Ac /* review */l = g.get(0);
+ if (uw(l.getFlows())) return;
+ var /* remaining */m = new ArrayList<Ab>(l.getFlows());
+ var /* measured */n = new HashMap<Integer, Long>(c);
+ List<Ab> /* confirmed */o = Dv.claim(m, /* flow */p -> p.isCost() && p.unitPrice >= 0
+ && Ae.agz(p.quantityDelta, p.unitPrice) == p.valueDelta,
+ (/* flow */q, /* quantity */r) -> Dv.take(n, q.itemId, r));
+ if (o.isEmpty()) return;
+ engine.activeSession.pz(l, o, m);
+ evidence.remove(l.getId());
+ if (m.isEmpty()) return;
+ Ac /* transfer */s = engine.mp(e, msg("cu"), "Charge load", o, msg("fo"), null);
+ s.setActionKind(Au.CHARGE_LOAD_AMBIGUOUS);
+ engine.add(s, false);
 }
 
-static boolean uw(List<Ab> flows) {
- var seen = new HashSet<Integer>();
- if (flows == null) return false;
- for (Ab flow : flows) {
-  if (flow != null && flow.quantityDelta < 0L && !seen.add(flow.itemId)) return true;
+static boolean uw(List<Ab> /* flows */a) {
+ var /* seen */b = new HashSet<Integer>();
+ if (a == null) return false;
+ for (Ab /* flow */c : a) {
+  if (c != null && c.quantityDelta < 0L && !b.add(c.itemId)) return true;
  }
  return false;
 }
 
-Set<Integer> acy(Ar.V variant) {
- var components = new LinkedHashSet<Integer>();
- if (variant == null || engine.activeSession == null) return components;
- for (Ac transaction : engine.activeSession.getTransactions()) {
-  if (transaction == null) continue;
-  LoadEvidence provenance = evidence.get(transaction.getId());
-  if (provenance == null || !variant.name().equalsIgnoreCase(provenance.variantWireName)) continue;
-  boolean atv = transaction.tm() == UNCERTAIN && transaction.getCorrection() == AUTO;
-  boolean ata = transaction.getCorrection() == COST || transaction.getCorrection() == REVENUE;
-  if (!atv && !ata) continue;
-  for (Ab flow : transaction.getFlows()) {
-   if (flow != null && flow.quantityDelta < 0L) components.add(flow.itemId);
+Set<Integer> acy(Ar.V /* variant */a) {
+ var /* components */b = new LinkedHashSet<Integer>();
+ if (a == null || engine.activeSession == null) return b;
+ for (Ac /* transaction */c : engine.activeSession.getTransactions()) {
+  if (c == null) continue;
+  LoadEvidence /* provenance */d = evidence.get(c.getId());
+  if (d == null || !a.name().equalsIgnoreCase(d.variantWireName)) continue;
+  boolean /* atv */e = c.tm() == UNCERTAIN && c.getCorrection() == AUTO;
+  boolean /* ata */f = c.getCorrection() == COST || c.getCorrection() == REVENUE;
+  if (!e && !f) continue;
+  for (Ab /* flow */g : c.getFlows()) {
+   if (g != null && g.quantityDelta < 0L) b.add(g.itemId);
   }
  }
- return components;
+ return b;
 }
 }

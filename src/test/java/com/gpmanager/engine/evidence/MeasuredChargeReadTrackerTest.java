@@ -155,17 +155,17 @@ public final class MeasuredChargeReadTrackerTest
         assertTrue(unknown.componentCounts.isEmpty());
 
         MeasuredChargeReadTracker tracker = new MeasuredChargeReadTracker();
-        assertNull(observe(tracker, blowpipe("Adamant", 100, 100)));
-        assertNull(observe(tracker, unknown));
+        ChargeOutcomeTest.none(observe(tracker, blowpipe("Adamant", 100, 100)));
+        ChargeOutcomeTest.none(observe(tracker, unknown));
         assertNull(tracker.baseline("single-target"));
-        assertNull(observe(tracker, blowpipe("Adamant", 95, 98)));
+        ChargeOutcomeTest.none(observe(tracker, blowpipe("Adamant", 95, 98)));
     }
 
     @Test
     public void tridentTrackerReturnsOnlyMeasuredNegativeIngredientCounts()
     {
         MeasuredChargeReadTracker tracker = new MeasuredChargeReadTracker();
-        assertNull(observe(tracker, trident("seas", "", 12)));
+        ChargeOutcomeTest.none(observe(tracker, trident("seas", "", 12)));
 
         Cm spend = observe(tracker, trident("seas", "", 9));
         assertNotNull(spend);
@@ -175,9 +175,10 @@ public final class MeasuredChargeReadTrackerTest
         assertEquals(-15L, quantityDelta(spend, FIRE_RUNE));
         assertEquals(-30L, quantityDelta(spend, COINS));
 
-        assertNull(observe(tracker, trident("seas", "", 9)));
-        assertNull(observe(tracker, trident("seas", "", 11)));
-        assertNull(observe(tracker, trident("swamp", "", 5)));
+        assertTrue("an unchanged Check is an empty delta",
+            observe(tracker, trident("seas", "", 9)).getComponentDeltas().isEmpty());
+        ChargeOutcomeTest.none(observe(tracker, trident("seas", "", 11)));
+        ChargeOutcomeTest.none(observe(tracker, trident("swamp", "", 5)));
         Cm swampSpend = observe(tracker, trident("swamp", "", 3));
         assertNotNull(swampSpend);
         assertEquals(-2L, quantityDelta(swampSpend, DEATH_RUNE));
@@ -190,7 +191,7 @@ public final class MeasuredChargeReadTrackerTest
     public void blowpipeTrackerMeasuresComponentsAndNeverUsesRatios()
     {
         MeasuredChargeReadTracker tracker = new MeasuredChargeReadTracker();
-        assertNull(observe(tracker, blowpipe("Adamant", 1_000, 1_000)));
+        ChargeOutcomeTest.none(observe(tracker, blowpipe("Adamant", 1_000, 1_000)));
         Cm spend = observe(tracker, blowpipe("Adamant", 987, 996));
         assertNotNull(spend);
         assertEquals(2, spend.getComponentDeltas().size());
@@ -207,7 +208,7 @@ public final class MeasuredChargeReadTrackerTest
     public void blowpipeDartTypeSwitchKeepsIndependentScaleMeasurement()
     {
         MeasuredChargeReadTracker tracker = new MeasuredChargeReadTracker();
-        assertNull(observe(tracker, blowpipe("Adamant", 100, 100)));
+        ChargeOutcomeTest.none(observe(tracker, blowpipe("Adamant", 100, 100)));
         Cm switchDelta = observe(tracker, blowpipe("Rune", 90, 99));
         assertNotNull(switchDelta);
         assertEquals(1, switchDelta.getComponentDeltas().size());
@@ -225,8 +226,8 @@ public final class MeasuredChargeReadTrackerTest
         MeasuredChargeReadTracker tracker = new MeasuredChargeReadTracker();
         Ar seas = Ar.acs(
             "Your Trident of the seas has 5,000 charges.");
-        assertNull(tracker.observe(seas, "inventory:slot-3:item-11907", System.currentTimeMillis()));
-        assertNull(tracker.observe(Ar.acs(
+        ChargeOutcomeTest.none(tracker.observe(seas, "inventory:slot-3:item-11907", System.currentTimeMillis()));
+        ChargeOutcomeTest.none(tracker.observe(Ar.acs(
             "Your Trident of the seas has 1,000 charges."), "inventory:slot-9:item-11907", System.currentTimeMillis()));
 
         Cm spend = tracker.observe(Ar.acs(
@@ -256,7 +257,7 @@ public final class MeasuredChargeReadTrackerTest
     public void explicitNoDartsClosesPriorKnownDartCount()
     {
         MeasuredChargeReadTracker tracker = new MeasuredChargeReadTracker();
-        assertNull(observe(tracker, blowpipe("Dragon", 500, 3)));
+        ChargeOutcomeTest.none(observe(tracker, blowpipe("Dragon", 500, 3)));
         Cm spend = observe(tracker, noDarts(497));
         assertNotNull(spend);
         assertEquals(-3L, quantityDelta(spend, ZULRAH_SCALES));
@@ -304,8 +305,8 @@ public final class MeasuredChargeReadTrackerTest
         assertFalse(malformed.bookable);
 
         MeasuredChargeReadTracker tracker = new MeasuredChargeReadTracker();
-        assertNull(observe(tracker, trident("seas", "", 10)));
-        assertNull(observe(tracker, malformed));
+        ChargeOutcomeTest.none(observe(tracker, trident("seas", "", 10)));
+        ChargeOutcomeTest.none(observe(tracker, malformed));
         assertNull(tracker.baseline("single-target"));
     }
 

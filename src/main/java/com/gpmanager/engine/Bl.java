@@ -22,17 +22,17 @@ enum Bk {
 */
 @FunctionalInterface
 interface MarketQuote {
- int priceOf(int itemId, boolean active);
+ int priceOf(int /* itemId */b, boolean /* active */c);
 }
 
-final IntFunction<ItemComposition> compositions;
-final MarketQuote marketQuotes;
-final IntPredicate unsupportedMapping;
-final GpManagerConfig config;
+IntFunction<ItemComposition> compositions;
+MarketQuote marketQuotes;
+IntPredicate unsupportedMapping;
+GpManagerConfig config;
 @Getter
 volatile Bk economyState;
 @Inject
-Bl(ItemManager itemManager, GpManagerConfig config) {
+Bl(ItemManager /* itemManager */b, GpManagerConfig /* config */c) {
  // Accounting explicitly requests GP Manager's chosen RuneLite active market route (the
  // boolean is always true at the call site). It must not delegate to getItemPrice(),
  // whose implementation follows the user's global useWikiItemPrices display preference
@@ -40,9 +40,9 @@ Bl(ItemManager itemManager, GpManagerConfig config) {
  // fall back to guide/Jagex pricing; the selected quote is captured and frozen at
  // booking time, and history is never repriced. The economy gate starts UNKNOWN until
  // the plugin observes a logged-in world, so automatic quotes fail closed meanwhile.
- this(config, itemManager::getItemComposition,
- (id, active) -> unitPriceOf(itemManager.getItemPriceWithSource(id, active)),
- id -> vb(itemManager, id), Bk.UNKNOWN);
+ this(c, b::getItemComposition,
+ (/* id */d, /* active */e) -> unitPriceOf(b.getItemPriceWithSource(d, e)),
+ /* id */f -> vb(b, f), Bk.UNKNOWN);
 }
 
 /**
@@ -50,44 +50,44 @@ Bl(ItemManager itemManager, GpManagerConfig config) {
 * beyond-max-cash trades; the unit-price model is int, so a value that does not fit (or is
 * not positive) stays unpriced for Review instead of booking a clamped, fabricated amount.
 */
-static int unitPriceOf(long quote) {
- return quote <= 0L || quote > Integer.MAX_VALUE ? 0 : Ae.toInt(quote);
+static int unitPriceOf(long /* quote */a) {
+ return a <= 0L || a > Integer.MAX_VALUE ? 0 : Ae.toInt(a);
 }
 
 /** Test seam: deterministic NORMAL economy and no mapping guard; the boolean stays explicit. */
-Bl(GpManagerConfig config, IntFunction<ItemComposition> compositions, MarketQuote marketQuotes) {
- this(config, compositions, marketQuotes, id -> false, Bk.NORMAL);
+Bl(GpManagerConfig /* config */a, IntFunction<ItemComposition> /* compositions */b, MarketQuote /* marketQuotes */c) {
+ this(a, b, c, /* id */d -> false, Bk.NORMAL);
 }
 
-Bl(GpManagerConfig config, IntFunction<ItemComposition> compositions,
-MarketQuote marketQuotes, IntPredicate unsupportedMapping, Bk economyState) {
- this.config = config;
- this.compositions = compositions;
- this.marketQuotes = marketQuotes;
- this.unsupportedMapping = unsupportedMapping == null ? id -> false : unsupportedMapping;
- this.economyState = economyState == null ? Bk.UNKNOWN : economyState;
+Bl(GpManagerConfig /* config */a, IntFunction<ItemComposition> /* compositions */b,
+MarketQuote /* marketQuotes */c, IntPredicate /* unsupportedMapping */d, Bk /* economyState */e) {
+ this.config = a;
+ this.compositions = b;
+ this.marketQuotes = c;
+ this.unsupportedMapping = d == null ? /* id */f -> false : d;
+ this.economyState = e == null ? Bk.UNKNOWN : e;
 }
 
 /** Legacy synthetic constructor retained for existing tests: NORMAL economy, no guard. */
-Bl(GpManagerConfig config, IntFunction<ItemComposition> compositions, IntUnaryOperator marketPrices) {
- this(config, compositions, (id, active) -> marketPrices.applyAsInt(id));
+Bl(GpManagerConfig /* config */a, IntFunction<ItemComposition> /* compositions */b, IntUnaryOperator /* marketPrices */c) {
+ this(a, b, (/* id */d, /* active */e) -> c.applyAsInt(d));
 }
 
 @Override
-public List<Ab> value(Map<Integer, Long> quantityDeltas) {
- return value(quantityDeltas, 0L);
+public List<Ab> value(Map<Integer, Long> /* quantityDeltas */a) {
+ return value(a, 0L);
 }
 
 @Override
-public List<Ab> value(Map<Integer, Long> quantityDeltas, long priceCapturedAtEpochMillis) {
- var flows = new ArrayList<Ab>();
- Map<Integer, Integer> priceOverrides = ItemRuleParser.parsePriceOverrides(config.manualPriceOverrides());
- for (Map.Entry<Integer, Long> entry : quantityDeltas.entrySet()) {
-  Ab flow = axg(entry.getKey(), entry.getValue(), priceOverrides, priceCapturedAtEpochMillis);
-  if (flow != null) flows.add(flow);
+public List<Ab> value(Map<Integer, Long> /* quantityDeltas */a, long /* priceCapturedAtEpochMillis */b) {
+ var /* flows */c = new ArrayList<Ab>();
+ Map<Integer, Integer> /* priceOverrides */d = ItemRuleParser.parsePriceOverrides(config.manualPriceOverrides());
+ for (Map.Entry<Integer, Long> /* entry */e : a.entrySet()) {
+  Ab /* flow */f = axg(e.getKey(), e.getValue(), d, b);
+  if (f != null) c.add(f);
  }
- flows.sort(Comparator.comparingLong((Ab flow) -> Ae.abs(flow.valueDelta)).reversed());
- return flows;
+ c.sort(Comparator.comparingLong((Ab /* flow */g) -> Ae.abs(g.valueDelta)).reversed());
+ return c;
 }
 
 /**
@@ -96,79 +96,79 @@ public List<Ab> value(Map<Integer, Long> quantityDeltas, long priceCapturedAtEpo
 * production shape cannot be mistaken for consumption before action settlement.
 */
 @Override
-public List<Ab> normalizeConsumedFlows(List<Ab> flows, Au actionKind, long priceCapturedAtEpochMillis) {
- if (flows == null || flows.isEmpty() || actionKind != Au.DRINK || Bn.isDecant(flows)) {
-  return flows;
+public List<Ab> normalizeConsumedFlows(List<Ab> /* flows */a, Au /* actionKind */b, long /* priceCapturedAtEpochMillis */c) {
+ if (a == null || a.isEmpty() || b != Au.DRINK || Bn.isDecant(a)) {
+  return a;
  }
- Map<Integer, Integer> priceOverrides = ItemRuleParser.parsePriceOverrides(config.manualPriceOverrides());
- List<Bn.Cg> pairs = Bn.acr(flows);
- if (pairs.isEmpty()) return flows;
+ Map<Integer, Integer> /* priceOverrides */d = ItemRuleParser.parsePriceOverrides(config.manualPriceOverrides());
+ List<Bn.Cg> /* pairs */e = Bn.acr(a);
+ if (e.isEmpty()) return a;
  // Each exact pair is an atomic accounting unit. Compute both replacement flows before
  // assigning either one; an unsupported basis returns null and leaves the caller's
  // original captured list untouched for Review.
- var normalized = new ArrayList<>(flows);
- for (Bn.Cg pair : pairs) {
-  if (!abj(normalized, pair.lossIndex, pair.remainderIndex, priceOverrides, priceCapturedAtEpochMillis)) {
+ var /* normalized */f = new ArrayList<>(a);
+ for (Bn.Cg /* pair */g : e) {
+  if (!abj(f, g.lossIndex, g.remainderIndex, d, c)) {
    return null;
   }
  }
- return normalized;
+ return f;
 }
 
-Ab rf(Ab flow, Map<Integer, Integer> priceOverrides, long now) {
- if (flow == null) return null;
- String one = (Bn.qz(flow.itemName) + "(1)").trim().toLowerCase(Locale.ROOT);
- Ab geCandidate = null;
+Ab rf(Ab /* flow */a, Map<Integer, Integer> /* priceOverrides */b, long /* now */c) {
+ if (a == null) return null;
+ String /* one */d = (Bn.qz(a.itemName) + "(1)").trim().toLowerCase(Locale.ROOT);
+ Ab /* geCandidate */e = null;
  try {
-  for (int id : ItemVariationMapping.getVariations(ItemVariationMapping.map(flow.itemId))) {
-   Ab unit = axg(id, 1L, priceOverrides, now);
-   String aqz = unit == null ? "" : unit.itemName;
-   if (aqz == null || !one.equals(aqz.trim().toLowerCase(Locale.ROOT))) continue;
-   if (unit.getPriceSource() == MANUAL_OVERRIDE) return unit;
-   if (unit.getPriceSource() == GRAND_EXCHANGE && geCandidate == null) geCandidate = unit;
+  for (int /* id */f : ItemVariationMapping.getVariations(ItemVariationMapping.map(a.itemId))) {
+   Ab /* unit */g = axg(f, 1L, b, c);
+   String /* aqz */h = g == null ? "" : g.itemName;
+   if (h == null || !d.equals(Ag.lower(h))) continue;
+   if (g.getPriceSource() == MANUAL_OVERRIDE) return g;
+   if (g.getPriceSource() == GRAND_EXCHANGE && e == null) e = g;
   }
- } catch (RuntimeException ignored) {
+ } catch (RuntimeException /* ignored */i) {
   return null;
  }
- return geCandidate;
+ return e;
 }
 
-private boolean abj(List<Ab> normalized, int lossIndex, int remainderIndex,
-Map<Integer, Integer> priceOverrides, long now) {
- Ab loss = normalized.get(lossIndex);
- Ab remainder = normalized.get(remainderIndex);
- int lostDose = Bn.ajr(loss.itemName);
- int gainedDose = Bn.ajr(remainder.itemName);
- if (lostDose <= 0 || gainedDose <= 0 || lostDose != gainedDose + 1
- || !Bn.qz(loss.itemName).equals(Bn.qz(remainder.itemName))) {
+private boolean abj(List<Ab> /* normalized */a, int /* lossIndex */b, int /* remainderIndex */c,
+Map<Integer, Integer> /* priceOverrides */d, long /* now */e) {
+ Ab /* loss */f = a.get(b);
+ Ab /* remainder */g = a.get(c);
+ int /* lostDose */h = Bn.ajr(f.itemName);
+ int /* gainedDose */i = Bn.ajr(g.itemName);
+ if (h <= 0 || i <= 0 || h != i + 1
+ || !Bn.qz(f.itemName).equals(Bn.qz(g.itemName))) {
   return false;
  }
- Ab authority = rf(loss, priceOverrides, now);
- if (!pm(loss, authority) || !pm(remainder, authority)) return false;
+ Ab /* authority */j = rf(f, d, e);
+ if (!pm(f, j) || !pm(g, j)) return false;
  try {
-  long apa = multiplyExact(lostDose, (long) authority.unitPrice);
-  long apy = multiplyExact(gainedDose, (long) authority.unitPrice);
-  Ab asu = new Ab(loss.itemId, loss.itemName, loss.quantityDelta, toIntExact(apa),
-  multiplyExact(loss.quantityDelta, apa), authority.getPriceSource(), authority.getPriceCapturedAtEpochMillis());
-  Ab asv = new Ab(remainder.itemId, remainder.itemName,
-  remainder.quantityDelta, toIntExact(apy),
-  multiplyExact(remainder.quantityDelta, apy), authority.getPriceSource(),
-  authority.getPriceCapturedAtEpochMillis());
-  normalized.set(lossIndex, asu);
-  normalized.set(remainderIndex, asv);
+  long /* apa */k = multiplyExact(h, (long) j.unitPrice);
+  long /* apy */l = multiplyExact(i, (long) j.unitPrice);
+  Ab /* asu */m = new Ab(f.itemId, f.itemName, f.quantityDelta, toIntExact(k),
+  multiplyExact(f.quantityDelta, k), j.getPriceSource(), j.getPriceCapturedAtEpochMillis());
+  Ab /* asv */n = new Ab(g.itemId, g.itemName,
+  g.quantityDelta, toIntExact(l),
+  multiplyExact(g.quantityDelta, l), j.getPriceSource(),
+  j.getPriceCapturedAtEpochMillis());
+  a.set(b, m);
+  a.set(c, n);
   return true;
- } catch (ArithmeticException ex) {
+ } catch (ArithmeticException /* ex */o) {
   return false;
  }
 }
 
-private static boolean pm(Ab flow, Ab authority) {
- if (flow == null || authority == null) return false;
- if (authority.getPriceSource() == GRAND_EXCHANGE) {
-  return flow.getPriceSource() == GRAND_EXCHANGE && flow.unitPrice > 0;
+private static boolean pm(Ab /* flow */a, Ab /* authority */b) {
+ if (a == null || b == null) return false;
+ if (b.getPriceSource() == GRAND_EXCHANGE) {
+  return a.getPriceSource() == GRAND_EXCHANGE && a.unitPrice > 0;
  }
- return authority.getPriceSource() == MANUAL_OVERRIDE && (flow.getPriceSource() == GRAND_EXCHANGE && flow.unitPrice > 0
- || flow.getPriceSource() == MANUAL_OVERRIDE);
+ return b.getPriceSource() == MANUAL_OVERRIDE && (a.getPriceSource() == GRAND_EXCHANGE && a.unitPrice > 0
+ || a.getPriceSource() == MANUAL_OVERRIDE);
 }
 
 /**
@@ -176,8 +176,8 @@ private static boolean pm(Ab flow, Ab authority) {
 * deferred claim, face value, explicit manual override, the mapping guard, the world/economy
 * gate, the explicit active RuneLite market route and UNPRICED otherwise.
 */
-Ab akj(int itemId, long quantityDelta, long now) {
- return axg(itemId, quantityDelta, ItemRuleParser.parsePriceOverrides(config.manualPriceOverrides()), now);
+Ab akj(int /* itemId */a, long /* quantityDelta */b, long /* now */c) {
+ return axg(a, b, ItemRuleParser.parsePriceOverrides(config.manualPriceOverrides()), c);
 }
 
 @Override
@@ -189,8 +189,8 @@ public boolean automaticMarketQuotesAvailable() {
 * Client-thread world/economy refresh. UNKNOWN and special economies fail automatic market
 * quotes closed; manual override and face-value policy still apply.
 */
-void setEconomyState(Bk state) {
- this.economyState = state == null ? Bk.UNKNOWN : state;
+void setEconomyState(Bk /* state */a) {
+ this.economyState = a == null ? Bk.UNKNOWN : a;
 }
 
 /**
@@ -199,11 +199,11 @@ void setEconomyState(Bk state) {
 * speedrunning, beta, tournament and no-save worlds) and an absent world
 * observation fail closed.
 */
-static Bk rh(Collection<WorldType> worldTypes) {
- if (worldTypes == null) return Bk.UNKNOWN;
- for (WorldType type : worldTypes) {
-  if (type == null) return Bk.UNKNOWN;
-  switch (type) {
+static Bk rh(Collection<WorldType> /* worldTypes */a) {
+ if (a == null) return Bk.UNKNOWN;
+ for (WorldType /* type */b : a) {
+  if (b == null) return Bk.UNKNOWN;
+  switch (b) {
    case DEADMAN:
    case SEASONAL:
    case QUEST_SPEEDRUNNING:
@@ -218,85 +218,89 @@ static Bk rh(Collection<WorldType> worldTypes) {
  return Bk.NORMAL;
 }
 
-Ab axg(int itemId, long quantityDelta, Map<Integer, Integer> priceOverrides, long priceCapturedAtEpochMillis) {
- boolean alp = DeferredClaims.of(itemId);
+Ab axg(int /* itemId */b, long /* quantityDelta */c, Map<Integer, Integer> /* priceOverrides */d, long /* priceCapturedAtEpochMillis */e) {
+ boolean /* alp */f = DeferredClaims.of(b);
  try {
-  ItemComposition composition = null;
+  ItemComposition /* composition */g = null;
   try {
-   composition = compositions.apply(itemId);
-  } catch (RuntimeException ignored) {
+   g = compositions.apply(b);
+  } catch (RuntimeException /* ignored */h) {
    // No definition yet: the flow keeps a placeholder name.
   }
-  String name = composition == null || composition.getName() == null ? "Item " + itemId : composition.getName();
+  String /* name */i = g == null || g.getName() == null ? "Item " + b : g.getName();
+  // A clue scroll, scroll box or reward casket is worth nothing until its casket opens (owner 2026-10-08).
+  f |= Ak.pattern("clue").matcher(i).matches();
   // An empty vial is a physical neutral; filled variants remain ordinary items.
-  if (itemId == ItemID.VIAL_EMPTY) return null;
-  boolean apc = priceOverrides.containsKey(itemId);
-  int alv = sm(itemId);
+  if (b == ItemID.VIAL_EMPTY) return null;
+  boolean /* apc */j = d.containsKey(b);
+  int /* alv */k = sm(b);
   // For ordinary items, a user override is authoritative even before RuneLite prices
   // load; fixed currencies below retain their face value by policy.
-  int amf = 0;
+  int /* amf */l = 0;
   // RuneLite's ItemManager price helper is intentionally convenient: when an item has
   // no direct quote it can recurse through ItemMapping and price an untradeable variant
   // from another item (for example unidentified minerals or golden nuggets via coal).
   // Those catalogue entries are non-GP currencies in GP Manager, so their physical
   // identity must not inherit a monetary identity from the platform mapping. An
   // explicit owner override remains authoritative.
-  if (!apc && !alp && alv == 0 && !CurrencyProxyCatalogue.awk(itemId)
-  && economyState == Bk.NORMAL && !unsupportedMapping.test(itemId)) {
+  if (!j && !f && k == 0 && !CurrencyProxyCatalogue.awk(b)
+  && economyState == Bk.NORMAL && !unsupportedMapping.test(b)) {
    try {
     // GP Manager's single automatic market policy: the explicit active route,
     // gated by the current world/economy and the mapping guard above.
-    amf = max(0, marketQuotes.priceOf(itemId, true));
-   } catch (RuntimeException ignored) {
+    l = max(0, marketQuotes.priceOf(b, true));
+   } catch (RuntimeException /* ignored */m) {
     // No quote: the flow stays unpriced for Review.
    }
   }
   // A proxy row values the component from a market item and its fixed exchange rate.
-  int[] proxy = amf == 0 ? CurrencyProxyCatalogue.axy(itemId) : null;
-  if (proxy != null) {
+  // The proxy's market item is priced only where market quotes are, never on unknown or
+ // special worlds (Codex review 1.2).
+ int[] /* proxy */n = l == 0 && economyState == Bk.NORMAL ? CurrencyProxyCatalogue.axy(b) : null;
+  if (n != null) {
    try {
-    amf = max(0, marketQuotes.priceOf(proxy[0], true) / proxy[1]);
-   } catch (RuntimeException ignored) {
+    l = max(0, marketQuotes.priceOf(n[0], true) / n[1]);
+   } catch (RuntimeException /* ignored */o) {
     // No proxy quote: the flow stays unpriced for Review.
    }
   }
-  int unitPrice;
-  Av priceSource;
-  if (alp) {
+  int /* unitPrice */p;
+  Av /* priceSource */q;
+  if (f) {
    // A non-tradeable key is an unopened claim, not held wealth. Its
    // contents become ordinary valued inventory gains only on receipt.
-   unitPrice = 0;
-   priceSource = DEFERRED_CLAIM;
-  } else if (alv > 0) {
-   unitPrice = alv;
-   priceSource = FACE_VALUE;
-  } else if (apc) {
-   unitPrice = priceOverrides.get(itemId);
-   priceSource = MANUAL_OVERRIDE;
-  } else if (amf > 0) {
+   p = 0;
+   q = DEFERRED_CLAIM;
+  } else if (k > 0) {
+   p = k;
+   q = FACE_VALUE;
+  } else if (j) {
+   p = d.get(b);
+   q = MANUAL_OVERRIDE;
+  } else if (l > 0) {
    // The item's own market quote is a supported observation. Non-GP currencies
    // and untradeables without a quote stay unpriced; an exchange relationship or
    // a hypothetical high-alchemy liquidation is never converted into booked GP.
-   unitPrice = amf;
-   priceSource = proxy == null ? GRAND_EXCHANGE : CURRENCY_PROXY;
+   p = l;
+   q = n == null ? GRAND_EXCHANGE : CURRENCY_PROXY;
   } else {
-   unitPrice = 0;
-   priceSource = UNPRICED;
+   p = 0;
+   q = UNPRICED;
   }
-  long valueDelta = agz(quantityDelta, unitPrice);
+  long /* valueDelta */r = agz(c, p);
   // Only a non-zero selected price is a captured price. Unpriced/deferred flows
   // deliberately retain zero so consumers cannot present a fabricated capture time.
-  long capturedAt = unitPrice > 0 && priceSource != Av.UNKNOWN && priceSource != FACE_VALUE
-  ? Ae.nonNeg(priceCapturedAtEpochMillis) : 0L;
-  return new Ab(itemId, name, quantityDelta, unitPrice, valueDelta, priceSource, capturedAt);
- } catch (RuntimeException ignored) {
-  return new Ab(itemId, "Item " + itemId, quantityDelta, 0, 0L, alp ? DEFERRED_CLAIM : UNPRICED);
+  long /* capturedAt */t = p > 0 && q != Av.UNKNOWN && q != FACE_VALUE
+  ? Ae.nonNeg(e) : 0L;
+  return new Ab(b, i, c, p, r, q, t);
+ } catch (RuntimeException /* ignored */u) {
+  return new Ab(b, "Item " + b, c, 0, 0L, f ? DEFERRED_CLAIM : UNPRICED);
  }
 }
 
-static int sm(int itemId) {
- if (itemId == ItemID.COINS) return 1;
- if (itemId == ItemID.PLATINUM) return 1_000;
+static int sm(int /* itemId */a) {
+ if (a == ItemID.COINS) return 1;
+ if (a == ItemID.PLATINUM) return 1_000;
  return 0;
 }
 
@@ -305,28 +309,28 @@ static int sm(int itemId) {
 * non-coin mapping can represent a state/base identity; quantity/rate mappings and coin
 * targets would silently manufacture monetary identity for a physically distinct item.
 */
-static boolean vb(ItemManager itemManager, int itemId) {
+static boolean vb(ItemManager /* itemManager */a, int /* itemId */b) {
  try {
-  int canonicalId = itemManager.canonicalize(itemId);
-  return vb(ItemMapping.map(canonicalId));
- } catch (RuntimeException ignored) {
+  int /* canonicalId */c = a.canonicalize(b);
+  return vb(ItemMapping.map(c));
+ } catch (RuntimeException /* ignored */d) {
   return true;
  }
 }
 
-static boolean vb(Collection<ItemMapping> mappings) {
- if (mappings == null) return false;
- for (ItemMapping mapping : mappings) {
-  if (mapping.getQuantity() != 1L || mapping.getTradeableItem() == ItemID.COINS) return true;
+static boolean vb(Collection<ItemMapping> /* mappings */a) {
+ if (a == null) return false;
+ for (ItemMapping /* mapping */b : a) {
+  if (b.getQuantity() != 1L || b.getTradeableItem() == ItemID.COINS) return true;
  }
  return false;
 }
 
-static long agz(long quantity, int price) {
+static long agz(long /* quantity */a, int /* price */b) {
  try {
-  return multiplyExact(quantity, (long) price);
- } catch (ArithmeticException ex) {
-  return quantity >= 0 ? Long.MAX_VALUE : Long.MIN_VALUE;
+  return multiplyExact(a, (long) b);
+ } catch (ArithmeticException /* ex */c) {
+  return a >= 0 ? Long.MAX_VALUE : Long.MIN_VALUE;
  }
 }
 }

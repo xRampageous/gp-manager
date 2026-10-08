@@ -35,22 +35,22 @@ DEFERRED_CLAIM("deferred-claim"),
 CHARGE_LOAD_AMBIGUOUS(msg("ep")), COOK("cook"), BURN("burn"),
 /** Settled supply loss whose specific action is not evidenced. */
 SUPPLIES("supplies");
-final String wireName;
+String wireName;
 /** Stable persisted identifier. */
 String wireName() {
  return wireName;
 }
 
-static Au us(String value) {
- return Ag.blank(value) ? null : BY_WIRE.get(value.trim().toLowerCase(Locale.ROOT));
+static Au us(String /* value */a) {
+ return Ag.blank(a) ? null : BY_WIRE.get(Ag.lower(a));
 }
 
 /** Wire and constant names, lowercased, read on every getActionKind() (a hot path). */
 static final Map<String, Au> BY_WIRE = new HashMap<>();
 static {
- for (Au kind : values()) {
-  BY_WIRE.put(kind.wireName, kind);
-  BY_WIRE.put(kind.name().toLowerCase(Locale.ROOT), kind);
+ for (Au /* kind */b : values()) {
+  BY_WIRE.put(b.wireName, b);
+  BY_WIRE.put(b.name().toLowerCase(Locale.ROOT), b);
  }
 }
 }

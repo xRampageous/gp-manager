@@ -197,13 +197,13 @@ public class GameDataTablesTest
         for (String row : RETRIEVAL_SERVICES)
         {
             String[] f = row.split("\\|", -1);
-            BossRetrievalCatalogue.Service service = BossRetrievalCatalogue.axr("Claim", f[2]);
+            BossRetrievalCatalogue.Service service = BossRetrievalCatalogue.a1("Claim", f[2]);
             assertNotNull(f[2], service);
             assertEquals(row, service.key + "|" + service.activity + "|" + service.interactable + "|"
                 + service.expectedFee + "|" + service.note + "|" + service.ambiguousTarget);
         }
-        assertTrue(BossRetrievalCatalogue.axr("Claim", "Gravestone of Zezima") != null);
-        assertEquals(null, BossRetrievalCatalogue.axr("Claim", "Banker"));
+        assertTrue(BossRetrievalCatalogue.a1("Claim", "Gravestone of Zezima") != null);
+        assertEquals(null, BossRetrievalCatalogue.a1("Claim", "Banker"));
     }
 
     @Test
@@ -211,10 +211,10 @@ public class GameDataTablesTest
     {
         for (String name : REWARD_SOURCES)
         {
-            assertTrue(name, RewardChestCatalogue.xn("The " + name.toUpperCase() + " pool"));
+            assertTrue(name, RewardChestCatalogue.a1("The " + name.toUpperCase() + " pool"));
         }
-        assertFalse(RewardChestCatalogue.xn("Goblin"));
-        assertFalse(RewardChestCatalogue.xn("Abyssal demon"));
+        assertFalse(RewardChestCatalogue.a1("Goblin"));
+        assertFalse(RewardChestCatalogue.a1("Abyssal demon"));
     }
 
     @Test
@@ -239,7 +239,7 @@ public class GameDataTablesTest
     public void itemNamesInTheTablesMatchRuneLiteIds() throws ReflectiveOperationException
     {
         int named = 0;
-        for (String table : new String[]{"d4", "d1", "d11"})
+        for (String table : new String[]{"d4", "d1", "d11", "d23"})
         {
             for (String[] row : Ak.rows(table))
             {
@@ -252,7 +252,7 @@ public class GameDataTablesTest
                 }
             }
         }
-        assertEquals(50 + 9 + 35, named);
+        assertEquals(50 + 9 + 35 + 8, named);
     }
 
     /** Every msg key the plugin uses has its text, and text.tsv holds nothing the code no longer uses. */
@@ -280,6 +280,18 @@ public class GameDataTablesTest
                 }
             }
         }
+        // Rules and pattern aliases now read text keys from TSV as well as Java.
+        java.util.regex.Pattern reference = java.util.regex.Pattern.compile("(?<=[\\t|+])@([\\w.-]+)");
+        try (java.util.stream.Stream<java.nio.file.Path> tables = java.nio.file.Files.walk(
+            java.nio.file.Paths.get("src/main/resources")))
+        {
+            for (java.nio.file.Path file : (Iterable<java.nio.file.Path>) tables.filter(
+                p -> p.toString().endsWith(".tsv"))::iterator)
+            {
+                String data = java.nio.file.Files.readString(file);
+                for (java.util.regex.Matcher m = reference.matcher(data); m.find(); ) used.add(m.group(1));
+            }
+        }
         assertTrue(used.size() > 50);
         assertTrue(Ak.TEXT.keySet().containsAll(used));
         for (String key : Ak.TEXT.keySet())
@@ -293,4 +305,118 @@ public class GameDataTablesTest
             assertTrue("no rows for " + p, Ak.TEXT.keySet().stream().anyMatch(k -> k.startsWith(p)));
         }
     }
+    /** d24 has no item ids; every action is a public RuneLite menu constant, and every key is used. */
+    @Test
+    public void menuAndChatTableHasOnlyUsedKeysAndSupportedActions()
+    {
+        assertEquals(Set.of("widget", "spend.raw", "spend.norm", "use", "fuel", "fire", "altar",
+            "bones", "cast", "offering", "spared", "spend.chat", "gather.exclude"), Dw.R.keySet());
+        Set<net.runelite.api.MenuAction> expected = Set.of(net.runelite.api.MenuAction.WIDGET_TARGET,
+            net.runelite.api.MenuAction.WIDGET_TARGET_ON_NPC, net.runelite.api.MenuAction.WIDGET_TARGET_ON_PLAYER,
+            net.runelite.api.MenuAction.WIDGET_TARGET_ON_WIDGET, net.runelite.api.MenuAction.WIDGET_TARGET_ON_GROUND_ITEM,
+            net.runelite.api.MenuAction.WIDGET_TARGET_ON_GAME_OBJECT);
+        assertEquals(expected.size(), Dw.R.get("widget").length);
+        for (net.runelite.api.MenuAction action : net.runelite.api.MenuAction.values())
+            assertEquals(action.name(), expected.contains(action), Dw.a1(action));
+        assertFalse(Dw.a1(null));
+    }
+
+    /** d25 uses names, not item ids; each row is a consumed verb or item predicate. */
+    @Test
+    public void actionAndItemRulesKeepEveryUsedKeyAndOrderedOutcome()
+    {
+        assertEquals(Set.of("drink", "eat", "~bury", "~scatter", "offer", "cast", "supplies",
+            "vessel", "rune", "claim", "ingredient", "food", "partial"), Bn.R.keySet());
+        List<String> loaded = new ArrayList<>();
+        for (String[] row : Ak.rows("d25"))
+        {
+            assertEquals(3, row.length);
+            if (!row[2].isEmpty()) loaded.add(row[0] + "|" + Au.valueOf(row[2]).name());
+        }
+        assertEquals(Arrays.asList("drink|DRINK", "eat|EAT", "~bury|BURY", "~scatter|SCATTER", "offer|OFFER", "cast|CAST"), loaded);
+        assertEquals(Ak.msg("ct"), Ak.pattern("ct").pattern());
+        assertEquals(Ak.msg("aj"), Ak.pattern("aj").pattern());
+        assertEquals(".*(pizza|cake|pie).*", Ak.pattern("pfood").pattern());
+    }
+
+    /** d26 contains phrases rather than gameval ids; d13 continues to validate region ids. */
+    @Test public void neutralTransferTableHasEveryUsedOutcomeAndNoUnusedRows() {
+        assertEquals(22, Ak.x("d26").size());
+        Set<String> used = new java.util.LinkedHashSet<>(MinigameTransferClassifier.R.keySet());
+        used.addAll(NeutralStorageClassifier.R.keySet());
+        assertEquals(used, Ak.r("d26").keySet());
+        List<String> storage = new ArrayList<>();
+        for (String[] row : Ak.x("d26")) {
+            assertEquals(4, row.length);
+            if (row[0].startsWith("m")) {
+                MinigameTransferClassifier.Event event = MinigameTransferClassifier.Event.valueOf(row[2]);
+                assertEquals(event.note, Ak.t(row[3]));
+                assertFalse(row[1].isEmpty());
+            } else {
+                NeutralStorageClassifier.Kind kind = NeutralStorageClassifier.Kind.valueOf(row[2]);
+                storage.add(kind.name());
+                assertEquals(kind.name(), row[0]);
+                assertEquals(kind.note, Ak.t(row[3]));
+                assertEquals(kind.phrases, Ak.t(row[1]));
+            }
+        }
+        assertEquals(Arrays.stream(NeutralStorageClassifier.Kind.values()).map(Enum::name)
+            .collect(java.util.stream.Collectors.toList()), storage);
+        assertEquals(Arrays.asList("m0", "m1", "m2", "m3", "m4", "m5", "m6", "m7.lms", "m8.lms"),
+            new ArrayList<>(MinigameTransferClassifier.R.keySet()));
+    }
+
+    @Test public void cataloguePatternsUseExistingVerbKeyAndNamedDispenserFragments() {
+        assertEquals(Ak.msg("e"), BossRetrievalCatalogue.V.pattern());
+        assertEquals("grave.*", BossRetrievalCatalogue.G.pattern());
+        assertEquals(".*(agility dispenser|ticket dispenser).*", AgilityCourses.D.pattern());
+        assertEquals(java.util.regex.Pattern.DOTALL, BossRetrievalCatalogue.G.flags());
+        assertEquals(java.util.regex.Pattern.DOTALL, AgilityCourses.D.flags());
+    }
+
+    @Test public void rewardFragmentsKeepEveryUsedKeyAndCompiledWitness() {
+        assertEquals(new java.util.LinkedHashSet<>(REWARD_SOURCES), RewardChestCatalogue.R.keySet());
+        for (String[] row : Ak.rows("d3")) {
+            assertEquals(2, row.length); assertEquals(row[0], row[1]);
+            assertTrue(Ag.has(row[0], RewardChestCatalogue.R.get(row[0])));
+        }
+    }
+
+    @Test public void spellRecipesKeepAllNamesCountsAndSupportedRuneNames() {
+        Map<String, Integer> ids = Map.of("air", ItemID.AIRRUNE, "water", ItemID.WATERRUNE,
+            "earth", ItemID.EARTHRUNE, "fire", ItemID.FIRERUNE, "mind", ItemID.MINDRUNE,
+            "chaos", ItemID.CHAOSRUNE, "death", ItemID.DEATHRUNE, "blood", ItemID.BLOODRUNE,
+            "soul", ItemID.SOULRUNE, "wrath", ItemID.WRATHRUNE);
+        List<String> names = new ArrayList<>(); Set<String> used = new HashSet<>();
+        for (String[] row : Ak.rows("d27")) {
+            assertEquals(2, row.length); names.add(row[0]);
+            for (String part : row[1].split(" ")) {
+                String[] split = part.split(":"); used.add(split[1]);
+                assertTrue(ids.get(split[1]) > 0);
+                assertEquals(Long.valueOf(split[0]), Spells.R.get(row[0]).get(split[1]));
+            }
+        }
+        assertEquals(ids.keySet(), used);
+        assertEquals(names, new ArrayList<>(Spells.R.keySet()));
+        assertEquals(Arrays.stream(Spo.TABLE.toArray(new String[0][])).map(a -> a[0])
+            .collect(java.util.stream.Collectors.toList()), names);
+        for (String[] row : Spo.TABLE) assertEquals(row[2], Ak.byName("d27").get(row[0]));
+    }
+
+    @Test public void activityTableKeepsEveryUsedListAndPredicate() {
+        assertEquals(Set.of("curated", "short", "combat", "pursuit", "generic"), ActivityLabel.R.keySet());
+        Map<String,List<String>> values = new HashMap<>();
+        for (String[] row : Ak.rows("d28")) {
+            assertEquals(3,row.length);
+            values.put(row[0], Arrays.stream(row[2].split("\\|"))
+                .map(Ak::t).collect(java.util.stream.Collectors.toList()));
+        }
+        assertEquals(Alo.CURATED,values.get("curated"));
+        assertEquals(Alo.CURATED_SHORT,values.get("short")); assertEquals(Alo.COMBAT,values.get("combat"));
+        assertEquals(Arrays.asList("PKing","Trading","Death reclaim"),values.get("pursuit"));
+        assertEquals(Arrays.asList("General","NPC loot"),values.get("generic"));
+        for (net.runelite.api.Skill skill : net.runelite.api.Skill.values())
+            assertEquals(ActivityLabel.COMBAT.contains(skill.getName()),Ag.has(skill.getName(),ActivityLabel.R.get("combat")));
+    }
+
 }

@@ -19,27 +19,27 @@ import lombok.*;
 @EqualsAndHashCode(of = "rsProfileKey")
 class TrackingIdentity {
 static final long ACCOUNT_HASH_INVALID = -1L;
-final String rsProfileKey;
-final long accountHash;
-TrackingIdentity(String rsProfileKey, long accountHash) {
- if (Ag.blank(rsProfileKey)) throw new IllegalArgumentException("rsProfileKey");
- this.rsProfileKey = rsProfileKey.trim();
- this.accountHash = accountHash;
+String rsProfileKey;
+long accountHash;
+TrackingIdentity(String /* rsProfileKey */a, long /* accountHash */b) {
+ if (Ag.blank(a)) throw new IllegalArgumentException("rsProfileKey");
+ this.rsProfileKey = a.trim();
+ this.accountHash = b;
 }
 
 /** Filesystem-safe directory name derived from the RS profile key. */
 String ajc() {
- var out = new StringBuilder(rsProfileKey.length());
+ var /* out */b = new StringBuilder(rsProfileKey.length());
  for (int i = 0; i < rsProfileKey.length(); i++) {
   char c = rsProfileKey.charAt(i);
   if ((c >= 'a' && c <= 'z') || (c >= 'A' && c <= 'Z') || (c >= '0' && c <= '9') || c == '-' || c == '_' || c == '.') {
-   out.append(c);
+   b.append(c);
   } else {
-   out.append('_');
+   b.append('_');
   }
  }
- String name = out.toString();
- return name.isEmpty() ? "profile" : name;
+ String /* name */d = b.toString();
+ return d.isEmpty() ? "profile" : d;
 }
 
 public String toString() {

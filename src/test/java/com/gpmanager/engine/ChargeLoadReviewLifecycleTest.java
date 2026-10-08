@@ -36,7 +36,7 @@ public class ChargeLoadReviewLifecycleTest
         long start = 10_000L;
         engine.rm(start);
         engine.setBaseline(snapshot(12934, 100L));
-        assertNull(engine.abu(blowpipe(0, 10), TARGET, start));
+        ChargeOutcomeTest.none(engine.abu(blowpipe(0, 10), TARGET, start));
 
         engine.yx(Ar.V.V1b,
             12934, "Zulrah's scales", TARGET, 8);
@@ -48,7 +48,7 @@ public class ChargeLoadReviewLifecycleTest
         assertEquals(0L, engine.getMetrics(start + 2_400L).net);
         assertEquals(0L, engine.getMetrics(start + 2_400L).costs);
 
-        assertNull(engine.abu(blowpipe(50, 10), TARGET, start + 3_000L));
+        ChargeOutcomeTest.none(engine.abu(blowpipe(50, 10), TARGET, start + 3_000L));
         assertEquals(Ai.TRANSFER, load.tm());
         assertEquals(0L, engine.getMetrics(start + 3_000L).net);
 
@@ -93,7 +93,7 @@ public class ChargeLoadReviewLifecycleTest
         String target = "149:0:9764864:11905:TRIDENT_SEAS";
         engine.rm(start);
         engine.setBaseline(snapshot(mapOf(560, 10L, 562, 10L, 554, 50L, 995, 100L)));
-        assertNull(engine.abu(
+        ChargeOutcomeTest.none(engine.abu(
             Ar.acs("Your Trident of the seas has 10 charges."),
             target,
             start));
@@ -108,7 +108,7 @@ public class ChargeLoadReviewLifecycleTest
         assertEquals(4, review.getFlows().size());
         assertEquals(0L, engine.getMetrics(start + 2_400L).net);
 
-        assertNull(engine.abu(
+        ChargeOutcomeTest.none(engine.abu(
             Ar.acs("Your Trident of the seas has 12 charges."),
             target,
             start + 3_000L));
@@ -164,7 +164,7 @@ public class ChargeLoadReviewLifecycleTest
         long start = 20_000L;
         engine.rm(start);
         engine.setBaseline(snapshot(mapOf(12934, 100L,  ItemID.RUNE_DART, 10L)));
-        assertNull(engine.abu(blowpipe(0, 10), TARGET, start));
+        ChargeOutcomeTest.none(engine.abu(blowpipe(0, 10), TARGET, start));
 
         engine.yx(Ar.V.V1b,
             12934, "Zulrah's scales", TARGET, 8);
@@ -227,8 +227,8 @@ public class ChargeLoadReviewLifecycleTest
         engine.yz();
         settle(engine, snapshot(12934, 80L), start + 3_000L);
 
-        assertNull(engine.abu(blowpipe(0, 10), TARGET, start + 5_000L));
-        assertNull(engine.abu(blowpipe(20, 10), TARGET, start + 6_000L));
+        ChargeOutcomeTest.none(engine.abu(blowpipe(0, 10), TARGET, start + 5_000L));
+        ChargeOutcomeTest.none(engine.abu(blowpipe(20, 10), TARGET, start + 6_000L));
         List<Ac> transfers = new ArrayList<>();
         for (Ac row : engine.getActiveSession().getTransactions())
         {
@@ -254,7 +254,7 @@ public class ChargeLoadReviewLifecycleTest
         long start = 35_000L;
         engine.rm(start);
         engine.setBaseline(snapshot(12934, 100L));
-        assertNull(engine.abu(blowpipe(0, 10), TARGET, start));
+        ChargeOutcomeTest.none(engine.abu(blowpipe(0, 10), TARGET, start));
         engine.yx(Ar.V.V1b,
             12934, "Zulrah's scales", TARGET, 8);
         engine.yz();
@@ -302,7 +302,7 @@ public class ChargeLoadReviewLifecycleTest
         long start = 45_000L;
         engine.rm(start);
 
-        assertNull(engine.abu(blowpipe(100, 10), TARGET, start));
+        ChargeOutcomeTest.none(engine.abu(blowpipe(100, 10), TARGET, start));
         Cm first = engine.abu(
             blowpipe(98, 10), TARGET, start + 1_000L);
         assertNotNull(first);
@@ -311,7 +311,7 @@ public class ChargeLoadReviewLifecycleTest
                 -200L, Av.GRAND_EXCHANGE)), start + 1_000L) != null);
 
         // A refill is an increase, not a cost and becomes the new baseline.
-        assertNull(engine.abu(blowpipe(120, 10), TARGET, start + 2_000L));
+        ChargeOutcomeTest.none(engine.abu(blowpipe(120, 10), TARGET, start + 2_000L));
         Cm second = engine.abu(
             blowpipe(119, 10), TARGET, start + 3_000L);
         assertNotNull(second);
@@ -330,14 +330,14 @@ public class ChargeLoadReviewLifecycleTest
         Am engine = engine();
         long start = 55_000L;
         engine.rm(start);
-        assertNull(engine.abu(blowpipe(100, 10), TARGET, start));
+        ChargeOutcomeTest.none(engine.abu(blowpipe(100, 10), TARGET, start));
 
         engine.acu(start + 1_000L);
         engine.resume(start + 2_000L, Ed.LIFECYCLE);
-        assertNull(engine.abu(blowpipe(90, 10), TARGET, start + 3_000L));
+        ChargeOutcomeTest.none(engine.abu(blowpipe(90, 10), TARGET, start + 3_000L));
 
         engine.agl("profile-b", engine.qm(), start + 4_000L);
-        assertNull(engine.abu(blowpipe(80, 10), TARGET, start + 5_000L));
+        ChargeOutcomeTest.none(engine.abu(blowpipe(80, 10), TARGET, start + 5_000L));
         Cm afterRestart = engine.abu(
             blowpipe(79, 10), TARGET, start + 6_000L);
         assertNotNull(afterRestart);
@@ -351,10 +351,11 @@ public class ChargeLoadReviewLifecycleTest
         long start = 65_000L;
         engine.rm(start);
         String second = "149:0:9764864:12934:V1b#2";
-        assertNull(engine.abu(blowpipe(100, 10), TARGET, start));
-        assertNull(engine.abu(blowpipe(40, 10), second, start + 500L));
+        ChargeOutcomeTest.none(engine.abu(blowpipe(100, 10), TARGET, start));
+        ChargeOutcomeTest.none(engine.abu(blowpipe(40, 10), second, start + 500L));
         // Checking the second pipe again is not a decrease on the first.
-        assertNull(engine.abu(blowpipe(40, 10), second, start + 1_000L));
+        assertTrue("an unchanged Check is an empty delta", engine.abu(blowpipe(40, 10), second, start + 1_000L)
+            .getComponentDeltas().isEmpty());
         Cm firstUse = engine.abu(blowpipe(97, 10), TARGET, start + 2_000L);
         assertNotNull(firstUse);
         assertEquals(-3L, firstUse.getComponentDeltas().get(0).getQuantityDelta());
@@ -378,7 +379,7 @@ public class ChargeLoadReviewLifecycleTest
         engine.rm(start);
         engine.setBaseline(snapshot(12934, 100L));
         String second = "149:0:9764864:12934:V1b#2";
-        assertNull(engine.abu(blowpipe(0, 10), TARGET, start));
+        ChargeOutcomeTest.none(engine.abu(blowpipe(0, 10), TARGET, start));
 
         engine.yx(Ar.V.V1b,
             12934, "Zulrah's scales", TARGET, 8);
@@ -387,8 +388,8 @@ public class ChargeLoadReviewLifecycleTest
         assertEquals(Ai.TRANSFER, review.tm());
 
         // The other blowpipe is Checked between the load and this pipe's next Check.
-        assertNull(engine.abu(blowpipe(40, 10), second, start + 2_000L));
-        assertNull(engine.abu(blowpipe(50, 10), TARGET, start + 3_000L));
+        ChargeOutcomeTest.none(engine.abu(blowpipe(40, 10), second, start + 2_000L));
+        ChargeOutcomeTest.none(engine.abu(blowpipe(50, 10), TARGET, start + 3_000L));
         assertEquals("the load is confirmed by this pipe's own Check", Ai.TRANSFER,
             review.tm());
         assertEquals(0L, engine.getMetrics(start + 3_000L).net);
@@ -401,13 +402,13 @@ public class ChargeLoadReviewLifecycleTest
         long start = 95_000L;
         engine.rm(start);
         engine.setBaseline(snapshot(ItemID.TOXIC_BLOWPIPE_LOADED, 1L));
-        assertNull(engine.abu(blowpipe(1000, 100), TARGET, start));
+        ChargeOutcomeTest.none(engine.abu(blowpipe(1000, 100), TARGET, start));
 
         // A second blowpipe is withdrawn into the same slot: that slot identity now belongs to
         // a different physical weapon, so the stored baseline must not be compared against it.
         settle(engine, snapshot(ItemID.TOXIC_BLOWPIPE_LOADED, 2L), start + 1_000L);
 
-        assertNull("a replacement that retained the slot identity must not book a phantom decrease",
+        ChargeOutcomeTest.none("a replacement that retained the slot identity must not book a phantom decrease",
             engine.abu(blowpipe(100, 100), TARGET, start + 5_000L));
         // The fresh read seeds the new baseline; a later decrease still books normally.
         Cm use = engine.abu(blowpipe(98, 100), TARGET, start + 6_000L);
@@ -422,7 +423,7 @@ public class ChargeLoadReviewLifecycleTest
         long start = 75_000L;
         engine.rm(start);
         engine.getActiveSession().setActivityHint("Zulrah", start);
-        assertNull(engine.abu(blowpipe(100, 10), TARGET, start));
+        ChargeOutcomeTest.none(engine.abu(blowpipe(100, 10), TARGET, start));
         Cm use = engine.abu(blowpipe(98, 10), TARGET, start + 1_000L);
         Ac spend = engine.mj(use, "Toxic blowpipe",
             Collections.singletonList(new Ab(12934, "Zulrah's scales", -2L, 100, -200L, Av.GRAND_EXCHANGE)), start + 1_000L);

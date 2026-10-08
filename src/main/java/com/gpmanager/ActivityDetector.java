@@ -26,29 +26,29 @@ long productionWindowExpiresAtEpochMillis;
 String gatherSkill = "";
 /** How long a Make-X run stays open for its skill's XP after the last production evidence. */
 long productionRunUntilEpochMillis;
-void abm(String activity, boolean immediate) {
- if (!config.autoActivityDetection() || blank(activity)) return;
- String next = activity.trim();
- if ("NPC loot".equalsIgnoreCase(next)) {
+void abm(String /* activity */a, boolean /* immediate */b) {
+ if (!config.autoActivityDetection() || blank(a)) return;
+ String /* next */c = a.trim();
+ if ("NPC loot".equalsIgnoreCase(c)) {
   // A generic fallback is not an activity; the previous real label stands.
   return;
  }
- if (next.equalsIgnoreCase(activityCandidate)) {
+ if (c.equalsIgnoreCase(activityCandidate)) {
   activityEvidence++;
  } else {
-  activityCandidate = next;
+  activityCandidate = c;
   activityEvidence = 1;
  }
- if (immediate || activityEvidence >= 2) {
-  detectedActivity = next;
-  engine.setDetectedActivity(next, System.currentTimeMillis());
+ if (b || activityEvidence >= 2) {
+  detectedActivity = c;
+  engine.setDetectedActivity(c, Ae.now());
  }
 }
 
 /** Settled transaction types that name the activity (PK, named loot, trade). */
-void abw(Ac transaction) {
- if (transaction == null) return;
- switch (transaction.getType()) {
+void abw(Ac /* transaction */a) {
+ if (a == null) return;
+ switch (a.getType()) {
   case PK_LOOT:
   case PK_SUPPLY_COST:
   case PK_DEATH_LOSS:
@@ -56,9 +56,9 @@ void abw(Ac transaction) {
   abm("PKing", true);
   break;
   case LOOT:
-  String amd = transaction.getActivityName();
-  if (amd != null && !amd.trim().isEmpty() && !"General".equalsIgnoreCase(amd.trim())) {
-   abm(amd.trim(), true);
+  String /* amd */b = a.getActivityName();
+  if (b != null && !b.trim().isEmpty() && !"General".equalsIgnoreCase(b.trim())) {
+   abm(b.trim(), true);
   }
   break;
   case TRADE:
@@ -71,12 +71,12 @@ void abw(Ac transaction) {
 
 /** Active-owner change reseeds the candidate from the session hint. */
 void ajd() {
- Ad active = engine.getActiveSession();
- String amm = active == null ? null : active.getId();
- if (amm == null ? activitySessionId == null : amm.equals(activitySessionId)) return;
- activitySessionId = amm;
- String initial = active == null ? "General" : active.getActivityHint();
- detectedActivity = awq(initial, "General");
+ Ad /* active */a = engine.getActiveSession();
+ String /* amm */b = a == null ? null : a.getId();
+ if (b == null ? activitySessionId == null : b.equals(activitySessionId)) return;
+ activitySessionId = b;
+ String /* initial */c = a == null ? "General" : a.getActivityHint();
+ detectedActivity = awq(c, "General");
  activityCandidate = detectedActivity;
  activityEvidence = 0;
 }
@@ -86,12 +86,12 @@ void pe() {
  agp(true);
 }
 
-void agp(boolean resetHold) {
- if (!"General".equalsIgnoreCase(detectedActivity) || resetHold) {
+void agp(boolean /* resetHold */a) {
+ if (!"General".equalsIgnoreCase(detectedActivity) || a) {
   detectedActivity = "General";
   activityCandidate = "General";
   activityEvidence = 0;
-  if (config.autoActivityDetection()) engine.setDetectedActivity("General", System.currentTimeMillis());
+  if (config.autoActivityDetection()) engine.setDetectedActivity("General", Ae.now());
  }
 }
 
@@ -99,34 +99,41 @@ void agp(boolean resetHold) {
 * Positive XP for {@code skill}: names the activity (Agility prefers the course) and, inside
 * an open PRODUCTION window, re-arms the context so the processing receipt can settle.
 */
-void acj(String skillName, String agilityCourse, boolean fighting, long now) {
- if ("Agility".equalsIgnoreCase(skillName) && agilityCourse != null) abm(agilityCourse, true);
+void acj(String /* skillName */b, String /* agilityCourse */c, boolean /* fighting */d, long /* now */e) {
+ if ("Agility".equalsIgnoreCase(b) && c != null) abm(c, true);
  // Combat XP, and Magic in a fight, names nothing: the NPC's loot does. Alching is Magic.
- else if (!"Prayer".equalsIgnoreCase(skillName) && !ActivityLabel.COMBAT.contains(skillName)
- && !(fighting && "Magic".equals(skillName))) abm(skillName.trim(), skillName.equalsIgnoreCase(gatherSkill));
+ else if (!"Prayer".equalsIgnoreCase(b) && !ActivityLabel.COMBAT.contains(b)
+ && !(d && "Magic".equals(b))) abm(b.trim(), b.equalsIgnoreCase(gatherSkill));
  // A Make-X run has actions with no XP (a failed iron smelt), so a production skill's XP
  // re-arms the context for 30 s after the last one, not only inside the six-tick window.
- if (now <= productionWindowExpiresAtEpochMillis
- || Dw.TRANSFORM.containsValue(skillName) || "Smithing".equals(skillName)) {
-  qf(skillName, now);
+ if (e <= productionWindowExpiresAtEpochMillis
+ || Dw.TRANSFORM.containsValue(b) || "Smithing".equals(b)) {
+  qf(b, e);
  }
 }
 
 /** Evidence the Make-X run goes on (its XP, a failed smelt): re-arms it within 30 s of the last. */
-void qf(String note, long now) {
- if (now <= productionRunUntilEpochMillis) le(note, now);
+void qf(String /* note */a, long /* now */b) {
+ if (b <= productionRunUntilEpochMillis) le(a, b);
+}
+
+/** Enabling during Make-X needs fresh production XP, without a click made while disabled. */
+void rb(long a) {
+ productionWindowExpiresAtEpochMillis = 0L;
+ productionRunUntilEpochMillis = a + 30_000L;
+ gatherSkill = "";
 }
 
 /** Station/menu hint: arm PRODUCTION context for the correlation window. */
-void le(String skillNote) {
- le(skillNote, System.currentTimeMillis());
+void le(String /* skillNote */a) {
+ le(a, Ae.now());
 }
 
-void le(String skillNote, long now) {
- int ticks = 6;
- String note = awq(skillNote, "Production");
- engine.markContext(Aj.PRODUCTION, ticks, note);
- productionWindowExpiresAtEpochMillis = now + ticks * MILLIS_PER_GAME_TICK;
- productionRunUntilEpochMillis = now + 30_000L;
+void le(String /* skillNote */a, long /* now */b) {
+ int /* ticks */c = 6;
+ String /* note */d = awq(a, "Production");
+ engine.markContext(Aj.PRODUCTION, c, d);
+ productionWindowExpiresAtEpochMillis = b + c * MILLIS_PER_GAME_TICK;
+ productionRunUntilEpochMillis = b + 30_000L;
 }
 }

@@ -44,26 +44,26 @@ interface Actions {
  }
 }
 
-final Actions actions;
-final Function<Integer, BufferedImage> sprites;
-final Map<Integer, ImageIcon> icons = new HashMap<>();
-final JPanel body = stack(PANEL, GAP);
-final Hero hero = new Hero();
-final JPanel target = new JPanel(new BorderLayout(0, 3));
-final JLabel targetTitle = label("", small(), LABEL);
-final JLabel targetValue = label("", Kit.body(), TEXT);
-final JLabel targetPace = label("", small(), LABEL);
-final ThinProgressBar targetBar = new ThinProgressBar();
+Actions actions;
+Function<Integer, BufferedImage> sprites;
+Map<Integer, ImageIcon> icons = new HashMap<>();
+JPanel body = stack(PANEL, GAP);
+Hero hero = new Hero();
+JPanel target = new JPanel(new BorderLayout(0, 3));
+JLabel targetTitle = label("", small(), LABEL);
+JLabel targetValue = label("", Kit.body(), TEXT);
+JLabel targetPace = label("", small(), LABEL);
+ThinProgressBar targetBar = new ThinProgressBar();
 /** Free play offers Start (the Start Grind sheet); a running Grind offers End instead. */
-final JButton startGrind;
-final JButton endGrind;
+JButton startGrind;
+JButton endGrind;
 /** GE offers still on the exchange; shown only while there are some, then they move to Recent. */
-final Table offers = new Table("OFFERS");
-final Table recent = new Table("RECENT");
+Table offers = new Table("OFFERS");
+Table recent = new Table("RECENT");
 /** Pending counts as small icons: loot keys, GE offers, grave reclaim. */
-final JPanel counts = new JPanel(new FlowLayout(FlowLayout.RIGHT, 4, 0));
-final ImageIcon geIcon = icon(() -> ImageUtil.loadImageResource(GrandExchangePlugin.class, "ge_icon.png"));
-final ImageIcon graveIcon = new ImageIcon(grave(LOSS.color));
+JPanel counts = new JPanel(new FlowLayout(FlowLayout.RIGHT, 4, 0));
+ImageIcon geIcon = icon(() -> ImageUtil.loadImageResource(GrandExchangePlugin.class, "ge_icon.png"));
+ImageIcon graveIcon = new ImageIcon(grave(LOSS.color));
 String drawnCounts = "";
 /** The RECENT empty sentence currently set; only a change forces a table rebuild. */
 String emptyRecent = "Nothing booked yet";
@@ -140,14 +140,14 @@ void apply(Ca s) {
   hero.big(booked ? signed(s.net) : "—", booked ? sign(s.net) : DIM,
   ru(s.net) + " gp · gains " + exact(s.gains) + (s.costSplitAvailable
   ? " · supplies " + exact(s.supplies) + " · losses " + exact(s.loss)
-  : " · costs " + exact(s.costs) + " (split unavailable)")
-  + (s.goal == null ? " · click to set a target" : ""), awx(s.rateEstablished, s.gpPerHour), s.rateEstablished,
+  : " · costs " + exact(s.costs) + msg("ex"))
+  + (s.goal == null ? msg("d9") : ""), awx(s.rateEstablished, s.gpPerHour), s.rateEstablished,
   clock(s.elapsedMillis) + " ACTIVE");
  } else {
-  hero.big("—", DIM, "Nothing tracked yet", "—", false, "");
+  hero.big("—", DIM, msg("d8"), "—", false, "");
  }
  // Owner 2026-10-01 (F12): the hero names the rate basis and the tracked-time policy.
- hero.rate.setToolTipText(s.rateEstablished ? "GP/h over active time" : null);
+ hero.rate.setToolTipText(s.rateEstablished ? msg("cb") : null);
  hero.clock.setToolTipText(s.hasSession ? msg("fu") : null);
  hero.strips(strips(s));
  la(s);
@@ -158,12 +158,12 @@ void apply(Ca s) {
  offers.setVisible(!open.isEmpty());
  // Owner 2026-10-01 (F13): the empty card says which event starts tracking, never a fake start.
  String empty = s.loggedOut ? msg("fv") : !s.freePlay ? "Nothing booked yet"
- : actions.autoStartArmed() ? "Tracking starts with your first gameplay" : "Press Grind to start tracking";
+ : actions.autoStartArmed() ? msg("d7") : msg("d6");
  if (!empty.equals(emptyRecent)) {
   emptyRecent = empty;
   recent.setEmptyText(empty);
  }
- recent.setTitle(rows.isEmpty() ? "RECENT" : "RECENT · " + rows.size()).setRows(rows);
+ recent.r1("RECENT", rows);
 }
 
 void la(Ca s) {
@@ -185,7 +185,7 @@ void la(Ca s) {
  }
  targetBar.setValue((int) Math.round(goal.fraction * 1000));
  targetBar.setForeground(goal.reached ? GAIN.color : ACCENT);
- targetPace.setText(goal.eta == null ? msg("ce") : goal.time ? goal.eta : goal.eta + " of play left at this rate");
+ targetPace.setText(goal.eta == null ? msg("ce") : goal.time ? goal.eta : goal.eta + msg("d5"));
  targetPace.setVisible(!goal.reached);
 }
 
@@ -202,7 +202,8 @@ Row rowOf(Recent row) {
  Entry entry = yn(row);
  var menu = new ArrayList<Table.Menu>();
  menu.add(new Table.Menu("Open in Ledger", () -> actions.openLedger(entry)));
- if (!row.open && row.itemId > 0 && !row.composite)
+ // A finished trade is one item too (owner 2026-10-08: a sold Fire rune had no Hide).
+ if (!row.open && row.itemId > 0 && (!row.composite || row.market))
  menu.add(new Table.Menu("Hide from recent", () -> actions.hideRecent(row.name)));
  // Ore a failed smelt lost sits beside the ore the bars used: say which is which.
  String name = msg("zz").equals(row.actionLabel) ? row.name + " (failed)" : row.name;
@@ -218,7 +219,7 @@ List<List<Cell>> strips(Ca s) {
  }
  Runnable ledger = () -> actions.openLedger(Entry.current());
  var money = new ArrayList<Cell>();
- money.add(new Cell("GAINS", signed(s.gains), GAIN, "Loot and other counted gains · " + exact(s.gains) + " gp", ledger));
+ money.add(new Cell("GAINS", signed(s.gains), GAIN, msg("d4") + exact(s.gains) + " gp", ledger));
  if (s.costSplitAvailable) {
   money.add(new Cell("SUPPLY", signed(-s.supplies), SUPPLY, msg("jl") + exact(s.supplies) + " gp", ledger));
   money.add(new Cell("LOSS", signed(-s.loss), LOSS, msg("jm") + exact(s.loss) + " gp", ledger));
@@ -239,9 +240,9 @@ List<List<Cell>> strips(Ca s) {
  // Owner 1.1: where a death can be lost, its risk and the skull live here, not on HUD+.
  if (s.pvpPossible || s.pvpSession) {
   rows.add(Arrays.asList(new Cell("RISK", s.pvpPossible ? compact(s.risk) : "—", s.risk > 0L ? LOSS : DIM,
-  "What a death here would lose: all but your 3 most valuable items (none skulled), +1 with Protect Item", null),
+  msg("d3"), null),
   new Cell("SKULL", s.skulled ? "On" : "Off", s.skulled ? LOSS : DIM, msg("he"), null),
-  new Cell("PROTECT", s.protectItem ? "On" : "Off", s.protectItem ? PLAIN : DIM, "Protect Item prayer", null)));
+  new Cell("PROTECT", s.protectItem ? "On" : "Off", s.protectItem ? PLAIN : DIM, msg("d2"), null)));
  }
  return rows;
 }
@@ -250,7 +251,7 @@ List<Cell> ajq(Ca s) {
  var list = new ArrayList<Cell>();
  if (s.reviewCount > 0) {
   list.add(new Cell("", "(!)" + s.reviewCount, REVIEW,
-  s.reviewCount == 1 ? msg("cf") : s.reviewCount + " items need your decision",
+  s.reviewCount == 1 ? msg("cf") : s.reviewCount + msg("d1"),
   () -> actions.openLedger(Entry.current(Audit.REVIEW, null))));
  }
  return list;
@@ -265,8 +266,8 @@ void counts(Ca s) {
  Runnable pending = () -> actions.openLedger(Entry.current());
  BufferedImage aop = sprites.apply(ItemID.WILDY_LOOT_KEY0);
  count(s.pendingKeys, aop == null ? null : new ImageIcon(aop), "key", DIM,
- "Loot keys not yet opened: " + s.pendingKeys, pending);
- count(s.marketPending, geIcon, "GE", MARKET, "Grand Exchange offers still open: " + s.marketPending, pending);
+ msg("d0") + s.pendingKeys, pending);
+ count(s.marketPending, geIcon, "GE", MARKET, msg("da") + s.marketPending, pending);
  count(s.reclaimItems, graveIcon, "grave", LOSS, msg("jn") + s.reclaimItems, pending);
  counts.revalidate();
  counts.repaint();
@@ -350,11 +351,11 @@ static String tipOf(Recent row) {
  if ("review".equals(row.tag)) tip.append(" · needs review");
  if (row.unpriced) tip.append(msg("jw"));
  if (row.market && !row.valueAvailable && !row.marketSettlementValue)
- tip.append(" · Market result is not realized");
+ tip.append(msg("c9"));
  if (row.market && row.marketSettlementValue)
  tip.append(row.valueAvailable ? msg("gs") : msg("gu"));
- if (row.receipts > 1 && !metaOf(row).contains("receipt"))
- tip.append(" · ").append(row.receipts).append(" receipts");
+ if (row.receipts > 1 && !metaOf(row).contains("entries"))
+ tip.append(" · ").append(row.receipts).append(" entries");
  return tip.toString();
 }
 
@@ -398,7 +399,7 @@ static String wordOf(Ca s) {
 
 /** The shared activity label: fresh NPC target, else the session activity, else the Grind name. */
 static String wf(Ca s) {
- return ActivityLabel.resolve(!s.target.isEmpty(), s.activityLabel, s.ownerLabel, s.hasSession, s.freePlay);
+ return ActivityLabel.d1(!s.target.isEmpty(), s.activityLabel, s.ownerLabel, s.hasSession, s.freePlay);
 }
 
 static String ajn(Ca s) {

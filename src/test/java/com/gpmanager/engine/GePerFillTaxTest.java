@@ -62,16 +62,63 @@ public class GePerFillTaxTest
     }
 
     @Test
-    public void coalescedFillAtAnUnprovablePriceStillFailsClosed()
+    public void coalescedMixedPriceFillSettlesAtTheTaxItsCashProves()
     {
-        // One observed chunk of 25 for 3,513: no per-item price is provable, so nothing is exact.
+        // One observed chunk of 25 for 3,513 (140.52 each): no single price, so the tax lies
+        // between (3,513 - 49 x 25) / 50 = 46 and 3,513 / 50 = 70. The collected cash proves 50.
         Fixture fixture = new Fixture(RUNE, 25L);
         fixture.sellInFills(0, new long[] {25L}, new long[] {3_513L}, T0 + 1_000L);
         fixture.collectAlone(0, 3_513L - 50L, T0 + 20_000L);
         fixture.engine.ajv(T0 + 23_000L);
 
-        assertEquals("nothing is counted from an unprovable tax", 0L, fixture.net());
+        assertEquals("exactly the proven tax is counted", -50L, fixture.net());
+        assertEquals(0, fixture.reviewRows());
+        assertEquals("the receipt shows the proven tax", 50L, fixture.row().inferredGeTaxGp);
+    }
+
+    @Test
+    public void cashNoMixedPriceSaleCouldPayStillFailsClosed()
+    {
+        // A tax of 10 on 25 items worth 3,513 is impossible (at least 46): fail closed.
+        Fixture fixture = new Fixture(RUNE, 25L);
+        fixture.sellInFills(0, new long[] {25L}, new long[] {3_513L}, T0 + 1_000L);
+        fixture.collectAlone(0, 3_513L - 10L, T0 + 20_000L);
+        fixture.engine.ajv(T0 + 23_000L);
+
+        assertEquals("nothing is counted from an impossible tax", 0L, fixture.net());
         assertTrue("it fails closed visibly", fixture.reviewRows() > 0);
+    }
+
+    @Test
+    public void collectAllOfAnExactAndAMixedPriceSaleSettlesBoth()
+    {
+        // Owner 2026-10-07 (yew logs at exactly 90 each and 10,471 longbows at 1,650,785):
+        // the two slots cleared together and one Collect paid both after tax.
+        Fixture fixture = new Fixture(RUNE, 45L);
+        fixture.sellInFills(0, new long[] {20L}, new long[] {2_800L}, T0 + 1_000L);
+        fixture.sellInFills(1, new long[] {25L}, new long[] {3_513L}, T0 + 5_000L);
+        fixture.clear(0, T0 + 19_400L);
+        fixture.clear(1, T0 + 19_450L);
+        fixture.collect((2_800L - 40L) + (3_513L - 50L), T0 + 20_000L);
+        fixture.engine.ajv(T0 + 23_000L);
+
+        assertEquals(-90L, fixture.net());
+        assertEquals(0, fixture.reviewRows());
+    }
+
+    @Test
+    public void collectAllOfTwoMixedPriceSalesSettlesTheirProvenTotal()
+    {
+        Fixture fixture = new Fixture(RUNE, 50L);
+        fixture.sellInFills(0, new long[] {25L}, new long[] {3_513L}, T0 + 1_000L);
+        fixture.sellInFills(1, new long[] {25L}, new long[] {3_513L}, T0 + 5_000L);
+        fixture.clear(0, T0 + 19_400L);
+        fixture.clear(1, T0 + 19_450L);
+        fixture.collect(2L * (3_513L - 50L), T0 + 20_000L);
+        fixture.engine.ajv(T0 + 23_000L);
+
+        assertEquals("the combined tax is exact", -100L, fixture.net());
+        assertEquals(0, fixture.reviewRows());
     }
 
     @Test

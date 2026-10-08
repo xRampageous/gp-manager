@@ -16,29 +16,26 @@ class GroundItemsConfigReader {
 static final Logger log = LoggerFactory.getLogger(GroundItemsConfigReader.class);
 final ConfigManager configManager;
 final PluginManager pluginManager;
-/** Test constructor without PluginManager. */
-GroundItemsConfigReader(ConfigManager configManager) {
- this(configManager, null);
-}
-
 Bc read() {
- boolean enabled = wz();
- GroundItemsConfig config;
+ boolean /* enabled */a = wz();
+ GroundItemsConfig /* config */b;
  try {
-  config = configManager.getConfig(GroundItemsConfig.class);
- } catch (RuntimeException ex) {
-  log.debug(msg("bd"), ex);
+  b = configManager.getConfig(GroundItemsConfig.class);
+ } catch (RuntimeException /* ex */c) {
+  log.debug(msg("bd"), c);
   return Bc.disabled();
  }
- if (config == null) return Bc.disabled();
- return new Bc(enabled, config.getHighlightItems(), config.getHiddenItems(),
- config.showHighlightedOnly());
+ if (b == null) return Bc.disabled();
+ var /* read */d = new Bc(a, b.getHighlightItems(), b.getHiddenItems(),
+ b.showHighlightedOnly());
+ d.insane = b.insaneValuePrice();
+ return d;
 }
 
 boolean wz() {
  if (pluginManager == null) return false;
- for (Plugin plugin : pluginManager.getPlugins()) {
-  if (plugin instanceof GroundItemsPlugin) return pluginManager.isPluginEnabled(plugin);
+ for (Plugin /* plugin */a : pluginManager.getPlugins()) {
+  if (a instanceof GroundItemsPlugin) return pluginManager.isPluginEnabled(a);
  }
  return false;
 }

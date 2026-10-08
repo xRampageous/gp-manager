@@ -13,20 +13,20 @@ UndoRecord() {
  // Gson
 }
 
-UndoRecord(Ac transaction, long timestampEpochMillis) {
- this.transactionId = transaction == null ? "" : transaction.getId();
- this.timestampEpochMillis = timestampEpochMillis;
- this.activityName = transaction == null ? "Transaction" : transaction.getActivityName();
- this.type = transaction == null ? Ai.ADJUSTMENT : transaction.getType();
- this.net = transaction == null ? 0L : transaction.getNet();
- this.transaction = transaction;
+UndoRecord(Ac /* transaction */a, long /* timestampEpochMillis */b) {
+ this.transactionId = a == null ? "" : a.getId();
+ this.timestampEpochMillis = b;
+ this.activityName = a == null ? "Transaction" : a.getActivityName();
+ this.type = a == null ? Ai.ADJUSTMENT : a.getType();
+ this.net = a == null ? 0L : a.getNet();
+ this.transaction = a;
 }
 
 String getTransactionId() { return Ag.axw(transactionId); }
 String getActivityName() { return Ag.blank(activityName) ? "Transaction" : activityName; }
 Ai getType() { return type == null ? Ai.ADJUSTMENT : type; }
-void zp(long now) {
+void zp(long /* now */a) {
  restored = true;
- restoredAtEpochMillis = now;
+ restoredAtEpochMillis = a;
 }
 }

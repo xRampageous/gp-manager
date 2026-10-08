@@ -15,11 +15,14 @@ repositories {
 
 // Repeatable baseline; use -PruneliteVersion=... for an explicit compatibility run.
 def runeLiteVersion = providers.gradleProperty('runeliteVersion').getOrElse('1.13.1')
-def pluginMainClass = 'com.gpmanager.GpManagerPluginTest'
+// Dev-only tools (the engine rework's session recorder) live in src/dev, outside the public
+// allowlist; a public checkout has none and keeps the plain launcher.
+def devTools = file('src/dev/java').exists()
+def pluginMainClass = devTools ? 'com.gpmanager.DevLauncher' : 'com.gpmanager.GpManagerPluginTest'
 
 group = 'com.gpmanager'
 // Plugin metadata and build version must agree; development identity is generated below.
-version = '1.1.2'
+version = '1.2.0'
 
 
 
@@ -28,6 +31,13 @@ sourceSets {
         java.srcDir 'src/simulation/java'
         compileClasspath += sourceSets.main.output
         runtimeClasspath += output + compileClasspath
+    }
+    if (devTools) {
+        dev {
+            java.srcDir 'src/dev/java'
+            compileClasspath += sourceSets.main.output + sourceSets.test.output
+            runtimeClasspath += output + compileClasspath
+        }
     }
 }
 
@@ -42,6 +52,10 @@ def compiledClassPaths = { sourceSet ->
 configurations {
     simulationImplementation.extendsFrom testImplementation
     simulationRuntimeOnly.extendsFrom testRuntimeOnly
+    if (devTools) {
+        devImplementation.extendsFrom testImplementation
+        devRuntimeOnly.extendsFrom testRuntimeOnly
+    }
 }
 
 // Standard Plugin Hub Lombok tooling (build-time only, as in runelite/example-plugin); the pin is
@@ -70,6 +84,13 @@ test {
     failOnNoDiscoveredTests = true
     // Forward local gp.* switches (goldens, fuzz seeds, perf multiplier) to the test JVM.
     System.properties.each { k, v -> if (k.toString().startsWith('gp.')) systemProperty k.toString(), v.toString() }
+    // Test temp files stay under build/ and are emptied each run, not left in the system temp folder.
+    def testTemp = layout.buildDirectory.dir('tmp/test-temp').get().asFile
+    systemProperty 'java.io.tmpdir', testTemp.path
+    doFirst {
+        project.delete(testTemp)
+        testTemp.mkdirs()
+    }
     testLogging {
         events 'passed', 'skipped', 'failed'
         exceptionFormat = 'full'
@@ -77,7 +98,7 @@ test {
 }
 
 tasks.register('run', JavaExec) {
-    classpath = sourceSets.test.runtimeClasspath
+    classpath = devTools ? sourceSets.dev.runtimeClasspath : sourceSets.test.runtimeClasspath
     mainClass = pluginMainClass
     jvmArgs '-ea'
     args '--developer-mode', '--debug'
@@ -96,6 +117,10 @@ tasks.register('panelPreview', JavaExec) {
 
 tasks.register('shadowJar', Jar) {
     dependsOn 'testClasses'
+    if (devTools) {
+        dependsOn 'devClasses'
+        from sourceSets.dev.output
+    }
     manifest {
         attributes('Main-Class': pluginMainClass, 'Multi-Release': true)
     }
@@ -149,11 +174,12 @@ def currentSchemaVersion = {
 
 tasks.named('processResources') {
     def buildVersion = project.version.toString()
-    // The 0.x line is the unreleased development line; the future 1.x line is release/RC.
+    // The version is the release being built; every build is a development build (the dev
+    // launcher's DEV footer) unless -PpublicRelease=true marks a published one.
     def publicRelease = providers.gradleProperty('publicRelease').getOrElse('false').toBoolean()
     inputs.property('publicRelease', publicRelease)
     inputs.property('revision', shortRevision())
-    def developmentBuild = !publicRelease && buildVersion.startsWith('0.')
+    def developmentBuild = !publicRelease
     def developmentVersion = developmentBuild ? "${buildVersion}-dev" : buildVersion
     def schemaVersion = currentSchemaVersion()
     def generated = layout.buildDirectory.dir('generated/gp-manager-build')
@@ -597,15 +623,12 @@ tasks.register('brandingCompatibilityAudit') {
         if (metadata.getProperty('displayName') != 'GP Manager'
             || metadata.getProperty('plugins') != 'com.gpmanager.GpManagerPlugin'
             || !descriptorBody.contains('name = "GP Manager"')
-            || !descriptorBody.contains('internalName = "gp-manager"')
-            || !descriptorBody.contains('legacyDataDirectory = "profit-manager"')) {
+            || !descriptorBody.contains('internalName = "gp-manager"')) {
             throw new GradleException('GP Manager identity check failed: public metadata or descriptor identity is not stable.')
         }
 
         if (!configSource.contains('@ConfigGroup(GpManagerConfig.GROUP)')
-            || !configSource.contains('String GROUP = "gpmanager"')
-            || !pluginSource.contains('migrateGroup')
-            || !pluginSource.contains('"profitmanager."')) {
+            || !configSource.contains('String GROUP = "gpmanager"')) {
             throw new GradleException('GP Manager compatibility check failed: canonical config group handling is missing.')
         }
 
@@ -669,4 +692,28 @@ tasks.register('brandingCompatibilityAudit') {
 
         println 'Branding compatibility audit passed: current public identity, config bridges, RuneLite Filepath ownership, and supported migration coverage.'
     }
+}
+
+// The dev tools must keep compiling with the plugin, so the gate builds them too. They target a
+// newer Java than the plugin (the replay's settings fake needs InvocationHandler.invokeDefault);
+// they never ship, so the Hub's Java 11 target is unaffected.
+if (devTools) {
+    tasks.named('compileDevJava') { options.release = 21 }
+    tasks.register('replayCheck', JavaExec) {
+        group = 'verification'
+        description = 'Replays the private session recordings in replays/ and checks each against its baseline.'
+        dependsOn 'devClasses'
+        classpath = sourceSets.dev.runtimeClasspath
+        mainClass = 'com.gpmanager.Replay'
+        args 'replays'
+    }
+    tasks.register('replayBaseline', JavaExec) {
+        group = 'verification'
+        description = "Writes each recording's replay baseline; run on the commit before a rework step."
+        dependsOn 'devClasses'
+        classpath = sourceSets.dev.runtimeClasspath
+        mainClass = 'com.gpmanager.Replay'
+        args '--rebaseline', 'replays'
+    }
+    tasks.named('check') { dependsOn 'devClasses', 'replayCheck' }
 }

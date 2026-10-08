@@ -98,7 +98,7 @@ public class HudTrayTest
     }
 
     @Test
-    public void rowsKeepTheirPlaceWhileQuantitiesGrow()
+    public void aRowThatGrowsMovesToTheTop()
     {
         HudTray tray = new HudTray();
         tray.booked(receipt(T0, Ai.LOOT, flow(536, "Dragon bones", 1L, 2_000)), T0, false);
@@ -108,14 +108,15 @@ public class HudTrayTest
             T0 + 2L, false);
 
         List<HudTray.Entry> entries = tray.entries();
-        assertEquals("the newest distinct item stays on top", "Green dragonhide", entries.get(0).name);
-        assertEquals("an update grows its row in place", "Dragon bones", entries.get(1).name);
-        assertEquals(2L, entries.get(1).quantity);
-        assertEquals(4_000L, entries.get(1).value);
+        // Owner 1.2: the newest loot is always on top, more of an item included.
+        assertEquals("the row that last grew leads", "Dragon bones", entries.get(0).name);
+        assertEquals("Green dragonhide", entries.get(1).name);
+        assertEquals(2L, entries.get(0).quantity);
+        assertEquals(4_000L, entries.get(0).value);
     }
 
     @Test
-    public void aClaimedRewardKeepsItsRowPlaceAndFadeIdentity()
+    public void aClaimedRewardLeadsAndKeepsItsFadeIdentity()
     {
         HudTray tray = new HudTray();
         tray.observed(995, "Coins", 5_000L, 1L, T0, false);
@@ -128,10 +129,10 @@ public class HudTrayTest
 
         List<HudTray.Entry> entries = tray.entries();
         assertEquals(2, entries.size());
-        assertEquals("the claim does not jump above newer loot", "Green dragonhide", entries.get(0).name);
-        assertEquals(HudTray.State.CLAIMED, entries.get(1).state);
-        assertEquals("the row keeps its first-seen identity", T0, entries.get(1).born);
-        assertEquals(5_000L, entries.get(1).quantity);
+        assertEquals("the claim is the newest loot (owner 1.2)", "Coins", entries.get(0).name);
+        assertEquals(HudTray.State.CLAIMED, entries.get(0).state);
+        assertEquals("the row keeps its first-seen identity", T0, entries.get(0).born);
+        assertEquals(5_000L, entries.get(0).quantity);
     }
 
     @Test
@@ -333,12 +334,12 @@ public class HudTrayTest
         HudTray tray = new HudTray();
         tray.kill("Guard", T0, false);
         tray.booked(receipt(T0 + 600L, Ai.LOOT, flow(995, "Coins", 30L, 1)), T0 + 600L, false);
-        assertFalse("folded after the stay", tray.open(T0 + 600L + STAY, STAY, false));
+        assertFalse("folded after the stay", open(tray, T0 + 600L + STAY));
 
         tray.kill("Guard", T0 + 20_000L, false);
-        assertFalse("the next kill leaves the tray folded", tray.open(T0 + 20_000L, STAY, false));
+        assertFalse("the next kill leaves the tray folded", open(tray, T0 + 20_000L));
         tray.booked(receipt(T0 + 21_000L, Ai.LOOT, flow(995, "Coins", 25L, 1)), T0 + 21_000L, false);
-        assertTrue("its loot opens it", tray.open(T0 + 21_000L, STAY, false));
+        assertTrue("its loot opens it", open(tray, T0 + 21_000L));
     }
 
     @Test
@@ -346,8 +347,8 @@ public class HudTrayTest
     {
         HudTray tray = new HudTray();
         tray.booked(receipt(T0, Ai.LOOT, flow(536, "Dragon bones", 1L, 2_000)), T0, false);
-        assertTrue(tray.open(T0 + 1_000L, STAY, false));
-        assertFalse("folds after the stay", tray.open(T0 + STAY, STAY, false));
+        assertTrue(open(tray, T0 + 1_000L));
+        assertFalse("folds after the stay", open(tray, T0 + STAY));
         int trip = tray.tripId();
         tray.booked(receipt(T0 + STAY, Ai.LOOT, flow(1753, "Green dragonhide", 1L, 1_500)),
             T0 + STAY, false);
@@ -516,5 +517,11 @@ public class HudTrayTest
         tray.kill("Guard", T0 + 70_000L, false);
         assertEquals("Guard", tray.label());
         assertEquals(1, (int) tray.streak(T0 + 70_000L).getValue());
+    }
+
+    /** The tray is open while an entry changed within the stay (Cp also applies the loot filter). */
+    private static boolean open(HudTray tray, long now)
+    {
+        return tray.entries().stream().anyMatch(entry -> now - entry.touched < STAY);
     }
 }

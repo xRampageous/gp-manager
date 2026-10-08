@@ -18,32 +18,32 @@ String grindName = "";
 long grindNet;
 long grindMillis;
 /** @param bigDrop the newest fresh big drop's item name, or empty */
-String update(Ca s, String bigDrop, long now) {
- boolean grind = s.hasSession && !s.freePlay;
- String key = s.sessionId;
- if (!key.equals(sessionKey)) {
+String update(Ca s, String /* bigDrop */a, long /* now */b) {
+ boolean /* grind */c = s.hasSession && !s.freePlay;
+ String /* key */d = s.sessionId;
+ if (!d.equals(sessionKey)) {
   text = "";
   until = 0L;
   bigDropSaid = "";
-  if (!grindName.isEmpty() && !grind) {
-   say(grindName + " ended · " + signed(grindNet) + " in " + ra(grindMillis), now);
+  if (!grindName.isEmpty() && !c) {
+   say(grindName + " ended · " + signed(grindNet) + " in " + ra(grindMillis), b);
   }
-  sessionKey = key;
+  sessionKey = d;
   reached = s.goal != null && s.goal.reached;
   timeReached = s.timeTargetMillis > 0L && s.elapsedMillis >= s.timeTargetMillis;
  }
- grindName = grind ? s.ownerLabel : "";
+ grindName = c ? s.ownerLabel : "";
  grindNet = s.net;
  grindMillis = s.elapsedMillis;
- if (s.goal != null && s.goal.reached && !reached) say("Target reached · " + signed(s.net), now);
+ if (s.goal != null && s.goal.reached && !reached) say("Target reached · " + signed(s.net), b);
  reached = s.goal != null && s.goal.reached;
  if (s.timeTargetMillis > 0L && s.elapsedMillis >= s.timeTargetMillis && !timeReached) {
   timeReached = true;
-  say("Time target reached · " + ra(s.timeTargetMillis), now);
+  say("Time target reached · " + ra(s.timeTargetMillis), b);
  }
- if (!bigDrop.isEmpty() && !bigDrop.equals(bigDropSaid)) say("Big drop · " + bigDrop, now);
- bigDropSaid = bigDrop;
- return now < until ? text : "";
+ if (!a.isEmpty() && !a.equals(bigDropSaid)) say("Big drop · " + a, b);
+ bigDropSaid = a;
+ return b < until ? text : "";
 }
 
 /** A factory reset starts a new profile: no moment, no ended Grind and no "already said" survives. */
@@ -59,8 +59,8 @@ void reset() {
  grindMillis = 0L;
 }
 
-void say(String value, long now) {
- text = value;
- until = now + SHOW_MILLIS;
+void say(String /* value */a, long /* now */b) {
+ text = a;
+ until = b + SHOW_MILLIS;
 }
 }

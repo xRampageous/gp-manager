@@ -14,8 +14,8 @@ public class BuildInfoTest
     @Test
     public void developmentMetadataParsesIntoTheTinyFooterMarker()
     {
-        BuildInfo info = BuildInfo.load(stream("version=0.8.0\n"
-            + "developmentVersion=0.8.0-dev\n"
+        BuildInfo info = BuildInfo.load(stream("version=1.2.0\n"
+            + "developmentVersion=1.2.0-dev\n"
             + "development=true\n"
             + "schema=105\n"
             + "builtAt=2026-09-23T01:24:37Z\n"
@@ -23,13 +23,13 @@ public class BuildInfoTest
             + "runeliteDependency=1.12.39\n"));
 
         assertTrue(info.development());
-        assertEquals("0.8.0", info.version());
-        assertEquals("0.8.0-dev", info.developmentVersion());
+        assertEquals("1.2.0", info.version());
+        assertEquals("1.2.0-dev", info.developmentVersion());
         assertEquals("105", info.schemaVersion());
         assertEquals("2929696", info.revision());
-        assertEquals("DEV \u00b7 0.8.0 \u00b7 01:24Z", info.badgeText());
+        assertEquals("DEV \u00b7 1.2.0 \u00b7 01:24Z", info.badgeText());
         assertTrue(info.tooltipText().contains("GP Manager Development Build"));
-        assertTrue(info.tooltipText().contains("Version: 0.8.0-dev"));
+        assertTrue(info.tooltipText().contains("Version: 1.2.0-dev"));
         assertTrue(info.tooltipText().contains("Schema: 105"));
         assertTrue(info.tooltipText().contains("Built: 2026-09-23 01:24:37 UTC"));
         assertTrue(info.tooltipText().contains("RuneLite: 1.12.39"));
@@ -75,22 +75,22 @@ public class BuildInfoTest
     @Test
     public void unparseableTimestampKeepsTheVersionAndDropsOnlyTheClock()
     {
-        BuildInfo info = BuildInfo.load(stream("version=0.8.0\n"
-            + "developmentVersion=0.8.0-dev\n"
+        BuildInfo info = BuildInfo.load(stream("version=1.2.0\n"
+            + "developmentVersion=1.2.0-dev\n"
             + "development=true\n"
             + "builtAt=not-a-timestamp\n"));
 
-        assertEquals("DEV \u00b7 0.8.0", info.badgeText());
+        assertEquals("DEV \u00b7 1.2.0", info.badgeText());
         assertTrue(info.tooltipText().contains("Built: not-a-timestamp"));
     }
 
     @Test
     public void injectedFixedIdentityDoesNotDependOnTheWallClock()
     {
-        BuildInfo info = BuildInfo.of("0.8.0", "0.8.0-dev", "105",
+        BuildInfo info = BuildInfo.of("1.2.0", "1.2.0-dev", "105",
             "2026-09-23T11:42:05Z", "abcdef1", "1.12.39", true);
 
-        assertEquals("DEV \u00b7 0.8.0 \u00b7 11:42Z", info.badgeText());
+        assertEquals("DEV \u00b7 1.2.0 \u00b7 11:42Z", info.badgeText());
     }
 
     private static ByteArrayInputStream stream(String text)

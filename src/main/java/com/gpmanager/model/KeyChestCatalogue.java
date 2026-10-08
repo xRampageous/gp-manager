@@ -48,76 +48,76 @@ import lombok.*;
 class KeyChestCatalogue {
 static final List<Entry> ENTRIES = new ArrayList<>();
 static {
- for (String[] row : Ak.rows("d11")) {
-  ENTRIES.add(new Entry(Integer.parseInt(row[0]), row[1], Boolean.parseBoolean(row[2])));
+ for (String[] /* row */b : Ak.rows("d11")) {
+  ENTRIES.add(new Entry(Integer.parseInt(b[0]), b[1], Boolean.parseBoolean(b[2])));
  }
 }
 
 /** Catalogue entries for a key item; Larran's key has both chest variants. */
-static List<Entry> rs(int keyItemId) {
- var entries = new ArrayList<Entry>();
- for (Entry entry : ENTRIES) {
-  if (entry.keyItemId == keyItemId) entries.add(entry);
+static List<Entry> rs(int /* keyItemId */a) {
+ var /* entries */b = new ArrayList<Entry>();
+ for (Entry /* entry */c : ENTRIES) {
+  if (c.keyItemId == a) b.add(c);
  }
- return entries;
+ return b;
 }
 
 /** First known chest association for an item, or {@code null} when not catalogued. */
-static Entry rq(int keyItemId) {
- List<Entry> entries = rs(keyItemId);
- return entries.isEmpty() ? null : entries.get(0);
+static Entry rq(int /* keyItemId */a) {
+ List<Entry> /* entries */b = rs(a);
+ return b.isEmpty() ? null : b.get(0);
 }
 
 /** Match an observed object target that contains one exact catalogue chest label. */
-static Entry rp(String target) {
- if (Ag.blank(target)) return null;
- String asw = normalize(target);
- Entry best = null;
- for (Entry entry : ENTRIES) {
-  String name = normalize(entry.getChestName());
-  if (asw.contains(name) && (best == null || name.length() > normalize(best.getChestName()).length())) {
-   best = entry;
+static Entry rp(String /* target */a) {
+ if (Ag.blank(a)) return null;
+ String /* asw */b = normalize(a);
+ Entry /* best */c = null;
+ for (Entry /* entry */d : ENTRIES) {
+  String /* name */e = normalize(d.chestName);
+  if (b.contains(e) && (c == null || e.length() > normalize(c.chestName).length())) {
+   c = d;
   }
  }
- return best;
+ return c;
 }
 
 /** Arm a short-lived chest label for measured key-loss disambiguation only. */
-static Entry rv(String option, String target) {
- String action = option == null ? "" : normalize(option);
- if (!(action.equals("open") || action.startsWith("open ") || action.equals("unlock") || action.startsWith("unlock ")
- || action.equals("search") || action.startsWith("search "))) {
+static Entry rv(String /* option */a, String /* target */b) {
+ String /* action */c = a == null ? "" : normalize(a);
+ if (!(c.equals("open") || c.startsWith("open ") || c.equals("unlock") || c.startsWith("unlock ")
+ || c.equals("search") || c.startsWith("search "))) {
   return null;
  }
- return rp(target);
+ return rp(b);
 }
 
-static boolean wc(int keyItemId) {
- return rq(keyItemId) != null;
+static boolean wc(int /* keyItemId */a) {
+ return rq(a) != null;
 }
 
 /** Deferred claims have no held value and are excluded from high-alchemy fallback. */
-static boolean wg(int keyItemId) {
- Entry entry = rq(keyItemId);
- return entry != null && !entry.isTradeable();
+static boolean wg(int /* keyItemId */a) {
+ Entry /* entry */b = rq(a);
+ return b != null && !b.tradeable;
 }
 
 static List<Entry> entries() {
  return Collections.unmodifiableList(ENTRIES);
 }
 
-static String normalize(String value) {
- return value.trim().replace('\u2019', '\'').toLowerCase(Locale.ROOT);
+static String normalize(String /* value */a) {
+ return a.trim().replace('\u2019', '\'').toLowerCase(Locale.ROOT);
 }
 
 /** Immutable key-to-chest information for accounting and presentation. */
 @AllArgsConstructor
 static class Entry {
  @Getter
- final int keyItemId;
+ int keyItemId;
  @Getter
- final String chestName;
+ String chestName;
  @Getter
- final boolean tradeable;
+ boolean tradeable;
 }
 }

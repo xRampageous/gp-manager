@@ -5,14 +5,14 @@ import static com.gpmanager.Ae.nonNeg;
 * measured outstanding stack quantities, and age is measured in active engine game ticks.
 */
 class DeathReclaimStatus {
-final boolean awaiting;
-final boolean armed;
-final long outstandingItemCount;
-final long ageTicks;
-DeathReclaimStatus(boolean awaiting, boolean armed, long outstandingItemCount, long ageTicks) {
- this.awaiting = awaiting;
- this.armed = awaiting && armed;
- this.outstandingItemCount = nonNeg(outstandingItemCount);
- this.ageTicks = nonNeg(ageTicks);
+boolean awaiting;
+boolean armed;
+long outstandingItemCount;
+long ageTicks;
+DeathReclaimStatus(boolean /* awaiting */a, boolean /* armed */b, long /* outstandingItemCount */c, long /* ageTicks */d) {
+ this.awaiting = a;
+ this.armed = a && b;
+ this.outstandingItemCount = nonNeg(c);
+ this.ageTicks = nonNeg(d);
 }
 }

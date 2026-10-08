@@ -3,30 +3,30 @@ import lombok.*;
 import java.util.*;
 @EqualsAndHashCode
 class Cc {
-final Map<Integer, Long> quantities;
-Cc(Map<Integer, Long> quantities) {
- this.quantities = Collections.unmodifiableMap(new HashMap<>(quantities));
+Map<Integer, Long> quantities;
+Cc(Map<Integer, Long> /* quantities */a) {
+ this.quantities = Collections.unmodifiableMap(new HashMap<>(a));
 }
 
 static Cc empty() {
  return new Cc(Collections.emptyMap());
 }
 
-Map<Integer, Long> diff(Cc previous) {
- var result = new HashMap<Integer, Long>();
- var itemIds = new HashSet<Integer>(quantities.keySet());
- itemIds.addAll(previous.quantities.keySet());
- for (Integer itemId : itemIds) {
-  long currentQuantity = quantities.getOrDefault(itemId, 0L);
-  long atf = previous.quantities.getOrDefault(itemId, 0L);
-  long delta = currentQuantity - atf;
-  if (delta != 0L) result.put(itemId, delta);
+Map<Integer, Long> diff(Cc /* previous */a) {
+ var /* result */b = new HashMap<Integer, Long>();
+ var /* itemIds */c = new HashSet<Integer>(quantities.keySet());
+ c.addAll(a.quantities.keySet());
+ for (Integer /* itemId */d : c) {
+  long /* currentQuantity */e = quantities.getOrDefault(d, 0L);
+  long /* atf */f = a.quantities.getOrDefault(d, 0L);
+  long /* delta */g = e - f;
+  if (g != 0L) b.put(d, g);
  }
- return result;
+ return b;
 }
 
 /** Quantity of one item id in this snapshot (0 when absent). */
-long aea(int itemId) {
- return quantities.getOrDefault(itemId, 0L);
+long aea(int /* itemId */a) {
+ return quantities.getOrDefault(a, 0L);
 }
 }

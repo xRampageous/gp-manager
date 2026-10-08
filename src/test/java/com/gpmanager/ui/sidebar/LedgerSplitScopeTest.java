@@ -54,7 +54,7 @@ public class LedgerSplitScopeTest
             new Ab(536, "Dragon bones", 1L, 2_000, 2_000L));
 
         fixture.split(transaction.getId());
-        assertEquals("the prompt names the receipt", "Split receipt", ShellProbe.sheetTitle(fixture.shell()));
+        assertEquals("the prompt names the entry", "Split entry", ShellProbe.sheetTitle(fixture.shell()));
         fixture.type("1");
         fixture.press("OK");
 

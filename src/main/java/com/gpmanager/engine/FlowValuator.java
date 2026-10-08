@@ -2,13 +2,13 @@ package com.gpmanager;
 import java.util.*;
 @FunctionalInterface
 interface FlowValuator {
-List<Ab> value(Map<Integer, Long> quantityDeltas);
+List<Ab> value(Map<Integer, Long> /* quantityDeltas */a);
 /**
 * Values flows using the caller's evidence-capture time. Existing valuators remain
 * source-compatible and may ignore the timestamp until they support price provenance.
 */
-default List<Ab> value(Map<Integer, Long> quantityDeltas, long priceCapturedAtEpochMillis) {
- return value(quantityDeltas);
+default List<Ab> value(Map<Integer, Long> /* quantityDeltas */a, long /* priceCapturedAtEpochMillis */b) {
+ return value(a);
 }
 
 /**
@@ -21,8 +21,8 @@ default List<Ab> value(Map<Integer, Long> quantityDeltas, long priceCapturedAtEp
 * A {@code null} result means the confirmed action had an unsupported or conflicting price
 * basis; callers must keep the original captured flows and route the receipt to Review.
 */
-default List<Ab> normalizeConsumedFlows(List<Ab> flows, Au actionKind, long priceCapturedAtEpochMillis) {
- return flows;
+default List<Ab> normalizeConsumedFlows(List<Ab> /* flows */a, Au /* actionKind */b, long /* priceCapturedAtEpochMillis */c) {
+ return a;
 }
 
 /**

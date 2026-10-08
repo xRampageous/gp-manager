@@ -2,28 +2,15 @@
 
 A RuneLite plugin that works out what you actually made. It watches your inventory, gear and bank changes and keeps the books — you just play.
 
-<p>
-  <img src="docs/screenshots/live.png" width="242" alt="Live tab: Net, gains, supplies, losses, GP/h, a Net target and recent drops (preview render)">
-  <img src="docs/screenshots/ledger.png" width="242" alt="Ledger tab: gains, costs, market, deaths and review, each row opening its receipts (preview render)">
-  <img src="docs/screenshots/grinds.png" width="242" alt="Grinds tab: the running Grind, all-time totals, saved Grinds and recent runs (preview render)">
-</p>
-<p>
-  <img src="docs/screenshots/hud.png" width="360" alt="HUD+ in the game window (preview render)">
-</p>
-
-An empty, untitled run uses one compact row:
-
-<img src="docs/screenshots/hud-empty.png" alt="Compact empty HUD: status, timer and rate (preview render)">
-
 ## What you get
 
 - **Live** – your Net, gains, supplies, losses and GP/h as you go, and the last few drops. Click the Net to set a target; Start and End a Grind right there, and click its name to rename it.
-- **Ledger** – every gain, loss, trade and death, with the reason it was counted. Losses split into Supplies, Items and Charges. Spells you autocast show by name. Open a row to see its receipts; fix any of them from one Correct menu (count it as revenue or a cost, mark it a transfer, exclude it, split it, or undo your latest correction). Anything it wasn't sure about waits in Review for your decision.
+- **Ledger** – every gain, loss, trade and death, with the reason it was counted. Losses split into Supplies, Items and Charges. Spells you autocast show by name. Open a row to see what it used or received, item by item, and each entry behind it; fix any entry from one Correct menu (count it as revenue or a cost, mark it a transfer, exclude it, split it, or undo your latest correction). Anything it wasn't sure about waits in Review for your decision.
 - **Grinds** – start a named Grind for what you're doing (Vorkath, Zulrah, a skilling spot), save it with targets, and see every run with its biggest gain and cost and its loot by the monster that dropped it. Between Grinds it tracks Free play on its own.
-- **All time** – on the Grinds tab: your total Net, GP/h, active time, Grinds played, supplies and losses, and your best Grind by Net and by GP/h.
+- **All time** – on the Grinds tab: your total Net, GP/h, active time, Grinds played, supplies and losses, your best Grind by Net and by GP/h, and your wealth: the bank (as of your last visit) plus what you carry.
 - **HUD+** – a compact box in the game window: your Grind (or KC while you fight), Net, GP/h, and a loot tray naming the current kill streak with its Net per kill. When a Grind ends it shows its Net and time.
 - **PvP** – kills, deaths, K/D and player loot, only in confidently dangerous areas, and what a death there would risk.
-- **Backups** – a copy of your save file you can keep or restore. Older receipts and detail beyond the receipt limit fold into exact totals; the selected retention window governs age-based compaction of closed runs.
+- **Backups** – a copy of your save file you can keep or restore. Older entries and detail beyond the entry limit fold into exact totals; the selected retention window governs age-based compaction of closed runs.
 
 ## How it counts
 
@@ -50,4 +37,4 @@ gradlew run
 
 `releaseBundle -PpublicRelease=true` prepares the public package without development build metadata.
 
-`releaseCheck` runs the tests, the accounting simulations and the safety audit. Contributions and bug reports: open an issue, with a screenshot of the Ledger receipt if you can.
+`releaseCheck` runs the tests, the accounting simulations and the safety audit. Contributions and bug reports: open an issue, with a screenshot of the Ledger entry if you can.

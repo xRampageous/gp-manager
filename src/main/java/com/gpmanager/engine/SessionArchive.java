@@ -21,30 +21,30 @@ void clear() {
 }
 
 /** Restores the retention markers. */
-void restore(SavedState state, long now) {
- lastReceiptRetentionDayUtc = state.getLastReceiptRetentionDayUtc();
+void restore(SavedState /* state */a, long /* now */b) {
+ lastReceiptRetentionDayUtc = a.getLastReceiptRetentionDayUtc();
 }
 
 /** Post-restore compaction with the configured window. */
-void pr(long now) {
- Db period = engine.config.receiptRetentionDays();
- int days = period == null ? Db.DAYS_90.getDays() : period.getDays();
- if (days > 0) pg(days, now);
- lastReceiptRetentionDayUtc = Instant.ofEpochMilli(now).atZone(ZoneOffset.UTC).toLocalDate().toString();
+void pr(long /* now */a) {
+ Db /* period */b = engine.config.receiptRetentionDays();
+ int /* days */c = b == null ? Db.DAYS_90.days : b.days;
+ if (c > 0) pg(c, a);
+ lastReceiptRetentionDayUtc = Instant.ofEpochMilli(a).atZone(ZoneOffset.UTC).toLocalDate().toString();
 }
 
-void auc(SessionArchive staged) {
- lastReceiptRetentionDayUtc = staged.lastReceiptRetentionDayUtc;
+void auc(SessionArchive /* staged */a) {
+ lastReceiptRetentionDayUtc = a.lastReceiptRetentionDayUtc;
 }
 
-void ayc(SavedState state) {
- state.setLastReceiptRetentionDayUtc(lastReceiptRetentionDayUtc);
+void ayc(SavedState /* state */a) {
+ a.setLastReceiptRetentionDayUtc(lastReceiptRetentionDayUtc);
 }
 
 void akm() {
- int maxHistory = Math.max(1, engine.config.maxHistorySessions());
- if (engine.history.size() > maxHistory) {
-  engine.history.subList(maxHistory, engine.history.size()).clear();
+ int /* maxHistory */a = Math.max(1, engine.config.maxHistorySessions());
+ if (engine.history.size() > a) {
+  engine.history.subList(a, engine.history.size()).clear();
   engine.nc();
  }
 }
@@ -56,93 +56,89 @@ void akm() {
 *
 * @return receipt rows compacted
 */
-int pg(int days, long now) {
- if (days <= 0) return 0;
- long cutoff;
+int pg(int /* days */b, long /* now */c) {
+ if (b <= 0) return 0;
+ long /* cutoff */d;
  try {
-  cutoff = Instant.ofEpochMilli(now).minus(days, ChronoUnit.DAYS).toEpochMilli();
- } catch (RuntimeException ex) {
-  cutoff = Long.MIN_VALUE;
+  d = Instant.ofEpochMilli(c).minus(b, ChronoUnit.DAYS).toEpochMilli();
+ } catch (RuntimeException /* ex */e) {
+  d = Long.MIN_VALUE;
  }
  // Rows still needed individually: an unresolved claim's audit row and the settlement that
  // carries a claim id keep their detail until the claim resolves (section L).
- Set<String> amr = engine.aul();
- Predicate<Ac> keep = transaction -> xm(transaction, amr)
- || (!transaction.uo().isEmpty() && amr.contains(transaction.uo()));
- int compactedReceipts = 0;
- for (Ad session : engine.akf()) {
-  if (session == null || session.getTransactions().isEmpty()) continue;
-  compactedReceipts = Ae.agy(compactedReceipts, session.pj(cutoff, keep));
+ Set<String> /* amr */f = engine.aul();
+ Predicate<Ac> /* keep */g = /* transaction */h -> xm(h, f)
+ || (!h.uo().isEmpty() && f.contains(h.uo()));
+ int /* compactedReceipts */i = 0;
+ for (Ad /* session */j : engine.akf()) {
+  if (j == null || j.getTransactions().isEmpty()) continue;
+  i = Ae.agy(i, j.pj(d, g));
  }
- if (compactedReceipts > 0) engine.nc();
- engine.pkHistory.ri(engine.akf(), days, now);
- return compactedReceipts;
+ if (i > 0) engine.nc();
+ engine.pkHistory.ri(engine.akf(), b, c);
+ return i;
 }
 
 /** A multi-key audit row owns claims named {@code auditId#n}; retain its base row while any
 * derived claim remains unresolved so provenance survives receipt compaction. */
-static boolean xm(Ac transaction, Set<String> amr) {
- if (transaction == null || empty(amr)) return false;
- String transactionId = transaction.getId();
- if (amr.contains(transactionId)) return true;
- String arx = transactionId + "#";
- for (String claimId : amr) {
-  if (claimId != null && claimId.startsWith(arx)) return true;
+static boolean xm(Ac /* transaction */a, Set<String> /* amr */b) {
+ if (a == null || empty(b)) return false;
+ String /* transactionId */c = a.getId();
+ if (b.contains(c)) return true;
+ String /* arx */d = c + "#";
+ for (String /* claimId */e : b) {
+  if (e != null && e.startsWith(d)) return true;
  }
  return false;
 }
 
 /** Daily UTC maintenance hook. Supplying time keeps lifecycle tests deterministic. */
-int yt(int days, long now) {
- LocalDate today = Instant.ofEpochMilli(now).atZone(ZoneOffset.UTC).toLocalDate();
- LocalDate previous = acw(lastReceiptRetentionDayUtc);
- if (previous == null) {
-  lastReceiptRetentionDayUtc = today.toString();
+int yt(int /* days */a, long /* now */b) {
+ LocalDate /* today */c = Instant.ofEpochMilli(b).atZone(ZoneOffset.UTC).toLocalDate();
+ LocalDate /* previous */d = acw(lastReceiptRetentionDayUtc);
+ if (d == null) {
+  lastReceiptRetentionDayUtc = c.toString();
   return 0;
  }
- if (!today.isAfter(previous)) return 0;
- int compacted = days <= 0 ? 0 : pg(days, now);
- lastReceiptRetentionDayUtc = today.toString();
- return compacted;
+ if (!c.isAfter(d)) return 0;
+ int /* compacted */e = a <= 0 ? 0 : pg(a, b);
+ lastReceiptRetentionDayUtc = c.toString();
+ return e;
 }
 
 /** Configured UTC retention maintenance used by the game-tick lifecycle. */
-int yt(long now) {
- Db period = engine.config.receiptRetentionDays();
- return yt(period == null ? Db.DAYS_90.getDays() : period.getDays(), now);
+int yt(long /* now */a) {
+ Db /* period */b = engine.config.receiptRetentionDays();
+ return yt(b == null ? Db.DAYS_90.days : b.days, a);
 }
 
-static LocalDate acw(String value) {
- if (blank(value)) return null;
+static LocalDate acw(String /* value */a) {
+ if (blank(a)) return null;
  try {
-  return LocalDate.parse(value.trim());
- } catch (RuntimeException ex) {
+  return LocalDate.parse(a.trim());
+ } catch (RuntimeException /* ex */b) {
   return null;
  }
 }
 
-Ad ua(String sessionId) {
- if (empty(sessionId)) return null;
- for (Ad session : engine.history) {
-  if (sessionId.equals(session.getId())) return session;
+Ad ua(String /* sessionId */a) {
+ if (empty(a)) return null;
+ for (Ad /* session */b : engine.history) {
+  if (a.equals(b.getId())) return b;
  }
  return null;
 }
 
-Bu tz(String sessionId, long now) {
- Ad session = ua(sessionId);
- return session == null ? null : session.metrics(now);
+Bu tz(String /* sessionId */a, long /* now */b) {
+ Ad /* session */c = ua(a);
+ return c == null ? null : c.metrics(b);
 }
 
-boolean qu(String sessionId) {
- if (empty(sessionId)) return false;
- for (int index = 0; index < engine.history.size(); index++) {
-  if (sessionId.equals(engine.history.get(index).getId())) {
-   engine.history.remove(index);
-   engine.nc();
-   return true;
-  }
- }
- return false;
+boolean qu(String /* sessionId */a) {
+ Ad b = ua(a);
+ if (b == null) return false;
+ engine.history.remove(b);
+ engine.nc();
+ return true;
 }
 }

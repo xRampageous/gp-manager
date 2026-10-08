@@ -61,25 +61,27 @@ interface Actions {
 }
 
 static final int ROWS = 5;
-final Actions actions;
-final Function<Integer, BufferedImage> sprites;
-final Map<Integer, ImageIcon> icons = new HashMap<>();
-final JPanel bar = new JPanel(new BorderLayout(4, 0));
-final JButton scope;
-final JPanel body = stack(PANEL, GAP);
-final IconTextField search = new IconTextField();
-final Table gains = new Table("GAINS");
-final Table costs = new Table("LOSSES");
-final Table market = new Table("MARKET");
-final Table deaths = new Table("DEATHS");
-final Table pending = new Table("PENDING");
-final Table review = new Table("REVIEW");
+Actions actions;
+Function<Integer, BufferedImage> sprites;
+Map<Integer, ImageIcon> icons = new HashMap<>();
+JPanel bar = new JPanel(new BorderLayout(4, 0));
+JButton scope;
+JPanel body = stack(PANEL, GAP);
+IconTextField search = new IconTextField();
+Table gains = new Table("GAINS");
+Table costs = new Table("LOSSES");
+Table market = new Table("MARKET");
+Table deaths = new Table("DEATHS");
+Table pending = new Table("PENDING");
+Table review = new Table("REVIEW");
 /** The group-detail receipt list; persistent so its pager survives refreshes (F07). */
-final Table detailReceipts = new Table("RECEIPTS");
+Table detailReceipts = new Table("ENTRIES");
+/** What a multi-item group used or received in all, item by item (owner 2026-10-03). */
+Table detailItems = new Table("USED");
 /** The scope/session/group the detail receipts belong to; a change restarts its pager. */
 String detailReceiptsFor = "";
-final Table corrected = new Table("CORRECTED");
-final JPanel detail = stack(PANEL, GAP);
+Table corrected = new Table("CORRECTED");
+JPanel detail = stack(PANEL, GAP);
 Ao data;
 boolean searchOpen;
 boolean quietSearch;
@@ -95,7 +97,6 @@ long[] pendingSplit;
 LedgerPage(Actions actions, Function<Integer, BufferedImage> sprites) {
  this.actions = actions;
  this.sprites = sprites == null ? id -> null : sprites;
- bar.setOpaque(false);
  scope = button("This Grind \u25be", false, () -> { });
  scope.addActionListener(e -> actions.openScopeMenu(scope));
  JButton find = button("Search", false, this::akg);
@@ -104,7 +105,7 @@ LedgerPage(Actions actions, Function<Integer, BufferedImage> sprites) {
  more.setToolTipText("Ledger actions");
  more.addActionListener(e -> awo().show(more, 0, more.getHeight()));
  // Owner 2026-10-01: one toolbar band shared with the Grinds page; actions sit on the right.
- bar.add(Kit.toolbar(new JComponent[] {scope}, new JComponent[] {find, more}), BorderLayout.NORTH);
+ Kit.h1(bar, new JComponent[] {scope}, new JComponent[] {find, more});
  search.setIcon(IconTextField.Icon.SEARCH);
  search.setBackground(CARD);
  search.setHoverBackgroundColor(SELECTED);
@@ -244,7 +245,7 @@ void overview(Ao d) {
    rows.add(new Row("death|" + death.transactionId, null, death.place, when(death.at, d.capturedAt),
    signed(death.value), LOSS, death.place + msg("fr"),
    ru(death.value) + " gp", selected, apk,
-   Arrays.asList(new Menu("Details", apk), new Menu("Open receipt",
+   Arrays.asList(new Menu("Details", apk), new Menu("Open entry",
    () -> actions.selectionChanged(death.transactionId, null, null)))));
   }
   deaths.setTitle("DEATHS · " + rows.size()).setTotal(signed(lost), LOSS)
@@ -312,7 +313,7 @@ Row awh(Group group, Tone tone) {
  Tone shown = tone;
  String meta = Dc.auo(group);
  String tip = group.primaryName + " · " + (group.receiptCount > 1
- ? (meta.isEmpty() ? "" : meta + " · ") + group.receiptCount + " receipts" : meta);
+ ? (meta.isEmpty() ? "" : meta + " · ") + group.receiptCount + " entries" : meta);
  if (group.reviewRequired) {
   value = "?";
   shown = REVIEW;
@@ -329,7 +330,7 @@ Row awh(Group group, Tone tone) {
  } else if (group.incomplete()) {
   value = "?";
   shown = DIM;
-  tip = group.primaryName + " · incomplete value coverage";
+  tip = group.primaryName + msg("c8");
  } else {
   value = signed(group.value);
  }
@@ -458,10 +459,10 @@ static String abx(Cu row, long net) {
  if (size == 0L) return "";
  var text = new StringBuilder();
  if (row.validDecisions.contains(Cl.GAIN)) {
-  text.append("If counted as a gain: Net ").append(signed(net + size));
+  text.append(msg("c7")).append(signed(net + size));
  }
  if (row.validDecisions.contains(Cl.COST)) {
-  text.append(text.length() == 0 ? "If counted as a cost: Net " : " · as a cost: Net ").append(signed(net - size));
+  text.append(text.length() == 0 ? msg("c6") : " · as a cost: Net ").append(signed(net - size));
  }
  return text.toString();
 }
@@ -501,8 +502,14 @@ void mw(Ao d) {
  int count = group.market ? open.receipts.size() : group.receiptCount;
  detail.add(title(group.primaryName, group.incomplete() ? "Incomplete" : ru(group.value) + " gp",
  group.incomplete() ? DIM : sign(group.value), (count == 0 ? "" : count
- + (group.market ? count == 1 ? " trade · " : " trades · " : count == 1 ? " receipt · " : " receipts · "))
+ + (group.market ? count == 1 ? " trade · " : " trades · " : count == 1 ? " entry · " : " entries · "))
  + "Latest " + age(nonNeg(d.capturedAt - latest))));
+ List<Row> items = items(group);
+ // A charged weapon always lists what it spent, even one rune type (owner 1.2).
+ if (!group.market && (items.size() > 1 || group.chargeUse)) {
+  detailItems.setTitle((group.chargeUse || group.value < 0L ? "USED · " : "ITEMS · ") + items.size()).setRows(items);
+  detail.add(detailItems);
+ }
  String receiptsFor = d.entry.scope.name() + "|" + String.valueOf(d.entry.historySessionId)
  + "|" + group.semanticGroupId;
  if (!receiptsFor.equals(detailReceiptsFor)) {
@@ -516,7 +523,25 @@ void mw(Ao d) {
  if (open.exact != null) detail.add(receipt(d, open.exact));
 }
 
-/** Every receipt in the group: a trade each for Market, one canonical transaction each otherwise. */
+/** The group's items summed across its entries: "Blood rune ×124" and what it came to. */
+List<Row> items(Group group) {
+ var totals = new LinkedHashMap<String, ResourceSummary>();
+ for (Card card : Ao.cards(group)) {
+  for (ResourceSummary item : card.resources) {
+   totals.merge(item.itemId + "|" + item.itemName, item, (a, b) -> new ResourceSummary(a.itemId, a.itemName, a.usedBy,
+   a.quantity + b.quantity, a.value + b.value, a.knownSubtotal + b.knownSubtotal, a.incomplete || b.incomplete));
+  }
+ }
+ var rows = new ArrayList<Row>();
+ for (ResourceSummary item : totals.values()) {
+  rows.add(new Row("item|" + item.itemId + "|" + item.itemName, icon(item.itemId), item.itemName, times(item.quantity),
+  item.incomplete ? "?" : signed(item.value), item.incomplete ? DIM : sign(item.value), "",
+  item.incomplete ? "" : ru(item.value) + " gp", false, null, null));
+ }
+ return rows;
+}
+
+/** Every entry in the group: a trade each for Market, one canonical transaction each otherwise. */
 void receipts(Ao d, Detail open) {
  Group group = open.group;
  Receipt chosen = open.exact;
@@ -530,24 +555,26 @@ void receipts(Ao d, Detail open) {
    Dc.aab(receipt), realized ? signed(primary)
    : Dc.avj(receipt.marketSettlement), realized ? MARKET : DIM,
    Dc.aaa(receipt, d.capturedAt)
-   + (receipt.corrected ? " · Result includes a manual correction." : ""),
+   + (receipt.corrected ? msg("c5") : ""),
    realized ? ru(primary) + " gp" : "", splittable(receipt)));
   }
  } else {
+  // A multi-item group's entries say what each use spent ("Blood rune ×2"), not the group again.
+  boolean several = items(group).size() > 1 || group.chargeUse;
   for (Ao.Card card : Ao.cards(group)) {
    boolean split = false;
    for (Receipt receipt : open.receipts) {
     split |= receipt.transactionId.equals(card.transactionId) && splittable(receipt);
    }
    rows.add(aen(d, group, card.transactionId, card.contributionId,
-   chosen != null && chosen.transactionId.equals(card.transactionId), group.primaryName,
+   chosen != null && chosen.transactionId.equals(card.transactionId), several ? card.summaryText() : group.primaryName,
    card.incomplete ? "?" : signed(card.value), card.incomplete ? DIM : sign(card.value),
    card.summaryText() + " · " + age(nonNeg(d.capturedAt - card.at))
    + (card.incomplete ? " · known value " + ru(card.knownSubtotal) + " gp" : ""),
    card.incomplete ? "" : ru(card.value) + " gp", split));
   }
  }
- detailReceipts.setTitle("RECEIPTS · " + rows.size()).setRows(rows);
+ detailReceipts.setTitle("ENTRIES · " + rows.size()).setRows(rows);
 }
 
 Row aen(Ao d, Group group, String transactionId,
@@ -622,7 +649,7 @@ JComponent receipt(Ao d, Receipt row) {
   .put("Change", ru(pendingPreview.change) + " gp", sign(pendingPreview.change)));
   panel.add(note(pendingPreview.note(), LABEL));
   JButton confirm = button("Confirm", true, this::confirm);
-  confirm.getAccessibleContext().setAccessibleName("Confirm correction");
+  confirm.getAccessibleContext().setAccessibleName(msg("c4"));
   panel.add(row(button("Cancel", false, () -> {
    ou();
    actions.refresh();
@@ -674,10 +701,10 @@ static String aut(Bi.Row trade, String label, String value) {
   return value.endsWith("Partial") ? msg("hl") : null;
   case "GE difference":
   String reference = trade.geReferenceGp >= 0L
-  ? " The frozen after-tax reference is " + exact(trade.geReferenceGp) + " gp across "
+  ? msg("c3") + exact(trade.geReferenceGp) + " gp across "
   + exact(trade.settledQty) + " collected" + (trade.expectedReferenceTaxGp > 0L ? " after "
   + exact(trade.expectedReferenceTaxGp) + " gp expected GE tax" : "") + "." : "";
-  return msg("jh") + "proceeds." + reference + " It does not affect Net.";
+  return msg("jh") + "proceeds." + reference + msg("c2");
   default:
   return null;
  }
@@ -730,7 +757,7 @@ void confirm() {
  ou();
  actions.refresh();
  if (outcome != Ea.APPLIED) {
-  aiu(outcome == Ea.STALE ? msg("gz") : "That correction was not applied");
+  aiu(outcome == Ea.STALE ? msg("gz") : msg("c1"));
  }
 }
 

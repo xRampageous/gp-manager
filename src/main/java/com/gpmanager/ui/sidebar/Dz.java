@@ -11,46 +11,46 @@ package com.gpmanager;
 */
 class Dz {
 static final Dz NONE = new Dz(false, null, 0L, Bo.NONE, "", false, "", false);
-final boolean idle;
+boolean idle;
 /** Presentation-only item filter; null means every booked row stays visible. */
-final RecentFilter filter;
+RecentFilter filter;
 /** Hide gained rows whose unit price is below this value; 0 shows all. Never hides costs. */
-final long minimumDisplayedLootValue;
+long minimumDisplayedLootValue;
 /** Cached client-thread PvP sample; presentation only. */
-final Bo pvp;
+Bo pvp;
 /** Activity context label for the status line; empty means "use the owner name". */
-final String activity;
+String activity;
 /** Freshest client-thread interaction target for the shared activity label; empty when none. */
-final String target;
+String target;
 /** The client is at the login screen; only read when no Grind is active. */
-final boolean offline;
+boolean offline;
 /** A world hop is in flight: presentation says Reconnecting, never Logged out. */
-final boolean hopping;
-Dz(boolean idle, RecentFilter filter, long minimumDisplayedLootValue, Bo pvp, String activity,
-boolean offline, String target) {
- this(idle, filter, minimumDisplayedLootValue, pvp, activity, offline, target, false);
+boolean hopping;
+Dz(boolean /* idle */a, RecentFilter /* filter */b, long /* minimumDisplayedLootValue */c, Bo /* pvp */d, String /* activity */e,
+boolean /* offline */f, String /* target */g) {
+ this(a, b, c, d, e, f, g, false);
 }
 
-Dz(boolean idle, RecentFilter filter, long minimumDisplayedLootValue, Bo pvp, String activity,
-boolean offline, String target, boolean hopping) {
- this.idle = idle;
- this.filter = filter;
- this.minimumDisplayedLootValue = Ae.nonNeg(minimumDisplayedLootValue);
- this.pvp = pvp == null ? Bo.NONE : pvp;
- this.activity = Ag.axw(activity);
- this.offline = offline;
- this.target = Ag.axw(target);
- this.hopping = hopping;
+Dz(boolean /* idle */a, RecentFilter /* filter */b, long /* minimumDisplayedLootValue */c, Bo /* pvp */d, String /* activity */e,
+boolean /* offline */f, String /* target */g, boolean /* hopping */h) {
+ this.idle = a;
+ this.filter = b;
+ this.minimumDisplayedLootValue = Ae.nonNeg(c);
+ this.pvp = d == null ? Bo.NONE : d;
+ this.activity = Ag.axw(e);
+ this.offline = f;
+ this.target = Ag.axw(g);
+ this.hopping = h;
 }
 
 /** Whether one flow stays on a presentation row under the current visibility settings. */
-boolean td(Ab flow) {
- if (flow == null) return false;
+boolean td(Ab /* flow */a) {
+ if (a == null) return false;
  // Costs, fees and deaths are never hidden by the display loot filter.
- if (flow.quantityDelta <= 0L) return true;
+ if (a.quantityDelta <= 0L) return true;
  // Unknown / unpriced gains remain discoverable for Review; the minimum is
  // compared against the unit price so quantity cannot defeat it.
- if (flow.unitPrice > 0 && flow.unitPrice < minimumDisplayedLootValue) return false;
- return filter == null || filter.isFlowIncluded(flow);
+ if (a.unitPrice > 0 && a.unitPrice < minimumDisplayedLootValue) return false;
+ return filter == null || filter.isFlowIncluded(a);
 }
 }

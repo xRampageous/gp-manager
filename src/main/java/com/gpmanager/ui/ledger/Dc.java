@@ -110,7 +110,7 @@ static List<String> zs(Row market, boolean corrected) {
   if (sell && market.collectionAmbiguous && market.settledQty > 0L) {
    // D1: a quarantined settlement's cash was never observed; Received is never shown
    // as if the player had actually collected it.
-   lines.add("Received|not proven");
+   lines.add(msg("c0"));
   }
   return lines;
  }
@@ -121,7 +121,7 @@ static List<String> zs(Row market, boolean corrected) {
    // The actual after-tax settled unit value; shown only when exactly divisible.
    lines.add("Received each|" + exact(market.receivedEachGp) + " gp");
   }
-  lines.add("Previously counted|" + (unknown ? "Unknown" : exact(market.trackedBasisConsumedGp) + " gp"));
+  lines.add(msg("cz") + (unknown ? "Unknown" : exact(market.trackedBasisConsumedGp) + " gp"));
   lines.add("Result|" + (unknown && !market.manualFinancialResult ? "\u2014" : market.realizedResultCorrectionAware
   ? ru(market.realizedResultGp) + " gp" + (market.coverage == Bi.Coverage.PARTIALLY_KNOWN
   ? " \u00b7 Partial" : "") + (corrected ? msg("cy") : "") : "\u2014"));

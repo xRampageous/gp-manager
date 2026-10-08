@@ -20,7 +20,7 @@ String lootSection = "lootSection";
 name = "HUD+", description = "The HUD+ overlay. Does not change Net or Ledger", position = 30, closedByDefault = true)
 String hudLiveSection = "hudLiveSection";
 @ConfigSection(
-name = "History", description = "Saved Grinds and receipt detail", position = 40, closedByDefault = true)
+name = "History", description = "Saved Grinds and entry detail", position = 40, closedByDefault = true)
 String grindsSection = "grindsSection";
 @ConfigItem(
 keyName = "lootPresentationFilter", name = "Display loot filter",
@@ -55,15 +55,15 @@ enum Cr { Small, Normal, Large }
 enum HudTimer { Compact, Full }
 enum HudTray {
  AUTO_FOLD("Auto-fold"), ALWAYS_OPEN("Always open");
- final String label;
- HudTray(String label) { this.label = label; }
+ String label;
+ HudTray(String /* label */b) { this.label = b; }
  public String toString() { return label; }
 }
 
 enum HudTrayKeeps {
  STREAK("This streak"), SESSION("Whole session");
- final String label;
- HudTrayKeeps(String label) { this.label = label; }
+ String label;
+ HudTrayKeeps(String /* label */b) { this.label = b; }
  public String toString() { return label; }
 }
 
@@ -194,7 +194,7 @@ default int maxHistorySessions() {
 }
 
 @ConfigItem(
-keyName = "receiptRetentionDays", name = "Receipt detail retention",
+keyName = "receiptRetentionDays", name = "Entry detail retention",
 description = "Compact closed sessions older than this; their totals stay", position = 1,
 section = grindsSection)
 default Db receiptRetentionDays() {
@@ -251,6 +251,16 @@ keyName = "idleTimeoutSeconds", name = "AFK pause timeout",
 description = "Idle seconds before AFK pause when AFK pause is on.", position = 3, section = generalSection)
 default int idleTimeoutSeconds() {
  return 120;
+}
+
+@Units(Units.MINUTES)
+@Range(max = 240)
+@ConfigItem(
+keyName = "sessionIdleAutoEndMinutes", name = "End Grind after AFK",
+description = "End a named Grind once AFK pause has held it this long (0 = off). Needs AFK pause; Free play never ends.",
+position = 4, section = generalSection)
+default int sessionIdleAutoEndMinutes() {
+ return 0;
 }
 
 @Range(min = 5, max = 300)

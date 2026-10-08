@@ -18,45 +18,45 @@ Map<String, PkMoney> children = new LinkedHashMap<>();
 Ay() {
 }
 
-Ay(String encounterId, Be type) {
- this.encounterId = encounterId;
- this.type = type == null ? Be.KILL : type;
+Ay(String /* encounterId */a, Be /* type */b) {
+ this.encounterId = a;
+ this.type = b == null ? Be.KILL : b;
 }
 
 String getEncounterId() { return Ag.axw(encounterId); }
 Be getType() { return type == null ? Be.KILL : type; }
 /** The finalized subtotal plus every receipt still open to correction. */
 PkMoney current() {
- var total = new PkMoney(finalizedNet, finalizedCosts, finalizedSupplies, finalizedCostSplitAvailable);
- children().values().forEach(total::plus);
- return total;
+ var /* total */a = new PkMoney(finalizedNet, finalizedCosts, finalizedSupplies, finalizedCostSplitAvailable);
+ children().values().forEach(a::plus);
+ return a;
 }
 
-boolean holds(String transactionId) {
- return children().containsKey(transactionId);
+boolean holds(String /* transactionId */a) {
+ return children().containsKey(a);
 }
 
 boolean vd() {
  return !children().isEmpty();
 }
 
-void awv(String transactionId, PkMoney money) {
- if (transactionId != null && !transactionId.isEmpty()) children().put(transactionId, money);
+void awv(String /* transactionId */a, PkMoney /* money */b) {
+ if (a != null && !a.isEmpty()) children().put(a, b);
 }
 
-boolean aga(String transactionId) {
- return children().remove(transactionId) != null;
+boolean aga(String /* transactionId */a) {
+ return children().remove(a) != null;
 }
 
 /** Folds one receipt child into the durable finalized subtotal exactly once. */
-boolean te(String transactionId) {
- PkMoney child = children().remove(transactionId);
- if (child == null) return false;
- var finalized = new PkMoney(finalizedNet, finalizedCosts, finalizedSupplies, finalizedCostSplitAvailable).plus(child);
- finalizedNet = finalized.netGp;
- finalizedCosts = finalized.tr();
- finalizedSupplies = finalized.uq();
- finalizedCostSplitAvailable = finalized.costSplitAvailable;
+boolean te(String /* transactionId */a) {
+ PkMoney /* child */b = children().remove(a);
+ if (b == null) return false;
+ var /* finalized */c = new PkMoney(finalizedNet, finalizedCosts, finalizedSupplies, finalizedCostSplitAvailable).plus(b);
+ finalizedNet = c.netGp;
+ finalizedCosts = c.tr();
+ finalizedSupplies = c.uq();
+ finalizedCostSplitAvailable = c.costSplitAvailable;
  return true;
 }
 

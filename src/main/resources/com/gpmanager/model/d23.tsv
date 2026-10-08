@@ -1,0 +1,10 @@
+# Items taken apart (Revert or Dismantle): item id, then what is lost doing it (quantity and item id).
+# Crystal tools give back the dragon tool and the seed; the 120 crystal shards used to make them are lost.
+23762	120	23962	CRYSTAL_HARPOON
+23764	120	23962	CRYSTAL_HARPOON_INACTIVE
+23680	120	23962	CRYSTAL_PICKAXE
+23682	120	23962	CRYSTAL_PICKAXE_INACTIVE
+23673	120	23962	CRYSTAL_AXE
+23675	120	23962	CRYSTAL_AXE_INACTIVE
+28220	120	23962	CRYSTAL_AXE_2H
+28223	120	23962	CRYSTAL_AXE_2H_INACTIVE

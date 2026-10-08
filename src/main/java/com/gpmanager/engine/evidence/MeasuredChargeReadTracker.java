@@ -10,55 +10,59 @@ class MeasuredChargeReadTracker {
 /** Bounded number of same-variant weapons tracked side by side (two blowpipes, a spare trident). */
 static final int MAX_TARGETS = 8;
 /** One baseline per stable target identity, most recently read last. */
-final LinkedHashMap<String, Baseline> baselines = new LinkedHashMap<>();
+LinkedHashMap<String, Baseline> baselines = new LinkedHashMap<>();
 /** One weapon's last exact read and its local observation time. */
 @Getter
 @AllArgsConstructor
 static class Baseline {
- final Ar read;
- final long atEpochMillis;
+ Ar read;
+ long atEpochMillis;
 }
 
 /** The weapon's last read, which its next Check is measured against; null when none. */
-synchronized Baseline baseline(String targetIdentity) {
- return targetIdentity == null ? null : baselines.get(targetIdentity.trim());
+synchronized Baseline baseline(String /* targetIdentity */a) {
+ return a == null ? null : baselines.get(a.trim());
 }
 
 /** Observe one exact Check read and retain its local observation time. */
-synchronized Cm observe(Ar read, String targetIdentity, long now) {
- if (read == null) return null;
- if (!read.bookable || Ag.blank(targetIdentity)) {
+synchronized Cm observe(Ar /* read */b, String /* targetIdentity */c, long /* now */d) {
+ if (b == null) return new Cm(null, Cm.K.MISMATCH);
+ if (!b.bookable || Ag.blank(c)) {
   reset();
-  return null;
+  return new Cm(b.variant, Cm.K.MISMATCH);
  }
- String aqe = targetIdentity.trim();
+ String /* aqe */e = c.trim();
  // Each weapon keeps its own baseline: a Check of the other blowpipe is neither a
  // decrease on this one nor a reason to forget what this one last read.
- Baseline last = baselines.remove(aqe);
- baselines.put(aqe, new Baseline(read, Ae.nonNeg(now)));
+ Baseline /* last */f = baselines.remove(e);
+ baselines.put(e, new Baseline(b, Ae.nonNeg(d)));
  while (baselines.size() > MAX_TARGETS) baselines.remove(baselines.keySet().iterator().next());
- Ar previous = last == null ? null : last.read;
- if (previous == null || previous.variant != read.variant) return null;
- boolean blowpipe = read.variant == Ar.V.V1b;
+ Ar /* previous */g = f == null ? null : f.read;
+ if (g == null) return new Cm(b.variant, Cm.K.SEED);
+ if (g.variant != b.variant) return new Cm(b.variant, Cm.K.MISMATCH);
+ boolean /* blowpipe */h = b.variant == Ar.V.V1b;
  // Dart type is an independent component identity. A type switch can return old darts
  // and load new ones, so do not infer dart spend from the change; scale measurements
  // remain valid across that switch.
- boolean aru = blowpipe && read.awi()
- && (!previous.awi() || previous.dartItemId != read.dartItemId);
- Map<Integer, Long> previousCounts = previous.componentCounts;
- var amk = new LinkedHashMap<Integer, Long>(read.componentCounts);
- if (blowpipe && previous.awi() && !read.awi()) amk.put(previous.dartItemId, 0L);
- var itemIds = new LinkedHashSet<Integer>(previousCounts.keySet());
- itemIds.addAll(amk.keySet());
- var decreases = new ArrayList<Cm.ComponentDelta>();
- for (int itemId : itemIds) {
-  long before = previousCounts.getOrDefault(itemId, 0L);
-  long after = amk.getOrDefault(itemId, 0L);
-  if (after < before && (!aru || itemId == ItemID.SNAKEBOSS_SCALE)) {
-   decreases.add(new Cm.ComponentDelta(itemId, after - before));
+ boolean /* aru */i = h && b.awi()
+ && (!g.awi() || g.dartItemId != b.dartItemId);
+ Map<Integer, Long> /* previousCounts */j = g.componentCounts;
+ var /* amk */k = new LinkedHashMap<Integer, Long>(b.componentCounts);
+ if (h && g.awi() && !b.awi()) k.put(g.dartItemId, 0L);
+ var /* itemIds */l = new LinkedHashSet<Integer>(j.keySet());
+ l.addAll(k.keySet());
+ var /* decreases */m = new ArrayList<Cm.ComponentDelta>();
+ boolean /* same */n = true;
+ for (int /* itemId */o : l) {
+  long /* before */p = j.getOrDefault(o, 0L);
+  long /* after */q = k.getOrDefault(o, 0L);
+  n &= q == p;
+  if (q < p && (!i || o == ItemID.SNAKEBOSS_SCALE)) {
+   m.add(new Cm.ComponentDelta(o, q - p));
   }
  }
- return decreases.isEmpty() ? null : new Cm(read.variant, decreases);
+ // Independent decreases still prove spend when a different component was loaded.
+ return new Cm(b.variant, m, !m.isEmpty() ? Cm.K.SPEND : n ? Cm.K.SAME : Cm.K.LOAD);
 }
 
 synchronized void reset() {
@@ -70,8 +74,8 @@ synchronized void reset() {
 * weapon entered the inventory, so a stored baseline can no longer be trusted to belong to
 * the item now occupying the slot. The next Check seeds a fresh baseline.
 */
-synchronized void agu(Ar.V variant) {
- if (variant == null) return;
- baselines.values().removeIf(last -> last.read.variant == variant);
+synchronized void agu(Ar.V /* variant */a) {
+ if (a == null) return;
+ baselines.values().removeIf(/* last */b -> b.read.variant == a);
 }
 }

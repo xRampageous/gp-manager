@@ -26,14 +26,14 @@ enum Signal {
 
 boolean inside;
 /** Feed the current region id (0 or negative when unknown). */
-Signal awr(int regionId) {
- boolean now = MinigameRegionHints.xl(regionId);
- if (now) {
-  boolean entered = !inside;
+Signal awr(int /* regionId */a) {
+ boolean /* now */b = MinigameRegionHints.xl(a);
+ if (b) {
+  boolean /* entered */c = !inside;
   inside = true;
-  return entered ? Signal.ENTERED : Signal.INSIDE;
+  return c ? Signal.ENTERED : Signal.INSIDE;
  }
- if (inside && regionId > 0) {
+ if (inside && a > 0) {
   inside = false;
   return Signal.LEFT;
  }

@@ -58,6 +58,19 @@ public final class PersistenceProbe
             : new Cs(repository.boundIdentity, repository.scopeGeneration, base, state);
     }
 
+    /**
+     * Waits for maintenance the Grinds controller ran off Swing's thread (Codex review 1.2), then for
+     * its result back on Swing's thread; {@code steps} covers a chain such as backup-then-reset.
+     */
+    public static void drain(Ei persistence, int steps) throws Exception
+    {
+        for (int step = 0; step < steps; step++)
+        {
+            persistence.lifecycleExecutor().submit(() -> { }).get(5, java.util.concurrent.TimeUnit.SECONDS);
+            javax.swing.SwingUtilities.invokeAndWait(() -> { });
+        }
+    }
+
     /** Number of existing rotated good-save copies (.1 through .3) in this scope. */
     public static int rotatedBackupCount(SessionRepository repository)
     {

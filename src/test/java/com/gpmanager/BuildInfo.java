@@ -126,7 +126,7 @@ public final class BuildInfo
     }
 
     /**
-     * The tiny footer marker: {@code DEV · 0.8.0 · 01:24Z}. Release builds return an empty
+     * The tiny footer marker: {@code DEV · 1.2.0 · 01:24Z}. Release builds return an empty
      * string, so the footer collapses instead of showing a stale development marker.
      */
     public String badgeText()

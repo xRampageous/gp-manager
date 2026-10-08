@@ -9,27 +9,36 @@ import net.runelite.api.widgets.Widget;
 */
 class Ee {
 /** Bank main or deposit-box UI visible — drives Banking header and Withdrew buffer. */
-static boolean vp(Client client) {
- return visible(client, InterfaceID.Bankmain.ITEMS_CONTAINER) || visible(client, InterfaceID.BankDepositbox.INVENTORY)
- || visible(client, InterfaceID.BankDepositbox.CONTENTS);
+static boolean vp(Client /* client */a) {
+ return visible(a, InterfaceID.Bankmain.ITEMS_CONTAINER) || visible(a, InterfaceID.BankDepositbox.INVENTORY)
+ || visible(a, InterfaceID.BankDepositbox.CONTENTS);
 }
 
 /** Tool Leprechaun store (either panel) visible; its withdrawals and deposits are storage. */
-static boolean yf(Client client) {
- return visible(client, InterfaceID.FarmingTools.FRAME) || visible(client, InterfaceID.FarmingToolsSide.UNIVERSE);
+static boolean yf(Client /* client */a) {
+ return visible(a, InterfaceID.FarmingTools.FRAME) || visible(a, InterfaceID.FarmingToolsSide.UNIVERSE);
 }
 
-static boolean wq(Client client) {
- if (client == null) return false;
- Widget root = client.getWidget(InterfaceID.GeOffers.UNIVERSE);
- return (root != null && !root.isHidden()) || visible(client, InterfaceID.GeOffersSide.ITEMS);
+/** Stores and exchanges whose own open window proves a move neutral (d29): its note, else null. */
+static final java.util.List<String[]> STORES = Ak.rows("d29");
+static String store(Client /* client */a) {
+ for (String[] /* row */b : STORES) if (visible(a, Integer.parseInt(b[0]))) return b[2];
+ return null;
 }
 
-static boolean visible(Client client, int componentId) {
+static boolean wq(Client /* client */a) {
+ if (a == null) return false;
+ Widget /* root */b = a.getWidget(InterfaceID.GeOffers.UNIVERSE);
+ // A banker's or clerk's collection box collects offers like the exchange itself (1.2).
+ return (b != null && !b.isHidden()) || visible(a, InterfaceID.GeOffersSide.ITEMS)
+ || visible(a, InterfaceID.GeCollect.UNIVERSE);
+}
+
+static boolean visible(Client /* client */a, int /* componentId */b) {
  try {
-  Widget widget = client == null ? null : client.getWidget(componentId);
-  return widget != null && !widget.isHidden();
- } catch (RuntimeException ignored) {
+  Widget /* widget */c = a == null ? null : a.getWidget(b);
+  return c != null && !c.isHidden();
+ } catch (RuntimeException /* ignored */d) {
   return false;
  }
 }

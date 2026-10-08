@@ -31,6 +31,23 @@ public class HudSizingTest
         assertTrue(metrics.stringWidth(cut) <= 60);
     }
 
+    /** Owner 1.2: a long name shortens before its count, and "(uncharged)" reads "(u)". */
+    @Test
+    public void aLongNameShortensButKeepsItsCount()
+    {
+        GpManagerConfig config = config(true, 4);
+        Cp builder = new Cp(config, null);
+        De overlay = new De(builder, config);
+        builder.tray().booked(receipt(NOW, Ai.LOOT, flow(21817, "Bracelet of ethereum (uncharged)", 2L, 90_000)), NOW, false);
+        builder.tray().booked(receipt(NOW + 1L, Ai.LOOT, flow(1, "An extraordinarily long item name that "
+            + "would never fit any sensible overlay", 3L, 10)), NOW + 1L, false);
+        builder.update(grind(46L, null), f -> true, NOW + 10L);
+        overlay.render(G);
+        assertTrue(overlay.names[0], overlay.names[0].endsWith("… ×3"));
+        assertTrue(overlay.names[1], overlay.names[1].startsWith("Bracelet of ethereum (u)"));
+        assertTrue(overlay.names[1], overlay.names[1].endsWith(" ×2"));
+    }
+
     @Test
     public void spritesCropToTheirVisiblePixels()
     {

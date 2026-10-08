@@ -56,10 +56,10 @@ static final int MAX_RECORDS = 32;
 /** Bounded retention of reconciled lifecycles so recent Market context survives. */
 static final int MAX_CLOSED_RECORDS = 64;
 /** Per-slot baseline of each observed offer; exact fill deltas come from its cumulative counters. */
-final Map<Integer, Snapshot> baselines = new HashMap<>();
-final List<Aa> records = new ArrayList<>();
+Map<Integer, Snapshot> baselines = new HashMap<>();
+List<Aa> records = new ArrayList<>();
 /** Slots whose identity was replaced mid-life; the next placement is quarantined. */
-final Set<Integer> replacedSlots = new HashSet<>();
+Set<Integer> replacedSlots = new HashSet<>();
 /**
 * Aggregate GE cash observed with a live Collect interaction but not yet exactly attributable
 * to every sell lifecycle it may settle. Retained internally (never a visible receipt) until
@@ -83,54 +83,54 @@ boolean pendingSettlementAwaitingEvidence;
 * sold offers a nearby collect movement belongs to; like held cash it is never persisted and
 * clears on restore/reset/adopt.
 */
-final Map<String, Long> slotClearedAtEpochMillis = new HashMap<>();
+Map<String, Long> slotClearedAtEpochMillis = new HashMap<>();
 /**
 * Transient: live lifecycles the login seed saw as an EMPTY slot. RuneLite reports every slot
 * EMPTY at login before the server restores the offers, so the same offer arriving shortly
 * after is a late replay of it, never a new offer reusing the slot.
 */
-final Map<String, Long> loginClearedAtEpochMillis = new HashMap<>();
+Map<String, Long> loginClearedAtEpochMillis = new HashMap<>();
 static final long LOGIN_REPLAY_MILLIS = 2L * 60L * 1000L;
 /**
 * Transient: when each offer last explained a movement (its offer id, with a "$" suffix for the
 * coin side). A placement explains one loss; a fill or cancellation explains nothing more until
 * the offer is seen again.
 */
-final Map<String, Long> explainedAt = new HashMap<>();
+Map<String, Long> explainedAt = new HashMap<>();
 /** Schema-106 pooled known-basis ledger; null keeps custody purely observational. */
 TrackedBasisLedger basisLedger;
 /** Wire the pooled known-basis ledger that owns SELL reservations and BUY coverage. */
-synchronized void setBasisLedger(TrackedBasisLedger ledger) {
- basisLedger = ledger;
+synchronized void setBasisLedger(TrackedBasisLedger /* ledger */a) {
+ basisLedger = a;
 }
 
 /** Latest capture time of an open SELL reservation for the item; 0 when none is open. */
-synchronized long yh(int itemId) {
- int canonicalId = itemId;
- long latest = 0L;
- for (Aa record : records) {
-  if (record == null || record.getSide() != SELL || record.itemId != canonicalId) {
+synchronized long yh(int /* itemId */a) {
+ int /* canonicalId */b = a;
+ long /* latest */c = 0L;
+ for (Aa /* record */d : records) {
+  if (d == null || d.getSide() != SELL || d.itemId != b) {
    continue;
   }
-  if (record.afs() <= 0L && record.afr() <= 0L) continue;
-  long capturedAt = record.getBasisCapturedAtEpochMillis() > 0L
-  ? record.getBasisCapturedAtEpochMillis() : record.getPlacedAtEpochMillis();
-  latest = max(latest, capturedAt);
+  if (d.afs() <= 0L && d.afr() <= 0L) continue;
+  long /* capturedAt */e = d.getBasisCapturedAtEpochMillis() > 0L
+  ? d.getBasisCapturedAtEpochMillis() : d.getPlacedAtEpochMillis();
+  c = max(c, e);
  }
- return latest;
+ return c;
 }
 
 /** Immutable result of one settle: residual flows still needing normal classification. */
 @AllArgsConstructor
 static class Partition {
- final List<Ab> residualFlows;
- final List<Ac> countedBookings;
- final List<Ac> transferBookings;
+ List<Ab> residualFlows;
+ List<Ac> countedBookings;
+ List<Ac> transferBookings;
  /** Physical flows consumed by custody claims; used to spend matching offer evidence. */
- final List<Ab> claimedFlows;
+ List<Ab> claimedFlows;
  Ac lastBooking() {
-  List<Ac> bookings = countedBookings.isEmpty() ? transferBookings : countedBookings;
-  return bookings.isEmpty() ? null : bookings.get(bookings.size() - 1);
+  List<Ac> /* bookings */b = countedBookings.isEmpty() ? transferBookings : countedBookings;
+  return b.isEmpty() ? null : b.get(b.size() - 1);
  }
 }
 
@@ -138,15 +138,15 @@ static class Partition {
 // Lifecycle observation
 // ---------------------------------------------------------------------------------------
 /** Apply one offer-ledger transition; returns any Review handoff or settled rows it forced. */
-synchronized List<Ac> ack(Bj.Transition transition,
-String itemName, long now, String sessionId) {
- if (transition == null || transition.current == null) return Collections.emptyList();
- var handoffs = new ArrayList<Ac>();
- observe(transition.previous, transition.current, itemName, now, sessionId, handoffs);
+synchronized List<Ac> ack(Bj.Transition /* transition */b,
+String /* itemName */c, long /* now */d, String /* sessionId */e) {
+ if (b == null || b.current == null) return Collections.emptyList();
+ var /* handoffs */f = new ArrayList<Ac>();
+ observe(b.previous, b.current, c, d, e, f);
  // New execution/lifecycle evidence may complete a settlement whose cash was observed
  // first; the held batch settles as soon as it is exactly attributable.
- aee(now, sessionId, handoffs);
- return handoffs;
+ aee(d, e, f);
+ return f;
 }
 
 /**
@@ -154,206 +154,212 @@ String itemName, long now, String sessionId) {
 * cumulative counters, Modify Offer, slot reuse and identity replacement. Backwards counters,
 * value moved without quantity, or a missed placement are a desync, never a fill.
 */
-void observe(Snapshot previous, Snapshot current, String itemName,
-long now, String sessionId, List<Ac> handoffs) {
- int slot = current.slot;
- Side side = Bj.sideOf(current.state);
- Snapshot base = baselines.remove(slot);
- if (side == null) {
-  Aa record = touch(slot, base != null ? base : previous, now);
-  if (record != null) {
-   record.setCleared(true);
+void observe(Snapshot /* previous */b, Snapshot /* current */c, String /* itemName */d,
+long /* now */e, String /* sessionId */f, List<Ac> /* handoffs */g) {
+ int /* slot */h = c.slot;
+ Side /* side */i = Bj.sideOf(c.state);
+ Snapshot /* base */j = baselines.remove(h);
+ if (i == null) {
+  Aa /* record */k = touch(h, j != null ? j : b, e);
+  if (k != null) {
+   k.setCleared(true);
    // Transient slot evidence: proves which offer a nearby collect belongs to.
-   slotClearedAtEpochMillis.put(record.getOfferId(), now);
+   slotClearedAtEpochMillis.put(k.getOfferId(), e);
   }
   return;
  }
- Aa replay = base == null ? ym(slot, side, current, now) : null;
- if (replay != null) {
-  loginClearedAtEpochMillis.remove(replay.getOfferId());
-  slotClearedAtEpochMillis.remove(replay.getOfferId());
-  replay.setCleared(false);
-  resume(replay, current, now);
-  baselines.put(slot, current);
+ Aa /* replay */l = j == null ? ym(h, i, c, e) : null;
+ if (l != null) {
+  loginClearedAtEpochMillis.remove(l.getOfferId());
+  slotClearedAtEpochMillis.remove(l.getOfferId());
+  l.setCleared(false);
+  resume(l, c, e);
+  baselines.put(h, c);
   return;
  }
- boolean active = Bj.isActive(current.state);
- if (base == null || active && (Bj.sideOf(base.state) != side || base.itemId != current.itemId)) {
-  if (base != null) {
+ boolean /* active */m = Bj.isActive(c.state);
+ if (j == null || m && (Bj.sideOf(j.state) != i || j.itemId != c.itemId)) {
+  if (j != null) {
    // Item/side changed mid-life without Modify evidence: retire the old lifecycle and
    // quarantine the next; never inherit prior basis or progress.
-   Aa old = touch(slot, base, now);
-   if (old != null) {
-    old.setConfidence(Confidence.AMBIGUOUS);
-    ut(old, now, sessionId, msg("ab"), handoffs);
+   Aa /* old */n = touch(h, j, e);
+   if (n != null) {
+    n.setConfidence(Confidence.AMBIGUOUS);
+    ut(n, e, f, msg("ab"), g);
    }
-   replacedSlots.add(slot);
+   replacedSlots.add(h);
   }
-  baselines.put(slot, current);
-  if (base == null && previous != null && previous.state != GrandExchangeOfferState.EMPTY) {
+  baselines.put(h, c);
+  if (j == null && b != null && b.state != GrandExchangeOfferState.EMPTY) {
    // A missed placement cannot be dated: quarantine the lifecycle, emit no fill.
-   desync(slot, current, current, itemName, now, sessionId, handoffs);
+   desync(h, c, c, d, e, f, g);
    return;
   }
-  place(slot, side, current, itemName, now, sessionId, handoffs);
-  advance(slot, current, current, current.quantityTraded, current.spent, now);
+  place(h, i, c, d, e, f, g);
+  advance(h, c, c, c.quantityTraded, c.spent, e);
   return;
  }
- if (active && (base.totalQuantity != current.totalQuantity || base.price != current.price)) {
+ if (m && (j.totalQuantity != c.totalQuantity || j.price != c.price)) {
   // A price-only Modify keeps the lifecycle and its basis; a quantity change has no exact
   // per-slice basis allocation, so realization fails closed to Review.
-  boolean priceOnly = base.totalQuantity == current.totalQuantity;
-  baselines.put(slot, new Snapshot(slot, base.state, base.itemId,
-  current.totalQuantity, base.quantityTraded, priceOnly ? current.price : base.price, base.spent));
-  Aa record = touch(slot, base, now);
-  if (record != null && priceOnly) {
-   record.listedPrice = nonNeg(current.price);
-  } else if (record != null) {
-   record.offeredQty = nonNeg(current.totalQuantity);
-   record.setQuantityModified(true);
+  boolean /* priceOnly */o = j.totalQuantity == c.totalQuantity;
+  baselines.put(h, new Snapshot(h, j.state, j.itemId,
+  c.totalQuantity, j.quantityTraded, o ? c.price : j.price, j.spent));
+  Aa /* record */p = touch(h, j, e);
+  if (p != null && o) {
+   p.listedPrice = nonNeg(c.price);
+  } else if (p != null) {
+   p.offeredQty = nonNeg(c.totalQuantity);
+   p.setQuantityModified(true);
   }
   return;
  }
- long quantity = current.quantityTraded - base.quantityTraded;
- long spent = current.spent - base.spent;
- baselines.put(slot, new Snapshot(slot, base.state, base.itemId, base.totalQuantity,
- current.quantityTraded, base.price, current.spent));
- if (quantity < 0L || spent < 0L || quantity == 0L && spent > 0L) {
-  desync(slot, base, current, itemName, now, sessionId, handoffs);
+ long /* quantity */q = c.quantityTraded - j.quantityTraded;
+ long /* spent */r = c.spent - j.spent;
+ baselines.put(h, new Snapshot(h, j.state, j.itemId, j.totalQuantity,
+ c.quantityTraded, j.price, c.spent));
+ if (q < 0L || r < 0L || q == 0L && r > 0L) {
+  desync(h, j, c, d, e, f, g);
   return;
  }
- advance(slot, base, current, quantity, spent, now);
+ advance(h, j, c, q, r, e);
 }
 
 /** A new offer in the slot: a duplicate replay of the live lifecycle changes nothing. */
-void place(int slot, Side side, Snapshot offer, String itemName, long now,
-String sessionId, List<Ac> handoffs) {
- Aa previous = aem(slot);
- if (previous != null && xo(previous, side, offer.itemId, offer.totalQuantity,
- offer.price) && !previous.cleared && !previous.xs()) {
-  previous.setLastSeenAtEpochMillis(now);
+void place(int /* slot */b, Side /* side */c, Snapshot /* offer */d, String /* itemName */e, long /* now */f,
+String /* sessionId */g, List<Ac> /* handoffs */h) {
+ Aa /* previous */i = aem(b);
+ if (i != null && xo(i, c, d.itemId, d.totalQuantity,
+ d.price) && !i.cleared && !i.xs()) {
+  i.setLastSeenAtEpochMillis(f);
   return;
  }
- if (previous != null && previous.getStage() == OPEN && previous.wo()) {
+ if (i != null && i.getStage() == OPEN && i.wo()) {
   // Settled but not yet sealed (a settlement completed by an offer transition):
   // seal it exactly as the next settle would, so it stays as history.
-  previous.setStage(CLOSED);
-  previous = null;
+  i.setStage(CLOSED);
+  i = null;
  }
- if (previous != null) {
+ if (i != null && i.cleared && i.xs() && trusted(i, i.getSide())) {
+  // Owner 1.2: a finished offer collected moments before its slot is reused still waits for
+  // its items or coins to settle; it gives up the slot instead of going to Review.
+  i.slot = -1;
+  i = null;
+ }
+ if (i != null) {
   // Slot reuse: a new offer never inherits prior basis or progress.
-  ut(previous, now, sessionId, msg("cc"), handoffs);
+  ut(i, f, g, msg("cc"), h);
  }
  // A settled (CLOSED) lifecycle in this slot stays as bounded market history for its
  // booked sale; only its unrealized reservation leaves with the slot.
- aey(yg(slot));
- Aa record = auu(slot, side, offer.itemId, itemName, offer.totalQuantity,
- offer.price, offer.state.name(), now, sessionId);
- if (replacedSlots.remove(slot)) record.setConfidence(Confidence.AMBIGUOUS);
+ aey(yg(b));
+ Aa /* record */j = auu(b, c, d.itemId, e, d.totalQuantity,
+ d.price, d.state.name(), f, g);
+ if (replacedSlots.remove(b)) j.setConfidence(Confidence.AMBIGUOUS);
  // Per-fill tax is exact only for a placement observed live from an empty slot.
- record.setFillTaxExact(side == SELL && record.getConfidence() == Confidence.CONFIRMED);
- records.add(record);
- rj(now, sessionId, handoffs);
+ j.setFillTaxExact(c == SELL && j.getConfidence() == Confidence.CONFIRMED);
+ records.add(j);
+ rj(f, g, h);
 }
 
 /** Exact fill progress, then the terminal state (a final fill lands before a cancellation). */
-void advance(int slot, Snapshot offer, Snapshot current, long quantity, long spent, long now) {
- boolean fill = quantity > 0L && spent >= 0L;
- boolean terminal = Bj.isTerminal(current.state);
- Aa record = fill || terminal ? touch(slot, offer, now) : null;
- if (record != null && fill) afi(record, quantity, spent);
- if (record != null && terminal) record.setOfferState(current.state.name());
+void advance(int /* slot */a, Snapshot /* offer */b, Snapshot /* current */c, long /* quantity */d, long /* spent */e, long /* now */f) {
+ boolean /* fill */g = d > 0L && e >= 0L;
+ boolean /* terminal */h = Bj.isTerminal(c.state);
+ Aa /* record */i = g || h ? touch(a, b, f) : null;
+ if (i != null && g) afi(i, d, e);
+ if (i != null && h) i.setOfferState(c.state.name());
 }
 
 /** Counters with no exact lineage: quarantine the lifecycle, or start an unbased one. */
-void desync(int slot, Snapshot offer, Snapshot current, String itemName,
-long now, String sessionId, List<Ac> handoffs) {
- Aa record = touch(slot, offer, now);
- if (record != null) {
-  record.setConfidence(Confidence.AMBIGUOUS);
-  record.setFillTaxExact(false);
- } else if (offer.itemId > 0) {
-  record = auu(slot, Bj.sideOf(offer.state), offer.itemId, itemName,
-  offer.totalQuantity, offer.price, current.state.name(), now, sessionId);
-  record.setConfidence(Confidence.LEGACY_UNBASED);
-  records.add(record);
+void desync(int /* slot */a, Snapshot /* offer */b, Snapshot /* current */c, String /* itemName */d,
+long /* now */e, String /* sessionId */f, List<Ac> /* handoffs */g) {
+ Aa /* record */h = touch(a, b, e);
+ if (h != null) {
+  h.setConfidence(Confidence.AMBIGUOUS);
+  h.setFillTaxExact(false);
+ } else if (b.itemId > 0) {
+  h = auu(a, Bj.sideOf(b.state), b.itemId, d,
+  b.totalQuantity, b.price, c.state.name(), e, f);
+  h.setConfidence(Confidence.LEGACY_UNBASED);
+  records.add(h);
  }
- rj(now, sessionId, handoffs);
+ rj(e, f, g);
 }
 
 /** The live lifecycle the login seed cleared in this slot, when this snapshot is that same offer. */
-Aa ym(int slot, Side side, Snapshot current, long now) {
- Aa record = aem(slot);
- Long clearedAt = record == null ? null : loginClearedAtEpochMillis.get(record.getOfferId());
- return clearedAt != null && now - clearedAt <= LOGIN_REPLAY_MILLIS && xo(record, side,
- current.itemId, current.totalQuantity, current.price) ? record : null;
+Aa ym(int /* slot */a, Side /* side */b, Snapshot /* current */c, long /* now */d) {
+ Aa /* record */e = aem(a);
+ Long /* clearedAt */f = e == null ? null : loginClearedAtEpochMillis.get(e.getOfferId());
+ return f != null && d - f <= LOGIN_REPLAY_MILLIS && xo(e, b,
+ c.itemId, c.totalQuantity, c.price) ? e : null;
 }
 
 /** Resume a persisted lifecycle; progress made while away is adopted once, never as a fill. */
-void resume(Aa existing, Snapshot snapshot, long now) {
- existing.setConfidence(Confidence.RESUMED);
- existing.setLastSeenAtEpochMillis(now);
- existing.setOfferState(snapshot.state.name());
- if (snapshot.quantityTraded != existing.getFilledQty()) {
+void resume(Aa /* existing */a, Snapshot /* snapshot */b, long /* now */c) {
+ a.setConfidence(Confidence.RESUMED);
+ a.setLastSeenAtEpochMillis(c);
+ a.setOfferState(b.state.name());
+ if (b.quantityTraded != a.getFilledQty()) {
   // Fills while logged out were never observed at their own prices.
-  existing.setFillTaxExact(false);
+  a.setFillTaxExact(false);
  }
- existing.setFilledQty(snapshot.quantityTraded);
- existing.setSpentGp(nonNeg(snapshot.spent));
+ a.setFilledQty(b.quantityTraded);
+ a.setSpentGp(nonNeg(b.spent));
 }
 
-Aa auu(int slot, Side side, int itemId, String itemName, long totalQty,
-long price, String state, long now, String sessionId) {
- var record = new Aa(UUID.randomUUID().toString(), slot, side, itemId,
- itemName, totalQty, price, now, Ag.axw(sessionId));
- record.setLastSeenAtEpochMillis(now);
- record.setOfferState(state);
- return record;
+Aa auu(int /* slot */a, Side /* side */b, int /* itemId */c, String /* itemName */d, long /* totalQty */e,
+long /* price */f, String /* state */g, long /* now */h, String /* sessionId */i) {
+ var /* record */j = new Aa(UUID.randomUUID().toString(), a, b, c,
+ d, e, f, h, Ag.axw(i));
+ j.setLastSeenAtEpochMillis(h);
+ j.setOfferState(g);
+ return j;
 }
 
 /**
 * Record the login slot baseline: resume a persisted matching lifecycle, quarantine active
 * offers first seen now as legacy/unbased, and hand off records whose slot changed identity.
 */
-synchronized List<Ac> avh(Map<Integer, Snapshot> snapshots, long now, String sessionId) {
- var handoffs = new ArrayList<Ac>();
+synchronized List<Ac> avh(Map<Integer, Snapshot> /* snapshots */b, long /* now */c, String /* sessionId */d) {
+ var /* handoffs */e = new ArrayList<Ac>();
  baselines.clear();
  loginClearedAtEpochMillis.clear();
- if (snapshots != null) {
-  for (Snapshot snapshot : snapshots.values()) {
-   if (snapshot == null) continue;
-   Aa existing = aem(snapshot.slot);
-   if (snapshot.state == GrandExchangeOfferState.EMPTY) {
-    if (existing != null) loginClearedAtEpochMillis.put(existing.getOfferId(), now);
-    else existing = yg(snapshot.slot);
-    if (existing != null) {
-     existing.setCleared(true);
-     existing.setLastSeenAtEpochMillis(now);
-     slotClearedAtEpochMillis.put(existing.getOfferId(), now);
+ if (b != null) {
+  for (Snapshot /* snapshot */f : b.values()) {
+   if (f == null) continue;
+   Aa /* existing */g = aem(f.slot);
+   if (f.state == GrandExchangeOfferState.EMPTY) {
+    if (g != null) loginClearedAtEpochMillis.put(g.getOfferId(), c);
+    else g = yg(f.slot);
+    if (g != null) {
+     g.setCleared(true);
+     g.setLastSeenAtEpochMillis(c);
+     slotClearedAtEpochMillis.put(g.getOfferId(), c);
     }
     continue;
    }
-   Side side = Bj.sideOf(snapshot.state);
-   if (side == null) continue;
+   Side /* side */h = Bj.sideOf(f.state);
+   if (h == null) continue;
    // Pre-existing progress is only a baseline, never replayed as a fill.
-   baselines.put(snapshot.slot, snapshot);
-   if (existing != null && xo(existing, side, snapshot.itemId, snapshot.totalQuantity, snapshot.price)) {
-    resume(existing, snapshot, now);
+   baselines.put(f.slot, f);
+   if (g != null && xo(g, h, f.itemId, f.totalQuantity, f.price)) {
+    resume(g, f, c);
     continue;
    }
-   if (existing != null) {
-    ut(existing, now, sessionId, msg("bi"), handoffs);
+   if (g != null) {
+    ut(g, c, d, msg("bi"), e);
    }
-   Aa record = auu(snapshot.slot, side, snapshot.itemId, "",
-   snapshot.totalQuantity, snapshot.price, snapshot.state.name(), now, sessionId);
-   record.setConfidence(Confidence.LEGACY_UNBASED);
-   record.setFilledQty(snapshot.quantityTraded);
-   record.setSpentGp(nonNeg(snapshot.spent));
-   records.add(record);
+   Aa /* record */i = auu(f.slot, h, f.itemId, "",
+   f.totalQuantity, f.price, f.state.name(), c, d);
+   i.setConfidence(Confidence.LEGACY_UNBASED);
+   i.setFilledQty(f.quantityTraded);
+   i.setSpentGp(nonNeg(f.spent));
+   records.add(i);
   }
  }
- rj(now, sessionId, handoffs);
- return handoffs;
+ rj(c, d, e);
+ return e;
 }
 
 /**
@@ -362,40 +368,40 @@ synchronized List<Ac> avh(Map<Integer, Snapshot> snapshots, long now, String ses
 * side's cancellation. Custody is authoritative for GE economics, so a movement it could not
 * claim but an offer explains is Grand Exchange activity for Review, never counted.
 */
-synchronized boolean explains(List<Ab> flows, long now) {
- boolean moved = false;
- for (Ab flow : flows) {
-  if (flow != null && flow.quantityDelta != 0L) {
-   moved = true;
-   if (explaining(flow, now) == null) return false;
+synchronized boolean explains(List<Ab> /* flows */a, long /* now */b) {
+ boolean /* moved */c = false;
+ for (Ab /* flow */d : a) {
+  if (d != null && d.quantityDelta != 0L) {
+   c = true;
+   if (explaining(d, b) == null) return false;
   }
  }
- return moved;
+ return c;
 }
 
 /** Spends the offer evidence behind these movements: one offer side explains one movement. */
-synchronized void spend(List<Ab> flows, long now) {
- for (Ab flow : flows) {
-  String key = flow == null || flow.quantityDelta == 0L ? null : explaining(flow, now);
-  if (key != null) explainedAt.put(key, now);
+synchronized void spend(List<Ab> /* flows */a, long /* now */b) {
+ for (Ab /* flow */c : a) {
+  String /* key */d = c == null || c.quantityDelta == 0L ? null : explaining(c, b);
+  if (d != null) explainedAt.put(d, b);
  }
 }
 
-String explaining(Ab flow, long now) {
- boolean coins = flow.itemId == ItemID.COINS;
- for (Aa record : records) {
-  boolean buy = record.getSide() == BUY;
-  String key = record.getOfferId() + (coins ? "$" : "");
-  Long spent = explainedAt.get(key);
-  long seen = record.getLastSeenAtEpochMillis();
+String explaining(Ab /* flow */b, long /* now */c) {
+ boolean /* coins */d = b.itemId == ItemID.COINS;
+ for (Aa /* record */e : records) {
+  boolean /* buy */f = e.getSide() == BUY;
+  String /* key */g = e.getOfferId() + (d ? "$" : "");
+  Long /* spent */h = explainedAt.get(g);
+  long /* seen */i = e.getLastSeenAtEpochMillis();
   // Only a live placement moves coins (buy) or items (sell) out of the inventory; a finished
   // fill of the same side or a cancellation of the other brings them back. Passive
   // progress on an open offer explains nothing.
-  boolean fits = flow.isCost() ? buy == coins && spent == null && !record.wx() && !record.vq()
-  && now - record.getPlacedAtEpochMillis() <= PLACEMENT_WINDOW_MILLIS
-  : (spent == null || spent < seen) && now - seen <= COLLECTION_WINDOW_MILLIS
-  && (buy != coins ? record.getFilledQty() > 0L && record.xs() : record.vq());
-  if (fits && (coins || record.itemId == flow.itemId)) return key;
+  boolean /* fits */j = b.isCost() ? f == d && h == null && !e.wx() && !e.vq()
+  && c - e.getPlacedAtEpochMillis() <= PLACEMENT_WINDOW_MILLIS
+  : (h == null || h < i) && c - i <= COLLECTION_WINDOW_MILLIS
+  && (f != d ? e.getFilledQty() > 0L && e.xs() : e.vq());
+  if (j && (d || e.itemId == b.itemId)) return g;
  }
  return null;
 }
@@ -404,8 +410,8 @@ String explaining(Ab flow, long now) {
 // Ab-level custody claims and canonical realization
 // ---------------------------------------------------------------------------------------
 /** Claim custody flows from one stabilized settle and book exact economics. */
-synchronized Partition partition(List<Ab> incoming, long now, String sessionId) {
- return partition(incoming, now, sessionId, itemId -> true, false);
+synchronized Partition partition(List<Ab> /* incoming */a, long /* now */b, String /* sessionId */c) {
+ return partition(a, b, c, /* itemId */d -> true, false);
 }
 
 /**
@@ -414,248 +420,253 @@ synchronized Partition partition(List<Ab> incoming, long now, String sessionId) 
 * whole-transaction safety gates. {@code collectionEvidence} is a bounded player Collect
 * interaction; without it, collection claims need an observed terminal offer state.
 */
-synchronized Partition partition(List<Ab> incoming, long now, String sessionId,
-IntPredicate itemAllowed, boolean collectionEvidence) {
- IntPredicate allowed = itemAllowed == null ? itemId -> true : itemAllowed;
- var counted = new ArrayList<Ac>();
- var transfers = new ArrayList<Ac>();
- var residual = new ArrayList<Ab>(incoming == null ? Collections.emptyList() : incoming);
- var claimed = new ArrayList<Ab>();
+synchronized Partition partition(List<Ab> /* incoming */b, long /* now */c, String /* sessionId */d,
+IntPredicate /* itemAllowed */e, boolean /* collectionEvidence */f) {
+ IntPredicate /* allowed */g = e == null ? /* itemId */h -> true : e;
+ var /* counted */i = new ArrayList<Ac>();
+ var /* transfers */j = new ArrayList<Ac>();
+ var /* residual */k = new ArrayList<Ab>(b == null ? Collections.emptyList() : b);
+ var /* claimed */l = new ArrayList<Ab>();
  // A settlement held from an earlier collect may now be exactly attributable.
- aee(now, sessionId, counted);
- oc(residual, claimed, now, allowed);
- ob(residual, claimed, now);
- oa(residual, claimed);
- oe(residual, claimed, allowed);
- ny(residual, claimed, now, sessionId, counted, allowed, collectionEvidence);
- og(residual, claimed, now, sessionId, counted, collectionEvidence);
- if (!claimed.isEmpty()) {
-  transfers.add(new Ac(now, null, Ai.TRANSFER, Aj.TRANSFER,
-  msg("db"), "Market", false, new ArrayList<>(claimed), Bd.CONFIRMED, msg("gd"), null));
+ aee(c, d, i);
+ oc(k, l, c, g);
+ ob(k, l, c);
+ oa(k, l);
+ oe(k, l, g);
+ ny(k, l, c, d, i, g, f);
+ og(k, l, c, d, i, f);
+ if (!l.isEmpty()) {
+  j.add(new Ac(c, null, Ai.TRANSFER, Aj.TRANSFER,
+  msg("db"), "Market", false, new ArrayList<>(l), Bd.CONFIRMED, msg("gd"), null));
  }
  // A hold created by this settle retries immediately: a batch whose evidence is complete
  // fails closed at once instead of waiting invisibly for a later event.
- aee(now, sessionId, counted);
- for (Aa open : records) {
-  if (open != null && open.getStage() == OPEN && open.wo()) open.setStage(CLOSED);
+ aee(c, d, i);
+ for (Aa /* open */m : records) {
+  if (m != null && m.getStage() == OPEN && m.wo()) m.setStage(CLOSED);
  }
- return new Partition(residual, counted, transfers, claimed);
+ return new Partition(k, i, j, l);
 }
 
 /** Prune reconciled lifecycles, expire terminal-unobserved ones and cap stale records. */
-synchronized Partition maintenance(long now, String sessionId) {
- var counted = new ArrayList<Ac>();
- prune(now, sessionId, counted);
+synchronized Partition maintenance(long /* now */a, String /* sessionId */b) {
+ var /* counted */c = new ArrayList<Ac>();
+ prune(a, b, c);
  // A held settlement retries and, once its evidence is exhausted or its bounded
  // lifecycle expires, fails closed to Review with the observed cash preserved.
- aee(now, sessionId, counted);
- return new Partition(Collections.emptyList(), counted, Collections.emptyList(), Collections.emptyList());
+ aee(a, b, c);
+ return new Partition(Collections.emptyList(), c, Collections.emptyList(), Collections.emptyList());
 }
 
-void prune(long now, String sessionId, List<Ac> reviews) {
- int closed = 0;
- for (Aa record : records) {
-  if (record != null && record.getStage() == CLOSED) closed++;
+void prune(long /* now */b, String /* sessionId */c, List<Ac> /* reviews */d) {
+ int /* closed */e = 0;
+ for (Aa /* record */f : records) {
+  if (f != null && f.getStage() == CLOSED) e++;
  }
  // Settled history is bounded: the oldest closed lifecycles leave first.
- for (; closed > MAX_CLOSED_RECORDS; closed--) {
-  Aa oldest = acl();
-  aey(oldest);
-  records.remove(oldest);
+ for (; e > MAX_CLOSED_RECORDS; e--) {
+  Aa /* oldest */g = acl();
+  aey(g);
+  records.remove(g);
  }
- for (int index = records.size() - 1; index >= 0; index--) {
-  Aa record = records.get(index);
-  if (record == null || record.getOfferId().isEmpty() || record.getStage() == CLOSED_UNOBSERVED) {
-   aey(record);
-   records.remove(index);
+ for (int /* index */h = records.size() - 1; h >= 0; h--) {
+  Aa /* record */i = records.get(h);
+  if (i == null || i.getOfferId().isEmpty() || i.getStage() == CLOSED_UNOBSERVED) {
+   aey(i);
+   records.remove(h);
    continue;
   }
-  if (record.getStage() == CLOSED) continue;
-  if (record.getStage() == AMBIGUOUS) {
-   ut(record, now, sessionId, msg("bv"), reviews);
+  if (i.getStage() == CLOSED) continue;
+  if (i.getStage() == AMBIGUOUS) {
+   ut(i, b, c, msg("bv"), d);
    continue;
   }
-  if (record.wo()) {
-   record.setStage(CLOSED);
+  if (i.wo()) {
+   i.setStage(CLOSED);
    continue;
   }
   // Expire by grace only a slot that is CLEARED and whose cash was never seen (a
   // collect-to-bank and similar). A SELL whose slot still shows the terminal state is
   // still in GE custody: its coins may be collected much later, so it must not expire by
   // time. BUY keeps its existing pattern (reported, not changed).
-  boolean cleared = record.cleared;
-  boolean buyTerminal = record.getSide() != SELL && record.xs();
-  if ((cleared || buyTerminal) && now - record.getLastSeenAtEpochMillis() > UNOBSERVED_GRACE_MILLIS) {
-   ut(record, now, sessionId, msg("dc"), reviews);
+  boolean /* cleared */j = i.cleared;
+  boolean /* buyTerminal */k = i.getSide() != SELL && i.xs();
+  if ((j || k) && b - i.getLastSeenAtEpochMillis() > UNOBSERVED_GRACE_MILLIS) {
+   ut(i, b, c, msg("dc"), d);
   }
  }
- slotClearedAtEpochMillis.values().removeIf(at -> now - at > UNOBSERVED_GRACE_MILLIS);
+ slotClearedAtEpochMillis.values().removeIf(/* at */l -> b - l > UNOBSERVED_GRACE_MILLIS);
 }
 
-void rj(long now, String sessionId, List<Ac> handoffs) {
- List<Aa> open = aeo();
- open.removeIf(record -> record.getStage() == CLOSED);
- for (int index = 0; index < open.size() - MAX_RECORDS; index++) {
-  ut(open.get(index), now, sessionId, msg("bo"), handoffs);
+void rj(long /* now */a, String /* sessionId */b, List<Ac> /* handoffs */c) {
+ List<Aa> /* open */d = aeo();
+ d.removeIf(/* record */e -> e.getStage() == CLOSED);
+ for (int /* index */f = 0; f < d.size() - MAX_RECORDS; f++) {
+  ut(d.get(f), a, b, msg("bo"), c);
  }
 }
 
 // -- Custody claims: each settle offers its flows to the lifecycles, oldest placement first --
 /** One lifecycle's claim on a flow: the magnitude it takes, or 0 to pass. */
 interface ClaimStep {
- long claim(Aa record, Ab flow, long remaining);
+ long claim(Aa /* record */b, Ab /* flow */c, long /* remaining */d);
 }
 
-void nz(List<Ab> residual, Predicate<Ab> which, ClaimStep step) {
- Dv.claim(residual, which, (flow, magnitude) -> {
-  long remaining = magnitude;
-  for (Aa record : aeo()) {
-   if (remaining > 0L) remaining -= nonNeg(step.claim(record, flow, remaining));
+void nz(List<Ab> /* residual */a, Predicate<Ab> /* which */b, ClaimStep /* step */c) {
+ Dv.claim(a, b, (/* flow */d, /* magnitude */e) -> {
+  long /* remaining */f = e;
+  for (Aa /* record */g : aeo()) {
+   if (f > 0L) f -= nonNeg(c.claim(g, d, f));
   }
-  return magnitude - remaining;
+  return e - f;
  });
 }
 
 /** A lifecycle observed from its placement with no identity desync. */
-static boolean trusted(Aa record, Side side) {
- return record.getSide() == side && !record.wx() && record.getConfidence() != Confidence.AMBIGUOUS;
+static boolean trusted(Aa /* record */a, Side /* side */b) {
+ return a.getSide() == b && !a.wx() && a.getConfidence() != Confidence.AMBIGUOUS;
 }
 
 /** SELL placement principal (item loss). */
-void oc(List<Ab> residual, List<Ab> claimed, long now, IntPredicate itemAllowed) {
- nz(residual, flow -> flow.isCost() && flow.itemId != ItemID.COINS && itemAllowed.test(flow.itemId),
- (record, flow, remaining) -> {
-  long claim = min(remaining, record.getOfferedQty());
-  if (!trusted(record, SELL) || record.itemId != flow.itemId
-  || record.vq() || record.cleared || record.getCapturedQty() > 0L
-  || now - record.getPlacedAtEpochMillis() > PLACEMENT_WINDOW_MILLIS || claim <= 0L) {
+void oc(List<Ab> /* residual */a, List<Ab> /* claimed */b, long /* now */c, IntPredicate /* itemAllowed */d) {
+ nz(a, /* flow */e -> e.isCost() && e.itemId != ItemID.COINS && d.test(e.itemId),
+ (/* record */f, /* flow */g, /* remaining */h) -> {
+  long /* claim */i = min(h, f.getOfferedQty());
+  if (!trusted(f, SELL) || f.itemId != g.itemId
+  || f.vq() || f.cleared || f.getCapturedQty() > 0L
+  || c - f.getPlacedAtEpochMillis() > PLACEMENT_WINDOW_MILLIS || i <= 0L) {
    return 0L;
   }
-  ts(record, flow, now);
+  ts(f, g, c);
   if (basisLedger != null) {
-   TrackedBasisLedger.Reservation reservation = basisLedger.reserve(record.itemId, claim, now);
-   if (!reservation.isEmpty()) {
-    record.reservedTrackedQty = nonNeg(safeAdd(record.getReservedTrackedQty(), reservation.trackedQty));
-    record.reservedTrackedBasisGp = nonNeg(safeAdd(record.getReservedTrackedBasisGp(), reservation.basisGp));
+   TrackedBasisLedger.Reservation /* reservation */j = basisLedger.reserve(f.itemId, i, c);
+   if (!j.isEmpty()) {
+    f.reservedTrackedQty = nonNeg(safeAdd(f.getReservedTrackedQty(), j.trackedQty));
+    f.reservedTrackedBasisGp = nonNeg(safeAdd(f.getReservedTrackedBasisGp(), j.basisGp));
    }
   }
-  record.setCapturedQty(claim);
-  record.setLastSeenAtEpochMillis(now);
-  claimed.add(flow.part(claim));
-  return claim;
+  f.setCapturedQty(i);
+  f.setLastSeenAtEpochMillis(c);
+  b.add(g.part(i));
+  return i;
  });
 }
 
 /** BUY observed reserve (coin loss). */
-void ob(List<Ab> residual, List<Ab> claimed, long now) {
- Set<Integer> gainItems = gainQuantities(residual, ANY).keySet();
- nz(residual, flow -> flow.isCost() && flow.itemId == ItemID.COINS, (record, flow, remaining) -> {
-  long claim = min(remaining, nonNeg(record.getOfferedQty() * record.getListedPrice()));
+void ob(List<Ab> /* residual */b, List<Ab> /* claimed */c, long /* now */d) {
+ Set<Integer> /* gainItems */e = gainQuantities(b, ANY).keySet();
+ nz(b, /* flow */f -> f.isCost() && f.itemId == ItemID.COINS, (/* record */g, /* flow */h, /* remaining */i) -> {
+  long /* reserve */j = nonNeg(g.getOfferedQty() * g.getListedPrice());
+  // Owner 1.2: an offer placed, bought and collected inside one settle shows only its exact
+  // spend, the reserve with its change already back; the purchase books it, never Review.
+  boolean /* instant */k = e.contains(g.itemId) && g.xs() && i == g.getSpentGp();
+  long /* claim */l = k ? i : min(i, j);
   // A same-item acquisition alongside the coin loss is a purchase, not a reserve:
   // leave the mixed movement to the normal classification path.
   // An offer that filled at once still took these coins; only a cancelled one kept none.
-  if (!trusted(record, BUY) || record.vq() || record.cleared
-  || record.getReserveGp() > 0L || now - record.getPlacedAtEpochMillis() > PLACEMENT_WINDOW_MILLIS
-  || gainItems.contains(record.itemId) || claim <= 0L) {
+  if (!trusted(g, BUY) || g.vq() || g.cleared && !k
+  || g.getReserveGp() > 0L || d - g.getPlacedAtEpochMillis() > PLACEMENT_WINDOW_MILLIS
+  || !k && e.contains(g.itemId) || l <= 0L) {
    return 0L;
   }
-  record.reserveGp = nonNeg(claim);
-  record.setLastSeenAtEpochMillis(now);
-  claimed.add(flow.part(claim, 1, FACE_VALUE));
-  return claim;
+  g.reserveGp = k ? j : nonNeg(l);
+  if (k) g.refundedGp = nonNeg(j - l);
+  g.setLastSeenAtEpochMillis(d);
+  c.add(h.part(l, 1, FACE_VALUE));
+  return l;
  });
 }
 
 /** BUY refund (coin gain). */
-void oa(List<Ab> residual, List<Ab> claimed) {
- nz(residual, flow -> flow.isGain() && flow.itemId == ItemID.COINS, (record, flow, remaining) -> {
-  long refundRoom = nonNeg(record.getOfferedQty() * record.getListedPrice() - record.getSpentGp())
-  - record.getRefundedGp();
-  long claim = min(remaining, min(nonNeg(refundRoom), record.nd()));
+void oa(List<Ab> /* residual */a, List<Ab> /* claimed */b) {
+ nz(a, /* flow */c -> c.isGain() && c.itemId == ItemID.COINS, (/* record */d, /* flow */e, /* remaining */f) -> {
+  long /* refundRoom */g = nonNeg(d.getOfferedQty() * d.getListedPrice() - d.getSpentGp())
+  - d.getRefundedGp();
+  long /* claim */h = min(f, min(nonNeg(g), d.nd()));
   // Change is owed once the offer is finished (bought or cancelled) or its slot cleared.
-  if (!trusted(record, BUY) || !(record.xs() || record.cleared) || claim <= 0L) {
+  if (!trusted(d, BUY) || !(d.xs() || d.cleared) || h <= 0L) {
    return 0L;
   }
-  record.refundedGp = nonNeg(safeAdd(record.getRefundedGp(), claim));
-  claimed.add(flow.part(claim, 1, FACE_VALUE));
-  return claim;
+  d.refundedGp = nonNeg(safeAdd(d.getRefundedGp(), h));
+  b.add(e.part(h, 1, FACE_VALUE));
+  return h;
  });
 }
 
 /** SELL cancellation return (item gain). */
-void oe(List<Ab> residual, List<Ab> claimed, IntPredicate itemAllowed) {
- nz(residual, flow -> flow.isGain() && flow.itemId != ItemID.COINS && itemAllowed.test(flow.itemId),
- (record, flow, remaining) -> {
-  long claim = min(remaining, record.aib());
-  if (!trusted(record, SELL) || record.itemId != flow.itemId
-  || !(record.vq() || record.cleared) || claim <= 0L) {
+void oe(List<Ab> /* residual */a, List<Ab> /* claimed */b, IntPredicate /* itemAllowed */c) {
+ nz(a, /* flow */d -> d.isGain() && d.itemId != ItemID.COINS && c.test(d.itemId),
+ (/* record */e, /* flow */f, /* remaining */g) -> {
+  long /* claim */h = min(g, e.aib());
+  if (!trusted(e, SELL) || e.itemId != f.itemId
+  || !(e.vq() || e.cleared) || h <= 0L) {
    return 0L;
   }
   // The returned principal is neutral at its frozen custody basis, never the
   // current live quote; with no frozen basis it stays the observed movement.
-  aez(record, claim);
-  record.setReturnedQty(safeAdd(record.getReturnedQty(), claim));
-  claimed.add(record.getBasisUnitPrice() > 0L
-  ? flow.part(claim, record.getBasisUnitPrice(), adi(record.getBasisSource())) : flow.part(claim));
-  return claim;
+  aez(e, h);
+  e.setReturnedQty(safeAdd(e.getReturnedQty(), h));
+  b.add(e.getBasisUnitPrice() > 0L
+  ? f.part(h, e.getBasisUnitPrice(), adi(e.getBasisSource())) : f.part(h));
+  return h;
  });
 }
 
 /** BUY collection (item gain). */
-void ny(List<Ab> residual, List<Ab> claimed, long now,
-String sessionId, List<Ac> counted, IntPredicate itemAllowed, boolean collectionEvidence) {
- nz(residual, flow -> flow.isGain() && flow.itemId != ItemID.COINS && itemAllowed.test(flow.itemId),
- (record, flow, remaining) -> {
-  long claim = min(remaining, record.ada());
+void ny(List<Ab> /* residual */b, List<Ab> /* claimed */c, long /* now */d,
+String /* sessionId */e, List<Ac> /* counted */f, IntPredicate /* itemAllowed */g, boolean /* collectionEvidence */h) {
+ nz(b, /* flow */i -> i.isGain() && i.itemId != ItemID.COINS && g.test(i.itemId),
+ (/* record */j, /* flow */k, /* remaining */l) -> {
+  long /* claim */m = min(l, j.ada());
   // Passive progress alone never turns a same-item delta into a collection.
-  if (!trusted(record, BUY) || record.itemId != flow.itemId || record.quantityModified || claim <= 0L
-  || !(collectionEvidence || record.xs() || record.cleared)) {
+  if (!trusted(j, BUY) || j.itemId != k.itemId || j.quantityModified || m <= 0L
+  || !(h || j.xs() || j.cleared)) {
    return 0L;
   }
-  if (record.getBasisSource().isEmpty()) ts(record, flow, now);
-  record.collectedQty = nonNeg(safeAdd(record.getCollectedQty(), claim));
-  record.setCollectedValueGp(safeAdd(record.collectedValueGp, Ae.agz(claim, flow.unitPrice)));
-  record.setLastSeenAtEpochMillis(now);
-  claimed.add(flow.part(claim));
-  if (record.getCollectedQty() < record.getFilledQty()) {
+  if (j.getBasisSource().isEmpty()) ts(j, k, d);
+  j.collectedQty = nonNeg(safeAdd(j.getCollectedQty(), m));
+  j.setCollectedValueGp(safeAdd(j.collectedValueGp, Ae.agz(m, k.unitPrice)));
+  j.setLastSeenAtEpochMillis(d);
+  c.add(k.part(m));
+  if (j.getCollectedQty() < j.getFilledQty()) {
    // Partial collection: execution chunks are not attributable; fail closed.
-   record.setCollectionAmbiguous(true);
+   j.setCollectionAmbiguous(true);
   } else {
-   mi(record, now, sessionId, counted);
+   mi(j, d, e, f);
   }
-  return claim;
+  return m;
  });
 }
 
-void mi(Aa record, long now, String sessionId, List<Ac> counted) {
- long settleQty = record.getCollectedQty() - record.getSettledQty();
- long execution = record.acx();
- if (settleQty <= 0L) return;
- boolean clean = vu(record, sessionId);
- var flows = new ArrayList<Ab>(2);
+void mi(Aa /* record */a, long /* now */b, String /* sessionId */c, List<Ac> /* counted */d) {
+ long /* settleQty */e = a.getCollectedQty() - a.getSettledQty();
+ long /* execution */f = a.acx();
+ if (e <= 0L) return;
+ boolean /* clean */g = vu(a, c);
+ var /* flows */h = new ArrayList<Ab>(2);
  // Exact NEW-model BUY: the asset value equals the actual settled spend, so acquisition is
  // Net-neutral and the acquired quantity becomes known coverage at that exact spend.
- flows.add(new Ab(record.itemId, record.getItemName(), settleQty, toInt(execution / settleQty),
- execution, adi(record.getBasisSource()), record.getBasisCapturedAtEpochMillis()));
- flows.add(coins(-execution, now));
- Ac transaction = mz(flows, now, clean, clean, msg("gb"));
- counted.add(transaction);
- record.setSettledQty(safeAdd(record.getSettledQty(), settleQty));
- record.setSettledExecutionGp(safeAdd(record.getSettledExecutionGp(), execution));
- record.setSettledCashGp(safeAdd(record.settledCashGp, execution));
- record.setSettlementId(transaction.getId());
- record.collectedQty = nonNeg(record.getSettledQty());
- record.setCollectedValueGp(0L);
+ h.add(new Ab(a.itemId, a.getItemName(), e, toInt(f / e),
+ f, adi(a.getBasisSource()), a.getBasisCapturedAtEpochMillis()));
+ h.add(coins(-f, b));
+ Ac /* transaction */i = mz(h, b, g, g, msg("gb"));
+ d.add(i);
+ a.setSettledQty(safeAdd(a.getSettledQty(), e));
+ a.setSettledExecutionGp(safeAdd(a.getSettledExecutionGp(), f));
+ a.setSettledCashGp(safeAdd(a.settledCashGp, f));
+ a.setSettlementId(i.getId());
+ a.collectedQty = nonNeg(a.getSettledQty());
+ a.setCollectedValueGp(0L);
 }
 
-static Ab coins(long amount, long now) {
- return new Ab(ItemID.COINS, "Coins", amount, 1, amount, FACE_VALUE, now);
+static Ab coins(long /* amount */a, long /* now */b) {
+ return new Ab(ItemID.COINS, "Coins", a, 1, a, FACE_VALUE, b);
 }
 
 /** Claims a whole coin gain as held or settled GE cash. */
-static long oj(Ab flow, List<Ab> claimed) {
- claimed.add(flow.part(flow.valueDelta, 1, FACE_VALUE));
- return flow.valueDelta;
+static long oj(Ab /* flow */a, List<Ab> /* claimed */b) {
+ b.add(a.part(a.valueDelta, 1, FACE_VALUE));
+ return a.valueDelta;
 }
 
 // -- SELL collection (coin gain) ----------------------------------------------------------
@@ -669,45 +680,45 @@ static long oj(Ab flow, List<Ab> claimed) {
 * slot-evidenced candidates may be quarantined, and every other candidate stays pending for a
 * later exact collect.</p>
 */
-void og(List<Ab> residual, List<Ab> claimed, long now,
-String sessionId, List<Ac> counted, boolean collectionEvidence) {
- if (!collectionEvidence) {
+void og(List<Ab> /* residual */b, List<Ab> /* claimed */c, long /* now */d,
+String /* sessionId */e, List<Ac> /* counted */f, boolean /* collectionEvidence */g) {
+ if (!g) {
   // A coin gain with no Collect interaction is not a collect interaction: keep the
   // pre-6A.1A2 booking path byte-for-byte (reported as a remaining exposure).
-  od(residual, claimed, now, sessionId, counted);
+  od(b, c, d, e, f);
   return;
  }
- Dv.claim(residual, flow -> flow.isGain() && flow.itemId == ItemID.COINS, (flow, magnitude) -> {
-  long cashGp = flow.valueDelta;
-  List<Aa> candidates = aii(true);
-  if (candidates.isEmpty()) {
+ Dv.claim(b, /* flow */h -> h.isGain() && h.itemId == ItemID.COINS, (/* flow */i, /* magnitude */j) -> {
+  long /* cashGp */k = i.valueDelta;
+  List<Aa> /* candidates */l = aii(true);
+  if (l.isEmpty()) {
    // Coins may arrive before the offer's execution/terminal evidence. A live Collect
    // interaction with a captured sell lifecycle still pending is that settlement's
    // cash; retain it internally instead of letting an unresolved Coins row reach
    // Review. The bounded hold retries as offer evidence arrives.
-   if (cashGp <= 0L || !uz()) return 0L;
-   agq(cashGp, now);
+   if (k <= 0L || !uz()) return 0L;
+   agq(k, d);
    pendingSettlementAwaitingEvidence = true;
-   return oj(flow, claimed);
+   return oj(i, c);
   }
-  Attribution attribution = attribute(candidates, cashGp, now);
-  if (attribution.kind == Bh.SETTLE) {
-   ahz(attribution.records, now, sessionId, counted);
-   return oj(flow, claimed);
+  Attribution /* attribution */m = attribute(l, k, d);
+  if (m.kind == Bh.SETTLE) {
+   ahz(m.records, k, d, e, f);
+   return oj(i, c);
   }
-  if (!attribution.contradicted) {
+  if (!m.contradicted) {
    // Exact-but-unconfirmed, tied, or unmatched evidence: retain the observed cash
    // transiently. The SLOT WINDOW gathers the slot evidence a fail-closed decision
    // needs; while a sell can still receive execution evidence, the existing long hold
    // keeps waiting for it.
-   agq(cashGp, now);
-   pendingSettlementAwaitingEvidence |= attribution.kind == Bh.NONE && uz();
-   return oj(flow, claimed);
+   agq(k, d);
+   pendingSettlementAwaitingEvidence |= m.kind == Bh.NONE && uz();
+   return oj(i, c);
   }
   // No exact attribution: only candidates with slot evidence in this interaction may be
   // quarantined. The unattributed movement follows the ordinary path to one uncounted
   // Review Coins row; every other candidate stays pending for a later exact collect.
-  adt(attribution.quarantinable, now, sessionId, counted);
+  adt(m.quarantinable, d, e, f);
   return 0L;
  });
 }
@@ -717,74 +728,106 @@ String sessionId, List<Ac> counted, boolean collectionEvidence) {
 * ordinary non-collect coin movements keep their existing classification; it is never used
 * for a collect interaction.
 */
-void od(List<Ab> residual,
-List<Ab> claimed, long now, String sessionId, List<Ac> counted) {
- Dv.claim(residual, flow -> flow.isGain() && flow.itemId == ItemID.COINS, (flow, magnitude) -> {
-  List<Aa> candidates = aii(false);
-  long totalExecution = 0L;
-  for (Aa record : candidates) totalExecution = safeAdd(totalExecution, record.acx());
-  long original = flow.valueDelta;
-  long claimCash = min(original, totalExecution);
-  if (claimCash <= 0L) return 0L;
-  if (candidates.size() > 1) {
-   boolean allClean = true;
-   boolean allKnownCoverage = true;
-   long expectedTax = 0L;
-   for (Aa record : candidates) {
-    allClean &= vu(record, sessionId);
-    allKnownCoverage &= record.afs() >= record.ada();
+void od(List<Ab> /* residual */a,
+List<Ab> /* claimed */b, long /* now */c, String /* sessionId */d, List<Ac> /* counted */e) {
+ Dv.claim(a, /* flow */f -> f.isGain() && f.itemId == ItemID.COINS, (/* flow */g, /* magnitude */h) -> {
+  List<Aa> /* candidates */i = aii(false);
+  long /* totalExecution */j = 0L;
+  for (Aa /* record */k : i) j = safeAdd(j, k.acx());
+  long /* original */l = g.valueDelta;
+  long /* claimCash */m = min(l, j);
+  if (m <= 0L) return 0L;
+  if (i.size() > 1) {
+   boolean /* allClean */n = true;
+   boolean /* allKnownCoverage */o = true;
+   long /* expectedTax */p = 0L;
+   for (Aa /* record */q : i) {
+    n &= vu(q, d);
+    o &= q.afs() >= q.ada();
     // Candidate fee only: the aggregate observed cash must confirm the exact combined gap.
-    expectedTax = safeAdd(expectedTax, nonNeg(acz(record)));
+    p = safeAdd(p, nonNeg(acz(q)));
    }
-   boolean taxAttributed = expectedTax > 0L && totalExecution - claimCash == expectedTax;
-   if (!taxAttributed && (expectedTax > 0L || claimCash != totalExecution) && !allKnownCoverage) {
-    allClean = false;
-    for (Aa record : candidates) record.setCollectionAmbiguous(true);
+   boolean /* taxAttributed */r = p > 0L && j - m == p;
+   if (!r && (p > 0L || m != j) && !o) {
+    n = false;
+    for (Aa /* record */t : i) t.setCollectionAmbiguous(true);
    }
    // An exact batch books each offer's after-tax share of the observed cash; any
    // other batch books gross execution and an adjustment row for the difference.
-   long allocated = 0L;
-   for (Aa record : candidates) {
-    long settleQty = record.ada();
-    long execution = record.acx();
-    if (settleQty > 0L && execution > 0L) {
-     long cash = taxAttributed ? execution - nonNeg(acz(record)) : execution;
-     mq(record, settleQty, cash, execution, now, sessionId, allClean, counted);
-     allocated = safeAdd(allocated, cash);
+   long /* allocated */u = 0L;
+   for (Aa /* record */v : i) {
+    long /* settleQty */w = v.ada();
+    long /* execution */x = v.acx();
+    if (w > 0L && x > 0L) {
+     long /* cash */y = r ? x - nonNeg(acz(v)) : x;
+     mq(v, w, y, x, c, d, n, e);
+     u = safeAdd(u, y);
     }
    }
-   if (claimCash != allocated) {
+   if (m != u) {
     // Legacy (non-collect) batch adjustment row; collect interactions never produce one.
-    counted.add(new Ac(now, null, allClean ? TRADE : UNCERTAIN, MARKET, msg("ak"), "Market", allClean,
-    singletonList(coins(claimCash - allocated, now)),
-    allClean ? Bd.CONFIRMED : Bd.UNCERTAIN, msg("ga"), null));
+    e.add(new Ac(c, null, n ? TRADE : UNCERTAIN, MARKET, msg("ak"), "Market", n,
+    singletonList(coins(m - u, c)),
+    n ? Bd.CONFIRMED : Bd.UNCERTAIN, msg("ga"), null));
    }
   } else {
-   Aa record = candidates.get(0);
-   long execution = record.acx();
-   boolean over = original > execution;
-   record.setCollectionAmbiguous(record.collectionAmbiguous || over);
-   mq(record, record.ada(), over ? execution : claimCash, execution,
-   now, sessionId, !over && vu(record, sessionId), counted);
+   Aa /* record */z = i.get(0);
+   long /* execution */aa = z.acx();
+   boolean /* over */ab = l > aa;
+   z.setCollectionAmbiguous(z.collectionAmbiguous || ab);
+   mq(z, z.ada(), ab ? aa : m, aa,
+   c, d, !ab && vu(z, d), e);
   }
-  claimed.add(flow.part(claimCash, 1, FACE_VALUE));
-  return claimCash;
+  b.add(g.part(m, 1, FACE_VALUE));
+  return m;
  });
 }
 
-/** Book one exactly attributed subset at each offer's own observed after-tax cash. */
-void ahz(List<Aa> records, long now, String sessionId, List<Ac> counted) {
- boolean allClean = true;
- for (Aa record : records) allClean &= vu(record, sessionId);
- for (Aa record : records) {
-  long settleQty = record.ada();
-  long execution = record.acx();
-  long tax = acz(record);
-  // A negative (unprovable) tax is never part of an exact match; the attribution excluded it.
-  if (settleQty > 0L && execution > 0L && tax >= 0L) {
-   mq(record, settleQty, execution - tax, execution, now, sessionId, allClean, counted);
-  }
+/**
+* Book one exactly attributed subset at each offer's own observed after-tax cash. A sale that
+* filled at several prices in one observed chunk has a tax range, not one tax: the observed
+* cash proves the subset's total, so each such offer pays its lowest possible tax plus, in
+* order, the rest up to its highest (owner 2026-10-08: a big mixed-price sale is no Review).
+*/
+void ahz(List<Aa> /* records */a, long /* cash */k, long /* now */b, String /* sessionId */c, List<Ac> /* counted */d) {
+ boolean /* allClean */e = true;
+ for (Aa /* record */f : a) {
+  e &= vu(f, c);
+  long[] /* net */n = net(f);
+  if (n != null) k -= n[1];
  }
+ // The tax beyond every offer's lowest possible tax.
+ k = -k;
+ for (Aa /* record */g : a) {
+  long[] /* net */n = net(g);
+  // An offer with no execution is never part of a match; the attribution excluded it.
+  if (n == null) continue;
+  long /* execution */i = g.acx();
+  long /* extra */l = max(0L, min(n[1] - n[0], k));
+  k -= l;
+  long /* tax */j = i - n[1] + l;
+  if (acz(g) < 0L) {
+   // The cash proved it: later reads (the receipt, a restart) see this exact tax.
+   g.fillTaxExact = true;
+   g.fillTaxGp = safeAdd(g.getSettledTaxGp(), j);
+  }
+  mq(g, g.ada(), i - j, i, b, c, e, d);
+ }
+}
+
+/**
+* The pending execution's possible after-tax cash {lowest, highest}, or null with no execution.
+* Exact when its tax is proven; otherwise each item paid price/50 rounded down, so the stack
+* paid at most gross/50 and at least (gross - 49 per item)/50 (below the 5M per-item cap).
+*/
+static long[] net(Aa /* record */a) {
+ long /* execution */b = a.acx();
+ long /* quantity */c = a.ada();
+ long /* tax */d = acz(a);
+ if (b <= 0L || c <= 0L) return null;
+ if (d >= 0L) return new long[] {b - d, b - d};
+ long /* least */e = b >= 250_000_000L ? 0L : max(0L, (b - 49L * c + 49L) / 50L);
+ return new long[] {b - b / 50L, b - e};
 }
 
 /**
@@ -792,126 +835,118 @@ void ahz(List<Aa> records, long now, String sessionId, List<Ac> counted) {
 * shape (uncounted, collectionAmbiguous, the booked allocation recorded) while the observed
 * cash itself is never assigned to a lifecycle it was not proven part of.
 */
-void adt(List<Aa> quarantinable, long now, String sessionId, List<Ac> counted) {
- for (Aa record : quarantinable) {
-  long settleQty = record.ada();
-  long execution = record.acx();
-  if (settleQty > 0L && execution > 0L) {
-   record.setCollectionAmbiguous(true);
-   mq(record, settleQty, execution, execution, now, sessionId, false, counted);
+void adt(List<Aa> /* quarantinable */a, long /* now */b, String /* sessionId */c, List<Ac> /* counted */d) {
+ for (Aa /* record */e : a) {
+  long /* settleQty */f = e.ada();
+  long /* execution */g = e.acx();
+  if (f > 0L && g > 0L) {
+   e.setCollectionAmbiguous(true);
+   mq(e, f, g, g, b, c, false, d);
   }
  }
 }
 
 /** Candidate sell lifecycles for one coin gain; the retry needs durable terminal evidence. */
-List<Aa> aii(boolean collectionEvidence) {
- var candidates = new ArrayList<Aa>();
- for (Aa record : aeo()) {
-  if (record.getSide() == SELL && record.ada() > 0L && record.getCapturedQty() > 0L
-  && record.ahm() >= record.ada() && !record.wx()
-  && (collectionEvidence || record.xs() || record.cleared)) {
-   candidates.add(record);
+List<Aa> aii(boolean /* collectionEvidence */a) {
+ var /* candidates */b = new ArrayList<Aa>();
+ for (Aa /* record */c : aeo()) {
+  if (c.getSide() == SELL && c.ada() > 0L && c.getCapturedQty() > 0L
+  && c.ahm() >= c.ada() && !c.wx()
+  && (a || c.xs() || c.cleared)) {
+   b.add(c);
   }
  }
- return candidates;
+ return b;
 }
 
 /** Retain observed collect cash transiently; the SLOT WINDOW anchors on the first hold. */
-void agq(long cashGp, long now) {
- if (cashGp <= 0L) return;
- if (pendingSettlementCashGp <= 0L) pendingSettlementHeldSinceEpochMillis = now;
- pendingSettlementCashGp = safeAdd(pendingSettlementCashGp, cashGp);
- pendingSettlementAtEpochMillis = max(pendingSettlementAtEpochMillis, now);
+void agq(long /* cashGp */a, long /* now */b) {
+ if (a <= 0L) return;
+ if (pendingSettlementCashGp <= 0L) pendingSettlementHeldSinceEpochMillis = b;
+ pendingSettlementCashGp = safeAdd(pendingSettlementCashGp, a);
+ pendingSettlementAtEpochMillis = max(pendingSettlementAtEpochMillis, b);
 }
 
 /** Exact attribution of one collect coin movement over the current candidate set. */
-Attribution attribute(List<Aa> candidates, long cashGp, long coinAt) {
- int size = candidates.size();
- var quarantinable = new ArrayList<Aa>();
- if (size <= 0 || size > MAX_SETTLEMENT_CANDIDATES) {
-  return new Attribution(Bh.NONE, quarantinable, quarantinable, false);
+Attribution attribute(List<Aa> /* candidates */b, long /* cashGp */c, long /* coinAt */d) {
+ int /* size */e = b.size();
+ var /* quarantinable */f = new ArrayList<Aa>();
+ if (e <= 0 || e > MAX_SETTLEMENT_CANDIDATES) {
+  return new Attribution(Bh.NONE, f, f, false);
  }
- long[] netGp = new long[size];
- boolean[] provable = new boolean[size];
- var cleared = new ArrayList<Integer>();
- boolean anq = false;
- long alk = 0L;
- for (int index = 0; index < size; index++) {
-  Aa record = candidates.get(index);
-  long tax = acz(record);
-  provable[index] = tax >= 0L;
-  netGp[index] = provable[index] ? record.acx() - tax : 0L;
-  Long clearedAt = slotClearedAtEpochMillis.get(record.getOfferId());
+ // Each candidate's possible after-tax cash: one value, or a range for a mixed-price fill.
+ long[][] /* nets */g = new long[e][];
+ var /* cleared */i = new ArrayList<Integer>();
+ for (int /* index */l = 0; l < e; l++) {
+  Aa /* record */m = b.get(l);
+  g[l] = net(m);
+  Long /* clearedAt */o = slotClearedAtEpochMillis.get(m.getOfferId());
   // The candidate's slot cleared within the SLOT WINDOW of the coin gain.
-  if (clearedAt != null && Math.abs(clearedAt - coinAt) <= SLOT_WINDOW_MILLIS) {
-   cleared.add(index);
-   quarantinable.add(record);
-   alk = safeAdd(alk, netGp[index]);
-   anq |= !provable[index];
+  if (o != null && Math.abs(o - d) <= SLOT_WINDOW_MILLIS) {
+   i.add(l);
+   f.add(m);
   }
  }
  // Apply slot evidence only after enumerating every subset within the eight-offer bound.
- List<List<Integer>> matches = aan(netGp, provable, cashGp, 1 << size);
- List<Integer> match = null;
- Bh kind = Bh.NONE;
- boolean contradicted = false;
- if (anq) {
-  // §2.4: a slot-evidenced candidate whose tax cannot be proven fails the interaction.
-  kind = Bh.NONE;
- } else if (size == 1 && provable[0] && netGp[0] == cashGp) {
-  // A single candidate has no competing explanation: its exact observed net proves the
-  // movement belongs to it, so no slot confirmation is needed (an inexact amount still
-  // fails closed below).
-  kind = Bh.SETTLE;
-  match = singletonList(0);
- } else if (!cleared.isEmpty() && alk == cashGp) {
-  // §2.1: the slot-clear set is the primary proof.
-  kind = Bh.SETTLE;
-  match = cleared;
- } else if (matches.size() > 1) {
+ List<List<Integer>> /* matches */p = aan(g, c, 1 << e);
+ List<Integer> /* match */q = null;
+ Bh /* kind */r = Bh.NONE;
+ boolean /* contradicted */t = false;
+ if (p.contains(i)) {
+  // §2.1: the slot-clear set is the primary proof; a single candidate has no competing
+  // explanation either, so neither needs slot confirmation (an amount it cannot have
+  // received, or an execution with no known price, still fails closed below).
+  r = Bh.SETTLE;
+  q = i;
+ } else if (e == 1 && !p.isEmpty()) {
+  r = Bh.SETTLE;
+  q = p.get(0);
+ } else if (p.size() > 1) {
   // §2.3: slot evidence may still select exactly one matching subset.
-  matches.removeIf(subset -> !subset.containsAll(cleared));
-  contradicted = !cleared.isEmpty() && matches.isEmpty();
-  kind = contradicted ? Bh.NONE : matches.size() == 1 ? Bh.SETTLE : Bh.TIE;
-  match = matches.size() == 1 ? matches.get(0) : null;
- } else if (matches.size() == 1) {
+  p.removeIf(/* subset */u -> !u.containsAll(i));
+  t = !i.isEmpty() && p.isEmpty();
+  r = t ? Bh.NONE : p.size() == 1 ? Bh.SETTLE : Bh.TIE;
+  q = p.size() == 1 ? p.get(0) : null;
+ } else if (p.size() == 1) {
   // A unique match settles when the slot-clear set is exactly it, needs confirmation while
   // no slot outside it cleared, and §2.2: a slot cleared outside it contradicts it.
-  match = matches.get(0);
-  contradicted = !match.containsAll(cleared);
-  kind = match.equals(cleared) ? Bh.SETTLE : contradicted ? Bh.NONE : Bh.CONFIRM;
+  q = p.get(0);
+  t = !q.containsAll(i);
+  r = q.equals(i) ? Bh.SETTLE : t ? Bh.NONE : Bh.CONFIRM;
  }
- var records = new ArrayList<Aa>();
- for (int index : match == null || contradicted ? Collections.<Integer>emptyList() : match) {
-  records.add(candidates.get(index));
+ var /* records */v = new ArrayList<Aa>();
+ for (int /* index */w : q == null || t ? Collections.<Integer>emptyList() : q) {
+  v.add(b.get(w));
  }
- return new Attribution(kind, records, quarantinable, contradicted);
+ return new Attribution(r, v, f, t);
 }
 
 /**
-* Exact subset enumeration over provable candidates: saturating sums, deterministic index
+* Subset enumeration over candidates with a known execution: a subset matches when the cash
+* lies within its summed {lowest, highest} after-tax cash. Saturating sums, deterministic index
 * order, at most {@code limit} matches. Returns empty when the candidate bound is exceeded,
 * so an over-full interaction can never be enumerated.
 */
-static List<List<Integer>> aan(long[] netGp, boolean[] provable, long cashGp, int limit) {
- int size = netGp == null ? 0 : netGp.length;
- var matches = new ArrayList<List<Integer>>();
- if (size <= 0 || size > MAX_SETTLEMENT_CANDIDATES || provable == null || provable.length != size) {
-  return matches;
+static List<List<Integer>> aan(long[][] /* nets */a, long /* cashGp */c, int /* limit */d) {
+ int /* size */e = a == null ? 0 : a.length;
+ var /* matches */f = new ArrayList<List<Integer>>();
+ if (e <= 0 || e > MAX_SETTLEMENT_CANDIDATES) {
+  return f;
  }
- for (int mask = 1; mask < 1 << size && matches.size() < limit; mask++) {
-  long sum = 0L;
-  var subset = new ArrayList<Integer>();
-  for (int index = 0; index < size; index++) {
-   if ((mask & (1 << index)) != 0) {
-    subset.add(index);
-    sum = provable[index] ? safeAdd(sum, netGp[index]) : Long.MIN_VALUE;
-    if (!provable[index]) break;
+ for (int /* mask */g = 1; g < 1 << e && f.size() < d; g++) {
+  long /* least */h = 0L;
+  long /* most */k = 0L;
+  var /* subset */i = new ArrayList<Integer>();
+  for (int /* index */j = 0; j < e && h >= 0L; j++) {
+   if ((g & (1 << j)) != 0) {
+    i.add(j);
+    h = a[j] == null ? -1L : safeAdd(h, a[j][0]);
+    k = a[j] == null ? k : safeAdd(k, a[j][1]);
    }
   }
-  if (sum == cashGp && sum != Long.MIN_VALUE) matches.add(subset);
+  if (h >= 0L && h <= c && c <= k) f.add(i);
  }
- return matches;
+ return f;
 }
 
 /** Attribution outcome kinds; names are conceptual, not persisted. */
@@ -928,17 +963,17 @@ enum Bh {
 
 @AllArgsConstructor
 static class Attribution {
- final Bh kind;
- final List<Aa> records;
- final List<Aa> quarantinable;
- final boolean contradicted;
+ Bh kind;
+ List<Aa> records;
+ List<Aa> quarantinable;
+ boolean contradicted;
 }
 
 /** True while an observed sell lifecycle can still receive execution/terminal evidence. */
 boolean uz() {
- for (Aa record : records) {
-  if (record != null && record.getSide() == SELL && record.getCapturedQty() > 0L && !record.wx()
-  && !record.xs() && !record.cleared) {
+ for (Aa /* record */a : records) {
+  if (a != null && a.getSide() == SELL && a.getCapturedQty() > 0L && !a.wx()
+  && !a.xs() && !a.cleared) {
    return true;
   }
  }
@@ -950,143 +985,143 @@ boolean uz() {
 * evidence (or the SLOT WINDOW) confirms it; a tie, a contradiction, or exhausted evidence
 * fails closed to Review, never distributed by guesswork.
 */
-void aee(long now, String sessionId, List<Ac> counted) {
+void aee(long /* now */b, String /* sessionId */c, List<Ac> /* counted */d) {
  if (pendingSettlementCashGp <= 0L) return;
  // The held cash IS a collect interaction, so the retry sees the same candidate set that
  // interaction saw (still-active sells whose fills may still be collected included).
- Attribution attribution = attribute(aii(true), pendingSettlementCashGp,
+ Attribution /* attribution */e = attribute(aii(true), pendingSettlementCashGp,
  pendingSettlementHeldSinceEpochMillis);
- boolean ane = now - pendingSettlementHeldSinceEpochMillis > SLOT_WINDOW_MILLIS;
+ boolean /* ane */f = b - pendingSettlementHeldSinceEpochMillis > SLOT_WINDOW_MILLIS;
  // §2.2b: a unique match settles at the window end with no contradicting slot evidence; the
  // existing long hold also books as soon as its missing execution evidence completes.
- if (attribution.kind == Bh.SETTLE || attribution.kind == Bh.CONFIRM
- && (ane || pendingSettlementAwaitingEvidence)) {
-  ahz(attribution.records, now, sessionId, counted);
+ if (e.kind == Bh.SETTLE || e.kind == Bh.CONFIRM
+ && (f || pendingSettlementAwaitingEvidence)) {
+  ahz(e.records, pendingSettlementCashGp, b, c, d);
   ox();
   return;
  }
  // §2.2 contradiction, §2.3 an unresolved tie, and §2.4/§3 exhausted evidence fail closed:
  // only slot-evidenced candidates are quarantined and the held cash goes to Review.
- if (attribution.contradicted || now - pendingSettlementAtEpochMillis > UNOBSERVED_GRACE_MILLIS
- || attribution.kind == Bh.TIE && ane || attribution.kind == Bh.NONE
- && (pendingSettlementAwaitingEvidence ? !uz() : ane)) {
-  adt(attribution.quarantinable, now, sessionId, counted);
-  aex(now, counted);
+ if (e.contradicted || b - pendingSettlementAtEpochMillis > UNOBSERVED_GRACE_MILLIS
+ || e.kind == Bh.TIE && f || e.kind == Bh.NONE
+ && (pendingSettlementAwaitingEvidence ? !uz() : f)) {
+  adt(e.quarantinable, b, c, d);
+  aex(b, d);
  }
 }
 
 /** Fail closed: the observed cash stays visible as an uncounted Review row, never guessed. */
-void aex(long now, List<Ac> counted) {
- long held = pendingSettlementCashGp;
+void aex(long /* now */a, List<Ac> /* counted */b) {
+ long /* held */c = pendingSettlementCashGp;
  ox();
- if (held <= 0L) return;
- counted.add(new Ac(now, null, UNCERTAIN, MARKET,
- "Grand Exchange", "Market", false, singletonList(coins(held, now)), Bd.UNCERTAIN,
+ if (c <= 0L) return;
+ b.add(new Ac(a, null, UNCERTAIN, MARKET,
+ "Grand Exchange", "Market", false, singletonList(coins(c, a)), Bd.UNCERTAIN,
  msg("gc"), null));
 }
 
-void mq(Aa record, long settleQty, long cashValue,
-long execution, long now, String sessionId, boolean clean, List<Ac> counted) {
- long remainingQty = record.afs();
- long remainingBasis = record.afr();
- long knownQty = min(settleQty, remainingQty);
- long knownBasis = Df.ayb(remainingQty, remainingBasis, knownQty);
- long aou = Df.yl(cashValue, settleQty, knownQty);
- boolean aly = knownQty <= 0L;
- record.setConsumedTrackedQty(safeAdd(record.getConsumedTrackedQty(), knownQty));
- record.setConsumedTrackedBasisGp(safeAdd(record.getConsumedTrackedBasisGp(), knownBasis));
+void mq(Aa /* record */b, long /* settleQty */c, long /* cashValue */d,
+long /* execution */e, long /* now */f, String /* sessionId */g, boolean /* clean */h, List<Ac> /* counted */i) {
+ long /* remainingQty */j = b.afs();
+ long /* remainingBasis */k = b.afr();
+ long /* knownQty */l = min(c, j);
+ long /* knownBasis */m = Df.ayb(j, k, l);
+ long /* aou */n = Df.yl(d, c, l);
+ boolean /* aly */o = l <= 0L;
+ b.setConsumedTrackedQty(safeAdd(b.getConsumedTrackedQty(), l));
+ b.setConsumedTrackedBasisGp(safeAdd(b.getConsumedTrackedBasisGp(), m));
  if (basisLedger != null) {
   // The realized quantity left ownership even when it carried no known coverage; the
   // per-item realization fence always advances.
-  basisLedger.qd(record.itemId, knownQty, knownBasis, now);
+  basisLedger.qd(b.itemId, l, m, f);
  }
  // The one shared accepted-tax predicate: this settlement's observed gross execution against
  // its actual Received cash. Only an exact per-item match counts; the tax is never inferred
  // from a reference, a guide price or a difference.
- long provenTax = acz(record);
- long arc = aly && clean && provenTax > 0L && execution - cashValue == provenTax ? provenTax : 0L;
- boolean knownCostOnly = arc > 0L;
- var flows = new ArrayList<Ab>(2);
- if (knownCostOnly) {
+ long /* provenTax */p = acz(b);
+ long /* arc */q = o && h && p > 0L && e - d == p ? p : 0L;
+ boolean /* knownCostOnly */r = q > 0L;
+ var /* flows */t = new ArrayList<Ab>(2);
+ if (r) {
   // Fully unknown prior value with a PROVEN tax: the departing item flow is valued at
   // the observed gross execution (not at the frozen reference) against the observed
   // Received cash, so the counted automatic Net is exactly -accepted tax — a market
   // trade cost. Result stays unknown: the accumulator below receives no result here, and
   // a later correction replaces this contribution instead of stacking on it.
-  long unit = execution / settleQty;
-  flows.add(new Ab(record.itemId, record.getItemName(), -settleQty,
-  toInt(unit), -execution, adi(record.getBasisSource()), record.getBasisCapturedAtEpochMillis()));
-  flows.add(coins(cashValue, now));
- } else if (aly) {
+  long /* unit */u = e / c;
+  t.add(new Ab(b.itemId, b.getItemName(), -c,
+  toInt(u), -e, adi(b.getBasisSource()), b.getBasisCapturedAtEpochMillis()));
+  t.add(coins(d, f));
+ } else if (o) {
   // Unknown coverage without a proven tax: the full observed movement stays as
   // liquidation evidence and is Net-neutral. It is never a fake cost and never
   // automatic profit.
-  flows.add(new Ab(record.itemId, record.getItemName(), -settleQty,
-  toInt(record.getBasisUnitPrice()), -record.lo(settleQty),
-  adi(record.getBasisSource()), record.getBasisCapturedAtEpochMillis()));
-  flows.add(coins(cashValue, now));
+  t.add(new Ab(b.itemId, b.getItemName(), -c,
+  toInt(b.getBasisUnitPrice()), -b.lo(c),
+  adi(b.getBasisSource()), b.getBasisCapturedAtEpochMillis()));
+  t.add(coins(d, f));
  } else {
-  if (knownBasis > 0L) {
-   long unit = knownQty > 0L ? knownBasis / knownQty : 0L;
-   flows.add(new Ab(record.itemId, record.getItemName(), -settleQty,
-   toInt(unit), -knownBasis, adi(record.getBasisSource()), record.getBasisCapturedAtEpochMillis()));
+  if (m > 0L) {
+   long /* unit */v = l > 0L ? m / l : 0L;
+   t.add(new Ab(b.itemId, b.getItemName(), -c,
+   toInt(v), -m, adi(b.getBasisSource()), b.getBasisCapturedAtEpochMillis()));
   }
-  flows.add(coins(aou, now));
+  t.add(coins(n, f));
  }
- String explanation = knownCostOnly ? msg("gj") : aly ? msg("gh") : knownQty < settleQty ? msg("gi")
+ String /* explanation */w = r ? msg("gj") : o ? msg("gh") : l < c ? msg("gi")
  : msg("gg");
  // Counted when the lifecycle is exact AND either the realized quantity carries known coverage
  // or the actual GE tax is proven. An unknown sale without a proven tax stays an exact,
  // uncounted evidence row (liquidation cash retained, Net-neutral, never a Review nag).
- Ac transaction = mz(flows, now, clean, clean && (!aly || knownCostOnly), explanation);
- counted.add(transaction);
- if (provenTax >= 0L) record.settledTaxGp = nonNeg(safeAdd(record.getSettledTaxGp(), provenTax));
- record.setSettledQty(safeAdd(record.getSettledQty(), settleQty));
- record.setSettledExecutionGp(safeAdd(record.getSettledExecutionGp(), execution));
- record.setSettledCashGp(safeAdd(record.settledCashGp, cashValue));
- record.setRealizedResultGp(safeAdd(record.realizedResultGp, aou - knownBasis));
- record.setSettlementId(transaction.getId());
+ Ac /* transaction */x = mz(t, f, h, h && (!o || r), w);
+ i.add(x);
+ if (p >= 0L) b.settledTaxGp = nonNeg(safeAdd(b.getSettledTaxGp(), p));
+ b.setSettledQty(safeAdd(b.getSettledQty(), c));
+ b.setSettledExecutionGp(safeAdd(b.getSettledExecutionGp(), e));
+ b.setSettledCashGp(safeAdd(b.settledCashGp, d));
+ b.setRealizedResultGp(safeAdd(b.realizedResultGp, n - m));
+ b.setSettlementId(x.getId());
 }
 
 /** Return an unconsumed reservation share when custody returns or retires a lifecycle. */
-void aez(Aa record, long returnedQty) {
- if (record == null || returnedQty <= 0L) return;
- long remainingQty = record.afs();
- long remainingBasis = record.afr();
- if (remainingQty <= 0L && remainingBasis <= 0L) return;
- long releaseQty = min(returnedQty, remainingQty);
- long releaseBasis = Df.ayb(remainingQty, remainingBasis, releaseQty);
- if (basisLedger != null && (releaseQty > 0L || releaseBasis > 0L)) {
-  basisLedger.release(record.itemId, releaseQty, releaseBasis);
+void aez(Aa /* record */a, long /* returnedQty */b) {
+ if (a == null || b <= 0L) return;
+ long /* remainingQty */c = a.afs();
+ long /* remainingBasis */d = a.afr();
+ if (c <= 0L && d <= 0L) return;
+ long /* releaseQty */e = min(b, c);
+ long /* releaseBasis */f = Df.ayb(c, d, e);
+ if (basisLedger != null && (e > 0L || f > 0L)) {
+  basisLedger.release(a.itemId, e, f);
  }
- record.reservedTrackedQty = nonNeg(max(record.getConsumedTrackedQty(), record.getReservedTrackedQty() - releaseQty));
- record.reservedTrackedBasisGp = nonNeg(max(record.getConsumedTrackedBasisGp(),
- record.getReservedTrackedBasisGp() - releaseBasis));
+ a.reservedTrackedQty = nonNeg(max(a.getConsumedTrackedQty(), a.getReservedTrackedQty() - e));
+ a.reservedTrackedBasisGp = nonNeg(max(a.getConsumedTrackedBasisGp(),
+ a.getReservedTrackedBasisGp() - f));
 }
 
 /** Release every still-unrealized reserved share when a lifecycle leaves custody state. */
-void aey(Aa record) {
- if (record == null) return;
- aez(record, max(record.afs(), record.afr()));
+void aey(Aa /* record */a) {
+ if (a == null) return;
+ aez(a, max(a.afs(), a.afr()));
 }
 
 // ---------------------------------------------------------------------------------------
 // Builders
 // ---------------------------------------------------------------------------------------
 /** One Market row: exact lifecycles book as trades, anything else stays uncounted for review. */
-Ac mz(List<Ab> flows, long now, boolean exact, boolean counted, String explanation) {
- return new Ac(now, null, exact ? TRADE : UNCERTAIN, MARKET, "Grand Exchange", "Market", counted, flows,
- exact ? Bd.CONFIRMED : Bd.UNCERTAIN,
- exact ? explanation : explanation + msg("js") + msg("bw"), null);
+Ac mz(List<Ab> /* flows */a, long /* now */b, boolean /* exact */c, boolean /* counted */d, String /* explanation */e) {
+ return new Ac(b, null, c ? TRADE : UNCERTAIN, MARKET, "Grand Exchange", "Market", d, a,
+ c ? Bd.CONFIRMED : Bd.UNCERTAIN,
+ c ? e : e + msg("js") + msg("bw"), null);
 }
 
-boolean vu(Aa record, String sessionId) {
- if (record.wx() || record.getConfidence() == Confidence.AMBIGUOUS || record.quantityModified
- || record.collectionAmbiguous || !record.vf()) {
+boolean vu(Aa /* record */b, String /* sessionId */c) {
+ if (b.wx() || b.getConfidence() == Confidence.AMBIGUOUS || b.quantityModified
+ || b.collectionAmbiguous || !b.vf()) {
   return false;
  }
- if (record.getOriginSessionId().isEmpty() && sessionId != null && !sessionId.isEmpty()) {
-  record.originSessionId = Ag.axw(sessionId);
+ if (b.getOriginSessionId().isEmpty() && c != null && !c.isEmpty()) {
+  b.originSessionId = Ag.axw(c);
  }
  // Owner policy (2026-09-24, replaces PRE-R5B 11.19): a settlement books in the session
  // where it is collected; the listing session is kept for the "Listed during" label only
@@ -1099,16 +1134,16 @@ boolean vu(Aa record, String sessionId) {
 * is proven (spent divisible by quantity, or an exempt item); otherwise per-fill tax is lost
 * for this lifecycle and the uniform rule over the total remains the only proof.
 */
-static void afi(Aa record, long quantity, long spent) {
- record.setFilledQty(safeAdd(record.getFilledQty(), quantity));
- record.setSpentGp(safeAdd(record.getSpentGp(), spent));
- if (record.getSide() != SELL || !record.fillTaxExact || quantity <= 0L) return;
- long chunkTax = GeTaxRule.adn(record.itemId, spent, quantity);
- if (chunkTax < 0L) {
-  record.setFillTaxExact(false);
+static void afi(Aa /* record */a, long /* quantity */b, long /* spent */c) {
+ a.setFilledQty(safeAdd(a.getFilledQty(), b));
+ a.setSpentGp(safeAdd(a.getSpentGp(), c));
+ if (a.getSide() != SELL || !a.fillTaxExact || b <= 0L) return;
+ long /* chunkTax */d = GeTaxRule.adn(a.itemId, c, b);
+ if (d < 0L) {
+  a.setFillTaxExact(false);
   return;
  }
- record.fillTaxGp = nonNeg(safeAdd(record.getFillTaxGp(), chunkTax));
+ a.fillTaxGp = nonNeg(safeAdd(a.getFillTaxGp(), d));
 }
 
 /**
@@ -1117,45 +1152,45 @@ static void afi(Aa record, long quantity, long spent) {
 * provable price, since fills at different prices pay different per-item tax; otherwise the
 * uniform rule over the pending total applies.
 */
-static long acz(Aa record) {
- long execution = record.acx();
- long quantity = record.ada();
- if (record.fillTaxExact && execution > 0L && quantity > 0L) {
-  long tax = record.getFillTaxGp() - record.getSettledTaxGp();
-  return tax >= 0L && tax <= execution ? tax : GeTaxRule.UNPROVABLE_TAX;
+static long acz(Aa /* record */a) {
+ long /* execution */b = a.acx();
+ long /* quantity */c = a.ada();
+ if (a.fillTaxExact && b > 0L && c > 0L) {
+  long /* tax */d = a.getFillTaxGp() - a.getSettledTaxGp();
+  return d >= 0L && d <= b ? d : GeTaxRule.UNPROVABLE_TAX;
  }
- return GeTaxRule.adn(record.itemId, execution, quantity);
+ return GeTaxRule.adn(a.itemId, b, c);
 }
 
 // ---------------------------------------------------------------------------------------
 // Persistence / lifecycle
 // ---------------------------------------------------------------------------------------
-synchronized void ayc(SavedState state) {
- if (state != null) state.setGeCustody(new ArrayList<>(records));
+synchronized void ayc(SavedState /* state */a) {
+ if (a != null) a.setGeCustody(new ArrayList<>(records));
 }
 
-synchronized void restore(SavedState state, long now) {
+synchronized void restore(SavedState /* state */a, long /* now */b) {
  reset();
- if (state == null) return;
+ if (a == null) return;
  // One live lifecycle per slot (its newest record); settled CLOSED history is kept as well.
- var newestBySlot = new HashMap<Integer, Aa>();
- var closedByOffer = new LinkedHashMap<String, Aa>();
- for (Aa record : state.getGeCustody()) {
-  if (record == null || record.getOfferId().isEmpty() || record.getStage() == CLOSED_UNOBSERVED) {
+ var /* newestBySlot */c = new HashMap<Integer, Aa>();
+ var /* closedByOffer */d = new LinkedHashMap<String, Aa>();
+ for (Aa /* record */e : a.getGeCustody()) {
+  if (e == null || e.getOfferId().isEmpty() || e.getStage() == CLOSED_UNOBSERVED) {
    continue;
   }
-  if (record.getStage() == CLOSED) closedByOffer.put(record.getOfferId(), record);
-  Aa existing = newestBySlot.get(record.slot);
-  if (existing == null || record.getPlacedAtEpochMillis() >= existing.getPlacedAtEpochMillis()) {
-   newestBySlot.put(record.slot, record);
+  if (e.getStage() == CLOSED) d.put(e.getOfferId(), e);
+  Aa /* existing */f = c.get(e.slot);
+  if (f == null || e.getPlacedAtEpochMillis() >= f.getPlacedAtEpochMillis()) {
+   c.put(e.slot, e);
   }
  }
- for (Aa record : newestBySlot.values()) closedByOffer.remove(record.getOfferId());
- records.addAll(newestBySlot.values());
- records.addAll(closedByOffer.values());
- records.sort((left, right) -> Long.compare(left.getPlacedAtEpochMillis(), right.getPlacedAtEpochMillis()));
- for (Aa record : records) {
-  if (record.getConfidence() == Confidence.CONFIRMED) record.setConfidence(Confidence.RESUMED);
+ for (Aa /* record */g : c.values()) d.remove(g.getOfferId());
+ records.addAll(c.values());
+ records.addAll(d.values());
+ records.sort((/* left */h, /* right */i) -> Long.compare(h.getPlacedAtEpochMillis(), i.getPlacedAtEpochMillis()));
+ for (Aa /* record */j : records) {
+  if (j.getConfidence() == Confidence.CONFIRMED) j.setConfidence(Confidence.RESUMED);
  }
 }
 
@@ -1170,9 +1205,9 @@ synchronized void reset() {
 }
 
 /** Adopt another ledger's durable records during a staged profile swap. */
-synchronized void auc(GeCustodyLedger other) {
+synchronized void auc(GeCustodyLedger /* other */a) {
  reset();
- if (other != null) records.addAll(other.records);
+ if (a != null) records.addAll(a.records);
 }
 
 synchronized List<Aa> aji() {
@@ -1192,113 +1227,113 @@ synchronized void ox() {
 // Internals
 // ---------------------------------------------------------------------------------------
 List<Aa> aeo() {
- var sorted = new ArrayList<Aa>(records);
- sorted.sort((left, right) -> {
-  int avp = Long.compare(left.getPlacedAtEpochMillis(), right.getPlacedAtEpochMillis());
-  return avp != 0 ? avp : Integer.compare(left.slot, right.slot);
+ var /* sorted */a = new ArrayList<Aa>(records);
+ a.sort((/* left */b, /* right */c) -> {
+  int /* avp */d = Long.compare(b.getPlacedAtEpochMillis(), c.getPlacedAtEpochMillis());
+  return d != 0 ? d : Integer.compare(b.slot, c.slot);
  });
- return sorted;
+ return a;
 }
 
 /** The slot's live lifecycle; settled (CLOSED) history never owns a slot. */
-Aa aem(int slot) {
- for (Aa record : records) {
-  if (record.slot == slot && record.getStage() != CLOSED) return record;
+Aa aem(int /* slot */a) {
+ for (Aa /* record */b : records) {
+  if (b.slot == a && b.getStage() != CLOSED) return b;
  }
  return null;
 }
 
-Aa yg(int slot) {
- Aa latest = null;
- for (Aa record : records) {
-  if (record.slot == slot && record.getStage() == CLOSED
-  && (latest == null || record.getPlacedAtEpochMillis() >= latest.getPlacedAtEpochMillis())) {
-   latest = record;
+Aa yg(int /* slot */a) {
+ Aa /* latest */b = null;
+ for (Aa /* record */c : records) {
+  if (c.slot == a && c.getStage() == CLOSED
+  && (b == null || c.getPlacedAtEpochMillis() >= b.getPlacedAtEpochMillis())) {
+   b = c;
   }
  }
- return latest;
+ return b;
 }
 
 Aa acl() {
- Aa oldest = null;
- for (Aa record : records) {
-  if (record != null && record.getStage() == CLOSED
-  && (oldest == null || record.getPlacedAtEpochMillis() < oldest.getPlacedAtEpochMillis())) {
-   oldest = record;
+ Aa /* oldest */a = null;
+ for (Aa /* record */b : records) {
+  if (b != null && b.getStage() == CLOSED
+  && (a == null || b.getPlacedAtEpochMillis() < a.getPlacedAtEpochMillis())) {
+   a = b;
   }
  }
- return oldest;
+ return a;
 }
 
 /**
 * The slot's live lifecycle for an offer (any side or item when unknown), falling back to its
 * latest settled history; marks it seen.
 */
-Aa touch(int slot, Snapshot offer, long now) {
- Side side = offer == null ? null : Bj.sideOf(offer.state);
- int itemId = offer == null ? 0 : offer.itemId;
- Aa match = null;
- for (Aa record : records) {
-  if (record.slot != slot || side != null && side != record.getSide() || itemId > 0 && record.itemId != itemId) {
+Aa touch(int /* slot */a, Snapshot /* offer */b, long /* now */c) {
+ Side /* side */d = b == null ? null : Bj.sideOf(b.state);
+ int /* itemId */e = b == null ? 0 : b.itemId;
+ Aa /* match */f = null;
+ for (Aa /* record */g : records) {
+  if (g.slot != a || d != null && d != g.getSide() || e > 0 && g.itemId != e) {
    continue;
   }
-  if (record.getStage() != CLOSED) {
-   match = record;
+  if (g.getStage() != CLOSED) {
+   f = g;
    break;
   }
-  if (match == null || record.getPlacedAtEpochMillis() >= match.getPlacedAtEpochMillis()) match = record;
+  if (f == null || g.getPlacedAtEpochMillis() >= f.getPlacedAtEpochMillis()) f = g;
  }
- if (match != null) match.setLastSeenAtEpochMillis(now);
- return match;
+ if (f != null) f.setLastSeenAtEpochMillis(c);
+ return f;
 }
 
-boolean xo(Aa record, Side side, int itemId, long totalQty, long price) {
- return record.getSide() == side && record.itemId == itemId
- && record.getOfferedQty() == totalQty && record.getListedPrice() == price;
+boolean xo(Aa /* record */a, Side /* side */b, int /* itemId */c, long /* totalQty */d, long /* price */e) {
+ return a.getSide() == b && a.itemId == c
+ && a.getOfferedQty() == d && a.getListedPrice() == e;
 }
 
-void ut(Aa record, long now, String sessionId, String reason, List<Ac> handoffs) {
- aey(record);
- Ac review = nf(record, now, reason);
- if (review != null) handoffs.add(review);
- records.remove(record);
+void ut(Aa /* record */a, long /* now */b, String /* sessionId */c, String /* reason */d, List<Ac> /* handoffs */e) {
+ aey(a);
+ Ac /* review */f = nf(a, b, d);
+ if (f != null) e.add(f);
+ records.remove(a);
 }
 
-Ac nf(Aa record, long now, String reason) {
- if (record.wx()) return null;
- boolean buy = record.getSide() == BUY;
- if (!buy && record.getCapturedQty() <= 0L) {
+Ac nf(Aa /* record */a, long /* now */b, String /* reason */c) {
+ if (a.wx()) return null;
+ boolean /* buy */d = a.getSide() == BUY;
+ if (!d && a.getCapturedQty() <= 0L) {
   // The principal was never observed entering custody; its movements follow the
   // ordinary classification path and must not be surfaced twice.
   return null;
  }
- long unsettledQty = buy ? record.ada() : record.ahm();
- long execution = record.acx();
- if (unsettledQty <= 0L && execution <= 0L) return null;
- var flows = new ArrayList<Ab>(2);
- long unit = record.getBasisUnitPrice();
- Av source = adi(record.getBasisSource());
- if (unsettledQty > 0L) {
-  long value = buy && record.collectedValueGp != 0L ? Ae.abs(record.collectedValueGp) : record.lo(unsettledQty);
-  flows.add(new Ab(record.itemId, record.getItemName(),
-  buy ? unsettledQty : -unsettledQty, toInt(unit), buy ? value : -value, source, record.getBasisCapturedAtEpochMillis()));
+ long /* unsettledQty */e = d ? a.ada() : a.ahm();
+ long /* execution */f = a.acx();
+ if (e <= 0L && f <= 0L) return null;
+ var /* flows */g = new ArrayList<Ab>(2);
+ long /* unit */h = a.getBasisUnitPrice();
+ Av /* source */i = adi(a.getBasisSource());
+ if (e > 0L) {
+  long /* value */j = d && a.collectedValueGp != 0L ? Ae.abs(a.collectedValueGp) : a.lo(e);
+  g.add(new Ab(a.itemId, a.getItemName(),
+  d ? e : -e, toInt(h), d ? j : -j, i, a.getBasisCapturedAtEpochMillis()));
  }
- if (execution > 0L) flows.add(coins(buy ? -execution : execution, now));
- return new Ac(now, null, UNCERTAIN, MARKET,
- "Grand Exchange", "Market", false, flows, Bd.UNCERTAIN, msg("jt") + reason + msg("ju"), null);
+ if (f > 0L) g.add(coins(d ? -f : f, b));
+ return new Ac(b, null, UNCERTAIN, MARKET,
+ "Grand Exchange", "Market", false, g, Bd.UNCERTAIN, msg("jt") + c + msg("ju"), null);
 }
 
-void ts(Aa record, Ab flow, long now) {
- Av source = flow.getPriceSource();
- record.setBasisUnitPrice(nonNeg(flow.unitPrice));
- record.setBasisSource(source == null ? UNKNOWN.name() : source.name());
- record.setBasisCapturedAtEpochMillis(now);
+void ts(Aa /* record */a, Ab /* flow */b, long /* now */c) {
+ Av /* source */d = b.getPriceSource();
+ a.setBasisUnitPrice(nonNeg(b.unitPrice));
+ a.setBasisSource(d == null ? UNKNOWN.name() : d.name());
+ a.setBasisCapturedAtEpochMillis(c);
 }
 
 /** Presentation/audit source name; never used for matching. */
-static Av adi(String sourceName) {
- for (Av source : Av.values()) {
-  if (source.name().equals(sourceName)) return source;
+static Av adi(String /* sourceName */a) {
+ for (Av /* source */b : Av.values()) {
+  if (b.name().equals(a)) return b;
  }
  return UNKNOWN;
 }

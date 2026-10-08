@@ -108,10 +108,10 @@ public class ChargeLoadArmingTest
         Widget scales = item(ItemID.SNAKEBOSS_SCALE, SCALES_SLOT);
         intake(selecting(scales), engine).lc(
             click(MenuAction.WIDGET_TARGET_ON_WIDGET, "Use", blowpipe), "");
-        assertEquals(Ar.V.V1b, engine.chargeLoadTransferEvidence.variant);
+        assertEquals(Ar.V.V1b, (engine.eb.peek(Eb.CL) == null ? null : engine.eb.peek(Eb.CL).v));
         assertEquals("the item in hand is the source", ItemID.SNAKEBOSS_SCALE,
-            engine.chargeLoadTransferEvidence.selectedItemId);
-        assertEquals("the weapon's own slot", BLOWPIPE_IDENTITY, engine.chargeLoadTransferEvidence.targetIdentity);
+            engine.eb.item(Eb.CL));
+        assertEquals("the weapon's own slot", BLOWPIPE_IDENTITY, (engine.eb.peek(Eb.CL) == null ? null : engine.eb.peek(Eb.CL).id));
     }
 
     @Test
@@ -122,10 +122,10 @@ public class ChargeLoadArmingTest
         Widget scales = item(ItemID.SNAKEBOSS_SCALE, SCALES_SLOT);
         intake(selecting(blowpipe), engine).lc(
             click(MenuAction.WIDGET_TARGET_ON_WIDGET, "Use", scales), "");
-        assertEquals(Ar.V.V1b, engine.chargeLoadTransferEvidence.variant);
-        assertEquals(ItemID.SNAKEBOSS_SCALE, engine.chargeLoadTransferEvidence.selectedItemId);
+        assertEquals(Ar.V.V1b, (engine.eb.peek(Eb.CL) == null ? null : engine.eb.peek(Eb.CL).v));
+        assertEquals(ItemID.SNAKEBOSS_SCALE, engine.eb.item(Eb.CL));
         assertEquals("the identity follows the weapon, not the clicked scales", BLOWPIPE_IDENTITY,
-            engine.chargeLoadTransferEvidence.targetIdentity);
+            (engine.eb.peek(Eb.CL) == null ? null : engine.eb.peek(Eb.CL).id));
     }
 
     @Test
@@ -135,10 +135,10 @@ public class ChargeLoadArmingTest
         Widget blowpipe = item(ItemID.TOXIC_BLOWPIPE_LOADED, BLOWPIPE_SLOT);
         intake(selecting(item(ItemID.BIG_BONES, 2)), engine).lc(
             click(MenuAction.WIDGET_TARGET_ON_WIDGET, "Use", blowpipe), "");
-        assertNull(engine.chargeLoadTransferEvidence.variant);
+        assertNull((engine.eb.peek(Eb.CL) == null ? null : engine.eb.peek(Eb.CL).v));
         intake(selecting(item(ItemID.SNAKEBOSS_SCALE, SCALES_SLOT)), engine).lc(
             click(MenuAction.CC_OP, "Check", blowpipe), "");
-        assertNull("only a use-on click arms a load", engine.chargeLoadTransferEvidence.variant);
+        assertNull("only a use-on click arms a load", (engine.eb.peek(Eb.CL) == null ? null : engine.eb.peek(Eb.CL).v));
     }
 
     @Test
@@ -149,10 +149,10 @@ public class ChargeLoadArmingTest
         ChargeIntake intake = intake(selecting(null), engine);
         Widget trident = item(ItemID.TOTS_CHARGED, 0);
         intake.onMenuOptionClicked(click(MenuAction.CC_OP, "uncharge", trident), "uncharge", "trident of the seas");
-        assertEquals(Ar.V.TRIDENT_SEAS, intake.returnVariant);
+        assertEquals(Ar.V.TRIDENT_SEAS, (intake.engine.eb.peek(Eb.RV) == null ? null : intake.engine.eb.peek(Eb.RV).v));
         intake.onMenuOptionClicked(click(MenuAction.WIDGET_CONTINUE, "continue", null), "continue", "");
-        assertEquals("answering the prompt keeps watching", Ar.V.TRIDENT_SEAS, intake.returnVariant);
+        assertEquals("answering the prompt keeps watching", Ar.V.TRIDENT_SEAS, (intake.engine.eb.peek(Eb.RV) == null ? null : intake.engine.eb.peek(Eb.RV).v));
         intake.onMenuOptionClicked(click(MenuAction.WALK, "walk here", null), "walk here", "");
-        assertNull("walking away ends it, so later runes stay loot", intake.returnVariant);
+        assertNull("walking away ends it, so later runes stay loot", (intake.engine.eb.peek(Eb.RV) == null ? null : intake.engine.eb.peek(Eb.RV).v));
     }
 }

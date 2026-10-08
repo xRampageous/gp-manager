@@ -8,8 +8,8 @@ import com.google.gson.Gson;
 */
 class JsonCodec {
 static volatile Gson gson;
-static void bind(Gson clientGson) {
- gson = clientGson;
+static void bind(Gson /* clientGson */a) {
+ gson = a;
 }
 
 static boolean isBound() {
@@ -17,8 +17,8 @@ static boolean isBound() {
 }
 
 static Gson gson() {
- Gson bound = gson;
- if (bound == null) throw new IllegalStateException(msg("c"));
- return bound;
+ Gson /* bound */a = gson;
+ if (a == null) throw new IllegalStateException(msg("c"));
+ return a;
 }
 }

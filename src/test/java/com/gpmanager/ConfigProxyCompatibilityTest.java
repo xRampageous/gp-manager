@@ -3,10 +3,7 @@ package com.gpmanager;
 import net.runelite.client.config.ConfigManager;
 import org.junit.Test;
 
-import java.util.Map;
-
 import static org.junit.Assert.assertEquals;
-import static org.junit.Assert.assertNotNull;
 
 /** Settings must work through RuneLite's real proxy, including enum-valued settings. */
 public class ConfigProxyCompatibilityTest
@@ -37,21 +34,5 @@ public class ConfigProxyCompatibilityTest
         assertEquals(Db.DAYS_365, config.receiptRetentionDays());
         assertEquals(GpManagerConfig.HudTrayKeeps.SESSION, config.hudTrayKeeps());
         assertEquals("Shark, Prayer potion", config.hiddenRecentItems());
-    }
-
-    @Test
-    public void settingsSurviveTheGroupRename()
-    {
-        ConfigManager manager = IsolatedConfigManager.seeded(null, "profitmanager", Map.of(
-            "hiddenRecentItems", "Shark", "receiptRetentionDays", "DAYS_365"));
-        GpManagerPlugin.migrateGroup(manager);
-        assertEquals("Shark", manager.getConfiguration("gpmanager", "hiddenRecentItems"));
-        assertEquals("DAYS_365", manager.getConfiguration("gpmanager", "receiptRetentionDays"));
-        assertNotNull("the marker stops a second copy",
-            manager.getConfiguration("gpmanager", "groupMigrated"));
-        manager.setConfiguration("gpmanager", "hiddenRecentItems", "Lobster");
-        GpManagerPlugin.migrateGroup(manager);
-        assertEquals("a later choice is never clobbered", "Lobster",
-            manager.getConfiguration("gpmanager", "hiddenRecentItems"));
     }
 }

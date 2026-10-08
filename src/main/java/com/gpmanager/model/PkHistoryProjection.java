@@ -11,9 +11,9 @@ class PkHistoryProjection extends PkProfileBase {
 int streak;
 long compactedDetailCount;
 /** Records one encounter's exact non-financial facts; money enters only at finalization. */
-void aev(Be type) {
+void aev(Be /* type */a) {
  encounters++;
- if (type == Be.KILL) {
+ if (a == Be.KILL) {
   kills++;
   streak = streak < 0 ? 1 : streak + 1;
  } else {

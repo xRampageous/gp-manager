@@ -133,7 +133,7 @@ public class HudBuilderTest
     }
 
     @Test
-    public void theTrayShowsItsRowsThenMoreAndTheFolioCountsHiddenLoot()
+    public void theTrayShowsItsRowsThenMoreAndTheFooterCountsHiddenLoot()
     {
         Cp builder = new Cp(config(true, 2), null);
         for (int i = 0; i < 4; i++)
@@ -144,12 +144,52 @@ public class HudBuilderTest
         Cb s = builder.update(grind(1_000L, null), flow -> flow.itemId != 100, NOW + 10L);
         assertEquals(2, s.rows.size());
         assertEquals("Item 3 ×1", s.rows.get(0).name);
-        assertEquals("+1 more", s.more);
+        assertEquals("the hidden item rides the footer, unnamed", "+1 more · +1 hidden", s.more);
         assertEquals("the chip is the newest item's change, not the total", "+1.0k", s.trip);
 
         Cb folded = builder.update(grind(1_000L, null), f -> true, NOW + 60_000L);
         assertTrue(folded.rows.isEmpty());
         assertEquals("", folded.trip);
+    }
+
+    /** Owner 2026-10-03: a hidden pickup never opens the tray or holds it open. */
+    @Test
+    public void hiddenLootNeverReopensAFoldedTray()
+    {
+        Cp builder = new Cp(config(true, 4), null);
+        builder.tray().booked(receipt(NOW, Ai.LOOT, flow(536, "Dragon bones", 1L, 2_000)), NOW, false);
+        long later = NOW + builder.aix() + Cp.FADE_MILLIS + 1_000L;
+        builder.tray().booked(receipt(later, Ai.LOOT, flow(526, "Bones", 1L, 100)), later, false);
+        Cb s = builder.update(grind(1_000L, null), flow -> flow.itemId != 526, later + 10L);
+        assertTrue("the visible row stays folded", s.rows.isEmpty());
+        assertEquals("a folded tray shows no footer", "", s.more);
+        assertEquals("the money still flashes beside Net", "+100", s.trip);
+
+        Cb all = builder.update(grind(1_000L, null), flow -> flow.itemId != 526, later + 20L);
+        assertEquals("folds by its visible entries' time", NOW + builder.aix(), all.foldAt);
+    }
+
+    @Test
+    public void anAllHiddenTrayStaysShut()
+    {
+        Cp builder = new Cp(config(true, 4), null);
+        builder.tray().booked(receipt(NOW, Ai.LOOT, flow(526, "Bones", 3L, 100)), NOW, false);
+        Cb s = builder.update(grind(1_000L, null), f -> false, NOW + 10L);
+        assertTrue(s.rows.isEmpty());
+        assertEquals("", s.more);
+    }
+
+    @Test
+    public void theHiddenFooterSkipsMarketCash()
+    {
+        Cp builder = new Cp(config(true, 4), null);
+        builder.tray().booked(receipt(NOW, Ai.LOOT, flow(536, "Dragon bones", 1L, 2_000)), NOW, false);
+        builder.tray().booked(receipt(NOW + 1L, Ai.LOOT, flow(526, "Bones", 2L, 100)), NOW + 1L, false);
+        builder.tray().booked(Tx.of(NOW + 2L, null, Ai.TRADE, Aj.MARKET, "GE trade", "Trading", true,
+            List.of(flow(995, "Coins", 5_000L, 1))), NOW + 2L, false);
+        Cb s = builder.update(grind(1_000L, null), flow -> flow.itemId == 536, NOW + 10L);
+        assertEquals(1, s.rows.size());
+        assertEquals("one hidden loot row; GE cash is not hidden loot", "+1 hidden", s.more);
     }
 
     @Test
@@ -296,6 +336,36 @@ public class HudBuilderTest
         assertEquals("rows stay while they fade", 1, fading.rows.size());
         Cb folded = builder.update(grind(1_000L, null), f -> true, NOW + builder.aix() + Cp.FADE_MILLIS);
         assertTrue(folded.rows.isEmpty());
+    }
+
+    /** Owner 1.2: more of an item already on the tray brings its row back to the top. */
+    @Test
+    public void theRowThatLastGrewLeadsTheTray()
+    {
+        Cp builder = new Cp(config(true, 4), null);
+        builder.tray().booked(receipt(NOW, Ai.LOOT, flow(1, "Bones", 1L, 100)), NOW, false);
+        builder.tray().booked(receipt(NOW + 1L, Ai.LOOT, flow(2, "Coins", 50L, 50)), NOW + 1L, false);
+        builder.tray().booked(receipt(NOW + 2L, Ai.LOOT, flow(1, "Bones", 1L, 100)), NOW + 2L, false);
+        Cb s = builder.update(grind(1_000L, null), f -> true, NOW + 10L);
+        assertEquals("Bones ×2", s.rows.get(0).name);
+        assertEquals("Coins ×50", s.rows.get(1).name);
+    }
+
+    /** HUD+ 1.2: cheaper loot after a big drop goes to "+N more", never the big drop itself. */
+    @Test
+    public void aBigDropKeepsItsRowWhenCheaperLootOverflowsTheTray()
+    {
+        Cp builder = new Cp(config(true, 2), null);
+        builder.tray().booked(receipt(NOW, Ai.LOOT, flow(20997, "Twisted bow", 1L, 1_200_000_000)), NOW, false);
+        for (int i = 1; i <= 3; i++)
+        {
+            builder.tray().booked(receipt(NOW + i, Ai.LOOT, flow(i, "Junk " + i, 1L, 100)), NOW + i, false);
+        }
+        Cb s = builder.update(grind(1_000L, null), f -> true, NOW + 10L);
+        assertEquals(2, s.rows.size());
+        assertEquals("the newest cheap row still shows", "Junk 3 ×1", s.rows.get(0).name);
+        assertTrue("the bow keeps its row", s.rows.get(1).gold);
+        assertEquals("+2 more", s.more);
     }
 
     @Test

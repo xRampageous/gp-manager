@@ -20,167 +20,165 @@ import static com.gpmanager.Ak.msg;
 @AllArgsConstructor
 class Ca {
 /** Stable session identity; names are editable and may repeat between runs. */
-final String sessionId;
+String sessionId;
 static final int RECENT_ROWS = 15;
 /** One session goal as the Live card shows it; read-only, from the session's current target. */
 @AllArgsConstructor
 static class Goal {
- final long target;
- final long current;
- final boolean reached;
+ long target;
+ long current;
+ boolean reached;
  /** "200k", or the Active Time target for a tracked-time goal. */
- final String label;
+ String label;
  /** "62%". */
- final String progress;
+ String progress;
  /** The pace line while the rate is trustworthy; null when it is not. */
- final String eta;
- final double fraction;
+ String eta;
+ double fraction;
  /** True when this card tracks Active Time rather than Net (owner 2026-10-01, F10). */
- final boolean time;
+ boolean time;
 }
 
 /** One exact item contribution or an honestly labelled composite activity row. */
 @AllArgsConstructor
 static class Recent {
- final int itemId;
- final String name;
- final String qty;
- final long value;
- final boolean neutral;
+ int itemId;
+ String name;
+ String qty;
+ long value;
+ boolean neutral;
  /** True when the lead flow has no price: the row shows an unknown marker, never 0. */
- final boolean unpriced;
- final String tag;
+ boolean unpriced;
+ String tag;
  /** How many receipts this row coalesced; 1 for a single receipt. */
- final int receipts;
+ int receipts;
  /** The newest canonical receipt behind the row, for Ledger context. */
- final String receiptId;
- final String contributionId;
- final String actionLabel;
- final long quantity;
- final boolean composite;
- final boolean market;
- final boolean valueAvailable;
+ String receiptId;
+ String contributionId;
+ String actionLabel;
+ long quantity;
+ boolean composite;
+ boolean market;
+ boolean valueAvailable;
  /** The Costs view this row opens in the Ledger; null off the Costs table. */
- final Bs ledgerCostView;
+ Bs ledgerCostView;
  /** True when this row belongs to the Review audit rather than a financial table. */
- final boolean ledgerReview;
+ boolean ledgerReview;
  /** Canonical realized Market result; the secondary "Result" line for Market rows. */
- final long marketResult;
+ long marketResult;
  /** True when {@link #value} is the observed signed settlement amount (SELL / BUY). */
- final boolean marketSettlementValue;
+ boolean marketSettlementValue;
  /** "Sold" / "Bought" once settled, else where the offer stands ("Offering", "Pending"); empty off-Market. */
- final String marketSide;
+ String marketSide;
  /** A GE offer still on the exchange (trading, or filled and not collected): Live lists it under Offers. */
- final boolean open;
+ boolean open;
 }
 
-final boolean hasSession;
-final String ownerLabel;
-final long elapsedMillis;
-final boolean paused;
-final boolean idle;
-final long net;
-final long gains;
+boolean hasSession;
+String ownerLabel;
+long elapsedMillis;
+boolean paused;
+boolean idle;
+long net;
+long gains;
 /** Non-consumable costs: deaths, tax, fees, drops. {@code -1} when the split is unavailable. */
-final long loss;
+long loss;
 /** Consumables: food, potions, runes, ammo, charges. {@code -1} when the split is unavailable. */
-final long supplies;
+long supplies;
 /** Total booked cost; always the truthful figure, split or not. */
-final long costs;
-final boolean costSplitAvailable;
-final boolean rateEstablished;
-final long gpPerHour;
-final Goal goal;
+long costs;
+boolean costSplitAvailable;
+boolean rateEstablished;
+long gpPerHour;
+Goal goal;
 /** Realized Market result for the active scope, separated from ordinary Gains/Losses. */
-final long marketResult;
+long marketResult;
 /** Pending/unrealised Market context rows; informational only, never counted in Net. */
-final int marketPending;
+int marketPending;
 /** True when the current world/economy blocks ordinary automatic market pricing. */
 /** Free play (the engine's durable owner) rather than a named session. */
-final boolean freePlay;
+boolean freePlay;
 /** Activity context label for the status line; empty when the owner name speaks for it. */
-final String activityLabel;
+String activityLabel;
 /** Freshest client-thread interaction target; the shared activity label reads it. */
-final String target;
+String target;
 /** Client-thread PvP sample, presentation only. */
-final boolean pvpPossible;
-final boolean skulled;
-final boolean protectItem;
-final long risk;
-final int reviewCount;
-final List<Recent> recent;
+boolean pvpPossible;
+boolean skulled;
+boolean protectItem;
+long risk;
+int reviewCount;
+List<Recent> recent;
 /** True for PK-mode sessions or any session that has booked a fight. */
-final boolean pvpSession;
-final int kills;
-final int deaths;
-final long killNet;
-final long deathLoss;
-final long bestKill;
+boolean pvpSession;
+int kills;
+int deaths;
+long killNet;
+long deathLoss;
+long bestKill;
 /** Loot keys and chests not opened yet; a count, never a GP guess. */
-final int pendingKeys;
+int pendingKeys;
 /** Items waiting at a death reclaim; 0 when nothing is waiting. */
-final long reclaimItems;
+long reclaimItems;
 /** Kills since the last death this Grind; 0 after a death. */
-final int streak;
+int streak;
 /** Longest run of kills without a death this Grind. */
-final int bestStreak;
+int bestStreak;
 /** Paused by logout: tracking waits for the next login, numbers stay as they were. */
-final boolean loggedOut;
+boolean loggedOut;
 /** The Grind's active-time target, or 0 when none is set. */
-final long timeTargetMillis;
+long timeTargetMillis;
 /** Seconds until the pending factory-reset resume fires; 0 when none is armed. */
-final long resumeInSeconds;
+long resumeInSeconds;
 /** True after a resume while the tracker's derived displays settle; bookings are immediate. */
-final boolean calibrating;
+boolean calibrating;
 /** True while a world hop is in flight: the status word says Reconnecting, not Logged out. */
-final boolean hopping;
-/** @param context plugin-side idle state, owner marks and loot visibility (may be null) */    static Ca capture(Am engine, long now, Dz context) {
- Dz ctx = context == null ? Dz.NONE : context;
- Bu metrics = engine.getMetrics(now);
- Ad active = engine.getActiveSession();
- boolean custom = engine.wb();
- boolean freePlay = active == null || !custom;
- String owner = active == null ? "Free play" : active.getName();
- long elapsed = metrics.elapsedMillis;
- int review = 0;
- List<Ac> transactions = active == null ? Collections.emptyList() : active.getTransactions();
- for (Ac t : transactions) {
-  if (t == null) continue;
-  if (Eh.aal(t)) review++;
- }
+boolean hopping;
+/** @param context plugin-side idle state, owner marks and loot visibility (may be null) */    static Ca capture(Am /* engine */a, long /* now */b, Dz /* context */c) {
+ Dz /* ctx */d = c == null ? Dz.NONE : c;
+ Sm v = a.summary();
+ Bu /* metrics */e = v.metrics(a.getActiveSession(), b);
+ Ad /* active */f = a.getActiveSession();
+ boolean /* custom */g = a.wb();
+ boolean /* freePlay */h = f == null || !g;
+ String /* owner */i = f == null ? "Free play" : f.getName();
+ long /* elapsed */j = e.elapsedMillis;
+ Sm.F w = f == null ? null : v.fact(f);
+ int k = w == null ? 0 : w.review;
+ List<Ac> l = w == null ? Collections.emptyList() : w.t;
  // One shared projection for the whole snapshot: Recent rows and the Market separation. The
  // Market rows are rebuilt on every read, so they are read once.
- List<Row> marketRows = engine.ub();
+ List<Row> /* marketRows */m = v.m;
  // Hero categories are canonical and unfiltered: the whole counted Market-context
  // population is removed from ordinary Gains/Supplies/Losses and represented once by its
  // correction-aware net. Recent Activity display filters never enter this math.
- Dy zl = Bp.zl(transactions);
- long marketResult = zl.getNet();
- int marketPending = 0;
- var marketByPresentation = new HashMap<String, Row>();
- for (Row row : marketRows) {
-  if (row != null) {
-   marketByPresentation.put(row.presentationId, row);
-   marketPending += Ao.wr(row.lifecycle) ? 1 : 0;
+ Dy /* zl */n = w == null ? Bp.zl(l) : w.market;
+ long /* marketResult */o = n.getNet();
+ int /* marketPending */p = 0;
+ var /* marketByPresentation */q = new HashMap<String, Row>();
+ for (Row /* row */r : m) {
+  if (r != null) {
+   q.put(r.presentationId, r);
+   p += Ao.wr(r.lifecycle) ? 1 : 0;
   }
  }
- Dt pk = active == null ? null : engine.vl();
- boolean pvpSession = active != null
- && (active.getMode() == Cx.PK || (pk != null && pk.ue() > 0));
- return new Ca(active == null ? "" : active.getId(), active != null, owner, elapsed, metrics.paused, ctx.idle,
- metrics.net, akw(metrics, zl), akx(metrics, zl),
- aky(metrics, zl), aku(metrics, zl), metrics.costSplitAvailable,
- RateReadiness.wn(elapsed), metrics.profitPerHour,
- goal(active, metrics, elapsed), marketResult, marketPending, freePlay, ctx.activity, ctx.target, ctx.pvp.pvpPossible,
- ctx.pvp.skulled, ctx.pvp.protectItem, ctx.pvp.risk, review,
- recent(engine, active, transactions, marketRows, marketByPresentation, ctx), pvpSession, pk == null ? 0 : pk.kills,
- pk == null ? 0 : pk.deaths, pk == null ? 0L : pk.totalKillNet, pk == null ? 0L : pk.totalDeathLoss,
- pk == null ? 0L : pk.bestKill, engine.getPendingClaims().size(), engine.tt().awaiting
- ? max(1L, engine.tt().outstandingItemCount) : 0L, pk == null ? 0 : max(0, pk.currentStreak),
- active == null ? 0 : active.mb(),
- active == null ? ctx.offline : active.paused && active.getPauseReason() == Ed.LIFECYCLE,
- active == null || active.getActiveTimeTargetMillis() == null ? 0L : active.getActiveTimeTargetMillis(),
- engine.autoResumeSeconds(now), engine.calibrating(now), ctx.hopping);
+ Dt /* pk */s = f == null ? null : a.vl();
+ boolean /* pvpSession */u = f != null
+ && (f.getMode() == Cx.PK || (s != null && s.ue() > 0));
+ return new Ca(f == null ? "" : f.getId(), f != null, i, j, e.paused, d.idle,
+ e.net, akw(e, n), akx(e, n),
+ aky(e, n), aku(e, n), e.costSplitAvailable,
+ RateReadiness.wn(j), e.profitPerHour,
+ goal(f, e, j), o, p, h, d.activity, d.target, d.pvp.pvpPossible,
+ d.pvp.skulled, d.pvp.protectItem, d.pvp.risk, k,
+ recent(a, f, l, m, q, d), u, s == null ? 0 : s.kills,
+ s == null ? 0 : s.deaths, s == null ? 0L : s.totalKillNet, s == null ? 0L : s.totalDeathLoss,
+ s == null ? 0L : s.bestKill, a.getPendingClaims().size(), a.tt().awaiting
+ ? max(1L, a.tt().outstandingItemCount) : 0L, s == null ? 0 : max(0, s.currentStreak),
+ f == null ? 0 : f.mb(),
+ f == null ? d.offline : f.paused && f.getPauseReason() == Ed.LIFECYCLE,
+ f == null || f.getActiveTimeTargetMillis() == null ? 0L : f.getActiveTimeTargetMillis(),
+ a.autoResumeSeconds(b), a.calibrating(b), d.hopping);
 }
 
 /**
@@ -188,52 +186,52 @@ final boolean hopping;
 * net. The historical goal editor, goal persistence and multi-kind goals are retired; no
 * editor affordance and no ETA without a trustworthy rate.
 */
-static Goal goal(Ad active, Bu metrics, long elapsed) {
- if (active == null) return null;
- Long target = active.getProfitTargetGp();
- if (target != null && target > 0L) {
-  long current = metrics.net;
-  double fraction = max(0d, min(1d, current / (double) target));
-  boolean reached = current >= target;
-  String eta = null;
-  if (!reached && elapsed >= 60_000L && metrics.profitPerHour > 0L) {
-   long minutes = round((target - current) * 60d / metrics.profitPerHour);
-   eta = minutes < 1L ? "<1m" : "~" + As.rb(minutes);
+static Goal goal(Ad /* active */b, Bu /* metrics */c, long /* elapsed */d) {
+ if (b == null) return null;
+ Long /* target */e = b.getProfitTargetGp();
+ if (e != null && e > 0L) {
+  long /* current */f = c.net;
+  double /* fraction */g = max(0d, min(1d, f / (double) e));
+  boolean /* reached */h = f >= e;
+  String /* eta */i = null;
+  if (!h && d >= 60_000L && c.profitPerHour > 0L) {
+   long /* minutes */j = round((e - f) * 60d / c.profitPerHour);
+   i = j < 1L ? "<1m" : "~" + As.rb(j);
   }
-  return new Goal(target, current, reached, compact(target),
-  reached ? "reached" : percent(fraction), eta, fraction, false);
+  return new Goal(e, f, h, compact(e),
+  h ? "reached" : percent(g), i, g, false);
  }
  // Owner 2026-10-01 (F10): a time-only target is still a target; the card tracks Active Time.
- Long timeTarget = active.getActiveTimeTargetMillis();
- if (timeTarget == null || timeTarget <= 0L) return null;
- double timeFraction = max(0d, min(1d, elapsed / (double) timeTarget));
- boolean timeReached = elapsed >= timeTarget;
+ Long /* timeTarget */k = b.getActiveTimeTargetMillis();
+ if (k == null || k <= 0L) return null;
+ double /* timeFraction */l = max(0d, min(1d, d / (double) k));
+ boolean /* timeReached */m = d >= k;
  // The shared Pace answer for a time target: where the booked Net lands at the target time.
- As.Pace pace = timeReached ? null
- : As.pace(null, timeTarget, metrics.net, true, metrics.profitPerHour, elapsed);
- return new Goal(timeTarget, elapsed, timeReached, ra(timeTarget),
- timeReached ? "reached" : percent(timeFraction),
- pace == null || !pace.available ? null : pace.line, timeFraction, true);
+ As.Pace /* pace */n = m ? null
+ : As.pace(null, k, c.net, true, c.profitPerHour, d);
+ return new Goal(k, d, m, ra(k),
+ m ? "reached" : percent(l),
+ n == null || !n.available ? null : n.line, l, true);
 }
 
 /** Visible ordinary Gains: canonical unfiltered revenue minus the counted Market fold. */
-static long akw(Bu metrics, Dy market) {
- return aha(metrics.revenue, market.revenue);
+static long akw(Bu /* metrics */a, Dy /* market */b) {
+ return aha(a.revenue, b.revenue);
 }
 
 /** Visible Supplies, or -1 when the canonical cost split is unavailable (combined fallback). */
-static long aky(Bu metrics, Dy market) {
- return metrics.costSplitAvailable ? aha(metrics.suppliesCosts, market.supplies) : -1L;
+static long aky(Bu /* metrics */a, Dy /* market */b) {
+ return a.costSplitAvailable ? aha(a.suppliesCosts, b.supplies) : -1L;
 }
 
 /** Visible Losses, or -1 when the canonical cost split is unavailable (combined fallback). */
-static long akx(Bu metrics, Dy market) {
- return metrics.costSplitAvailable ? aha(metrics.otherCosts, market.other) : -1L;
+static long akx(Bu /* metrics */a, Dy /* market */b) {
+ return a.costSplitAvailable ? aha(a.otherCosts, b.other) : -1L;
 }
 
 /** Visible combined Costs: canonical costs minus the counted Market gross costs. */
-static long aku(Bu metrics, Dy market) {
- return aha(metrics.costs, market.costs);
+static long aku(Bu /* metrics */a, Dy /* market */b) {
+ return aha(a.costs, b.costs);
 }
 
 /** The last Live list and what it was built from; the key covers every input of the list. */
@@ -243,116 +241,119 @@ static List<Recent> recentList = Collections.emptyList();
 * The Live list is rebuilt only when a booking (the engine revision), a Market row or the loot
 * display filter changed; otherwise every tick reuses it instead of re-projecting the Grind.
 */
-static synchronized List<Recent> recent(Am engine, Ad active,
-List<Ac> transactions, List<Row> marketRows, Map<String, Row> marketByPresentation, Dz ctx) {
- List<Object> key = Arrays.asList(engine, engine.getRevision(), active, marketRows,
- ctx.minimumDisplayedLootValue, ctx.filter, ctx.filter == null ? "" : ctx.filter.version());
- if (!key.equals(recentKey)) {
-  recentList = afa(Br.capture(transactions, marketRows,
-  active == null ? "" : active.getId(), ctx::td), marketByPresentation, ctx.filter);
-  recentKey = key;
+static synchronized List<Recent> recent(Am /* engine */a, Ad /* active */b,
+List<Ac> /* transactions */c, List<Row> /* marketRows */d, Map<String, Row> /* marketByPresentation */e, Dz /* ctx */f) {
+ List<Object> /* key */g = Arrays.asList(a, a.getRevision(), b, d,
+ f.minimumDisplayedLootValue, f.filter, f.filter == null ? "" : f.filter.version());
+ if (!g.equals(recentKey)) {
+  recentList = afa(a.summary().view(a.summary().scope(b == null ? Collections.emptyList() : Collections.singletonList(b)), f::td), e, f.filter);
+  recentKey = g;
  }
  return recentList;
 }
 
-static List<Recent> afa(Br.Result projection,
-Map<String, Row> marketRows, RecentFilter filter) {
- var rows = new ArrayList<Recent>();
- for (Group group : projection.groups) {
+static List<Recent> afa(Br.Result /* projection */a,
+Map<String, Row> /* marketRows */b, RecentFilter /* filter */c) {
+ var /* rows */d = new ArrayList<Recent>();
+ for (Group /* group */e : a.groups) {
   // Charges live in the Ledger only.
-  if (group.chargeUse) continue;
-  Recent row = toRecent(group, group.marketPresentationId.isEmpty() ? null : marketRows.get(group.marketPresentationId));
+  if (e.chargeUse) continue;
+  Recent /* row */f = toRecent(e, e.marketPresentationId.isEmpty() ? null : b.get(e.marketPresentationId));
   // A canceled offer that returned everything stays in the Ledger, not Recent (owner 2026-09-28).
-  if (row == null || "canceled".equals(row.tag)
-  || !row.open && filter != null && !filter.showRecent(row.name, row.quantity)) {
+  if (f == null || "canceled".equals(f.tag)
+  || !f.open && c != null && !c.showRecent(f.name, f.quantity)) {
    continue;
   }
-  rows.add(row);
-  if (rows.size() == RECENT_ROWS) break;
+  d.add(f);
+  if (d.size() == RECENT_ROWS) break;
  }
- return Collections.unmodifiableList(rows);
+ return Collections.unmodifiableList(d);
 }
 
 
 /** One semantic group as the Live row the page paints, with proven Market value semantics. */
-static Recent toRecent(Group group, Row marketRow) {
- if (group == null) return null;
- boolean market = group.market;
- boolean ati = market && group.coverage == Coverage.COMPLETE;
- long marketResult = group.value;
- boolean amg = market && marketRow != null
- && marketRow.isRealizedIncluded() && marketRow.settledQty > 0L && marketRow.observedSettlementGp != 0L;
- boolean ape = marketRow != null && "SELL".equals(marketRow.side.name());
- boolean aso = marketRow != null
- && marketRow.lifecycle == Bi.Lifecycle.CANCELLED_RETURNED;
- String marketSide = marketRow == null ? ""
- : marketRow.isRealizedIncluded() ? ape ? "Sold" : "Bought" : Dc.avj(marketRow);
- boolean unpriced = !market && group.coverage == Coverage.INCOMPLETE;
- String tag = group.reviewRequired ? "review" : aso ? "canceled"
- : market ? "market" : unpriced ? "unpriced" : null;
- String quantity = aeb(group);
- String qty;
- String actionLabel;
- if (market) {
+static Recent toRecent(Group /* group */b, Row /* marketRow */c) {
+ if (b == null) return null;
+ boolean /* market */d = b.market;
+ boolean /* ati */e = d && b.coverage == Coverage.COMPLETE;
+ long /* marketResult */f = b.value;
+ boolean /* amg */g = d && c != null
+ && c.isRealizedIncluded() && c.settledQty > 0L && c.observedSettlementGp != 0L;
+ boolean /* ape */h = c != null && "SELL".equals(c.side.name());
+ boolean /* aso */i = c != null
+ && c.lifecycle == Bi.Lifecycle.CANCELLED_RETURNED;
+ String /* marketSide */j = c == null ? ""
+ : c.isRealizedIncluded() ? h ? "Sold" : "Bought" : Dc.avj(c);
+ boolean /* unpriced */k = !d && b.coverage == Coverage.INCOMPLETE;
+ String /* tag */l = b.reviewRequired ? "review" : i ? "canceled"
+ : d ? "market" : k ? "unpriced" : null;
+ String /* quantity */m = aeb(b);
+ String /* qty */n;
+ String /* actionLabel */o;
+ if (d) {
   // Cash movement first: the primary value is the observed signed settlement; the
   // canonical Market result is the explicit secondary line, never the primary.
-  String atg = amg ? aeb(group) : null;
-  String detail = ati ? (marketSide.isEmpty() ? "Result " + signed(marketResult)
-  : marketSide + " \u00b7 Result " + signed(marketResult)) : amg
-  ? marketSide + " \u00b7 Result \u2014" : group.qe;
-  qty = null;
-  actionLabel = atg == null ? detail : atg + " \u00b7 " + detail;
- } else if (group.actionGroup()) {
+  String /* detail */q = e ? (j.isEmpty() ? "Result " + signed(f)
+  : j + " \u00b7 Result " + signed(f)) : g
+  ? j + " \u00b7 Result \u2014" : b.qe;
+  // A finished trade shows its quantity like any item ("\u00d7500"); the line keeps its side
+  // and Result (owner 2026-10-08).
+  n = g ? aeb(b) : null;
+  o = q;
+ } else if (b.actionGroup()) {
   // An exact named spell is its own title, so the verb plus the receipt count is the
   // honest second line. A generic action keeps its composition, which is the only
   // context that distinguishes it.
   // Owner 2026-09-28: a count per cast like any item ("×23"), never "23 receipts", so the
   // narrow quantity column leaves every name readable.
-  String casts = group.receiptCount > 1 ? times(group.receiptCount) : null;
-  qty = !group.primaryName.equalsIgnoreCase(group.actionLabel) ? casts
-  : casts == null ? group.qe : group.qe + " · " + casts;
-  actionLabel = group.actionLabel;
- } else if (!group.failedOf().isEmpty()) {
-  qty = group.failedOf();
-  actionLabel = group.failedTip();
+  String /* casts */r = b.receiptCount > 1 ? times(b.receiptCount) : null;
+  n = !b.primaryName.equalsIgnoreCase(b.actionLabel) ? r
+  : r == null ? b.qe : b.qe + " · " + r;
+  o = b.actionLabel;
+ } else if (!b.failedOf().isEmpty()) {
+  n = b.failedOf();
+  o = b.failedTip();
  } else {
-  qty = quantity;
+  n = m;
   // A run whose every unit failed so far reads as failed, whichever receipt came first.
-  actionLabel = group.failed > 0L ? msg("zz") : group.actionLabel;
+  o = b.failed > 0L ? msg("zz") : b.actionLabel;
  }
- Bs ledgerCostView = group.table == Br.Table.COSTS_SUPPLIES
- ? group.chargeUse ? Bs.CHARGES : Bs.SUPPLIES : group.table == Br.Table.COSTS_LOSS
+ Bs /* ledgerCostView */s = b.table == Br.Table.COSTS_SUPPLIES
+ ? b.chargeUse ? Bs.CHARGES : Bs.SUPPLIES : b.table == Br.Table.COSTS_LOSS
  ? Bs.LOSS : null;
- boolean neutral = group.neutral;
- long value = neutral ? 0L : group.value;
- boolean aql = false;
- if (amg && !neutral) {
-  value = ape ? Math.abs(marketRow.observedSettlementGp) : -Math.abs(marketRow.observedSettlementGp);
-  aql = true;
+ boolean /* neutral */t = b.neutral;
+ long /* value */u = t ? 0L : b.value;
+ boolean /* aql */v = false;
+ if (g && !t) {
+  u = h ? Math.abs(c.observedSettlementGp) : -Math.abs(c.observedSettlementGp);
+  v = true;
  }
- return new Recent(group.itemId, group.primaryName, qty, value, neutral, unpriced, tag,
- group.receiptCount, group.representativeTransactionId, group.representativeContributionId,
- actionLabel, Ae.nonNeg(group.quantity), group.composite, market,
- market ? group.coverage == Coverage.COMPLETE : !unpriced, ledgerCostView, group.reviewRequired,
- marketResult, aql, marketSide, marketRow != null && Ao.wr(marketRow.lifecycle));
+ return new Recent(b.itemId, b.primaryName, n, u, t, k, l,
+ b.receiptCount, b.representativeTransactionId, b.representativeContributionId,
+ o, Ae.nonNeg(b.quantity), b.composite, d,
+ d ? b.coverage == Coverage.COMPLETE : !k, s, b.reviewRequired,
+ f, v, j, c != null && Ao.wr(c.lifecycle));
 }
 
 /**
 * "1 dose"/"\u00d73 doses" for any drink, "1 portion"/"\u00d72 portions" for pies,
 * pizzas and cakes, otherwise "\u00d7N" (a sapling planted from its pot is not a portion).
 */
-static String aeb(Group group) {
- String name = group.primaryName.toLowerCase(Locale.ROOT);
- String unit = Ag.has(name, "pizza", "cake", "pie") ? "portion"
- : group.actionLabel.equals("Drank") ? "dose" : null;
- if (group.normalizedConsume && unit != null) {
-  if (group.quantity == 1L) return "1 " + unit;
-  return group.quantity > 1L ? times(group.quantity) + " " + unit + "s" : null;
+static String aeb(Group /* group */b) {
+ String /* name */c = b.primaryName.toLowerCase(Locale.ROOT);
+ String /* unit */d = Ag.has(c, "pizza", "cake", "pie") ? "portion"
+ : b.actionLabel.equals("Drank") ? "dose" : null;
+ if (b.normalizedConsume && d != null) {
+  if (b.quantity == 1L) return "1 " + d;
+  return b.quantity > 1L ? times(b.quantity) + " " + d + "s" : null;
  }
- if (group.claim < 0) {
+ if (b.claim < 0) {
   // A claim spend reads as its own signed count ("-1 pouch"); a pickup stays "×N".
-  return "\u2212" + Math.max(1L, group.quantity);
+  return "\u2212" + Math.max(1L, b.quantity);
  }
- return group.quantity > 1L ? times(group.quantity) : null;
+ return b.quantity > 1L ? times(b.quantity) : null;
 }
+
+
+
 }

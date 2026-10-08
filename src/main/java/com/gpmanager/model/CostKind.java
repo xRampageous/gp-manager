@@ -26,24 +26,24 @@ static final int GE_TAX_ITEM_ID = -99502;
 * Non-cost, ignored, transfer, uncounted and deferred claim flows return
 * {@link #NONE}.
 */
-static CostKind of(Ac transaction, Ab flow) {
- if (transaction == null || flow == null || transaction.getActionKind() == Au.DEFERRED_CLAIM) {
+static CostKind of(Ac /* transaction */b, Ab /* flow */c) {
+ if (b == null || c == null || b.getActionKind() == Au.DEFERRED_CLAIM) {
   return NONE;
  }
- Bp.Ax effective = Bp.flow(transaction, flow);
- if (!effective.available || !effective.included || effective.costs <= 0L) return NONE;
- if (flow.itemId == GE_TAX_ITEM_ID || transaction.tm() == PK_FEE
- || transaction.tm() == PK_DEATH_LOSS) {
+ Bp.Ax /* effective */d = Bp.flow(b, c);
+ if (!d.available || !d.included || d.costs <= 0L) return NONE;
+ if (c.itemId == GE_TAX_ITEM_ID || b.tm() == PK_FEE
+ || b.tm() == PK_DEATH_LOSS) {
   return LOSS;
  }
- if (transaction.tm() == TRADE) return MARKET;
- Ai type = transaction.tm();
+ if (b.tm() == TRADE) return MARKET;
+ Ai /* type */f = b.tm();
  // Supplies are consumables the player used (eat / drink / cast / fire / charges / processing
  // inputs), which the engine evidences with an action kind or a supply-shaped type. A plain
  // "value decreased" consumption with no evidence is an item gone, i.e. a loss.
  // A production run's input is a supply even when that action made nothing (a failed smelt).
- if (type == PK_SUPPLY_COST || type == PROCESSING || transaction.getActionKind() != null
- || transaction.getContext() == Aj.PRODUCTION) {
+ if (f == PK_SUPPLY_COST || f == PROCESSING || b.getActionKind() != null
+ || b.getContext() == Aj.PRODUCTION) {
   return SUPPLIES;
  }
  return LOSS;

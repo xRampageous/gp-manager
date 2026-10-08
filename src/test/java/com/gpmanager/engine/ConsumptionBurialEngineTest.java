@@ -67,7 +67,7 @@ public class ConsumptionBurialEngineTest
         engine.rm(1_000L);
         engine.setBaseline(Cc.empty());
         assertNull(engine.adj(snapshot(526, 1L), 1_000L));
-        engine.noteConsumptionIntent(526, 8);
+        engine.ci(526, 8);
         engine.yz();
 
         Ac burial = settle(engine, Cc.empty(), 1_600L);
@@ -84,7 +84,7 @@ public class ConsumptionBurialEngineTest
         Am engine = new Am(valuator, new TransactionClassifier(), CONFIG);
         engine.rm(1_000L);
         engine.setBaseline(snapshot(1511, 1L)); // oak logs
-        engine.noteConsumptionIntent(526, 6); // stale bones bury
+        engine.ci(526, 6); // stale bones bury
         engine.markContext(Aj.TRANSFER, 6, "Bank container transfer");
         engine.yz();
 
@@ -313,7 +313,7 @@ public class ConsumptionBurialEngineTest
         Am closeFirst = startedWithBones(1L);
         closeFirst.ze(6);
         closeFirst.yu();
-        closeFirst.noteConsumptionIntent(526, 6);
+        closeFirst.ci(526, 6);
         closeFirst.yz();
         Ac burialCloseFirst = settle(closeFirst, Cc.empty(), 1_600L);
         assertEquals(Ai.CONSUMPTION, burialCloseFirst.getType());
@@ -324,7 +324,7 @@ public class ConsumptionBurialEngineTest
         dirtyFirst.ze(6);
         dirtyFirst.yz();
         dirtyFirst.yu();
-        dirtyFirst.noteConsumptionIntent(526, 6);
+        dirtyFirst.ci(526, 6);
         Ac burialDirtyFirst = settle(dirtyFirst, Cc.empty(), 1_600L);
         assertEquals(Ai.CONSUMPTION, burialDirtyFirst.getType());
         assertTrue(burialDirtyFirst.isCounted());
@@ -338,7 +338,7 @@ public class ConsumptionBurialEngineTest
         engine.markContext(Aj.TRANSFER, 6, "Bank container transfer");
         engine.yu();
         assertNull(engine.adj(snapshot(526, 1L), 1_200L));
-        engine.noteConsumptionIntent(526, 6);
+        engine.ci(526, 6);
         engine.yz();
 
         Ac burial = settle(engine, Cc.empty(), 1_800L);
@@ -354,7 +354,7 @@ public class ConsumptionBurialEngineTest
         Am engine = engine();
         engine.rm(1_000L);
         engine.setBaseline(snapshot(379, 1L)); // lobster
-        engine.noteConsumptionIntent(379, 6);
+        engine.ci(379, 6);
         engine.yz();
 
         Ac eaten = settle(engine, Cc.empty(), 1_600L);
@@ -371,7 +371,7 @@ public class ConsumptionBurialEngineTest
         Am engine = engine();
         engine.rm(1_000L);
         engine.setBaseline(snapshot(2434, 1L));
-        engine.noteConsumptionIntent(2434, 6);
+        engine.ci(2434, 6);
         engine.yz();
 
         Map<Integer, Long> after = new HashMap<>();
@@ -390,7 +390,7 @@ public class ConsumptionBurialEngineTest
         Am engine = namedEngine();
         engine.rm(1_000L);
         engine.setBaseline(snapshot(2434, 1L));
-        engine.noteConsumptionIntent(-1, 6);
+        engine.ci(-1, 6);
         engine.yz();
 
         Map<Integer, Long> after = new HashMap<>();
@@ -413,7 +413,7 @@ public class ConsumptionBurialEngineTest
         engine.markContext(Aj.TRANSFER, 6, "Bank container transfer");
         engine.yu();
         assertNull(engine.adj(snapshot(526, 1L), 1_200L));
-        engine.noteConsumptionIntent(-1, 6);
+        engine.ci(-1, 6);
         engine.yz();
 
         Ac burial = settle(engine, Cc.empty(), 1_800L);
@@ -433,7 +433,7 @@ public class ConsumptionBurialEngineTest
         engine.markContext(Aj.TRANSFER, 6, "Bank container transfer");
         engine.yu();
         assertNull(engine.adj(snapshot(556, 100L), 1_200L));
-        engine.noteConsumptionIntent(556, 6);
+        engine.ci(556, 6);
         engine.yz();
 
         Ac cast = settle(engine, snapshot(556, 95L), 1_800L);
@@ -451,7 +451,7 @@ public class ConsumptionBurialEngineTest
         Am engine = alchemyEngine();
         engine.rm(1_000L);
         engine.setBaseline(snapshot(1942, 1L));
-        engine.noteConsumptionIntent(1942, 8);
+        engine.ci(1942, 8);
         engine.yz();
 
         Map<Integer, Long> after = new HashMap<>();
@@ -486,7 +486,7 @@ public class ConsumptionBurialEngineTest
     public void bankOpenClearsStaleConsumeIntentSoDepositStaysTransfer()
     {
         Am engine = startedWithBones(1L);
-        engine.noteConsumptionIntent(526, 6);
+        engine.ci(526, 6);
         engine.ze(6);
         engine.yz();
 
@@ -528,7 +528,7 @@ public class ConsumptionBurialEngineTest
         before.put(3012, 1L); // energy potion(2)
         before.put(1942, 3L); // potatoes already held
         engine.setBaseline(new Cc(before));
-        engine.noteConsumptionIntent(-1, 8);
+        engine.ci(-1, 8);
         engine.yz();
 
         Map<Integer, Long> after = new HashMap<>();
@@ -577,7 +577,7 @@ public class ConsumptionBurialEngineTest
     public void chatReinforceKeepsNamedIntentItemId()
     {
         Am engine = startedWithBones(1L);
-        engine.noteConsumptionIntent(526, 4);
+        engine.ci(526, 4);
         engine.aew(8);
         engine.yz();
 
@@ -596,7 +596,7 @@ public class ConsumptionBurialEngineTest
         before.put(2434, 1L);
         before.put(1942, 1L);
         engine.setBaseline(new Cc(before));
-        engine.noteConsumptionIntent(-1, 6);
+        engine.ci(-1, 6);
         engine.yz();
 
         Map<Integer, Long> after = new HashMap<>();
@@ -655,7 +655,7 @@ public class ConsumptionBurialEngineTest
         before.put(526, 2L);
         before.put(1942, 2L);
         engine.setBaseline(new Cc(before));
-        engine.noteConsumptionIntent(9999, 8); // wrong id (not bones)
+        engine.ci(9999, 8); // wrong id (not bones)
         engine.yz();
 
         Map<Integer, Long> after = new HashMap<>();
@@ -705,7 +705,7 @@ public class ConsumptionBurialEngineTest
         before.put(1942, 1L);
         engine.setBaseline(new Cc(before));
         engine.ze(6); // open once
-        engine.noteConsumptionIntent(-1, 8); // armed while bank open (menu/chat)
+        engine.ci(-1, 8); // armed while bank open (menu/chat)
         engine.ze(6); // per-tick refresh must keep intent
         engine.ze(6);
         engine.yz();
@@ -734,7 +734,7 @@ public class ConsumptionBurialEngineTest
         before.put(1942, 2L);
         engine.setBaseline(new Cc(before));
         engine.ze(6);
-        engine.noteConsumptionIntent(-1, 8);
+        engine.ci(-1, 8);
         engine.yz();
 
         Map<Integer, Long> after = new HashMap<>();
@@ -786,7 +786,7 @@ public class ConsumptionBurialEngineTest
         before.put(1942, 3L);
         engine.setBaseline(new Cc(before));
 
-        engine.noteConsumptionIntent(-1, 12);
+        engine.ci(-1, 12);
         engine.aew(12); // chat: drink / dig+bury
         engine.yz();
         Map<Integer, Long> afterField = new HashMap<>();
@@ -797,7 +797,7 @@ public class ConsumptionBurialEngineTest
         assertEquals(Ai.CONSUMPTION, field.getType());
         assertTrue(field.isCounted());
 
-        engine.noteConsumptionIntent(1942, 8);
+        engine.ci(1942, 8);
         engine.aew(8); // chat: you eat the potato. yuck!
         engine.yz();
         Map<Integer, Long> afterEat = new HashMap<>();

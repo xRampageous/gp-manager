@@ -29,7 +29,7 @@ static final long FADE_MILLIS = 300L;
 static final long CHIP_MILLIS = 4_000L;
 /** Item sprites by id and stack size, so coins show their pile rather than one coin. */
 interface Icons {
- BufferedImage of(int itemId, int quantity);
+ BufferedImage of(int /* itemId */b, int /* quantity */c);
 }
 
 /** Counts at which stack sprites (coins) change; bucketing keeps the sprite cache small. */
@@ -86,8 +86,8 @@ boolean xy() {
 }
 
 /** The NPC the player is fighting; empty when released or not a fight. */
-void interaction(String name, boolean combat) {
- interaction = name == null || !combat ? "" : name.trim();
+void interaction(String /* name */a, boolean /* combat */b) {
+ interaction = a == null || !b ? "" : a.trim();
 }
 
 /** The fight target; the shared activity label reads only whether there is one. */
@@ -98,83 +98,98 @@ String vx() {
 /**
 * @param visible the display loot filter; hidden rows stay unnamed, and only their count shows
 */
-Cb update(Ca s, Predicate<Ab> visible, long now) {
- String owner = s.sessionId;
- if (!owner.equals(sessionOwner)) {
+Cb update(Ca s, Predicate<Ab> /* visible */b, long /* now */c) {
+ String /* owner */d = s.sessionId;
+ if (!d.equals(sessionOwner)) {
   // Free play to a Grind (or back) starts a clean tray; the first sighting keeps what is there.
   if (!sessionOwner.isEmpty()) tray.clear();
-  sessionOwner = owner;
+  sessionOwner = d;
    baseKey = null;
   trayOpenedAt = 0L;
  }
- String moment = moments.update(s, tray.bigDrop(now, HudMoments.SHOW_MILLIS), now);
- boolean grind = s.hasSession && !s.freePlay;
+ String /* moment */e = moments.update(s, tray.bigDrop(c, HudMoments.SHOW_MILLIS), c);
+ boolean /* grind */f = s.hasSession && !s.freePlay;
  // A new streak measures its Net from the last tick before its first event.
- String avk = tray.avk();
- if (!avk.equals(baseKey)) {
-  long base = avk.equals(prevKey) ? prevBase : baseKey == null ? s.net : lastNet;
+ String /* avk */g = tray.avk();
+ if (!g.equals(baseKey)) {
+  long /* base */i = g.equals(prevKey) ? prevBase : baseKey == null ? s.net : lastNet;
   prevKey = baseKey;
   prevBase = streakBase;
-  streakBase = base;
-  baseKey = avk;
+  streakBase = i;
+  baseKey = g;
  }
  lastNet = s.net;
  // Nothing booked yet reads as a dash, never a zero (the sidebar's first-run rule).
- boolean booked = s.hasSession && (s.gains != 0L || s.costs != 0L || s.marketResult != 0L || !s.recent.isEmpty());
+ boolean /* booked */j = s.hasSession && (s.gains != 0L || s.costs != 0L || s.marketResult != 0L || !s.recent.isEmpty());
  tray.keepMillis(config.streakEndSeconds() * 1_000L);
  // Owner 2026-10-01: a streak that just ended says so with its final count, and the folio
  // keeps it as "Last streak" until the next streak refreshes the tray.
- Map.Entry<String, Integer> liveStreak = tray.streak(now);
- if (liveStreak == null && streakLive && tray.kills > 0 && !tray.npcs.isEmpty()) {
-  streakEndedUntil = now + HudMoments.SHOW_MILLIS;
+ Map.Entry<String, Integer> /* liveStreak */k = tray.streak(c);
+ if (k == null && streakLive && tray.kills > 0 && !tray.npcs.isEmpty()) {
+  streakEndedUntil = c + HudMoments.SHOW_MILLIS;
  }
- streakLive = liveStreak != null;
- if (moment.isEmpty() && !streakLive && now < streakEndedUntil && tray.kills > 0) {
-  moment = "Streak ended · " + tray.names() + " ×" + tray.kills;
+ streakLive = k != null;
+ if (e.isEmpty() && !streakLive && c < streakEndedUntil && tray.kills > 0) {
+  e = "Streak ended · " + tray.names() + " ×" + tray.kills;
  }
  // "Hide when not tracking": nothing to track, logged out or paused hides HUD+; Free play shows
  // once something is booked (observed, unbooked tray activity does not count). A moment, such as
  // "<Grind> ended", still shows for its few seconds.
- boolean live = s.hasSession && !s.loggedOut && !s.paused && !s.idle;
- boolean shown = config.showHud() && (!config.hudHideWhenIdle() || !moment.isEmpty()
- || live && (grind || booked || tray.aup()));
- if (!shown) {
+ boolean /* live */l = s.hasSession && !s.loggedOut && !s.paused && !s.idle;
+ boolean /* shown */m = config.showHud() && (!config.hudHideWhenIdle() || !e.isEmpty()
+ || l && (f || j || tray.aup()));
+ if (!m) {
   current = Cb.HIDDEN;
   return current;
  }
- boolean tracking = s.hasSession && !s.loggedOut;
- Gem gem = !tracking ? Gem.OFF : s.paused && !s.idle ? Gem.PAUSED : s.idle ? Gem.AWAY
+ boolean /* tracking */n = s.hasSession && !s.loggedOut;
+ Gem /* gem */o = !n ? Gem.OFF : s.paused && !s.idle ? Gem.PAUSED : s.idle ? Gem.AWAY
  : s.pvpPossible ? Gem.PVP : Gem.LIVE;
- String target = "";
- double progress = -1d;
+ String /* target */p = "";
+ double /* progress */q = -1d;
  if (s.goal != null) {
-  target = " / " + s.goal.label;
-  progress = s.net <= 0L ? 0d : max(0d, min(1d, s.goal.fraction));
+  p = " / " + s.goal.label;
+  q = s.net <= 0L ? 0d : max(0d, min(1d, s.goal.fraction));
  }
- String rate = !s.hasSession ? "—" : s.rateEstablished ? Fmt.rate(s.gpPerHour) + "/h" : "Calculating…";
- boolean always = config.hudTray() == GpManagerConfig.HudTray.ALWAYS_OPEN;
- boolean open = tray.open(now, aix() + FADE_MILLIS, always);
- trayOpenedAt = !open ? 0L : trayOpenedAt == 0L ? now : trayOpenedAt;
- List<Entry> entries = tray.entries();
- var rows = new ArrayList<Row>();
- int aqm = 0;
+ String /* rate */r = !s.hasSession ? "—" : s.rateEstablished ? Fmt.rate(s.gpPerHour) + "/h" : "Calculating…";
+ boolean /* always */t = config.hudTray() == GpManagerConfig.HudTray.ALWAYS_OPEN;
+ // Owner 2026-10-03: hidden loot never opens or holds the tray open; an open tray's footer counts it.
+ var /* listed */u = new ArrayList<Entry>();
+ long /* shownAt */v = 0L;
+ int /* hidden */w = 0;
+ for (Entry /* entry */x : tray.entries()) {
+  if (b.test(flowOf(x))) {
+   u.add(x);
+   v = max(v, x.touched);
+  } else if (x.state != State.TRADED) {
+   w++;
+  }
+ }
+ boolean /* open */y = !u.isEmpty() && (t || c - v < aix() + FADE_MILLIS);
+ trayOpenedAt = !y ? 0L : trayOpenedAt == 0L ? c : trayOpenedAt;
+ var /* rows */z = new ArrayList<Row>();
  // The chip beside Net is the newest item's change; the tray row keeps the running total.
- long chipUntil = tray.lastDeltaAt() == 0L ? 0L : tray.lastDeltaAt() + CHIP_MILLIS;
- long trip = now < chipUntil ? tray.lastDelta() : 0L;
- for (Entry entry : entries) {
-  if (visible.test(flowOf(entry)) && open && aqm++ < config.hudTrayRows()) rows.add(row(entry));
+ long /* chipUntil */aa = tray.lastDeltaAt() == 0L ? 0L : tray.lastDeltaAt() + CHIP_MILLIS;
+ long /* trip */ab = c < aa ? tray.lastDelta() : 0L;
+ // A big drop keeps its row however much cheaper loot follows it; "+N more" takes the rest.
+ int /* plain */ac = config.hudTrayRows();
+ for (Entry /* entry */ad : u) if (ad.gold) ac--;
+ for (Entry /* entry */ae : u) {
+  if (y && z.size() < config.hudTrayRows() && (ae.gold || ac-- > 0)) z.add(row(ae));
  }
- int more = aqm - rows.size();
- String context = moment.isEmpty() ? qe(s) : moment;
+ int /* more */af = y ? u.size() - z.size() : 0;
+ String /* footer */ag = af > 0 ? "+" + af + " more" : "";
+ if (y && w > 0) ag = (ag.isEmpty() ? "" : ag + " · ") + "+" + w + " hidden";
+ String /* context */ah = e.isEmpty() ? qe(s) : e;
  // Owner 2026-10-01 (F18): a moment never hides unresolved Review; a compact count rides along.
- if (!moment.isEmpty() && s.reviewCount > 0) context = context + " \u00b7 (!) " + s.reviewCount;
- Color contextColor = moment.isEmpty() ? lineColor : moment.startsWith("Big drop") ? GOLD : GAIN.color;
- current = new Cb(true, gem, title(s, now), s.hasSession ? timer(s.elapsedMillis) : "",
- booked ? signed(s.net) : "—", booked ? tone(s.net) : DIM.color,
- target, progress, trip != 0L ? signed(trip) : "", tone(trip), chipUntil, rate, context,
- contextColor, moment.startsWith("Big drop"), trayLabel(s, now), rows, more > 0 ? "+" + more + " more" : "",
- tray.tripId(), always ? 0L : tray.foldAt(aix()), trayOpenedAt,
- now);
+ if (!e.isEmpty() && s.reviewCount > 0) ah = ah + " \u00b7 (!) " + s.reviewCount;
+ Color /* contextColor */ai = e.isEmpty() ? lineColor : e.startsWith("Big drop") ? GOLD : GAIN.color;
+ current = new Cb(true, o, title(s, c), s.hasSession ? timer(s.elapsedMillis) : "",
+ j ? signed(s.net) : "—", j ? tone(s.net) : DIM.color,
+ p, q, ab != 0L ? signed(ab) : "", tone(ab), aa, r, ah,
+ ai, e.startsWith("Big drop"), trayLabel(s, c), z, ag,
+ tray.tripId(), t ? 0L : v + aix(), trayOpenedAt,
+ c);
  return current;
 }
 
@@ -183,9 +198,9 @@ Cb update(Ca s, Predicate<Ab> visible, long now) {
 * aside, and only while the fight is fresh); otherwise a named Grind shows its name and Free play
 * shows nothing. Activity names (Combat, Woodcutting) are for the sidebar.
 */
-String title(Ca s, long now) {
- Map.Entry<String, Integer> streak = tray.streak(now);
- if (streak != null && s.hasSession && !interaction.isEmpty()) return "KC: " + streak.getValue();
+String title(Ca s, long /* now */a) {
+ Map.Entry<String, Integer> /* streak */b = tray.streak(a);
+ if (b != null && s.hasSession && !interaction.isEmpty()) return "KC: " + b.getValue();
  return s.hasSession && !s.freePlay ? Fmt.activity(s.ownerLabel) : "";
 }
 
@@ -206,58 +221,59 @@ String qe(Ca s) {
  return "";
 }
 
-static boolean counted(Entry entry) {
- return entry.state != State.PENDING && entry.state != State.TRADED;
+static boolean counted(Entry /* entry */a) {
+ return a.state != State.PENDING && a.state != State.TRADED;
 }
 
-static Ab flowOf(Entry entry) {
+static Ab flowOf(Entry /* entry */b) {
  // A hidden item stays off the tray whichever way it moved (owner 2026-09-28: a dropped one too).
- return new Ab(entry.itemId, entry.name, entry.quantity, (int) min(Integer.MAX_VALUE, entry.unitPrice), entry.value);
+ return new Ab(b.itemId, b.name, b.quantity, (int) min(Integer.MAX_VALUE, b.unitPrice), b.value);
 }
 
-Row row(Entry entry) {
- return new Row(icon(entry), entry.name + " " + times(entry.quantity),
- entry.state.tag, value(entry), color(entry), entry.gold, entry.born);
+Row row(Entry /* entry */a) {
+ // "(u)" is the game's own short form for uncharged, as in "Craw's bow (u)" (owner 1.2).
+ return new Row(icon(a), a.name.replace(" (uncharged)", " (u)") + " " + times(a.quantity),
+ a.state.tag, value(a), color(a), a.gold, a.born);
 }
 
-static String value(Entry entry) {
- return entry.value == 0L && entry.unitPrice == 0L ? "?"
- : counted(entry) || entry.state == State.TRADED ? signed(entry.value) : compact(entry.value);
+static String value(Entry /* entry */a) {
+ return a.value == 0L && a.unitPrice == 0L ? "?"
+ : counted(a) || a.state == State.TRADED ? signed(a.value) : compact(a.value);
 }
 
-static Color color(Entry entry) {
- return entry.gold ? GOLD : entry.state == State.LOST ? LOSS.color : entry.state == State.TRADED ? MARKET.color
- : counted(entry) ? GAIN.color : DIM.color;
+static Color color(Entry /* entry */a) {
+ return a.gold ? GOLD : a.state == State.LOST ? LOSS.color : a.state == State.TRADED ? MARKET.color
+ : counted(a) ? GAIN.color : DIM.color;
 }
 
 /** The tray heading; a kill streak adds its Net per kill (owner 1.1: the hover panel is gone). */
-String trayLabel(Ca s, long now) {
- Map.Entry<String, Integer> streak = tray.streak(now);
- return streak == null || streak.getValue() < 2 || !s.hasSession ? tray.label()
- : tray.label() + " \u00b7 " + signed((s.net - streakBase) / streak.getValue()) + "/kill";
+String trayLabel(Ca s, long /* now */a) {
+ Map.Entry<String, Integer> /* streak */b = tray.streak(a);
+ return b == null || b.getValue() < 2 || !s.hasSession ? tray.label()
+ : tray.label() + " \u00b7 " + signed((s.net - streakBase) / b.getValue()) + "/kill";
 }
 
-BufferedImage icon(Entry entry) {
- return icons == null || entry.itemId <= 0 || !config.showItemIcons() ? null
- : icons.of(entry.itemId, stack(entry.quantity));
+BufferedImage icon(Entry /* entry */a) {
+ return icons == null || a.itemId <= 0 || !config.showItemIcons() ? null
+ : icons.of(a.itemId, stack(a.quantity));
 }
 
-static int stack(long quantity) {
- for (int stack : STACKS) {
-  if (quantity >= stack) return stack;
+static int stack(long /* quantity */a) {
+ for (int /* stack */b : STACKS) {
+  if (a >= b) return b;
  }
  return 1;
 }
 
-String timer(long millis) {
- if (config.hudTimer() == GpManagerConfig.HudTimer.Full) return clock(millis);
- long total = nonNeg(millis) / 1000L;
- long h = total / 3600L;
- long m = total % 3600L / 60L;
- return h > 0L ? String.format(ROOT, "%dh%02dm", h, m) : String.format(ROOT, "%dm%02ds", m, total % 60L);
+String timer(long /* millis */a) {
+ if (config.hudTimer() == GpManagerConfig.HudTimer.Full) return clock(a);
+ long /* total */b = nonNeg(a) / 1000L;
+ long h = b / 3600L;
+ long m = b % 3600L / 60L;
+ return h > 0L ? String.format(ROOT, "%dh%02dm", h, m) : String.format(ROOT, "%dm%02ds", m, b % 60L);
 }
 
-static Color tone(long value) {
- return Tone.sign(value).color;
+static Color tone(long /* value */a) {
+ return Tone.sign(a).color;
 }
 }

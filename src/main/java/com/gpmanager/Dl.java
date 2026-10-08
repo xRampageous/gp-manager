@@ -7,8 +7,8 @@ import lombok.AllArgsConstructor;
 */
 @AllArgsConstructor
 public enum Dl {
-ALL_ITEMS("All items"), FOLLOW_GROUND_ITEMS("Follow Ground Items"), HIGHLIGHTED_LIST_ONLY(msg("eo"));
-final String label;
+ALL_ITEMS("All items"), FOLLOW_GROUND_ITEMS(msg("a0")), HIGHLIGHTED_LIST_ONLY(msg("eo"));
+String label;
 public String toString() {
  return label;
 }

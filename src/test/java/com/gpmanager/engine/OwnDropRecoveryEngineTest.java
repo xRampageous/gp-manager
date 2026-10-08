@@ -94,7 +94,7 @@ public class OwnDropRecoveryEngineTest
     {
         Am engine = startedWithBones(1L);
         engine.aki(1, 1, 0);
-        engine.noteConsumptionIntent(526, 6);
+        engine.ci(526, 6);
 
         Ac burial = settle(engine, Cc.empty(), 1_600L);
         assertEquals(Ai.CONSUMPTION, burial.getType());
@@ -114,7 +114,7 @@ public class OwnDropRecoveryEngineTest
     {
         Am engine = startedWithBones(1L);
         engine.aki(1, 1, 0);
-        engine.noteConsumptionIntent(526, 6, true, null);
+        engine.ci(526, 6, true, null);
 
         Ac destroyed = settle(engine, Cc.empty(), 1_600L);
         assertEquals(Ai.CONSUMPTION, destroyed.getType());

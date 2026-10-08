@@ -26,9 +26,9 @@ public class ChargeEstimateReconciliationTest
         assertEquals(Bd.LIKELY, receipt.getConfidence());
         assertEquals("Estimated", receipt.getExplanation());
         assertEquals(-300L, receipt.getNet());
-        assertEquals(2L, engine.chargeEstimateJournal.adp(
+        assertEquals(2L, ChargeProbes.adp(engine.chargeEstimateJournal, 
             engine.getActiveSession().getId(), "slot-a", "seas", ItemID.DEATHRUNE));
-        assertEquals(2L, engine.chargeEstimateJournal.adp(
+        assertEquals(2L, ChargeProbes.adp(engine.chargeEstimateJournal, 
             engine.getActiveSession().getId(), "slot-a", "seas", ItemID.CHAOSRUNE));
     }
 
@@ -64,9 +64,9 @@ public class ChargeEstimateReconciliationTest
         assertEquals(Bd.CONFIRMED, estimate.getConfidence());
         assertEquals("Confirmed", estimate.getExplanation());
         assertEquals(2L, measured.quantity(ItemID.CHAOSRUNE, false));
-        assertEquals(0L, engine.chargeEstimateJournal.adp(
+        assertEquals(0L, ChargeProbes.adp(engine.chargeEstimateJournal, 
             engine.getActiveSession().getId(), "slot-a", "seas", ItemID.DEATHRUNE));
-        assertEquals(0L, engine.chargeEstimateJournal.adp(
+        assertEquals(0L, ChargeProbes.adp(engine.chargeEstimateJournal, 
             engine.getActiveSession().getId(), "slot-a", "seas", ItemID.CHAOSRUNE));
     }
 
@@ -111,7 +111,7 @@ public class ChargeEstimateReconciliationTest
         assertNotNull(measured);
         assertEquals(2L, old.quantity(ItemID.DEATHRUNE, false));
         assertEquals(2L, measured.quantity(ItemID.DEATHRUNE, false));
-        assertEquals(0L, engine.chargeEstimateJournal.adp(oldSession,
+        assertEquals(0L, ChargeProbes.adp(engine.chargeEstimateJournal, oldSession,
             "slot-a", "seas", ItemID.DEATHRUNE));
     }
 
@@ -123,7 +123,7 @@ public class ChargeEstimateReconciliationTest
         engine.mn("slot-a", "seas", Au.CAST,
             Collections.singletonList(flow(ItemID.DEATHRUNE, "Death rune", -1L, 100)), T0 + 1L);
         engine.acu(T0 + 2L);
-        assertEquals(0L, engine.chargeEstimateJournal.adp(
+        assertEquals(0L, ChargeProbes.adp(engine.chargeEstimateJournal, 
             engine.getActiveSession().getId(), "slot-a", "seas", ItemID.DEATHRUNE));
     }
 

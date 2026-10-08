@@ -24,24 +24,24 @@ Bx() {
  // Gson
 }
 
-Bx(Be type, long timestampEpochMillis, String label, Bd confidence,
-String explanation) {
+Bx(Be /* type */a, long /* timestampEpochMillis */b, String /* label */c, Bd /* confidence */d,
+String /* explanation */e) {
  this.id = UUID.randomUUID().toString();
- this.type = type;
- this.timestampEpochMillis = timestampEpochMillis;
- this.label = label == null || label.trim().isEmpty() ? (type == Be.DEATH ? "Player death" : "Player kill")
- : label.trim();
- this.confidence = confidence == null ? Bd.UNCERTAIN : confidence;
- this.explanation = axw(explanation);
+ this.type = a;
+ this.timestampEpochMillis = b;
+ this.label = c == null || c.trim().isEmpty() ? (a == Be.DEATH ? "Player death" : "Player kill")
+ : c.trim();
+ this.confidence = d == null ? Bd.UNCERTAIN : d;
+ this.explanation = axw(e);
 }
 
-void kg(String transactionId) {
- if (empty(transactionId)) return;
- if (!transactionIds.contains(transactionId)) transactionIds.add(transactionId);
+void kg(String /* transactionId */a) {
+ if (empty(a)) return;
+ if (!transactionIds.contains(a)) transactionIds.add(a);
 }
 
-void afh(String transactionId) {
- transactionIds.remove(transactionId);
+void afh(String /* transactionId */a) {
+ transactionIds.remove(a);
 }
 
 String getId() {
@@ -64,17 +64,17 @@ List<String> getTransactionIds() {
 * correction-aware accounting projection. Repeated observations of the
 * same transaction id therefore update rather than double count it.
 */
-void ahr(Ac transaction) {
- if (transaction == null) return;
- String transactionId = transaction.getId();
- if (blank(transactionId)) return;
- financialContributions.put(transactionId, PkMoney.of(transaction));
+void ahr(Ac /* transaction */a) {
+ if (a == null) return;
+ String /* transactionId */b = a.getId();
+ if (blank(b)) return;
+ financialContributions.put(b, PkMoney.of(a));
 }
 
 /** Removes one un-compacted receipt contribution, for correction undo. */
-boolean afd(String transactionId) {
- if (transactionId == null) return false;
- return financialContributions.remove(transactionId) != null;
+boolean afd(String /* transactionId */a) {
+ if (a == null) return false;
+ return financialContributions.remove(a) != null;
 }
 
 /**
@@ -83,14 +83,14 @@ boolean afd(String transactionId) {
 * longer individually undoable; callers should only compact receipts that
 * have left the correction/undo window.
 */
-boolean pf(String transactionId) {
- if (transactionId == null) return false;
- PkMoney contribution = financialContributions.remove(transactionId);
- if (contribution == null) return false;
- retainedFinancialNetGp = safeAdd(retainedFinancialNetGp, contribution.netGp);
- retainedFinancialCostsGp = safeAdd(retainedFinancialCostsGp, contribution.tr());
- if (contribution.costSplitAvailable) {
-  retainedFinancialSuppliesCostsGp = safeAdd(retainedFinancialSuppliesCostsGp, contribution.uq());
+boolean pf(String /* transactionId */a) {
+ if (a == null) return false;
+ PkMoney /* contribution */b = financialContributions.remove(a);
+ if (b == null) return false;
+ retainedFinancialNetGp = safeAdd(retainedFinancialNetGp, b.netGp);
+ retainedFinancialCostsGp = safeAdd(retainedFinancialCostsGp, b.tr());
+ if (b.costSplitAvailable) {
+  retainedFinancialSuppliesCostsGp = safeAdd(retainedFinancialSuppliesCostsGp, b.uq());
  } else {
   financialCostSplitComplete = false;
  }
@@ -108,9 +108,9 @@ long uk() {
 }
 
 PkMoney total() {
- var total = new PkMoney(retainedFinancialNetGp, retainedFinancialCostsGp,
+ var /* total */a = new PkMoney(retainedFinancialNetGp, retainedFinancialCostsGp,
  retainedFinancialSuppliesCostsGp, financialCostSplitComplete);
- financialContributions.values().forEach(total::plus);
- return total;
+ financialContributions.values().forEach(a::plus);
+ return a;
 }
 }

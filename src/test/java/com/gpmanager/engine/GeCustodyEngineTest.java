@@ -539,7 +539,7 @@ public class GeCustodyEngineTest
         h.engine.setBaseline(new Cc(h.inventory));
 
         h.offer(0, SELLING, RUNE, 100, 0, 7, 0);
-        h.engine.noteConsumptionIntent(ItemID.SHARK, 18, false, Au.EAT);
+        h.engine.ci(ItemID.SHARK, 18, false, Au.EAT);
         Ac settle = h.settle(with(h.inventory, RUNE, 0L, ItemID.SHARK, 0L));
 
         assertNotNull(settle);
@@ -594,7 +594,7 @@ public class GeCustodyEngineTest
         h.engine.setBaseline(new Cc(h.inventory));
 
         h.offer(0, SELLING, RUNE, 5, 0, 7, 0);
-        h.engine.noteConsumptionIntent(RUNE, 18, false, Au.CAST);
+        h.engine.ci(RUNE, 18, false, Au.CAST);
         Ac cast = h.settle(with(h.inventory, RUNE, 9L));
 
         assertNotNull(cast);
@@ -641,9 +641,13 @@ public class GeCustodyEngineTest
         // A brand-new offer in the same slot before the coins were ever collected.
         h.offer(0, SELLING, LOGS, 5, 0, 100, 0);
 
-        assertEquals("unresolved lifecycle became a Review row", 1, h.reviews().size());
-        assertEquals("the new offer is a fresh identity", 1,
+        // Owner 1.2: the finished sale gives up its slot and waits for its coins, instead of
+        // going straight to Review (a fast collect-and-relist settles a moment later).
+        assertEquals("nothing is handed to Review yet", 0, h.reviews().size());
+        assertEquals("the new offer is a fresh identity beside the waiting sale", 2,
             h.engine.geCustody.aji().size());
+        h.engine.ajv(h.now + GeCustodyLedger.UNOBSERVED_GRACE_MILLIS + 1_000L);
+        assertEquals("coins never seen: the unresolved lifecycle becomes a Review row", 1, h.reviews().size());
     }
 
     // ---- derived projection ---------------------------------------------------------------

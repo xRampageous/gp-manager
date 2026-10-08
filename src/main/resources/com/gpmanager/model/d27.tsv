@@ -1,0 +1,43 @@
+# Spell recipes, keyed by the unchanged d19 names; counts and order are unchanged.
+Wind Strike	1:air 1:mind
+Water Strike	1:air 1:water 1:mind
+Earth Strike	1:air 2:earth 1:mind
+Fire Strike	2:air 3:fire 1:mind
+Wind Bolt	2:air 1:chaos
+Water Bolt	2:air 2:water 1:chaos
+Earth Bolt	2:air 3:earth 1:chaos
+Fire Bolt	3:air 4:fire 1:chaos
+Crumble Undead	2:air 2:earth 1:chaos
+Wind Blast	3:air 1:death
+Water Blast	3:air 3:water 1:death
+Earth Blast	3:air 4:earth 1:death
+Fire Blast	4:air 5:fire 1:death
+Wind Wave	5:air 1:blood
+Water Wave	5:air 7:water 1:blood
+Earth Wave	5:air 7:earth 1:blood
+Fire Wave	5:air 7:fire 1:blood
+Iban Blast	5:fire 1:death
+Flames of Zamorak	1:air 4:fire 2:blood
+Claws of Guthix	4:air 1:fire 2:blood
+Saradomin Strike	4:air 2:fire 2:blood
+Wind Surge	7:air 1:wrath
+Water Surge	7:air 10:water 1:wrath
+Earth Surge	7:air 10:earth 1:wrath
+Fire Surge	7:air 10:fire 1:wrath
+Magic Dart	1:death 4:mind
+Smoke Rush	1:air 1:fire 2:chaos 2:death
+Shadow Rush	1:air 2:chaos 2:death 1:soul
+Blood Rush	1:blood 2:chaos 2:death
+Ice Rush	2:water 2:chaos 2:death
+Smoke Burst	2:air 2:fire 4:chaos 2:death
+Shadow Burst	1:air 4:chaos 2:death 2:soul
+Blood Burst	2:blood 4:chaos 2:death
+Ice Burst	4:water 4:chaos 2:death
+Smoke Blitz	2:air 2:fire 2:blood 2:death
+Shadow Blitz	2:air 2:blood 2:death 2:soul
+Blood Blitz	4:blood 2:death
+Ice Blitz	3:water 2:blood 2:death
+Smoke Barrage	4:air 4:fire 2:blood 4:death
+Shadow Barrage	4:air 2:blood 4:death 3:soul
+Blood Barrage	4:blood 4:death 1:soul
+Ice Barrage	6:water 2:blood 4:death

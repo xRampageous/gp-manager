@@ -58,6 +58,35 @@ public class RecentVisibilityTest
     }
 
     @Test
+    public void aFinishedTradeCanBeHiddenButAnOpenOfferAndASpellCannot()
+    {
+        // Owner 2026-10-08: a sold Fire rune row had no "Hide from recent".
+        LivePage page = new LivePage(new LivePage.Actions()
+        {
+            public void togglePause() { }
+            public void editTarget() { }
+            public void openLedger(Ao.Entry entry) { }
+        }, id -> null);
+        assertTrue(hides(page, recent(554, "Fire rune", true, false)));
+        assertFalse("an offer still on the exchange stays listed",
+            hides(page, recent(554, "Fire rune", true, true)));
+        assertFalse("a spell's runes are no single item", hides(page, recent(554, "Fire Strike", false, false)));
+        assertTrue(hides(page, new Ca.Recent(385, "Shark", null, 900L, false, false, null, 1, "r", "c",
+            "", 1L, false, false, true, null, false, 0L, false, "", false)));
+    }
+
+    static Ca.Recent recent(int itemId, String name, boolean market, boolean open)
+    {
+        return new Ca.Recent(itemId, name, null, 1_000L, false, false, market ? "market" : null, 1, "r", "c",
+            "", 200L, true, market, true, null, false, 0L, market, market ? "Sold" : "", open);
+    }
+
+    static boolean hides(LivePage page, Ca.Recent row)
+    {
+        return page.rowOf(row).menu.stream().anyMatch(menu -> "Hide from recent".equals(menu.label));
+    }
+
+    @Test
     public void aSmeltingRunsOreIsOneRowOfFailedOverAll()
     {
         Am engine = PresentationLifecycleTest.engine();

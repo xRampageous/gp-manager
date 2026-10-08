@@ -24,25 +24,25 @@ long latestAcquisitionEpochMillis;
 Az() {
 }
 
-Az(int itemId) {
- this.itemId = itemId;
+Az(int /* itemId */a) {
+ this.itemId = a;
 }
 
 long getAvailableQty() { return nonNeg(availableQty); }
-void setAvailableQty(long value) { availableQty = nonNeg(value); }
+void setAvailableQty(long /* value */a) { availableQty = nonNeg(a); }
 long getAvailableBasisGp() { return nonNeg(availableBasisGp); }
-void setAvailableBasisGp(long value) { availableBasisGp = nonNeg(value); }
+void setAvailableBasisGp(long /* value */a) { availableBasisGp = nonNeg(a); }
 long getReservedQty() { return nonNeg(reservedQty); }
-void setReservedQty(long value) { reservedQty = nonNeg(value); }
+void setReservedQty(long /* value */a) { reservedQty = nonNeg(a); }
 long getReservedBasisGp() { return nonNeg(reservedBasisGp); }
-void setReservedBasisGp(long value) { reservedBasisGp = nonNeg(value); }
+void setReservedBasisGp(long /* value */a) { reservedBasisGp = nonNeg(a); }
 long getRealizationFenceEpochMillis() { return nonNeg(realizationFenceEpochMillis); }
-void setRealizationFenceEpochMillis(long value) {
- realizationFenceEpochMillis = nonNeg(value);
+void setRealizationFenceEpochMillis(long /* value */a) {
+ realizationFenceEpochMillis = nonNeg(a);
 }
 
 long getLatestAcquisitionEpochMillis() { return nonNeg(latestAcquisitionEpochMillis); }
-void setLatestAcquisitionEpochMillis(long value) {
- latestAcquisitionEpochMillis = nonNeg(value);
+void setLatestAcquisitionEpochMillis(long /* value */a) {
+ latestAcquisitionEpochMillis = nonNeg(a);
 }
 }

@@ -29,7 +29,7 @@ enum Tone {
  GAIN(ColorScheme.GRAND_EXCHANGE_PRICE), SUPPLY(ColorScheme.GRAND_EXCHANGE_ALCH), LOSS(new Color(255, 122, 107)),
  MARKET(new Color(90, 180, 255)), REVIEW(ColorScheme.PROGRESS_INPROGRESS_COLOR), PLAIN(Color.WHITE),
  DIM(ColorScheme.LIGHT_GRAY_COLOR);
- final Color color;
+ Color color;
  Tone(Color color) {
   this.color = color;
  }
@@ -95,6 +95,43 @@ static JPanel toolbar(JComponent[] controls, JComponent[] actions) {
  for (JComponent action : actions) right.add(action);
  row.add(right, BorderLayout.EAST);
  return row;
+}
+
+/** Attach the common Ledger/Grinds header band to its existing page holder. */
+static void h1(JPanel a, JComponent[] b, JComponent[] c) {
+ a.setOpaque(false);
+ a.add(toolbar(b, c), BorderLayout.NORTH);
+}
+
+/** The empty table line, with the existing font, tone and inset dimensions. */
+static JLabel e1(String a) {
+ JLabel b = label(a, small(), LABEL);
+ pad(b, 3, 6, 3, 6);
+ return b;
+}
+
+/** Table and sheet page count; retain the original integer boundary behavior. */
+static int p1(int a, int b) { return Math.max(1, (a + b - 1) / b); }
+
+/** Clamp a requested table/sheet page to the existing nonempty page range. */
+static int p2(int a, int b) { return Math.max(0, Math.min(a, b - 1)); }
+
+/** Apply pager text and navigation state; callers retain their different text formats. */
+static void p3(JLabel a, JButton b, JButton c, int d, int e, String f) {
+ a.setText(f);
+ b.setEnabled(d > 0);
+ c.setEnabled(d < e - 1);
+}
+
+/** The same ordered row/Grind menu: labels, listeners and Swing defaults remain intact. */
+static JPopupMenu m1(java.util.List<Table.Menu> a) {
+ var b = new JPopupMenu();
+ for (Table.Menu c : a) {
+  var d = new JMenuItem(c.label);
+  d.addActionListener(e -> c.action.run());
+  b.add(d);
+ }
+ return b;
 }
 
 /** The text shortened with "\u2026" to fit a pixel budget; the full text belongs in the tooltip. */

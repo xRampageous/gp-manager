@@ -10,12 +10,12 @@ long nextCompletionSequence;
 /** Highest compacted completion sequence; monotone so removed detail can never backfill. */
 long detailFloorSequence = -1L;
 long km() {
- long allocated = nonNeg(nextCompletionSequence);
- nextCompletionSequence = allocated + 1L;
- return allocated;
+ long /* allocated */a = nonNeg(nextCompletionSequence);
+ nextCompletionSequence = a + 1L;
+ return a;
 }
 
-void adv(long value) {
- detailFloorSequence = max(detailFloorSequence, nonNeg(value));
+void adv(long /* value */a) {
+ detailFloorSequence = max(detailFloorSequence, nonNeg(a));
 }
 }

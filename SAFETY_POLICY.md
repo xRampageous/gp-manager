@@ -2,7 +2,7 @@
 
 ## Product scope
 
-GP Manager is a passive accounting ledger. It may read ordinary RuneLite events and item-container state, perform local arithmetic, display historical totals, and save or export those totals locally.
+GP Manager is a passive accounting ledger. It may read ordinary RuneLite events and item-container state, perform local arithmetic, display historical totals, and save those totals locally.
 
 ## Permanently prohibited
 
@@ -11,7 +11,7 @@ GP Manager is a passive accounting ledger. It may read ordinary RuneLite events 
 - Packet manipulation, client-state mutation, or gameplay widget manipulation.
 - Boss solvers, reactive combat guidance, tile markers tied to mechanics, gameplay risk warnings, escape guidance, opponent scouting, or live recommendations.
 - Any network transmission of its own; telemetry, crowdsourcing, player lookup services, remote APIs, credentials, or player-data exposure.
-- Reflection (`java.lang.reflect`, `Class.forName`, `setAccessible`), JNI/native code, runtime-downloaded code, Java serialization, subprocess execution (`ProcessBuilder`, `Runtime.exec`) and OS launchers (`Desktop.getDesktop().open` / `.browse`). Wiki links may only use RuneLite's `LinkBrowser`; the export folder path is copied, never opened.
+- Reflection (`java.lang.reflect`, `Class.forName`, `setAccessible`), JNI/native code, runtime-downloaded code, Java serialization, subprocess execution (`ProcessBuilder`, `Runtime.exec`) and OS launchers (`Desktop.getDesktop().open` / `.browse`). Wiki links may only use RuneLite's `LinkBrowser`; the data folder path is copied, never opened.
 - Constructing Gson in production (`new Gson()` / `new GsonBuilder()`): all JSON goes through the client's injected Gson bound once at start-up (`JsonCodec.bind`).
 - `Class.getResource` for bundled files; bundled resources are read with `getResourceAsStream` only.
 - Runtime dependencies outside the RuneLite-provided surface without an explicit future safety review.
@@ -25,7 +25,7 @@ GP Manager is a passive accounting ledger. It may read ordinary RuneLite events 
 - Reading RuneLite item prices through `ItemManager`.
 - Calculating revenue, costs, profit/loss, rates, confidence, corrections, activities, and PK encounter totals.
 - Rendering the plugin's own panel and compact accounting overlay.
-- User-triggered local CSV export and local JSON persistence.
+- Local JSON persistence and user-triggered local backups.
 - Developer-only offline simulations that call accounting classes directly and never launch or modify RuneLite.
 
 ## PK-specific restrictions

@@ -1,0 +1,12 @@
+# Reward chests whose "Bank-all" sends loot straight to the bank, never through the inventory.
+# The chest's item container is read at the click and booked like a pickup (research 1.2).
+# interface id <TAB> item container id <TAB> RuneLite gameval names (InterfaceID / InventoryID)
+539	581	RAIDS_REWARDS / RAIDS_REWARDS
+23	612	TOB_CHESTS / TOB_CHESTS
+771	811	TOA_CHESTS / TOA_CHESTS
+864	843	COLOSSEUM_REWARD_CHEST_2 / COLOSSEUM_REWARDS
+868	847	PMOON_REWARD / PMOON_REWARDINV
+742	797	WILDY_LOOT_CHEST / LOOT_INV_ACCESS
+919	923	DOM_END_LEVEL_UI / DOM_LOOTPILE
+367	0	TRAWLER_REWARD / TRAWLER_REWARDINV
+607	307	FOSSIL_DRIFTNET / MACRO_CERTER

@@ -13,85 +13,85 @@ class PkHistoryArchive {
 static final int MAX_DETAILED_ENCOUNTERS = 2_000;
 final Am engine;
 Cf state = new Cf();
-void restore(SavedState saved) {
- state = saved == null ? new Cf() : saved.getPkHistory();
+void restore(SavedState /* saved */a) {
+ state = a == null ? new Cf() : a.getPkHistory();
 }
 
-void ayc(SavedState saved) {
- saved.pkHistory = state == null ? new Cf() : state;
+void ayc(SavedState /* saved */a) {
+ a.pkHistory = state == null ? new Cf() : state;
 }
 
 void clear() {
  state = new Cf();
 }
 
-void auc(PkHistoryArchive staged) {
- state = staged.state;
+void auc(PkHistoryArchive /* staged */a) {
+ state = a.state;
 }
 
 /** Assigns the profile-wide completion position once, then enforces the bounded detail cap. */
-void aeu(Bx encounter) {
- if (encounter == null) return;
- encounter.completionSequence = Ae.nonNeg(state.km());
+void aeu(Bx /* encounter */a) {
+ if (a == null) return;
+ a.completionSequence = Ae.nonNeg(state.km());
  ri(state, engine.akf(), 0, 0L);
 }
 
 /** Enforces the profile-wide detail bound: age horizon (when configured) plus the newest cap. */
-void ri(List<Ad> sessions, int days, long now) {
- ri(state, sessions, days, now);
+void ri(List<Ad> /* sessions */a, int /* days */b, long /* now */c) {
+ ri(state, a, b, c);
 }
 
-static void ri(Cf state, List<Ad> sessions, int days, long now) {
- if (state == null) return;
- List<Ce> rows = retainedRows(sessions);
- if (rows.isEmpty()) return;
- lg(state, rows);
- long cutoff = days <= 0 ? Long.MIN_VALUE : now - Math.max(0, days) * 86_400_000L;
- long floor = state.detailFloorSequence;
- rows.sort(Comparator.comparingLong(Ce::sequence).thenComparing(row -> row.encounter.getId()));
- int retained = rows.size();
- for (Ce row : rows) {
-  boolean arn = row.sequence() <= floor;
-  boolean avv = days > 0 && row.encounter.timestampEpochMillis < cutoff;
-  boolean asz = retained > MAX_DETAILED_ENCOUNTERS;
-  if (!arn && !avv && !asz) continue;
-  if (row.session.afw(row.encounter)) {
-   retained--;
-   state.adv(row.sequence());
+static void ri(Cf /* state */a, List<Ad> /* sessions */b, int /* days */c, long /* now */d) {
+ if (a == null) return;
+ List<Ce> /* rows */e = retainedRows(b);
+ if (e.isEmpty()) return;
+ lg(a, e);
+ long /* cutoff */f = c <= 0 ? Long.MIN_VALUE : d - Math.max(0, c) * 86_400_000L;
+ long /* floor */g = a.detailFloorSequence;
+ e.sort(Comparator.comparingLong(Ce::sequence).thenComparing(/* row */h -> h.encounter.getId()));
+ int /* retained */i = e.size();
+ for (Ce /* row */j : e) {
+  boolean /* arn */k = j.sequence() <= g;
+  boolean /* avv */l = c > 0 && j.encounter.timestampEpochMillis < f;
+  boolean /* asz */m = i > MAX_DETAILED_ENCOUNTERS;
+  if (!k && !l && !m) continue;
+  if (j.session.afw(j.encounter)) {
+   i--;
+   a.adv(j.sequence());
   }
  }
 }
 
 /** Legacy or hand-built rows without a completion position receive one, once, deterministically. */
-static void lg(Cf state, List<Ce> rows) {
- var missing = new ArrayList<Ce>();
- for (Ce row : rows) {
-  if (row.encounter.completionSequence < 0L) missing.add(row);
+static void lg(Cf /* state */a, List<Ce> /* rows */b) {
+ var /* missing */c = new ArrayList<Ce>();
+ for (Ce /* row */d : b) {
+  if (d.encounter.completionSequence < 0L) c.add(d);
  }
- if (missing.isEmpty()) return;
- missing.sort(Comparator.comparingLong((Ce row) -> row.encounter.timestampEpochMillis)
- .thenComparing(row -> row.session.getId()).thenComparing(row -> row.encounter.getId()));
- for (Ce row : missing) {
-  row.encounter.completionSequence = Ae.nonNeg(state.km());
+ if (c.isEmpty()) return;
+ c.sort(Comparator.comparingLong((Ce /* row */e) -> e.encounter.timestampEpochMillis)
+ .thenComparing(/* row */f -> f.session.getId()).thenComparing(/* row */g -> g.encounter.getId()));
+ for (Ce /* row */h : c) {
+  h.encounter.completionSequence = Ae.nonNeg(a.km());
  }
 }
 
-static List<Ce> retainedRows(List<Ad> sessions) {
- var rows = new ArrayList<Ce>();
- if (sessions == null) return rows;
- for (Ad session : sessions) {
-  if (session == null) continue;
-  for (Bx encounter : session.getPkEncounters()) {
-   if (encounter != null) rows.add(new Ce(session, encounter));
+static List<Ce> retainedRows(List<Ad> /* sessions */a) {
+ var /* rows */b = new ArrayList<Ce>();
+ if (a == null) return b;
+ for (Ad /* session */c : a) {
+  if (c == null) continue;
+  for (Bx /* encounter */d : c.getPkEncounters()) {
+   if (d != null) b.add(new Ce(c, d));
   }
  }
- return rows;
+ return b;
 }
 
 @AllArgsConstructor
 static class Ce {
- final Ad session;
- final Bx encounter;
+ Ad session;
+ Bx encounter;
  long sequence() {
   return encounter.completionSequence;
  }

@@ -10,15 +10,15 @@ enum State {
  NEVER_SAVED, OK, FAILED, CONFLICT
 }
 
-final State state;
-final String detail;
-final boolean retryAvailable;
-final String recoveredFrom;
-Ci(State state, String detail, boolean retryAvailable, String recoveredFrom) {
- this.state = state;
- this.detail = Ag.axw(detail);
- this.retryAvailable = retryAvailable;
- this.recoveredFrom = Ag.axw(recoveredFrom);
+State state;
+String detail;
+boolean retryAvailable;
+String recoveredFrom;
+Ci(State /* state */a, String /* detail */b, boolean /* retryAvailable */c, String /* recoveredFrom */d) {
+ this.state = a;
+ this.detail = Ag.axw(b);
+ this.retryAvailable = c;
+ this.recoveredFrom = Ag.axw(d);
 }
 
 static Ci abd() {

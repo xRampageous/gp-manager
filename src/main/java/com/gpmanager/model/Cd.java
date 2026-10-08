@@ -11,18 +11,18 @@ Cd() {
  // Gson
 }
 
-Cd(int itemId, long removedQty, long knownQty, long basisGp) {
- this.itemId = itemId;
- this.remainingRemovedQty = nonNeg(removedQty);
- this.remainingKnownQty = nonNeg(knownQty);
- this.remainingBasisGp = nonNeg(basisGp);
+Cd(int /* itemId */a, long /* removedQty */b, long /* knownQty */c, long /* basisGp */d) {
+ this.itemId = a;
+ this.remainingRemovedQty = nonNeg(b);
+ this.remainingKnownQty = nonNeg(c);
+ this.remainingBasisGp = nonNeg(d);
 }
 
 long uh() { return nonNeg(remainingRemovedQty); }
 long ug() { return nonNeg(remainingKnownQty); }
-void restore(long removedQty, long knownQty, long basisGp) {
- remainingRemovedQty = nonNeg(remainingRemovedQty - max(0L, removedQty));
- remainingKnownQty = nonNeg(remainingKnownQty - max(0L, knownQty));
- remainingBasisGp = nonNeg(remainingBasisGp - max(0L, basisGp));
+void restore(long /* removedQty */a, long /* knownQty */b, long /* basisGp */c) {
+ remainingRemovedQty = nonNeg(remainingRemovedQty - max(0L, a));
+ remainingKnownQty = nonNeg(remainingKnownQty - max(0L, b));
+ remainingBasisGp = nonNeg(remainingBasisGp - max(0L, c));
 }
 }

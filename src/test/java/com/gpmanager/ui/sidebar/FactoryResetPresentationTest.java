@@ -61,6 +61,7 @@ public class FactoryResetPresentationTest
                 resetThroughTheMenu(panel.get());
                 return null;
             });
+            PersistenceProbe.drain(coordinator, 2);
 
             Cb after = render(builder, engine, now + 12L);
             assertTrue("the applied reset clears the tray", after.rows.isEmpty());
@@ -108,6 +109,7 @@ public class FactoryResetPresentationTest
                 resetThroughTheMenu(panel.get());
                 return null;
             });
+            PersistenceProbe.drain(coordinator, 2);
 
             Cb after = render(builder, engine, now + 12L);
             assertFalse("a refused reset keeps the tray", after.rows.isEmpty());

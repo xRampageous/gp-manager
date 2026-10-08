@@ -16,7 +16,7 @@ public class FiremakingSupplyEvidenceTest
         assertFuelAction("Tend-to", "Blisterwood logs");
         assertFuelAction("Tend to", "Juniper logs");
         assertTrue("existing Use Tinderbox evidence remains supported",
-            Dw.ww("Use", "Tinderbox -> Willow logs"));
+            Dw.d1("Use", "Tinderbox -> Willow logs"));
     }
 
     @Test
@@ -26,13 +26,13 @@ public class FiremakingSupplyEvidenceTest
         assertNull(Bn.resolve(null, unexplained.getFlows(), unexplained.getType(), "Firemaking"));
         assertEquals(CostKind.LOSS, CostKind.of(unexplained, unexplained.getFlows().get(0)));
 
-        Au arbitraryUse = Bn.tu("Use");
+        Au arbitraryUse = Bn.a1("Use");
         assertNull(arbitraryUse);
         assertNull(Bn.resolve(arbitraryUse, unexplained.getFlows(),
             unexplained.getType(), "Firemaking"));
         assertEquals(CostKind.LOSS, CostKind.of(unexplained, unexplained.getFlows().get(0)));
 
-        Au mismatchedFuelIntent = Bn.resolve(Bn.tu("Light"),
+        Au mismatchedFuelIntent = Bn.resolve(Bn.a1("Light"),
             Collections.singletonList(new Ab(946, "Knife", -1L, 1, -1L)),
             Ai.CONSUMPTION, "Firemaking");
         assertNull("Light does not turn a non-fuel loss into Supplies", mismatchedFuelIntent);
@@ -41,7 +41,7 @@ public class FiremakingSupplyEvidenceTest
     private static void assertFuelAction(String menuOption, String name)
     {
         Ac transaction = transaction(name);
-        Au resolved = Bn.resolve(Bn.tu(menuOption),
+        Au resolved = Bn.resolve(Bn.a1(menuOption),
             transaction.getFlows(), transaction.getType(), "Firemaking");
         assertEquals(Au.SUPPLIES, resolved);
         transaction.setActionKind(resolved);

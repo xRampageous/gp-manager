@@ -22,8 +22,8 @@ enum Dr {
 /** One parsed target input; {@code value} is non-null only when {@code parse == VALID}. */
 @AllArgsConstructor
 static class Dn {
- final Dr parse;
- final Long value;
+ Dr parse;
+ Long value;
  boolean empty() {
   return parse == Dr.EMPTY;
  }
@@ -33,64 +33,64 @@ static class Dn {
 }
 
 /** Friendly Net-target parsing: 5m, 5M, 5000k, 5,000,000. Blank means no target. */
-static Dn acv(String raw) {
- if (blank(raw)) return new Dn(Dr.EMPTY, null);
+static Dn acv(String /* raw */a) {
+ if (blank(a)) return new Dn(Dr.EMPTY, null);
  // Strict whole-string form: digits with optional decimals and one k/m/b suffix. Anything
  // else is malformed and must never be treated as "clear".
- String text = raw.trim().toLowerCase(Locale.ROOT).replace(",", "").replace("_", "").replace(" ", "");
- if (!text.matches("\\d+(?:\\.\\d+)?[kmb]?")) return new Dn(Dr.INVALID, null);
- long value = axx(text);
- return value > 0L ? new Dn(Dr.VALID, value) : new Dn(Dr.INVALID, null);
+ String /* text */c = Ag.lower(a).replace(",", "").replace("_", "").replace(" ", "");
+ if (!c.matches("\\d+(?:\\.\\d+)?[kmb]?")) return new Dn(Dr.INVALID, null);
+ long /* value */e = axx(c);
+ return e > 0L ? new Dn(Dr.VALID, e) : new Dn(Dr.INVALID, null);
 }
 
 /** Friendly Active-Time parsing: 90m, 3h, "3h 30m", plain minutes. Blank means no target. */
-static Dn ade(String raw) {
- if (blank(raw)) return new Dn(Dr.EMPTY, null);
- String text = raw.trim().toLowerCase(Locale.ROOT).replace(",", "").replace("_", "").trim();
- if (text.matches("\\d+(?:\\.\\d+)?")) {
-  long minutes = round(Double.parseDouble(text));
-  return minutes > 0L ? new Dn(Dr.VALID, minutes * 60_000L)
+static Dn ade(String /* raw */a) {
+ if (blank(a)) return new Dn(Dr.EMPTY, null);
+ String /* text */b = Ag.lower(a).replace(",", "").replace("_", "").trim();
+ if (b.matches("\\d+(?:\\.\\d+)?")) {
+  long /* minutes */c = round(Double.parseDouble(b));
+  return c > 0L ? new Dn(Dr.VALID, c * 60_000L)
   : new Dn(Dr.INVALID, null);
  }
  // Strict whole-string form: optional "Nh" then optional "Mm" and nothing else.
- java.util.regex.Matcher matcher = java.util.regex.Pattern
- .compile("^(?:(\\d+(?:\\.\\d+)?)\\s*h)?\\s*(?:(\\d+(?:\\.\\d+)?)\\s*m)?$").matcher(text);
- if (!matcher.matches() || (matcher.group(1) == null && matcher.group(2) == null)) {
+ java.util.regex.Matcher /* matcher */e = java.util.regex.Pattern
+ .compile("^(?:(\\d+(?:\\.\\d+)?)\\s*h)?\\s*(?:(\\d+(?:\\.\\d+)?)\\s*m)?$").matcher(b);
+ if (!e.matches() || (e.group(1) == null && e.group(2) == null)) {
   return new Dn(Dr.INVALID, null);
  }
- long total = 0L;
- if (matcher.group(1) != null) total += round(Double.parseDouble(matcher.group(1)) * 3_600_000d);
- if (matcher.group(2) != null) total += round(Double.parseDouble(matcher.group(2)) * 60_000d);
- return total > 0L ? new Dn(Dr.VALID, total) : new Dn(Dr.INVALID, null);
+ long /* total */f = 0L;
+ if (e.group(1) != null) f += round(Double.parseDouble(e.group(1)) * 3_600_000d);
+ if (e.group(2) != null) f += round(Double.parseDouble(e.group(2)) * 60_000d);
+ return f > 0L ? new Dn(Dr.VALID, f) : new Dn(Dr.INVALID, null);
 }
 
 /** Applies a Net input to an existing target: INVALID keeps the existing value untouched. */
-static Long ks(String raw, Long existing) {
- Dn input = acv(raw);
- if (input.invalid()) return existing;
- return input.value;
+static Long ks(String /* raw */a, Long /* existing */b) {
+ Dn /* input */c = acv(a);
+ if (c.invalid()) return b;
+ return c.value;
 }
 
 /** Applies an Active-Time input to an existing target: INVALID keeps the existing value. */
-static Long lb(String raw, Long existing) {
- Dn input = ade(raw);
- if (input.invalid()) return existing;
- return input.value;
+static Long lb(String /* raw */a, Long /* existing */b) {
+ Dn /* input */c = ade(a);
+ if (c.invalid()) return b;
+ return c.value;
 }
 
 /** True when both fields are safe to apply (valid or deliberately blank). */
-static boolean vv(String netRaw, String timeRaw) {
- return !acv(netRaw).invalid() && !ade(timeRaw).invalid();
+static boolean vv(String /* netRaw */a, String /* timeRaw */b) {
+ return !acv(a).invalid() && !ade(b).invalid();
 }
 
 /** Derived pace over canonical facts; nothing here is booked or persisted. */
 @AllArgsConstructor
 static class Pace {
  /** True when a Pace question exists at all (at least one target). */
- final boolean present;
- final boolean available;
- final String line;
- final String second;
+ boolean present;
+ boolean available;
+ String line;
+ String second;
  /** No target at all: there is no Pace question to answer, so no row renders. */
  static Pace none() {
   return new Pace(false, false, "", null);
@@ -102,88 +102,88 @@ static class Pace {
 * C: both plus the required average. Unavailable evidence reads "Calculating…" instead of a
 * fabricated precision; estimates stay visually muted.
 */
-static Pace pace(Long netTargetGp, Long timeTargetMillis, long net,
-boolean rateEstablished, long gpPerHour, long activeMillis) {
- if (netTargetGp == null && timeTargetMillis == null) return Pace.none();
- if (!rateEstablished) return new Pace(true, false, "Calculating\u2026", null);
- if (netTargetGp != null && timeTargetMillis == null) {
-  if (net >= netTargetGp) return new Pace(true, true, "Target reached", null);
-  if (gpPerHour <= 0L) {
+static Pace pace(Long /* netTargetGp */a, Long /* timeTargetMillis */b, long /* net */c,
+boolean /* rateEstablished */d, long /* gpPerHour */e, long /* activeMillis */f) {
+ if (a == null && b == null) return Pace.none();
+ if (!d) return new Pace(true, false, "Calculating\u2026", null);
+ if (a != null && b == null) {
+  if (c >= a) return new Pace(true, true, "Target reached", null);
+  if (e <= 0L) {
    // The rate is established and genuinely non-positive: an ETA would be fabricated.
    return new Pace(true, true, "Not on pace", null);
   }
-  long minutes = nonNeg(round((netTargetGp - net) * 60d / gpPerHour));
-  return new Pace(true, true, "~" + rb(minutes) + " remaining", null);
+  long /* minutes */g = nonNeg(round((a - c) * 60d / e));
+  return new Pace(true, true, "~" + rb(g) + " remaining", null);
  }
- long remaining = nonNeg(timeTargetMillis - activeMillis);
- long projected = net + round(gpPerHour * (remaining / 3_600_000d));
- if (netTargetGp == null) {
-  return remaining <= 0L ? new Pace(true, true, "Time target reached", null) : new Pace(true, true,
-  "~" + signed(projected) + " projected Net", null);
+ long /* remaining */i = nonNeg(b - f);
+ long /* projected */j = c + round(e * (i / 3_600_000d));
+ if (a == null) {
+  return i <= 0L ? new Pace(true, true, "Time target reached", null) : new Pace(true, true,
+  "~" + signed(j) + " projected Net", null);
  }
- if (remaining <= 0L) {
+ if (i <= 0L) {
   return new Pace(true, true, "Time target reached", "Required average was "
-  + compact(agd(netTargetGp, net, activeMillis)) + "/h");
+  + compact(agd(a, c, f)) + "/h");
  }
- long required = agd(netTargetGp, net, timeTargetMillis);
- return new Pace(true, true, "~" + signed(projected) + " projected at " + rb(timeTargetMillis / 60_000L),
- "Required average " + compact(required) + "/h");
+ long /* required */k = agd(a, c, b);
+ return new Pace(true, true, "~" + signed(j) + " projected at " + rb(b / 60_000L),
+ "Required average " + compact(k) + "/h");
 }
 
-static long agd(long target, long net, long byMillis) {
- if (byMillis <= 0L) return 0L;
- return round(nonNeg(target - net) * 3_600_000d / byMillis);
+static long agd(long /* target */a, long /* net */b, long /* byMillis */c) {
+ if (c <= 0L) return 0L;
+ return round(nonNeg(a - b) * 3_600_000d / c);
 }
 
-static String rb(long minutes) {
- return minutes < 90L ? minutes + "m" : (minutes / 60L) + "h " + (minutes % 60L) + "m";
+static String rb(long /* minutes */a) {
+ return a < 90L ? a + "m" : (a / 60L) + "h " + (a % 60L) + "m";
 }
 
 /** One reusable definition plus its derived Last/Best subset from linked canonical history. */
 @AllArgsConstructor
 static class MyGrind {
- final SavedState.Ap definition;
- final int yk;
- final boolean hasLast;
- final long lastNet;
- final long lastStartedAt;
- final boolean hasBest;
- final long bestNet;
+ SavedState.Ap definition;
+ int yk;
+ boolean hasLast;
+ long lastNet;
+ long lastStartedAt;
+ boolean hasBest;
+ long bestNet;
 }
 
 /** One recent canonical instance, rendered with Grind language. */
 @AllArgsConstructor
 static class Recent {
- final String sessionId;
- final String name;
- final long startedAt;
- final long net;
- final long activeMillis;
- final String linkedGrindId;
+ String sessionId;
+ String name;
+ long startedAt;
+ long net;
+ long activeMillis;
+ String linkedGrindId;
 }
 
 /** One instance's detail: financial summary, targets and target outcome. */
 @AllArgsConstructor
 static class Detail {
- final String sessionId;
- final String name;
- final long startedAt;
- final long net;
- final long revenue;
- final long supplies;
- final long losses;
- final boolean splitAvailable;
- final long activeMillis;
- final long elapsedMillis;
- final boolean rateEstablished;
- final long gpPerHour;
- final Long netTargetGp;
- final Long activeTimeTargetMillis;
- final boolean closed;
- final boolean compacted;
- final String linkedGrindId;
+ String sessionId;
+ String name;
+ long startedAt;
+ long net;
+ long revenue;
+ long supplies;
+ long losses;
+ boolean splitAvailable;
+ long activeMillis;
+ long elapsedMillis;
+ boolean rateEstablished;
+ long gpPerHour;
+ Long netTargetGp;
+ Long activeTimeTargetMillis;
+ boolean closed;
+ boolean compacted;
+ String linkedGrindId;
  /** Derived recap/comparison/PB facts for a completed Grind; null while it is running. */
- final Ba history;
+ Ba history;
  /** Factual target outcome wording; never "Failed". */
  String aay() {
   return Ba.aay(netTargetGp, net, closed);
@@ -193,152 +193,153 @@ static class Detail {
  }
 }
 
-final boolean hasActive;
-final String activeName;
-final String activeSessionId;
-final long activeNet;
-final long activeGpPerHour;
-final boolean activeRateEstablished;
-final long activeMillis;
-final Long activeNetTarget;
-final Long activeTimeTarget;
-final String activeGrindId;
-final Pace activePace;
-final List<MyGrind> myGrinds;
-final List<Recent> recent;
-final ZoneId profileZone;
-final Detail detail;
-final AllTime allTime;
+boolean hasActive;
+String activeName;
+String activeSessionId;
+long activeNet;
+long activeGpPerHour;
+boolean activeRateEstablished;
+long activeMillis;
+Long activeNetTarget;
+Long activeTimeTarget;
+String activeGrindId;
+Pace activePace;
+List<MyGrind> myGrinds;
+List<Recent> recent;
+ZoneId profileZone;
+Detail detail;
+AllTime allTime;
 /** The All time card: every retained session (Free play included) from canonical metrics. */
 @AllArgsConstructor
 static class AllTime {
- final long net;
- final long activeMillis;
- final Long gpPerHour;
- final int grinds;
- final boolean splitAvailable;
- final long supplies;
- final long losses;
- final String bestNetName;
- final long bestNet;
- final String bestRateName;
- final long bestRate;
+ long net;
+ long activeMillis;
+ Long gpPerHour;
+ int grinds;
+ boolean splitAvailable;
+ long supplies;
+ long losses;
+ String bestNetName;
+ long bestNet;
+ String bestRateName;
+ long bestRate;
+ /** Bank (when last seen) plus what is carried now; -1 age until the bank has been opened. */
+ long wealth;
+ long bankAge;
+ long bank;
 }
 
-static AllTime allTime(Am engine, long now) {
- long net = 0L, active = 0L, supplies = 0L, losses = 0L, bestNet = 0L, bestRate = 0L;
- var grinds = new HashSet<String>();
- boolean split = true;
- String bestNetName = null;
- String bestRateName = null;
- var seen = new HashSet<String>();
- var sessions = new ArrayList<Ad>(engine.getHistory());
- sessions.add(engine.getActiveSession());
- sessions.add(engine.getGeneralSession());
- for (Ad session : sessions) {
-  if (session == null || !seen.add(session.getId())) continue;
-  var run = new Run(engine, session, now);
-  Bu metrics = run.retained ? run.metrics : session.metrics(now);
-  net = safeAdd(net, metrics.net);
-  active = safeAdd(active, metrics.elapsedMillis);
-  split &= metrics.costSplitAvailable;
-  supplies = safeAdd(supplies, metrics.suppliesCosts);
-  losses = safeAdd(losses, metrics.otherCosts);
-  if (session.getOwnerKind() == Bt.NAMED_SESSION) {
+static AllTime allTime(Am /* engine */a, long /* now */b) {
+ Sm z0 = a.summary();
+ long /* net */c = 0L, /* active */d = 0L, /* supplies */e = 0L, /* losses */f = 0L, /* bestNet */g = 0L, /* bestRate */h = 0L;
+ var /* grinds */i = new HashSet<String>();
+ boolean /* split */j = true;
+ String /* bestNetName */k = null;
+ String /* bestRateName */l = null;
+ var /* seen */m = new HashSet<String>();
+ var /* sessions */n = new ArrayList<Ad>(a.getHistory());
+ n.add(a.getActiveSession());
+ n.add(a.getGeneralSession());
+ for (Ad /* session */o : n) {
+  if (o == null || !m.add(o.getId())) continue;
+  var /* run */p = z0.run(a, o, b);
+  Bu /* metrics */q = p.retained ? p.metrics : z0.metrics(o, b);
+  c = safeAdd(c, q.net);
+  d = safeAdd(d, q.elapsedMillis);
+  j &= q.costSplitAvailable;
+  e = safeAdd(e, q.suppliesCosts);
+  f = safeAdd(f, q.otherCosts);
+  if (o.getOwnerKind() == Bt.NAMED_SESSION) {
    // Runs of one saved Grind count once; an unsaved Grind is its own name.
-   grinds.add(session.xf() ? session.getGrindId() : "name:" + session.getName());
+   i.add(o.xf() ? o.getGrindId() : "name:" + o.getName());
   }
-  if (!session.isClosed() || session.excludedFromAverages) continue;
-  if (bestNetName == null || run.net() > bestNet) {
-   bestNetName = session.getName();
-   bestNet = run.net();
+  if (!o.isClosed() || o.excludedFromAverages) continue;
+  if (k == null || p.net() > g) {
+   k = o.getName();
+   g = p.net();
   }
-  if (run.gpPerHour != null && (bestRateName == null || run.gpPerHour > bestRate)) {
-   bestRateName = session.getName();
-   bestRate = run.gpPerHour;
+  if (p.gpPerHour != null && (l == null || p.gpPerHour > h)) {
+   l = o.getName();
+   h = p.gpPerHour;
   }
  }
- return new AllTime(net, active, RateReadiness.wn(active)
- ? Ba.hourly(net, active) : null, grinds.size(), split, supplies, losses,
- bestNetName, bestNet, bestRateName, bestRate);
+ long /* wealth */r;
+ long /* bankAge */s;
+ long /* bank */t;
+ synchronized (a) {
+  t = a.bankValue;
+  r = safeAdd(a.bankValue, a.carriedValue);
+  s = a.bankAt == 0L ? -1L : b - a.bankAt;
+ }
+ return new AllTime(c, d, RateReadiness.wn(d)
+ ? Ba.hourly(c, d) : null, i.size(), j, e, f,
+ k, g, l, h, r, s, t);
 }
 
-static As capture(Am engine, long now, boolean includeArchived, String detailSessionId) {
- Ad active = engine.getActiveSession();
- boolean custom = engine.wb();
- long net = 0L;
- long rate = 0L;
- boolean rateEstablished = false;
- long activeMillis = 0L;
- Long netTarget = null;
- Long timeTarget = null;
- String activeName = "";
- String activeSessionId = "";
- String activeGrindId = "";
- if (active != null) {
-  Bu metrics = engine.getMetrics(now);
-  net = metrics.net;
-  rate = metrics.profitPerHour;
-  rateEstablished = RateReadiness.wn(metrics.elapsedMillis);
-  activeMillis = metrics.elapsedMillis;
-  netTarget = active.getProfitTargetGp();
-  timeTarget = active.getActiveTimeTargetMillis();
-  activeName = active.getName();
-  activeSessionId = active.getId();
-  activeGrindId = active.getGrindId();
+static As capture(Am /* engine */a, long /* now */b, boolean /* includeArchived */c, String /* detailSessionId */d) {
+ Sm z0 = a.summary();
+ Ad /* active */e = a.getActiveSession();
+ boolean /* custom */f = a.wb();
+ long /* net */g = 0L;
+ long /* rate */h = 0L;
+ boolean /* rateEstablished */i = false;
+ long /* activeMillis */j = 0L;
+ Long /* netTarget */k = null;
+ Long /* timeTarget */l = null;
+ String /* activeName */m = "";
+ String /* activeSessionId */n = "";
+ String /* activeGrindId */o = "";
+ if (e != null) {
+  Bu /* metrics */p = z0.metrics(a.getActiveSession(), b);
+  g = p.net;
+  h = p.profitPerHour;
+  i = RateReadiness.wn(p.elapsedMillis);
+  j = p.elapsedMillis;
+  k = e.getProfitTargetGp();
+  l = e.getActiveTimeTargetMillis();
+  m = e.getName();
+  n = e.getId();
+  o = e.getGrindId();
  }
- Pace pace = pace(netTarget, timeTarget, net, rateEstablished, rate, activeMillis);
- var myGrinds = new ArrayList<MyGrind>();
- for (SavedState.Ap definition : engine.getSavedGrinds(includeArchived)) {
-  List<Ad> yk = engine.pp(definition.getGrindId());
-  Ad last = null;
-  long best = Long.MIN_VALUE;
-  long lastNet = 0L;
-  for (Ad session : yk) {
-   long aqj = new Run(engine, session, now).net();
-   if (last == null || session.startedAtEpochMillis > last.startedAtEpochMillis) {
-    last = session;
-    lastNet = aqj;
-   }
-   best = max(best, aqj);
-  }
-  boolean avs = last != null;
-  myGrinds.add(new MyGrind(definition, yk.size(), avs, lastNet,
-  avs ? last.startedAtEpochMillis : 0L, avs, best == Long.MIN_VALUE ? 0L : best));
+ Pace /* pace */q = pace(k, l, g, i, h, j);
+ var /* myGrinds */r = new ArrayList<MyGrind>();
+ for (SavedState.Ap /* definition */s : a.getSavedGrinds(c)) {
+  Sm.G t = z0.g.get(s.getGrindId());
+  r.add(new MyGrind(s, t.count, t.has, t.last, t.at, t.has, t.best));
  }
- myGrinds.sort(Comparator.comparing((MyGrind grind) -> !grind.definition.favorite)
- .thenComparing(grind -> -grind.lastStartedAt)
- .thenComparing(grind -> grind.definition.getName(), String.CASE_INSENSITIVE_ORDER)
- .thenComparing(grind -> grind.definition.getGrindId()));
- var recent = new ArrayList<Recent>();
- for (Ad session : engine.getHistory()) {
-  if (session == null) continue;
-  Bu metrics = new Run(engine, session, now).metrics;
-  recent.add(new Recent(session.getId(), session.getName(), session.startedAtEpochMillis,
-  metrics.net, metrics.elapsedMillis, session.getGrindId()));
+ r.sort(Comparator.comparing((MyGrind /* grind */aa) -> !aa.definition.favorite)
+ .thenComparing(/* grind */ab -> -ab.lastStartedAt)
+ .thenComparing(/* grind */ac -> ac.definition.getName(), String.CASE_INSENSITIVE_ORDER)
+ .thenComparing(/* grind */ad -> ad.definition.getGrindId()));
+ var /* recent */ae = new ArrayList<Recent>();
+ for (Ad /* session */af : a.getHistory()) {
+  if (af == null) continue;
+  Bu /* metrics */ag = z0.run(a, af, b).metrics;
+  ae.add(new Recent(af.getId(), af.getName(), af.startedAtEpochMillis,
+  ag.net, ag.elapsedMillis, af.getGrindId()));
  }
- recent.sort(Comparator.comparingLong((Recent item) -> item.startedAt).reversed()
- .thenComparing(item -> item.sessionId));
- Detail detail = null;
- if (detailSessionId != null && !detailSessionId.isEmpty()) {
-  Ad selected = active != null && detailSessionId.equals(active.getId())
-  ? active : engine.ua(detailSessionId);
-  if (selected != null) {
-   boolean liveDetail = active != null && detailSessionId.equals(active.getId());
-   Bu metrics = liveDetail ? engine.getMetrics(now) : new Run(engine, selected, now).metrics;
-   String ask = selected.getGrindId();
-   detail = new Detail(selected.getId(), selected.getName(), selected.startedAtEpochMillis, metrics.net, metrics.revenue,
-   metrics.costSplitAvailable ? metrics.suppliesCosts : -1L, metrics.costSplitAvailable ? metrics.otherCosts : -1L,
-   metrics.costSplitAvailable, metrics.elapsedMillis, metrics.elapsedMillis,
-   RateReadiness.wn(metrics.elapsedMillis), Ba.hourly(metrics.net, metrics.elapsedMillis),
-   selected.getProfitTargetGp(), selected.getActiveTimeTargetMillis(),
-   selected.isClosed(), selected.tp() != 0L || selected.tn() != 0L, ask,
-   selected.isClosed() ? Ba.of(selected) : null);
+ ae.sort(Comparator.comparingLong((Recent /* item */ah) -> ah.startedAt).reversed()
+ .thenComparing(/* item */ai -> ai.sessionId));
+ Detail /* detail */aj = null;
+ if (d != null && !d.isEmpty()) {
+  Ad /* selected */ak = e != null && d.equals(e.getId())
+  ? e : a.ua(d);
+  if (ak != null) {
+   boolean /* liveDetail */al = e != null && d.equals(e.getId());
+   Bu /* metrics */am = al ? z0.metrics(a.getActiveSession(), b) : z0.run(a, ak, b).metrics;
+   String /* ask */an = ak.getGrindId();
+   aj = new Detail(ak.getId(), ak.getName(), ak.startedAtEpochMillis, am.net, am.revenue,
+   am.costSplitAvailable ? am.suppliesCosts : -1L, am.costSplitAvailable ? am.otherCosts : -1L,
+   am.costSplitAvailable, am.elapsedMillis, am.elapsedMillis,
+   RateReadiness.wn(am.elapsedMillis), Ba.hourly(am.net, am.elapsedMillis),
+   ak.getProfitTargetGp(), ak.getActiveTimeTargetMillis(),
+   ak.isClosed(), ak.tp() != 0L || ak.tn() != 0L, an,
+   ak.isClosed() ? z0.fact(ak).recap : null);
   }
  }
- ZoneId profileZone = engine.uf();
- return new As(active != null && custom, activeName, activeSessionId, net, rate,
- rateEstablished, activeMillis, netTarget, timeTarget, activeGrindId, pace, myGrinds,
- recent, profileZone, detail, allTime(engine, now));
+ ZoneId /* profileZone */ao = a.uf();
+ return new As(e != null && f, m, n, g, h,
+ i, j, k, l, o, q, r,
+ ae, ao, aj, allTime(a, b));
 }
 }

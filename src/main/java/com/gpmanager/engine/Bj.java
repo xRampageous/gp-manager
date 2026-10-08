@@ -14,7 +14,7 @@ import javax.inject.Singleton;
 */
 @Singleton
 class Bj {
-final Map<Integer, Snapshot> bySlot = new LinkedHashMap<>();
+Map<Integer, Snapshot> bySlot = new LinkedHashMap<>();
 boolean loginSeed;
 /** Begin a login/relogin baseline pass; all observations are suppressed until it is finished. */
 synchronized void lu() {
@@ -31,14 +31,14 @@ synchronized void tg() {
 * Observe one immutable slot snapshot. Repeated identical snapshots, a first empty slot and all
 * login-seed observations return an empty Optional.
 */
-synchronized Optional<Transition> observe(Snapshot current) {
- Objects.requireNonNull(current, "current");
- Snapshot previous = bySlot.put(current.slot, current);
- if (loginSeed || current.equals(previous) || current.state == GrandExchangeOfferState.EMPTY
- && (previous == null || previous.state == GrandExchangeOfferState.EMPTY)) {
+synchronized Optional<Transition> observe(Snapshot /* current */a) {
+ Objects.requireNonNull(a, "current");
+ Snapshot /* previous */b = bySlot.put(a.slot, a);
+ if (loginSeed || a.equals(b) || a.state == GrandExchangeOfferState.EMPTY
+ && (b == null || b.state == GrandExchangeOfferState.EMPTY)) {
   return Optional.empty();
  }
- return Optional.of(new Transition(previous, current));
+ return Optional.of(new Transition(b, a));
 }
 
 /**
@@ -50,44 +50,44 @@ synchronized Map<Integer, Snapshot> snapshots() {
 }
 
 /** The offer side a state belongs to; null for an empty slot. */
-static Aa.Side sideOf(GrandExchangeOfferState state) {
- return state == GrandExchangeOfferState.BUYING || state == GrandExchangeOfferState.BOUGHT
- || state == GrandExchangeOfferState.CANCELLED_BUY ? Aa.Side.BUY
- : state == GrandExchangeOfferState.SELLING || state == GrandExchangeOfferState.SOLD
- || state == GrandExchangeOfferState.CANCELLED_SELL ? Aa.Side.SELL : null;
+static Aa.Side sideOf(GrandExchangeOfferState /* state */a) {
+ return a == GrandExchangeOfferState.BUYING || a == GrandExchangeOfferState.BOUGHT
+ || a == GrandExchangeOfferState.CANCELLED_BUY ? Aa.Side.BUY
+ : a == GrandExchangeOfferState.SELLING || a == GrandExchangeOfferState.SOLD
+ || a == GrandExchangeOfferState.CANCELLED_SELL ? Aa.Side.SELL : null;
 }
 
-static boolean isActive(GrandExchangeOfferState state) {
- return state == GrandExchangeOfferState.BUYING || state == GrandExchangeOfferState.SELLING;
+static boolean isActive(GrandExchangeOfferState /* state */a) {
+ return a == GrandExchangeOfferState.BUYING || a == GrandExchangeOfferState.SELLING;
 }
 
-static boolean isTerminal(GrandExchangeOfferState state) {
- return sideOf(state) != null && !isActive(state);
+static boolean isTerminal(GrandExchangeOfferState /* state */a) {
+ return sideOf(a) != null && !isActive(a);
 }
 
 /** Immutable copy of the API fields used by the offer ledger. */
 @EqualsAndHashCode
 @AllArgsConstructor
 static class Snapshot {
- final int slot;
- final GrandExchangeOfferState state;
- final int itemId;
- final int totalQuantity;
+ int slot;
+ GrandExchangeOfferState state;
+ int itemId;
+ int totalQuantity;
  /** RuneLite's quantity bought or sold so far, copied from getQuantitySold(). */
- final int quantityTraded;
- final long price;
+ int quantityTraded;
+ long price;
  /** Raw getSpent() observation; the model does not assign sell-side or tax semantics. */
- final long spent;
- static Snapshot fromOffer(int slot, GrandExchangeOffer offer) {
-  return new Snapshot(slot, offer.getState(), offer.getItemId(), offer.getTotalQuantity(),
-  offer.getQuantitySold(), offer.getPrice(), offer.getSpent());
+ long spent;
+ static Snapshot fromOffer(int /* slot */b, GrandExchangeOffer /* offer */c) {
+  return new Snapshot(b, c.getState(), c.getItemId(), c.getTotalQuantity(),
+  c.getQuantitySold(), c.getPrice(), c.getSpent());
  }
 }
 
 /** One observed slot change: the previous snapshot (null when first seen) and the current one. */
 @AllArgsConstructor
 static class Transition {
- final Snapshot previous;
- final Snapshot current;
+ Snapshot previous;
+ Snapshot current;
 }
 }

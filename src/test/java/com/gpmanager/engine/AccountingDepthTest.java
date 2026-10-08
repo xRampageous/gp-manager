@@ -49,29 +49,29 @@ public class AccountingDepthTest
     @Test
     public void rewardChestsAndNeutralStorageAndCrates()
     {
-        assertTrue(RewardChestCatalogue.xn("Barrows chest"));
+        assertTrue(RewardChestCatalogue.a1("Barrows chest"));
         for (KeyChestCatalogue.Entry chest : KeyChestCatalogue.entries())
         {
-            assertTrue(chest.getChestName(), RewardChestCatalogue.xn(chest.getChestName()));
+            assertTrue(chest.getChestName(), RewardChestCatalogue.a1(chest.getChestName()));
         }
-        assertTrue(RewardChestCatalogue.xn("Corrupted Gauntlet"));
-        assertTrue(RewardChestCatalogue.xn("Tempoross"));
-        assertTrue(RewardChestCatalogue.xn("Wintertodt"));
-        assertTrue(RewardChestCatalogue.xn("Guardians of the Rift"));
-        assertFalse(RewardChestCatalogue.xn("Goblin"));
+        assertTrue(RewardChestCatalogue.a1("Corrupted Gauntlet"));
+        assertTrue(RewardChestCatalogue.a1("Tempoross"));
+        assertTrue(RewardChestCatalogue.a1("Wintertodt"));
+        assertTrue(RewardChestCatalogue.a1("Guardians of the Rift"));
+        assertFalse(RewardChestCatalogue.a1("Goblin"));
 
         assertEquals(NeutralStorageClassifier.Kind.SEED_VAULT,
-            NeutralStorageClassifier.classify("Seed vault"));
+            NeutralStorageClassifier.a1("Seed vault"));
         assertEquals(NeutralStorageClassifier.Kind.TOOL_LEPRECHAUN,
-            NeutralStorageClassifier.classify("Tool Leprechaun"));
+            NeutralStorageClassifier.a1("Tool Leprechaun"));
         assertEquals(NeutralStorageClassifier.Kind.MLM_HOPPER,
-            NeutralStorageClassifier.classify("Motherlode hopper"));
+            NeutralStorageClassifier.a1("Motherlode hopper"));
         assertEquals(NeutralStorageClassifier.Kind.NMZ_COFFER,
-            NeutralStorageClassifier.classify("NMZ coffer"));
+            NeutralStorageClassifier.a1("NMZ coffer"));
 
-        assertTrue(RewardChestCatalogue.xn("Bird house"));
-        assertTrue(RewardChestCatalogue.xn("Herbiboar"));
-        assertTrue(RewardChestCatalogue.xn("Giants' Foundry"));
+        assertTrue(RewardChestCatalogue.a1("Bird house"));
+        assertTrue(RewardChestCatalogue.a1("Herbiboar"));
+        assertTrue(RewardChestCatalogue.a1("Giants' Foundry"));
     }
 
     @Test
@@ -128,9 +128,9 @@ public class AccountingDepthTest
     public void lmsRaidGimNeutral()
     {
         assertEquals(MinigameTransferClassifier.Event.LMS_ENTER,
-            MinigameTransferClassifier.classify("LMS enter loadout"));
+            MinigameTransferClassifier.a1("LMS enter loadout"));
         assertEquals(MinigameTransferClassifier.Event.GIM_SHARED_DEPOSIT,
-            MinigameTransferClassifier.classify("GIM shared storage deposit"));
+            MinigameTransferClassifier.a1("GIM shared storage deposit"));
         assertTrue(MinigameTransferClassifier.xg(
             MinigameTransferClassifier.Event.RAID_BAG_CLEAR));
     }

@@ -73,7 +73,7 @@ void start() {
 * RuneLite plugin lifecycle callback. Identity work queued immediately
 * afterwards remains ordered behind this operation on the same executor.
 */
-void vr(Runnable initialization) {
+void vr(Runnable /* initialization */a) {
  synchronized (lifecycleExecutorLock) {
   // A plugin re-enable may arrive after the prior lifecycle fenced
   // this coordinator. Reopen only the lifecycle executor; writer
@@ -83,40 +83,40 @@ void vr(Runnable initialization) {
    lifecycleEpoch.incrementAndGet();
   }
  }
- final long epoch = lifecycleEpoch.get();
- ExecutorService executor = lifecycleExecutor();
- if (executor == null) {
+ long /* epoch */b = lifecycleEpoch.get();
+ ExecutorService /* executor */c = lifecycleExecutor();
+ if (c == null) {
   lifecycleInitializationFailed = true;
   return;
  }
  try {
-  executor.execute(() -> {
+  c.execute(() -> {
    try {
-    if (!lifecycleShutdown && epoch == lifecycleEpoch.get()) initialization.run();
-   } catch (RuntimeException ex) {
-    if (epoch == lifecycleEpoch.get()) lifecycleInitializationFailed = true;
-    log.warn(msg("t"), ex);
+    if (!lifecycleShutdown && b == lifecycleEpoch.get()) a.run();
+   } catch (RuntimeException /* ex */d) {
+    if (b == lifecycleEpoch.get()) lifecycleInitializationFailed = true;
+    log.warn(msg("t"), d);
    }
   });
- } catch (RuntimeException ex) {
+ } catch (RuntimeException /* ex */e) {
   lifecycleInitializationFailed = true;
-  log.warn(msg("f"), ex);
+  log.warn(msg("f"), e);
  }
 }
 
 TrackingIdentity resolveCurrentIdentity() {
  if (configManager == null) return null;
- String rsProfileKey = configManager.getRSProfileKey();
- long accountHash = TrackingIdentity.ACCOUNT_HASH_INVALID;
+ String /* rsProfileKey */a = configManager.getRSProfileKey();
+ long /* accountHash */b = TrackingIdentity.ACCOUNT_HASH_INVALID;
  if (client != null) {
   try {
-   accountHash = client.getAccountHash();
-  } catch (RuntimeException ex) {
+   b = client.getAccountHash();
+  } catch (RuntimeException /* ex */c) {
    // Client may not expose hash before login.
   }
  }
- if (rsProfileKey != null && !rsProfileKey.trim().isEmpty()) {
-  return new TrackingIdentity(rsProfileKey.trim(), accountHash);
+ if (a != null && !a.trim().isEmpty()) {
+  return new TrackingIdentity(a.trim(), b);
  }
  return null;
 }
@@ -126,62 +126,63 @@ TrackingIdentity resolveCurrentIdentity() {
 * account bind/load/flush on the lifecycle executor. The next game tick
 * consumes the ready transition after the worker has installed the scope.
 */
-void aje(BooleanSupplier persistHistory) {
- ajz(resolveCurrentIdentity(), persistHistory, false);
+void aje(BooleanSupplier /* persistHistory */a) {
+ ajz(resolveCurrentIdentity(), a, false);
 }
 
 /** Seam for deterministic lifecycle tests and explicit profile events. */
-void ajz(TrackingIdentity next, boolean persistHistory) {
- ajz(next, () -> persistHistory, true);
+void ajz(TrackingIdentity /* next */a, boolean /* persistHistory */b) {
+ ajz(a, () -> b, true);
 }
 
-void ajz(TrackingIdentity next, BooleanSupplier persistHistory, boolean capturePreviousOnCaller) {
- agw(persistHistory, capturePreviousOnCaller, "identity switch",
- persist -> ajy(next, persist, false));
+void ajz(TrackingIdentity /* next */a, BooleanSupplier /* persistHistory */b, boolean /* capturePreviousOnCaller */c) {
+ agw(b, c, "identity switch",
+ /* persist */d -> ajy(a, d, false));
 }
 
 /**
 * One lifecycle job on the executor: capture the old owner's latest state (on the caller when
 * asked, else on the worker), run the job unless shut down, then publish whether it is ready.
 */
-void agw(BooleanSupplier persistHistory, boolean capturePreviousOnCaller, String what,
-Predicate<Boolean> job) {
- final long request = lifecycleRequest.incrementAndGet();
+void agw(BooleanSupplier /* persistHistory */a, boolean /* capturePreviousOnCaller */b, String /* what */c,
+Predicate<Boolean> /* job */d) {
+ long /* request */e = lifecycleRequest.incrementAndGet();
+ eo(nextHash(), e);
  synchronized (this) {
   if (lifecycleShutdown) return;
   // Capture the old owner's latest state before the worker can enter
   // its disk wait. A pending earlier lifecycle operation has already
   // made the same capture at its boundary.
-  if (capturePreviousOnCaller && !lifecyclePending && activeIdentity != null && persistHistory.getAsBoolean()) {
+  if (b && !lifecyclePending && activeIdentity != null && a.getAsBoolean()) {
    ahe();
   }
   lifecyclePending = true;
   identityReadyTransition.set(false);
  }
- ExecutorService executor = lifecycleExecutor();
- if (executor == null) {
-  sz(request, false);
+ ExecutorService /* executor */f = lifecycleExecutor();
+ if (f == null) {
+  sz(e, false);
   return;
  }
  try {
-  executor.execute(() -> {
-   boolean ready = false;
+  f.execute(() -> {
+   boolean /* ready */g = false;
    try {
-    boolean persist = persistHistory.getAsBoolean();
-    if (!capturePreviousOnCaller) {
+    boolean /* persist */h = a.getAsBoolean();
+    if (!b) {
      synchronized (this) {
-      if (!lifecycleShutdown && activeIdentity != null && persist) ahf();
+      if (!lifecycleShutdown && activeIdentity != null && h) ahf();
      }
     }
-    if (!lifecycleShutdown) ready = job.test(persist);
-   } catch (RuntimeException ex) {
-    log.warn("Unable to complete GP Manager " + what, ex);
+    if (!lifecycleShutdown) g = d.test(h);
+   } catch (RuntimeException /* ex */i) {
+    log.warn(msg("b5") + c, i);
    }
-   sz(request, ready);
+   sz(e, g);
   });
- } catch (RuntimeException ex) {
-  log.warn("Unable to schedule GP Manager " + what, ex);
-  sz(request, false);
+ } catch (RuntimeException /* ex */j) {
+  log.warn(msg("b4") + c, j);
+  sz(e, false);
  }
 }
 
@@ -195,11 +196,11 @@ ExecutorService lifecycleExecutor() {
  }
 }
 
-void sz(long request, boolean ready) {
+void sz(long /* request */a, boolean /* ready */b) {
  if (lifecycleShutdown && shutdownSnapshotPending) sq();
- if (request != lifecycleRequest.get()) return;
+ if (a != lifecycleRequest.get()) return;
  lifecyclePending = false;
- if (ready && !lifecycleShutdown) identityReadyTransition.set(true);
+ if (b && !lifecycleShutdown) identityReadyTransition.set(true);
 }
 
 /** True once for the client tick that may resume ingestion after an async bind. */
@@ -212,68 +213,75 @@ boolean py() {
 * prior identity remains bound. Failed flush/save refuses the switch and
 * preserves the previous account's in-memory state.
 */
-synchronized boolean ajy(TrackingIdentity next, boolean persistHistory) {
- return ajy(next, persistHistory, true);
+synchronized boolean ajy(TrackingIdentity /* next */a, boolean /* persistHistory */b) {
+ return ajy(a, b, true);
 }
 
-synchronized boolean ajy(TrackingIdentity next, boolean persistHistory, boolean capturePrevious) {
- if (next == null) return activeIdentity != null;
- if (next.equals(activeIdentity)) return true;
- if (lifecycleShutdown && !capturePrevious) return false;
- if (activeIdentity != null && persistHistory) {
-  if (capturePrevious) ahe();
+synchronized boolean ajy(TrackingIdentity /* next */a, boolean /* persistHistory */b, boolean /* capturePrevious */c) {
+ if (a == null) return activeIdentity != null;
+ if (a.equals(activeIdentity)) return true;
+ if (c) eo(a.accountHash, lifecycleRequest.incrementAndGet());
+ if (lifecycleShutdown && !c) return false;
+ if (activeIdentity != null && b) {
+  if (c) ahe();
   if (!th(Duration.ofSeconds(5))) {
    log.warn(msg("ig"));
    return false;
   }
-  Ci status = writer.getStatus();
-  if (status.auq() || status.state == Ci.State.CONFLICT) {
-   log.warn(msg("ih"), status.detail);
+  Ci /* status */d = writer.getStatus();
+  if (d.auq() || d.state == Ci.State.CONFLICT) {
+   log.warn(msg("ih"), d.detail);
    return false;
   }
  }
- TrackingIdentity previous = activeIdentity;
- long apo = writer.tk();
- long previousNextRevision = nextRevision;
- activeIdentity = next;
+ TrackingIdentity /* previous */e = activeIdentity;
+ long /* apo */f = writer.tk();
+ long /* previousNextRevision */g = nextRevision;
+ activeIdentity = a;
  try {
-  repository.mc(next);
-  if (persistHistory) {
-   SavedState loaded = yq(next);
-   if (lifecycleShutdown && !capturePrevious) {
-    awz(previous, apo, previousNextRevision);
-    return false;
-   }
-   writer.aft(loaded.revision);
-   nextRevision = max(loaded.revision + 1L, 1L);
-   engine.agl(next.rsProfileKey, loaded, System.currentTimeMillis());
-  } else {
-   writer.aft(0L);
-   nextRevision = 1L;
-   engine.agl(next.rsProfileKey, new SavedState(), System.currentTimeMillis());
+  repository.mc(a);
+  SavedState h = b ? yq(a) : new SavedState();
+  if (b && lifecycleShutdown && !c) {
+   awz(e, f, g);
+   return false;
   }
- } catch (RuntimeException ex) {
-  awz(previous, apo, previousNextRevision);
-  log.warn(msg("ii"), ex);
+  writer.aft(h.revision);
+  nextRevision = max(h.revision + 1L, 1L);
+  engine.agl(a.rsProfileKey, h, Ae.now());
+ } catch (RuntimeException /* ex */i) {
+  awz(e, f, g);
+  log.warn(msg("ii"), i);
   return false;
  }
- if (previous == null || !previous.equals(next)) engine.lp();
+ eo(a.accountHash, lifecycleRequest.get());
+ if (e == null || !e.equals(a)) engine.lp();
  return true;
 }
 
 /** A refused switch leaves the previous account bound exactly as it was. */
-void awz(TrackingIdentity previous, long appliedRevision, long previousNextRevision) {
- if (previous == null) repository.akn();
- else repository.mc(previous);
- activeIdentity = previous;
- writer.aft(appliedRevision);
- nextRevision = previousNextRevision;
+void awz(TrackingIdentity /* previous */a, long /* appliedRevision */b, long /* previousNextRevision */c) {
+ if (a == null) repository.akn();
+ else repository.mc(a);
+ activeIdentity = a;
+ writer.aft(b);
+ nextRevision = c;
 }
 
-void onLogout(boolean persistHistory) {
- if (lifecyclePending) return;
+/** Fence evidence with the same generation already used to reject stale lifecycle completions. */
+void eo() { eo(nextHash(), lifecycleRequest.incrementAndGet()); }
+long nextHash() { return client == null ? (activeIdentity == null ? -1L : activeIdentity.accountHash) : client.getAccountHash(); }
+void eo(long /* hash */a, long /* generation */b) { if (engine != null) engine.eb.owner(a * 1_000L + b); }
+
+void onLogout(boolean /* persistHistory */a) {
+ if (lifecyclePending) {
+  // A logout advances the existing request generation too. Publish its completion after
+  // the earlier bind, so discarding that stale completion cannot leave ingestion fenced.
+  agw(() -> a, false, "logout", /* persist */b -> false);
+  return;
+ }
+ eo();
  synchronized (this) {
-  if (!lifecyclePending && activeIdentity != null && persistHistory) ahf();
+  if (!lifecyclePending && activeIdentity != null && a) ahf();
  }
 }
 
@@ -281,15 +289,15 @@ void onLogout(boolean persistHistory) {
 * Account-hash invalidation is a lifecycle event; its save/load work stays off the callback, and
 * the setting is read after queued startup configuration migration completes.
 */
-void acc(BooleanSupplier persistHistory) {
- agw(persistHistory, false, "account clear", persist -> {
-  acd(persist);
+void acc(BooleanSupplier /* persistHistory */a) {
+ agw(a, false, "account clear", /* persist */b -> {
+  acd(b);
   return false;
  });
 }
 
-synchronized void acd(boolean persistHistory) {
- if (activeIdentity != null && persistHistory) {
+synchronized void acd(boolean /* persistHistory */a) {
+ if (activeIdentity != null && a) {
   ahf();
   if (!th(Duration.ofSeconds(5))) log.warn(msg("ij"));
   if (lifecycleShutdown) return;
@@ -299,7 +307,7 @@ synchronized void acd(boolean persistHistory) {
  repository.akn();
  writer.aft(0L);
  nextRevision = 1L;
- engine.agl(null, new SavedState(), System.currentTimeMillis());
+ engine.agl(null, new SavedState(), Ae.now());
 }
 
 void ahe() {
@@ -307,7 +315,7 @@ void ahe() {
 }
 
 /** {@code quick}: a gameplay save, which may reuse unchanged closed sessions' JSON. */
-void ahe(boolean quick) {
+void ahe(boolean /* quick */b) {
  // A lifecycle worker may hold this monitor while it waits for a disk
  // flush or loads the next account scope. Gameplay ingestion is already
  // fenced at this point, so a callback request must return without
@@ -315,7 +323,7 @@ void ahe(boolean quick) {
  // explicit snapshot path.
  if (lifecyclePending) return;
  synchronized (this) {
-  if (!lifecyclePending) ahf(quick);
+  if (!lifecyclePending) ahf(b);
  }
 }
 
@@ -324,19 +332,19 @@ void ahf() {
  ahf(false);
 }
 
-void ahf(boolean quick) {
- Cs intent = qn(quick);
- if (intent == null) return;
- writer.submit(intent);
+void ahf(boolean /* quick */a) {
+ Cs /* intent */b = qn(a);
+ if (b == null) return;
+ writer.submit(b);
 }
 
 synchronized boolean aya() {
- Cs intent = qn();
- if (intent == null) return false;
- writer.submit(intent);
+ Cs /* intent */a = qn();
+ if (a == null) return false;
+ writer.submit(a);
  if (!writer.flush(Duration.ofSeconds(5))) return false;
- Ci status = writer.getStatus();
- return status != null && !status.auq() && status.state != Ci.State.CONFLICT;
+ Ci /* status */b = writer.getStatus();
+ return b != null && !b.auq() && b.state != Ci.State.CONFLICT;
 }
 
 /** In-memory persistence health for a restrained panel warning; performs no file I/O. */
@@ -352,14 +360,14 @@ String ahx() {
 /** Outcome of a reset; the pre-reset backup path is set only when the reset was applied. */
 static class Ds {
  @Getter
- final boolean applied;
+ boolean applied;
  @Getter
- final String detail;
- final Filepath preResetBackup;
- Ds(boolean applied, String detail, Filepath preResetBackup) {
-  this.applied = applied;
-  this.detail = Ag.axw(detail);
-  this.preResetBackup = preResetBackup;
+ String detail;
+ Filepath preResetBackup;
+ Ds(boolean /* applied */b, String /* detail */c, Filepath /* preResetBackup */d) {
+  this.applied = b;
+  this.detail = Ag.axw(c);
+  this.preResetBackup = d;
  }
  public Filepath getPreResetBackup() { return preResetBackup; }
 }
@@ -372,89 +380,126 @@ static class Ds {
 * client advances the account first, the reset is refused (never rebased) and the in-memory
 * profile is restored, so the user can re-run it against the newer state if they still want to.
 */
-synchronized Ds sj(long now) {
- String scope = ahx();
- if (scope != null) return new Ds(false, scope, null);
+synchronized Ds sj(long /* now */a) {
+ String /* scope */b = ahx();
+ if (b != null) return new Ds(false, b, null);
  maintenance = true;
  try {
-  return afz(now, null);
+  return afz(a, null);
  } finally {
   maintenance = false;
  }
 }
 
 /** Restores one of this account's backups; the current state is backed up first. */
-synchronized Ds agm(Filepath file, long now) {
- String scope = ahx();
- if (scope != null) return new Ds(false, scope, null);
+synchronized Ds agm(Filepath /* file */a, long /* now */b) {
+ String /* scope */c = ahx();
+ if (c != null) return new Ds(false, c, null);
  maintenance = true;
  try {
-  return afz(now, SessionRepository.adc(JsonCodec.gson(),
-  new JsonParser().parse(SessionRepository.awy(file))));
- } catch (IOException | RuntimeException ex) {
-  return new Ds(false, "Backup could not be read: " + ex.getMessage(), null);
+  return afz(b, SessionRepository.r1(JsonCodec.gson(), a));
+ } catch (IOException | RuntimeException /* ex */d) {
+  return new Ds(false, msg("b3") + d.getMessage(), null);
  } finally {
   maintenance = false;
  }
 }
 
 /** Commits a fresh owner ({@code from} null: factory reset) or a restored backup, or rolls back. */
-Ds afz(long now, SavedState from) {
+Ds afz(long /* now */a, SavedState /* from */b) {
  if (!aya()) return new Ds(false, msg("y"), null);
- if (from != null && !from.ye()) {
+ if (b != null && !b.ye()) {
   // The same schema gate as startup: an incompatible backup is never interpreted
   // and rewritten as the current schema (owner 2026-10-01).
-  return new Ds(false, msg("im") + from.schemaVersion + msg("ax"), null);
+  return new Ds(false, msg("im") + b.schemaVersion + msg("ax"), null);
  }
- Filepath backup = null;
- if (from != null) {
-  try {
-   backup = akt(now);
-  } catch (IOException | RuntimeException ex) {
-   return new Ds(false, "Pre-restore backup failed: " + ex.getMessage(), null);
-  }
+ Filepath /* backup */c = null;
+ SavedState /* protected state */h;
+ try {
+  Filepath i = b == null ? b1(a) : (c = akt(a));
+  h = SessionRepository.r1(JsonCodec.gson(), i);
+ } catch (IOException | RuntimeException /* ex */d) {
+  return new Ds(false, msg("b2") + d.getMessage(), null);
  }
- SavedState before = snapshot();
- if (from == null) engine.agr(now);
- else engine.agl(activeIdentity.rsProfileKey, from, now);
- Bm outcome = agc();
- if (!outcome.isCommitted()) {
-  engine.agl(activeIdentity.rsProfileKey, before, now);
-  String why = outcome.kind == Bm.Kind.CONFLICT ? msg("hb") + " " : "";
+ SavedState /* before */e;
+ synchronized (engine) {
+  // Sidebar edits use the engine lock, but are not ingestion. Refuse a stale safety copy
+  // before replacing data, with check/snapshot/mutation atomic and all file IO outside.
+  if (!b2(engine.sl()).equals(b2(h))) return new Ds(false,
+  (b == null ? "Factory reset" : "Restore") + " was not applied: data changed while the safety copy was prepared; retry.", c);
+  e = snapshot();
+  eo();
+  if (b == null) engine.agr(a);
+  else engine.agl(activeIdentity.rsProfileKey, b, a);
+ }
+ Bm /* outcome */f = agc();
+ if (!f.isCommitted()) {
+  engine.agl(activeIdentity.rsProfileKey, e, a);
+  String /* why */g = f.kind == Bm.Kind.CONFLICT ? msg("hb") + " " : "";
   // Owner 2026-10-01 (F25): the shared outcome names the operation that was refused.
-  return new Ds(false, (from == null ? "Factory reset" : "Restore")
-  + " was not applied: " + why + outcome.message + (from == null ? "" : msg("cq")), backup);
+  return new Ds(false, (b == null ? "Factory reset" : "Restore")
+  + " was not applied: " + g + f.message + (b == null ? "" : msg("cq")), c);
  }
  engine.lp();
- return new Ds(true, msg("bp"), backup);
+ return new Ds(true, msg("bp"), c);
 }
 
 /**
 * A copy of the bound account's save in backups/, named account-time and re-read to prove it is
 * intact; only this account's newest 10 are kept.
 */
-Filepath akt(long now) throws IOException {
+Filepath akt(long /* now */a) throws IOException {
  synchronized (backupLock) {
-  return aktLocked(now);
+  return aktLocked(a);
  }
 }
 
-private Filepath aktLocked(long now) throws IOException {
+/**
+* Validated reset safety copy. Reuse this account's matching export, including an explicit
+* Back up first copy; compare every durable fact, ignoring only the root save-time/revision.
+* Corrupt, incompatible or different-owner copies never qualify. Failure refuses the reset.
+* The existing backup lock and coordinator maintenance fence keep capture/reuse ordered.
+*/
+Filepath b1(long a) throws IOException {
+ synchronized (backupLock) {
+  com.google.gson.JsonObject b;
+  synchronized (engine) { b = b2(engine.sl()); }
+  for (Filepath c : backups()) {
+   try {
+    SavedState d = SessionRepository.r1(JsonCodec.gson(), c);
+    if (d.ye() && b.equals(b2(d))) return c;
+   } catch (IOException | RuntimeException e) {
+    // Preserve unreadable exports; secure a new copy before changing the account.
+   }
+  }
+  return aktLocked(a);
+ }
+}
+
+/** Complete backup content with only root bookkeeping headers excluded from equality. */
+static com.google.gson.JsonObject b2(SavedState a) {
+ com.google.gson.JsonObject b = JsonCodec.gson().toJsonTree(a).getAsJsonObject();
+ b.remove("savedAtEpochMillis");
+ b.remove("revision");
+ return b;
+}
+
+private Filepath aktLocked(long /* now */a) throws IOException {
  repository.backupDirectory.createDirectories();
- String name = account() + "-" + java.time.format.DateTimeFormatter.ofPattern("yyyyMMdd-HHmmss").withZone(ZoneId.systemDefault())
- .format(Instant.ofEpochMilli(now));
- Filepath file = repository.backupDirectory.joinSegment(name + ".json");
- for (int n = 2; file.exists() && n < 1_000; n++) {
-  file = repository.backupDirectory.joinSegment(name + "-" + n + ".json");
+ String /* name */b = account() + "-" + java.time.format.DateTimeFormatter.ofPattern("yyyyMMdd-HHmmss").withZone(ZoneId.systemDefault())
+ .format(Instant.ofEpochMilli(a));
+ Filepath /* file */c = repository.backupDirectory.joinSegment(b + ".json");
+ for (int n = 2; c.exists() && n < 1_000; n++) {
+  c = repository.backupDirectory.joinSegment(b + "-" + n + ".json");
  }
- String json;
+ String /* json */d;
  synchronized (engine) {
-  json = JsonCodec.gson().toJson(engine.sl());
+  d = JsonCodec.gson().toJson(engine.sl());
  }
- file.write(json, StandardOpenOption.CREATE, StandardOpenOption.TRUNCATE_EXISTING, StandardOpenOption.WRITE);
- SessionRepository.adc(JsonCodec.gson(), new JsonParser().parse(SessionRepository.awy(file)));
+ c.write(d, StandardOpenOption.CREATE, StandardOpenOption.TRUNCATE_EXISTING, StandardOpenOption.WRITE);
+ SessionRepository.r1(JsonCodec.gson(), c);
  adz(10);
- return file;
+ return c;
 }
 
 String account() {
@@ -464,22 +509,22 @@ String account() {
 /** This account's backups, newest first. */
 java.util.List<Filepath> backups() throws IOException {
  if (!repository.backupDirectory.exists()) return new java.util.ArrayList<>();
- try (var files = repository.backupDirectory.walk(1)) {
-  return files.filter(f -> f.isFile() && f.getFileName().startsWith(account() + "-"))
+ try (var /* files */a = repository.backupDirectory.walk(1)) {
+  return a.filter(f -> f.isFile() && f.getFileName().startsWith(account() + "-"))
   .sorted(java.util.Comparator.reverseOrder()).collect(java.util.stream.Collectors.toList());
  }
 }
 
 /** Deletes all but this account's newest {@code keep} backups; returns how many went. */
-int adz(int keep) throws IOException {
- java.util.List<Filepath> all = backups();
- for (Filepath old : all.subList(min(keep, all.size()), all.size())) old.deleteIfExists();
- return max(0, all.size() - keep);
+int adz(int /* keep */a) throws IOException {
+ java.util.List<Filepath> /* all */b = backups();
+ for (Filepath /* old */c : b.subList(min(a, b.size()), b.size())) c.deleteIfExists();
+ return max(0, b.size() - a);
 }
 
 synchronized boolean wv() {
- TrackingIdentity current = resolveCurrentIdentity();
- return current != null && current.equals(activeIdentity);
+ TrackingIdentity /* current */a = resolveCurrentIdentity();
+ return a != null && a.equals(activeIdentity);
 }
 
 /**
@@ -498,28 +543,28 @@ boolean isTrackingReady() {
 }
 
 synchronized Bm agc() {
- Cs intent = qn();
- if (intent == null) return Bm.failedUnchanged(msg("ci"));
- return writer.aic(intent);
+ Cs /* intent */a = qn();
+ if (a == null) return Bm.failedUnchanged(msg("ci"));
+ return writer.aic(a);
 }
 
-synchronized boolean th(Duration timeout) {
- return writer.flush(timeout);
+synchronized boolean th(Duration /* timeout */a) {
+ return writer.flush(a);
 }
 
-void shutdown(boolean persistHistory) {
- boolean asj = lifecyclePending;
+void shutdown(boolean /* persistHistory */b) {
+ boolean /* asj */c = lifecyclePending;
  lifecycleShutdown = true;
  lifecycleEpoch.incrementAndGet();
- lifecycleRequest.incrementAndGet();
+ eo();
  lifecyclePending = false;
  identityReadyTransition.set(false);
- shutdownPersistHistory = persistHistory;
+ shutdownPersistHistory = b;
  // If a lifecycle worker is already fencing an owner, it captured that
  // owner's state before entering its disk wait. Keep the worker alive so
  // it can take one final post-shutdown snapshot after that wait returns;
  // the lifecycle callback itself still never waits for the worker.
- if (asj) {
+ if (c) {
   shutdownSnapshotPending = true;
   synchronized (lifecycleExecutorLock) {
    if (lifecycleExecutor == null || lifecycleExecutor.isShutdown()) sq();
@@ -527,7 +572,7 @@ void shutdown(boolean persistHistory) {
   }
   return;
  }
- if (persistHistory && repository.isBound()) ahe();
+ if (b && repository.isBound()) ahe();
  writer.shutdown(Duration.ofSeconds(5));
  synchronized (lifecycleExecutorLock) {
   if (lifecycleExecutor != null) lifecycleExecutor.shutdown();
@@ -540,8 +585,8 @@ void sq() {
  shutdownSnapshotPending = false;
  try {
   if (shutdownPersistHistory && repository.isBound()) ahe();
- } catch (RuntimeException ex) {
-  log.warn(msg("il"), ex);
+ } catch (RuntimeException /* ex */a) {
+  log.warn(msg("il"), a);
  } finally {
   writer.shutdown(Duration.ofSeconds(5));
   synchronized (lifecycleExecutorLock) {
@@ -554,15 +599,15 @@ void sq() {
 * Loads the bound scope. Any schema other than 1.0's is left exactly as it is and makes the
 * scope read-only; it is never rewritten.
 */
-SavedState yq(TrackingIdentity identity) {
+SavedState yq(TrackingIdentity /* identity */a) {
  readOnlyReason = null;
- SavedState loaded = repository.load();
- if (!loaded.ye()) {
-  readOnlyReason = msg("im") + loaded.schemaVersion + msg("ax");
+ SavedState /* loaded */b = repository.load();
+ if (!b.ye()) {
+  readOnlyReason = msg("im") + b.schemaVersion + msg("ax");
   log.warn(readOnlyReason);
   return new SavedState();
  }
- return loaded;
+ return b;
 }
 
 /**
@@ -571,44 +616,44 @@ SavedState yq(TrackingIdentity identity) {
 * A save {@code header}'s revision and savedAt, and the bound owner, are stamped on the fresh
 * container first, so this one pass is the payload; the schema is the new container's current one.
 */
-String aiw(SavedState header, boolean quick) {
+String aiw(SavedState /* header */b, boolean /* quick */c) {
  synchronized (engine) {
-  SavedState state = engine.qm();
-  if (header != null) {
-   state.setRevision(header.revision);
-   state.setSavedAtEpochMillis(header.savedAtEpochMillis);
-   if (activeIdentity != null) state.setOwnerKey(activeIdentity.rsProfileKey);
+  SavedState /* state */d = engine.qm();
+  if (b != null) {
+   d.setRevision(b.revision);
+   d.setSavedAtEpochMillis(b.savedAtEpochMillis);
+   if (activeIdentity != null) d.setOwnerKey(activeIdentity.rsProfileKey);
   }
   // History is most of the save and closed sessions rarely change: each session is written on
   // its own and spliced into the same bytes one toJson would give; a quick save reuses the
   // JSON of a closed session whose saveStamp has not moved since.
-  var gson = repository.gson;
-  var history = state.history;
-  state.history = new java.util.ArrayList<>();
-  String rest = gson.toJson(state);
-  String hole = "\"generalSuspendedByCustom\":" + state.generalSuspendedByCustom + ",\"history\":[";
-  int at = rest.indexOf(hole) + hole.length();
-  if (at < hole.length() || rest.charAt(at) != ']') {
-   state.history = history;
-   return gson.toJson(state);
+  var /* gson */e = repository.gson;
+  var /* history */f = d.history;
+  d.history = new java.util.ArrayList<>();
+  String /* rest */g = e.toJson(d);
+  String /* hole */h = "\"generalSuspendedByCustom\":" + d.generalSuspendedByCustom + ",\"history\":[";
+  int /* at */i = g.indexOf(h) + h.length();
+  if (i < h.length() || g.charAt(i) != ']') {
+   d.history = f;
+   return e.toJson(d);
   }
-  var json = new StringBuilder(rest.length() + closedJsonChars + 4_096).append(rest, 0, at);
-  var next = new java.util.IdentityHashMap<Ad, Object[]>();
-  long chars = 0;
-  for (Ad session : history) {
-   if (json.length() > at) json.append(',');
-   Object[] cached = session == null ? null : closedJson.get(session);
-   String one = quick && cached != null && (long) cached[0] == session.saveStamp ? (String) cached[1]
-   : gson.toJson(session);
-   if (session != null && session.isClosed()) {
-    next.put(session, new Object[] {session.saveStamp, one});
-    chars += one.length();
+  var /* json */j = new StringBuilder(g.length() + closedJsonChars + 4_096).append(g, 0, i);
+  var /* next */k = new java.util.IdentityHashMap<Ad, Object[]>();
+  long /* chars */l = 0;
+  for (Ad /* session */m : f) {
+   if (j.length() > i) j.append(',');
+   Object[] /* cached */n = m == null ? null : closedJson.get(m);
+   String /* one */o = c && n != null && (long) n[0] == m.saveStamp ? (String) n[1]
+   : e.toJson(m);
+   if (m != null && m.isClosed()) {
+    k.put(m, new Object[] {m.saveStamp, o});
+    l += o.length();
    }
-   json.append(one);
+   j.append(o);
   }
-  closedJson = next;
-  closedJsonChars = (int) min(chars, 1 << 28);
-  return json.append(rest, at, rest.length()).toString();
+  closedJson = k;
+  closedJsonChars = (int) min(l, 1 << 28);
+  return j.append(g, i, g.length()).toString();
  }
 }
 
@@ -627,17 +672,17 @@ Cs qn() {
  return qn(false);
 }
 
-Cs qn(boolean quick) {
+Cs qn(boolean /* quick */b) {
  if (!repository.isBound() || readOnlyReason != null || writer.vw(repository.scopeGeneration)) {
   return null;
  }
  // Prefer the writer's verified lineage when a prior save is still
  // updating disk lastKnown — avoids queuing another base-N snapshot.
- long anl = max(repository.lastKnownDiskRevision, writer.tk());
- var header = new SavedState();
- header.setRevision(max(nextRevision, anl + 1L));
- nextRevision = header.revision + 1L;
- header.setSavedAtEpochMillis(System.currentTimeMillis());
- return new Cs(activeIdentity, repository.scopeGeneration, anl, header, aiw(header, quick && ++quickSaves % 10 != 0));
+ long /* anl */c = max(repository.lastKnownDiskRevision, writer.tk());
+ var /* header */d = new SavedState();
+ d.setRevision(max(nextRevision, c + 1L));
+ nextRevision = d.revision + 1L;
+ d.setSavedAtEpochMillis(Ae.now());
+ return new Cs(activeIdentity, repository.scopeGeneration, c, d, aiw(d, b && ++quickSaves % 10 != 0));
 }
 }

@@ -36,7 +36,7 @@ static final int[] KEY_CONTAINER_IDS = {
  InventoryID.DEADMAN_LOOT_INV0, InventoryID.DEADMAN_LOOT_INV1, InventoryID.DEADMAN_LOOT_INV2,
  InventoryID.DEADMAN_LOOT_INV3, InventoryID.DEADMAN_LOOT_INV4};
 static final String LOOT_KEY_NOTE = msg("dj");
-final List<By> claims = new ArrayList<>();
+List<By> claims = new ArrayList<>();
 /** The chest object click, armed for a few ticks. */
 Eg open;
 /** A key loss seen while armed whose contents have not settled yet. */
@@ -44,15 +44,15 @@ Eg used;
 Map<Integer, Long> localDeathKeys;
 int localDeathTicks;
 boolean lootChestVisible;
-final Map<Integer, Map<Integer, Long>> observedKeyContainerContents = new HashMap<>();
+Map<Integer, Map<Integer, Long>> observedKeyContainerContents = new HashMap<>();
 /** Contents removed from each loot key's chest container, kept for a few ticks as claim evidence. */
-final Map<Integer, Removed> removedByKey = new HashMap<>();
+Map<Integer, Removed> removedByKey = new HashMap<>();
 /** A chest opened with one key type: the key, how many were used and the chest's name. */
 @AllArgsConstructor
 static class Eg {
- final int keyItemId;
- final long quantity;
- final String chestName;
+ int keyItemId;
+ long quantity;
+ String chestName;
  @Getter(AccessLevel.NONE)
  int ticks;
 }
@@ -69,32 +69,32 @@ void clear() {
 }
 
 /** Restores the persisted claims and drops any already settled by a retained transaction. */
-void restore(SavedState state, List<Ad> sessions) {
+void restore(SavedState /* state */a, List<Ad> /* sessions */b) {
  claims.clear();
- var settled = new HashSet<String>();
- for (Ad session : sessions) {
-  for (Ac transaction : session == null ? Collections.<Ac>emptyList() : session.getTransactions()) {
-   if (transaction != null && !transaction.uo().isEmpty()) {
-    settled.add(transaction.uo());
+ var /* settled */c = new HashSet<String>();
+ for (Ad /* session */d : b) {
+  for (Ac /* transaction */e : d == null ? Collections.<Ac>emptyList() : d.getTransactions()) {
+   if (e != null && !e.uo().isEmpty()) {
+    c.add(e.uo());
    }
   }
  }
- var seen = new HashSet<String>();
- for (By claim : state.getPendingClaims()) {
-  if (claim != null && claim.isValid() && seen.add(claim.getClaimId()) && !settled.contains(claim.getClaimId())) {
-   claims.add(claim);
+ var /* seen */f = new HashSet<String>();
+ for (By /* claim */g : a.getPendingClaims()) {
+  if (g != null && g.isValid() && f.add(g.getClaimId()) && !c.contains(g.getClaimId())) {
+   claims.add(g);
   }
  }
  sort();
 }
 
-void auc(Da staged) {
+void auc(Da /* staged */a) {
  claims.clear();
- claims.addAll(staged.claims);
+ claims.addAll(a.claims);
 }
 
-void ayc(SavedState state) {
- state.setPendingClaims(new ArrayList<>(claims));
+void ayc(SavedState /* state */a) {
+ a.setPendingClaims(new ArrayList<>(claims));
 }
 
 List<By> all() {
@@ -102,9 +102,9 @@ List<By> all() {
 }
 
 /** Opens a claim keyed by the audit row's id; a second open with the same id is ignored. */
-void open(String claimId, int keyItemId, long quantity, long now) {
- if (empty(claimId) || keyItemId <= 0 || quantity <= 0L || indexOf(claimId) >= 0) return;
- claims.add(new By(claimId, keyItemId, quantity, now));
+void open(String /* claimId */a, int /* keyItemId */b, long /* quantity */c, long /* now */d) {
+ if (empty(a) || b <= 0 || c <= 0L || indexOf(a) >= 0) return;
+ claims.add(new By(a, b, c, d));
  sort();
 }
 
@@ -112,43 +112,43 @@ void open(String claimId, int keyItemId, long quantity, long now) {
 * Applies a settlement or death loss of {@code quantity} keys to the oldest claims for the key.
 * Returns the id of the last claim it touched when that claim closed; null otherwise.
 */
-String consume(int keyItemId, long quantity) {
- String closed = null;
- long remaining = nonNeg(quantity);
- for (int index = 0; index < claims.size() && remaining > 0L; index++) {
-  By claim = claims.get(index);
-  if (claim.itemOrKeyId != keyItemId) continue;
-  long applied = min(remaining, claim.getQuantity());
-  remaining -= applied;
-  closed = reduce(index, applied) ? claim.getClaimId() : null;
-  index -= closed == null ? 0 : 1;
+String consume(int /* keyItemId */a, long /* quantity */b) {
+ String /* closed */c = null;
+ long /* remaining */d = nonNeg(b);
+ for (int /* index */e = 0; e < claims.size() && d > 0L; e++) {
+  By /* claim */f = claims.get(e);
+  if (f.itemOrKeyId != a) continue;
+  long /* applied */g = min(d, f.getQuantity());
+  d -= g;
+  c = reduce(e, g) ? f.getClaimId() : null;
+  e -= c == null ? 0 : 1;
  }
- return closed;
+ return c;
 }
 
 /** Settles one specific claim by {@code quantity}; returns its id when it closed. */
-String settle(String claimId, long quantity) {
- int index = indexOf(claimId);
- boolean closed = index >= 0 && reduce(index, nonNeg(quantity));
+String settle(String /* claimId */a, long /* quantity */b) {
+ int /* index */c = indexOf(a);
+ boolean /* closed */d = c >= 0 && reduce(c, nonNeg(b));
  sort();
- return closed ? claimId : null;
+ return d ? a : null;
 }
 
 /** Shrinks the claim at {@code index}; true when it reached zero and was removed. */
-boolean reduce(int index, long quantity) {
- By claim = claims.get(index);
- long left = claim.getQuantity() - quantity;
- if (left > 0L) {
-  claims.set(index, new By(claim.getClaimId(), claim.itemOrKeyId, left, claim.getCreatedAtEpochMillis()));
+boolean reduce(int /* index */a, long /* quantity */b) {
+ By /* claim */c = claims.get(a);
+ long /* left */d = c.getQuantity() - b;
+ if (d > 0L) {
+  claims.set(a, new By(c.getClaimId(), c.itemOrKeyId, d, c.getCreatedAtEpochMillis()));
   return false;
  }
- claims.remove(index);
+ claims.remove(a);
  return true;
 }
 
-int indexOf(String claimId) {
- for (int index = 0; index < claims.size(); index++) {
-  if (claims.get(index).getClaimId().equals(claimId)) return index;
+int indexOf(String /* claimId */a) {
+ for (int /* index */b = 0; b < claims.size(); b++) {
+  if (claims.get(b).getClaimId().equals(a)) return b;
  }
  return -1;
 }
@@ -173,14 +173,14 @@ void tick() {
  open = open == null || --open.ticks <= 0 ? null : open;
  used = used == null || --used.ticks <= 0 ? null : used;
  if (localDeathTicks > 0 && --localDeathTicks == 0) localDeathKeys = null;
- removedByKey.values().removeIf(removed -> --removed.ticks <= 0);
+ removedByKey.values().removeIf(/* removed */a -> --a.ticks <= 0);
 }
 
 /** Arms (or disarms) ordinary key-chest provenance from an actual chest object click. */
-boolean qo(String option, String target) {
- KeyChestCatalogue.Entry entry = KeyChestCatalogue.rv(option, target);
+boolean qo(String /* option */a, String /* target */b) {
+ KeyChestCatalogue.Entry /* entry */c = KeyChestCatalogue.rv(a, b);
  used = null;
- open = entry == null ? null : new Eg(entry.getKeyItemId(), 0L, entry.getChestName(), OPEN_WINDOW_TICKS);
+ open = c == null ? null : new Eg(c.keyItemId, 0L, c.chestName, OPEN_WINDOW_TICKS);
  return open != null;
 }
 
@@ -193,62 +193,62 @@ void nk() {
 * Correlate a settled key loss with settled positive inventory contents. A click alone is never
 * a claim, and ambiguous keys with multiple chest types require the observed object name.
 */
-Eg aaj(Map<Integer, Long> keyLosses, Map<Integer, Long> positiveContents, String sourceBackedActivity) {
- boolean sourced = sourceBackedActivity != null && !sourceBackedActivity.trim().isEmpty();
- Map<Integer, Long> losses = positiveEntries(keyLosses);
- if (empty(positiveContents)) {
-  if (sourced) {
+Eg aaj(Map<Integer, Long> /* keyLosses */b, Map<Integer, Long> /* positiveContents */c, String /* sourceBackedActivity */d) {
+ boolean /* sourced */e = d != null && !d.trim().isEmpty();
+ Map<Integer, Long> /* losses */f = positiveEntries(b);
+ if (empty(c)) {
+  if (e) {
    nk();
-  } else if (open != null && losses.size() == 1 && losses.containsKey(open.keyItemId)) {
+  } else if (open != null && f.size() == 1 && f.containsKey(open.keyItemId)) {
    // The key left before its contents: remember the use for a few ticks.
-   used = new Eg(open.keyItemId, losses.get(open.keyItemId), open.chestName, OPEN_WINDOW_TICKS);
+   used = new Eg(open.keyItemId, f.get(open.keyItemId), open.chestName, OPEN_WINDOW_TICKS);
    open = null;
   }
   return null;
  }
- int keyId = -1;
- long quantity = 0L;
- String chestName = null;
- if (!losses.isEmpty()) {
-  Eg armed = open != null ? open : used;
-  Map.Entry<Integer, Long> loss = losses.entrySet().iterator().next();
-  if (losses.size() != 1 || armed != null && armed.keyItemId != loss.getKey()) {
+ int /* keyId */g = -1;
+ long /* quantity */h = 0L;
+ String /* chestName */i = null;
+ if (!f.isEmpty()) {
+  Eg /* armed */j = open != null ? open : used;
+  Map.Entry<Integer, Long> /* loss */k = f.entrySet().iterator().next();
+  if (f.size() != 1 || j != null && j.keyItemId != k.getKey()) {
    nk();
    return null;
   }
-  keyId = loss.getKey();
-  quantity = loss.getValue();
-  List<KeyChestCatalogue.Entry> entries = KeyChestCatalogue.rs(keyId);
-  chestName = open != null && open.keyItemId == keyId ? open.chestName
-  : entries.size() == 1 ? entries.get(0).getChestName() : null;
+  g = k.getKey();
+  h = k.getValue();
+  List<KeyChestCatalogue.Entry> /* entries */l = KeyChestCatalogue.rs(g);
+  i = open != null && open.keyItemId == g ? open.chestName
+  : l.size() == 1 ? l.get(0).chestName : null;
   used = null;
  } else if (used != null) {
-  keyId = used.keyItemId;
-  quantity = used.quantity;
-  chestName = used.chestName;
+  g = used.keyItemId;
+  h = used.quantity;
+  i = used.chestName;
   used = null;
  }
- if (keyId < 0 || quantity <= 0L || chestName == null) {
+ if (g < 0 || h <= 0L || i == null) {
   // Do not let an uncorroborated gain leave an object click armed to
   // relabel a later, unrelated key loss and contents change.
   open = null;
   return null;
  }
- KeyChestCatalogue.Entry aqn = sourced ? KeyChestCatalogue.rp(sourceBackedActivity) : null;
- if (sourced && (aqn == null || !chestName.equalsIgnoreCase(aqn.getChestName()))) {
+ KeyChestCatalogue.Entry /* aqn */m = e ? KeyChestCatalogue.rp(d) : null;
+ if (e && (m == null || !i.equalsIgnoreCase(m.chestName))) {
   nk();
   return null;
  }
- if (open != null && open.keyItemId == keyId && open.chestName != null && !open.chestName.equalsIgnoreCase(chestName)) {
+ if (open != null && open.keyItemId == g && open.chestName != null && !open.chestName.equalsIgnoreCase(i)) {
   return null;
  }
  nk();
- return new Eg(keyId, quantity, chestName, 0);
+ return new Eg(g, h, i, 0);
 }
 
-void ly(Map<Integer, Long> keyInventory) {
- Map<Integer, Long> keys = keyQuantities(keyInventory);
- localDeathKeys = keys.isEmpty() ? null : keys;
+void ly(Map<Integer, Long> /* keyInventory */a) {
+ Map<Integer, Long> /* keys */b = keyQuantities(a);
+ localDeathKeys = b.isEmpty() ? null : b;
  localDeathTicks = localDeathKeys == null ? 0 : DEATH_WINDOW_TICKS;
 }
 
@@ -256,28 +256,28 @@ boolean vo() {
  return localDeathKeys != null && localDeathTicks > 0;
 }
 
-void setLootChestVisible(boolean visible) {
- if (lootChestVisible && !visible) {
+void setLootChestVisible(boolean /* visible */b) {
+ if (lootChestVisible && !b) {
   // Reopening a key UI starts a fresh container-delta baseline. A
   // short, already-observed claim delta may still settle afterward.
   observedKeyContainerContents.clear();
  }
- lootChestVisible = visible;
+ lootChestVisible = b;
 }
 
 /**
 * Observe one loot key's server-owned contents while its interface is visible. Only removals
 * from this container can correlate settled INV gains to a claim.
 */
-void abq(int keyItemId, Map<Integer, Long> contents) {
- int aoq = yc(keyItemId);
- if (!lootChestVisible || aoq < 0 || contents == null) return;
- Map<Integer, Long> next = positiveEntries(contents);
- Map<Integer, Long> removed = minus(observedKeyContainerContents.put(aoq, next), next);
- if (!removed.isEmpty()) {
-  Removed evidence = removedByKey.computeIfAbsent(aoq, key -> new Removed(new HashMap<>(), 0));
-  removed.forEach((itemId, quantity) -> evidence.contents.merge(itemId, quantity, Ae::safeAdd));
-  evidence.ticks = CLAIM_EVIDENCE_TICKS;
+void abq(int /* keyItemId */a, Map<Integer, Long> /* contents */b) {
+ int /* aoq */c = yc(a);
+ if (!lootChestVisible || c < 0 || b == null) return;
+ Map<Integer, Long> /* next */d = positiveEntries(b);
+ Map<Integer, Long> /* removed */e = minus(observedKeyContainerContents.put(c, d), d);
+ if (!e.isEmpty()) {
+  Removed /* evidence */f = removedByKey.computeIfAbsent(c, /* key */g -> new Removed(new HashMap<>(), 0));
+  e.forEach((/* itemId */h, /* quantity */i) -> f.contents.merge(h, i, Ae::safeAdd));
+  f.ticks = CLAIM_EVIDENCE_TICKS;
  }
 }
 
@@ -288,58 +288,58 @@ void abq(int keyItemId, Map<Integer, Long> contents) {
 * unit even when the key-loss callback arrived separately. Returns the claim id when it
 * closed. Descriptive: never alters the settling transaction's type, valuation or flows.
 */
-String aiq(Map<Integer, Long> settledPositiveFlows, Map<Integer, Long> settledKeyLosses) {
- if (empty(settledPositiveFlows)) return null;
- By match = null;
- int ami = -1;
- for (Map.Entry<Integer, Removed> evidence : removedByKey.entrySet()) {
-  By claim = covers(evidence.getValue().contents, settledPositiveFlows)
-  ? akp(yb(evidence.getKey())) : null;
-  if (claim != null && claim.getQuantity() > 0L) {
-   if (match != null) return null;
-   match = claim;
-   ami = evidence.getKey();
+String aiq(Map<Integer, Long> /* settledPositiveFlows */a, Map<Integer, Long> /* settledKeyLosses */b) {
+ if (empty(a)) return null;
+ By /* match */c = null;
+ int /* ami */d = -1;
+ for (Map.Entry<Integer, Removed> /* evidence */e : removedByKey.entrySet()) {
+  By /* claim */f = covers(e.getValue().contents, a)
+  ? akp(yb(e.getKey())) : null;
+  if (f != null && f.getQuantity() > 0L) {
+   if (c != null) return null;
+   c = f;
+   d = e.getKey();
   }
  }
- if (match == null) return null;
- long anr = settledKeyLosses == null ? 0L : settledKeyLosses.getOrDefault(yb(ami), 0L);
- Removed evidence = removedByKey.get(ami);
- evidence.contents = minus(evidence.contents, settledPositiveFlows);
- evidence.ticks = CLAIM_EVIDENCE_TICKS;
- if (evidence.contents.isEmpty()) removedByKey.remove(ami);
- return settle(match.getClaimId(), evidence.contents.isEmpty() && anr <= 0L ? 1L : anr);
+ if (c == null) return null;
+ long /* anr */g = b == null ? 0L : b.getOrDefault(yb(d), 0L);
+ Removed /* evidence */h = removedByKey.get(d);
+ h.contents = minus(h.contents, a);
+ h.ticks = CLAIM_EVIDENCE_TICKS;
+ if (h.contents.isEmpty()) removedByKey.remove(d);
+ return settle(c.getClaimId(), h.contents.isEmpty() && g <= 0L ? 1L : g);
 }
 
 /** The one unresolved claim for this key item when exactly one exists; null otherwise. */
-By akp(int keyItemId) {
- By match = null;
- for (By claim : claims) {
-  if (claim.itemOrKeyId != keyItemId) continue;
-  if (match != null) return null;
-  match = claim;
+By akp(int /* keyItemId */a) {
+ By /* match */b = null;
+ for (By /* claim */c : claims) {
+  if (c.itemOrKeyId != a) continue;
+  if (b != null) return null;
+  b = c;
  }
- return match;
+ return b;
 }
 
 /**
 * Closes pending loot-key claims only for key units that disappeared from INV in a local-death
 * settlement, measured against the death snapshot.
 */
-void aet(List<Ab> settledFlows, Map<Integer, Long> currentKeyInventory) {
+void aet(List<Ab> /* settledFlows */b, Map<Integer, Long> /* currentKeyInventory */c) {
  if (!vo()) return;
- Map<Integer, Long> flowLosses = lossQuantities(settledFlows, Da::xa);
- Map<Integer, Long> gone = minus(localDeathKeys, keyQuantities(currentKeyInventory));
- for (int keyItemId : KEY_ITEM_IDS) {
-  long pendingKeys = 0L;
-  for (By claim : claims) pendingKeys += claim.itemOrKeyId == keyItemId ? claim.getQuantity() : 0L;
-  long amj = min(pendingKeys, min(gone.getOrDefault(keyItemId, 0L), flowLosses.getOrDefault(keyItemId, 0L)));
-  if (amj > 0L) {
-   consume(keyItemId, amj);
+ Map<Integer, Long> /* flowLosses */d = lossQuantities(b, Da::xa);
+ Map<Integer, Long> /* gone */e = minus(localDeathKeys, keyQuantities(c));
+ for (int /* keyItemId */f : KEY_ITEM_IDS) {
+  long /* pendingKeys */g = 0L;
+  for (By /* claim */h : claims) g += h.itemOrKeyId == f ? h.getQuantity() : 0L;
+  long /* amj */i = min(g, min(e.getOrDefault(f, 0L), d.getOrDefault(f, 0L)));
+  if (i > 0L) {
+   consume(f, i);
    // Inventory/equipment changes can stabilize in separate batches after a death.
    // Keep the bounded snapshot until each confirmed key loss is consumed or the
    // game-tick window expires; an unrelated first batch must not make a later
    // key-loss flow look like an ordinary cost.
-   take(localDeathKeys, keyItemId, amj);
+   take(localDeathKeys, f, i);
   }
  }
  if (localDeathKeys.isEmpty()) {
@@ -349,46 +349,46 @@ void aet(List<Ab> settledFlows, Map<Integer, Long> currentKeyInventory) {
 }
 
 // -- Key identity --
-static boolean xa(int itemId) {
- return yc(itemId) >= 0;
+static boolean xa(int /* itemId */a) {
+ return yc(a) >= 0;
 }
 
-static int yc(int itemId) {
- for (int index = 0; index < KEY_ITEM_IDS.length; index++) {
-  if (KEY_ITEM_IDS[index] == itemId) return index;
+static int yc(int /* itemId */a) {
+ for (int /* index */b = 0; b < KEY_ITEM_IDS.length; b++) {
+  if (KEY_ITEM_IDS[b] == a) return b;
  }
  return -1;
 }
 
-static int yb(int index) {
- return index < 0 || index >= KEY_ITEM_IDS.length ? -1 : KEY_ITEM_IDS[index];
+static int yb(int /* index */a) {
+ return a < 0 || a >= KEY_ITEM_IDS.length ? -1 : KEY_ITEM_IDS[a];
 }
 
-static int ya(int index) {
- return index < 0 || index >= KEY_CONTAINER_IDS.length ? -1 : KEY_CONTAINER_IDS[index];
+static int ya(int /* index */a) {
+ return a < 0 || a >= KEY_CONTAINER_IDS.length ? -1 : KEY_CONTAINER_IDS[a];
 }
 
 /** Positive item quantities in a container, skipping items {@code skip} rejects (nested crates). */
-static Map<Integer, Long> manifestFromContainer(ItemContainer container, IntPredicate skip) {
+static Map<Integer, Long> manifestFromContainer(ItemContainer /* container */b, IntPredicate /* skip */c) {
  // Refuse an incomplete evidence policy rather than accidentally valuing a
  // nested crate as if its unopened contents were already manifest items.
- var manifest = new LinkedHashMap<Integer, Long>();
- if (container == null || container.getItems() == null || skip == null) return emptyMap();
- for (Item item : container.getItems()) {
-  if (item != null && item.getId() >= 0 && item.getQuantity() > 0 && !skip.test(item.getId())) {
-   manifest.merge(item.getId(), (long) item.getQuantity(), Ae::safeAdd);
+ var /* manifest */d = new LinkedHashMap<Integer, Long>();
+ if (b == null || b.getItems() == null || c == null) return emptyMap();
+ for (Item /* item */e : b.getItems()) {
+  if (e != null && e.getId() >= 0 && e.getQuantity() > 0 && !c.test(e.getId())) {
+   d.merge(e.getId(), (long) e.getQuantity(), Ae::safeAdd);
   }
  }
- return unmodifiableMap(manifest);
+ return unmodifiableMap(d);
 }
 
-static Map<Integer, Long> keyQuantities(ItemContainer inventory) {
- return manifestFromContainer(inventory, itemId -> !xa(itemId));
+static Map<Integer, Long> keyQuantities(ItemContainer /* inventory */a) {
+ return manifestFromContainer(a, /* itemId */b -> !xa(b));
 }
 
-static Map<Integer, Long> keyQuantities(Map<Integer, Long> quantities) {
- Map<Integer, Long> keys = positiveEntries(quantities);
- keys.keySet().removeIf(itemId -> !xa(itemId));
- return keys;
+static Map<Integer, Long> keyQuantities(Map<Integer, Long> /* quantities */a) {
+ Map<Integer, Long> /* keys */b = positiveEntries(a);
+ b.keySet().removeIf(/* itemId */c -> !xa(c));
+ return b;
 }
 }

@@ -176,7 +176,7 @@ public class LedgerGroupReceiptNavigationTest
         assertTrue("the trade count replaces resource-type noise: " + texts,
             texts.stream().anyMatch(text -> text.startsWith("1 trade \u00b7 Latest ")));
         assertTrue(texts.stream().noneMatch(text -> text.contains("0 resource types")));
-        assertTrue(texts.stream().anyMatch(text -> text.startsWith("RECEIPTS")));
+        assertTrue(texts.stream().anyMatch(text -> text.startsWith("ENTRIES")));
     }
 
     @Test
@@ -208,9 +208,9 @@ public class LedgerGroupReceiptNavigationTest
         List<String> texts = LedgerPageProbe.detailTexts(page);
         List<String> rows = LedgerPageProbe.detailReceiptRowTexts(page);
         assertTrue("action groups count their receipts: " + texts,
-            texts.stream().anyMatch(text -> text.startsWith("1 receipt · Latest ")));
+            texts.stream().anyMatch(text -> text.startsWith("1 entry · Latest ")));
         assertTrue("the receipt section renders (" + group.primaryName + " market=" + group.market
-            + " rows=" + rows + "): " + texts, texts.stream().anyMatch(text -> text.startsWith("RECEIPTS")));
+            + " rows=" + rows + "): " + texts, texts.stream().anyMatch(text -> text.startsWith("ENTRIES")));
     }
 
     @Test
@@ -231,7 +231,7 @@ public class LedgerGroupReceiptNavigationTest
         assertNotNull(group);
         LedgerPage page = page(captureWithGroup(market, group.semanticGroupId));
         assertTrue(LedgerPageProbe.detailReceiptRowTexts(page).isEmpty());
-        assertTrue(LedgerPageProbe.detailTexts(page).stream().anyMatch(text -> text.contains("No collected receipts yet")));
+        assertTrue(LedgerPageProbe.detailTexts(page).stream().anyMatch(text -> text.contains("No collected entries yet")));
         List<String> texts = LedgerPageProbe.detailTexts(page);
         assertTrue("no trade count is invented before collection: " + texts,
             texts.stream().noneMatch(text -> text.contains("1 trade")));

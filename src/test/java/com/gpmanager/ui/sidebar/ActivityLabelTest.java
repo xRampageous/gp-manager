@@ -13,45 +13,45 @@ public class ActivityLabelTest
     @Test
     public void theNamedRunAlwaysSpeaks()
     {
-        assertEquals("Vorkath", ActivityLabel.resolve(true, "Woodcutting", "Vorkath", true, false));
-        assertEquals("Vorkath", ActivityLabel.resolve(false, "Theatre of Blood (Hard Mode)", "Vorkath", true, false));
+        assertEquals("Vorkath", ActivityLabel.d1(true, "Woodcutting", "Vorkath", true, false));
+        assertEquals("Vorkath", ActivityLabel.d1(false, "Theatre of Blood (Hard Mode)", "Vorkath", true, false));
     }
 
     @Test
     public void freePlayShowsANamedActivity()
     {
-        assertEquals("Woodcutting", ActivityLabel.resolve(false, "Woodcutting", "Overall", true, true));
+        assertEquals("Woodcutting", ActivityLabel.d1(false, "Woodcutting", "Overall", true, true));
         assertEquals("a pickpocket target is no fight", "Thieving",
-            ActivityLabel.resolve(true, "Thieving", "Overall", true, true));
+            ActivityLabel.d1(true, "Thieving", "Overall", true, true));
         assertEquals("Seers' Village Rooftop",
-            ActivityLabel.resolve(false, "Seers' Village Rooftop", "Overall", true, true));
-        assertEquals("PKing", ActivityLabel.resolve(true, "PKing", "Overall", true, true));
+            ActivityLabel.d1(false, "Seers' Village Rooftop", "Overall", true, true));
+        assertEquals("PKing", ActivityLabel.d1(true, "PKing", "Overall", true, true));
     }
 
     @Test
     public void raidsKeepTheirCuratedName()
     {
         assertEquals("ToB (HM)",
-            ActivityLabel.resolve(true, "Theatre of Blood (Hard Mode)", "Overall", true, true));
+            ActivityLabel.d1(true, "Theatre of Blood (Hard Mode)", "Overall", true, true));
         assertEquals("CoX (CM)",
-            ActivityLabel.resolve(true, "Chambers of Xeric (Challenge Mode)", "Overall", false, false));
+            ActivityLabel.d1(true, "Chambers of Xeric (Challenge Mode)", "Overall", false, false));
     }
 
     @Test
     public void fightsAndNpcLootReadCombat()
     {
-        assertEquals("Combat", ActivityLabel.resolve(true, "", "Overall", true, true));
+        assertEquals("Combat", ActivityLabel.d1(true, "", "Overall", true, true));
         assertEquals("an NPC's loot never names it", "Combat",
-            ActivityLabel.resolve(false, "Greater Nechryael", "Overall", true, true));
+            ActivityLabel.d1(false, "Greater Nechryael", "Overall", true, true));
         assertEquals("a 1.0 save's Hitpoints hint", "Combat",
-            ActivityLabel.resolve(false, "Hitpoints", "Overall", true, true));
+            ActivityLabel.d1(false, "Hitpoints", "Overall", true, true));
     }
 
     @Test
     public void placeholdersNeverSurface()
     {
-        assertEquals("free play shows nothing", "", ActivityLabel.resolve(false, "", "Overall", true, true));
-        assertEquals("", ActivityLabel.resolve(false, "General", "Vorkath", false, false));
-        assertEquals("", ActivityLabel.resolve(false, "NPC loot", "Overall", true, true));
+        assertEquals("free play shows nothing", "", ActivityLabel.d1(false, "", "Overall", true, true));
+        assertEquals("", ActivityLabel.d1(false, "General", "Vorkath", false, false));
+        assertEquals("", ActivityLabel.d1(false, "NPC loot", "Overall", true, true));
     }
 }

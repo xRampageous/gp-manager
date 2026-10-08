@@ -19,17 +19,17 @@ class Table extends JPanel {
 /** One row. Equality covers what is drawn, so an unchanged page is not rebuilt. */
 @EqualsAndHashCode(exclude = {"open", "menu"})
 static class Row {
- final String key;
- final Icon icon;
- final String name;
- final String qty;
- final String value;
- final Kit.Tone tone;
- final String tip;
- final String exact;
- final boolean selected;
- final Runnable open;
- final List<Menu> menu;
+ String key;
+ Icon icon;
+ String name;
+ String qty;
+ String value;
+ Kit.Tone tone;
+ String tip;
+ String exact;
+ boolean selected;
+ Runnable open;
+ List<Menu> menu;
  Row(String key, Icon icon, String name, String qty, String value, Kit.Tone tone,
  String tip, String exact, boolean selected, Runnable open, List<Menu> menu) {
   this.key = axw(key);
@@ -52,24 +52,24 @@ static class Row {
 /** A right-click menu entry. */
 @AllArgsConstructor
 static class Menu {
- final String label;
- final Runnable action;
+ String label;
+ Runnable action;
 }
 
-final JPanel header = new JPanel(new BorderLayout(GAP, 0));
-final JLabel chevron = label("▾", small(), LABEL);
-final JLabel title = label("", small(), LABEL);
-final JLabel total = label("", small(), LABEL);
-final JButton previous = acq("‹");
-final JButton next = acq("›");
-final JLabel pageLabel = label("", small(), LABEL);
+JPanel header = new JPanel(new BorderLayout(GAP, 0));
+JLabel chevron = label("▾", small(), LABEL);
+JLabel title = label("", small(), LABEL);
+JLabel total = label("", small(), LABEL);
+JButton previous = acq("‹");
+JButton next = acq("›");
+JLabel pageLabel = label("", small(), LABEL);
 /** One row, centred on the title's line so "‹ 1/2 ›" sits level with it. */
-final JPanel right = new JPanel(new GridBagLayout());
-final JPanel body = stack(CARD, 0);
+JPanel right = new JPanel(new GridBagLayout());
+JPanel body = stack(CARD, 0);
 JComponent extra;
 /** A small control beside the title, such as the Losses view picker (owner 1.1). */
 JComponent picker;
-final JPanel left = new JPanel(new FlowLayout(FlowLayout.LEFT, 4, 4));
+JPanel left = new JPanel(new FlowLayout(FlowLayout.LEFT, 4, 4));
 JComponent action;
 List<Row> rows = emptyList();
 List<Row> drawn = null;
@@ -256,6 +256,11 @@ Table setRows(List<Row> value) {
  return this;
 }
 
+/** A counted page table title; empty lists keep the original bare title. */
+Table r1(String a, List<Row> b) {
+ return setTitle(b.isEmpty() ? a : a + " · " + b.size()).setRows(b);
+}
+
 void avd() {
  axa(0);
 }
@@ -265,20 +270,18 @@ int pages() {
 }
 
 static int pages(int count, int perPage) {
- return max(1, (count + perPage - 1) / perPage);
+ return Kit.p1(count, perPage);
 }
 
 void axa(int requested) {
- page = max(0, min(requested, pages() - 1));
+ page = Kit.p2(requested, pages());
  int from = page * rowsPerPage;
  List<Row> visible = rows.subList(min(from, rows.size()), min(from + rowsPerPage, rows.size()));
  if (!visible.equals(drawn)) {
   drawn = new ArrayList<>(visible);
   body.removeAll();
   if (visible.isEmpty()) {
-   JLabel empty = label(emptyText, small(), LABEL);
-   pad(empty, 3, 6, 3, 6);
-   body.add(empty);
+   body.add(Kit.e1(emptyText));
   }
   int avf = avf();
   // The quantity column is as wide as this page's widest quantity, so names keep the rest.
@@ -302,9 +305,7 @@ void adx() {
  if (action != null) {
   right.add(action);
  } else if (!folded && !rows.isEmpty()) {
-  pageLabel.setText((page + 1) + "/" + pages());
-  previous.setEnabled(page > 0);
-  next.setEnabled(page < pages() - 1);
+  Kit.p3(pageLabel, previous, next, page, pages(), (page + 1) + "/" + pages());
   right.add(previous);
   right.add(pageLabel);
   right.add(next);
@@ -349,13 +350,7 @@ static JComponent ahj(Row row, int height, int qtyWidth) {
   });
  }
  if (!row.menu.isEmpty()) {
-  var popup = new JPopupMenu();
-  for (Menu entry : row.menu) {
-   var item = new JMenuItem(entry.label);
-   item.addActionListener(e -> entry.action.run());
-   popup.add(item);
-  }
-  line.setComponentPopupMenu(popup);
+  line.setComponentPopupMenu(Kit.m1(row.menu));
  }
  return line;
 }

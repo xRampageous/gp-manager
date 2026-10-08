@@ -13,219 +13,184 @@ import static java.util.Collections.*;
 @AllArgsConstructor
 class Ar {
 static final int SCALES = ItemID.SNAKEBOSS_SCALE;
-static final Pattern TRIDENT_CHECK = Ak.pattern("ayz");
 static final Pattern BLOWPIPE_CHECK = Ak.pattern("ays");
 static final Pattern TYPED_DARTS = Ak.pattern("aza");
-static final Pattern RUNE_CHARGES = Ak.pattern("ayx");
-static final Pattern ATES_CHECK = Ak.pattern("ayr");
-static final Pattern TOME_CHECK = Ak.pattern("ayy");
-static final Pattern CRYSTAL_CHECK = Ak.pattern("ayw");
-static final Pattern BLOOD_FURY_CHECK = Ak.pattern("aya");
 static final Pattern EYE_OF_AYAK_CHECK = Ak.pattern("ayc");
 static final Pattern EYE_RUNE_CHECK = Ak.pattern("ayd");
 static final Map<String, Integer> DARTS = new LinkedHashMap<>();
 static {
- for (String[] row : Ak.rows("d15"))
- DARTS.put(row[0], Integer.parseInt(row[1]));
+ for (String[] /* row */b : Ak.rows("d15"))
+ DARTS.put(b[0], Integer.parseInt(b[1]));
 }
 
+/** Charged-item families; each one's data (names, ids, triggers, recipe, Check shape) is a d20 row. */
 @Getter
-@AllArgsConstructor
 enum V {
- TRIDENT_SEAS("Trident of the Seas", true, new int[]{ItemID.TOTS, ItemID.TOTS_CHARGED, ItemID.TOTS_UNCHARGED,
-  ItemID.TOTS_CHARGED_ORN, ItemID.TOTS_ORN, ItemID.TOTS_UNCHARGED_ORN}), TRIDENT_SWAMP(msg("cv"), true,
- new int[]{ItemID.TOXIC_TOTS_CHARGED, ItemID.TOXIC_TOTS_UNCHARGED,
-  ItemID.TOXIC_TOTS_CHARGED_ORN, ItemID.TOXIC_TOTS_UNCHARGED_ORN}), TRIDENT_SWAMP_ENHANCED(msg("cw"), true,
- new int[]{ItemID.TOXIC_TOTS_I_CHARGED, ItemID.TOXIC_TOTS_I_UNCHARGED,
-  ItemID.TOXIC_TOTS_I_CHARGED_ORN, ItemID.TOXIC_TOTS_I_UNCHARGED_ORN}), TRIDENT_SEAS_ENHANCED(msg("cx"), true,
- new int[]{ItemID.TOTS_I_CHARGED, ItemID.TOTS_I_UNCHARGED, ItemID.TOTS_I_CHARGED_ORN, ItemID.TOTS_I_UNCHARGED_ORN}),
- V1b("Toxic blowpipe", true, new int[]{ItemID.TOXIC_BLOWPIPE, ItemID.TOXIC_BLOWPIPE_LOADED,
-  ItemID.TOXIC_BLOWPIPE_ORNAMENT, ItemID.TOXIC_BLOWPIPE_LOADED_ORNAMENT}),
- /** Rune-fed built-in casts: the Check reads charges; each cast consumes the pinned runes. */
- SHADOW("Tumeken's shadow", true, new int[]{ItemID.TUMEKENS_SHADOW, ItemID.TUMEKENS_SHADOW_UNCHARGED}),
- SANGUINESTI("Sanguinesti staff", true, new int[]{ItemID.SANGUINESTI_STAFF, ItemID.SANGUINESTI_STAFF_UNCHARGED}),
- SANGUINESTI_HOLY(msg("m1"), true, new int[]{ItemID.SANGUINESTI_STAFF_OR, ItemID.SANGUINESTI_STAFF_UNCHARGED_OR}),
- WARPED("Warped sceptre", true, new int[]{ItemID.WARPED_SCEPTRE, ItemID.WARPED_SCEPTRE_UNCHARGED}),
- VENATOR("Venator bow", true, new int[]{ItemID.VENATOR_BOW, ItemID.VENATOR_BOW_UNCHARGED}),
- /** The ornament-kit variant reads as its own bow. */
- VENATOR_ECHO("Echo venator bow", true, new int[]{ItemID.VENATOR_BOW_ORNAMENT, ItemID.VENATOR_BOW_ORNAMENT_UNCHARGED}),
- /** Tear-fed: one demon tear is one charge; its charge/Check line reports the balance. */
- EYE_OF_AYAK("Eye of Ayak", true, new int[]{ItemID.EYE_OF_AYAK, ItemID.EYE_OF_AYAK_UNCHARGED}),
- /** Estimate-only until its Check mapping lands. */
- SCYTHE("Scythe of vitur", false, new int[]{ItemID.SCYTHE_OF_VITUR, ItemID.SCYTHE_OF_VITUR_UNCHARGED,
-  ItemID.SCYTHE_OF_VITUR_OR, ItemID.SCYTHE_OF_VITUR_UNCHARGED_OR,
-  ItemID.SCYTHE_OF_VITUR_BL, ItemID.SCYTHE_OF_VITUR_UNCHARGED_BL}),
- /** Untradeable, tear-fed teleport charges. */
- ATES("Pendant of Ates", true, new int[]{ItemID.PENDANT_OF_ATES, ItemID.PENDANT_OF_ATES_EMPTY}),
- /** Page-fed spell shields: one page gives 20 charges. */
- V3("Tome of fire", true, new int[]{ItemID.TOME_OF_FIRE, ItemID.TOME_OF_FIRE_UNCHARGED}),
- /** Shard-fed crystal weapons: one shard gives 100 charges. */
- CRYSTAL_BOW("Crystal bow", true, new int[]{ItemID.CRYSTAL_BOW, ItemID.CRYSTAL_BOW_INACTIVE, ItemID.CRYSTAL_BOW_2500}),
- CRYSTAL_HALBERD("Crystal halberd", true,
- new int[]{ItemID.CRYSTAL_HALBERD, ItemID.CRYSTAL_HALBERD_INACTIVE, ItemID.CRYSTAL_HALBERD_2500}),
- BOWFA("Bow of Faerdhinen", true, new int[]{ItemID.BOW_OF_FAERDHINEN, ItemID.BOW_OF_FAERDHINEN_INACTIVE}),
- /** Shard-fed blade: one charge per attack, hit or miss; the Check text is not pinned yet. */
- SAELDOR("Blade of Saeldor", false, new int[]{ItemID.BLADE_OF_SAELDOR, ItemID.BLADE_OF_SAELDOR_INACTIVE}),
- /** Blood-shard amulet: one charge per successful melee hit, whether it heals or not. */
- BLOOD_FURY("Blood fury", true, new int[]{ItemID.BLOOD_AMULET});
- final String displayName;
- final boolean implemented;
- @Getter(AccessLevel.NONE)
- final int[] itemIds;
+ TRIDENT_SEAS, TRIDENT_SWAMP, TRIDENT_SWAMP_ENHANCED, TRIDENT_SEAS_ENHANCED, V1b, SHADOW, SANGUINESTI, SANGUINESTI_HOLY,
+ WARPED, VENATOR, VENATOR_ECHO, EYE_OF_AYAK, SCYTHE, ATES, V3, CRYSTAL_BOW, CRYSTAL_HALBERD, BOWFA, SAELDOR, BLOOD_FURY,
+ CRAW, WEBWEAVER, VIGGORA, URSINE, THAMMARON, ACCURSED, MEMOIRS;
+ String displayName;
+ boolean implemented;
+ String family;
+ Au action;
+ int units;
+ /** The Check line's pattern with its count group and its single-charge group (0: none). */
+ Pattern check;
+ int countGroup, oneGroup;
+ int[] graphics, animations, itemIds;
+ /** Components one use spends; a Check's count of uses times this is its measured stock. */
+ Map<Integer, Long> recipe;
+ /** A fractional per-use part, [itemId, numerator, denominator], or null. */
+ long[] fraction;
+ List<String> aliases;
+ static {
+  for (String[] r : Ak.rows("d20")) {
+   V v = valueOf(r[0]);
+   v.displayName = r[1];
+   v.implemented = Boolean.parseBoolean(r[2]);
+   v.family = r[3];
+   v.action = Au.valueOf(r[4]);
+   v.units = Integer.parseInt(r[5]);
+   if (!"-".equals(r[6])) {
+    String[] c = r[6].split(" ");
+    v.check = Ak.pattern(c[0]);
+    v.countGroup = Integer.parseInt(c[1]);
+    v.oneGroup = Integer.parseInt(c[2]);
+   }
+   v.graphics = ids(r[7]);
+   v.animations = ids(r[8]);
+   var /* recipe */d = new LinkedHashMap<Integer, Long>();
+   for (String /* part */e : parts(r[9], " ")) d.put(id(e), Long.parseLong(e.substring(0, e.indexOf('*'))));
+   v.recipe = unmodifiableMap(d);
+   if (!"-".equals(r[10])) {
+    String[] f = r[10].split("[/*]");
+    v.fraction = new long[]{id(r[10]), Long.parseLong(f[0]), Long.parseLong(f[1])};
+   }
+   v.aliases = parts(r[11], ";");
+   v.itemIds = ids(r[12]);
+  }
+ }
+ static List<String> parts(String /* cell */g, String /* separator */h) {
+  return "-".equals(g) ? emptyList() : List.of(g.split(h));
+ }
+ /** The id in "qty*id=NAME" or "id=NAME". */
+ static int id(String /* part */g) {
+  return Integer.parseInt(g.substring(g.indexOf('*') + 1, g.indexOf('=')));
+ }
+ static int[] ids(String /* cell */g) {
+  return parts(g, ",").stream().mapToInt(V::id).toArray();
+ }
  boolean trident() {
-  return name().startsWith("TRIDENT");
- }
- /** A rune-fed built-in cast whose Check reads charges. */
- boolean chargeFed() {
-  return this == SHADOW || this == WARPED || this == VENATOR || this == VENATOR_ECHO || name().startsWith("SANGUINESTI");
- }
- boolean crystal() {
-  return name().startsWith("CRYSTAL_") || this == BOWFA || this == SAELDOR;
+  return "TRIDENT".equals(family);
  }
 }
 
-final V variant;
-final Map<Integer, Long> componentCounts;
+V variant;
+Map<Integer, Long> componentCounts;
 /** Returns -1 when a Check explicitly reported no darts or had an unknown type. */
-final int dartItemId;
-final boolean bookable;
+int dartItemId;
+boolean bookable;
 /**
 * Parse a pinned Check-message shape. Returns {@code null} for unrelated chat.
 * Recognized but unsupported/unknown variants return a non-bookable read so a
 * tracker can clear an older baseline safely.
 */
-static Ar acs(String rawMessage) {
- String message = avl(rawMessage);
- V surface = message == null ? null : surface(message.toLowerCase(ROOT));
- if (surface == null) return null;
+static Ar acs(String /* rawMessage */b) {
+ String /* message */c = avl(b);
+ V /* surface */d = c == null ? null : surface(c.toLowerCase(ROOT));
+ if (d == null) return null;
  // A recognizably malformed Check surface resets the caller's old baseline
  // rather than carrying stale evidence forward.
- var components = new LinkedHashMap<Integer, Long>();
- int avr = -1;
+ var /* components */e = new LinkedHashMap<Integer, Long>();
+ int /* avr */f = -1;
  try {
-  Matcher trident = TRIDENT_CHECK.matcher(message);
-  Matcher blowpipe = BLOWPIPE_CHECK.matcher(message);
-  if (trident.matches() && surface.implemented) {
-   long charges = trident.group(3) != null ? acm(trident.group(3)) : trident.group(4) != null ? 1L : 0L;
-   components.put(ItemID.DEATHRUNE, charges);
-   components.put(ItemID.CHAOSRUNE, charges);
-   components.put(ItemID.FIRERUNE, Math.multiplyExact(charges, 5L));
-   if (surface == V.TRIDENT_SEAS || surface == V.TRIDENT_SEAS_ENHANCED) {
-    components.put(ItemID.COINS, Math.multiplyExact(charges, 10L));
-   } else {
-    components.put(SCALES, charges);
+  Matcher /* blowpipe */g = BLOWPIPE_CHECK.matcher(c);
+  if (g.matches()) {
+   e.put(SCALES, acm(g.group(2)));
+   String /* anu */h = g.group(1).trim();
+   Matcher /* darts */i = TYPED_DARTS.matcher(h);
+   if (!"none".equalsIgnoreCase(h)) {
+    f = i.matches() ? DARTS.getOrDefault(aau(i.group(1)), -1) : -1;
+    if (f < 0) return unsupported(d);
+    e.put(f, acm(i.group(2)));
    }
-  } else if (blowpipe.matches()) {
-   components.put(SCALES, acm(blowpipe.group(2)));
-   String anu = blowpipe.group(1).trim();
-   Matcher darts = TYPED_DARTS.matcher(anu);
-   if (!"none".equalsIgnoreCase(anu)) {
-    avr = darts.matches() ? DARTS.getOrDefault(aau(darts.group(1)), -1) : -1;
-    if (avr < 0) return unsupported(surface);
-    components.put(avr, acm(darts.group(2)));
+  } else if (d == V.EYE_OF_AYAK) {
+   Matcher /* eye */j = EYE_OF_AYAK_CHECK.matcher(c);
+   Matcher /* runes */k = EYE_RUNE_CHECK.matcher(c);
+   if (j.matches()) {
+    e.put(ItemID.DEMON_TEAR, acm(j.group(1)));
+   } else if (k.matches()) {
+    long /* charges */l = acm(k.group(1));
+    e.put(ItemID.DEATHRUNE, Math.multiplyExact(l, 2L));
+    e.put(ItemID.CHAOSRUNE, l);
    }
-  } else if (surface != null && surface.chargeFed()) {
-   Matcher charges = RUNE_CHARGES.matcher(message);
-   if (charges.matches()) {
-    long count = charges.group(2) != null ? acm(charges.group(2)) : charges.group(3) != null ? 1L : 0L;
-    if (surface == V.SHADOW) {
-     components.put(ItemID.SOULRUNE, Math.multiplyExact(count, 2L));
-     components.put(ItemID.CHAOSRUNE, Math.multiplyExact(count, 5L));
-    } else if (surface == V.WARPED) {
-     components.put(ItemID.CHAOSRUNE, Math.multiplyExact(count, 2L));
-     components.put(ItemID.EARTHRUNE, Math.multiplyExact(count, 5L));
-    } else if (surface == V.VENATOR || surface == V.VENATOR_ECHO) {
-     components.put(ItemID.ANCIENT_ESSENCE, count);
-    } else {
-     components.put(ItemID.BLOODRUNE, Math.multiplyExact(count, 2L));
-    }
-   }
-  } else if (surface == V.ATES) {
-   Matcher ates = ATES_CHECK.matcher(message);
-   if (ates.matches()) {
-    components.put(ItemID.FROZEN_TEAR, ates.group(1) != null ? acm(ates.group(1)) : ates.group(2) != null ? 1L : 0L);
-   }
-  } else if (surface == V.V3) {
-   Matcher tome = TOME_CHECK.matcher(message);
-   if (tome.matches()) {
-    components.put(ItemID.WINT_BURNT_PAGE, tome.group(1) != null ? acm(tome.group(1))
-    : tome.group(2) != null ? 1L : 0L);
-   }
-  } else if (surface == V.BLOOD_FURY) {
-   Matcher fury = BLOOD_FURY_CHECK.matcher(message);
-   if (fury.matches()) components.put(ItemID.BLOOD_SHARD, acm(fury.group(1)));
-  } else if (surface == V.EYE_OF_AYAK) {
-   Matcher eye = EYE_OF_AYAK_CHECK.matcher(message);
-   Matcher runes = EYE_RUNE_CHECK.matcher(message);
-   if (eye.matches()) {
-    components.put(ItemID.DEMON_TEAR, acm(eye.group(1)));
-   } else if (runes.matches()) {
-    long charges = acm(runes.group(1));
-    components.put(ItemID.DEATHRUNE, Math.multiplyExact(charges, 2L));
-    components.put(ItemID.CHAOSRUNE, charges);
-   }
-  } else if (surface != null && surface.crystal()) {
-   Matcher crystal = CRYSTAL_CHECK.matcher(message);
-   if (crystal.matches()) {
-    components.put(ItemID.PRIF_CRYSTAL_SHARD, crystal.group(2) != null ? acm(crystal.group(2))
-    : crystal.group(3) != null ? 1L : 0L);
+  } else if (d.check != null) {
+   // Every other family's Check counts uses, so its stock is that count times one use's recipe.
+   Matcher /* read */m = d.check.matcher(c);
+   if (m.matches()) {
+    String /* counted */n = m.group(d.countGroup);
+    long /* count */o = n != null ? acm(n) : d.oneGroup > 0 && m.group(d.oneGroup) != null ? 1L : 0L;
+    for (var /* part */p : d.recipe.entrySet()) e.put(p.getKey(), Math.multiplyExact(o, p.getValue()));
    }
   }
-  if (!components.isEmpty()) return new Ar(surface, unmodifiableMap(components), avr, true);
- } catch (NumberFormatException | ArithmeticException malformed) {
+  if (!e.isEmpty()) return new Ar(d, unmodifiableMap(e), f, true);
+ } catch (NumberFormatException | ArithmeticException /* malformed */q) {
   // The count is syntax-checked; this is a value outside the supported range.
  }
- return unsupported(surface);
+ return unsupported(d);
 }
 
 /** The Check surface a lowercase chat line belongs to, whether or not it parses. */
-static V surface(String lower) {
- if (lower.startsWith("darts:") && lower.contains("scales:")) return V.V1b;
- if (lower.startsWith("the pendant has ")) return V.ATES;
- if (lower.startsWith("your tome has been charged with ")) return V.V3;
- if (lower.startsWith(msg("br"))) return V.BLOOD_FURY;
- if (lower.startsWith(msg("bx"))
- || lower.startsWith(msg("cj"))) {
+static V surface(String /* lower */a) {
+ if (a.startsWith("darts:") && a.contains("scales:")) return V.V1b;
+ if (a.startsWith("the pendant has ")) return V.ATES;
+ if (a.startsWith("your tome has been charged with ")) return V.V3;
+ if (a.startsWith(msg("br"))) return V.BLOOD_FURY;
+ if (a.startsWith(msg("bx"))
+ || a.startsWith(msg("cj"))) {
   return V.EYE_OF_AYAK;
  }
- for (V variant : V.values()) {
-  if (variant == V.V1b) continue;
-  String name = variant.displayName.toLowerCase(ROOT);
-  if (lower.startsWith("your " + name + " has ") || lower.startsWith("your " + name + " only has ")
-  || lower.startsWith(name + " has ") || lower.startsWith(name + " only has ")) {
-   return variant;
+ for (V /* variant */b : V.values()) {
+  if (b == V.V1b) continue;
+  String /* name */c = b.displayName.toLowerCase(ROOT);
+  if (a.startsWith("your " + c + " has ") || a.startsWith("your " + c + " only has ")
+  || a.startsWith(c + " has ") || a.startsWith(c + " only has ")) {
+   return b;
   }
+ }
+ // A Check that names no weapon ("Your bow has…"): the first row sharing that wording.
+ for (V /* variant */d : V.values()) {
+  if (d.check != null && d.check.matcher(a).matches()) return d;
  }
  return null;
 }
 
 /** Resolve only exact supported menu-target names; menu evidence is identity only. */
-static V ajb(String itemName) {
- String name = aau(itemName);
- for (V variant : V.values()) {
-  if (variant.implemented && variant.displayName.toLowerCase(ROOT).equals(name)) return variant;
+static V ajb(String /* itemName */a) {
+ String /* name */b = aau(a);
+ if (b == null) return null;
+ for (V /* variant */c : V.values()) {
+  if (c.implemented && (c.displayName.toLowerCase(ROOT).equals(b) || c.aliases.contains(b))) {
+   return c;
+  }
  }
- if (msg("cb").equals(name) || "uncharged trident".equals(name)) return V.TRIDENT_SEAS;
- if (msg("cz").equals(name)) return V.TRIDENT_SWAMP;
- if (msg("da").equals(name)) return V.TRIDENT_SEAS_ENHANCED;
- if (msg("bu").equals(name)) return V.TRIDENT_SWAMP_ENHANCED;
  return null;
 }
 
 /** Any catalogue variant by exact display name for presentation; estimate-only variants included. */
-static V ajt(String itemName) {
- String name = aau(itemName);
- for (V variant : V.values()) {
-  if (variant.displayName.toLowerCase(ROOT).equals(name)) return variant;
+static V ajt(String /* itemName */a) {
+ String /* name */b = aau(a);
+ for (V /* variant */c : V.values()) {
+  if (c.displayName.toLowerCase(ROOT).equals(b)) return c;
  }
  return null;
 }
 
 /** Resolve charged and uncharged item ids so a Check receipt can be tied to its menu target. */
-static V aja(int itemId) {
- for (V variant : V.values()) {
-  for (int id : variant.itemIds) {
-   if (id == itemId) return variant;
+static V aja(int /* itemId */a) {
+ for (V /* variant */b : V.values()) {
+  for (int /* id */c : b.itemIds) {
+   if (c == a) return b;
   }
  }
  return null;
@@ -235,11 +200,14 @@ static V aja(int itemId) {
 * Validate a candidate item-on-weapon load component. Both the canonical id
 * and displayed name must agree, so unknown dart types fail closed.
 */
-static boolean xq(V variant, int itemId, String itemName) {
- String expectedName = variant == null || !variant.implemented ? null : rz(variant, itemId);
- String rt = aau(itemName);
- return expectedName != null && rt != null
- && (expectedName.equals(rt) || rt.equals(expectedName + "s") && !expectedName.endsWith("s"));
+static boolean xq(V /* variant */a, int /* itemId */b, String /* itemName */c) {
+ String /* expectedName */d = a == null || !a.implemented ? null : rz(a, b);
+ String /* rt */e = aau(c);
+ // Owner 1.2: what an item's own charge is made of is loaded, never spent, for every item.
+ if (e != null && a != null && (a.recipe.containsKey(b)
+ || a.fraction != null && a.fraction[0] == b)) return true;
+ return d != null && e != null
+ && (d.equals(e) || e.equals(d + "s") && !d.endsWith("s"));
 }
 
 boolean awi() {
@@ -247,62 +215,59 @@ boolean awi() {
 }
 
 /** Component units per priced item: a page feeds 20 charges, a shard 100. */
-static int akr(V variant, int componentItemId) {
- if (variant == V.V3) return 20;
- if (variant == V.BLOOD_FURY) return 10_000;
- if (variant.crystal()) return 100;
- return 1;
+static int akr(V /* variant */a, int /* componentItemId */b) {
+ return a.units;
 }
 
 /** Returns only a positive same-variant load increase; decreases are charge spend evidence. */
-static Map<Integer, Long> exactLoadQuantities(Ar previous, Ar current) {
- if (previous == null || current == null || !previous.bookable || !current.bookable
- || previous.variant != current.variant || current.variant != V.V1b && !current.variant.trident()) {
+static Map<Integer, Long> exactLoadQuantities(Ar /* previous */a, Ar /* current */b) {
+ if (a == null || b == null || !a.bookable || !b.bookable
+ || a.variant != b.variant || b.variant != V.V1b && !b.variant.trident()) {
   return emptyMap();
  }
- var result = new LinkedHashMap<Integer, Long>();
- for (Map.Entry<Integer, Long> entry : current.componentCounts.entrySet()) {
-  if (current.variant == V.V1b && entry.getKey() != SCALES) continue;
-  Long before = previous.componentCounts.get(entry.getKey());
-  if (before == null || entry.getValue() == null) return emptyMap();
-  if (entry.getValue() > before) result.put(entry.getKey(), entry.getValue() - before);
+ var /* result */c = new LinkedHashMap<Integer, Long>();
+ for (Map.Entry<Integer, Long> /* entry */d : b.componentCounts.entrySet()) {
+  if (b.variant == V.V1b && d.getKey() != SCALES) continue;
+  Long /* before */e = a.componentCounts.get(d.getKey());
+  if (e == null || d.getValue() == null) return emptyMap();
+  if (d.getValue() > e) c.put(d.getKey(), d.getValue() - e);
  }
- return unmodifiableMap(result);
+ return unmodifiableMap(c);
 }
 
-static Ar unsupported(V variant) {
- return new Ar(variant, emptyMap(), -1, false);
+static Ar unsupported(V /* variant */a) {
+ return new Ar(a, emptyMap(), -1, false);
 }
 
-static String rz(V variant, int itemId) {
- if (variant == V.V1b) {
-  for (Map.Entry<String, Integer> dart : DARTS.entrySet()) {
-   if (dart.getValue() == itemId) return dart.getKey();
+static String rz(V /* variant */b, int /* itemId */c) {
+ if (b == V.V1b) {
+  for (Map.Entry<String, Integer> /* dart */d : DARTS.entrySet()) {
+   if (d.getValue() == c) return d.getKey();
   }
-  return itemId == SCALES ? "zulrah's scale" : null;
+  return c == SCALES ? "zulrah's scale" : null;
  }
- if (variant == V.BLOOD_FURY) return itemId == ItemID.BLOOD_SHARD ? "blood shard" : null;
- if (variant == V.EYE_OF_AYAK) {
+ if (b == V.BLOOD_FURY) return c == ItemID.BLOOD_SHARD ? "blood shard" : null;
+ if (b == V.EYE_OF_AYAK) {
   // Both charging modes validate, so a recharge books as a neutral transfer (owner 2026-09-30).
-  return itemId == ItemID.DEMON_TEAR ? "demon tear" : itemId == ItemID.DEATHRUNE ? "death rune"
-  : itemId == ItemID.CHAOSRUNE ? "chaos rune" : null;
+  return c == ItemID.DEMON_TEAR ? "demon tear" : c == ItemID.DEATHRUNE ? "death rune"
+  : c == ItemID.CHAOSRUNE ? "chaos rune" : null;
  }
- boolean seas = variant == V.TRIDENT_SEAS || variant == V.TRIDENT_SEAS_ENHANCED;
- return !variant.trident() ? null : itemId == ItemID.DEATHRUNE ? "death rune" : itemId == ItemID.CHAOSRUNE ? "chaos rune"
- : itemId == ItemID.FIRERUNE ? "fire rune" : seas && itemId == ItemID.COINS ? "coin"
- : !seas && itemId == SCALES ? "zulrah's scale" : null;
+ boolean /* seas */e = b == V.TRIDENT_SEAS || b == V.TRIDENT_SEAS_ENHANCED;
+ return !b.trident() ? null : c == ItemID.DEATHRUNE ? "death rune" : c == ItemID.CHAOSRUNE ? "chaos rune"
+ : c == ItemID.FIRERUNE ? "fire rune" : e && c == ItemID.COINS ? "coin"
+ : !e && c == SCALES ? "zulrah's scale" : null;
 }
 
-static long acm(String raw) {
- return Long.parseLong(raw.replace(",", ""));
+static long acm(String /* raw */a) {
+ return Long.parseLong(a.replace(",", ""));
 }
 
-static String avl(String value) {
- return value == null ? null : value.replaceAll("<[^>]*>", "").trim();
+static String avl(String /* value */a) {
+ return a == null ? null : a.replaceAll("<[^>]*>", "").trim();
 }
 
-static String aau(String value) {
- String ars = avl(value);
- return Ag.empty(ars) ? null : ars.toLowerCase(ROOT).replaceAll("\\s+", " ");
+static String aau(String /* value */a) {
+ String /* ars */b = avl(a);
+ return Ag.empty(b) ? null : b.toLowerCase(ROOT).replaceAll("\\s+", " ");
 }
 }

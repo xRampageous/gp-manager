@@ -71,13 +71,13 @@ SavedState() {
 void aar() {
  aar(generalSession);
  aar(customSession);
- for (Ad session : getHistory()) aar(session);
+ for (Ad /* session */a : getHistory()) aar(a);
 }
 
-static void aar(Ad session) {
- if (session == null) return;
- for (Ac transaction : session.getTransactions()) {
-  if (transaction != null) transaction.aax();
+static void aar(Ad /* session */a) {
+ if (a == null) return;
+ for (Ac /* transaction */b : a.getTransactions()) {
+  if (b != null) b.aax();
  }
 }
 
@@ -86,8 +86,8 @@ List<Ap> getSavedGrinds() {
  return savedGrinds;
 }
 
-void setSavedGrinds(List<Ap> values) {
- savedGrinds = values == null ? new ArrayList<>() : new ArrayList<>(values);
+void setSavedGrinds(List<Ap> /* values */a) {
+ savedGrinds = a == null ? new ArrayList<>() : new ArrayList<>(a);
 }
 
 List<Aa> getGeCustody() {
@@ -95,11 +95,11 @@ List<Aa> getGeCustody() {
  return geCustody;
 }
 
-void setGeCustody(List<Aa> values) {
+void setGeCustody(List<Aa> /* values */a) {
  geCustody = new ArrayList<>();
- if (values != null) {
-  for (Aa value : values) {
-   if (value != null && !value.getOfferId().isEmpty()) geCustody.add(value);
+ if (a != null) {
+  for (Aa /* value */b : a) {
+   if (b != null && !b.getOfferId().isEmpty()) geCustody.add(b);
   }
  }
 }
@@ -124,12 +124,12 @@ static class Ap {
  boolean archived;
  Ap() {
  }
- Ap(String grindId, String name, Long netTargetGp, Long activeTimeTargetMillis, boolean favorite) {
-  this.grindId = grindId;
-  this.name = name;
-  this.netTargetGp = netTargetGp;
-  this.activeTimeTargetMillis = activeTimeTargetMillis;
-  this.favorite = favorite;
+ Ap(String /* grindId */b, String /* name */c, Long /* netTargetGp */d, Long /* activeTimeTargetMillis */e, boolean /* favorite */f) {
+  this.grindId = b;
+  this.name = c;
+  this.netTargetGp = d;
+  this.activeTimeTargetMillis = e;
+  this.favorite = f;
  }
  String getGrindId() { return axw(grindId); }
  String getName() { return axw(name); }
@@ -139,12 +139,12 @@ static class Ap {
  }
 }
 
-SavedState(Ad generalSession, Ad customSession, boolean generalSuspendedByCustom, List<Ad> history) {
- this.savedAtEpochMillis = System.currentTimeMillis();
- this.generalSession = generalSession;
- this.customSession = customSession;
- this.generalSuspendedByCustom = generalSuspendedByCustom;
- this.history = new ArrayList<>(history == null ? new ArrayList<>() : history);
+SavedState(Ad /* generalSession */a, Ad /* customSession */b, boolean /* generalSuspendedByCustom */c, List<Ad> /* history */d) {
+ this.savedAtEpochMillis = Ae.now();
+ this.generalSession = a;
+ this.customSession = b;
+ this.generalSuspendedByCustom = c;
+ this.history = new ArrayList<>(d == null ? new ArrayList<>() : d);
 }
 
 /** True only for the 1.0 schema; anything else is preserved read-only and never rewritten. */
@@ -166,16 +166,16 @@ String getLastReceiptRetentionDayUtc() {
  return axw(lastReceiptRetentionDayUtc);
 }
 
-void setLastReceiptRetentionDayUtc(String day) {
- lastReceiptRetentionDayUtc = day == null ? "" : day.trim();
+void setLastReceiptRetentionDayUtc(String /* day */a) {
+ lastReceiptRetentionDayUtc = a == null ? "" : a.trim();
 }
 
 String getProfileTimeZoneId() {
  return axw(profileTimeZoneId);
 }
 
-void setProfileTimeZoneId(String value) {
- profileTimeZoneId = value == null ? "" : value.trim();
+void setProfileTimeZoneId(String /* value */a) {
+ profileTimeZoneId = a == null ? "" : a.trim();
 }
 
 Cf getPkHistory() {
@@ -187,12 +187,12 @@ List<By> getPendingClaims() {
  return pendingClaims == null ? emptyList() : unmodifiableList(pendingClaims);
 }
 
-void setPendingClaims(List<By> values) {
- pendingClaims = empty(values) ? null : new ArrayList<>(values);
+void setPendingClaims(List<By> /* values */a) {
+ pendingClaims = empty(a) ? null : new ArrayList<>(a);
 }
 
-void setPendingDeathReclaim(Bw value) {
- pendingDeathReclaim = value == null || value.isEmpty() ? null : value;
+void setPendingDeathReclaim(Bw /* value */a) {
+ pendingDeathReclaim = a == null || a.isEmpty() ? null : a;
 }
 
 /**
@@ -208,12 +208,12 @@ static class Bw {
  int gravestoneAgeTicks;
  Bw() {
  }
- Bw(List<Bg> outstandingItems, List<Bg> heldAtDeath, int wipeTicksRemaining,
- int gravestoneAgeTicks) {
-  this.outstandingItems = copyItems(outstandingItems);
-  this.heldAtDeath = copyItems(heldAtDeath);
-  this.wipeTicksRemaining = max(0, wipeTicksRemaining);
-  this.gravestoneAgeTicks = max(0, gravestoneAgeTicks);
+ Bw(List<Bg> /* outstandingItems */b, List<Bg> /* heldAtDeath */c, int /* wipeTicksRemaining */d,
+ int /* gravestoneAgeTicks */e) {
+  this.outstandingItems = copyItems(b);
+  this.heldAtDeath = copyItems(c);
+  this.wipeTicksRemaining = max(0, d);
+  this.gravestoneAgeTicks = max(0, e);
  }
  List<Bg> getOutstandingItems() {
   return outstandingItems == null ? emptyList() : unmodifiableList(outstandingItems);
@@ -226,13 +226,13 @@ static class Bw {
  boolean isEmpty() {
   return getOutstandingItems().isEmpty() && getHeldAtDeath().isEmpty();
  }
- static List<Bg> copyItems(List<Bg> values) {
-  if (empty(values)) return null;
-  var copy = new ArrayList<Bg>();
-  for (Bg value : values) {
-   if (value != null && value.isValid()) copy.add(value);
+ static List<Bg> copyItems(List<Bg> /* values */b) {
+  if (empty(b)) return null;
+  var /* copy */c = new ArrayList<Bg>();
+  for (Bg /* value */d : b) {
+   if (d != null && d.isValid()) c.add(d);
   }
-  return copy.isEmpty() ? null : copy;
+  return c.isEmpty() ? null : c;
  }
 }
 
@@ -242,9 +242,9 @@ static class Bg {
  long quantity;
  Bg() {
  }
- Bg(int itemId, long quantity) {
-  this.itemId = itemId;
-  this.quantity = nonNeg(quantity);
+ Bg(int /* itemId */b, long /* quantity */c) {
+  this.itemId = b;
+  this.quantity = nonNeg(c);
  }
  long getQuantity() { return nonNeg(quantity); }
  boolean isValid() {
@@ -265,11 +265,11 @@ static class By {
  long createdAtEpochMillis;
  By() {
  }
- By(String claimId, int itemOrKeyId, long quantity, long createdAtEpochMillis) {
-  this.claimId = claimId;
-  this.itemOrKeyId = itemOrKeyId;
-  this.quantity = nonNeg(quantity);
-  this.createdAtEpochMillis = nonNeg(createdAtEpochMillis);
+ By(String /* claimId */b, int /* itemOrKeyId */c, long /* quantity */d, long /* createdAtEpochMillis */e) {
+  this.claimId = b;
+  this.itemOrKeyId = c;
+  this.quantity = nonNeg(d);
+  this.createdAtEpochMillis = nonNeg(e);
  }
  String getClaimId() { return axw(claimId); }
  long getQuantity() { return nonNeg(quantity); }

@@ -62,41 +62,41 @@ public class DeathReclaimLifecycleTest
     @Test
     public void catalogueMatchesServicesByNameAndRetrievalVerb()
     {
-        BossRetrievalCatalogue.Service zulrah = BossRetrievalCatalogue.axr("Talk-to", "Priestess Zul-Gwenwynig");
+        BossRetrievalCatalogue.Service zulrah = BossRetrievalCatalogue.a1("Talk-to", "Priestess Zul-Gwenwynig");
         assertNotNull(zulrah);
         assertEquals(100_000L, zulrah.expectedFee);
         assertFalse(zulrah.ambiguousTarget);
-        assertEquals(60_000L, BossRetrievalCatalogue.axr("Claim", "Shura").expectedFee);
-        assertEquals(50_000L, BossRetrievalCatalogue.axr("Search", "Magical chest").expectedFee);
-        assertEquals(25_000L, BossRetrievalCatalogue.axr("Talk-to", "Arno").expectedFee);
-        BossRetrievalCatalogue.Service chest = BossRetrievalCatalogue.axr("Open", "Chest");
+        assertEquals(60_000L, BossRetrievalCatalogue.a1("Claim", "Shura").expectedFee);
+        assertEquals(50_000L, BossRetrievalCatalogue.a1("Search", "Magical chest").expectedFee);
+        assertEquals(25_000L, BossRetrievalCatalogue.a1("Talk-to", "Arno").expectedFee);
+        BossRetrievalCatalogue.Service chest = BossRetrievalCatalogue.a1("Open", "Chest");
         assertNotNull(chest);
         assertTrue(chest.ambiguousTarget);
         assertEquals(BossRetrievalCatalogue.VARIABLE_FEE, chest.expectedFee);
-        assertTrue(BossRetrievalCatalogue.axr("Loot", "Gravestone").ambiguousTarget);
+        assertTrue(BossRetrievalCatalogue.a1("Loot", "Gravestone").ambiguousTarget);
         // Non-retrieval verbs and unrelated NPCs never match.
-        assertNull(BossRetrievalCatalogue.axr("Attack", "Priestess Zul-Gwenwynig"));
-        assertNull(BossRetrievalCatalogue.axr("Talk-to", "Banker"));
-        assertNull(BossRetrievalCatalogue.axr("Use", "Chest"));
+        assertNull(BossRetrievalCatalogue.a1("Attack", "Priestess Zul-Gwenwynig"));
+        assertNull(BossRetrievalCatalogue.a1("Talk-to", "Banker"));
+        assertNull(BossRetrievalCatalogue.a1("Use", "Chest"));
     }
 
     @Test
     public void whyLineCarriesPublishedFeeAndFlagsAMismatch()
     {
-        BossRetrievalCatalogue.Service zulrah = BossRetrievalCatalogue.axr("Talk-to", "Priestess Zul-Gwenwynig");
+        BossRetrievalCatalogue.Service zulrah = BossRetrievalCatalogue.a1("Talk-to", "Priestess Zul-Gwenwynig");
         assertEquals(
             "Item retrieval fee — Zulrah (Priestess Zul-Gwenwynig), published 100,000. Free below 50 kills and for Ultimate Ironmen",
             zulrah.why(100_000L));
         assertTrue(zulrah.why(90_000L).contains("observed 90,000"));
-        assertTrue(BossRetrievalCatalogue.axr("Open", "Chest").why(250_000L).contains("fee varies"));
+        assertTrue(BossRetrievalCatalogue.a1("Open", "Chest").why(250_000L).contains("fee varies"));
     }
 
     @Test
     public void lifecycleAcceptsAmbiguousTargetsOnlyWhileAwaitingReclaim()
     {
         DeathReclaimLifecycle lifecycle = new DeathReclaimLifecycle();
-        BossRetrievalCatalogue.Service chest = BossRetrievalCatalogue.axr("Open", "Chest");
-        BossRetrievalCatalogue.Service torfinn = BossRetrievalCatalogue.axr("Talk-to", "Torfinn");
+        BossRetrievalCatalogue.Service chest = BossRetrievalCatalogue.a1("Open", "Chest");
+        BossRetrievalCatalogue.Service torfinn = BossRetrievalCatalogue.a1("Talk-to", "Torfinn");
         assertFalse("random chest without a death is not a reclaim", lifecycle.aca(chest, 10));
         assertFalse("a generic Talk-to at a service NPC is not enough", lifecycle.aca(torfinn, 10));
         lifecycle.ace(java.util.Collections.singletonMap(WHIP, 1L));
@@ -105,7 +105,7 @@ public class DeathReclaimLifecycleTest
         assertTrue(lifecycle.isAwaitingReclaim());
         assertTrue("a named service is accepted after a local PvM death", lifecycle.aca(torfinn, 10));
         assertTrue(lifecycle.aca(chest, 10));
-        BossRetrievalCatalogue.Service grave = BossRetrievalCatalogue.axr("Check", "Grave");
+        BossRetrievalCatalogue.Service grave = BossRetrievalCatalogue.a1("Check", "Grave");
         assertNotNull(grave);
         assertTrue("a Grave Check re-arms an awaiting reclaim", lifecycle.aca(grave, 1));
         assertTrue(lifecycle.xk());
@@ -259,7 +259,7 @@ public class DeathReclaimLifecycleTest
         Am engine = started(carried);
         engine.zi(20, carried.quantities);
         assertTrue(engine.abe(
-            BossRetrievalCatalogue.axr("Talk-to", "Torfinn"), 40));
+            BossRetrievalCatalogue.a1("Talk-to", "Torfinn"), 40));
         engine.yz();
 
         Ac ambiguousWipe = settle(engine, gear(0L, 0L, 180_000L, 0L), 1_600L);
@@ -317,7 +317,7 @@ public class DeathReclaimLifecycleTest
         {
             assertNull(engine.adj(carried, 1_100L + i * 600L));
         }
-        engine.noteConsumptionIntent(WHIP, 20);
+        engine.ci(WHIP, 20);
         engine.yz();
 
         Ac consumed = settle(engine, Cc.empty(), 3_000L);
@@ -334,7 +334,7 @@ public class DeathReclaimLifecycleTest
         Cc carried = gear(1L, 0L, 0L, 1L);
         Am engine = started(carried);
         engine.zi(1, carried.quantities);
-        engine.noteConsumptionIntent(SHARK, 30);
+        engine.ci(SHARK, 30);
         engine.yz();
 
         Ac consumption = settle(engine, Cc.empty(), 1_600L);
@@ -456,7 +456,7 @@ public class DeathReclaimLifecycleTest
         engine.setBaseline(gear(0L, 0L, 150_000L, 0L));
 
         assertTrue(engine.abe(
-            BossRetrievalCatalogue.axr("Loot", "Gravestone"), 1));
+            BossRetrievalCatalogue.a1("Loot", "Gravestone"), 1));
         assertTrue(engine.tt().armed);
         engine.yz();
         Ac fee = settle(engine, gear(1L, 0L, 50_000L, 0L), 4_000L);
@@ -600,7 +600,7 @@ public class DeathReclaimLifecycleTest
 
         // Reclaim at Zul-Gwenwynig: 100k leaves, whip + torture return in the same settle.
         assertTrue(engine.abe(
-            BossRetrievalCatalogue.axr("Talk-to", "Priestess Zul-Gwenwynig"), 40));
+            BossRetrievalCatalogue.a1("Talk-to", "Priestess Zul-Gwenwynig"), 40));
         engine.yz();
         Ac fee = settle(engine, gear(1L, 1L, 50_000L, 0L), 6_000L);
         assertNotNull(fee);
@@ -641,8 +641,8 @@ public class DeathReclaimLifecycleTest
         Ac wipe = settle(engine, Cc.empty(), 1_600L);
         assertNotNull(wipe);
         engine.setBaseline(gear(0L, 0L, 0L, 2L));
-        assertTrue(engine.abe(BossRetrievalCatalogue.axr("Talk-to", "Torfinn"), 40));
-        engine.noteConsumptionIntent(SHARK, 6);
+        assertTrue(engine.abe(BossRetrievalCatalogue.a1("Talk-to", "Torfinn"), 40));
+        engine.ci(SHARK, 6);
         engine.yz();
 
         Ac eat = settle(engine, gear(0L, 0L, 0L, 1L), 1_600L);
@@ -664,7 +664,7 @@ public class DeathReclaimLifecycleTest
         assertEquals(Ai.TRANSFER, wipe.getType());
         assertTrue(EngineProbe.isAwaitingDeathReclaim(engine));
 
-        assertTrue(engine.abe(BossRetrievalCatalogue.axr("Talk-to", "Torfinn"), 40));
+        assertTrue(engine.abe(BossRetrievalCatalogue.a1("Talk-to", "Torfinn"), 40));
         engine.yz();
         Ac loot = settle(engine, gear(0L, 0L, 150_000L, 1L), 4_000L);
 
@@ -704,7 +704,7 @@ public class DeathReclaimLifecycleTest
         Ac wipe = settle(engine, Cc.empty(), 1_600L);
         assertNotNull(wipe);
         assertTrue(engine.abe(
-            BossRetrievalCatalogue.axr("Talk-to", "Torfinn"), 40));
+            BossRetrievalCatalogue.a1("Talk-to", "Torfinn"), 40));
 
         engine.zk(
             java.util.Collections.singletonMap(WHIP, 1L), 20, "Loot from Dragon", "Dragon");
@@ -727,7 +727,7 @@ public class DeathReclaimLifecycleTest
         engine.yz();
         assertNotNull(settle(engine, Cc.empty(), 1_600L));
         assertTrue(engine.abe(
-            BossRetrievalCatalogue.axr("Talk-to", "Torfinn"), 40));
+            BossRetrievalCatalogue.a1("Talk-to", "Torfinn"), 40));
 
         engine.zk(
             java.util.Collections.singletonMap(WHIP, 1L), 20, "Loot from Dragon", "Dragon");
@@ -761,7 +761,7 @@ public class DeathReclaimLifecycleTest
         Am engine = started(gear(0L, 0L, 150_000L, 0L));
         engine.zi(20, gear(0L, 0L, 150_000L, 0L).quantities);
         assertTrue(engine.abe(
-            BossRetrievalCatalogue.axr("Talk-to", "Torfinn"), 40));
+            BossRetrievalCatalogue.a1("Talk-to", "Torfinn"), 40));
         engine.markContext(Aj.TRANSFER, 20, "Bank deposit");
         engine.yz();
 
@@ -806,7 +806,7 @@ public class DeathReclaimLifecycleTest
         assertNotNull(wipe);
         assertTrue(EngineProbe.isAwaitingDeathReclaim(engine));
 
-        assertTrue(engine.abe(BossRetrievalCatalogue.axr("Talk-to", "Torfinn"), 40));
+        assertTrue(engine.abe(BossRetrievalCatalogue.a1("Talk-to", "Torfinn"), 40));
         engine.yz();
         Ac loot = settle(engine, gear(1L, 0L, 150_000L, 1L), 4_000L);
 
@@ -850,7 +850,7 @@ public class DeathReclaimLifecycleTest
 
         assertFalse(EngineProbe.isAwaitingDeathReclaim(engine));
         assertFalse("unclassified death must not arm retrieval accounting", engine.abe(
-            BossRetrievalCatalogue.axr("Talk-to", "Torfinn"), 40));
+            BossRetrievalCatalogue.a1("Talk-to", "Torfinn"), 40));
         engine.yz();
         Ac returned = settle(engine, gear(1L, 0L, 150_000L, 0L), 4_000L);
 
@@ -869,7 +869,7 @@ public class DeathReclaimLifecycleTest
         assertNotNull(wipe);
         assertTrue(EngineProbe.isAwaitingDeathReclaim(engine));
 
-        assertTrue(engine.abe(BossRetrievalCatalogue.axr("Talk-to", "Torfinn"), 40));
+        assertTrue(engine.abe(BossRetrievalCatalogue.a1("Talk-to", "Torfinn"), 40));
         engine.yz();
         Ac firstReturn = settle(engine, gear(1L, 0L, 150_000L, 0L), 4_000L);
         assertNotNull(firstReturn);
@@ -901,7 +901,7 @@ public class DeathReclaimLifecycleTest
         assertFalse("account restore cannot retain another owner's death whitelist",
             EngineProbe.isAwaitingDeathReclaim(engine));
         assertFalse(engine.abe(
-            BossRetrievalCatalogue.axr("Talk-to", "Torfinn"), 40));
+            BossRetrievalCatalogue.a1("Talk-to", "Torfinn"), 40));
         engine.yz();
         Ac newOwnerGain = settle(engine, gear(1L, 0L, 0L, 0L), 5_000L);
         assertNotNull(newOwnerGain);
@@ -927,7 +927,7 @@ public class DeathReclaimLifecycleTest
         assertTrue("pause must not discard same-owner death ownership evidence",
             EngineProbe.isAwaitingDeathReclaim(engine));
         assertTrue(engine.abe(
-            BossRetrievalCatalogue.axr("Talk-to", "Torfinn"), 40));
+            BossRetrievalCatalogue.a1("Talk-to", "Torfinn"), 40));
 
         engine.yz();
         Ac returned = settle(engine, gear(1L, 0L, 0L, 0L), 5_000L);
@@ -960,7 +960,7 @@ public class DeathReclaimLifecycleTest
         restarted.setBaseline(Cc.empty());
         assertTrue("a restart restores the pending reclaim", EngineProbe.isAwaitingDeathReclaim(restarted));
         assertTrue(restarted.abe(
-            BossRetrievalCatalogue.axr("Talk-to", "Torfinn"), 40));
+            BossRetrievalCatalogue.a1("Talk-to", "Torfinn"), 40));
 
         restarted.yz();
         Ac returned = settle(restarted, gear(1L, 0L, 0L, 0L), 12_000L);
@@ -1005,7 +1005,7 @@ public class DeathReclaimLifecycleTest
         first.yz();
         assertNotNull(settle(first, Cc.empty(), 1_600L));
         assertTrue(first.abe(
-            BossRetrievalCatalogue.axr("Talk-to", "Torfinn"), 40));
+            BossRetrievalCatalogue.a1("Talk-to", "Torfinn"), 40));
         first.yz();
         Ac partial = settle(first, gear(1L, 0L, 0L, 0L), 3_000L);
         assertNotNull(partial);
@@ -1022,7 +1022,7 @@ public class DeathReclaimLifecycleTest
         restarted.setBaseline(gear(1L, 0L, 0L, 0L));
         assertEquals(1L, restarted.tt().outstandingItemCount);
         assertTrue(restarted.abe(
-            BossRetrievalCatalogue.axr("Talk-to", "Torfinn"), 40));
+            BossRetrievalCatalogue.a1("Talk-to", "Torfinn"), 40));
         restarted.yz();
         Ac remainder = settle(restarted, gear(1L, 1L, 0L, 0L), 12_000L);
 
@@ -1041,7 +1041,7 @@ public class DeathReclaimLifecycleTest
         first.yz();
         assertNotNull(settle(first, Cc.empty(), 1_600L));
         assertTrue(first.abe(
-            BossRetrievalCatalogue.axr("Talk-to", "Torfinn"), 40));
+            BossRetrievalCatalogue.a1("Talk-to", "Torfinn"), 40));
         first.yz();
         assertNotNull(settle(first, gear(1L, 0L, 0L, 0L), 3_000L));
         assertNull(roundTrip(first.qm()).pendingDeathReclaim);
@@ -1052,7 +1052,7 @@ public class DeathReclaimLifecycleTest
         restarted.setBaseline(Cc.empty());
         assertFalse(EngineProbe.isAwaitingDeathReclaim(restarted));
         assertFalse("closed reclaim evidence cannot arm again", restarted.abe(
-            BossRetrievalCatalogue.axr("Talk-to", "Torfinn"), 40));
+            BossRetrievalCatalogue.a1("Talk-to", "Torfinn"), 40));
 
         restarted.yz();
         Ac later = settle(restarted, gear(1L, 0L, 0L, 0L), 12_000L);
@@ -1098,7 +1098,7 @@ public class DeathReclaimLifecycleTest
         restarted.resume(11_000L, Ed.IDLE, Ed.RECOVERY);
         restarted.setBaseline(gear(0L, 0L, 150_000L, 0L));
         assertTrue(restarted.abe(
-            BossRetrievalCatalogue.axr("Talk-to", "Priestess Zul-Gwenwynig"), 40));
+            BossRetrievalCatalogue.a1("Talk-to", "Priestess Zul-Gwenwynig"), 40));
         restarted.yz();
         Ac fee = settle(restarted, gear(1L, 0L, 50_000L, 0L), 12_000L);
 

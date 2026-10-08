@@ -1,0 +1,21 @@
+# Stores and exchanges whose own open window proves an item move is neutral: storing, taking back
+# or swapping keeps its worth (owner 2026-10-08). A click inside one names the item, never the store.
+# Death's coffer turns items into credit that only pays the reclaim and instance fees already
+# counted when paid. Item sets swap a set for its pieces (or back) at the Grand Exchange.
+# component id <TAB> RuneLite gameval InterfaceID name <TAB> receipt note
+43319297	IiElnockStorage.FRAME	Elnock's storage
+44630016	IiElnockStorageSide.UNIVERSE	Elnock's storage
+41353218	SeedVault.FRAME	Seed vault
+41287682	SeedVaultDeposit.INV	Seed vault
+61800449	SailingBoatCargohold.FRAME	Cargo hold
+61865985	SailingBoatCargoholdSide.ITEMS	Cargo hold
+43909121	DeathCoffer.FRAME	Death's coffer
+43974656	DeathCofferSide.ITEMS	Death's coffer
+29556737	Itemsets.FRAME	Item sets
+28180480	ItemsetsSide.ITEMS	Item sets
+44236802	PohCostumes.FRAME	Costume room
+44171264	PohCostumesSide.ITEMS	Costume room
+39649281	FossilStorage.FRAME	Fossil storage
+39976960	FossilStorageInv.INV	Fossil storage
+20250625	FossilDriftnetStore.FRAME	Drift net store
+20119552	FossilDriftnetSidestore.ITEMS	Drift net store

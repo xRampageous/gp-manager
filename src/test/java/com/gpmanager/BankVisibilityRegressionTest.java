@@ -53,6 +53,43 @@ public class BankVisibilityRegressionTest
         assertFalse(Ee.yf(closed));
     }
 
+    /**
+     * Owner 2026-10-08: storing in or taking from a store with its own window (Elnock, the seed
+     * vault, a cargo hold, Death's coffer, item sets...) is no loot. Every d29 row names a real
+     * RuneLite component, and only that store's window gives its note.
+     */
+    @Test public void storeWindowsAreStorageWhileEitherPanelShows() throws Exception
+    {
+        Widget shown = proxy(Widget.class, name -> "isHidden".equals(name) ? false : null);
+        assertTrue(Ee.STORES.size() >= 16);
+        for (String[] row : Ee.STORES)
+        {
+            String[] name = row[1].split("\\.");
+            int component = Class.forName("net.runelite.api.gameval.InterfaceID$" + name[0])
+                .getField(name[1]).getInt(null);
+            assertEquals(row[1], component, Integer.parseInt(row[0]));
+            Client open = (Client) Proxy.newProxyInstance(Client.class.getClassLoader(), new Class<?>[] {Client.class},
+                (obj, method, args) -> "getWidget".equals(method.getName()) && args.length == 1
+                    && Integer.valueOf(component).equals(args[0]) ? shown : null);
+            assertEquals(row[1], row[2], Ee.store(open));
+            assertFalse("not the tool store", Ee.yf(open));
+            assertFalse("not the Grand Exchange", Ee.wq(open));
+        }
+        assertNull(Ee.store(proxy(Client.class, name -> null)));
+    }
+
+    /** A banker's collection box collects Grand Exchange offers: a Collect there is GE evidence. */
+    @Test public void collectionBoxCountsAsTheGrandExchange()
+    {
+        Widget shown = proxy(Widget.class, name -> "isHidden".equals(name) ? false : null);
+        int box = net.runelite.api.gameval.InterfaceID.GeCollect.UNIVERSE;
+        Client open = (Client) Proxy.newProxyInstance(Client.class.getClassLoader(), new Class<?>[] {Client.class},
+            (obj, method, args) -> "getWidget".equals(method.getName()) && args.length == 1
+                && Integer.valueOf(box).equals(args[0]) ? shown : null);
+        assertTrue(Ee.wq(open));
+        assertFalse(Ee.wq(proxy(Client.class, name -> null)));
+    }
+
     private boolean bankOpen(boolean visible) throws Exception
     {
         ItemContainer cachedBank = proxy(ItemContainer.class, (name) -> null);

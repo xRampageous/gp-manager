@@ -12,15 +12,16 @@ import static com.gpmanager.Ai.*;
 * Presentation only; nothing here books or values money, it only mirrors the bookings.
 */
 class HudTray {
-/** A single drop worth this much lights its row gold and raises a moment. */
+/** A single drop worth this much lights its row gold and raises a moment, unless Ground Items sets it. */
 static final long BIG_DROP = 10_000_000L;
+long big = BIG_DROP;
 /** Bounded presentation mirror of canonical receipts eligible for own-drop recovery. */
 static final int MAX_DROP_RECEIPTS = 64;
 enum State {
  RECEIVED(""), PENDING("pending"), CLAIMED("claimed"), LOST("lost"), RECOVERED("recovered"), TRADED("traded");
- final String tag;
- State(String tag) {
-  this.tag = tag;
+ String tag;
+ State(String /* tag */c) {
+  this.tag = c;
  }
 }
 
@@ -35,25 +36,27 @@ static class Entry {
  long value;
  boolean gold;
  long born;
+ /** The last time this entry grew; the tray opens and folds by its visible entries' times. */
+ long touched;
 }
 
 static class DropReceipt {
- final Ac transaction;
- final int itemId;
+ Ac transaction;
+ int itemId;
  long lastQuantity;
  long lastValue;
- DropReceipt(Ac transaction, int itemId) {
-  this.transaction = transaction;
-  this.itemId = itemId;
+ DropReceipt(Ac /* transaction */c, int /* itemId */d) {
+  this.transaction = c;
+  this.itemId = d;
  }
 }
 
-final Map<String, Entry> entries = new LinkedHashMap<>();
+Map<String, Entry> entries = new LinkedHashMap<>();
 /** Receipt references are presentation-only and live no longer than the tray streak/session. */
-final List<DropReceipt> dropReceipts = new ArrayList<>();
+List<DropReceipt> dropReceipts = new ArrayList<>();
 /** The NPC this streak first killed ("" before its first kill), every NPC it killed, and its kills. */
 String source = "";
-final Set<String> npcs = new LinkedHashSet<>();
+Set<String> npcs = new LinkedHashSet<>();
 int kills;
 /** The streak a switch of target ended, kept through its quiet gap: switching back merges it. */
 Map<String, Entry> prevEntries = new LinkedHashMap<>();
@@ -65,7 +68,6 @@ int prevTrip;
 long prevEventAt;
 long lastEventAt;
 /** When an item last arrived: the tray opens on items only, never on a kill or an attack. */
-long shownAt;
 /** Changes with every new streak (and on clear); HUD+ rebases the streak's Net and width on it. */
 int tripId;
 String label = "Looted";
@@ -75,155 +77,149 @@ long lastDelta;
 long lastDeltaAt;
 long bigDropAt;
 /** A booking settled; mirror its visible item flows onto the tray. */
-synchronized void booked(Ac transaction, long now, boolean xy) {
- if (transaction == null) return;
- if (!transaction.isCounted() || transaction.getType() == Ai.TRANSFER
- || transaction.getCorrection() == Ah.TRANSFER || transaction.getType() == UNCERTAIN
+synchronized void booked(Ac /* transaction */b, long /* now */c, boolean /* xy */d) {
+ if (b == null) return;
+ if (!b.isCounted() || b.getType() == Ai.TRANSFER
+ || b.getCorrection() == Ah.TRANSFER || b.getType() == UNCERTAIN
  // Owner 2026-09-28: eating and drinking stay off HUD+ (a sip's "(3)" is no drop).
- || transaction.getActionKind() == Au.EAT || transaction.getActionKind() == Au.DRINK
- || Bn.wi(transaction.getFlows())) {
+ || b.getActionKind() == Au.EAT || b.getActionKind() == Au.DRINK
+ || Bn.wi(b.getFlows())) {
   return;
  }
- boolean market = transaction.getContext() == Aj.MARKET || transaction.getType() == TRADE;
- boolean claimed = transaction.getActionKind() == Au.DEFERRED_CLAIM || !transaction.uo().isEmpty();
- if (!npcs.isEmpty() && transaction.getNote().startsWith("Loot from ")
- && !has(npcs, transaction.getActivityName())) {
+ boolean /* market */e = b.getContext() == Aj.MARKET || b.getType() == TRADE;
+ boolean /* claimed */f = b.getActionKind() == Au.DEFERRED_CLAIM || !b.uo().isEmpty();
+ if (!npcs.isEmpty() && b.getNote().startsWith("Loot from ")
+ && !has(npcs, b.getActivityName())) {
   // Another NPC's leftover drop, picked up after this streak began: it counts in Net, not here.
   return;
  }
- boolean reclaim = (transaction.getActivityName() + " " + transaction.getNote()).toLowerCase(ROOT).contains("reclaim");
+ boolean /* reclaim */g = (b.getActivityName() + " " + b.getNote()).toLowerCase(ROOT).contains("reclaim");
  // Only deaths, drops and destroys ride the tray as lost; other item use is routine.
- String dropped = Ag.has(transaction.getNote(), "Dropped", "Destroyed") ? transaction.getNote() : "";
- boolean lost = transaction.tm() == PK_DEATH_LOSS
- || transaction.getContext() == Aj.PK_DEATH || !dropped.isEmpty();
- boolean any = false;
- long delta = 0L;
- for (Ab flow : transaction.getFlows()) {
-  if (flow == null || flow.quantityDelta == 0L) continue;
-  boolean gain = flow.quantityDelta > 0L;
+ String /* dropped */h = Ag.has(b.getNote(), "Dropped", "Destroyed") ? b.getNote() : "";
+ boolean /* lost */i = b.tm() == PK_DEATH_LOSS
+ || b.getContext() == Aj.PK_DEATH || !h.isEmpty();
+ boolean /* any */j = false;
+ long /* delta */k = 0L;
+ for (Ab /* flow */l : b.getFlows()) {
+  if (l == null || l.quantityDelta == 0L) continue;
+  boolean /* gain */m = l.quantityDelta > 0L;
   // Routine rune/ammo/charge use never rides the tray, but a pickup is a drop
   // like any other (owner 2026-09-29).
-  if (!gain && routine(flow.itemName)) continue;
-  if (!gain && (market || !lost)) continue;
-  if (!any) {
+  if (!m && routine(l.itemName)) continue;
+  if (!m && (e || !i)) continue;
+  if (!j) {
    // A drop joins the running trip; on an empty tray it reads "Dropped" (owner 2026-09-28).
-   event(now, xy, claimed ? "Claimed" : !dropped.isEmpty() ? null : lost ? "Lost"
-   : verb(transaction, flow.itemName, now), null);
-   if (!dropped.isEmpty() && entries.isEmpty()) label = dropped;
-   shownAt = now;
-   any = true;
+   event(c, d, f ? "Claimed" : !h.isEmpty() ? null : i ? "Lost"
+   : verb(b, l.itemName, c), null);
+   if (!h.isEmpty() && entries.isEmpty()) label = h;
+   j = true;
   }
-  int id = flow.itemId;
-  long quantity = abs(flow.quantityDelta);
-  State state = !gain ? State.LOST : market ? State.TRADED : reclaim ? State.RECOVERED
-  : claimed ? State.CLAIMED : State.RECEIVED;
-  long born = 0L;
-  if (state == State.RECEIVED || state == State.CLAIMED) {
+  int /* id */n = l.itemId;
+  long /* quantity */o = abs(l.quantityDelta);
+  State /* state */p = !m ? State.LOST : e ? State.TRADED : g ? State.RECOVERED
+  : f ? State.CLAIMED : State.RECEIVED;
+  long /* born */q = 0L;
+  if (p == State.RECEIVED || p == State.CLAIMED) {
    // A claim turns its pending row into Claimed in place, keeping its first-seen identity.
-   Entry pending = entries.get(key(State.PENDING, id));
-   if (pending != null && take(State.PENDING, id, quantity) > 0L) {
-    state = State.CLAIMED;
-    born = pending.born;
+   Entry /* pending */r = entries.get(key(State.PENDING, n));
+   if (r != null && take(State.PENDING, n, o) > 0L) {
+    p = State.CLAIMED;
+    q = r.born;
    }
   }
-  Entry entry = add(id, flow.itemName, state, flow.unitPrice, quantity, flow.valueDelta, now, born);
-  delta += state == State.TRADED ? 0L : flow.valueDelta;
-  if (gain && state != State.TRADED && flow.valueDelta >= BIG_DROP) {
-   entry.gold = true;
-   bigDrop = flow.itemName;
-   bigDropAt = now;
+  Entry /* entry */t = add(n, l.itemName, p, l.unitPrice, o, l.valueDelta, c, q);
+  k += p == State.TRADED ? 0L : l.valueDelta;
+  if (m && p != State.TRADED && l.valueDelta >= big) {
+   t.gold = true;
+   bigDrop = l.itemName;
+   bigDropAt = c;
   }
  }
- if (any && delta != 0L) {
-  lastDelta = delta;
-  lastDeltaAt = now;
+ if (j && k != 0L) {
+  lastDelta = k;
+  lastDeltaAt = c;
  }
- afq(transaction);
+ afq(b);
 }
 
 /**
 * A reward window reported loot it is holding; nothing is counted until it settles. Ground
 * loot never comes here: the tray lists what was received, so a pickup appears once, in place.
 */
-synchronized void observed(int itemId, String name, long quantity, long unitPrice, long now, boolean xy) {
- if (quantity <= 0L) return;
- event(now, xy, null, null);
- shownAt = now;
- add(itemId, name, State.PENDING, unitPrice, quantity, unitPrice * quantity, now, 0L);
+synchronized void observed(int /* itemId */a, String /* name */b, long /* quantity */c, long /* unitPrice */d, long /* now */e, boolean /* xy */f) {
+ if (c <= 0L) return;
+ event(e, f, null, null);
+ add(a, b, State.PENDING, d, c, d * c, e, 0L);
 }
 
-/** When the tray folds after its last item. */
-synchronized long foldAt(long aix) {
- return shownAt + aix;
-}
 
 /**
 * One NPC loot event is one kill; a kill of another NPC starts that NPC's streak, unless it was
 * killed in the streak before, still inside that streak's quiet gap: then both are one mixed
 * streak again (owner 1.1).
 */
-synchronized void kill(String npc, long now, boolean xy) {
- String name = npc == null ? "" : npc.trim();
- if (name.isEmpty() || "NPC loot".equals(name)) return;
- if (!has(npcs, name)) {
+synchronized void kill(String /* npc */a, long /* now */b, boolean /* xy */c) {
+ String /* name */d = a == null ? "" : a.trim();
+ if (d.isEmpty() || "NPC loot".equals(d)) return;
+ if (!has(npcs, d)) {
   if (kills > 0) {
    // The new target's first kill refreshes the tray to its own streak; loot already
    // booked before any kill stays (owner 2026-10-01).
-   boolean back = has(prevNpcs, name) && now - prevEventAt < aef();
-   var rows = new LinkedHashMap<String, Entry>(entries);
-   var drops = new ArrayList<DropReceipt>(dropReceipts);
-   var was = new LinkedHashSet<String>(npcs);
-   int had = kills;
-   int trip = tripId;
-   long last = lastEventAt;
-   String from = source;
-   restart(xy);
-   if (back) {
-    if (!xy) {
+   boolean /* back */e = has(prevNpcs, d) && b - prevEventAt < aef();
+   var /* rows */f = new LinkedHashMap<String, Entry>(entries);
+   var /* drops */g = new ArrayList<DropReceipt>(dropReceipts);
+   var /* was */h = new LinkedHashSet<String>(npcs);
+   int /* had */i = kills;
+   int /* trip */j = tripId;
+   long /* last */k = lastEventAt;
+   String /* from */l = source;
+   restart(c);
+   if (e) {
+    if (!c) {
      merge(prevEntries.values());
-     merge(rows.values());
+     merge(f.values());
      dropReceipts.addAll(prevDrops);
-     dropReceipts.addAll(drops);
+     dropReceipts.addAll(g);
     }
     npcs.addAll(prevNpcs);
-    npcs.addAll(was);
-    kills = prevKills + had;
+    npcs.addAll(h);
+    kills = prevKills + i;
     tripId = prevTrip;
     source = prevSource;
     prevNpcs = new LinkedHashSet<>();
    } else {
-    prevEntries = rows;
-    prevDrops = drops;
-    prevNpcs = was;
-    prevKills = had;
-    prevTrip = trip;
-    prevEventAt = last;
-    prevSource = from;
+    prevEntries = f;
+    prevDrops = g;
+    prevNpcs = h;
+    prevKills = i;
+    prevTrip = j;
+    prevEventAt = k;
+    prevSource = l;
    }
   }
   label = "Looted";
  }
- event(now, xy, "Looted", name);
+ event(b, c, "Looted", d);
  kills++;
 }
 
 /** The live kill streak ("Guard & Man", 5), or null before a kill or once the streak went quiet. */
-synchronized Map.Entry<String, Integer> streak(long now) {
- return kills == 0 || now - lastEventAt >= aef() ? null : new AbstractMap.SimpleImmutableEntry<>(names(), kills);
+synchronized Map.Entry<String, Integer> streak(long /* now */a) {
+ return kills == 0 || a - lastEventAt >= aef() ? null : new AbstractMap.SimpleImmutableEntry<>(names(), kills);
 }
 
 /** The streak's NPCs: "Guard", "Guard & Man", "Guard, Man +1"; empty before a kill. */
 synchronized String names() {
- var list = new ArrayList<String>();
- for (String npc : npcs) list.add(Fmt.activity(npc));
- int n = list.size();
- return n == 0 ? "" : n == 1 ? list.get(0) : n == 2 ? list.get(0) + " & " + list.get(1)
- : list.get(0) + ", " + list.get(1) + " +" + (n - 2);
+ var /* list */a = new ArrayList<String>();
+ for (String /* npc */b : npcs) a.add(Fmt.activity(b));
+ int n = a.size();
+ return n == 0 ? "" : n == 1 ? a.get(0) : n == 2 ? a.get(0) + " & " + a.get(1)
+ : a.get(0) + ", " + a.get(1) + " +" + (n - 2);
 }
 
-static boolean has(Set<String> names, String name) {
- for (String each : names) {
-  if (each.equalsIgnoreCase(name)) return true;
+static boolean has(Set<String> /* names */a, String /* name */b) {
+ for (String /* each */c : a) {
+  if (c.equalsIgnoreCase(b)) return true;
  }
  return false;
 }
@@ -238,7 +234,6 @@ synchronized void clear() {
  prevNpcs = new LinkedHashSet<>();
  kills = 0;
  lastEventAt = 0L;
- shownAt = 0L;
  lastDelta = 0L;
  lastDeltaAt = 0L;
  bigDrop = "";
@@ -246,17 +241,14 @@ synchronized void clear() {
  label = "Looted";
 }
 
-synchronized boolean open(long now, long aix, boolean alwaysOpen) {
- aec();
- return !entries.isEmpty() && (alwaysOpen || now - shownAt < aix);
-}
 
 /** Newest arrivals first; a row keeps its place while its quantity grows. */
 synchronized List<Entry> entries() {
  aec();
- var list = new ArrayList<Entry>(entries.values());
- list.sort((a, b) -> Long.compare(b.born, a.born));
- return list;
+ var /* list */c = new ArrayList<Entry>(entries.values());
+ // Owner 1.2: the row that last grew leads, so the newest loot is always on top.
+ c.sort((a, b) -> a.touched != b.touched ? Long.compare(b.touched, a.touched) : Long.compare(b.born, a.born));
+ return c;
 }
 
 /** The newest booking's counted change, e.g. +23 for one more item; 0 before any. */
@@ -272,7 +264,7 @@ synchronized long lastDeltaAt() {
 /** Something booked rides the tray; a reward window's held (pending) loot is not booked yet. */
 synchronized boolean aup() {
  aec();
- return entries.values().stream().anyMatch(entry -> entry.state != State.PENDING);
+ return entries.values().stream().anyMatch(/* entry */a -> a.state != State.PENDING);
 }
 
 synchronized int tripId() {
@@ -285,8 +277,8 @@ synchronized String label() {
 }
 
 /** The newest big drop's name while it is fresh (moments show it a few seconds). */
-synchronized String bigDrop(long now, long forMillis) {
- return now - bigDropAt < forMillis ? bigDrop : "";
+synchronized String bigDrop(long /* now */a, long /* forMillis */b) {
+ return a - bigDropAt < b ? bigDrop : "";
 }
 
 /**
@@ -294,21 +286,21 @@ synchronized String bigDrop(long now, long forMillis) {
 * "Looted") or a kill of another NPC ends it; the next streak starts with an empty tray unless
 * rows keep for the whole session. Folding only hides the tray; it never ends a streak.
 */
-void event(long now, boolean xy, String kind, String npc) {
- if (lastEventAt > 0L && now - lastEventAt >= aef() || kind != null && !kind.equals(label)
- || npc != null && !npcs.isEmpty() && !has(npcs, npc)) {
-  restart(xy);
+void event(long /* now */a, boolean /* xy */b, String /* kind */c, String /* npc */d) {
+ if (lastEventAt > 0L && a - lastEventAt >= aef() || c != null && !c.equals(label)
+ || d != null && !npcs.isEmpty() && !has(npcs, d)) {
+  restart(b);
  }
- if (kind != null) label = kind;
- if (npc != null) {
-  if (source.isEmpty()) source = npc;
-  npcs.add(npc);
+ if (c != null) label = c;
+ if (d != null) {
+  if (source.isEmpty()) source = d;
+  npcs.add(d);
  }
- lastEventAt = now;
+ lastEventAt = a;
 }
 
-void restart(boolean xy) {
- if (!xy) {
+void restart(boolean /* xy */a) {
+ if (!a) {
   entries.clear();
   dropReceipts.clear();
  }
@@ -327,114 +319,115 @@ synchronized String avk() {
 /** A streak goes quiet after three of its own kill intervals: at least a minute, at most five. */
 volatile long keepMillis = 60_000L;
 /** Owner-set streak window: the tray ends a streak this long after its last kill. */
-synchronized void keepMillis(long millis) {
- keepMillis = max(10_000L, min(3_600_000L, millis));
+synchronized void keepMillis(long /* millis */a) {
+ keepMillis = max(10_000L, min(3_600_000L, a));
 }
 
 long aef() {
  return keepMillis;
 }
 
-long take(State from, int itemId, long quantity) {
- Entry source = entries.get(key(from, itemId));
- if (source == null) return 0L;
- long moved = min(quantity, source.quantity);
- source.quantity -= moved;
- source.value = source.unitPrice * source.quantity;
- if (source.quantity <= 0L) entries.remove(key(from, itemId));
- return moved;
+long take(State /* from */a, int /* itemId */b, long /* quantity */c) {
+ Entry /* source */d = entries.get(key(a, b));
+ if (d == null) return 0L;
+ long /* moved */e = min(c, d.quantity);
+ d.quantity -= e;
+ d.value = d.unitPrice * d.quantity;
+ if (d.quantity <= 0L) entries.remove(key(a, b));
+ return e;
 }
 
-void merge(Collection<Entry> rows) {
- for (Entry row : rows) {
-  add(row.itemId, row.name, row.state, row.unitPrice, row.quantity, row.value, 0L, row.born).gold |= row.gold;
+void merge(Collection<Entry> /* rows */a) {
+ for (Entry /* row */b : a) {
+  add(b.itemId, b.name, b.state, b.unitPrice, b.quantity, b.value, 0L, b.born).gold |= b.gold;
  }
 }
 
-Entry add(int itemId, String name, State state, long unitPrice, long quantity, long value, long now, long born) {
- Entry entry = entries.computeIfAbsent(key(state, itemId),
- ignored -> new Entry(itemId, name == null ? "Unknown item" : name, state, unitPrice));
- if (entry.born == 0L) entry.born = born != 0L ? born : now;
- entry.quantity += quantity;
- entry.value += value;
- return entry;
+Entry add(int /* itemId */a, String /* name */b, State /* state */c, long /* unitPrice */d, long /* quantity */e, long /* value */f, long /* now */g, long /* born */h) {
+ Entry /* entry */i = entries.computeIfAbsent(key(c, a),
+ /* ignored */j -> new Entry(a, b == null ? "Unknown item" : b, c, d));
+ if (i.born == 0L) i.born = h != 0L ? h : g;
+ i.touched = g;
+ i.quantity += e;
+ i.value += f;
+ return i;
 }
 
-void afq(Ac transaction) {
- if (!"Dropped".equals(transaction.getNote()) || !transaction.isCounted() || !transaction.xe()
- || transaction.getCorrection() != Ah.AUTO) {
+void afq(Ac /* transaction */a) {
+ if (!"Dropped".equals(a.getNote()) || !a.isCounted() || !a.xe()
+ || a.getCorrection() != Ah.AUTO) {
   return;
  }
- for (Ab flow : transaction.getFlows()) {
-  if (flow == null || !flow.isCost() || flow.itemId <= 0) continue;
-  boolean known = dropReceipts.stream().anyMatch(receipt -> receipt.transaction == transaction
-  && receipt.itemId == flow.itemId);
-  if (known) continue;
-  DropReceipt receipt = new DropReceipt(transaction, flow.itemId);
-  long[] costs = nq(receipt);
-  receipt.lastQuantity = costs[0];
-  receipt.lastValue = costs[1];
-  dropReceipts.add(receipt);
+ for (Ab /* flow */b : a.getFlows()) {
+  if (b == null || !b.isCost() || b.itemId <= 0) continue;
+  boolean /* known */c = dropReceipts.stream().anyMatch(/* receipt */d -> d.transaction == a
+  && d.itemId == b.itemId);
+  if (c) continue;
+  DropReceipt /* receipt */e = new DropReceipt(a, b.itemId);
+  long[] /* costs */f = nq(e);
+  e.lastQuantity = f[0];
+  e.lastValue = f[1];
+  dropReceipts.add(e);
  }
  while (dropReceipts.size() > MAX_DROP_RECEIPTS) dropReceipts.remove(0);
 }
 
 synchronized void aec() {
- for (DropReceipt receipt : dropReceipts) {
-  long[] costs = nq(receipt);
-  long apu = receipt.lastQuantity - costs[0];
-  long apv = receipt.lastValue - costs[1];
-  if (apu > 0L && apv >= 0L) {
-   afo(receipt.itemId, apu, apv);
+ for (DropReceipt /* receipt */a : dropReceipts) {
+  long[] /* costs */b = nq(a);
+  long /* apu */c = a.lastQuantity - b[0];
+  long /* apv */d = a.lastValue - b[1];
+  if (c > 0L && d >= 0L) {
+   afo(a.itemId, c, d);
   }
-  receipt.lastQuantity = costs[0];
-  receipt.lastValue = costs[1];
+  a.lastQuantity = b[0];
+  a.lastValue = b[1];
  }
 }
 
-long[] nq(DropReceipt receipt) {
- long quantity = 0L;
- long value = 0L;
- for (Ab flow : receipt.transaction.getFlows()) {
-  if (flow == null || flow.itemId != receipt.itemId || !flow.isCost()) continue;
-  Bp.Ax amounts = Bp.flow(receipt.transaction, flow);
-  if (amounts.costs <= 0L) continue;
-  quantity = Ae.safeAdd(quantity, Ae.abs(flow.quantityDelta));
-  value = Ae.safeAdd(value, amounts.costs);
+long[] nq(DropReceipt /* receipt */a) {
+ long /* quantity */b = 0L;
+ long /* value */c = 0L;
+ for (Ab /* flow */d : a.transaction.getFlows()) {
+  if (d == null || d.itemId != a.itemId || !d.isCost()) continue;
+  Bp.Ax /* amounts */e = Bp.flow(a.transaction, d);
+  if (e.costs <= 0L) continue;
+  b = Ae.safeAdd(b, Ae.abs(d.quantityDelta));
+  c = Ae.safeAdd(c, e.costs);
  }
- return new long[] {quantity, value};
+ return new long[] {b, c};
 }
 
-boolean afo(int itemId, long quantity, long value) {
- Entry entry = entries.get(key(State.LOST, itemId));
- if (entry == null || quantity <= 0L || entry.quantity < quantity) return false;
- entry.quantity -= quantity;
- entry.value = min(0L, Ae.safeAdd(entry.value, value));
- if (entry.quantity <= 0L) entries.remove(key(State.LOST, itemId));
+boolean afo(int /* itemId */a, long /* quantity */b, long /* value */c) {
+ Entry /* entry */d = entries.get(key(State.LOST, a));
+ if (d == null || b <= 0L || d.quantity < b) return false;
+ d.quantity -= b;
+ d.value = min(0L, Ae.safeAdd(d.value, c));
+ if (d.quantity <= 0L) entries.remove(key(State.LOST, a));
  return true;
 }
 
-static String key(State state, int itemId) {
- return state.name() + ":" + itemId;
+static String key(State /* state */a, int /* itemId */b) {
+ return a.name() + ":" + b;
 }
 
 /** Runes, ammunition and charges are routine use: they count in Net but never ride the tray. */
-static boolean routine(String name) {
- String lower = name == null ? "" : name.toLowerCase(ROOT);
- return lower.endsWith(" rune") || lower.endsWith(" runes") || lower.contains("arrow")
- || lower.endsWith(" bolts") || lower.contains(" bolts (") || lower.endsWith(" dart")
- || Ag.has(lower, "javelin", "throwing", "zulrah's scales");
+static boolean routine(String /* name */a) {
+ String /* lower */b = a == null ? "" : a.toLowerCase(ROOT);
+ return b.endsWith(" rune") || b.endsWith(" runes") || b.contains("arrow")
+ || b.endsWith(" bolts") || b.contains(" bolts (") || b.endsWith(" dart")
+ || Ag.has(b, "javelin", "throwing", "zulrah's scales");
 }
 
 static final List<String[]> VERBS = Ak.rows("d17");
 static final Set<String> MINIONS = new HashSet<>();
 static {
- Ak.rows("d16").forEach(row -> MINIONS.add(row[0]));
+ Ak.rows("d16").forEach(/* row */c -> MINIONS.add(c[0]));
 }
 
 /** A boss's spawn (Greater Nechryael's death spawns): no header, streak, kill or activity of its own. */
-static boolean minion(String npc) {
- return npc != null && MINIONS.contains(npc.trim().toLowerCase(ROOT));
+static boolean minion(String /* npc */a) {
+ return a != null && MINIONS.contains(Ag.lower(a));
 }
 
 /** The newest skilling XP's tray verb ("Mined") and when it arrived. */
@@ -442,11 +435,11 @@ String xpVerb = "Looted";
 long xpAt;
 
 /** Skill XP arrived: an item booked moments later is that skill's work. */
-synchronized void xp(String skill, long now) {
- String kind = awl(skill);
- if ("Looted".equals(kind)) return;
- xpVerb = kind;
- xpAt = now;
+synchronized void xp(String /* skill */a, long /* now */b) {
+ String /* kind */c = awl(a);
+ if ("Looted".equals(c)) return;
+ xpVerb = c;
+ xpAt = b;
 }
 
 /**
@@ -454,21 +447,21 @@ synchronized void xp(String skill, long now) {
 * the item, else the activity. The activity names a skill only after its second XP drop, so it
 * can still be General, or the last skill, on a run's first item: every run stays one streak.
 */
-String verb(Ac transaction, String item, long now) {
- String kind = transaction.getContext() == Aj.PRODUCTION ? awl(transaction.getNote()) : "Looted";
- if ("Looted".equals(kind) && (transaction.getType() == GAIN || transaction.getType() == PROCESSING)
- && now - xpAt < 6_000L) {
-  kind = xpVerb;
+String verb(Ac /* transaction */b, String /* item */c, long /* now */d) {
+ String /* kind */e = b.getContext() == Aj.PRODUCTION ? awl(b.getNote()) : "Looted";
+ if ("Looted".equals(e) && (b.getType() == GAIN || b.getType() == PROCESSING)
+ && d - xpAt < 6_000L) {
+  e = xpVerb;
  }
- if ("Looted".equals(kind)) kind = awl(transaction.getActivityName());
+ if ("Looted".equals(e)) e = awl(b.getActivityName());
  // Smithing XP makes bars at a furnace and items at an anvil.
- return "Smithed".equals(kind) && item != null && item.endsWith(" bar") ? "Smelted" : kind;
+ return "Smithed".equals(e) && c != null && c.endsWith(" bar") ? "Smelted" : e;
 }
 
-static String awl(String activity) {
- String lower = activity == null ? "" : activity.toLowerCase(ROOT);
- for (String[] row : VERBS) {
-  if (lower.contains(row[0])) return row[1];
+static String awl(String /* activity */a) {
+ String /* lower */b = a == null ? "" : a.toLowerCase(ROOT);
+ for (String[] /* row */c : VERBS) {
+  if (b.contains(c[0])) return c[1];
  }
  return "Looted";
 }

@@ -18,14 +18,14 @@ void clear() {
 
 /** Soft-busy across Make-X / process XP gaps. */
 void abn() {
- model.abn(System.currentTimeMillis());
+ model.abn(Ae.now());
 }
 
 /** @return true once when the character newly becomes idle */
 boolean onGameTick() {
- Player local = client.getLocalPlayer();
- boolean animating = local != null && local.getAnimation() != -1;
- boolean interacting = local != null && local.getInteracting() != null;
- return model.tick(animating, interacting, System.currentTimeMillis());
+ Player /* local */a = client.getLocalPlayer();
+ boolean /* animating */b = a != null && a.getAnimation() != -1;
+ boolean /* interacting */c = a != null && a.getInteracting() != null;
+ return model.tick(b, c, Ae.now());
 }
 }

@@ -19,18 +19,18 @@ static final int[] SAFE_ARENA_REGIONS = {9520, 8237, 8493, 8749, 9552};
 * @param pvpArenaWorld     {@code THIS_IS_A_PVP_ARENA_WORLD} varbit (safe PvP Arena)
 * @param regionId          current region, or {@code <= 0} when unknown
 */
-static Dh classify(boolean insideWilderness, boolean pvpSpecOrb, boolean pvpOrBhWorld,
-boolean pvpArenaWorld, int regionId) {
- if (pvpArenaWorld || xw(regionId)) return SAFE_PVP_OR_MINIGAME;
- if (insideWilderness || (pvpOrBhWorld && pvpSpecOrb)) return DANGEROUS_PVP;
+static Dh classify(boolean /* insideWilderness */a, boolean /* pvpSpecOrb */b, boolean /* pvpOrBhWorld */c,
+boolean /* pvpArenaWorld */d, int /* regionId */e) {
+ if (d || xw(e)) return SAFE_PVP_OR_MINIGAME;
+ if (a || (c && b)) return DANGEROUS_PVP;
  return NONE;
 }
 
-static boolean xw(int regionId) {
- if (MinigameRegionHints.xh(regionId)) return true;
- if (regionId > 0) {
-  for (int region : SAFE_ARENA_REGIONS) {
-   if (region == regionId) return true;
+static boolean xw(int /* regionId */a) {
+ if (MinigameRegionHints.xh(a)) return true;
+ if (a > 0) {
+  for (int /* region */b : SAFE_ARENA_REGIONS) {
+   if (b == a) return true;
   }
  }
  return false;

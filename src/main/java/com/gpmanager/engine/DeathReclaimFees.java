@@ -6,7 +6,7 @@ import static com.gpmanager.Ak.msg;
 * published service amount is explanation text.
 */
 class DeathReclaimFees {
-static String vc(boolean ironman) {
- return ironman ? msg("ap") : msg("ca");
+static String vc(boolean /* ironman */a) {
+ return a ? msg("ap") : msg("ca");
 }
 }

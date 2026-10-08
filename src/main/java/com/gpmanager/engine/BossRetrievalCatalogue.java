@@ -17,29 +17,29 @@ static final long VARIABLE_FEE = -1L;
 static final long TIERED_FEE = -2L;
 @AllArgsConstructor
 static class Service {
- final String key;
- final String activity;
- final String interactable;
- final long expectedFee;
- final String note;
+ String key;
+ String activity;
+ String interactable;
+ long expectedFee;
+ String note;
  /**
  * Target name shared with unrelated scenery (a bare "Chest", a gravestone): only
  * evidence when a local PvM death is still awaiting reclaim.
  */
- final boolean ambiguousTarget;
+ boolean ambiguousTarget;
  /** Ledger explanation for an observed coin payment at this service. */
- String why(long observedCoins) {
-  var why = new StringBuilder("Item retrieval fee — ").append(activity).append(" (").append(interactable).append(")");
+ String why(long /* observedCoins */b) {
+  var /* why */c = new StringBuilder(msg("a4")).append(activity).append(" (").append(interactable).append(")");
   if (expectedFee > 0L) {
-   why.append(", published ").append(String.format(ROOT, "%,d", expectedFee));
-   if (observedCoins > 0L && observedCoins != expectedFee) {
-    why.append(", observed ").append(String.format(ROOT, "%,d", observedCoins));
+   c.append(", published ").append(String.format(ROOT, "%,d", expectedFee));
+   if (b > 0L && b != expectedFee) {
+    c.append(", observed ").append(String.format(ROOT, "%,d", b));
    }
   } else if (expectedFee == VARIABLE_FEE) {
-   why.append(", fee varies");
+   c.append(", fee varies");
   }
-  if (!note.isEmpty()) why.append(". ").append(note);
-  return why.toString();
+  if (!note.isEmpty()) c.append(". ").append(note);
+  return c.toString();
  }
 }
 
@@ -56,19 +56,24 @@ static {
 * (see {@link #isRetrievalOption}). Ambiguous targets ("Chest", "Gravestone", "Death")
 * are returned too; the engine only acts on them while a local PvM death awaits reclaim.
 */
-static Service axr(String option, String target) {
- if (target == null || option == null || !option.trim().toLowerCase(ROOT).matches(msg("e"))) {
+
+
+/** Menu verbs that open or complete a reclaim. */
+/** Existing reclaim vocabulary and grave prefix compiled once from d18. */
+static final java.util.regex.Pattern V = Ak.pattern("reclaim");
+static final java.util.regex.Pattern G = Ak.pattern("grave");
+static Service a1(String /* option */a, String /* target */b) {
+ if (b == null || a == null || !V.matcher(Ag.lower(a)).matches()) {
   return null;
  }
- String lower = target.trim().toLowerCase(ROOT);
- if (lower.isEmpty()) return null;
- Service exact = BY_INTERACTABLE.get(lower);
- if (exact != null) return exact;
- for (Map.Entry<String, Service> entry : BY_INTERACTABLE.entrySet()) {
-  if (!entry.getValue().ambiguousTarget && lower.contains(entry.getKey())) return entry.getValue();
+ String /* lower */c = Ag.lower(b);
+ if (c.isEmpty()) return null;
+ Service /* exact */d = BY_INTERACTABLE.get(c);
+ if (d != null) return d;
+ for (Map.Entry<String, Service> /* entry */f : BY_INTERACTABLE.entrySet()) {
+  if (!f.getValue().ambiguousTarget && c.contains(f.getKey())) return f.getValue();
  }
- if (lower.startsWith("gravestone") || lower.startsWith("grave")) return BY_INTERACTABLE.get("gravestone");
+ if (G.matcher(c).matches()) return BY_INTERACTABLE.get("gravestone");
  return null;
 }
-
-/** Menu verbs that open or complete a reclaim. */}
+}

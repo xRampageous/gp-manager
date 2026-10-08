@@ -160,7 +160,7 @@ public class GeSellClassificationTest
 
         Bj ledger = new Bj();
         noteGe(engine, ledger, 0, SELLING, ItemID.NATURERUNE, 5, 0, 200, 0, now);
-        engine.noteConsumptionIntent(ItemID.NATURERUNE, 18, false, Au.CAST);
+        engine.ci(ItemID.NATURERUNE, 18, false, Au.CAST);
         inventory.put(ItemID.NATURERUNE, 4L);
 
         Ac cast = settleStable(engine, inventory, now);
@@ -186,7 +186,7 @@ public class GeSellClassificationTest
         assertEquals("a sold rune placement is ownership-neutral custody, never a cost",
             CostKind.NONE, CostKind.of(sale, sale.getFlows().get(0)));
 
-        engine.noteConsumptionIntent(ItemID.NATURERUNE, 18, false, Au.CAST);
+        engine.ci(ItemID.NATURERUNE, 18, false, Au.CAST);
         inventory.put(ItemID.NATURERUNE, 3L);
         Ac cast = settleStable(engine, inventory, now + 10_000L);
         assertNotNull(cast);
@@ -219,7 +219,7 @@ public class GeSellClassificationTest
         assertEquals(1, engine.getActiveSession().getTransactions().size());
         assertEquals(Ai.CONSUMPTION, engine.getActiveSession().getTransactions().get(0).getType());
 
-        engine.noteConsumptionIntent(ItemID.NATURERUNE, 18, false, Au.CAST);
+        engine.ci(ItemID.NATURERUNE, 18, false, Au.CAST);
         inventory.put(ItemID.NATURERUNE, 3L);
         Ac cast = settleStable(engine, inventory, now + 10_000L);
         assertNotNull(cast);
@@ -240,7 +240,7 @@ public class GeSellClassificationTest
         Bb iceBurst = Bb.tv("Cast",
             spellbookGroup << 16 | 14, spellbookGroup, "<col=ff9040>Ice Burst</col>", "Cast");
         assertNotNull(iceBurst);
-        engine.noteConsumptionIntent(ItemID.NATURERUNE, 18, false, Au.CAST, iceBurst);
+        engine.ci(ItemID.NATURERUNE, 18, false, Au.CAST, iceBurst);
         inventory.put(ItemID.NATURERUNE, 4L);
         Ac cast = settleStable(engine, inventory, now);
         assertNotNull(cast);
@@ -263,10 +263,10 @@ public class GeSellClassificationTest
         Map<Integer, Long> inventory = inventory(ItemID.COINS, 100_000L, dragonBones, 5L);
         engine.setBaseline(new Cc(inventory));
 
-        engine.noteConsumptionIntent(dragonBones, 18, false, Au.BURY, null);
+        engine.ci(dragonBones, 18, false, Au.BURY, null);
         // A spellbook Cast click can resolve no item id. The open intent must keep the
         // resolved item's proven verb; the exact spell name is a hint, not a re-verb.
-        engine.noteConsumptionIntent(-1, 18, false, Au.CAST,
+        engine.ci(-1, 18, false, Au.CAST,
             Bb.of("Ice Burst"));
         inventory.put(dragonBones, 4L);
         Ac buried = settleStable(engine, inventory, now);

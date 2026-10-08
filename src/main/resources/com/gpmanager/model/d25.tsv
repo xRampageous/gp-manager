@@ -1,0 +1,14 @@
+# Ordered action verbs retain the old VERBS keys and precedence; blank outputs are predicates.
+drink	^drink	DRINK
+eat	^eat	EAT
+~bury	bury	BURY
+~scatter	scatter	SCATTER
+offer	^offer	OFFER
+cast	^cast	CAST
+supplies	%ct	
+vessel	^empty |=vial|=jug|=beer glass	
+rune	$ rune	
+claim	=coin pouch|%clue|=impling jar|$ impling jar	
+ingredient	!^grimy 	
+food	%pfood	
+partial	%aj	

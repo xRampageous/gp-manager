@@ -48,25 +48,24 @@ interface Actions {
  void refresh();
 }
 
-final Actions actions;
-final JPanel body = stack(PANEL, GAP);
-final JPanel bar = new JPanel(new BorderLayout(4, 0));
-final JPanel list = stack(PANEL, GAP);
-final JPanel detail = stack(PANEL, GAP);
-final JPanel running = new JPanel(new BorderLayout(GAP, 0));
-final JLabel runningName = label("", bold(), TEXT);
-final JLabel runningNet = label("", Kit.body(), TEXT);
-final Table mine = new Table("MY GRINDS");
-final JPanel selectedPanel = stack(CARD, 0);
-final Table recent = new Table("RECENT GRINDS");
+Actions actions;
+JPanel body = stack(PANEL, GAP);
+JPanel bar = new JPanel(new BorderLayout(4, 0));
+JPanel list = stack(PANEL, GAP);
+JPanel detail = stack(PANEL, GAP);
+JPanel running = new JPanel(new BorderLayout(GAP, 0));
+JLabel runningName = label("", bold(), TEXT);
+JLabel runningNet = label("", Kit.body(), TEXT);
+Table mine = new Table("MY GRINDS");
+JPanel selectedPanel = stack(CARD, 0);
+Table recent = new Table("RECENT GRINDS");
 /** All time as one compact strip; hovering it gives the full breakdown. */
-final JPanel allTime = stack(CARD, 0);
-final Hero hero = new Hero();
+JPanel allTime = stack(CARD, 0);
+Hero hero = new Hero();
 As data;
 String selectedId;
 GrindsPage(Actions actions) {
  this.actions = actions;
- bar.setOpaque(false);
  JButton start = button("Start Grind", true, actions::newGrind);
  JButton add = button("+ Add Grind", false, actions::addGrind);
  JButton more = button("\u00b7\u00b7\u00b7", false, () -> { });
@@ -74,7 +73,7 @@ GrindsPage(Actions actions) {
  more.getAccessibleContext().setAccessibleName("Grinds options");
  more.addActionListener(e -> actions.openDataMenu(more));
  // Owner 2026-10-01: the same toolbar band as the Ledger; the controls live in the header.
- bar.add(Kit.toolbar(new JComponent[] {start, add}, new JComponent[] {more}), BorderLayout.NORTH);
+ Kit.h1(bar, new JComponent[] {start, add}, new JComponent[] {more});
  running.setBackground(CARD);
  pad(running, 2, 6, 2, 2);
  runningName.setText("● ");
@@ -171,6 +170,16 @@ void kn(As.AllTime a) {
   pad(anm, 3, 6, 4, 6);
   allTime.add(anm);
  }
+ if (a.wealth > 0L) {
+  // Owner 1.2: the bank (when last seen) and what you carry, side by side.
+  long carried = a.wealth - a.bank;
+  JLabel worth = label(a.bankAge < 0L ? "Carried " + compact(carried) + msg("cx")
+  : "Bank " + compact(a.bank) + " · Carried " + compact(carried), small(), LABEL);
+  pad(worth, 0, 6, 4, 6);
+  worth.setToolTipText("Bank " + ru(a.bank) + " gp" + (a.bankAge < 0L ? "" : ", checked " + age(a.bankAge))
+  + msg("cw") + ru(carried) + " gp");
+  allTime.add(worth);
+ }
  allTime.setToolTipText(tip.append("</html>").toString());
  for (Component child : allTime.getComponents()) {
   if (child instanceof JComponent && ((JComponent) child).getToolTipText() == null) {
@@ -195,7 +204,7 @@ void aud(As d) {
   grind.hasLast ? "Last run " + ru(grind.lastNet) + " gp" : "", isSelected,
   () -> select(isSelected ? null : id), axz(aun(grind))));
  }
- mine.setTitle(rows.isEmpty() ? "MY GRINDS" : "MY GRINDS · " + rows.size()).setRows(rows);
+ mine.r1("MY GRINDS", rows);
  if (selected == null) selectedId = null;
  kz(selected);
 }
@@ -215,7 +224,7 @@ void kz(MyGrind grind) {
  Ap def = grind.definition;
  var facts = new Dd(null);
  facts.put("Last run", grind.hasLast ? signed(grind.lastNet) + " · "
- + when(grind.lastStartedAt, System.currentTimeMillis()) : "—", grind.hasLast ? sign(grind.lastNet) : DIM);
+ + when(grind.lastStartedAt, Ae.now()) : "—", grind.hasLast ? sign(grind.lastNet) : DIM);
  facts.put("Best", grind.hasBest ? signed(grind.bestNet) : "—", grind.hasBest ? sign(grind.bestNet) : DIM);
  facts.put("Target", aju(def.getNetTargetGp(), def.getActiveTimeTargetMillis()), PLAIN);
  selectedPanel.add(facts);
@@ -236,13 +245,13 @@ List<Act> aun(MyGrind grind) {
  Ap def = grind.definition;
  String id = def.getGrindId();
  return Arrays.asList(new Act("Start", () -> actions.startGrind(id, null, null, null)),
- new Act("Start with changes…", () -> actions.startWithChanges(id)), new Act("Edit…", () -> actions.editSavedGrind(id)),
+ new Act(msg("cv"), () -> actions.startWithChanges(id)), new Act("Edit…", () -> actions.editSavedGrind(id)),
  new Act(def.archived ? "Unarchive" : "Archive", () -> actions.archiveSavedGrind(id, !def.archived)),
  new Act("Delete…", () -> actions.deleteSavedGrind(id)));
 }
 
 void kx(As d) {
- long now = System.currentTimeMillis();
+ long now = Ae.now();
  var rows = new ArrayList<Row>();
  for (Recent run : d.recent) {
   String id = run.sessionId;
@@ -254,7 +263,7 @@ void kx(As d) {
   new Menu("Open in Ledger", () -> actions.openLedger(id)), new Menu("Start again", () -> actions.startAgain(id)),
   new Menu("Delete…", () -> actions.deleteHistorical(id)))));
  }
- recent.setTitle(rows.isEmpty() ? "RECENT GRINDS" : "RECENT GRINDS · " + rows.size()).setRows(rows);
+ recent.r1("RECENT GRINDS", rows);
 }
 
 // ---- detail -------------------------------------------------------------------------------
@@ -265,7 +274,7 @@ void mw(As d) {
  var top = new JPanel(new BorderLayout());
  top.setOpaque(false);
  top.add(back, BorderLayout.WEST);
- top.add(label(when(g.startedAt, System.currentTimeMillis()).toUpperCase(Locale.ROOT),
+ top.add(label(when(g.startedAt, Ae.now()).toUpperCase(Locale.ROOT),
  small(), LABEL), BorderLayout.EAST);
  pad(top, 0, 0, 0, 6);
  detail.add(top);
@@ -273,7 +282,7 @@ void mw(As d) {
  hero.big(signed(g.net), sign(g.net), ru(g.net) + " gp",
  g.rateEstablished ? rate(g.gpPerHour) + "/h" : "—", g.rateEstablished, duration(g.activeMillis) + " ACTIVE");
  // Owner 2026-10-01 (F12): a completed run's rate is the whole-run basis.
- hero.rate.setToolTipText(g.rateEstablished ? "GP/h over active time" : null);
+ hero.rate.setToolTipText(g.rateEstablished ? msg("cb") : null);
  var strip = new ArrayList<Cell>();
  strip.add(new Cell("GAINS", signed(g.revenue), GAIN, exact(g.revenue) + " gp", null));
  if (g.splitAvailable) {
@@ -329,8 +338,8 @@ static void highlights(Dd kv, Ba.Recap recap) {
 /** A menu entry usable both as a row's right-click menu and a ⋯ popup. */
 @AllArgsConstructor
 static class Act {
- final String label;
- final Runnable run;
+ String label;
+ Runnable run;
 }
 
 static List<Menu> axz(List<Act> items) {
@@ -340,13 +349,7 @@ static List<Menu> axz(List<Act> items) {
 }
 
 static JPopupMenu popup(List<Act> items) {
- var menu = new JPopupMenu();
- for (Act item : items) {
-  var entry = new JMenuItem(item.label);
-  entry.addActionListener(e -> item.run.run());
-  menu.add(entry);
- }
- return menu;
+ return Kit.m1(axz(items));
 }
 
 // ---- text ---------------------------------------------------------------------------------

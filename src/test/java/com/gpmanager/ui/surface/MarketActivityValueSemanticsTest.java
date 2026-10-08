@@ -46,8 +46,9 @@ public class MarketActivityValueSemanticsTest
         String meta = LivePage.metaOf(row);
         assertTrue("secondary line names the side and the Result: " + meta,
             meta.contains("Sold") && meta.contains("Result " + Fmt.signed(-1_200L)));
-        assertTrue("the proven quantity leads the second line: " + meta,
-            meta.startsWith(Fmt.times(200L)));
+        assertEquals("the proven quantity sits in the quantity column", Fmt.times(200L), row.qty);
+        assertFalse("and is not repeated on the second line: " + row.actionLabel,
+            row.actionLabel.contains(Fmt.times(200L)));
     }
 
     @Test
@@ -93,6 +94,7 @@ public class MarketActivityValueSemanticsTest
         assertEquals("spend is negative", -36_000L, row.value);
         assertEquals("a NEW BUY is Net-neutral, so its Result is known zero", 0L, row.marketResult);
         assertEquals("Bought", row.marketSide);
+        assertEquals("owner 2026-10-08: a purchase shows how many were bought", Fmt.times(200L), row.qty);
         String meta = LivePage.metaOf(row);
         assertTrue(meta.contains("Bought") && meta.contains("Result " + Fmt.signed(0L)));
     }

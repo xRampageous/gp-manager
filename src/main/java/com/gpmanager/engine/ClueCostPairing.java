@@ -7,9 +7,9 @@ package com.gpmanager;
 class ClueCostPairing {
 String activeClueEncounterId;
 String activeClueLabel;
-synchronized void aue(String encounterId, String label) {
- this.activeClueEncounterId = rk(encounterId);
- this.activeClueLabel = rk(label);
+synchronized void aue(String /* encounterId */a, String /* label */b) {
+ this.activeClueEncounterId = rk(a);
+ this.activeClueLabel = rk(b);
 }
 
 synchronized void axp() {
@@ -29,34 +29,34 @@ synchronized String tj() {
 * Classify a spend note while a clue path may be open.
 * Dig / teleport / clue key → CLUE_COST; food / potions → UNRELATED_USED.
 */
-synchronized boolean wt(String noteOrOption) {
- String lower = Ag.norm(noteOrOption);
- return activeClueEncounterId != null && lower != null && yv(lower);
+synchronized boolean wt(String /* noteOrOption */a) {
+ String /* lower */b = Ag.norm(a);
+ return activeClueEncounterId != null && b != null && yv(b);
 }
 
-static boolean yv(String lowerNote) {
- if (Ag.empty(lowerNote)) return false;
- return lowerNote.contains("dig") || lowerNote.contains("teleport") || lowerNote.contains("tele ")
- || lowerNote.contains("clue") || lowerNote.contains("casket") || lowerNote.contains("spade")
- || lowerNote.contains("key") && (Ag.has(lowerNote, "clue", "chest"));
+static boolean yv(String /* lowerNote */a) {
+ if (Ag.empty(a)) return false;
+ return a.contains("dig") || a.contains("teleport") || a.contains("tele ")
+ || a.contains("clue") || a.contains("casket") || a.contains("spade")
+ || a.contains("key") && (Ag.has(a, "clue", "chest"));
 }
 
-static boolean ys(String name) {
- String lower = Ag.norm(name);
- return lower != null && (Ag.has(lower, "clue", "casket", "treasure trail"));
+static boolean ys(String /* name */a) {
+ String /* lower */b = Ag.norm(a);
+ return b != null && (Ag.has(b, "clue", "casket", "treasure trail"));
 }
 
 synchronized String awb() {
- String label = activeClueLabel == null ? "clue" : activeClueLabel;
- return "Clue cost paired to " + label;
+ String /* label */a = activeClueLabel == null ? "clue" : activeClueLabel;
+ return "Clue cost paired to " + a;
 }
 
 synchronized void clear() {
  axp();
 }
 
-static String rk(String value) {
- if (Ag.blank(value)) return null;
- return value.trim();
+static String rk(String /* value */a) {
+ if (Ag.blank(a)) return null;
+ return a.trim();
 }
 }

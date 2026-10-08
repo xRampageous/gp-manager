@@ -15,46 +15,46 @@ import static com.gpmanager.Ak.msg;
 class Ec {
 static final Logger log = LoggerFactory.getLogger(Ec.class);
 interface NavigationHost {
- void add(NavigationButton button);
- void remove(NavigationButton button);
+ void add(NavigationButton /* button */b);
+ void remove(NavigationButton /* button */b);
 }
 
 NavigationButton button;
 /** The runtime sidebar icon; never null so the required button cannot vanish silently. */
 static BufferedImage awn() {
- try (InputStream stream = Ec.class.getResourceAsStream(msg("cs"))) {
-  BufferedImage image = stream == null ? null : ImageIO.read(stream);
-  if (image != null) return image;
+ try (InputStream /* stream */a = Ec.class.getResourceAsStream(msg("cs"))) {
+  BufferedImage /* image */b = a == null ? null : ImageIO.read(a);
+  if (b != null) return b;
   log.warn(msg("jq"));
- } catch (IOException ex) {
-  log.warn(msg("jr"), ex);
+ } catch (IOException /* ex */c) {
+  log.warn(msg("jr"), c);
  }
  return new BufferedImage(16, 16, BufferedImage.TYPE_INT_ARGB);
 }
 
-static NavigationHost akh(ClientToolbar toolbar) {
- if (toolbar == null) return null;
+static NavigationHost akh(ClientToolbar /* toolbar */a) {
+ if (a == null) return null;
  return new NavigationHost() {
-  public void add(NavigationButton navigationButton) {
-   toolbar.addNavigation(navigationButton);
+  public void add(NavigationButton /* navigationButton */b) {
+   a.addNavigation(b);
   }
-  public void remove(NavigationButton navigationButton) {
-   toolbar.removeNavigation(navigationButton);
+  public void remove(NavigationButton /* navigationButton */b) {
+   a.removeNavigation(b);
   }
  };
 }
 
 /** @return true when this call installed the button (host, panel and icon present). */
-synchronized boolean install(NavigationHost navigation, PluginPanel panel, BufferedImage icon) {
- if (button != null || navigation == null || panel == null || icon == null) return false;
- NavigationButton next = NavigationButton.builder().tooltip("GP Manager").icon(icon).priority(5).panel(panel).build();
- navigation.add(next);
- button = next;
+synchronized boolean install(NavigationHost /* navigation */a, PluginPanel /* panel */b, BufferedImage /* icon */c) {
+ if (button != null || a == null || b == null || c == null) return false;
+ NavigationButton /* next */d = NavigationButton.builder().tooltip("GP Manager").icon(c).priority(5).panel(b).build();
+ a.add(d);
+ button = d;
  return true;
 }
 
-synchronized void uninstall(NavigationHost navigation) {
- if (button != null && navigation != null) navigation.remove(button);
+synchronized void uninstall(NavigationHost /* navigation */a) {
+ if (button != null && a != null) a.remove(button);
  button = null;
 }
 

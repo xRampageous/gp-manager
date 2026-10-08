@@ -17,9 +17,9 @@ final GroundItemsConfigReader configReader;
 volatile Bc snapshot;
 volatile String fingerprint = "";
 /** Test helper with a fixed snapshot (no live ConfigManager). */
-LootPresentationFilterService(Bc snapshot) {
+LootPresentationFilterService(Bc /* snapshot */a) {
  configReader = null;
- afn(snapshot);
+ afn(a);
 }
 
 synchronized void refresh() {
@@ -28,21 +28,28 @@ synchronized void refresh() {
 }
 
 /** Applies only explicit list preferences; ambiguous value/price rules stay visible. */
-boolean isFlowIncluded(Ab flow, Dl mode) {
- Dl effective = mode == null ? Dl.ALL_ITEMS : mode;
- if (effective == Dl.ALL_ITEMS || flow == null) return true;
+boolean isFlowIncluded(Ab /* flow */a, Dl /* mode */b) {
+ Dl /* effective */c = b == null ? Dl.ALL_ITEMS : b;
+ if (c == Dl.ALL_ITEMS || a == null) return true;
  rr();
- Bc current = snapshot;
- if (!current.pluginEnabled) return true;
- int state = aus(current.highlightedCsv, current.hiddenCsv,
- flow.itemName, Ae.nonNeg(Math.abs(flow.quantityDelta)));
- if (state == HIDDEN) return false;
- return effective != Dl.HIGHLIGHTED_LIST_ONLY ? !current.showHighlightedOnly || state == HIGHLIGHTED
- : state == HIGHLIGHTED;
+ Bc /* current */d = snapshot;
+ if (!d.pluginEnabled) return true;
+ int /* state */e = aus(d.highlightedCsv, d.hiddenCsv,
+ a.itemName, Ae.nonNeg(Math.abs(a.quantityDelta)));
+ if (e == HIDDEN) return false;
+ return c != Dl.HIGHLIGHTED_LIST_ONLY ? !d.showHighlightedOnly || e == HIGHLIGHTED
+ : e == HIGHLIGHTED;
 }
 
-synchronized void afn(Bc value) {
- snapshot = value == null ? Bc.disabled() : value;
+/** HUD+'s big-drop line: Ground Items' insane value when the display follows it, else 10M. */
+long big(Dl /* mode */a) {
+ rr();
+ Bc /* current */b = snapshot;
+ return a == Dl.FOLLOW_GROUND_ITEMS && b.pluginEnabled && b.insane > 0L ? b.insane : HudTray.BIG_DROP;
+}
+
+synchronized void afn(Bc /* value */a) {
+ snapshot = a == null ? Bc.disabled() : a;
  fingerprint = snapshot.fingerprint();
 }
 
@@ -51,68 +58,68 @@ synchronized void rr() {
  if (snapshot == null) afn(null);
 }
 
-static int aus(String highlightedCsv, String hiddenCsv, String itemName, long quantity) {
- int exact = aur(highlightedCsv, itemName, quantity, false);
- if (exact != NONE) return HIGHLIGHTED;
- exact = aur(hiddenCsv, itemName, quantity, false);
- if (exact != NONE) return HIDDEN;
- int wildcard = aur(highlightedCsv, itemName, quantity, true);
- if (wildcard != NONE) return HIGHLIGHTED;
- return aur(hiddenCsv, itemName, quantity, true) == NONE ? NONE : HIDDEN;
+static int aus(String /* highlightedCsv */a, String /* hiddenCsv */b, String /* itemName */c, long /* quantity */d) {
+ int /* exact */e = aur(a, c, d, false);
+ if (e != NONE) return HIGHLIGHTED;
+ e = aur(b, c, d, false);
+ if (e != NONE) return HIDDEN;
+ int /* wildcard */f = aur(a, c, d, true);
+ if (f != NONE) return HIGHLIGHTED;
+ return aur(b, c, d, true) == NONE ? NONE : HIDDEN;
 }
 
-static int aur(String csv, String itemName, long quantity, boolean wildcard) {
- String name = Ag.axw(itemName);
- for (Rule rule : rules(csv)) {
-  if (rule.wildcard == wildcard && rule.matches(name, quantity)) return 1;
+static int aur(String /* csv */a, String /* itemName */b, long /* quantity */c, boolean /* wildcard */d) {
+ String /* name */e = Ag.axw(b);
+ for (Rule /* rule */f : rules(a)) {
+  if (f.wildcard == d && f.matches(e, c)) return 1;
  }
  return NONE;
 }
 
 /** Parsed list rules by list text: the Ground Items lists are parsed once, not per item. */
 static final java.util.Map<String, java.util.List<Rule>> RULES = new java.util.concurrent.ConcurrentHashMap<>();
-static java.util.List<Rule> rules(String csv) {
+static java.util.List<Rule> rules(String /* csv */a) {
  if (RULES.size() > 16) RULES.clear();
- return RULES.computeIfAbsent(Ag.axw(csv), text -> {
-  var parsed = new java.util.ArrayList<Rule>();
-  for (String raw : Text.fromCSV(text)) {
-   Rule rule = Rule.parse(raw);
-   if (rule != null) parsed.add(rule);
+ return RULES.computeIfAbsent(Ag.axw(a), /* text */b -> {
+  var /* parsed */c = new java.util.ArrayList<Rule>();
+  for (String /* raw */d : Text.fromCSV(b)) {
+   Rule /* rule */e = Rule.parse(d);
+   if (e != null) c.add(e);
   }
-  return parsed;
+  return c;
  });
 }
 
 @AllArgsConstructor
 static class Rule {
- final String name;
- final int quantity;
- final boolean lessThan;
- final boolean wildcard;
- static Rule parse(String value) {
-  if (Ag.blank(value)) return null;
-  String text = value.trim();
-  int split = -1;
-  for (int i = text.length() - 1; i >= 0; i--) {
-   char c = text.charAt(i);
+ String name;
+ int quantity;
+ boolean lessThan;
+ boolean wildcard;
+ static Rule parse(String /* value */b) {
+  if (Ag.blank(b)) return null;
+  String /* text */d = b.trim();
+  int /* split */e = -1;
+  for (int i = d.length() - 1; i >= 0; i--) {
+   char c = d.charAt(i);
    if (Character.isDigit(c) || Character.isWhitespace(c)) continue;
-   if (c == '<' || c == '>') split = i;
+   if (c == '<' || c == '>') e = i;
    break;
   }
-  int quantity = 0;
-  boolean less = false;
-  if (split >= 0 && split + 1 < text.length()) {
+  int /* quantity */f = 0;
+  boolean /* less */g = false;
+  if (e >= 0 && e + 1 < d.length()) {
    try {
-    quantity = Integer.parseInt(text.substring(split + 1).trim());
-    less = text.charAt(split) == '<';
-    text = text.substring(0, split).trim();
-   } catch (NumberFormatException ignored) { }
+    f = Integer.parseInt(d.substring(e + 1).trim());
+    g = d.charAt(e) == '<';
+    d = d.substring(0, e).trim();
+   } catch (NumberFormatException /* ignored */h) { }
   }
-  return new Rule(text, Math.max(0, quantity), less, text.contains("*"));
+  return new Rule(d, Math.max(0, f), g, d.contains("*"));
  }
- boolean matches(String itemName, long count) {
-  if (wildcard ? !WildcardMatcher.matches(name, itemName) : !name.equalsIgnoreCase(itemName)) return false;
-  return lessThan ? count < quantity : count > quantity;
+ boolean matches(String /* itemName */b, long /* count */d) {
+  if (wildcard ? !WildcardMatcher.matches(name, b) : !name.equalsIgnoreCase(b)) return false;
+  return lessThan ? d < quantity : d > quantity;
  }
 }
 }

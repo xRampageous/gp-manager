@@ -20,25 +20,25 @@ public class ChargeCastEstimateTest
     @Test
     public void castGraphicsArePinnedPerFamilyAndIgnoreUnsupportedVariants()
     {
-        assertEquals(1251, ChargeIntake.nx(Ar.V.TRIDENT_SEAS));
-        assertEquals(1251, ChargeIntake.nx(Ar.V.TRIDENT_SEAS_ENHANCED));
-        assertEquals(665, ChargeIntake.nx(Ar.V.TRIDENT_SWAMP));
-        assertEquals(665, ChargeIntake.nx(Ar.V.TRIDENT_SWAMP_ENHANCED));
-        assertEquals(2125, ChargeIntake.nx(Ar.V.SHADOW));
-        assertEquals(2567, ChargeIntake.nx(Ar.V.WARPED));
-        assertEquals(1540, ChargeIntake.nx(Ar.V.SANGUINESTI));
-        assertEquals(1540, ChargeIntake.nx(Ar.V.SANGUINESTI_HOLY));
+        assertEquals(1251, ChargeProbes.nx(Ar.V.TRIDENT_SEAS));
+        assertEquals(1251, ChargeProbes.nx(Ar.V.TRIDENT_SEAS_ENHANCED));
+        assertEquals(665, ChargeProbes.nx(Ar.V.TRIDENT_SWAMP));
+        assertEquals(665, ChargeProbes.nx(Ar.V.TRIDENT_SWAMP_ENHANCED));
+        assertEquals(2125, ChargeProbes.nx(Ar.V.SHADOW));
+        assertEquals(2567, ChargeProbes.nx(Ar.V.WARPED));
+        assertEquals(1540, ChargeProbes.nx(Ar.V.SANGUINESTI));
+        assertEquals(1540, ChargeProbes.nx(Ar.V.SANGUINESTI_HOLY));
         assertTrue("the Justiciar casting graphic is still the same family",
             ChargeIntake.wa(Ar.V.SANGUINESTI, 1900));
         assertFalse(ChargeIntake.wa(Ar.V.SHADOW, 1900));
-        assertEquals(2289, ChargeIntake.nx(Ar.V.VENATOR));
-        assertEquals(0, ChargeIntake.nx(Ar.V.SCYTHE));
+        assertEquals(2289, ChargeProbes.nx(Ar.V.VENATOR));
+        assertEquals(0, ChargeProbes.nx(Ar.V.SCYTHE));
         assertEquals(5061, ChargeIntake.lm(Ar.V.V1b));
         assertEquals(0, ChargeIntake.lm(Ar.V.VENATOR));
         assertEquals(Au.FIRE, ChargeIntake.rw(Ar.V.VENATOR));
         assertEquals(Au.SUPPLIES, ChargeIntake.rw(Ar.V.SCYTHE));
         assertEquals(Au.CAST, ChargeIntake.rw(Ar.V.SHADOW));
-        assertEquals(0, ChargeIntake.nx(Ar.V.V1b));
+        assertEquals(0, ChargeProbes.nx(Ar.V.V1b));
     }
 
     @Test
@@ -96,9 +96,9 @@ public class ChargeCastEstimateTest
         assertEquals(Au.FIRE, ChargeIntake.rw(Ar.V.BOWFA));
         assertEquals(Au.FIRE, ChargeIntake.rw(Ar.V.CRYSTAL_BOW));
         assertEquals(Au.SUPPLIES, ChargeIntake.rw(Ar.V.CRYSTAL_HALBERD));
-        assertEquals(1888, ChargeIntake.nx(Ar.V.BOWFA));
-        assertEquals(0, ChargeIntake.nx(Ar.V.CRYSTAL_BOW));
-        assertEquals(0, ChargeIntake.nx(Ar.V.CRYSTAL_HALBERD));
+        assertEquals(1888, ChargeProbes.nx(Ar.V.BOWFA));
+        assertEquals(0, ChargeProbes.nx(Ar.V.CRYSTAL_BOW));
+        assertEquals(0, ChargeProbes.nx(Ar.V.CRYSTAL_HALBERD));
         assertTrue(ChargeIntake.lg(Ar.V.CRYSTAL_BOW, AnimationID.HUMAN_BOW));
         assertTrue(ChargeIntake.lg(Ar.V.CRYSTAL_HALBERD, AnimationID.HUMAN_SPEAR_SPIKE));
         assertTrue(ChargeIntake.lg(Ar.V.CRYSTAL_HALBERD, AnimationID.HUMAN_SCYTHE_SWEEP));
@@ -142,7 +142,7 @@ public class ChargeCastEstimateTest
     @Test
     public void corruptedCrystalWeaponsStayUnmatchedAndTheEchoBowSharesItsFamily()
     {
-        assertEquals(2289, ChargeIntake.nx(Ar.V.VENATOR_ECHO));
+        assertEquals(2289, ChargeProbes.nx(Ar.V.VENATOR_ECHO));
         assertEquals(Au.FIRE, ChargeIntake.rw(Ar.V.VENATOR_ECHO));
         assertEquals(Long.valueOf(1L),
             ChargeIntake.recipeOf(Ar.V.VENATOR_ECHO).get(ItemID.ANCIENT_ESSENCE));

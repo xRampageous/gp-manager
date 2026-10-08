@@ -426,7 +426,7 @@ public class ItemValuationServiceTest
             int[] ids = {2434, 139, 141, 143};
             for (int i = 0; i < ids.length; i++)
             {
-                engine.noteConsumptionIntent(ids[i], 6, false, Au.DRINK);
+                engine.ci(ids[i], 6, false, Au.DRINK);
                 Map<Integer, Long> inventory = i < 3 ? Map.of(ids[i + 1], 1L)
                     : retainVial ? Map.of(ItemID.VIAL_EMPTY, 1L) : Collections.emptyMap();
                 Ac sip = settleDrink(engine, inventory, 2_000L + i * 2_000L);
@@ -451,7 +451,7 @@ public class ItemValuationServiceTest
         Am engine = new Am(potionService(config), new TransactionClassifier(), config);
         engine.rm(1_000L);
         engine.setBaseline(new Cc(Map.of(2434, 1L)));
-        engine.noteConsumptionIntent(2434, 6, false, Au.DRINK);
+        engine.ci(2434, 6, false, Au.DRINK);
         Ac sip = settleDrink(engine, Map.of(139, 1L), 2_000L);
         assertEquals(Ai.UNCERTAIN, sip.getType());
         assertFalse(sip.isCounted());
@@ -479,7 +479,7 @@ public class ItemValuationServiceTest
             engine.abh(transition, "Prayer potion(3)", filled ? 1_600L : 1_300L);
         }
         engine.abg(1_800L);
-        engine.noteConsumptionIntent(2434, 6, false, Au.DRINK);
+        engine.ci(2434, 6, false, Au.DRINK);
         Ac sip = settleDrink(engine, Map.of(139, 1L), 2_000L);
         assertEquals(Ai.UNCERTAIN, sip.getType());
         assertFalse(sip.isCounted());

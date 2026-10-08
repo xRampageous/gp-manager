@@ -1,5 +1,147 @@
 # GP Manager changelog
 
+## 1.2.0 — 2026-10-09
+
+- **Loot that goes straight into a bag counts.** Items you pick up into an open looting bag
+  (in the Wilderness), herb sack, gem bag, seed box or log basket never touched your inventory, so
+  they were never counted. They now count like any pickup, and picking your own dropped item back
+  up into a bag cancels its "Dropped" loss instead of counting as new loot. Fish caught into an
+  open fish barrel and logs cut into an open log or forestry basket count too, read from the
+  game's "You catch…" and "You get some…" messages.
+- **Death and instance fees paid from the coffer or bank count.** Reclaim fees Death takes from
+  your coffer or bank, and private instance fees paid from the coffer, never left your inventory,
+  so they were missed. They are now read from the game's own messages and count as costs, without
+  counting a fee twice.
+- **Raid and minigame loot you bank from the chest counts.** Choosing Bank-all at the Chambers
+  of Xeric, Theatre of Blood or Tombs of Amascut chest, the Fortis Colosseum, the Lunar Chest,
+  the Wilderness loot chest, Doom of Mokhaihotl, Fishing Trawler or drift net fishing sends loot
+  straight to your bank, so it was never counted. It now counts like loot you pick up.
+- **Ammo and runes you never see spent.** Ammo fired from Dizana's quiver and the death runes an
+  ash sanctifier uses (one per ten ashes) now count as supplies; charging the sanctifier nets to
+  zero. Loot from your own kill picked up into a bag counts for the full minute it stays yours.
+- **Combining potions needs no review.** Merging potions by hand or decanting them keeps every
+  dose, so it now books nothing instead of adding an entry to Review each time.
+- **Lighting a lantern is no longer a cost.** Choosing Light on a lantern booked its whole price
+  as spent, and extinguishing it left an entry in Review. Lit and unlit light sources (candles,
+  torches, lamps, lanterns, the mining helmet) and open and closed bags, sacks, barrels, baskets
+  and pouches now count as the same item, so switching between them books nothing.
+- **Taking an item apart needs no review.** Reverting or dismantling an item (a crystal tool, a
+  godsword) keeps its worth in the parts, so it books nothing instead of adding a Review entry.
+  Reverting a crystal pickaxe, axe, felling axe or harpoon counts the 120 crystal shards used to
+  make it as spent.
+- **Taking items out of a tackle box is not loot.** Withdrawing from (or storing in) a tackle box,
+  seed box, forestry kit or huntsman's kit through its own window is a neutral move, so it no
+  longer shows in Recent as a gain.
+- **Fast Grand Exchange buys need no review.** An offer that fills and is collected within a
+  couple of seconds no longer leaves a second coin entry in Review next to the purchase. A
+  finished offer collected just before you place a new one in the same slot still settles as a
+  purchase instead of going to Review.
+- **Revenant weapons count their ether.** Craw's bow, Webweaver bow, Viggora's and Ursine
+  chainmace, and Thammaron's and Accursed sceptre spend one revenant ether per attack. Each attack
+  is estimated as you fight, and checking the weapon measures what was really used. Charging one
+  with ether, or uncharging it, books nothing.
+- **Newest loot on top of the HUD+ tray, and long names keep their count.** A row moves to the
+  top whenever it grows, so the latest drop is always first. A name too long for the tray now
+  shortens before its count, so "×2" always shows, and "(uncharged)" reads "(u)", as the game
+  writes it for "Craw's bow (u)".
+- **Charging never books a loss.** Putting charges into any supported item (crystal shards into
+  a crystal bow, runes into a sanguinesti staff or Tumeken's shadow, ether into a revenant weapon,
+  tears into the Pendant of Ates, the scythe at the Vyre well) moves those items into charges, so
+  it books nothing. A "How many charges?" prompt no longer cuts the charge short. The charges
+  count as used only when you attack.
+- **Kharedst's memoirs and the blood essence cost what they use.** Each memoirs (or Book of the
+  Dead) teleport from the worn book spends one law, body, mind and soul rune, and checking the book
+  measures what was really used. Charging it at the Old Memorial books nothing. Activating a blood
+  essence counts that essence as used, instead of adding an entry to Review.
+- **Fixes from a second code audit.** Choosing Bank-all at a reward chest counts only what really
+  leaves the chest, so a refused or repeated click no longer adds loot. Another player's or a public
+  pile vanishing as you click Take is no longer counted as going into your bag; only your own pile
+  is. A reclaim fee paid from the bank never lands on the next account you log into. A Check that
+  shows the same charges as before removes estimates that were too high, and checking one of two
+  identical weapons no longer makes the other's use count twice. A catch split between your pack
+  and a fish barrel counts each fish once.
+- **Turning GP Manager on mid-Make-X counts the next action.** Enabling the plugin while
+  fletching (or crafting, smithing, cooking) no longer swallows the first XP drop, so the next
+  item you make counts as Processing without another click instead of going to Review.
+- **HUD+ big drops follow Ground Items and keep their row.** With the loot display following
+  Ground Items (the default), a drop lights gold and raises "Big drop" at your Ground Items insane
+  value instead of a fixed 10M. A big drop also keeps its tray row however much cheaper loot comes
+  after it; the cheaper rows go to "+N more" instead.
+- **Bank and carried on the All time card.** One line shows your bank (as of when you last
+  opened it) and what you carry, e.g. "Bank 3.55B · Carried 1.21B"; hover it for exact amounts
+  and when the bank was checked. Items use their GE price, untradeables their high alch value,
+  and bank placeholders count nothing. The bank total is remembered per account across restarts.
+- **Moving is not AFK.** Walking or running now holds off AFK pause and wakes a Grind it paused,
+  so a long trip to a boss with no XP no longer pauses your run. Moving never starts tracking.
+- **End Grind after AFK.** A new setting (off by default) ends a named Grind once AFK pause
+  has held it for the minutes you choose. It saves to your history as if you had pressed End at
+  the moment it paused, and Free play takes over. Free play itself never ends. Needs AFK pause on.
+- **Hidden loot stays quiet.** Picking up an item your loot filter hides no longer pops the tray
+  open again. When the tray is open anyway, its footer says how many hidden items it holds
+  ("+2 hidden"). Hidden items still count in Net, and the number beside Net still flashes.
+- **See what a row used.** Opening a Ledger row that spent or received more than one item lists
+  each item with its total: a Scythe of vitur row shows "Blood rune ×124" and "Vial of blood ×1",
+  not just a count. Each entry under it says what that use spent ("Blood rune ×2"). A charged
+  weapon's row always lists what it spent, even when that is a single rune type.
+- **Receipts are now entries.** The Ledger, its menus and the "Entry detail retention" setting
+  use the word "entries"; your saved settings are unchanged.
+- **No false "save failed" warnings.** Antivirus or Windows Search can briefly hold a file the
+  plugin has just written. GP Manager now tries again at once, and a one-off failure stays
+  silent: your previous save is intact and the next save (within minutes, and always at logout)
+  writes everything. The warning only appears if saving keeps failing.
+- **Fixes from an independent code review.** A change in an item's price no longer re-prices
+  every earlier charge of a charged weapon into the next one; only the new charge uses the new
+  price. Crystal shards are no longer priced from the main-game market on special or unknown
+  worlds. Backup, restore and factory reset no longer freeze RuneLite while they write to disk.
+  Bag pickups only count the stack you clicked when it is yours (loot from your own kill or your
+  own drop), so another player taking a pile never becomes your loot. Catches book the raw fish
+  (never cooked). Backup and reset always act on the account you confirmed them on, even if you
+  switch accounts meanwhile. The bank and carried line follows bank and inventory changes, a
+  re-opened bank and a change of account.
+- **Charged items are a data table.** Nothing you see changes; adding a charged weapon is now
+  cheap, which the next charged-item additions build on.
+- **Cleanup.** Leftovers from the plugin's old name are gone.
+- **Re-enabling during production resumes processing.** Fresh production XP after enabling
+  confirms the ongoing Make-X run, so its next input/output change does not become Review
+  just because the initiating click happened while GP Manager was disabled.
+- **Pending actions stay with their account.** An unfinished fee, chest transfer, bag pickup or
+  other action cannot carry into another account or be reused when you return to the first.
+- **Bag pickup credit is limited to your remaining recorded loot.** Items already collected
+  normally cannot also count when a pile later goes into a bag; credit never exceeds the
+  quantity still proved to be yours.
+- **A higher charge Check keeps a top-up neutral.** An exact increase in a weapon's charges
+  marks loading as a transfer even when the message does not say “charged with”.
+- **Reset keeps a safety copy.** Both Reset choices require a validated backup of the current
+  account before clearing it. An unchanged existing copy can be reused; if a safe copy cannot
+  be secured, the reset is refused and the account data stays intact.
+- **Edits during a safety copy are preserved.** Reset and Restore refuse to replace data that
+  changed while their safety copy was being prepared; retry the action to protect the latest data.
+- **Big Grand Exchange sales no longer go to Review.** A sale that fills at several prices at
+  once (10,000 longbows bought by different players) has no single price, so its tax could not
+  be checked and the whole collect, with any other sale collected beside it, went to Review. The
+  coins you collect now prove the tax, as long as they are an amount the 2% tax rule allows.
+  Collecting through a banker's or clerk's collection box counts like the exchange itself.
+- **Fletching with a knife is production.** Using a knife on logs counted the logs as burned
+  fuel and the first batch went to Review. A Make-X you start with item-on-item Use, confirmed
+  with the space bar or its Make button (even after a wait), now books as production once its
+  skill's XP arrives. Feeding a fire, a brazier or a funeral pyre still counts its fuel as used.
+- **Clue scrolls, scroll boxes and caskets are worth nothing until opened.** They have no price,
+  so picking one up showed "?" and finishing a step went to Review. Like a coin pouch, a trail's
+  scrolls, boxes, bottles, nests, geodes and its reward casket now count only for what the
+  casket gives you.
+- **Impling jars count.** Catching an impling (an empty jar becomes a full one) and looting a
+  jar (the full jar becomes its loot, and usually an empty jar back) book as gains instead of
+  Review, for every impling.
+- **More stores are not loot.** Storing or taking back items through Elnock's storage in
+  Puro-Puro (also Quick-withdraw), the seed vault, a boat's cargo hold, your house's costume room,
+  fossil storage and the drift net store is a neutral move like the bank. Swapping a set for its
+  pieces (or back) at the Grand Exchange books nothing, and items sacrificed to Death's coffer no
+  longer count as a loss on top of the reclaim and instance fees the coffer later pays.
+- **A sold item can be hidden from Recent.** Finished Grand Exchange trades now offer
+  "Hide from recent" like any other item.
+- **Trades show how many.** A finished purchase or sale in Recent shows its quantity beside the
+  item ("Magic logs ×500"), like every other row.
+
 ## 1.1.2 — 2026-10-02
 
 - **Plugin Hub listing.** The description no longer mentions CSV export, which 1.1.0 removed.

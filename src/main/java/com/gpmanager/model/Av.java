@@ -9,7 +9,7 @@ CURRENCY_PROXY("currency proxy"), GRAND_EXCHANGE("RuneLite market"), OFFER_PRICE
 FACE_VALUE("face value"),
 /** Retired high-alchemy fallback valuation; retained so saved history still loads. */
 HIGH_ALCHEMY("high alchemy"), DEFERRED_CLAIM("Claim on open"), UNPRICED("unpriced"), UNKNOWN("unknown");
-final String label;
+String label;
 public String toString() {
  return label;
 }

@@ -14,11 +14,11 @@ public class InventoryConsumptionOptionTest
     {
         for (String option : new String[] {"bury", "scatter", "eat", "drink", "empty", "break", "cast", "release", "eat 1", "drink 1", "light", "offer", "tend-to"})
         {
-            assertTrue(option, Dw.wy(option));
+            assertTrue(option, Dw.b1(option));
         }
-        assertFalse(Dw.wy("cook"));
-        assertTrue(Dw.xi("light"));
-        assertFalse(Dw.xi("cook"));
+        assertFalse(Dw.b1("cook"));
+        assertTrue(Dw.c1("light"));
+        assertFalse(Dw.c1("cook"));
     }
 
     @Test
@@ -26,9 +26,9 @@ public class InventoryConsumptionOptionTest
     {
         for (String option : new String[] {"drop", "use", "wear", "wield", "deposit", ""})
         {
-            assertFalse(option, Dw.wy(option));
+            assertFalse(option, Dw.b1(option));
         }
-        assertFalse(Dw.wy(null));
+        assertFalse(Dw.b1(null));
     }
 
     @Test
@@ -39,20 +39,20 @@ public class InventoryConsumptionOptionTest
         assertEquals("Herblore", Dw.ajx("clean"));
         assertEquals("Fletching", Dw.ajx("fletch"));
         assertEquals("", Dw.ajx("eat"));
-        assertTrue(Dw.ww("use", "Tinderbox -> Willow logs"));
-        assertFalse(Dw.ww("use", "Willow logs"));
-        assertTrue(Dw.xt("use", "Dragon bones -> Altar"));
-        assertTrue(Dw.xp("cast", "Sinister Offering"));
+        assertTrue(Dw.d1("use", "Tinderbox -> Willow logs"));
+        assertFalse(Dw.d1("use", "Willow logs"));
+        assertTrue(Dw.e1("use", "Dragon bones -> Altar"));
+        assertTrue(Dw.f1("cast", "Sinister Offering"));
     }
 
     @Test
     public void recognisesHarvestGatherOptionsForActivityHints()
     {
-        assertTrue(Dw.xb("pick"));
-        assertTrue(Dw.xb("harvest"));
-        assertTrue(Dw.xb("chop down"));
-        assertTrue(Dw.xb("mine"));
-        assertFalse(Dw.xb("rake"));
+        assertTrue(Dw.i1("pick"));
+        assertTrue(Dw.i1("harvest"));
+        assertTrue(Dw.i1("chop down"));
+        assertTrue(Dw.i1("mine"));
+        assertFalse(Dw.i1("rake"));
         assertEquals("Farming", Dw.ka("pick"));
         assertEquals("Woodcutting", Dw.ka("chop"));
         assertEquals("Mining", Dw.ka("mine"));
@@ -63,15 +63,15 @@ public class InventoryConsumptionOptionTest
     @Test
     public void recognisesLiveConsumptionChatMessages()
     {
-        assertTrue(Dw.vy("you drink some of your prayer potion."));
-        assertTrue(Dw.vy("you dig a hole and bury the bones."));
-        assertTrue(Dw.vy("you eat the lobster."));
-        assertTrue(Dw.vy("you scatter the ashes."));
-        assertTrue(Dw.vy("the gods are very pleased with your offering."));
-        assertFalse("bone-save keeps the bone: never a spend", Dw.vy("the dark lord spares your sacrifice but still rewards you."));
-        assertTrue(Dw.vt("The Dark Lord spares your sacrifice."));
-        assertFalse(Dw.vy("you pick a potato."));
-        assertFalse(Dw.vy(""));
-        assertFalse(Dw.vy(null));
+        assertTrue(Dw.h1("you drink some of your prayer potion."));
+        assertTrue(Dw.h1("you dig a hole and bury the bones."));
+        assertTrue(Dw.h1("you eat the lobster."));
+        assertTrue(Dw.h1("you scatter the ashes."));
+        assertTrue(Dw.h1("the gods are very pleased with your offering."));
+        assertFalse("bone-save keeps the bone: never a spend", Dw.h1("the dark lord spares your sacrifice but still rewards you."));
+        assertTrue(Dw.g1("The Dark Lord spares your sacrifice."));
+        assertFalse(Dw.h1("you pick a potato."));
+        assertFalse(Dw.h1(""));
+        assertFalse(Dw.h1(null));
     }
 }

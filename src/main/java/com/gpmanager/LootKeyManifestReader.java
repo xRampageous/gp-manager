@@ -5,57 +5,56 @@ import javax.inject.*;
 import net.runelite.api.*;
 import net.runelite.api.gameval.InterfaceID;
 import net.runelite.api.widgets.Widget;
-import net.runelite.client.game.ItemManager;
 /** Polls the real loot-key chest interface; menu and chat wording is never key source evidence. */
 @Singleton
 @RequiredArgsConstructor(onConstructor_ = @Inject)
 class LootKeyManifestReader {
 final Client client;
-final ItemManager itemManager;
+final Ix ix;
 final Am engine;
 void poll() {
  if (client == null || engine == null) return;
- Widget root = client.getWidget(InterfaceID.WildyLootChest.UNIVERSE);
- boolean visible = root != null && !root.isHidden();
- engine.ahs(visible);
- if (!visible) return;
- for (int index = 0; index < 5; index++) {
-  int keyItemId = Da.yb(index);
-  ItemContainer aon = client.getItemContainer(Da.ya(index));
-  if (aon == null) continue;
-  Map<Integer, Long> rawManifest = Da.manifestFromContainer(aon, this::xj);
-  var manifest = new HashMap<Integer, Long>();
-  for (Map.Entry<Integer, Long> item : rawManifest.entrySet()) {
-   int canonicalId = itemManager == null ? item.getKey() : itemManager.canonicalize(item.getKey());
-   long quantity = item.getValue();
-   if (canonicalId <= 0 || quantity <= 0L) continue;
-   manifest.merge(canonicalId, quantity, LootKeyManifestReader::ahl);
+ Widget /* root */a = client.getWidget(InterfaceID.WildyLootChest.UNIVERSE);
+ boolean /* visible */b = a != null && !a.isHidden();
+ engine.ahs(b);
+ if (!b) return;
+ for (int /* index */c = 0; c < 5; c++) {
+  int /* keyItemId */d = Da.yb(c);
+  ItemContainer /* aon */e = client.getItemContainer(Da.ya(c));
+  if (e == null) continue;
+  Map<Integer, Long> /* rawManifest */f = Da.manifestFromContainer(e, this::xj);
+  var /* manifest */g = new HashMap<Integer, Long>();
+  for (Map.Entry<Integer, Long> /* item */h : f.entrySet()) {
+   int /* canonicalId */i = ix == null ? h.getKey() : ix.canon(h.getKey());
+   long /* quantity */j = h.getValue();
+   if (i <= 0 || j <= 0L) continue;
+   g.merge(i, j, LootKeyManifestReader::ahl);
   }
   // An open chest is evidence only; settled inventory gains carry the financial truth.
-  engine.abr(keyItemId, manifest);
+  engine.abr(d, g);
  }
 }
 
-boolean xj(int itemId) {
- String name = itemName(itemId);
- return name == null || Ag.has(name, "crate", "casket");
+boolean xj(int /* itemId */a) {
+ String /* name */b = itemName(a);
+ return b == null || Ag.has(b, "crate", "casket");
 }
 
-String itemName(int itemId) {
- if (itemManager == null) return null;
+String itemName(int /* itemId */a) {
+ if (ix == null) return null;
  try {
-  ItemComposition composition = itemManager.getItemComposition(itemId);
-  return composition == null || composition.getName() == null || composition.getName().trim().isEmpty()
-  ? null : composition.getName().toLowerCase(Locale.ROOT);
- } catch (RuntimeException unavailable) {
+  ItemComposition /* composition */b = ix.comp(a);
+  return b == null || b.getName() == null || b.getName().trim().isEmpty()
+  ? null : b.getName().toLowerCase(Locale.ROOT);
+ } catch (RuntimeException /* unavailable */c) {
   return null;
  }
 }
 
-static long ahl(long left, long right) {
+static long ahl(long /* left */a, long /* right */b) {
  try {
-  return Math.addExact(left, right);
- } catch (ArithmeticException overflow) {
+  return Math.addExact(a, b);
+ } catch (ArithmeticException /* overflow */c) {
   return Long.MAX_VALUE;
  }
 }

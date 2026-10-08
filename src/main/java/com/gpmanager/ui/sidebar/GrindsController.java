@@ -7,25 +7,25 @@ import static com.gpmanager.Fmt.*;
 import static com.gpmanager.Ak.msg;
 /** Grinds actions: start, save, edit, targets, history, export, backups and recovery. */
 class GrindsController implements GrindsPage.Actions {
-final Dp panel;
-final Am engine;
-final Shell shell;
-final SessionRepository repository;
-final Ei persistence;
-GrindsController(Dp panel) {
- this.panel = panel;
- this.engine = panel.engine;
- this.shell = panel.shell();
- this.repository = panel.repository;
- this.persistence = panel.persistence;
+Dp panel;
+Am engine;
+Shell shell;
+SessionRepository repository;
+Ei persistence;
+GrindsController(Dp /* panel */a) {
+ this.panel = a;
+ this.engine = a.engine;
+ this.shell = a.shell();
+ this.repository = a.repository;
+ this.persistence = a.persistence;
 }
 
-void mutate(Runnable domain) {
- panel.mutate(domain);
+void mutate(Runnable /* domain */a) {
+ panel.mutate(a);
 }
 
-void acg(Entry entry) {
- panel.acg(entry);
+void acg(Entry /* entry */a) {
+ panel.acg(a);
 }
 
 public void back() {
@@ -34,85 +34,85 @@ public void back() {
  refresh();
 }
 
-public void openLedger(String sessionId) {
- Ad active = engine.getActiveSession();
- if (active != null && active.getId().equals(sessionId)) {
+public void openLedger(String /* sessionId */a) {
+ Ad /* active */b = engine.getActiveSession();
+ if (b != null && b.getId().equals(a)) {
   acg(Entry.current());
  } else {
-  Ad historical = sessionId == null ? null : engine.ua(sessionId);
-  acg(new Entry(Ao.Scope.HISTORY, sessionId, historical == null ? null : historical.getName()));
+  Ad /* historical */c = a == null ? null : engine.ua(a);
+  acg(new Entry(Ao.Scope.HISTORY, a, c == null ? null : c.getName()));
  }
 }
 
 public void endGrind() {
- Ad ending = engine.getActiveSession();
- if (ending == null || !engine.wb()) return;
- String endedId = ending.getId();
- String endedName = ending.getName();
+ Ad /* ending */b = engine.getActiveSession();
+ if (b == null || !engine.wb()) return;
+ String /* endedId */c = b.getId();
+ String /* endedName */d = b.getName();
  // Ending is a deliberate menu pick and keeps history, so it needs no second confirmation.
  mutate(() -> {
-  if (!engine.sx(System.currentTimeMillis())) return;
-  Bu ended = engine.tz(endedId, System.currentTimeMillis());
+  if (!engine.sx(Ae.now())) return;
+  Bu /* ended */e = engine.tz(c, Ae.now());
   // Owner 2026-10-01 (F14): the ended run stays one click from its recap.
-  shell.notify(endedName + " ended", ended == null ? "View recap"
-  : signed(ended.net) + msg("kh"), false, "View recap", () -> {
-   panel.grindsDetailId = endedId;
+  shell.notify(d + " ended", e == null ? "View recap"
+  : signed(e.net) + msg("kh"), false, "View recap", () -> {
+   panel.grindsDetailId = c;
    shell.show(Shell.GRINDS);
    refresh();
   });
  });
 }
 
-public void startGrind(String grindId, Long netOverride, Long timeOverride, String nameOverride) {
- Ap definition = grindId == null ? null : engine.um(grindId);
- String name = nameOverride != null && !nameOverride.trim().isEmpty()
- ? nameOverride.trim() : definition == null ? "" : definition.getName();
- Long net = netOverride != null ? netOverride : definition == null ? null : definition.getNetTargetGp();
- Long time = timeOverride != null ? timeOverride : definition == null ? null : definition.getActiveTimeTargetMillis();
- if (definition != null) grindId = definition.getGrindId();
- if (grindId != null && engine.wb() && engine.getActiveSession() != null
- && grindId.equals(engine.getActiveSession().getGrindId())) {
+public void startGrind(String /* grindId */a, Long /* netOverride */b, Long /* timeOverride */c, String /* nameOverride */d) {
+ Ap /* definition */e = a == null ? null : engine.um(a);
+ String /* name */f = d != null && !d.trim().isEmpty()
+ ? d.trim() : e == null ? "" : e.getName();
+ Long /* net */g = b != null ? b : e == null ? null : e.getNetTargetGp();
+ Long /* time */h = c != null ? c : e == null ? null : e.getActiveTimeTargetMillis();
+ if (e != null) a = e.getGrindId();
+ if (a != null && engine.wb() && engine.getActiveSession() != null
+ && a.equals(engine.getActiveSession().getGrindId())) {
   shell.show(Shell.LIVE);
   refresh();
   return;
  }
- String atr = name;
- String startGrindId = grindId;
- ako(name, () -> mutate(() ->
- engine.startGrind(atr, startGrindId, net, time, System.currentTimeMillis())));
+ String /* atr */i = f;
+ String /* startGrindId */j = a;
+ ako(f, () -> mutate(() ->
+ engine.startGrind(i, j, g, h, Ae.now())));
 }
 
 public void openTargets() {
- Ad active = engine.getActiveSession();
- if (active == null) return;
- ajp("Targets", msg("ff"), aum(null, active.getProfitTargetGp(),
- active.getActiveTimeTargetMillis()), "Save", this::openTargets, (name, net, time) -> {
-  Long netTarget = As.ks(net, active.getProfitTargetGp());
-  Long timeTarget = As.lb(time, active.getActiveTimeTargetMillis());
-  mutate(() -> engine.ahq(netTarget, timeTarget, System.currentTimeMillis()));
+ Ad /* active */a = engine.getActiveSession();
+ if (a == null) return;
+ ajp("Targets", msg("ff"), aum(null, a.getProfitTargetGp(),
+ a.getActiveTimeTargetMillis()), "Save", this::openTargets, (/* name */b, /* net */c, /* time */d) -> {
+  Long /* netTarget */e = As.ks(c, a.getProfitTargetGp());
+  Long /* timeTarget */f = As.lb(d, a.getActiveTimeTargetMillis());
+  mutate(() -> engine.ahq(e, f, Ae.now()));
  });
 }
 
 /** Owner 2026-10-01 (F20): the run an action was opened on; never whatever is active now. */
-Ad acq(String sessionId) {
- if (sessionId == null || sessionId.isEmpty()) return engine.getActiveSession();
- Ad active = engine.getActiveSession();
- return active != null && sessionId.equals(active.getId()) ? active : engine.ua(sessionId);
+Ad acq(String /* sessionId */a) {
+ if (a == null || a.isEmpty()) return engine.getActiveSession();
+ Ad /* active */b = engine.getActiveSession();
+ return b != null && a.equals(b.getId()) ? b : engine.ua(a);
 }
 
-public void saveThisGrind(String sessionId) {
- Ad target = acq(sessionId);
- if (target == null || (target == engine.getActiveSession() && !engine.wb())) return;
- Long net = target.getProfitTargetGp();
- Long time = target.getActiveTimeTargetMillis();
- String identity = target.getId();
- shell.prompt("Save This Grind", "Grind name", target.getName(), cleanName -> mutate(() -> {
+public void saveThisGrind(String /* sessionId */a) {
+ Ad /* target */b = acq(a);
+ if (b == null || (b == engine.getActiveSession() && !engine.wb())) return;
+ Long /* net */c = b.getProfitTargetGp();
+ Long /* time */d = b.getActiveTimeTargetMillis();
+ String /* identity */e = b.getId();
+ shell.prompt("Save This Grind", "Grind name", b.getName(), /* cleanName */f -> mutate(() -> {
   // Re-validate after the prompt: the viewed run must still resolve to the same identity.
-  Ad now = acq(sessionId);
-  if (now == null || !identity.equals(now.getId())) return;
-  Ap created = engine.avg(cleanName, net, time, false, identity);
-  if (created != null) {
-   shell.tell("Saved as My Grind", cleanName + msg("ki"), false);
+  Ad /* now */g = acq(a);
+  if (g == null || !e.equals(g.getId())) return;
+  Ap /* created */h = engine.avg(f, c, d, false, e);
+  if (h != null) {
+   shell.tell("Saved as My Grind", f + msg("ki"), false);
   }
  }));
 }
@@ -123,25 +123,25 @@ public void saveThisGrind(String sessionId) {
 * Owner 2026-10-01 (F22): the saved list is bounded to five rows with paging.
 */
 public void newGrind() {
- JPanel content = stack(CARD, 2);
- final java.util.ArrayList<Ap> saved = new java.util.ArrayList<>(engine.getSavedGrinds(false));
- saved.sort(java.util.Comparator.comparing(grind -> !grind.favorite));
- new Paged(saved.size(), (box, page) -> {
-  int from = Math.min(page * CHOICE_ROWS, saved.size());
-  for (Ap grind : saved.subList(from, Math.min(from + CHOICE_ROWS, saved.size()))) {
-   JButton start = button((grind.favorite ? "\u2605 " : "") + grind.getName(), false, () -> {
+ JPanel /* content */b = stack(CARD, 2);
+ java.util.ArrayList<Ap> /* saved */c = new java.util.ArrayList<>(engine.getSavedGrinds(false));
+ c.sort(java.util.Comparator.comparing(/* grind */d -> !d.favorite));
+ new Paged(c.size(), (/* box */e, /* page */f) -> {
+  int /* from */g = Math.min(f * CHOICE_ROWS, c.size());
+  for (Ap /* grind */h : c.subList(g, Math.min(g + CHOICE_ROWS, c.size()))) {
+   JButton /* start */i = button((h.favorite ? "\u2605 " : "") + h.getName(), false, () -> {
     shell.pc();
-    startGrind(grind.getGrindId(), null, null, null);
+    startGrind(h.getGrindId(), null, null, null);
    });
-   start.setHorizontalAlignment(SwingConstants.LEFT);
-   start.setMaximumSize(new java.awt.Dimension(Integer.MAX_VALUE, 22));
-   box.add(start);
+   i.setHorizontalAlignment(SwingConstants.LEFT);
+   i.setMaximumSize(new java.awt.Dimension(Integer.MAX_VALUE, 22));
+   e.add(i);
   }
- }).build(content);
- avx(content, "nameField", saved.isEmpty() ? "Grind name" : "Or a new Grind", "");
- shell.sheet("Start Grind", saved.isEmpty() ? "" : msg("jo"), content, new Shell.Choice("Start", true, () -> {
-  String name = field(content, "nameField");
-  if (!name.isEmpty()) startGrind(null, null, null, name);
+ }).build(b);
+ avx(b, "nameField", c.isEmpty() ? "Grind name" : "Or a new Grind", "");
+ shell.sheet("Start Grind", c.isEmpty() ? "" : msg("jo"), b, new Shell.Choice("Start", true, () -> {
+  String /* name */j = field(b, "nameField");
+  if (!j.isEmpty()) startGrind(null, null, null, j);
  }));
 }
 
@@ -153,166 +153,164 @@ static final int CHOICE_ROWS = 5;
 */
 static final class Paged {
  interface RowFill {
-  void fill(JPanel box, int page);
+  void fill(JPanel /* box */b, int /* page */c);
  }
- final JPanel box = stack(CARD, 2);
- final int total;
- final RowFill fill;
- final int[] page = {0};
- final JButton prev = button("\u2039", false, () -> turn(-1));
- final JButton next = button("\u203a", false, () -> turn(1));
- final JLabel range = label("", small(), LABEL);
- final JPanel bar = new JPanel(new java.awt.FlowLayout(java.awt.FlowLayout.LEFT, 4, 0));
- Paged(int total, RowFill fill) {
-  this.total = total;
-  this.fill = fill;
+ JPanel box = stack(CARD, 2);
+ int total;
+ RowFill fill;
+ int[] page = {0};
+ JButton prev = button("\u2039", false, () -> turn(-1));
+ JButton next = button("\u203a", false, () -> turn(1));
+ JLabel range = label("", small(), LABEL);
+ JPanel bar = new JPanel(new java.awt.FlowLayout(java.awt.FlowLayout.LEFT, 4, 0));
+ Paged(int /* total */b, RowFill /* fill */c) {
+  this.total = b;
+  this.fill = c;
   bar.setOpaque(false);
   bar.add(prev);
   bar.add(next);
   bar.add(range);
  }
  /** Adds the list (and its pager) to the sheet body and renders the first page. */
- JPanel build(JPanel content) {
-  content.add(box);
-  if (total > CHOICE_ROWS) content.add(bar);
+ JPanel build(JPanel /* content */b) {
+  b.add(box);
+  if (total > CHOICE_ROWS) b.add(bar);
   redraw();
   return box;
  }
- void turn(int delta) {
-  page[0] = Math.max(0, Math.min(page[0] + delta, pages() - 1));
+ void turn(int /* delta */b) {
+  page[0] = Kit.p2(page[0] + b, pages());
   redraw();
  }
  int pages() {
-  return Math.max(1, (total + CHOICE_ROWS - 1) / CHOICE_ROWS);
+  return Kit.p1(total, CHOICE_ROWS);
  }
  void redraw() {
   box.removeAll();
   fill.fill(box, page[0]);
-  int from = page[0] * CHOICE_ROWS;
-  range.setText(total == 0 ? "" : (from + 1) + "\u2013" + Math.min(total, from + CHOICE_ROWS) + " of " + total);
-  prev.setEnabled(page[0] > 0);
-  next.setEnabled(page[0] < pages() - 1);
+  int /* from */b = page[0] * CHOICE_ROWS;
+  Kit.p3(range, prev, next, page[0], pages(), total == 0 ? "" : (b + 1) + "\u2013" + Math.min(total, b + CHOICE_ROWS) + " of " + total);
   box.revalidate();
  }
 }
 
 public void addGrind() {
- shell.prompt("Add Grind", "Grind name", "", name -> mutate(() -> engine.avg(name, null, null, false, null)));
+ shell.prompt("Add Grind", "Grind name", "", /* name */a -> mutate(() -> engine.avg(a, null, null, false, null)));
 }
 
-public void updateSavedGrind(String grindId, String sessionId) {
- Ap definition = engine.um(grindId);
- Ad target = acq(sessionId);
- if (definition == null || target == null) return;
- Long net = target.getProfitTargetGp();
- Long time = target.getActiveTimeTargetMillis();
- String identity = target.getId();
- shell.confirm("Update " + definition.getName(), msg("go"), "Update", () -> mutate(() -> {
+public void updateSavedGrind(String /* grindId */a, String /* sessionId */b) {
+ Ap /* definition */c = engine.um(a);
+ Ad /* target */d = acq(b);
+ if (c == null || d == null) return;
+ Long /* net */e = d.getProfitTargetGp();
+ Long /* time */f = d.getActiveTimeTargetMillis();
+ String /* identity */g = d.getId();
+ shell.confirm("Update " + c.getName(), msg("go"), "Update", () -> mutate(() -> {
   // Re-validate after the confirmation: definition and viewed run must still be the same.
-  Ap current = engine.um(grindId);
-  Ad now = acq(sessionId);
-  if (current == null || now == null || !identity.equals(now.getId())) return;
-  engine.updateSavedGrind(grindId, current.getName(), net, time, current.favorite);
+  Ap /* current */h = engine.um(a);
+  Ad /* now */i = acq(b);
+  if (h == null || i == null || !g.equals(i.getId())) return;
+  engine.updateSavedGrind(a, h.getName(), e, f, h.favorite);
  }));
 }
 
-public void editSavedGrind(String grindId) {
- Ap definition = engine.um(grindId);
- if (definition == null) return;
- JPanel form = aum(definition.getName(), definition.getNetTargetGp(),
- definition.getActiveTimeTargetMillis(), definition.favorite);
- ajp("Edit " + definition.getName(), msg("gn"),
- form, "Save", () -> editSavedGrind(grindId), (name, net, time) -> {
-  String cleanName = name.isEmpty() ? definition.getName() : name;
-  Long netTarget = As.ks(net, definition.getNetTargetGp());
-  Long timeTarget = As.lb(time, definition.getActiveTimeTargetMillis());
+public void editSavedGrind(String /* grindId */a) {
+ Ap /* definition */b = engine.um(a);
+ if (b == null) return;
+ JPanel /* form */c = aum(b.getName(), b.getNetTargetGp(),
+ b.getActiveTimeTargetMillis(), b.favorite);
+ ajp("Edit " + b.getName(), msg("gn"),
+ c, "Save", () -> editSavedGrind(a), (/* name */d, /* net */e, /* time */f) -> {
+  String /* cleanName */g = d.isEmpty() ? b.getName() : d;
+  Long /* netTarget */h = As.ks(e, b.getNetTargetGp());
+  Long /* timeTarget */i = As.lb(f, b.getActiveTimeTargetMillis());
   // Owner 2026-10-01 (F21): the editor shows and saves the existing Favorite flag.
-  boolean favorite = flag(form, "favoriteField");
-  mutate(() -> engine.updateSavedGrind(grindId, cleanName, netTarget, timeTarget, favorite));
+  boolean /* favorite */j = flag(c, "favoriteField");
+  mutate(() -> engine.updateSavedGrind(a, g, h, i, j));
  });
 }
 
-public void startWithChanges(String grindId) {
- Ap definition = engine.um(grindId);
- if (definition == null) return;
+public void startWithChanges(String /* grindId */a) {
+ Ap /* definition */b = engine.um(a);
+ if (b == null) return;
  ajp("Start with changes", msg("jp"),
- nb(definition), "Start", () -> startWithChanges(grindId), (typed, net, time) -> {
-  String name = typed.isEmpty() ? definition.getName() : typed;
-  Long netTarget = As.ks(net, null);
-  Long timeTarget = As.lb(time, null);
-  String startGrindId = definition.getGrindId();
+ nb(b), "Start", () -> startWithChanges(a), (/* typed */c, /* net */d, /* time */e) -> {
+  String /* name */f = c.isEmpty() ? b.getName() : c;
+  Long /* netTarget */g = As.ks(d, null);
+  Long /* timeTarget */h = As.lb(e, null);
+  String /* startGrindId */i = b.getGrindId();
   // One-off changes apply to this instance only; saved defaults stay untouched.
-  ako(name, () -> mutate(() ->
-  engine.startGrind(name, startGrindId, netTarget, timeTarget, System.currentTimeMillis())));
+  ako(f, () -> mutate(() ->
+  engine.startGrind(f, i, g, h, Ae.now())));
  });
 }
 
-public void archiveSavedGrind(String grindId, boolean archived) {
- if (!archived) {
-  mutate(() -> engine.aht(grindId, false));
+public void archiveSavedGrind(String /* grindId */a, boolean /* archived */b) {
+ if (!b) {
+  mutate(() -> engine.aht(a, false));
   return;
  }
- shell.confirm("Archive Grind", msg("gl"), "Archive", () -> mutate(() -> engine.aht(grindId, true)));
+ shell.confirm("Archive Grind", msg("gl"), "Archive", () -> mutate(() -> engine.aht(a, true)));
 }
 
-public void deleteSavedGrind(String grindId) {
- Ap definition = engine.um(grindId);
- if (definition == null) return;
- shell.confirm("Delete " + definition.getName(), msg("gm"),
- "Delete", () -> mutate(() -> engine.deleteSavedGrind(grindId)));
+public void deleteSavedGrind(String /* grindId */a) {
+ Ap /* definition */b = engine.um(a);
+ if (b == null) return;
+ shell.confirm("Delete " + b.getName(), msg("gm"),
+ "Delete", () -> mutate(() -> engine.deleteSavedGrind(a)));
 }
 
-public void startAgain(String sessionId) {
- Ad session = sessionId == null ? null : engine.ua(sessionId);
- if (session == null) {
-  Ad active = engine.getActiveSession();
-  session = active != null && active.getId().equals(sessionId) ? active : null;
+public void startAgain(String /* sessionId */a) {
+ Ad /* session */b = a == null ? null : engine.ua(a);
+ if (b == null) {
+  Ad /* active */c = engine.getActiveSession();
+  b = c != null && c.getId().equals(a) ? c : null;
  }
- if (session == null) return;
- String name = session.getName();
- String linkedGrindId = session.getGrindId();
- Long net = session.getProfitTargetGp();
- Long time = session.getActiveTimeTargetMillis();
- ako(name, () -> mutate(() ->
- engine.startGrind(name, linkedGrindId, net, time, System.currentTimeMillis())));
+ if (b == null) return;
+ String /* name */d = b.getName();
+ String /* linkedGrindId */e = b.getGrindId();
+ Long /* net */f = b.getProfitTargetGp();
+ Long /* time */g = b.getActiveTimeTargetMillis();
+ ako(d, () -> mutate(() ->
+ engine.startGrind(d, e, f, g, Ae.now())));
 }
 
-public void openDetail(String sessionId) {
- panel.grindsDetailId = sessionId;
+public void openDetail(String /* sessionId */a) {
+ panel.grindsDetailId = a;
  refresh();
 }
 
-public void deleteHistorical(String sessionId) {
- Ad session = engine.ua(sessionId);
- if (session == null) return;
- shell.confirm("Delete " + session.getName(), msg("hd"), "Delete for good", () -> {
+public void deleteHistorical(String /* sessionId */a) {
+ Ad /* session */b = engine.ua(a);
+ if (b == null) return;
+ shell.confirm("Delete " + b.getName(), msg("hd"), "Delete for good", () -> {
   panel.grindsDetailId = null;
-  mutate(() -> engine.qu(sessionId));
+  mutate(() -> engine.qu(a));
  });
 }
 
 /** The Grinds page's own menu: only what changes that page. */
-public void openDataMenu(JComponent anchor) {
- var menu = new JPopupMenu();
- JCheckBoxMenuItem archived = new JCheckBoxMenuItem("Show archived", panel.grindsShowArchived);
- archived.addActionListener(e -> {
-  panel.grindsShowArchived = archived.isSelected();
+public void openDataMenu(JComponent /* anchor */a) {
+ var /* menu */b = new JPopupMenu();
+ JCheckBoxMenuItem /* archived */c = new JCheckBoxMenuItem("Show archived", panel.grindsShowArchived);
+ c.addActionListener(e -> {
+  panel.grindsShowArchived = c.isSelected();
   refresh();
  });
- menu.add(archived);
- menu.show(anchor, 0, anchor.getHeight() + 2);
+ b.add(c);
+ b.show(a, 0, a.getHeight() + 2);
 }
 
 /** The gear menu beside the tabs: profile-wide data actions, from any page. */
 JPopupMenu mv() {
- var menu = new JPopupMenu();
- menu.add(item("Back up profile", persistence != null, () -> lq()));
- menu.add(item("Restore backup\u2026", persistence != null, () -> agm()));
- menu.add(item("Clear old backups", persistence != null, this::qw));
- menu.add(item(msg("fg"), () -> qr()));
- menu.addSeparator();
- menu.add(item(msg("kj"), persistence != null, () -> ti()));
- return menu;
+ var /* menu */a = new JPopupMenu();
+ a.add(item("Back up profile", persistence != null, () -> lq()));
+ a.add(item("Restore backup\u2026", persistence != null, () -> agm()));
+ a.add(item("Clear old backups", persistence != null, this::qw));
+ a.add(item(msg("fg"), () -> qr()));
+ a.addSeparator();
+ a.add(item(msg("kj"), persistence != null, () -> ti()));
+ return a;
 }
 
 public void refresh() {
@@ -320,184 +318,198 @@ public void refresh() {
 }
 
 /** The Start-with-changes form: name and the two targets; the saved definition is never edited. */
-JPanel nb(Ap definition) {
- return aum(definition.getName(), definition.getNetTargetGp(), definition.getActiveTimeTargetMillis());
+JPanel nb(Ap /* definition */a) {
+ return aum(a.getName(), a.getNetTargetGp(), a.getActiveTimeTargetMillis());
 }
 
 /** Name (when given), the two target fields and, when editing a saved Grind, its Favorite flag. */
-static JPanel aum(String name, Long net, Long time) {
- return aum(name, net, time, null);
+static JPanel aum(String /* name */a, Long /* net */b, Long /* time */c) {
+ return aum(a, b, c, null);
 }
 
-static JPanel aum(String name, Long net, Long time, Boolean favorite) {
- JPanel form = stack(CARD, 2);
- if (name != null) avx(form, "nameField", "Name", name);
- avx(form, "netField", msg("gv"), net == null ? "" : String.valueOf(net));
- avx(form, "timeField", msg("hg"), time == null ? "" : akk(time));
- if (favorite != null) avx(form, "favoriteField", "\u2605 Favorite", favorite.booleanValue());
- return form;
+static JPanel aum(String /* name */a, Long /* net */b, Long /* time */c, Boolean /* favorite */d) {
+ JPanel /* form */e = stack(CARD, 2);
+ if (a != null) avx(e, "nameField", "Name", a);
+ avx(e, "netField", msg("gv"), b == null ? "" : String.valueOf(b));
+ avx(e, "timeField", msg("hg"), c == null ? "" : akk(c));
+ if (d != null) avx(e, "favoriteField", "\u2605 Favorite", d.booleanValue());
+ return e;
 }
 
-static void avx(JPanel form, String key, String label, String value) {
- JTextField field = new JTextField(value);
- form.add(label(label, small(), LABEL));
- form.add(field);
- form.putClientProperty(key, field);
+static void avx(JPanel /* form */a, String /* key */b, String /* label */c, String /* value */d) {
+ JTextField /* field */e = new JTextField(d);
+ a.add(label(c, small(), LABEL));
+ a.add(e);
+ a.putClientProperty(b, e);
 }
 
-static void avx(JPanel form, String key, String label, boolean selected) {
- JCheckBox box = new JCheckBox(label, selected);
- box.setOpaque(false);
- box.setFont(small());
- form.add(box);
- form.putClientProperty(key, box);
+static void avx(JPanel /* form */a, String /* key */b, String /* label */c, boolean /* selected */d) {
+ JCheckBox /* box */e = new JCheckBox(c, d);
+ e.setOpaque(false);
+ e.setFont(small());
+ a.add(e);
+ a.putClientProperty(b, e);
 }
 
-static boolean flag(JPanel form, String key) {
- Object box = form.getClientProperty(key);
- return box instanceof JCheckBox && ((JCheckBox) box).isSelected();
+static boolean flag(JPanel /* form */a, String /* key */b) {
+ Object /* box */c = a.getClientProperty(b);
+ return c instanceof JCheckBox && ((JCheckBox) c).isSelected();
 }
 
-static String field(JPanel form, String key) {
- Object field = form.getClientProperty(key);
- return field instanceof JTextField ? ((JTextField) field).getText().trim() : "";
+static String field(JPanel /* form */a, String /* key */b) {
+ Object /* field */c = a.getClientProperty(b);
+ return c instanceof JTextField ? ((JTextField) c).getText().trim() : "";
 }
 
 interface TargetSave {
- void save(String name, String net, String time);
+ void save(String /* name */b, String /* net */c, String /* time */d);
 }
 
 /** A name-and-targets sheet; malformed targets never become a silent clear: say so and reopen it. */
-void ajp(String title, String detail, JPanel form, String action, Runnable reopen, TargetSave save) {
- shell.sheet(title, detail, form, new Shell.Choice(action, true, () -> {
-  String net = field(form, "netField");
-  String time = field(form, "timeField");
-  if (As.vv(net, time)) {
-   save.save(field(form, "nameField"), net, time);
+void ajp(String /* title */a, String /* detail */b, JPanel /* form */c, String /* action */d, Runnable /* reopen */e, TargetSave /* save */f) {
+ shell.sheet(a, b, c, new Shell.Choice(d, true, () -> {
+  String /* net */g = field(c, "netField");
+  String /* time */h = field(c, "timeField");
+  if (As.vv(g, h)) {
+   f.save(field(c, "nameField"), g, h);
   } else {
    shell.tell("Targets not saved", msg("hf"), true);
-   reopen.run();
+   e.run();
   }
  }));
 }
 
 /** One Grind at a time: starting another asks to end the running one first (spec §4). */
-void ako(String nextName, Runnable start) {
+void ako(String /* nextName */b, Runnable /* start */c) {
  if (engine.getActiveSession() == null || !engine.wb()) {
-  start.run();
+  c.run();
   return;
  }
- Ca now = panel.lastSnapshot;
- String running = engine.getActiveSession().getName()
- + (now == null ? "" : " (" + signed(now.net) + ", " + clock(now.elapsedMillis) + ")");
+ Ca /* now */d = panel.lastSnapshot;
+ String /* running */e = engine.getActiveSession().getName()
+ + (d == null ? "" : " (" + signed(d.net) + ", " + clock(d.elapsedMillis) + ")");
  // The engine never replaces a running Grind silently: Switch ends it first, then starts.
- shell.confirm("Switch Grind", "End " + running + " and start " + nextName + "?", "Switch", () -> {
-  mutate(() -> engine.sx(System.currentTimeMillis()));
-  start.run();
+ shell.confirm("Switch Grind", "End " + e + " and start " + b + "?", "Switch", () -> {
+  mutate(() -> engine.sx(Ae.now()));
+  c.run();
  });
 }
 
 /** Puts a path on the system clipboard. */
-static void copyPath(String path) {
- java.awt.datatransfer.StringSelection selection = new java.awt.datatransfer.StringSelection(path);
- java.awt.Toolkit.getDefaultToolkit().getSystemClipboard().setContents(selection, selection);
+static void copyPath(String /* path */a) {
+ java.awt.datatransfer.StringSelection /* selection */b = new java.awt.datatransfer.StringSelection(a);
+ java.awt.Toolkit.getDefaultToolkit().getSystemClipboard().setContents(b, b);
+}
+
+/**
+* Disk work runs on the persistence worker, never Swing's thread, so RuneLite stays responsive;
+* its result comes back on Swing's thread (Codex review 1.2).
+*/
+<T> void off(java.util.concurrent.Callable<T> /* work */b, java.util.function.Consumer<T> /* done */c, String /* failed */d) {
+ java.util.concurrent.ExecutorService /* worker */e = persistence.lifecycleExecutor();
+ if (e == null) return;
+ // Bound to the account it was confirmed on: holding the persistence lock, no account switch can
+ // land mid-job, and a switch before it starts refuses it (Codex follow-up 1.2).
+ TrackingIdentity /* owner */f = persistence.activeIdentity;
+ e.execute(() -> {
+  try {
+   T /* result */g;
+   synchronized (persistence) {
+    if (!java.util.Objects.equals(f, persistence.activeIdentity)) {
+     SwingUtilities.invokeLater(() -> shell.tell("Account changed", msg("e9"), true));
+     return;
+    }
+    g = b.call();
+   }
+   SwingUtilities.invokeLater(() -> c.accept(g));
+  } catch (Exception /* ex */h) {
+   SwingUtilities.invokeLater(() -> shell.failed(d, h));
+  }
+ });
 }
 
 void lq() {
- try {
-  net.runelite.client.util.Filepath backup = persistence.akt(System.currentTimeMillis());
-  shell.tell("Profile backed up", String.valueOf(backup.getFileName()), false);
- } catch (java.io.IOException | RuntimeException ex) {
-  shell.failed("Backup failed", ex);
- }
+ off(() -> persistence.akt(Ae.now()),
+ /* backup */a -> shell.tell("Profile backed up", String.valueOf(a.getFileName()), false), "Backup failed");
 }
 
 /** This account's backups, newest first; restoring backs up the current state first. */
 void agm() {
- JPanel content = stack(CARD, 2);
- final java.util.List<net.runelite.client.util.Filepath> files;
- final java.util.List<Long> modified = new java.util.ArrayList<>();
+ JPanel /* content */a = stack(CARD, 2);
+ java.util.List<net.runelite.client.util.Filepath> /* files */b;
+ java.util.List<Long> /* modified */c = new java.util.ArrayList<>();
  try {
-  files = persistence.backups();
-  for (net.runelite.client.util.Filepath file : files) modified.add(file.getLastModifiedTime().toMillis());
- } catch (java.io.IOException ex) {
-  shell.failed(msg("bz"), ex);
+  b = persistence.backups();
+  for (net.runelite.client.util.Filepath /* file */d : b) c.add(d.getLastModifiedTime().toMillis());
+ } catch (java.io.IOException /* ex */e) {
+  shell.failed(msg("bz"), e);
   return;
  }
- final long now = System.currentTimeMillis();
- new Paged(files.size(), (box, page) -> {
-  int from = Math.min(page * CHOICE_ROWS, files.size());
-  for (int i = from; i < Math.min(from + CHOICE_ROWS, files.size()); i++) {
-   net.runelite.client.util.Filepath file = files.get(i);
-   long at = modified.get(i);
-   JButton row = button(whenSeconds(at, now), false, () -> shell.confirm("Restore backup",
-   "Replace this profile with the " + whenSeconds(at, now)
-   + msg("kk"), "Restore", () -> {
-    Ei.Ds outcome = persistence.agm(file, System.currentTimeMillis());
-    if (outcome.isApplied()) panel.afx();
-    shell.tell(outcome.isApplied() ? "Backup restored" : "Restore refused",
-    outcome.isApplied() ? "" : outcome.getDetail(), !outcome.isApplied());
-   }));
+ long /* now */f = Ae.now();
+ new Paged(b.size(), (/* box */g, /* page */h) -> {
+  int /* from */j = Math.min(h * CHOICE_ROWS, b.size());
+  for (int i = j; i < Math.min(j + CHOICE_ROWS, b.size()); i++) {
+   net.runelite.client.util.Filepath /* file */k = b.get(i);
+   long /* at */l = c.get(i);
+   JButton /* row */m = button(whenSeconds(l, f), false, () -> shell.confirm("Restore backup",
+   msg("e8") + whenSeconds(l, f)
+   + msg("kk"), "Restore", () -> off(() -> persistence.agm(k, Ae.now()), /* outcome */n -> {
+    if (n.isApplied()) panel.afx();
+    shell.tell(n.isApplied() ? "Backup restored" : "Restore refused",
+    n.isApplied() ? "" : n.getDetail(), !n.isApplied());
+   }, "Restore failed")));
    // Owner 2026-10-01 (F22): when() is minute-precision; the filename disambiguates.
-   row.setToolTipText(String.valueOf(file.getFileName()));
-   box.add(row);
+   m.setToolTipText(String.valueOf(k.getFileName()));
+   g.add(m);
   }
- }).build(content);
- shell.sheet("Restore backup", files.isEmpty() ? "No backups yet." : "Newest first.", content);
+ }).build(a);
+ shell.sheet("Restore backup", b.isEmpty() ? "No backups yet." : "Newest first.", a);
 }
 
 void qr() {
  if (repository == null) return;
- String path = String.valueOf(repository.ty());
- copyPath(path);
- shell.tell(msg("fh"), path, false);
+ String /* path */a = String.valueOf(repository.ty());
+ copyPath(a);
+ shell.tell(msg("fh"), a, false);
 }
 
 /** Owner 2026-10-01 (F26): the deletion is immediate and irreversible, so state it first. */
 void qw() {
  try {
-  java.util.List<net.runelite.client.util.Filepath> backups = persistence.backups();
-  if (backups.size() <= 1) {
+  java.util.List<net.runelite.client.util.Filepath> /* backups */a = persistence.backups();
+  if (a.size() <= 1) {
    shell.tell("Nothing to clear", "0 older backups", false);
    return;
   }
-  long newest = backups.get(0).getLastModifiedTime().toMillis();
-  shell.confirm("Clear old backups", "Remove " + (backups.size() - 1) + " older backups; the newest ("
-  + when(newest, System.currentTimeMillis()) + ") is kept?", "Remove", () -> {
-   try {
-    shell.tell("Old backups cleared", persistence.adz(1) + " removed; the newest is kept", false);
-   } catch (java.io.IOException ex) {
-    shell.failed("Clear failed", ex);
-   }
-  });
- } catch (java.io.IOException ex) {
-  shell.failed(msg("bz"), ex);
+  long /* newest */b = a.get(0).getLastModifiedTime().toMillis();
+  shell.confirm("Clear old backups", "Remove " + (a.size() - 1) + msg("e7")
+  + when(b, Ae.now()) + ") is kept?", "Remove", () -> off(() -> persistence.adz(1),
+  /* removed */c -> shell.tell(msg("e6"), c + msg("e5"), false), "Clear failed"));
+ } catch (java.io.IOException /* ex */d) {
+  shell.failed(msg("bz"), d);
  }
 }
 
 void ti() {
- shell.sheet("Factory reset", msg("hc"), null, new Shell.Choice("Back up first", true, () -> {
-  // Owner 2026-10-01 (F26): back up first, then reset; a failed backup refuses the reset.
-  try {
-   net.runelite.client.util.Filepath backup = persistence.akt(System.currentTimeMillis());
-   shell.tell("Profile backed up", String.valueOf(backup.getFileName()), false);
-  } catch (java.io.IOException | RuntimeException ex) {
-   shell.failed("Backup failed", ex);
-   return;
-  }
-  axr();
- }), new Shell.Choice("Reset", false, this::axr));
+ // Owner 2026-10-01 (F26): back up first, then reset; a failed backup refuses the reset.
+ // One job, so the backup and the reset are the same account's (Codex follow-up 1.2).
+ shell.sheet("Factory reset", msg("hc"), null, new Shell.Choice("Back up first", true,
+ () -> off(() -> {
+  persistence.akt(Ae.now());
+  return persistence.sj(Ae.now());
+ }, this::reset, "Backup failed")), new Shell.Choice("Reset", false, this::axr));
 }
 
 /** The existing direct reset: one confirmation already happened in the sheet. */
 void axr() {
- Ei.Ds outcome = persistence.sj(System.currentTimeMillis());
- if (outcome.isApplied()) {
-  // The profile was replaced: HUD+ must not keep the old trip's loot or moments.
-  panel.afx();
- }
- String detail = outcome.isApplied() ? (outcome.getPreResetBackup() == null ? msg("fi")
- : "backup " + String.valueOf(outcome.getPreResetBackup().getFileName())) : outcome.getDetail();
- shell.tell(outcome.isApplied() ? "Profile reset" : "Reset refused", detail, !outcome.isApplied());
+ off(() -> persistence.sj(Ae.now()), this::reset, "Reset failed");
+}
+
+void reset(Ei.Ds /* outcome */a) {
+ // The profile was replaced: HUD+ must not keep the old trip's loot or moments.
+ if (a.isApplied()) panel.afx();
+ String /* detail */b = a.isApplied() ? (a.getPreResetBackup() == null ? msg("fi")
+ : "backup " + String.valueOf(a.getPreResetBackup().getFileName())) : a.getDetail();
+ shell.tell(a.isApplied() ? "Profile reset" : "Reset refused", b, !a.isApplied());
 }
 }

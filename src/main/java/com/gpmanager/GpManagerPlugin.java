@@ -29,8 +29,9 @@ import static com.gpmanager.Ed.*;
 import static net.runelite.api.GameState.*;
 import static java.lang.Math.*;
 import static com.gpmanager.Aj.*;
+import static com.gpmanager.Eb.*;
 @PluginDescriptor(
-name = "GP Manager", internalName = "gp-manager", legacyDataDirectory = "profit-manager",
+name = "GP Manager", internalName = "gp-manager",
 description = "Passive profit tracking: profit per Grind and per hour, a ledger you can correct, all-time totals, PvP results and a loot HUD.",
 tags = {"profit", "gp", "loot", "costs", "supplies", "sessions", "pking", "pk", "hud"})
 public class GpManagerPlugin extends Plugin {
@@ -57,6 +58,9 @@ ConfigManager configManager;
 ContainerSnapshotFactory snapshotFactory;
 @Inject
 ItemManager itemManager;
+/** Accounting's item lookups; ItemManager itself stays for sprites. */
+@Inject
+Ix ix;
 @Inject
 SpriteManager spriteManager;
 @Inject
@@ -106,7 +110,7 @@ volatile Bo currentPvp = Bo.NONE;
 List<Ab> held = Collections.emptyList();
 /** Read by the sidebar on the EDT; written from startup and game-state events. */
 volatile boolean loggedIn;
-final Ec navigation = new Ec();
+Ec navigation = new Ec();
 /**
 * Installs the sidebar and HUD+. When the toolbar
 * is unavailable the plugin keeps tracking without presentation, and R1 acceptance fails
@@ -114,44 +118,44 @@ final Ec navigation = new Ec();
 */
 void installPresentation() {
  try {
-  var panel = new Dp(engine, config, itemManager, repository, persistence);
-  panel.spriteManager = spriteManager;
-  panel.mutationOwner = clientThread::invoke;
-  panel.axo(() -> currentPvp);
-  panel.na(() -> loggedIn);
-  panel.axq(() -> lastGameState == HOPPING);
-  var builder = new Cp(config, (id, quantity) -> itemManager.getImage(id, quantity, false));
-  panel.axn(builder);
-  hudOverlay = new De(builder, config);
+  var /* panel */a = new Dp(engine, config, itemManager, repository, persistence);
+  a.spriteManager = spriteManager;
+  a.mutationOwner = clientThread::invoke;
+  a.axo(() -> currentPvp);
+  a.na(() -> loggedIn);
+  a.axq(() -> lastGameState == HOPPING);
+  var /* builder */b = new Cp(config, (/* id */c, /* quantity */e) -> itemManager.getImage(c, e, false));
+  a.axn(b);
+  hudOverlay = new De(b, config);
   overlayManager.add(hudOverlay);
-  hud = builder;
+  hud = b;
   lootPresentationFilter.refresh();
-  panel.mh(new RecentFilter() {
-   public boolean isFlowIncluded(Ab flow) {
-    return lootPresentationFilter.isFlowIncluded(flow, config.lootPresentationFilter());
+  a.mh(new RecentFilter() {
+   public boolean isFlowIncluded(Ab /* flow */f) {
+    return lootPresentationFilter.isFlowIncluded(f, config.lootPresentationFilter());
    }
    public String version() {
     return config.lootPresentationFilter() + "|" + lootPresentationFilter.fingerprint + "|" + config.hiddenRecentItems();
    }
-   public boolean showRecent(String name, long quantity) {
-    return LootPresentationFilterService.aus("", config.hiddenRecentItems(), name, quantity)
+   public boolean showRecent(String /* name */f, long /* quantity */g) {
+    return LootPresentationFilterService.aus("", config.hiddenRecentItems(), f, g)
     != LootPresentationFilterService.HIDDEN;
    }
-   public void hideRecent(String name) {
-    var names = new ArrayList<>(Text.fromCSV(config.hiddenRecentItems()));
-    if (!names.contains(name)) names.add(name);
-    configManager.setConfiguration(GpManagerConfig.GROUP, "hiddenRecentItems", Text.toCSV(names));
+   public void hideRecent(String /* name */f) {
+    var /* names */g = new ArrayList<>(Text.fromCSV(config.hiddenRecentItems()));
+    if (!g.contains(f)) g.add(f);
+    configManager.setConfiguration(GpManagerConfig.GROUP, "hiddenRecentItems", Text.toCSV(g));
    }
   });
-  activityPanel = panel;
-  if (!navigation.install(Ec.akh(clientToolbar), panel, Ec.awn())) {
+  activityPanel = a;
+  if (!navigation.install(Ec.akh(clientToolbar), a, Ec.awn())) {
    log.warn(msg("d"), clientToolbar != null, Ec.awn() != null);
    afe();
    return;
   }
   log.info(msg("al"));
- } catch (RuntimeException | LinkageError ex) {
-  log.warn(msg("as"), ex);
+ } catch (RuntimeException | LinkageError /* ex */f) {
+  log.warn(msg("as"), f);
   afe();
  }
 }
@@ -172,65 +176,68 @@ void afe() {
 * where client access is legal; the EDT reads the cached sample through {@code axo}.
 */
 void ahp() {
- Player local = client.getLocalPlayer();
- int skull = local == null ? SkullIcon.NONE : local.getSkullIcon();
- boolean possible = pvp.context().ws();
- boolean skulled = skull != SkullIcon.NONE;
- boolean protect = client.getVarbitValue(VarbitID.PRAYER_PROTECTITEM) == 1;
- if (!possible) held = Collections.emptyList();
+ Player /* local */a = client.getLocalPlayer();
+ int /* skull */b = a == null ? SkullIcon.NONE : a.getSkullIcon();
+ boolean /* possible */c = pvp.context().ws();
+ boolean /* skulled */d = b != SkullIcon.NONE;
+ boolean /* protect */e = client.getVarbitValue(VarbitID.PRAYER_PROTECTITEM) == 1;
+ if (!c) held = Collections.emptyList();
  else if (client.getTickCount() % 2 == 0 && valuation != null && snapshotFactory != null) {
   held = valuation.value(snapshotFactory.nr(true).quantities);
  }
- currentPvp = new Bo(possible, skulled, protect, possible ? Bo.risk(held, skulled, protect) : 0L);
+ currentPvp = new Bo(c, d, e, c ? Bo.risk(held, d, e) : 0L);
 }
 
-void transactionBooked(Ac transaction, long now) {
- Cp builder = hud;
- if (builder != null) builder.tray().booked(transaction, now, builder.xy());
+void transactionBooked(Ac /* transaction */a, long /* now */b) {
+ Cp /* builder */c = hud;
+ if (c != null) {
+  c.tray().big = lootPresentationFilter.big(config.lootPresentationFilter());
+  c.tray().booked(a, b, c.xy());
+ }
  refreshPresentation();
 }
 
-void lootObserved(boolean pending, String source, Collection<ItemStack> items, int multiplicity, long now) {
- Cp builder = hud;
- String batch = source + ":" + pending + ":" + multiplicity + ":" + axv(items);
+void lootObserved(boolean /* pending */a, String /* source */b, Collection<ItemStack> /* items */c, int /* multiplicity */d, long /* now */e) {
+ Cp /* builder */f = hud;
+ String /* batch */g = b + ":" + a + ":" + d + ":" + axv(c);
  // Only reward windows ride the tray (ground loot shows once it is picked up). One reward
  // can arrive through several RuneLite events; show it once.
- if (builder != null && pending && items != null && !(batch.equals(lastLootBatch) && now - lastLootAt < 1_200L)) {
-  lastLootBatch = batch;
-  lastLootAt = now;
-  for (ItemStack item : items) {
+ if (f != null && a && c != null && !(g.equals(lastLootBatch) && e - lastLootAt < 1_200L)) {
+  lastLootBatch = g;
+  lastLootAt = e;
+  for (ItemStack /* item */h : c) {
    // Named and priced by the one valuation route; nothing is counted from this.
-   for (Ab flow : valuation.value(Collections.singletonMap(itemManager.canonicalize(item.getId()),
-   (long) item.getQuantity() * max(1, multiplicity)))) {
-    builder.tray().observed(flow.itemId, flow.itemName, flow.quantityDelta, flow.unitPrice, now, builder.xy());
+   for (Ab /* flow */i : valuation.value(Collections.singletonMap(ix.canon(h.getId()),
+   (long) h.getQuantity() * max(1, d)))) {
+    f.tray().observed(i.itemId, i.itemName, i.quantityDelta, i.unitPrice, e, f.xy());
    }
   }
  }
  refreshPresentation();
 }
 
-void ownerScopeChanged(String scope) {
- Cp builder = hud;
- if (builder != null) builder.tray().clear();
- Dp panel = activityPanel;
- if (panel == null) return;
- if (scope == null || "held".equals(scope) || "switching".equals(scope)) panel.ot();
- else panel.ahd();
+void ownerScopeChanged(String /* scope */a) {
+ Cp /* builder */b = hud;
+ if (b != null) b.tray().clear();
+ Dp /* panel */c = activityPanel;
+ if (c == null) return;
+ if (a == null || "held".equals(a) || "switching".equals(a)) c.ot();
+ else c.ahd();
 }
 
-void interactionChanged(String name, boolean combat) {
+void interactionChanged(String /* name */a, boolean /* combat */b) {
  // Presentation policy: the target never retitles the run; HUD+ shows it as its header,
  // and fighting another NPC starts that NPC's tray streak.
- Cp builder = hud;
- if (builder != null && !HudTray.minion(name)) {
-  builder.interaction(name, combat);
+ Cp /* builder */c = hud;
+ if (c != null && !HudTray.minion(a)) {
+  c.interaction(a, b);
  }
 }
 
 /** Every-tick signals: live values only, never a full page rebuild. */
 void pulse() {
- Dp panel = activityPanel;
- if (panel != null) panel.tick();
+ Dp /* panel */a = activityPanel;
+ if (a != null) a.tick();
 }
 
 int ticksSinceSave;
@@ -238,26 +245,28 @@ int recentPlayerCombatTicks;
 int idleTicks;
 /** Wall clock of the first idle tick; the pause is dated here. */
 long idleStartedAt;
-final Map<Skill, Integer> lastSkillExperience = new EnumMap<>(Skill.class);
-final NeutralZoneTracker neutralZoneTracker = new NeutralZoneTracker();
+Map<Skill, Integer> lastSkillExperience = new EnumMap<>(Skill.class);
+NeutralZoneTracker neutralZoneTracker = new NeutralZoneTracker();
 int geOfferSeedTicks;
 /** Rising-edge: clear NPC soft-stick once when bank opens, not every bank tick. */
 boolean bankClearedInteractionThisOpen;
+/** One client-thread initialization when this plugin enable becomes ready. */
+boolean boot;
 @Override
 protected void startUp() {
- migrateGroup(configManager);
+ boot = true;
  JsonCodec.bind(gson);
- boolean aow = client.getGameState() == LOGGED_IN;
- loggedIn = aow;
- TrackingIdentity asi = persistence.resolveCurrentIdentity();
+ boolean /* aow */a = client.getGameState() == LOGGED_IN;
+ loggedIn = a;
+ TrackingIdentity /* asi */b = persistence.resolveCurrentIdentity();
  persistence.vr(() -> {
   try {
    repository.initialize(getPluginDirectory());
-  } catch (IOException ex) {
-   throw new IllegalStateException(msg("k"), ex);
+  } catch (IOException /* ex */c) {
+   throw new IllegalStateException(msg("k"), c);
   }
   persistence.start();
-  if (aow) persistence.ajz(asi, config.persistHistory());
+  if (a) persistence.ajz(b, config.persistHistory());
  });
  // Always sync identity for account isolation; persistHistory only
  // controls durable load/save, not whether accounts may mix.
@@ -267,20 +276,10 @@ protected void startUp() {
  // startUp runs on the EDT; world type and the inventory baseline are client-thread reads.
  clientThread.invokeLater(() -> {
   refreshEconomyState();
+  loadBank();
   if (nh()) ve();
  });
  pulse();
-}
-
-/** One-time bridge: settings saved under the original plugin name's group carry into the current one. */
-static void migrateGroup(ConfigManager manager) {
- if (manager.getConfiguration(GpManagerConfig.GROUP, "groupMigrated") != null) return;
- String old = "profitmanager.";
- for (String whole : manager.getConfigurationKeys(old)) {
-  String value = manager.getConfiguration("profitmanager", whole.substring(old.length()));
-  if (value != null) manager.setConfiguration(GpManagerConfig.GROUP, whole.substring(old.length()), value);
- }
- manager.setConfiguration(GpManagerConfig.GROUP, "groupMigrated", "true");
 }
 
 @Override
@@ -288,7 +287,7 @@ protected void shutDown() {
  charges.oi();
  // The durable General tracker and any custom session are saved in
  // place. Shutdown must not turn either into history or merge owners.
- engine.acu(System.currentTimeMillis());
+ engine.acu(Ae.now());
  persistence.shutdown(config.persistHistory());
  lastSkillExperience.clear();
  interactionContextTracker.clear();
@@ -311,32 +310,32 @@ void refreshEconomyState() {
 }
 
 @Subscribe
-public void onGameStateChanged(GameStateChanged event) {
- GameState previous = lastGameState;
- lastGameState = event.getGameState();
- if (event.getGameState() == LOGGED_IN) {
+public void onGameStateChanged(GameStateChanged /* event */b) {
+ GameState /* previous */c = lastGameState;
+ lastGameState = b.getGameState();
+ if (b.getGameState() == LOGGED_IN) {
   loggedIn = true;
   // Login or world hop: re-read the economy identity from the client thread.
   refreshEconomyState();
- } else if (event.getGameState() == LOGIN_SCREEN || event.getGameState() == HOPPING) {
+ } else if (b.getGameState() == LOGIN_SCREEN || b.getGameState() == HOPPING) {
   recentPlayerCombatTicks = 0;
-  loggedIn = event.getGameState() == HOPPING;
+  loggedIn = b.getGameState() == HOPPING;
   // No world identity: automatic market quotes fail closed until the next login.
   if (valuation != null) valuation.setEconomyState(Bl.Bk.UNKNOWN);
  }
  // LOGGED_IN -> LOADING -> LOGGED_IN is a region change (teleport, instance, stairs), not a
  // login. Re-priming the baseline there swallowed whatever changed on the way -- a teleport
  // tablet breaking never booked. Only the location-bound trackers reset on a load.
- if (event.getGameState() == LOADING) {
+ if (b.getGameState() == LOADING) {
   oo();
   return;
  }
- if (event.getGameState() == LOGGED_IN && previous == LOADING) {
+ if (b.getGameState() == LOGGED_IN && c == LOADING) {
   activity.ajd();
   pulse();
   return;
  }
- if (event.getGameState() != LOGGED_IN) {
+ if (b.getGameState() != LOGGED_IN) {
   geOfferLedger.lu();
   geOfferSeedTicks = 0;
   charges.ags();
@@ -344,30 +343,71 @@ public void onGameStateChanged(GameStateChanged event) {
   oo();
   characterIdleTracker.clear();
  }
- if (event.getGameState() == LOGGED_IN) {
+ if (b.getGameState() == LOGGED_IN) {
   lr();
   persistence.aje(config::persistHistory);
   pulse();
- } else if (event.getGameState() == LOGIN_SCREEN || event.getGameState() == HOPPING) {
+ } else if (b.getGameState() == LOGIN_SCREEN || b.getGameState() == HOPPING) {
   lastSkillExperience.clear();
   if (persistence.isTrackingReady()) {
-   engine.acu(System.currentTimeMillis());
+   engine.acu(Ae.now());
    persist();
   }
-  if (event.getGameState() == LOGIN_SCREEN) persistence.onLogout(config.persistHistory());
+  if (b.getGameState() == LOGIN_SCREEN) persistence.onLogout(config.persistHistory());
  }
 }
 
+/** Wealth line (owner 1.2): GE price, or high alch for untradeables; placeholders count nothing. */
+long worth(ItemContainer /* container */a) {
+ long /* total */b = 0L;
+ if (a == null || ix == null) return 0L;
+ for (Item /* item */c : a.getItems()) {
+  if (c == null || c.getId() < 0 || c.getQuantity() <= 0) continue;
+  // A bank placeholder keeps the slot of an item you took out; it is not the item (owner 1.2).
+  if (ix.comp(c.getId()).getPlaceholderTemplateId() != -1) continue;
+  int /* id */d = ix.canon(c.getId());
+  // Face value for coins and platinum; the active market route the accounting uses, never the
+  // user-preference getter; high alch for untradeables.
+  long /* price */e = Bl.sm(d) > 0 ? Bl.sm(d) : ix.price(d);
+  if (e <= 0L) e = ix.comp(d).getHaPrice();
+  b += e * c.getQuantity();
+ }
+ return b;
+}
+
+/** A catch or cut's item: "Raw trout" beats cooked "Trout" in any search order (Codex review 1.2). */
+static int caughtItem(String /* name */a, List<net.runelite.http.api.item.ItemPrice> /* found */b) {
+ int /* plain */c = -1;
+ for (var /* item */d : b) {
+  if (d.getName().equalsIgnoreCase("raw " + a)) return d.getId();
+  if (d.getName().equalsIgnoreCase(a)) c = d.getId();
+ }
+ return c;
+}
+
+/** What you carry now: inventory and worn equipment. */
+void carry() {
+ engine.carried(worth(client.getItemContainer(InventoryID.INV)) + worth(client.getItemContainer(InventoryID.WORN)));
+}
+
+/** This account's last bank total, kept in its RuneLite profile so a restart remembers it. */
+void loadBank() {
+ String /* saved */a = configManager == null ? null : configManager.getRSProfileConfiguration(GpManagerConfig.GROUP, "bankWealth");
+ String[] /* parts */b = a == null || !a.matches("\\d+@\\d+") ? new String[0] : a.split("@");
+ engine.bank(b.length == 2 ? Long.parseLong(b[0]) : 0L, b.length == 2 ? Long.parseLong(b[1]) : 0L);
+}
+
 @Subscribe
-public void onRuneScapeProfileChanged(RuneScapeProfileChanged event) {
+public void onRuneScapeProfileChanged(RuneScapeProfileChanged /* event */a) {
  lx();
+ loadBank();
  refreshEconomyState();
  persistence.aje(config::persistHistory);
  pulse();
 }
 
 @Subscribe
-public void onAccountHashChanged(AccountHashChanged event) {
+public void onAccountHashChanged(AccountHashChanged /* event */a) {
  lx();
  if (client.getAccountHash() == -1L) {
   persistence.acc(config::persistHistory);
@@ -380,8 +420,8 @@ public void onAccountHashChanged(AccountHashChanged event) {
 
 /** Profile/account identity is changing: transient charge/GE/interaction evidence never crosses owners. */
 void lx() {
+ persistence.eo();
  recentPlayerCombatTicks = 0;
- engine.ol();
  lr();
  charges.ags();
  interactionContextTracker.clear();
@@ -401,8 +441,16 @@ void ve() {
  // Login restores identity and baseline. Resume LIFECYCLE only (hop/relog).
  // Idle and Recovery stay until activity or explicit Resume. Manual / Stop stay held.
  if (engine.getActiveSession() != null) engine.lp();
- long now = System.currentTimeMillis();
- engine.resume(now, LIFECYCLE);
+ carry();
+ long /* now */a = Ae.now();
+ if (boot) {
+  boot = false;
+  // Seed current XP rather than swallowing the first real XP drop after enabling.
+  lastSkillExperience.clear();
+  for (Skill b : Skill.values()) if (b != Skill.OVERALL) lastSkillExperience.put(b, client.getSkillExperience(b));
+  activity.rb(a);
+ }
+ engine.resume(a, LIFECYCLE);
  avz();
  idleTicks = 0;
  activity.ajd();
@@ -422,9 +470,9 @@ void avz() {
 
 /** Same-turn owner rebind so a custom start/finish or account switch never lingers one tick. */
 void ajh() {
- String scope = persistence != null && persistence.isTrackingReady()
+ String /* scope */a = persistence != null && persistence.isTrackingReady()
  ? String.valueOf(System.identityHashCode(engine.getActiveSession())) : "held";
- ownerScopeChanged(scope);
+ ownerScopeChanged(a);
 }
 
 void lr() {
@@ -437,24 +485,24 @@ void lr() {
 
 void kj() {
  if (geOfferSeedTicks <= 0 || --geOfferSeedTicks > 0) return;
- GrandExchangeOffer[] offers = client.getGrandExchangeOffers();
- boolean complete = offers != null && (offers.length == 3 || offers.length == 8);
- if (complete) {
-  for (int slot = 0; slot < offers.length; slot++) {
-   GrandExchangeOffer offer = offers[slot];
-   if (offer == null) {
-    complete = false;
+ GrandExchangeOffer[] /* offers */b = client.getGrandExchangeOffers();
+ boolean /* complete */c = b != null && (b.length == 3 || b.length == 8);
+ if (c) {
+  for (int /* slot */d = 0; d < b.length; d++) {
+   GrandExchangeOffer /* offer */e = b[d];
+   if (e == null) {
+    c = false;
     break;
    }
-   geOfferLedger.observe(Bj.Snapshot.fromOffer(slot, offer));
+   geOfferLedger.observe(Bj.Snapshot.fromOffer(d, e));
   }
  }
- if (complete) {
+ if (c) {
   geOfferLedger.tg();
   // Schema-104 custody baseline: resume exact persisted lifecycles, quarantine offers
   // first seen already open, and never replay pre-existing progress as a fill.
   // Progress made while the client was away is taken from the slot once, here.
-  engine.ahy(geOfferLedger.snapshots(), System.currentTimeMillis());
+  engine.ahy(geOfferLedger.snapshots(), Ae.now());
  } else {
   // Do not treat a partial/null slot array as an empty-account baseline.
   // Retry until all eight current slots are observed.
@@ -463,15 +511,23 @@ void kj() {
 }
 
 @Subscribe
-public void onItemContainerChanged(ItemContainerChanged event) {
+public void onItemContainerChanged(ItemContainerChanged /* event */b) {
  if (!nh()) return;
- int aln = event.getContainerId();
- boolean inventory = aln == InventoryID.INV || aln == InventoryID.WORN;
- if (!inventory) zb();
- if (aln == InventoryID.BANK) {
+ int /* aln */c = b.getContainerId();
+ boolean /* inventory */d = c == InventoryID.INV || c == InventoryID.WORN;
+ if (!d) zb();
+ if (c == InventoryID.BANK) {
   engine.markContext(Aj.TRANSFER, CORRELATION_TICKS, "Bank transfer");
+  long /* bank */e = worth(b.getItemContainer());
+  long /* at */f = Ae.now();
+  engine.bank(e, f);
+  // The replay has no settings store; accounting never reads this copy back mid-session.
+  if (configManager != null) configManager.setRSProfileConfiguration(GpManagerConfig.GROUP, "bankWealth", e + "@" + f);
  }
- if (inventory) {
+ kit(c, b.getItemContainer());
+ chestChanged(c, b.getItemContainer());
+ if (d) carry();
+ if (d) {
   // Inventory can fire after the bank widget is gone but before the next
   // GameTick. Close soft transfer evidence first so burial is not latched.
   pb();
@@ -490,37 +546,74 @@ public void onItemContainerChanged(ItemContainerChanged event) {
  }
 }
 
+/** Kits with their own window, by container; RuneLite loads one when its window first opens. */
+static final Map<Integer, String> KITS = Map.of(InventoryID.TACKLE_BOX, "Tackle box", InventoryID.SEED_BOX, "Seed box",
+InventoryID.FORESTRY_KIT, "Forestry kit", InventoryID.HUNTSMANS_KIT, "Huntsman's kit");
+
+/**
+* A click inside a kit's window names the item, never the kit, so the kit's contents changing is
+* the storage evidence: taking items out or putting them in is neutral (owner 1.2). The first
+* sighting only loads the kit.
+*/
+void kit(int /* id */a, ItemContainer /* container */b) {
+ String /* kit */c = KITS.get(a);
+ if (c == null || b == null) return;
+ Item[] /* items */d = b.getItems();
+ Ev /* old */f = engine.eb.peek(KT, e -> e.item == a);
+ Item[] /* before */g = f == null ? null : (Item[]) f.data;
+ if (f != null) engine.eb.take(KT, a, 1L, e -> e == f);
+ engine.eb.add(KT, a, 1L, Integer.MAX_VALUE, c).data = d;
+ if (g != null && !Arrays.equals(g, d)) engine.zh(c, CORRELATION_TICKS);
+}
+
+/** A tick after a bag pickup, what is still not in the inventory went into the open bag (owner 1.2). */
+void bagSettle() {
+ Ev e = engine.eb.peek(BG);
+ if (e == null || e.owner != engine.eb.owner || client.getTickCount() <= e.at) return;
+ long /* missing */a = e.held + e.qty - snapshotFactory.capture(false, false).aea(e.item);
+ if (a > 0L) engine.bagged(e, Math.min(a, e.qty));
+ engine.eb.take(BG, e.item, e.qty, v -> v == e);
+}
+
+/** A one-tick bag observation; the source's inventory baseline bounds a split pickup. */
+void bag(int /* item */a, long /* qty */b, long /* held */c) {
+ Ev e = engine.eb.put(BG, a, b, 5, null);
+ e.at = client.getTickCount();
+ e.held = c;
+}
+
 void pb() {
  if (!Ee.vp(client)) engine.yu();
 }
 
 @Subscribe
-public void onGrandExchangeOfferChanged(GrandExchangeOfferChanged event) {
- if (event == null || event.getOffer() == null || event.getSlot() < 0) return;
+public void onGrandExchangeOfferChanged(GrandExchangeOfferChanged /* event */a) {
+ if (a == null || a.getOffer() == null || a.getSlot() < 0) return;
  // The API replays every slot as EMPTY at login, followed by each offer
  // that the server restores. Keep these as baselines; the ledger is
  // observation-only until that seed is finished.
- Bj.Snapshot snapshot = Bj.Snapshot.fromOffer(event.getSlot(), event.getOffer());
- Optional<Bj.Transition> observed = geOfferLedger.observe(snapshot);
- if (observed.isPresent()) handleGeOfferTransition(observed.get());
+ Bj.Snapshot /* snapshot */b = Bj.Snapshot.fromOffer(a.getSlot(), a.getOffer());
+ Optional<Bj.Transition> /* observed */c = geOfferLedger.observe(b);
+ if (c.isPresent()) handleGeOfferTransition(c.get());
 }
 
-void handleGeOfferTransition(Bj.Transition transition) {
- int apj = transition.current.itemId > 0 || transition.previous == null
- ? transition.current.itemId : transition.previous.itemId;
+void handleGeOfferTransition(Bj.Transition /* transition */a) {
+ int /* apj */b = a.current.itemId > 0 || a.previous == null
+ ? a.current.itemId : a.previous.itemId;
  // Observation only: custody owns offer-based classification through its item- and
  // side-scoped offer records. A passive progress or slot transition must never arm
  // MARKET context for whatever inventory change settles next.
- engine.abh(transition, apj > 0 ? itemName(apj) : "", System.currentTimeMillis());
+ engine.abh(a, b > 0 ? itemName(b) : "", Ae.now());
  // Fill progress is evidence only; money is booked from the settled inventory movement.
 }
 
 @Subscribe
-public void onVarbitChanged(VarbitChanged event) {
+public void onVarbitChanged(VarbitChanged /* event */b) {
  // Rune pouch contents live in varbits, not an item container. A change there is
  // an inventory change for accounting: casting from the pouch is a cost, filling
  // it from the inventory nets to zero.
- if (event == null || !config.includeRunePouch() || !ContainerSnapshotFactory.xv(event.getVarbitId())) {
+ if (b == null || (!config.includeRunePouch() || !ContainerSnapshotFactory.xv(b.getVarbitId()))
+ && b.getVarbitId() != VarbitID.CHARGES_ASH_SANCTIFIER_QUANTITY) {
   return;
  }
  if (!nh()) return;
@@ -530,57 +623,79 @@ public void onVarbitChanged(VarbitChanged event) {
 }
 
 @Subscribe
-public void onGraphicChanged(GraphicChanged event) {
- if (!nh() || event == null || event.getActor() != client.getLocalPlayer()) return;
- charges.spotAnims(event.getActor().getSpotAnims(), System.currentTimeMillis());
+public void onGraphicChanged(GraphicChanged /* event */a) {
+ if (!nh() || a == null || a.getActor() != client.getLocalPlayer()) return;
+ charges.spotAnims(a.getActor().getSpotAnims(), Ae.now());
 }
 
 @Subscribe
-public void onHitsplatApplied(HitsplatApplied event) {
- if (!nh() || event == null || !(event.getActor() instanceof NPC)) return;
- Hitsplat aol = event.getHitsplat();
+public void onHitsplatApplied(HitsplatApplied /* event */b) {
+ if (!nh() || b == null || !(b.getActor() instanceof NPC)) return;
+ Hitsplat /* aol */c = b.getHitsplat();
  // isMine sees every target of one swing (owner 2026-09-29): a scythe sweep's second
  // and third hits land on NPCs the player never "interacts" with.
- if (aol == null || !aol.isMine()) return;
- charges.aci(aol.getAmount(), System.currentTimeMillis());
+ if (c == null || !c.isMine()) return;
+ charges.aci(c.getAmount(), Ae.now());
 }
 
 @Subscribe
-public void onAnimationChanged(AnimationChanged event) {
- if (!nh() || event == null || event.getActor() != client.getLocalPlayer()) return;
- charges.acj(event.getActor().getAnimation(), System.currentTimeMillis());
+public void onAnimationChanged(AnimationChanged /* event */a) {
+ if (!nh() || a == null || a.getActor() != client.getLocalPlayer()) return;
+ charges.acj(a.getActor().getAnimation(), Ae.now());
 }
 
 @Subscribe
-public void onChatMessage(ChatMessage event) {
- if (!nh() || event == null) return;
- ChatMessageType type = event.getType();
- if (type != ChatMessageType.SPAM && type != ChatMessageType.GAMEMESSAGE) return;
- String message = normalize(event.getMessage());
- if (charges.abt(message, System.currentTimeMillis())) {
+public void onChatMessage(ChatMessage /* event */b) {
+ if (!nh() || b == null) return;
+ ChatMessageType /* type */c = b.getType();
+ if (c != ChatMessageType.SPAM && c != ChatMessageType.GAMEMESSAGE) return;
+ String /* message */d = normalize(b.getMessage());
+ if (charges.abt(d, Ae.now())) {
   // Charge Check chat is an explicit measurement, never an activity or title signal.
   return;
  }
  // Any unrelated chat between click and numeric response makes the target
  // association uncertain; the next Check must establish fresh intent.
  charges.oi();
- if (message.contains("accepted trade")) {
+ // Fees paid from Death's Coffer or the bank never leave the inventory; the game's own lines name
+ // them (research 1.2). "Death charges you" is the whole reclaim fee, so a bank share inside it
+ // waits two ticks and is dropped once that line arrives.
+ var /* fee */e = Ak.pattern("dfe").matcher(d);
+ var /* bank */f = Ak.pattern("dbk").matcher(d);
+ var /* coffer */g = Ak.pattern("dcf").matcher(d);
+ if (e.matches()) {
+  engine.eb.drop(FE);
+  engine.ml(Ar.acm(e.group(1)), msg("b1"), Ae.now(), false);
+ } else if (f.matches() && engine.deathReclaim.isAwaitingReclaim()) {
+  engine.eb.put(FE, -1, Ar.acm(f.group(1)), 10, "Reclaim fee (bank)").at = client.getTickCount();
+ } else if (g.matches()) {
+  engine.ml(Ar.acm(g.group(1)), msg("b0"), Ae.now(), false);
+ }
+ var /* caught */h = Ak.pattern("bag").matcher(d);
+ if (h.matches() && ix != null && engine.baseline != null && snapshotFactory.bagOpen()) {
+  // A catch or a cut an open barrel or basket took never reaches the inventory (owner 1.2).
+  int /* found */i = caughtItem(h.group(2), ix.find(h.group(2)));
+  if (i >= 0) {
+   bag(i, h.group(1) == null ? 1L : Long.parseLong(h.group(1)), engine.baseline.aea(i));
+  }
+ }
+ if (d.contains("accepted trade")) {
   // Trade completed chat — keep MARKET armed through inventory settle.
   engine.markContext(MARKET, aad(), "Player trade");
   zb();
   return;
  }
- if (message.contains("too impure")) {
+ if (d.contains("too impure")) {
   // A failed iron smelt gives no XP but is still part of the smelting run.
-  activity.qf("Smelting", System.currentTimeMillis());
+  activity.qf("Smelting", Ae.now());
   return;
  }
- if (Dw.vt(message)) {
+ if (Dw.g1(d)) {
   // Chaos altar bone-save is not a spend — inventory may keep the bone.
   zb();
   return;
  }
- if (!Dw.vy(message)) return;
+ if (!Dw.h1(d)) return;
  // Live bury/drink often animate after the menu click; chat confirms the spend
  // and keeps open intent alive until inventory stabilizes (incl. coalesced picks).
  engine.aew(vh());
@@ -588,96 +703,108 @@ public void onChatMessage(ChatMessage event) {
 }
 
 @Subscribe
-public void onMenuOptionClicked(MenuOptionClicked event) {
- if (!nh() || event == null || event.isConsumed()) return;
- String option = normalize(event.getMenuOption());
- boolean consumption = Dw.wy(option);
- boolean gather = Dw.xb(option);
- if (gather || consumption) {
+public void onMenuOptionClicked(MenuOptionClicked /* event */b) {
+ if (!nh() || b == null || b.isConsumed()) return;
+ String /* option */c = normalize(b.getMenuOption());
+ if ("bank-all".equals(c)) bankAll(b.getParam1() >>> 16);
+ boolean /* consumption */d = Dw.b1(c);
+ boolean /* gather */f = Dw.i1(c);
+ if (f || d) {
   // A genuine action can produce an item without XP or an animation
   // (field crops). Capture its pre-action inventory on automatic start.
   markGameplayActivity(true);
  }
- interactionContextTracker.onMenuOptionClicked(event);
+ interactionContextTracker.onMenuOptionClicked(b);
  zb();
- String target = normalize(event.getMenuTarget());
- String avt = option + " " + target;
- engine.abp(option, target);
- charges.onMenuOptionClicked(event, option, target);
+ String /* target */g = normalize(b.getMenuTarget());
+ String /* avt */h = c + " " + g;
+ engine.abp(c, g);
+ charges.onMenuOptionClicked(b, c, g);
  // A loss-only "Offer" click with the Grand Exchange open is a sell placement: the
  // inventory removal is GE evidence, not a prayer/altar spend. The proven GE UI context
  // disambiguates the shared "Offer" verb; a generic Offer elsewhere keeps its spend intent.
- if (consumption && "offer".equals(option) && Ee.wq(client)) {
-  trading(CORRELATION_TICKS, msg("eh") + (target.isEmpty() ? "" : " " + target));
+ if (d && "offer".equals(c) && Ee.wq(client)) {
+  trading(CORRELATION_TICKS, msg("eh") + (g.isEmpty() ? "" : " " + g));
   return;
  }
  // A Collect interaction with the open Grand Exchange is bounded collection evidence. It
  // never owns a movement by itself; it lets exact custody settlements correlate.
- if (option.startsWith("collect") && Ee.wq(client)) {
-  engine.abg(System.currentTimeMillis());
+ if (c.startsWith("collect") && Ee.wq(client)) {
+  engine.abg(Ae.now());
   trading(CORRELATION_TICKS, msg("ei"));
   return;
  }
- if (consumption) {
-  int itemId = agh(event);
+ if ("revert".equals(c) || "dismantle".equals(c)) engine.dismantle(agh(b));
+ if (d) {
+  int /* itemId */i = agh(b);
   // Always note intent — even when item id is unresolved (open intent). Spend is
   // confirmed on stable inventory removal / dose leftover; the verb lets the settled
   // row say Drank/Ate/Buried honestly. Exact spell text is optional presentation
   // evidence and never changes matching, type, counted state or value.
-  engine.noteConsumptionIntent(itemId, vh(), false,
-  Bn.tu(option), ajm(event, option));
- } else if ("drop".equals(option)) {
-  int itemId = agh(event);
+  engine.ci(i, vh(), false,
+  Bn.a1(c), ajm(b, c));
+ } else if ("drop".equals(c)) {
+  int /* itemId */j = agh(b);
   // Prefer resolved id only — open drop (itemId=-1) needs safer engine matching.
-  if (itemId >= 0) {
+  if (j >= 0) {
    // Match consume TTL so dump-then-settle does not miss power-train drops.
-   Player local = client.getLocalPlayer();
-   if (local != null && local.getWorldLocation() != null) {
-    WorldPoint tile = local.getWorldLocation();
-    engine.abz(itemId, vh(), tile.getX(), tile.getY(), tile.getPlane(), true);
-    ajg(local);
+   Player /* local */k = client.getLocalPlayer();
+   if (k != null && k.getWorldLocation() != null) {
+    WorldPoint /* tile */l = k.getWorldLocation();
+    engine.abz(j, vh(), l.getX(), l.getY(), l.getPlane(), true);
+    ajg(k);
    } else {
-    engine.abz(itemId, vh(), 0, 0, 0, false);
+    engine.abz(j, vh(), 0, 0, 0, false);
    }
   }
- } else if ("take".equals(option) && event.getMenuAction() != null
- && event.getMenuAction().name().startsWith("GROUND_ITEM_")) {
+ } else if ("take".equals(c) && b.getMenuAction() != null
+ && b.getMenuAction().name().startsWith("GROUND_ITEM_")) {
   // A ground item's id is the entry's identifier; a pickup of fired ammo is recovery.
-  engine.noteTake(itemManager == null ? event.getId() : itemManager.canonicalize(event.getId()));
- } else if ("destroy".equals(option)) {
+  int /* id */m = snapshotFactory.canonical(b.getId());
+  Ev e = engine.eb.put(TK, m, 1L, 5, null);
+  e.at = client.getTickCount();
+  e.x = b.getParam0();
+  e.y = b.getParam1();
+  e.held = snapshotFactory.capture(false, false).aea(m);
+  engine.noteTake(m);
+ } else if ("destroy".equals(c)) {
   // Irreversible loss — consume-style intent, never recoverable own-drop.
-  engine.noteConsumptionIntent(agh(event), vh(), true);
+  engine.ci(agh(b), vh(), true);
  }
  // Use Tinderbox ↔ Logs (inventory Use): a spend intent for the fuel, same as Light.
- if (Dw.ww(option, target)) {
-  engine.noteConsumptionIntent(agh(event), vh(), false, Au.SUPPLIES);
+ if (Dw.d1(c, g)) {
+  engine.ci(agh(b), vh(), false, Au.SUPPLIES);
  }
  // Use bones/ashes ↔ altar (PoH / wildy): an offer spend intent; Prayer XP confirms it.
- if (Dw.xt(option, target) || Dw.xp(option, target)) {
-  engine.noteConsumptionIntent(agh(event), vh(), false, Au.OFFER);
+ if (Dw.e1(c, g) || Dw.f1(c, g)) {
+  engine.ci(agh(b), vh(), false, Au.OFFER);
  }
  // Agility dispensers (Wilderness course rewards, Brimhaven tickets): the claim keeps the
  // course title; the rewards book as ordinary inventory gains.
- if (AgilityCourses.xd(target)) {
-  Player local = client.getLocalPlayer();
-  String course = local == null || local.getWorldLocation() == null ? null
-  : AgilityCourses.qp(local.getWorldLocation().getRegionID());
-  activity.abm(course == null ? "Agility" : course, true);
+ if (AgilityCourses.a1(g)) {
+  Player /* local */n = client.getLocalPlayer();
+  String /* course */o = n == null || n.getWorldLocation() == null ? null
+  : AgilityCourses.qp(n.getWorldLocation().getRegionID());
+  activity.abm(o == null ? "Agility" : o, true);
  }
  // Farming / gather object actions: their skill's first XP names the activity (accounting is inventory GAIN).
- if (gather) {
-  activity.gatherSkill = Dw.ka(option);
- } else if (!consumption) {
+ if (f) {
+  activity.gatherSkill = Dw.ka(c);
+ } else if (!d) {
   // Transform/production options (station or inventory) arm PRODUCTION context so the
   // paired receipt settles without double count; XP re-arms it inside the window.
-  String skill = Dw.ajx(option);
-  if (!skill.isEmpty()) activity.le(skill);
+  String /* skill */p = Dw.ajx(c);
+  if (!p.isEmpty()) activity.le(p);
+  // Item on item (a knife on logs, a herb into a vial) starts a Make-X the space bar confirms
+  // with no click, and its Make button may come a minute later: the run's own skill XP arms it
+  // (owner 2026-10-08, fletching went to Review).
+  else if (b.getMenuAction() == MenuAction.WIDGET_TARGET_ON_WIDGET || c.startsWith("make")) activity.rb(Ae.now());
  }
- BossRetrievalCatalogue.Service retrieval = BossRetrievalCatalogue.axr(option, target);
- if (retrieval != null) {
+ BossRetrievalCatalogue.Service /* retrieval */q = BossRetrievalCatalogue.a1(c, g);
+ if (q != null) {
   // Long window: dialogue + confirm + coins + items can take several ticks.
-  boolean armed = engine.abe(retrieval, max(CORRELATION_TICKS * 4, config.stabilizationTicks() + 30));
-  if (armed) {
+  boolean /* armed */r = engine.abe(q, max(CORRELATION_TICKS * 4, config.stabilizationTicks() + 30));
+  if (r) {
    activity.abm("Death reclaim", true);
    return;
   }
@@ -689,61 +816,68 @@ public void onMenuOptionClicked(MenuOptionClicked event) {
   CORRELATION_TICKS);
   return;
  }
+ // Other stores the same way (Elnock, the seed vault, a cargo hold, Death's coffer, item sets...):
+ // the open window, or Quick-withdraw on Elnock (owner 2026-10-08).
+ String /* store */s = Ee.store(client);
+ if (s != null || "quick-withdraw".equals(c) && g.contains("elnock")) {
+  engine.zh(s == null ? "Elnock's storage" : s, CORRELATION_TICKS);
+  return;
+ }
  // "Deposit" is also ordinary menu vocabulary on unrelated objects. The menu string
  // alone is not ownership evidence; require the live bank/deposit-box interface before
  // treating a bank action as a hard neutral transfer. Direct withdraw clicks latch too:
  // the bank can close before its inventory change stabilizes or its BANK callback arrives.
  // Withdraw-X only opens a quantity prompt; its BANK callback proves the actual movement.
- if (Ee.vp(client) && (Ag.has(avt, "bank", "deposit")
- || option.startsWith("withdraw") && !"withdraw-x".equals(option))) {
-  if (avt.contains("deposit box")) {
+ if (Ee.vp(client) && (Ag.has(h, "bank", "deposit")
+ || c.startsWith("withdraw") && !"withdraw-x".equals(c))) {
+  if (h.contains("deposit box")) {
    engine.zh(msg("ej"), CORRELATION_TICKS);
   } else {
    engine.markContext(Aj.TRANSFER, CORRELATION_TICKS, msg("ek"));
   }
   return;
  }
- NeutralStorageClassifier.Kind neutral = NeutralStorageClassifier.classify(avt);
- if (neutral == null) neutral = NeutralStorageClassifier.classify(target);
- if (neutral != null) {
-  engine.zh(NeutralStorageClassifier.ajw(neutral), CORRELATION_TICKS);
+ NeutralStorageClassifier.Kind /* neutral */t = NeutralStorageClassifier.a1(h);
+ if (t == null) t = NeutralStorageClassifier.a1(g);
+ if (t != null) {
+  engine.zh(NeutralStorageClassifier.ajw(t), CORRELATION_TICKS);
   return;
  }
- String ans = UtilityContainerCatalogue.sv(target);
- if (ans != null && UtilityContainerCatalogue.wp(option)) {
-  boolean arw = avt.contains("deposit box");
-  UtilityContainerCatalogue.Kind kind = UtilityContainerCatalogue.oq(option, arw);
-  if (UtilityContainerCatalogue.xg(kind)) {
-   String note = "Container " + kind.name().toLowerCase(Locale.ROOT) + " (" + ans + ")";
-   if (avt.contains("plank sack")) note = msg("at");
-   engine.markContext(Aj.TRANSFER, CORRELATION_TICKS, note);
+ String /* ans */u = UtilityContainerCatalogue.sv(g);
+ if (u != null && UtilityContainerCatalogue.wp(c)) {
+  boolean /* arw */v = h.contains("deposit box");
+  UtilityContainerCatalogue.Kind /* kind */w = UtilityContainerCatalogue.oq(c, v);
+  if (UtilityContainerCatalogue.xg(w)) {
+   String /* note */z = "Container " + w.name().toLowerCase(Locale.ROOT) + " (" + u + ")";
+   if (h.contains("plank sack")) z = msg("at");
+   engine.markContext(Aj.TRANSFER, CORRELATION_TICKS, z);
   }
   return;
  }
  // A menu click alone cannot establish that a key was destroyed or dropped.
  // Its settled inventory loss is handled by the ordinary evidence path.
- if (("destroy".equals(option) || "drop".equals(option)) && target.contains("loot key")) return;
- MinigameTransferClassifier.Event minigame = MinigameTransferClassifier.classify(avt, qs());
- if (minigame != null) {
-  engine.zh(MinigameTransferClassifier.ajw(minigame), CORRELATION_TICKS);
+ if (("destroy".equals(c) || "drop".equals(c)) && g.contains("loot key")) return;
+ MinigameTransferClassifier.Event /* minigame */aa = MinigameTransferClassifier.a1(h, qs());
+ if (aa != null) {
+  engine.zh(MinigameTransferClassifier.ajw(aa), CORRELATION_TICKS);
   return;
  }
- if (option.startsWith("buy") || option.startsWith("sell") || option.startsWith("collect")) {
+ if (c.startsWith("buy") || c.startsWith("sell") || c.startsWith("collect")) {
   trading(CORRELATION_TICKS, (Ee.wq(client) ? "Grand Exchange " : "")
-  + option + (target.isEmpty() ? "" : " " + target));
+  + c + (g.isEmpty() ? "" : " " + g));
   return;
  }
  // Player–player trade: arm MARKET so settle classifies as TRADE → Traded flash.
  // Ownership-neutral peer exchange — no GE tax (note must include "player trade").
- if (option.contains("accept trade") || option.startsWith("trade with")) {
+ if (c.contains("accept trade") || c.startsWith("trade with")) {
   trading(aad(), "Player trade");
  }
 }
 
 /** A GE or trade click: Trading activity and the MARKET context its inventory settle needs. */
-void trading(int ticks, String note) {
+void trading(int /* ticks */a, String /* note */b) {
  activity.abm("Trading", true);
- engine.markContext(MARKET, ticks, note);
+ engine.markContext(MARKET, a, b);
 }
 
 /** Consume/drop/altar intent lifetime: animations outlast correlation, plus a coalesced settle window. */
@@ -761,74 +895,74 @@ int yy() {
 }
 
 @Subscribe
-public void onNpcLootReceived(NpcLootReceived event) {
+public void onNpcLootReceived(NpcLootReceived /* event */a) {
  if (!nh()) return;
  markGameplayActivity();
  if (engine.getActiveSession() == null) return;
- String npcName = event.getNpc() == null ? "NPC loot" : event.getNpc().getName();
- if (blank(npcName)) npcName = "NPC loot";
- Cp builder = hud;
- if (!HudTray.minion(npcName)) {
-  activity.abm(npcName, true);
-  engine.aeh(npcName);
-  if (builder != null) builder.tray().kill(npcName, System.currentTimeMillis(), builder.xy());
+ String /* npcName */b = a.getNpc() == null ? "NPC loot" : a.getNpc().getName();
+ if (blank(b)) b = "NPC loot";
+ Cp /* builder */c = hud;
+ if (!HudTray.minion(b)) {
+  activity.abm(b, true);
+  engine.aeh(b);
+  if (c != null) c.tray().kill(b, Ae.now(), c.xy());
  }
- engine.zk(expectedLoot(event.getItems()), yy(), "Loot from " + npcName, npcName);
- aby(false, npcName, event.getItems(), 1);
+ engine.zk(expectedLoot(a.getItems()), yy(), "Loot from " + b, b);
+ aby(false, b, a.getItems(), 1);
 }
 
 @Subscribe
-public void onServerNpcLoot(ServerNpcLoot event) {
- if (!nh() || event == null) return;
- String npcName = event.getComposition() == null ? "NPC loot" : event.getComposition().getName();
- if (blank(npcName)) npcName = "NPC loot";
- aby(false, npcName, event.getItems(), 1);
+public void onServerNpcLoot(ServerNpcLoot /* event */a) {
+ if (!nh() || a == null) return;
+ String /* npcName */b = a.getComposition() == null ? "NPC loot" : a.getComposition().getName();
+ if (blank(b)) b = "NPC loot";
+ aby(false, b, a.getItems(), 1);
 }
 
 @Subscribe
-public void onLootReceived(LootReceived event) {
+public void onLootReceived(LootReceived /* event */a) {
  // Optional: only fires when Loot Tracker is enabled. Deduped against
  // NpcLootReceived / ServerNpcLoot for the same kill.
- if (!nh() || event == null || event.getItems() == null) return;
- String name = awq(event.getName(), "Reward");
- boolean pending = event.getType() == LootRecordType.EVENT && RewardChestCatalogue.xn(name);
- aby(pending, name, event.getItems(), max(1, event.getAmount()));
+ if (!nh() || a == null || a.getItems() == null) return;
+ String /* name */b = awq(a.getName(), "Reward");
+ boolean /* pending */c = a.getType() == LootRecordType.EVENT && RewardChestCatalogue.a1(b);
+ aby(c, b, a.getItems(), max(1, a.getAmount()));
 }
 
 @Subscribe
-public void onPlayerLootReceived(PlayerLootReceived event) {
+public void onPlayerLootReceived(PlayerLootReceived /* event */b) {
  if (!nh()) return;
  markGameplayActivity();
  // A safe arena kill (LMS, Castle Wars, PvP Arena) is never a dangerous-PvP encounter.
  if (pvp.sample(client.getLocalPlayer()).isSafe()) return;
  activity.abm("PKing", true);
  if (!config.enablePkTracking()) return;
- Player player = event.getPlayer();
+ Player /* player */c = b.getPlayer();
  // PvP keeps your own results only; opponent names are never stored (SIDEBAR_SPEC.md §6b).
- String label = "Player kill";
- long now = System.currentTimeMillis();
+ String /* label */d = "Player kill";
+ long /* now */e = Ae.now();
  ajg(client.getLocalPlayer());
- engine.zn(expectedLoot(event.getItems()), yy(), label, now);
- String sourceName = player != null && player.getName() != null && !player.getName().trim().isEmpty()
- ? player.getName().trim() : "Player kill";
- aby(false, sourceName, event.getItems(), 1);
+ engine.zn(expectedLoot(b.getItems()), yy(), d, e);
+ String /* sourceName */f = c != null && c.getName() != null && !c.getName().trim().isEmpty()
+ ? c.getName().trim() : "Player kill";
+ aby(false, f, b.getItems(), 1);
  persist();
  recentPlayerCombatTicks = 0;
 }
 
 @Subscribe
-public void onInteractingChanged(InteractingChanged event) {
- if (event.getSource() == client.getLocalPlayer()) {
-  if (event.getTarget() instanceof NPC) {
+public void onInteractingChanged(InteractingChanged /* event */b) {
+ if (b.getSource() == client.getLocalPlayer()) {
+  if (b.getTarget() instanceof NPC) {
    // Use the existing authorized lifecycle for an actual interaction, never a menu hover.
    markGameplayActivity();
   }
-  interactionContextTracker.onInteractingChanged(event);
+  interactionContextTracker.onInteractingChanged(b);
  }
  if (!nh() || client.getLocalPlayer() == null) return;
- boolean asl = event.getSource() == client.getLocalPlayer() && event.getTarget() instanceof Player;
- boolean atd = event.getTarget() == client.getLocalPlayer() && event.getSource() instanceof Player;
- if (asl || atd) {
+ boolean /* asl */c = b.getSource() == client.getLocalPlayer() && b.getTarget() instanceof Player;
+ boolean /* atd */d = b.getTarget() == client.getLocalPlayer() && b.getSource() instanceof Player;
+ if (c || d) {
   // Keep short-lived evidence for death-safety classification even
   // when PK accounting is disabled. That evidence prevents a lingering
   // NPC target from turning a PvP death into an ownership-neutral reclaim.
@@ -841,39 +975,39 @@ public void onInteractingChanged(InteractingChanged event) {
 }
 
 @Subscribe
-public void onActorDeath(ActorDeath event) {
- Player localPlayer = client.getLocalPlayer();
- if (!nh() || localPlayer == null || event.getActor() != localPlayer) {
+public void onActorDeath(ActorDeath /* event */b) {
+ Player /* localPlayer */c = client.getLocalPlayer();
+ if (!nh() || c == null || b.getActor() != c) {
   return;
  }
  // Preserve the pre-death held-key evidence before any disposition branch.
  // A later stabilized key loss can then close its audit row without treating
  // the unowned manifest as a loss.
  engine.lv(Da.keyQuantities(client.getItemContainer(InventoryID.INV)));
- ajg(localPlayer);
+ ajg(c);
  // Ownership input: this canonical INV/WORN read is intersected with settled negative
  // item flows by the engine.
- Cc anv = snapshotFactory == null ? null
+ Cc /* anv */d = snapshotFactory == null ? null
  : snapshotFactory.nr(config.includeEquipment());
  // Only a confident dangerous context plus recent player combat is a PvP death; a
  // safe arena never is; elsewhere require NPC context before the reclaim window.
- boolean ams = interactionContextTracker != null && interactionContextTracker.vi();
- Cn disposition = yr(
- config.enablePkTracking(), recentPlayerCombatTicks, ams, pvp.sample(localPlayer));
+ boolean /* ams */e = interactionContextTracker != null && interactionContextTracker.vi();
+ Cn /* disposition */f = yr(
+ config.enablePkTracking(), recentPlayerCombatTicks, e, pvp.sample(c));
  // PvM or PK: drop the NPC/activity soft-stick so the killer cannot title the next owner.
  interactionContextTracker.clear();
  characterIdleTracker.clear();
  activity.pe();
  refreshPresentation();
- if (disposition == Cn.TRACK_PK) {
+ if (f == Cn.TRACK_PK) {
   zb();
   activity.abm("PKing", true);
-  engine.zo("Player death", System.currentTimeMillis());
+  engine.zo("Player death", Ae.now());
   persist();
   recentPlayerCombatTicks = 0;
   return;
  }
- if (disposition == Cn.UNCLASSIFIED) {
+ if (f == Cn.UNCLASSIFIED) {
   // Missing PvP evidence alone cannot prove this was a PvM death. Let the
   // inventory delta use ordinary loss classification rather than hiding a loss.
   engine.zj();
@@ -886,60 +1020,139 @@ public void onActorDeath(ActorDeath event) {
  // later returns the items and books observed coins as the fee.
  zb();
  engine.zi(max(CORRELATION_TICKS * 2, config.stabilizationTicks() + 16),
- anv == null ? null : anv.quantities);
+ d == null ? null : d.quantities);
  // Persist the physical death whitelist immediately. A restart before the first
  // inventory wipe must still be able to classify the later loss as a transfer.
  persist();
 }
 
-static Cn yr(boolean pkTrackingEnabled, int playerCombatTicks, boolean ams,
-Dh context) {
- if (context.isSafe()) {
+static Cn yr(boolean /* pkTrackingEnabled */b, int /* playerCombatTicks */c, boolean /* ams */d,
+Dh /* context */e) {
+ if (e.isSafe()) {
   // Safe arenas restore gear; never a PK death, never a reclaim.
   return Cn.UNCLASSIFIED;
  }
- if (playerCombatTicks > 0) {
+ if (c > 0) {
   // Player-combat evidence always blocks an unsafe PvM reclaim classification. It
   // books a PK death only with PK accounting on and a confident dangerous context;
   // otherwise the inventory loss follows ordinary accounting.
-  return pkTrackingEnabled && context.ws() ? Cn.TRACK_PK : Cn.UNCLASSIFIED;
+  return b && e.ws() ? Cn.TRACK_PK : Cn.UNCLASSIFIED;
  }
- if (!context.ws()) return Cn.TRACK_PVM_RECLAIM;
- return ams ? Cn.TRACK_PVM_RECLAIM : Cn.UNCLASSIFIED;
+ if (!e.ws()) return Cn.TRACK_PVM_RECLAIM;
+ return d ? Cn.TRACK_PVM_RECLAIM : Cn.UNCLASSIFIED;
 }
 
-Map<Integer, Long> expectedLoot(Collection<ItemStack> items) {
- var expected = new HashMap<Integer, Long>();
- for (ItemStack item : items) {
-  if (item != null && item.getId() >= 0 && item.getQuantity() > 0) {
-   expected.merge(itemManager.canonicalize(item.getId()), (long) item.getQuantity(), Long::sum);
+Map<Integer, Long> expectedLoot(Collection<ItemStack> /* items */a) {
+ var /* expected */b = new HashMap<Integer, Long>();
+ for (ItemStack /* item */c : a) {
+  if (c != null && c.getId() >= 0 && c.getQuantity() > 0) {
+   b.merge(ix.canon(c.getId()), (long) c.getQuantity(), Long::sum);
   }
  }
- return expected;
+ return b;
 }
 
 @Subscribe
-public void onStatChanged(StatChanged event) {
- Skill skill = event.getSkill();
- if (skill == null) return;
- Integer previous = lastSkillExperience.put(skill, event.getXp());
- if (previous == null || event.getXp() <= previous || !nh()) return;
+public void onStatChanged(StatChanged /* event */a) {
+ Skill /* skill */b = a.getSkill();
+ if (b == null) return;
+ Integer /* previous */c = lastSkillExperience.put(b, a.getXp());
+ if (c == null || a.getXp() <= c || !nh()) return;
  markGameplayActivity();
  characterIdleTracker.abn();
- long now = System.currentTimeMillis();
+ long /* now */d = Ae.now();
  // Agility is an activity in its own right: the course names it when the region is known.
- Player local = client.getLocalPlayer();
- String course = skill != Skill.AGILITY || local == null || local.getWorldLocation() == null ? null
- : AgilityCourses.qp(local.getWorldLocation().getRegionID());
- activity.acj(skill.getName(), course, interactionContextTracker.vi(), now);
- Cp builder = hud;
- if (builder != null) builder.tray().xp(skill.getName(), now);
- charges.aks(skill, client.getTickCount(), now);
+ Player /* local */e = client.getLocalPlayer();
+ String /* course */f = b != Skill.AGILITY || e == null || e.getWorldLocation() == null ? null
+ : AgilityCourses.qp(e.getWorldLocation().getRegionID());
+ activity.acj(b.getName(), f, interactionContextTracker.vi(), d);
+ Cp /* builder */g = hud;
+ if (g != null) g.tray().xp(b.getName(), d);
+ charges.aks(b, client.getTickCount(), d);
+}
+
+/** The last Take: item, tick and how many the inventory held then; a bag pickup waits a tick. */
+/** Reward chest interface → its item container (d22), and the last Bank-all tick. */
+static final Map<Integer, Integer> CHESTS = new HashMap<>();
+static {
+ for (String[] /* row */b : Ak.rows("d22")) CHESTS.put(Integer.parseInt(b[0]), Integer.parseInt(b[1]));
+}
+/**
+* "Bank-all" on a reward chest banks loot that never reaches the inventory; it is booked like a
+* pickup, once per click (research 1.2).
+*/
+void bankAll(int /* chestInterface */a) {
+ Integer /* chest */b = CHESTS.get(a);
+ ItemContainer /* loot */c = b == null ? null : client.getItemContainer(b);
+ if (c == null) return;
+ engine.eb.drop(CH);
+ Ev e = engine.eb.add(CH, -1, 1L, 10, null);
+ e.x = b;
+ e.at = client.getTickCount();
+ chestSnapshot(counts(c), e.until);
+}
+
+/**
+* After a Bank-all, only what really leaves the chest is booked, once: a refused or repeated
+* click moves nothing (Codex research 1.2).
+*/
+void chestChanged(int /* id */a, ItemContainer /* loot */b) {
+ Ev e = engine.eb.peek(CH, v -> v.item == -1 && v.x == a);
+ if (e == null || e.owner != engine.eb.owner || b == null || client.getTickCount() - e.at > 10) return;
+ Map<Integer, Long> /* now */c = counts(b);
+ for (Ev v : new ArrayList<>(engine.eb.open)) {
+  if (v.kind != CH || v.item < 0 || v.owner != engine.eb.owner) continue;
+  long /* gone */d = v.qty - c.getOrDefault(v.item, 0L);
+  if (d > 0L) engine.bagged(v, d);
+ }
+ int /* until */f = e.until;
+ engine.eb.open.removeIf(v -> v.kind == CH && v.item >= 0);
+ chestSnapshot(c, f);
+}
+
+/** Each measured chest stack is quantity proof within the clicked chest's window. */
+void chestSnapshot(Map<Integer, Long> /* counts */a, int /* until */b) {
+ a.forEach((/* item */c, /* qty */d) -> engine.eb.add(CH, c, d, b - engine.eb.now, null));
+}
+
+Map<Integer, Long> counts(ItemContainer /* container */a) {
+ var /* counts */b = new HashMap<Integer, Long>();
+ for (Item /* item */c : a.getItems()) {
+  if (c != null && c.getId() >= 0 && c.getQuantity() > 0) b.merge(snapshotFactory.canonical(c.getId()), (long) c.getQuantity(), Long::sum);
+ }
+ return b;
+}
+
+/** The local player's tile last tick: a change is movement, which is not AFK (owner 1.2). */
+WorldPoint lastTile;
+
+boolean moved(WorldPoint /* tile */a) {
+ boolean /* moved */b = a != null && lastTile != null && !a.equals(lastTile);
+ lastTile = a;
+ return b;
+}
+/** The taken item vanished beside you while an open bag was carried: it may be in the bag. */
+@Subscribe
+public void onItemDespawned(ItemDespawned /* event */a) {
+ Player /* local */b = client.getLocalPlayer();
+ TileItem /* item */c = a.getItem();
+ Point /* at */d = a.getTile() == null ? null : a.getTile().getSceneLocation();
+ Ev e = engine.eb.peek(TK);
+ if (!nh() || e == null || e.owner != engine.eb.owner || b == null || c == null || d == null
+ || d.getX() != e.x || d.getY() != e.y || snapshotFactory.canonical(c.getId()) != e.item
+ || client.getTickCount() - e.at > 5 || !snapshotFactory.bagOpen()
+ || b.getWorldLocation().distanceTo(a.getTile().getWorldLocation()) > 1
+ || c.getOwnership() != TileItem.OWNERSHIP_SELF) return;
+ long /* qty */f = engine.eb.reserve(LT, e.item, c.getQuantity(), LP);
+ f += engine.eb.reserve(OD, e.item, c.getQuantity() - f, RD);
+ if (f > 0L && engine.eb.take(TK, e.item, 1L, v -> v == e) > 0L) bag(e.item, f, e.held);
 }
 
 @Subscribe
-public void onGameTick(GameTick event) {
+public void onGameTick(GameTick /* event */b) {
  if (!nh()) {
+  // A fenced account (login, switch, restore) drops pending bag evidence untouched (Codex review 1.2).
+  engine.eb.drop(BG, FE);
   if (client.getGameState() == LOGGED_IN) {
    if (persistence.py() && nh()) {
     ve();
@@ -949,21 +1162,31 @@ public void onGameTick(GameTick event) {
   return;
  }
  if (persistence.py()) ve();
- engine.tickAutoStart(System.currentTimeMillis());
+ Ev /* fee */c = engine.eb.peek(FE);
+ if (c != null && c.owner == engine.eb.owner && client.getTickCount() - c.at > 2) {
+  engine.fee(c, Ae.now());
+ }
+ bagSettle();
+ engine.tickAutoStart(Ae.now());
  kj();
  activity.ajd();
- boolean bankOpen = Ee.vp(client);
- Player localPlayer = client.getLocalPlayer();
- pvp.onGameTick(localPlayer);
+ boolean /* bankOpen */d = Ee.vp(client);
+ Player /* localPlayer */e = client.getLocalPlayer();
+ pvp.onGameTick(e);
  ahp();
- WorldPoint tile = ajg(localPlayer);
- if (tile != null) kt(tile.getRegionID());
- boolean arh = localPlayer != null && localPlayer.getAnimation() != -1;
- boolean ari = localPlayer != null && localPlayer.getInteracting() != null;
- if (arh || ari) markGameplayActivity();
- else kk();
+ WorldPoint /* tile */f = ajg(e);
+ if (f != null) kt(f.getRegionID());
+ boolean /* arh */g = e != null && e.getAnimation() != -1;
+ boolean /* ari */h = e != null && e.getInteracting() != null;
+ // Owner 1.2: moving is not AFK. It holds off AFK pause and wakes an AFK-paused Grind, but
+ // never starts tracking by itself.
+ if (g || h) markGameplayActivity();
+ else if (moved(f)) {
+  idleTicks = 0;
+  if (engine.resume(Ae.now(), IDLE)) avz();
+ } else kk();
  interactionContextTracker.onGameTick();
- if (bankOpen) {
+ if (d) {
   engine.ze(max(CORRELATION_TICKS, config.stabilizationTicks() + 2));
   // Rising edge only — Banking ends combat soft-stick so Dark wizard
   // cannot reappear the moment the bank closes.
@@ -988,27 +1211,27 @@ public void onGameTick(GameTick event) {
  } else if (recentPlayerCombatTicks > 0) {
   recentPlayerCombatTicks--;
  }
- long now = System.currentTimeMillis();
- if (engine.yt(now) > 0) {
+ long /* now */i = Ae.now();
+ if (engine.yt(i) > 0) {
   ticksSinceSave = 0;
   persist();
  }
  engine.aka();
- if (engine.ajv(now)) {
+ if (engine.ajv(i)) {
   ticksSinceSave = 0;
   persist();
  }
  lootKeys.poll();
  charges.watchReturn();
- Ac transaction = engine.adj(
- snapshotFactory.capture(config.includeEquipment(), config.includeRunePouch()), now, row -> {
-  activity.abw(row);
-  transactionBooked(row, now);
+ Ac /* transaction */j = engine.adj(
+ snapshotFactory.capture(config.includeEquipment(), config.includeRunePouch()), i, /* row */k -> {
+  activity.abw(k);
+  transactionBooked(k, i);
  });
- if (transaction != null) {
+ if (j != null) {
   zb();
-  activity.abw(transaction);
-  transactionBooked(transaction, now);
+  activity.abw(j);
+  transactionBooked(j, i);
   // A burst of receipts saves once within 10 ticks, not per receipt: each save copies the whole
   // profile under the engine lock (release pass 2026-09-28). Deaths and logout still save at once.
   ticksSinceSave = max(ticksSinceSave, SAVE_INTERVAL_TICKS - 10);
@@ -1024,15 +1247,15 @@ public void onGameTick(GameTick event) {
 * A save serializes the whole profile on the client thread. With nothing booked since the last
 * one, only a slow heartbeat remains: crash recovery pauses a running session at it.
 */
-static boolean saveDue(int ticksSinceSave, long revision, long savedRevision) {
- return ticksSinceSave >= SAVE_INTERVAL_TICKS && (revision != savedRevision || ticksSinceSave >= IDLE_SAVE_TICKS);
+static boolean saveDue(int /* ticksSinceSave */a, long /* revision */b, long /* savedRevision */c) {
+ return a >= SAVE_INTERVAL_TICKS && (b != c || a >= IDLE_SAVE_TICKS);
 }
 
-WorldPoint ajg(Player localPlayer) {
- WorldPoint tile = localPlayer == null ? null : localPlayer.getWorldLocation();
- if (tile == null) engine.oy();
- else engine.aki(tile.getX(), tile.getY(), tile.getPlane());
- return tile;
+WorldPoint ajg(Player /* localPlayer */a) {
+ WorldPoint /* tile */b = a == null ? null : a.getWorldLocation();
+ if (b == null) engine.oy();
+ else engine.aki(b.getX(), b.getY(), b.getPlane());
+ return b;
 }
 
 /**
@@ -1040,82 +1263,82 @@ WorldPoint ajg(Player localPlayer) {
 * click. Keep an ownership-neutral transfer window open every tick inside, and one
 * closing window after leaving so the restore settles as a transfer too.
 */
-void kt(int regionId) {
- NeutralZoneTracker.Signal signal = neutralZoneTracker.awr(regionId);
- if (signal == NeutralZoneTracker.Signal.ENTERED) {
+void kt(int /* regionId */a) {
+ NeutralZoneTracker.Signal /* signal */b = neutralZoneTracker.awr(a);
+ if (b == NeutralZoneTracker.Signal.ENTERED) {
   engine.lw();
   engine.zh(msg("el"), config.stabilizationTicks() + 4);
- } else if (signal == NeutralZoneTracker.Signal.INSIDE) {
+ } else if (b == NeutralZoneTracker.Signal.INSIDE) {
   engine.zh(msg("em"), config.stabilizationTicks() + 4);
- } else if (signal == NeutralZoneTracker.Signal.LEFT) {
+ } else if (b == NeutralZoneTracker.Signal.LEFT) {
   engine.rg(max(CORRELATION_TICKS * 2, config.stabilizationTicks() + 16));
  }
 }
 
 int qs() {
- int regionId = -1;
+ int /* regionId */a = -1;
  try {
   if (client != null && client.getLocalPlayer() != null && client.getLocalPlayer().getWorldLocation() != null) {
-   regionId = client.getLocalPlayer().getWorldLocation().getRegionID();
+   a = client.getLocalPlayer().getWorldLocation().getRegionID();
   }
- } catch (Exception ignored) {
+ } catch (Exception /* ignored */b) {
   // Live signals are best-effort.
  }
- return regionId;
+ return a;
 }
 
 /** Presentation-only duplicate guard for one loot batch reported by several RuneLite events. */
 String lastLootBatch = "";
 long lastLootAt;
-static String axv(Collection<ItemStack> items) {
- var key = new StringBuilder();
- if (items != null) {
-  for (ItemStack item : items) key.append(item.getId()).append('x').append(item.getQuantity()).append(',');
+static String axv(Collection<ItemStack> /* items */a) {
+ var /* key */b = new StringBuilder();
+ if (a != null) {
+  for (ItemStack /* item */c : a) b.append(c.getId()).append('x').append(c.getQuantity()).append(',');
  }
- return key.toString();
+ return b.toString();
 }
 
 /** Unconfirmed loot goes to presentation only; pickup settles through the engine. */
-void aby(boolean pending, String sourceName, Collection<ItemStack> items, int multiplicity) {
- long now = System.currentTimeMillis();
- boolean chest = sourceName != null && sourceName.toLowerCase(Locale.ROOT).contains("loot chest");
- if ((pending || chest) && ClueCostPairing.ys(sourceName)) {
-  engine.ls("loot:" + sourceName, sourceName);
+void aby(boolean /* pending */a, String /* sourceName */b, Collection<ItemStack> /* items */c, int /* multiplicity */d) {
+ long /* now */e = Ae.now();
+ boolean /* chest */f = b != null && b.toLowerCase(Locale.ROOT).contains("loot chest");
+ if ((a || f) && ClueCostPairing.ys(b)) {
+  engine.ls("loot:" + b, b);
  }
- lootObserved(pending || chest, sourceName, items, multiplicity, now);
+ lootObserved(a || f, b, c, d, e);
 }
 
 @Subscribe
-public void onConfigChanged(ConfigChanged event) {
- if (event == null || event.getGroup() == null) return;
- if (Bc.GROUP.equals(event.getGroup())) {
+public void onConfigChanged(ConfigChanged /* event */b) {
+ if (b == null || b.getGroup() == null) return;
+ if (Bc.GROUP.equals(b.getGroup())) {
   // The Ground Items list preferences changed: re-read the filter authority and
   // repaint the sidebar. Presentation only; stored receipts never change.
   lootPresentationFilter.refresh();
   refreshPresentation();
   return;
  }
- if (!GpManagerConfig.GROUP.equals(event.getGroup())) return;
- if ("includeEquipment".equals(event.getKey()) || "includeRunePouch".equals(event.getKey())) {
+ if (!GpManagerConfig.GROUP.equals(b.getGroup())) return;
+ if ("includeEquipment".equals(b.getKey()) || "includeRunePouch".equals(b.getKey())) {
   // The tracked snapshot shape changed. Warm a new baseline so enabling or
   // disabling a container cannot appear as a synthetic gain or cost.
   engine.lp();
  }
- if (msg("en").equals(event.getKey()) || msg("ch").equals(event.getKey())) {
+ if (msg("en").equals(b.getKey()) || msg("ch").equals(b.getKey())) {
   refreshPresentation();
  }
 }
 
 /** Republishes the current facts to the sidebar; presentation only. */
 void refreshPresentation() {
- Dp panel = activityPanel;
- if (panel != null) panel.refresh();
+ Dp /* panel */a = activityPanel;
+ if (a != null) a.refresh();
 }
 
 boolean nh() {
  try {
   if (client == null || client.getGameState() != LOGGED_IN) return false;
- } catch (RuntimeException ex) {
+ } catch (RuntimeException /* ex */a) {
   return false;
  }
  return persistence.isTrackingReady();
@@ -1123,30 +1346,30 @@ boolean nh() {
 
 void zb() {
  if (!nh()) return;
- long now = System.currentTimeMillis();
+ long /* now */b = Ae.now();
  idleTicks = 0;
  // Inventory/bank context alone resumes IDLE but never Manual/Stop and
  // never auto-starts a tracker (startup needs gameplay activity).
- if (engine.resume(now, IDLE)) avz();
+ if (engine.resume(b, IDLE)) avz();
 }
 
 void markGameplayActivity() {
  markGameplayActivity(false);
 }
 
-void markGameplayActivity(boolean beforeItemChange) {
+void markGameplayActivity(boolean /* beforeItemChange */a) {
  if (!nh()) return;
- long now = System.currentTimeMillis();
+ long /* now */b = Ae.now();
  idleTicks = 0;
- if (engine.ait(now)) {
-  if (beforeItemChange && client.getItemContainer(InventoryID.INV) != null) {
+ if (engine.ait(b)) {
+  if (a && client.getItemContainer(InventoryID.INV) != null) {
    engine.setBaseline(snapshotFactory.capture(config.includeEquipment(), config.includeRunePouch()));
   } else {
    engine.lp();
   }
  }
  // Lifecycle (logout/hop), Idle, and Recovery resume on gameplay; Manual/Stop do not.
- if (engine.resume(now, LIFECYCLE, IDLE, RECOVERY)) avz();
+ if (engine.resume(b, LIFECYCLE, IDLE, RECOVERY)) avz();
 }
 
 void kk() {
@@ -1154,15 +1377,16 @@ void kk() {
   idleTicks = 0;
   return;
  }
- long now = System.currentTimeMillis();
+ long /* now */a = Ae.now();
  if (idleTicks++ == 0) {
   // The last gameplay action was the previous tick; the idle stretch starts here.
-  idleStartedAt = now;
+  idleStartedAt = a;
  }
- int att = max(1, (max(1, config.idleTimeoutSeconds()) * 1000 + 599) / 600);
- if (idleTicks >= att) {
+ int /* att */b = max(1, (max(1, config.idleTimeoutSeconds()) * 1000 + 599) / 600);
+ if (idleTicks >= b) {
   // Pause at the measured idle start so active time ends when the player stopped.
-  engine.adh(now, idleStartedAt);
+  engine.adh(a, idleStartedAt);
+  if (engine.idleEnd(a, config.sessionIdleAutoEndMinutes())) avz();
  }
 }
 
@@ -1172,17 +1396,17 @@ void kk() {
 * no widget of its own, so the client's still-selected spell widget is the positive evidence.
 * The menu target is never consulted: a target named "Ice Burst" cannot name a spell.
 */
-Bb ajm(MenuOptionClicked event, String option) {
- Widget clicked = event.getWidget();
- if (clicked != null) {
-  Bb direct = Bb.tv(option, clicked.getId(),
-  InterfaceID.MAGIC_SPELLBOOK, clicked.getText(), clicked.getName());
-  if (direct != null) return direct;
+Bb ajm(MenuOptionClicked /* event */a, String /* option */b) {
+ Widget /* clicked */c = a.getWidget();
+ if (c != null) {
+  Bb /* direct */d = Bb.tv(b, c.getId(),
+  InterfaceID.MAGIC_SPELLBOOK, c.getText(), c.getName());
+  if (d != null) return d;
  }
- if (!Dw.yj(event.getMenuAction())) return null;
- Widget selected = client.getSelectedWidget();
- return selected == null ? null : Bb.tv(option, selected.getId(),
- InterfaceID.MAGIC_SPELLBOOK, selected.getText(), selected.getName());
+ if (!Dw.a1(a.getMenuAction())) return null;
+ Widget /* selected */e = client.getSelectedWidget();
+ return e == null ? null : Bb.tv(b, e.getId(),
+ InterfaceID.MAGIC_SPELLBOOK, e.getText(), e.getName());
 }
 
 /**
@@ -1190,30 +1414,30 @@ Bb ajm(MenuOptionClicked event, String option) {
 * item-op / widget / inventory-slot ids (Supplies Tracker pattern) and canonicalize so
 * intent matches snapshot item ids.
 */
-int agh(MenuOptionClicked event) {
- if (event == null) return -1;
- int itemId = event.getItemId();
- if (itemId < 0 && event.isItemOp()) itemId = event.getId();
- if (itemId < 0) {
-  Widget widget = event.getWidget();
-  if (widget != null) itemId = widget.getItemId();
+int agh(MenuOptionClicked /* event */a) {
+ if (a == null) return -1;
+ int /* itemId */b = a.getItemId();
+ if (b < 0 && a.isItemOp()) b = a.getId();
+ if (b < 0) {
+  Widget /* widget */c = a.getWidget();
+  if (c != null) b = c.getItemId();
  }
  // CC_OP inventory Eat/Drink often leaves getItemId() == -1; read the clicked slot.
- if (itemId < 0) itemId = xx(event.getParam0());
- if (itemId < 0) return -1;
- return itemManager == null ? itemId : itemManager.canonicalize(itemId);
+ if (b < 0) b = xx(a.getParam0());
+ if (b < 0) return -1;
+ return ix == null ? b : ix.canon(b);
 }
 
-int xx(int slot) {
- if (slot < 0) return -1;
+int xx(int /* slot */a) {
+ if (a < 0) return -1;
  try {
-  ItemContainer inventory = client.getItemContainer(InventoryID.INV);
-  if (inventory == null) return -1;
-  Item[] items = inventory.getItems();
-  if (items == null || slot >= items.length) return -1;
-  Item item = items[slot];
-  return item == null ? -1 : item.getId();
- } catch (RuntimeException ex) {
+  ItemContainer /* inventory */b = client.getItemContainer(InventoryID.INV);
+  if (b == null) return -1;
+  Item[] /* items */c = b.getItems();
+  if (c == null || a >= c.length) return -1;
+  Item /* item */d = c[a];
+  return d == null ? -1 : d.getId();
+ } catch (RuntimeException /* ex */e) {
   return -1;
  }
 }
@@ -1223,26 +1447,26 @@ void persist() {
 }
 
 /** {@code quick}: the periodic gameplay save, which reuses unchanged closed sessions' JSON. */
-void persist(boolean quick) {
+void persist(boolean /* quick */a) {
  savedRevision = engine.getRevision();
- if (config.persistHistory()) persistence.ahe(quick);
+ if (config.persistHistory()) persistence.ahe(a);
 }
 
-String itemName(int itemId) {
+String itemName(int /* itemId */a) {
  try {
-  ItemComposition composition = itemManager == null ? null : itemManager.getItemComposition(itemId);
-  return composition == null ? "Item " + itemId : composition.getName();
- } catch (RuntimeException ex) {
-  return "Item " + itemId;
+  ItemComposition /* composition */b = ix == null ? null : ix.comp(a);
+  return b == null ? "Item " + a : b.getName();
+ } catch (RuntimeException /* ex */c) {
+  return "Item " + a;
  }
 }
 
-String normalize(String text) {
- return text == null ? "" : text.replaceAll("<[^>]+>", "").trim().toLowerCase(Locale.ROOT);
+String normalize(String /* text */a) {
+ return a == null ? "" : a.replaceAll("<[^>]+>", "").trim().toLowerCase(Locale.ROOT);
 }
 
 @Provides
-GpManagerConfig aeq(ConfigManager configManager) {
- return configManager.getConfig(GpManagerConfig.class);
+GpManagerConfig aeq(ConfigManager /* configManager */a) {
+ return a.getConfig(GpManagerConfig.class);
 }
 }

@@ -25,7 +25,7 @@ public final class HudPreview
 
     public static void write(File out) throws IOException
     {
-        long now = System.currentTimeMillis();
+        long now = Ae.now();
         emptyAndFiltered(out, now);
         GpManagerConfig config = new GpManagerConfig()
         {

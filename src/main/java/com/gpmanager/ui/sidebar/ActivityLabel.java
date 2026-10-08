@@ -8,46 +8,53 @@ import java.util.*;
 */
 class ActivityLabel {
 /** Raids and minigames whose session name outranks a fresh target. */
-static final List<String> CURATED = Arrays.asList("theatre of blood", "chambers of xeric",
-"tombs of amascut", msg("fe"), "barbarian assault", "tempoross", "wintertodt", "inferno",
-"fight caves", "colosseum", "nightmare", "gauntlet");
-static final List<String> CURATED_SHORT = Arrays.asList("tob", "cox", "toa", "gotr");
+static final List<String> CURATED = l("curated");
+static final List<String> CURATED_SHORT = l("short");
 /** XP in these is fighting, not an activity of its own. */
-static final List<String> COMBAT = Arrays.asList("Attack", "Strength", "Defence", "Ranged", "Hitpoints");
+static final List<String> COMBAT = l("combat");
 
 /** The status-line label: the named run, else a named activity, else Combat, else empty. */
-static String resolve(boolean fighting, String activity, String ownerLabel, boolean hasSession, boolean freePlay) {
- if (hasSession && !freePlay) return Fmt.activity(ownerLabel);
- String hint = clean(activity);
- if (named(hint)) return Fmt.activity(hint);
- // What is left came from fighting: an NPC's loot names it, or combat XP.
- return fighting || !hint.isEmpty() ? "Combat" : "";
-}
+
 
 /** A raid, minigame, skill, agility course or one of the named pursuits; never an NPC. */
-static boolean named(String hint) {
- if (curated(hint) || AgilityCourses.BY_REGION.containsValue(hint)
- || Arrays.asList("PKing", "Trading", "Death reclaim").contains(hint)) return true;
- for (net.runelite.api.Skill skill : net.runelite.api.Skill.values()) {
-  if (skill.getName().equalsIgnoreCase(hint)) return !COMBAT.contains(skill.getName());
- }
- return false;
-}
+
 
 /** True when the session activity is a raid or minigame that keeps its name over a target. */
-static boolean curated(String activity) {
- String lower = activity == null ? "" : activity.trim().toLowerCase(Locale.ROOT);
- if (lower.isEmpty()) return false;
- if (CURATED_SHORT.contains(lower)) return true;
- for (String name : CURATED) {
-  if (lower.contains(name)) return true;
+
+
+/** Trim, and drop generic placeholders that are not activities. */
+
+
+/** Label predicates share the compiled rule matcher; skill case matching remains unchanged. */
+static final Map<String, Ag.P[][]> R = Ak.r("d28");
+static boolean b1(String a) {
+ String b = Ag.lower(a);
+ return !b.isEmpty() && (Ag.has(b, R.get("short")) || Ag.has(b, R.get("curated")));
+}
+static String c1(String a) {
+ String b = a == null ? "" : a.trim();
+ return b.isEmpty() || Ag.has(b, R.get("generic")) ? "" : b;
+}
+static boolean a1(String /* hint */a) {
+ if (b1(a) || AgilityCourses.BY_REGION.containsValue(a)
+ || Ag.has(a, R.get("pursuit"))) return true;
+ for (net.runelite.api.Skill /* skill */b : net.runelite.api.Skill.values()) {
+  if (b.getName().equalsIgnoreCase(a)) return !COMBAT.contains(b.getName());
  }
  return false;
 }
+static String d1(boolean /* fighting */a, String /* activity */b, String /* ownerLabel */c, boolean /* hasSession */d, boolean /* freePlay */e) {
+ if (d && !e) return Fmt.activity(c);
+ String /* hint */f = c1(b);
+ if (a1(f)) return Fmt.activity(f);
+ // What is left came from fighting: an NPC's loot names it, or combat XP.
+ return a || !f.isEmpty() ? "Combat" : "";
+}
 
-/** Trim, and drop generic placeholders that are not activities. */
-static String clean(String value) {
- String trimmed = value == null ? "" : value.trim();
- return trimmed.isEmpty() || "General".equalsIgnoreCase(trimmed) || "NPC loot".equalsIgnoreCase(trimmed) ? "" : trimmed;
+/** Original list fields retain their exact values; the table is their only source. */
+static List<String> l(String a) {
+ for (String[] b : Ak.x("d28")) if (b[0].equals(a))
+ return Arrays.stream(b[2].split("\\|")).map(Ak::t).collect(java.util.stream.Collectors.toList());
+ throw new IllegalArgumentException(a);
 }
 }

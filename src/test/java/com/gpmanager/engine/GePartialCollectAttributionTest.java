@@ -36,7 +36,7 @@ public class GePartialCollectAttributionTest
     private static final int RUNE = ItemID.NATURERUNE;
     private static final long T0 = 1_000_000_000_000L;
 
-    // §7 owner fixture: slot order, quantities, gross execution, actual tax and actual Received.
+    // Â§7 owner fixture: slot order, quantities, gross execution, actual tax and actual Received.
     private static final int[] OWNER_ITEM = {CHICKEN, MITHRIL, SILVER, SHARK, MAPLE, OAK_PLANK, MAGIC,
         MAHOGANY};
     private static final long[] OWNER_QTY = {1L, 30L, 60L, 30L, 4L, 20L, 4L, 9L};
@@ -64,7 +64,7 @@ public class GePartialCollectAttributionTest
         INTERLEAVED
     }
 
-    // ── the owner fixture (§7) ─────────────────────────────────────────────────────────────────
+    // â”€â”€ the owner fixture (Â§7) â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
 
     @Test
     public void ownerPartialCollectSettlesOnlyTheClearedSlotCoinsFirst()
@@ -191,7 +191,7 @@ public class GePartialCollectAttributionTest
         assertEquals(0, restored.adjustmentRows());
     }
 
-    // ── the attribution law ────────────────────────────────────────────────────────────────────
+    // â”€â”€ the attribution law â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
 
     @Test
     public void singleTaxedSlotSettlesWhileOthersWait()
@@ -252,7 +252,7 @@ public class GePartialCollectAttributionTest
         owner.engine.acu(t + 20_500L);
         assertEquals("observed cash remains reviewable before evidence is dropped", 1, owner.unattributedCoinRows());
         assertEquals(0L, EngineProbe.pendingSettlementCash(owner.engine.geCustody));
-        assertEquals(0L, owner.engine.geCollectionIntentUntil);
+        assertEquals(null, owner.engine.eb.peek(Eb.GE));
         owner.engine.resume(t + 20_600L, Ed.LIFECYCLE);
         owner.clearSlot(3, SHARK, t + 20_700L);
         owner.maintenance(t + 21_000L);
@@ -426,26 +426,22 @@ public class GePartialCollectAttributionTest
     @Test
     public void matchingSubsetsRefusesMoreThanEightCandidates()
     {
-        long[] nets = new long[9];
-        boolean[] provable = new boolean[9];
+        long[][] nets = new long[9][];
         for (int index = 0; index < 9; index++)
         {
-            nets[index] = 10L;
-            provable[index] = true;
+            nets[index] = new long[] {10L, 10L};
         }
         assertTrue("more than eight candidates are never enumerated",
-            GeCustodyLedger.aan(nets, provable, 10L, 2).isEmpty());
+            GeCustodyLedger.aan(nets, 10L, 2).isEmpty());
         assertEquals(8, GeCustodyLedger.MAX_SETTLEMENT_CANDIDATES);
 
-        long[] eight = new long[8];
-        boolean[] eightProvable = new boolean[8];
+        long[][] eight = new long[8][];
         for (int index = 0; index < 8; index++)
         {
-            eight[index] = 10L;
-            eightProvable[index] = true;
+            eight[index] = new long[] {10L, 10L};
         }
         assertEquals("a matching pair stops the enumeration early", 2,
-            GeCustodyLedger.aan(eight, eightProvable, 10L, 2).size());
+            GeCustodyLedger.aan(eight, 10L, 2).size());
     }
 
     @Test
@@ -466,7 +462,7 @@ public class GePartialCollectAttributionTest
         assertEquals(0, owner.reviewCount());
     }
 
-    // ── §4 fail-open fix and §5 expiry fix ────────────────────────────────────────────────────
+    // â”€â”€ Â§4 fail-open fix and Â§5 expiry fix â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
 
     @Test
     public void knownBasisSingleSaleWithWrongCashFailsClosed()
@@ -530,7 +526,7 @@ public class GePartialCollectAttributionTest
         assertEquals(0, owner.reviewCount());
     }
 
-    // ── fixtures ───────────────────────────────────────────────────────────────────────────────
+    // â”€â”€ fixtures â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
 
     /**
      * Run one collect interaction in the requested ordering: the coin gain and every slot's

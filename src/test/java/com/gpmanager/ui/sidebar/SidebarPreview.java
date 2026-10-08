@@ -24,7 +24,20 @@ import javax.swing.SwingUtilities;
  */
 public final class SidebarPreview
 {
+    /** Fixed clock for pixel comparisons; restore it when called in another test JVM. */
     public static void main(String[] args) throws Exception
+    {
+     java.util.function.LongSupplier c = Ae.clock;
+     try {
+      Ae.clock = () -> java.time.Instant.parse("2026-10-06T07:57:00Z").toEpochMilli();
+      sh(args);
+     } finally {
+      Ae.clock = c;
+     }
+    }
+
+    /** Render the same offline cases with a fixed clock and development badge. */
+    static void sh(String[] args) throws Exception
     {
         File out = new File(args != null && args.length > 0 ? args[0] : "build/sidebar-preview");
         out.mkdirs();
@@ -58,6 +71,8 @@ public final class SidebarPreview
         ledgerReview(out);
         ledgerDetail(out);
         ledgerCorrectionPreview(out);
+        ledgerChargeUsed(out);
+        ledgerChargeOneHit(out);
         ledgerCompacted(out);
         grindsCurrent(out);
         grindsMy(out);
@@ -82,7 +97,7 @@ public final class SidebarPreview
     private static void normalNegative(File out) throws IOException
     {
         Am engine = engine();
-        long now = System.currentTimeMillis() - 20 * 60_000L;
+        long now = Ae.now() - 20 * 60_000L;
         engine.ajl("Vorkath", Cx.GENERAL, now);
         engine.getActiveSession().kf(consumed(now + 1_000L, "Prayer potion(4)", 3, -12, 9_800, -117_600L), 2_000);
         liveShot(out, "a-live-normal-negative.png", engine, Bo.NONE);
@@ -92,7 +107,7 @@ public final class SidebarPreview
     private static void fullPositive(File out) throws IOException
     {
         Am engine = engine();
-        long now = System.currentTimeMillis() - 45 * 60_000L;
+        long now = Ae.now() - 45 * 60_000L;
         engine.ajl("Vorkath", Cx.GENERAL, now);
         engine.getActiveSession().kf(booked(now + 1_000L, "Dragon bones", 1, 2, 3_200, 6_400), 2_000);
         engine.getActiveSession().kf(booked(now + 2_000L, "Battlestaff", 2, 5, 4_400, 22_000), 2_000);
@@ -113,7 +128,7 @@ public final class SidebarPreview
     private static void pvpContext(File out) throws IOException
     {
         Am engine = engine();
-        long now = System.currentTimeMillis() - 15 * 60_000L;
+        long now = Ae.now() - 15 * 60_000L;
         engine.ajl("Wilderness", Cx.PK, now);
         engine.getActiveSession().kf(booked(now + 1_000L, "Dragon bones", 1, 1, 3_200, 3_200), 2_000);
         engine.getActiveSession().kf(pkDeath(now + 2_000L), 2_000);
@@ -141,6 +156,38 @@ public final class SidebarPreview
             engine.getActiveSession().getTransactions().get(0).getId(), null);
     }
 
+    /** Owner 2026-10-03: a charged weapon's row lists what its uses spent, item by item. */
+    private static void ledgerChargeUsed(File out) throws IOException
+    {
+        Am engine = engine();
+        long now = Ae.now() - 20 * 60_000L;
+        engine.ajl("Theatre of Blood", Cx.GENERAL, now);
+        Ac first = null;
+        for (int hit = 0; hit < 62; hit++)
+        {
+            java.util.List<Ab> spent = new java.util.ArrayList<>(java.util.List.of(
+                new Ab(565, "Blood rune", -2L, 410, -820L)));
+            if (hit % 50 == 49)
+            {
+                spent.add(new Ab(22446, "Vial of blood", -1L, 46_000, -46_000L));
+            }
+            Ac booked = engine.mn("worn:scythe", "Scythe of vitur", Au.SUPPLIES, spent, now + hit * 2_400L);
+            first = first == null ? booked : first;
+        }
+        ledgerShot(out, "led-f-ledger-charge-used.png", engine, first == null ? null : first.getId(), null);
+    }
+
+    /** Owner 1.2: a single scythe hit still names the blood runes it spent. */
+    private static void ledgerChargeOneHit(File out) throws IOException
+    {
+        Am engine = engine();
+        long now = Ae.now() - 5 * 60_000L;
+        engine.ajl("Theatre of Blood", Cx.GENERAL, now);
+        Ac hit = engine.mn("worn:scythe", "Scythe of vitur", Au.SUPPLIES,
+            java.util.List.of(new Ab(565, "Blood rune", -2L, 333, -666L)), now);
+        ledgerShot(out, "led-g-ledger-charge-one-hit.png", engine, hit == null ? null : hit.getId(), null);
+    }
+
     private static void ledgerCorrectionPreview(File out) throws IOException
     {
         Am engine = mixedEngine();
@@ -151,7 +198,7 @@ public final class SidebarPreview
     private static void ledgerCompacted(File out) throws IOException
     {
         Am engine = engine();
-        long now = System.currentTimeMillis() - 48 * 60 * 60_000L;
+        long now = Ae.now() - 48 * 60 * 60_000L;
         engine.ajl("Old grind", Cx.GENERAL, now);
         for (int i = 0; i < 8; i++)
         {
@@ -168,7 +215,7 @@ public final class SidebarPreview
     private static void r31FreshLive(File out) throws IOException
     {
         Am engine = engine();
-        long now = System.currentTimeMillis();
+        long now = Ae.now();
         engine.ajl("2323", Cx.GENERAL, now - 20_000L);
         engine.getActiveSession().kf(booked(now - 15_000L, "Willow logs", 3, 5, 42, 210), 2_000);
         engine.getActiveSession().kf(consumed(now - 10_000L, "Prayer potion(4)", 3, -1, 210, -210L), 2_000);
@@ -179,7 +226,7 @@ public final class SidebarPreview
     private static void r31GrindsNoTargets(File out) throws IOException
     {
         Am engine = engine();
-        long now = System.currentTimeMillis();
+        long now = Ae.now();
         engine.ajl("Vorkath", Cx.GENERAL, now - 20_000L);
         engine.getActiveSession().kf(booked(now - 15_000L, "Dragon bones", 1, 1, 3_200, 3_200), 2_000);
         Dp panel = panel(engine, Bo.NONE);
@@ -191,7 +238,7 @@ public final class SidebarPreview
     private static void r31GrindsTargetCalculating(File out) throws IOException
     {
         Am engine = engine();
-        long now = System.currentTimeMillis();
+        long now = Ae.now();
         engine.ajl("Vorkath", Cx.GENERAL, now - 20_000L);
         engine.getActiveSession().kf(booked(now - 15_000L, "Dragon bones", 1, 1, 3_200, 3_200), 2_000);
         engine.getActiveSession().setProfitTargetGp(5_000_000L);
@@ -216,7 +263,7 @@ public final class SidebarPreview
     private static void r4GrindDetailNoPrevious(File out) throws IOException
     {
         Am engine = engine();
-        long now = System.currentTimeMillis();
+        long now = Ae.now();
         finishedGrind(engine, "Muspah", now - 3 * 3_600_000L, 612_000L);
         Dp panel = panel(engine, Bo.NONE);
         panel.shell().show(Shell.GRINDS);
@@ -228,7 +275,7 @@ public final class SidebarPreview
     private static void r4GrindDetailCompacted(File out) throws IOException
     {
         Am engine = engine();
-        long now = System.currentTimeMillis();
+        long now = Ae.now();
         finishedLinked(engine, "Vorkath", now - 4 * 3_600_000L, 3_600_000L, 400_000L, 3 * 3_600_000L);
         engine.getHistory().get(0).pj(now - 2 * 3_600_000L, transaction -> false);
         Dp panel = panel(engine, Bo.NONE);
@@ -240,7 +287,7 @@ public final class SidebarPreview
     private static Am insightsFixture()
     {
         Am engine = engine();
-        long now = System.currentTimeMillis();
+        long now = Ae.now();
         long day = 24L * 3_600_000L;
         finishedLinked(engine, "Vorkath", now - 2 * day, 4_200_000L, 620_000L, 2 * 3_600_000L);
         finishedLinked(engine, "Vorkath", now - 6 * 3_600_000L, 2_840_000L, 180_000L, 1 * 3_600_000L);
@@ -295,7 +342,7 @@ public final class SidebarPreview
     private static void r41LedgerLongRow(File out) throws IOException
     {
         Am engine = engine();
-        long now = System.currentTimeMillis() - 5 * 60_000L;
+        long now = Ae.now() - 5 * 60_000L;
         engine.ajl("Vorkath", Cx.GENERAL, now);
         engine.getActiveSession().kf(booked(now + 1_000L, "Cooked chicken", 2140, 1, 740, 740L), 2_000);
         Ac drink = consumed(now + 2_000L, "Super attack potion(4)", 3, -1, 9_800, -19_600L);
@@ -314,7 +361,7 @@ public final class SidebarPreview
     private static Am openOnlyFixture()
     {
         Am engine = engine();
-        long now = System.currentTimeMillis();
+        long now = Ae.now();
         engine.ajl("Vorkath", Cx.GENERAL, now - 3_600_000L);
         engine.getActiveSession().kf(booked(now - 3_500_000L, "Dragon bones", 1, 1, 3_200, 3_200L),
             2_000);
@@ -344,7 +391,7 @@ public final class SidebarPreview
     private static Am ledgerIconEngine(long longValue)
     {
         Am engine = engine();
-        long now = System.currentTimeMillis() - 5 * 60_000L;
+        long now = Ae.now() - 5 * 60_000L;
         engine.ajl("Vorkath", Cx.GENERAL, now);
         engine.getActiveSession().kf(consumed(now + 1_000L, "Cooked chicken", 2140, 1, 740, -740L),
             2_000);
@@ -360,7 +407,7 @@ public final class SidebarPreview
     private static Am longNameFixture()
     {
         Am engine = engine();
-        long now = System.currentTimeMillis();
+        long now = Ae.now();
         longNameLinked(engine, now - 5 * 3_600_000L, now - 4 * 3_600_000L, 2_000_000L);
         longNameLinked(engine, now - 3 * 3_600_000L, now - 1 * 3_600_000L, 3_000_000L);
         return engine;
@@ -410,7 +457,7 @@ public final class SidebarPreview
     private static Am mixedEngine()
     {
         Am engine = engine();
-        long now = System.currentTimeMillis() - 30 * 60_000L;
+        long now = Ae.now() - 30 * 60_000L;
         engine.ajl("Vorkath", Cx.GENERAL, now);
         engine.getActiveSession().kf(booked(now + 1_000L, "Willow logs", 3, 5, 42, 210), 2_000);
         engine.getActiveSession().kf(consumed(now + 2_000L, "Prayer potion(4)", 3, -2, 9_800, -19_600L), 2_000);
@@ -443,7 +490,7 @@ public final class SidebarPreview
     {
         Am engine = engine();
         long day = 24L * 3_600_000L;
-        long now = System.currentTimeMillis();
+        long now = Ae.now();
         finishedGrind(engine, "Vorkath", now - day, 2_840_000L);
         finishedGrind(engine, "Zulrah", now - 2 * day, -412_000L);
         finishedGrind(engine, "Muspah", now - 3 * day, 612_000L);
@@ -503,7 +550,7 @@ public final class SidebarPreview
     private static Am grindsFixture()
     {
         Am engine = engine();
-        long now = System.currentTimeMillis() - 2 * 3_600_000L;
+        long now = Ae.now() - 2 * 3_600_000L;
         engine.ajl("Vorkath", Cx.GENERAL, now);
         engine.getActiveSession().kf(booked(now + 1_000L, "Dragon bones", 1, 2, 3_200, 6_400), 2_000);
         engine.getActiveSession().kf(booked(now + 2_000L, "Battlestaff", 2, 5, 4_400, 22_000), 2_000);
@@ -513,8 +560,8 @@ public final class SidebarPreview
         engine.avg("Vorkath", 5_000_000L, 3L * 3_600_000L, true, engine.getActiveSession().getId());
         engine.sx(now + 10_000L);
 
-        engine.ajl("Zulrah", Cx.GENERAL, System.currentTimeMillis() - 60_000L);
-        engine.getActiveSession().kf(booked(System.currentTimeMillis() - 50_000L, "Magic logs", 5, 5, 1_000, 5_000), 2_000);
+        engine.ajl("Zulrah", Cx.GENERAL, Ae.now() - 60_000L);
+        engine.getActiveSession().kf(booked(Ae.now() - 50_000L, "Magic logs", 5, 5, 1_000, 5_000), 2_000);
         engine.avg("Zulrah", 2_000_000L, null, false, engine.getActiveSession().getId());
         engine.getActiveSession().setProfitTargetGp(5_000_000L);
         engine.getActiveSession().setActiveTimeTargetMillis(3L * 3_600_000L);
@@ -559,7 +606,7 @@ public final class SidebarPreview
             if (correction != null)
             {
                 LedgerPageProbe.preview(SidebarPanelProbe.ledgerPage(panel), Ao.preview(engine, transactionId,
-                    correction, System.currentTimeMillis()), correction);
+                    correction, Ae.now()), correction);
             }
             SidebarPanelProbe.refresh(panel);
         }
@@ -568,11 +615,13 @@ public final class SidebarPreview
 
     private static Dp panel(Am engine, Bo pvp)
     {
+        SummaryParity.check(engine, Ae.now());
         JFrame frame = new JFrame("GP Manager preview");
         frame.setDefaultCloseOperation(JFrame.DISPOSE_ON_CLOSE);
         frame.setLayout(new BorderLayout());
         Dp panel = new Dp(engine, config(), null);
-        DevBadge.apply(panel, BuildInfo.load());
+        DevBadge.apply(panel, BuildInfo.of("1.2.0", "1.2.0-dev", "108",
+            "2026-10-06T07:57:00Z", "preview", "1.13.1", true));
         panel.axo(() -> pvp);
         SidebarPanelProbe.bindSprites(panel, id -> dummySprite());
         Container content = frame.getContentPane();

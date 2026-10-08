@@ -30,40 +30,40 @@ long otherCosts;
 @Getter
 boolean costSplitComplete = true;
 /** Folds one encounter's finalized money exactly once. */
-void fold(Be type, PkMoney money) {
- long als = money.netGp;
- net = safeAdd(net, als);
- costs = safeAdd(costs, money.tr());
- if (money.costSplitAvailable) {
-  suppliesCosts = safeAdd(suppliesCosts, money.uq());
-  otherCosts = safeAdd(otherCosts, aha(money.tr(), money.uq()));
+void fold(Be /* type */a, PkMoney /* money */b) {
+ long /* als */c = b.netGp;
+ net = safeAdd(net, c);
+ costs = safeAdd(costs, b.tr());
+ if (b.costSplitAvailable) {
+  suppliesCosts = safeAdd(suppliesCosts, b.uq());
+  otherCosts = safeAdd(otherCosts, aha(b.tr(), b.uq()));
  } else {
   costSplitComplete = false;
  }
- if (type == Be.KILL) {
-  killNet = safeAdd(killNet, als);
-  bestKill = max(bestKill, nonNeg(als));
+ if (a == Be.KILL) {
+  killNet = safeAdd(killNet, c);
+  bestKill = max(bestKill, nonNeg(c));
  } else {
-  deathLoss = safeAdd(deathLoss, money.auk());
-  largestDeathLoss = max(largestDeathLoss, money.auk());
+  deathLoss = safeAdd(deathLoss, b.auk());
+  largestDeathLoss = max(largestDeathLoss, b.auk());
  }
 }
 
 /** Folds a Ad projection (or another base) exactly once. */
-void merge(PkProfileBase other) {
- if (other == null) return;
- encounters = agy(encounters, other.encounters);
- kills = agy(kills, other.kills);
- deaths = agy(deaths, other.deaths);
- net = safeAdd(net, other.net);
- costs = safeAdd(costs, other.costs);
- killNet = safeAdd(killNet, other.killNet);
- deathLoss = safeAdd(deathLoss, other.deathLoss);
- bestKill = max(bestKill, other.bestKill);
- largestDeathLoss = max(largestDeathLoss, other.largestDeathLoss);
- suppliesCosts = safeAdd(suppliesCosts, other.suppliesCosts);
- otherCosts = safeAdd(otherCosts, other.otherCosts);
- costSplitComplete &= other.costSplitComplete;
+void merge(PkProfileBase /* other */a) {
+ if (a == null) return;
+ encounters = agy(encounters, a.encounters);
+ kills = agy(kills, a.kills);
+ deaths = agy(deaths, a.deaths);
+ net = safeAdd(net, a.net);
+ costs = safeAdd(costs, a.costs);
+ killNet = safeAdd(killNet, a.killNet);
+ deathLoss = safeAdd(deathLoss, a.deathLoss);
+ bestKill = max(bestKill, a.bestKill);
+ largestDeathLoss = max(largestDeathLoss, a.largestDeathLoss);
+ suppliesCosts = safeAdd(suppliesCosts, a.suppliesCosts);
+ otherCosts = safeAdd(otherCosts, a.otherCosts);
+ costSplitComplete &= a.costSplitComplete;
 }
 
 /**
@@ -71,10 +71,10 @@ void merge(PkProfileBase other) {
 * mirroring the Ad query composition. Anchors keep mutable attribution visible until
 * their receipts finalize.
 */
-void merge(PkProfileBase projection, List<Ay> anchors) {
- merge(projection);
- for (Ay anchor : anchors) {
-  if (anchor != null) fold(anchor.getType(), anchor.current());
+void merge(PkProfileBase /* projection */a, List<Ay> /* anchors */b) {
+ merge(a);
+ for (Ay /* anchor */c : b) {
+  if (c != null) fold(c.getType(), c.current());
  }
 }
 

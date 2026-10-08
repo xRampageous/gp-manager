@@ -28,16 +28,16 @@ class TrackedBasisLedger implements Ad.Dj {
 /** Exact known-coverage share a proven SELL placement captured from the available pool. */
 @AllArgsConstructor
 static class Reservation {
- final long trackedQty;
- final long basisGp;
+ long trackedQty;
+ long basisGp;
  boolean isEmpty() {
   return trackedQty <= 0L && basisGp <= 0L;
  }
 }
 
-final Map<Integer, Az> pools = new LinkedHashMap<>();
+Map<Integer, Az> pools = new LinkedHashMap<>();
 long basisEpochMillis;
-java.util.function.IntFunction<Long> openReservationLookup = id -> 0L;
+java.util.function.IntFunction<Long> openReservationLookup = /* id */b -> 0L;
 // ---------------------------------------------------------------------------------------
 // Acquisition / removal / change
 // ---------------------------------------------------------------------------------------
@@ -46,40 +46,40 @@ java.util.function.IntFunction<Long> openReservationLookup = id -> 0L;
 * coverage for proven permanent non-custody ownership sinks. Custody-owned settlements already
 * consumed their reservation, so their item legs never deplete again.
 */
-public synchronized void onAdded(Ac transaction, boolean custodyOwned) {
- if (transaction == null || transaction.timestampEpochMillis < basisEpochMillis) {
+public synchronized void onAdded(Ac /* transaction */a, boolean /* custodyOwned */b) {
+ if (a == null || a.timestampEpochMillis < basisEpochMillis) {
   // Pre-epoch stock is UNKNOWN coverage by migration law; nothing is inferred here.
   return;
  }
- if (basisEpochMillis <= 0L && transaction.timestampEpochMillis > 0L) basisEpochMillis = transaction.timestampEpochMillis;
- kc(contribution(transaction), transaction.timestampEpochMillis);
- if (!custodyOwned) qx(transaction);
+ if (basisEpochMillis <= 0L && a.timestampEpochMillis > 0L) basisEpochMillis = a.timestampEpochMillis;
+ kc(contribution(a), a.timestampEpochMillis);
+ if (!b) qx(a);
 }
 
 /** Validate restoring a previously removed transaction; false blocks the restore. */
-public synchronized boolean canAdd(Ac transaction) {
- if (transaction == null) return false;
- if (transaction.timestampEpochMillis >= basisEpochMillis
- && !sinkQuantities(transaction.tm(), transaction.isCounted(), transaction.getCorrection(),
- transaction.getFlows()).isEmpty()) {
+public synchronized boolean canAdd(Ac /* transaction */a) {
+ if (a == null) return false;
+ if (a.timestampEpochMillis >= basisEpochMillis
+ && !sinkQuantities(a.tm(), a.isCounted(), a.getCorrection(),
+ a.getFlows()).isEmpty()) {
   return false;
  }
- return nj(contribution(transaction), 1L, transaction.timestampEpochMillis);
+ return nj(contribution(a), 1L, a.timestampEpochMillis);
 }
 
 /** Validate removing a retained transaction (undo); false blocks the canonical removal. */
-public synchronized boolean canRemove(Ac transaction) {
- if (transaction == null || transaction.timestampEpochMillis < basisEpochMillis) return true;
- if (!sinkQuantities(transaction.tm(), transaction.isCounted(),
- transaction.getCorrection(), transaction.getFlows()).isEmpty()) {
+public synchronized boolean canRemove(Ac /* transaction */a) {
+ if (a == null || a.timestampEpochMillis < basisEpochMillis) return true;
+ if (!sinkQuantities(a.tm(), a.isCounted(),
+ a.getCorrection(), a.getFlows()).isEmpty()) {
   return false;
  }
- return nj(contribution(transaction), -1L, transaction.timestampEpochMillis);
+ return nj(contribution(a), -1L, a.timestampEpochMillis);
 }
 
-boolean nj(Map<Integer, long[]> deltas, long sign, long timestamp) {
- for (Entry<Integer, long[]> entry : deltas.entrySet()) {
-  if (!awa(entry.getKey(), sign * entry.getValue()[0], sign * entry.getValue()[1], timestamp)) {
+boolean nj(Map<Integer, long[]> /* deltas */a, long /* sign */b, long /* timestamp */c) {
+ for (Entry<Integer, long[]> /* entry */d : a.entrySet()) {
+  if (!awa(d.getKey(), b * d.getValue()[0], b * d.getValue()[1], c)) {
    return false;
   }
  }
@@ -87,43 +87,43 @@ boolean nj(Map<Integer, long[]> deltas, long sign, long timestamp) {
 }
 
 /** Reverse a previously removed transaction's exact known coverage. */
-public synchronized void onRemoved(Ac transaction) {
- if (transaction == null || transaction.timestampEpochMillis < basisEpochMillis) return;
- contribution(transaction).forEach((itemId, delta) -> kq(itemId, -delta[0], -delta[1]));
+public synchronized void onRemoved(Ac /* transaction */a) {
+ if (a == null || a.timestampEpochMillis < basisEpochMillis) return;
+ contribution(a).forEach((/* itemId */b, /* delta */c) -> kq(b, -c[0], -c[1]));
 }
 
 /**
 * Validate a pending correction/split/undo before any canonical mutation. False means the
 * mutation must be rejected as-is: the item's known coverage is reserved or already realized.
 */
-public synchronized boolean canChange(Ac transaction, Ah previousCorrection, List<Ab> previousFlows,
-Ah nextCorrection, List<Ab> nextFlows) {
- if (transaction == null) return false;
- Map<Integer, long[]> before = contribution(transaction, previousCorrection, previousFlows);
+public synchronized boolean canChange(Ac /* transaction */a, Ah /* previousCorrection */b, List<Ab> /* previousFlows */c,
+Ah /* nextCorrection */d, List<Ab> /* nextFlows */e) {
+ if (a == null) return false;
+ Map<Integer, long[]> /* before */f = contribution(a, b, c);
  // A null next-flow set means the caller can only promise the positive contribution
  // shrinks; validating against the empty worst case is the strictest safe check.
- Map<Integer, long[]> after = contribution(transaction, nextCorrection, nextFlows);
- Map<Integer, Long> beforeSinks = sinkQuantities(transaction, previousCorrection, previousFlows);
- Map<Integer, Long> afterSinks = sinkQuantities(transaction, nextCorrection, nextFlows);
- if (transaction.timestampEpochMillis >= basisEpochMillis && !beforeSinks.equals(afterSinks)
- && !np(transaction, beforeSinks, afterSinks) && !nm(beforeSinks, afterSinks,
- transaction.timestampEpochMillis)) {
+ Map<Integer, long[]> /* after */g = contribution(a, d, e);
+ Map<Integer, Long> /* beforeSinks */h = sinkQuantities(a, b, c);
+ Map<Integer, Long> /* afterSinks */i = sinkQuantities(a, d, e);
+ if (a.timestampEpochMillis >= basisEpochMillis && !h.equals(i)
+ && !np(a, h, i) && !nm(h, i,
+ a.timestampEpochMillis)) {
   return false;
  }
- return nj(deltas(before, after), 1L, transaction.timestampEpochMillis);
+ return nj(deltas(f, g), 1L, a.timestampEpochMillis);
 }
 
 /** Apply the exact effective delta after a permitted correction/split/undo. */
-public synchronized void onChanged(Ac transaction, Ah previousCorrection, List<Ab> previousFlows) {
- if (transaction == null) return;
- Map<Integer, Long> beforeSinks = sinkQuantities(transaction, previousCorrection, previousFlows);
- Map<Integer, Long> afterSinks = sinkQuantities(transaction.tm(),
- transaction.isCounted(), transaction.getCorrection(), transaction.getFlows());
- kc(deltas(contribution(transaction, previousCorrection, previousFlows),
- contribution(transaction)), transaction.timestampEpochMillis);
- if (!beforeSinks.equals(afterSinks)) {
-  if (beforeSinks.isEmpty()) qx(transaction);
-  else ahc(transaction, beforeSinks, afterSinks);
+public synchronized void onChanged(Ac /* transaction */a, Ah /* previousCorrection */b, List<Ab> /* previousFlows */c) {
+ if (a == null) return;
+ Map<Integer, Long> /* beforeSinks */d = sinkQuantities(a, b, c);
+ Map<Integer, Long> /* afterSinks */e = sinkQuantities(a.tm(),
+ a.isCounted(), a.getCorrection(), a.getFlows());
+ kc(deltas(contribution(a, b, c),
+ contribution(a)), a.timestampEpochMillis);
+ if (!d.equals(e)) {
+  if (d.isEmpty()) qx(a);
+  else ahc(a, d, e);
  }
 }
 
@@ -131,98 +131,98 @@ public synchronized void onChanged(Ac transaction, Ah previousCorrection, List<A
 // Reservation / realization / depletion
 // ---------------------------------------------------------------------------------------
 /** Reserve the tracked-first known-coverage share for a quantity entering proven SELL custody. */
-synchronized Reservation reserve(int itemId, long quantity, long now) {
- int id = itemId;
- long requested = nonNeg(quantity);
- Az pool = pools.get(id);
- long availableQty = pool == null ? 0L : pool.getAvailableQty();
- long availableBasis = pool == null ? 0L : pool.getAvailableBasisGp();
- long consumeQty = min(requested, availableQty);
- long basis = Df.ayb(availableQty, availableBasis, consumeQty);
- if (consumeQty <= 0L && basis <= 0L) return new Reservation(0L, 0L);
- pool = pool(id, true);
- pool.setAvailableQty(availableQty - consumeQty);
- pool.setAvailableBasisGp(availableBasis - basis);
- pool.setReservedQty(pool.getReservedQty() + consumeQty);
- pool.setReservedBasisGp(pool.getReservedBasisGp() + basis);
- return new Reservation(consumeQty, basis);
+synchronized Reservation reserve(int /* itemId */a, long /* quantity */b, long /* now */c) {
+ int /* id */d = a;
+ long /* requested */e = nonNeg(b);
+ Az /* pool */f = pools.get(d);
+ long /* availableQty */g = f == null ? 0L : f.getAvailableQty();
+ long /* availableBasis */h = f == null ? 0L : f.getAvailableBasisGp();
+ long /* consumeQty */i = min(e, g);
+ long /* basis */j = Df.ayb(g, h, i);
+ if (i <= 0L && j <= 0L) return new Reservation(0L, 0L);
+ f = pool(d, true);
+ f.setAvailableQty(g - i);
+ f.setAvailableBasisGp(h - j);
+ f.setReservedQty(f.getReservedQty() + i);
+ f.setReservedBasisGp(f.getReservedBasisGp() + j);
+ return new Reservation(i, j);
 }
 
 /** Move an exactly realized reservation share out of the reserved totals and fence the item. */
-synchronized void qd(int itemId, long quantity, long basisGp, long now) {
- int id = itemId;
- Az pool = pool(id, true);
- pool.setReservedQty(pool.getReservedQty() - nonNeg(quantity));
- pool.setReservedBasisGp(pool.getReservedBasisGp() - nonNeg(basisGp));
- pool.setRealizationFenceEpochMillis(max(pool.getRealizationFenceEpochMillis(), now));
+synchronized void qd(int /* itemId */a, long /* quantity */b, long /* basisGp */c, long /* now */d) {
+ int /* id */e = a;
+ Az /* pool */f = pool(e, true);
+ f.setReservedQty(f.getReservedQty() - nonNeg(b));
+ f.setReservedBasisGp(f.getReservedBasisGp() - nonNeg(c));
+ f.setRealizationFenceEpochMillis(max(f.getRealizationFenceEpochMillis(), d));
 }
 
 /** Return an unconsumed reservation share to the available pool (cancel/return). */
-synchronized void release(int itemId, long quantity, long basisGp) {
- int id = itemId;
- long releaseQty = nonNeg(quantity);
- long releaseBasis = nonNeg(basisGp);
- if (releaseQty <= 0L && releaseBasis <= 0L) return;
- Az pool = pool(id, true);
- pool.setReservedQty(pool.getReservedQty() - releaseQty);
- pool.setReservedBasisGp(pool.getReservedBasisGp() - releaseBasis);
- pool.setAvailableQty(pool.getAvailableQty() + releaseQty);
- pool.setAvailableBasisGp(pool.getAvailableBasisGp() + releaseBasis);
+synchronized void release(int /* itemId */a, long /* quantity */b, long /* basisGp */c) {
+ int /* id */d = a;
+ long /* releaseQty */e = nonNeg(b);
+ long /* releaseBasis */f = nonNeg(c);
+ if (e <= 0L && f <= 0L) return;
+ Az /* pool */g = pool(d, true);
+ g.setReservedQty(g.getReservedQty() - e);
+ g.setReservedBasisGp(g.getReservedBasisGp() - f);
+ g.setAvailableQty(g.getAvailableQty() + e);
+ g.setAvailableBasisGp(g.getAvailableBasisGp() + f);
 }
 
 /** Deplete known coverage for a proven permanent ownership sink; returns basis consumed. */
-synchronized long deplete(int itemId, long quantity, long now) {
- int id = itemId;
- long requested = nonNeg(quantity);
- Az pool = pools.get(id);
- if (requested <= 0L) return 0L;
- if (pool == null) {
+synchronized long deplete(int /* itemId */b, long /* quantity */c, long /* now */d) {
+ int /* id */e = b;
+ long /* requested */f = nonNeg(c);
+ Az /* pool */g = pools.get(e);
+ if (f <= 0L) return 0L;
+ if (g == null) {
   // Even a sink with no known coverage leaves a realization fence: units left ownership,
   // so later retroactive coverage for them can never be re-added.
-  pool(id, true).setRealizationFenceEpochMillis(now);
+  pool(e, true).setRealizationFenceEpochMillis(d);
   return 0L;
  }
- long consumeQty = min(requested, pool.getAvailableQty());
- long basis = Df.ayb(pool.getAvailableQty(), pool.getAvailableBasisGp(), consumeQty);
- pool.setAvailableQty(pool.getAvailableQty() - consumeQty);
- pool.setAvailableBasisGp(pool.getAvailableBasisGp() - basis);
- pool.setRealizationFenceEpochMillis(max(pool.getRealizationFenceEpochMillis(), now));
- return basis;
+ long /* consumeQty */h = min(f, g.getAvailableQty());
+ long /* basis */i = Df.ayb(g.getAvailableQty(), g.getAvailableBasisGp(), h);
+ g.setAvailableQty(g.getAvailableQty() - h);
+ g.setAvailableBasisGp(g.getAvailableBasisGp() - i);
+ g.setRealizationFenceEpochMillis(max(g.getRealizationFenceEpochMillis(), d));
+ return i;
 }
 
 /** Currency is money, never tracked owned-item value. */
-static boolean wk(int itemId) {
- return itemId == ItemID.COINS || itemId == ItemID.PLATINUM;
+static boolean wk(int /* itemId */a) {
+ return a == ItemID.COINS || a == ItemID.PLATINUM;
 }
 
 // ---------------------------------------------------------------------------------------
 // Persistence / lifecycle
 // ---------------------------------------------------------------------------------------
-synchronized void ayc(SavedState state) {
- if (state == null) return;
- var out = new TrackedBasisState();
+synchronized void ayc(SavedState /* state */b) {
+ if (b == null) return;
+ var /* out */c = new TrackedBasisState();
  // Epoch 0 only happens for an engine that never restored or tracked anything; a positive
  // sentinel keeps a saved pool loadable as "tracked since the beginning".
- out.basisEpochMillis = nonNeg(basisEpochMillis > 0L ? basisEpochMillis : 1L);
- var list = new ArrayList<Az>();
- for (Az pool : pools.values()) {
-  if (pool == null) continue;
-  if (pool.getAvailableQty() <= 0L && pool.getAvailableBasisGp() <= 0L
-  && pool.getReservedQty() <= 0L && pool.getReservedBasisGp() <= 0L && pool.getRealizationFenceEpochMillis() <= 0L) {
+ c.basisEpochMillis = nonNeg(basisEpochMillis > 0L ? basisEpochMillis : 1L);
+ var /* list */d = new ArrayList<Az>();
+ for (Az /* pool */e : pools.values()) {
+  if (e == null) continue;
+  if (e.getAvailableQty() <= 0L && e.getAvailableBasisGp() <= 0L
+  && e.getReservedQty() <= 0L && e.getReservedBasisGp() <= 0L && e.getRealizationFenceEpochMillis() <= 0L) {
    continue;
   }
-  var copy = new Az(pool.itemId);
-  copy.setAvailableQty(pool.getAvailableQty());
-  copy.setAvailableBasisGp(pool.getAvailableBasisGp());
-  copy.setReservedQty(pool.getReservedQty());
-  copy.setReservedBasisGp(pool.getReservedBasisGp());
-  copy.setRealizationFenceEpochMillis(pool.getRealizationFenceEpochMillis());
-  copy.setLatestAcquisitionEpochMillis(pool.getLatestAcquisitionEpochMillis());
-  list.add(copy);
+  var /* copy */f = new Az(e.itemId);
+  f.setAvailableQty(e.getAvailableQty());
+  f.setAvailableBasisGp(e.getAvailableBasisGp());
+  f.setReservedQty(e.getReservedQty());
+  f.setReservedBasisGp(e.getReservedBasisGp());
+  f.setRealizationFenceEpochMillis(e.getRealizationFenceEpochMillis());
+  f.setLatestAcquisitionEpochMillis(e.getLatestAcquisitionEpochMillis());
+  d.add(f);
  }
- list.removeIf(value -> value == null || value.itemId <= 0);
- out.pools = new ArrayList<>(list);
- state.setTrackedBasis(out);
+ d.removeIf(/* value */g -> g == null || g.itemId <= 0);
+ c.pools = new ArrayList<>(d);
+ b.setTrackedBasis(c);
 }
 
 /**
@@ -230,36 +230,36 @@ synchronized void ayc(SavedState state) {
 * the migration boundary: existing holdings are UNKNOWN coverage, no bank value seeds basis and
 * no history is reconstructed. Reserved totals are rebound from the durable custody records.
 */
-synchronized void restore(SavedState state, List<Aa> custodyRecords, long now) {
+synchronized void restore(SavedState /* state */a, List<Aa> /* custodyRecords */b, long /* now */c) {
  pools.clear();
- TrackedBasisState saved = state == null ? null : state.getTrackedBasis();
- if (saved != null && saved.getBasisEpochMillis() > 0L) {
-  basisEpochMillis = saved.getBasisEpochMillis();
-  for (Az pool : saved.awg()) {
-   if (pool == null || pool.itemId <= 0) continue;
-   pools.put(pool.itemId, pool);
+ TrackedBasisState /* saved */d = a == null ? null : a.getTrackedBasis();
+ if (d != null && d.getBasisEpochMillis() > 0L) {
+  basisEpochMillis = d.getBasisEpochMillis();
+  for (Az /* pool */e : d.awg()) {
+   if (e == null || e.itemId <= 0) continue;
+   pools.put(e.itemId, e);
   }
  } else {
-  basisEpochMillis = now;
+  basisEpochMillis = c;
  }
- aek(custodyRecords);
+ aek(b);
 }
 
 /** Recompute reserved totals from the durable custody records (they are the authority). */
-synchronized void aek(List<Aa> custodyRecords) {
- for (Az pool : pools.values()) {
-  pool.setReservedQty(0L);
-  pool.setReservedBasisGp(0L);
+synchronized void aek(List<Aa> /* custodyRecords */a) {
+ for (Az /* pool */b : pools.values()) {
+  b.setReservedQty(0L);
+  b.setReservedBasisGp(0L);
  }
- if (custodyRecords == null) return;
- for (Aa record : custodyRecords) {
-  if (record == null || record.getSide() != Aa.Side.SELL) continue;
-  long remainingQty = record.afs();
-  long remainingBasis = record.afr();
-  if (remainingQty <= 0L && remainingBasis <= 0L) continue;
-  Az pool = pool(record.itemId, true);
-  pool.setReservedQty(pool.getReservedQty() + remainingQty);
-  pool.setReservedBasisGp(pool.getReservedBasisGp() + remainingBasis);
+ if (a == null) return;
+ for (Aa /* record */c : a) {
+  if (c == null || c.getSide() != Aa.Side.SELL) continue;
+  long /* remainingQty */d = c.afs();
+  long /* remainingBasis */e = c.afr();
+  if (d <= 0L && e <= 0L) continue;
+  Az /* pool */f = pool(c.itemId, true);
+  f.setReservedQty(f.getReservedQty() + d);
+  f.setReservedBasisGp(f.getReservedBasisGp() + e);
  }
 }
 
@@ -270,12 +270,12 @@ synchronized void reset() {
 }
 
 /** Adopt another ledger's durable state during a staged profile swap. */
-synchronized void auc(TrackedBasisLedger other) {
+synchronized void auc(TrackedBasisLedger /* other */a) {
  reset();
- if (other != null) {
-  basisEpochMillis = other.basisEpochMillis;
-  other.pools.forEach((itemId, pool) -> {
-   if (pool != null) pools.put(itemId, pool);
+ if (a != null) {
+  basisEpochMillis = a.basisEpochMillis;
+  a.pools.forEach((/* itemId */b, /* pool */c) -> {
+   if (c != null) pools.put(b, c);
   });
  }
 }
@@ -283,171 +283,171 @@ synchronized void auc(TrackedBasisLedger other) {
 // ---------------------------------------------------------------------------------------
 // Internals
 // ---------------------------------------------------------------------------------------
-Az pool(int itemId, boolean create) {
- Az pool = pools.get(itemId);
- if (pool == null && create) {
-  pool = new Az(itemId);
-  pools.put(itemId, pool);
+Az pool(int /* itemId */a, boolean /* create */b) {
+ Az /* pool */c = pools.get(a);
+ if (c == null && b) {
+  c = new Az(a);
+  pools.put(a, c);
  }
- return pool;
+ return c;
 }
 
-void kc(Map<Integer, long[]> contribution, long timestamp) {
- for (Entry<Integer, long[]> entry : contribution.entrySet()) {
-  kq(entry.getKey(), entry.getValue()[0], entry.getValue()[1]);
-  if (entry.getValue()[0] > 0L) {
-   Az pool = pool(entry.getKey(), true);
-   pool.setLatestAcquisitionEpochMillis(max(pool.getLatestAcquisitionEpochMillis(), timestamp));
+void kc(Map<Integer, long[]> /* contribution */a, long /* timestamp */b) {
+ for (Entry<Integer, long[]> /* entry */c : a.entrySet()) {
+  kq(c.getKey(), c.getValue()[0], c.getValue()[1]);
+  if (c.getValue()[0] > 0L) {
+   Az /* pool */d = pool(c.getKey(), true);
+   d.setLatestAcquisitionEpochMillis(max(d.getLatestAcquisitionEpochMillis(), b));
   }
  }
 }
 
 /** Deplete known coverage for each proven permanent non-custody ownership sink in the row. */
-void qx(Ac transaction) {
- Map<Integer, Long> quantities = sinkQuantities(transaction.tm(),
- transaction.isCounted(), transaction.getCorrection(), transaction.getFlows());
- if (quantities.isEmpty()) return;
- List<Cd> shares = transaction.xe() ? new ArrayList<>() : null;
- for (Entry<Integer, Long> entry : quantities.entrySet()) {
-  Az pool = pools.get(entry.getKey());
-  long knownQty = min(entry.getValue(), pool == null ? 0L : pool.getAvailableQty());
-  long basis = deplete(entry.getKey(), entry.getValue(), transaction.timestampEpochMillis);
-  if (shares != null) shares.add(new Cd(entry.getKey(), entry.getValue(), knownQty, basis));
+void qx(Ac /* transaction */a) {
+ Map<Integer, Long> /* quantities */b = sinkQuantities(a.tm(),
+ a.isCounted(), a.getCorrection(), a.getFlows());
+ if (b.isEmpty()) return;
+ List<Cd> /* shares */c = a.xe() ? new ArrayList<>() : null;
+ for (Entry<Integer, Long> /* entry */d : b.entrySet()) {
+  Az /* pool */e = pools.get(d.getKey());
+  long /* knownQty */f = min(d.getValue(), e == null ? 0L : e.getAvailableQty());
+  long /* basis */g = deplete(d.getKey(), d.getValue(), a.timestampEpochMillis);
+  if (c != null) c.add(new Cd(d.getKey(), d.getValue(), f, g));
  }
- if (shares != null) transaction.aie(shares);
+ if (c != null) a.aie(c);
 }
 
 /** A confirmed own ground-drop pickup may undo its recorded sink share before later use. */
-boolean np(Ac transaction, Map<Integer, Long> before, Map<Integer, Long> after) {
- if (!transaction.xe() || !transaction.yi() || before.isEmpty()) return false;
- if (!after.equals(sinkQuantities(transaction.tm(), true, AUTO, transaction.getFlows()))) {
+boolean np(Ac /* transaction */b, Map<Integer, Long> /* before */c, Map<Integer, Long> /* after */d) {
+ if (!b.xe() || !b.yi() || c.isEmpty()) return false;
+ if (!d.equals(sinkQuantities(b.tm(), true, AUTO, b.getFlows()))) {
   // A manual Ignore/Transfer keeps the physical loss intact. Only a proven pickup
   // shrinks the booked negative flows before this observer runs.
   return false;
  }
- for (Entry<Integer, Long> entry : before.entrySet()) {
-  int itemId = entry.getKey();
-  long remaining = after.getOrDefault(itemId, 0L);
-  if (remaining > entry.getValue()) return false;
-  Cd share = avi(transaction, itemId);
-  if (share == null || share.uh() != entry.getValue()) return false;
+ for (Entry<Integer, Long> /* entry */e : c.entrySet()) {
+  int /* itemId */f = e.getKey();
+  long /* remaining */g = d.getOrDefault(f, 0L);
+  if (g > e.getValue()) return false;
+  Cd /* share */h = avi(b, f);
+  if (h == null || h.uh() != e.getValue()) return false;
  }
- for (Integer itemId : after.keySet()) if (!before.containsKey(itemId)) return false;
+ for (Integer /* itemId */i : d.keySet()) if (!c.containsKey(i)) return false;
  return true;
 }
 
-Cd avi(Ac transaction, int itemId) {
- for (Cd share : transaction.va()) {
-  if (share != null && share.itemId == itemId) return share;
+Cd avi(Ac /* transaction */a, int /* itemId */b) {
+ for (Cd /* share */c : a.va()) {
+  if (c != null && c.itemId == b) return c;
  }
  return null;
 }
 
 /** An owner may first count a Review removal while no later use has frozen its pool. */
-boolean nm(Map<Integer, Long> before, Map<Integer, Long> after, long transactionTimestamp) {
- if (!before.isEmpty() || after.isEmpty()) return false;
- for (Integer itemId : after.keySet()) {
-  if (!awa(itemId, 0L, 0L, transactionTimestamp)) return false;
-  Az pool = pools.get(itemId);
-  if (pool != null && pool.getAvailableQty() > 0L && (pool.getLatestAcquisitionEpochMillis() <= 0L
-  || pool.getLatestAcquisitionEpochMillis() > transactionTimestamp)) {
+boolean nm(Map<Integer, Long> /* before */a, Map<Integer, Long> /* after */b, long /* transactionTimestamp */c) {
+ if (!a.isEmpty() || b.isEmpty()) return false;
+ for (Integer /* itemId */d : b.keySet()) {
+  if (!awa(d, 0L, 0L, c)) return false;
+  Az /* pool */e = pools.get(d);
+  if (e != null && e.getAvailableQty() > 0L && (e.getLatestAcquisitionEpochMillis() <= 0L
+  || e.getLatestAcquisitionEpochMillis() > c)) {
    return false;
   }
  }
  return true;
 }
 
-void ahc(Ac transaction, Map<Integer, Long> before, Map<Integer, Long> after) {
- for (Entry<Integer, Long> entry : before.entrySet()) {
-  long amu = entry.getValue() - after.getOrDefault(entry.getKey(), 0L);
-  if (amu <= 0L) continue;
-  Cd share = avi(transaction, entry.getKey());
-  if (share == null) continue;
-  long knownQty = Df.ayb(share.uh(), share.ug(), amu);
-  long basis = Df.ayb(share.ug(), nonNeg(share.remainingBasisGp), knownQty);
-  kq(entry.getKey(), knownQty, basis);
-  share.restore(amu, knownQty, basis);
+void ahc(Ac /* transaction */a, Map<Integer, Long> /* before */b, Map<Integer, Long> /* after */c) {
+ for (Entry<Integer, Long> /* entry */d : b.entrySet()) {
+  long /* amu */e = d.getValue() - c.getOrDefault(d.getKey(), 0L);
+  if (e <= 0L) continue;
+  Cd /* share */f = avi(a, d.getKey());
+  if (f == null) continue;
+  long /* knownQty */g = Df.ayb(f.uh(), f.ug(), e);
+  long /* basis */h = Df.ayb(f.ug(), nonNeg(f.remainingBasisGp), g);
+  kq(d.getKey(), g, h);
+  f.restore(e, g, h);
  }
 }
 
 /** Physical counted removals that would require exact reversal of pooled sink depletion. */
-Map<Integer, Long> sinkQuantities(Ai type, boolean counted, Ah correction, List<Ab> flows) {
- var quantities = new LinkedHashMap<Integer, Long>();
- if (!counted || type == Ai.TRANSFER || type == Ai.TRADE
- || correction == TRANSFER || flows == null) {
+Map<Integer, Long> sinkQuantities(Ai /* type */a, boolean /* counted */b, Ah /* correction */c, List<Ab> /* flows */d) {
+ var /* quantities */e = new LinkedHashMap<Integer, Long>();
+ if (!b || a == Ai.TRANSFER || a == Ai.TRADE
+ || c == TRANSFER || d == null) {
   // Custody-owned trade settlements consume their reservation separately. Their financial
   // Result corrections must remain available without touching physical basis.
-  return quantities;
+  return e;
  }
- for (Ab flow : flows) {
-  if (flow == null || flow.quantityDelta >= 0L || wk(flow.itemId)) continue;
-  long quantity = flow.quantityDelta == Long.MIN_VALUE ? Long.MAX_VALUE : -flow.quantityDelta;
-  int itemId = flow.itemId;
-  quantities.put(itemId, safeAdd(quantities.getOrDefault(itemId, 0L), quantity));
+ for (Ab /* flow */f : d) {
+  if (f == null || f.quantityDelta >= 0L || wk(f.itemId)) continue;
+  long /* quantity */g = f.quantityDelta == Long.MIN_VALUE ? Long.MAX_VALUE : -f.quantityDelta;
+  int /* itemId */h = f.itemId;
+  e.put(h, safeAdd(e.getOrDefault(h, 0L), g));
  }
- return quantities;
+ return e;
 }
 
-void kq(int itemId, long deltaQty, long deltaBasisGp) {
- if (deltaQty == 0L && deltaBasisGp == 0L) return;
- Az pool = pool(itemId, true);
- pool.setAvailableQty(pool.getAvailableQty() + deltaQty);
- pool.setAvailableBasisGp(pool.getAvailableBasisGp() + deltaBasisGp);
+void kq(int /* itemId */a, long /* deltaQty */b, long /* deltaBasisGp */c) {
+ if (b == 0L && c == 0L) return;
+ Az /* pool */d = pool(a, true);
+ d.setAvailableQty(d.getAvailableQty() + b);
+ d.setAvailableBasisGp(d.getAvailableBasisGp() + c);
 }
 
-boolean awa(int itemId, long deltaQty, long deltaBasisGp, long transactionTimestamp) {
- if (transactionTimestamp < basisEpochMillis) return false;
- int id = itemId;
- Long amw = openReservationLookup.apply(id);
- if (amw != null && amw > 0L && amw >= transactionTimestamp) return false;
- Az pool = pools.get(id);
- long fence = pool == null ? 0L : pool.getRealizationFenceEpochMillis();
- if (fence > 0L && fence >= transactionTimestamp) return false;
- long availableQty = pool == null ? 0L : pool.getAvailableQty();
- long availableBasis = pool == null ? 0L : pool.getAvailableBasisGp();
- if (availableQty + deltaQty < 0L || availableBasis + deltaBasisGp < 0L) return false;
+boolean awa(int /* itemId */a, long /* deltaQty */b, long /* deltaBasisGp */c, long /* transactionTimestamp */d) {
+ if (d < basisEpochMillis) return false;
+ int /* id */e = a;
+ Long /* amw */f = openReservationLookup.apply(e);
+ if (f != null && f > 0L && f >= d) return false;
+ Az /* pool */g = pools.get(e);
+ long /* fence */h = g == null ? 0L : g.getRealizationFenceEpochMillis();
+ if (h > 0L && h >= d) return false;
+ long /* availableQty */i = g == null ? 0L : g.getAvailableQty();
+ long /* availableBasis */j = g == null ? 0L : g.getAvailableBasisGp();
+ if (i + b < 0L || j + c < 0L) return false;
  return true;
 }
 
-Map<Integer, long[]> deltas(Map<Integer, long[]> before, Map<Integer, long[]> after) {
- var out = new LinkedHashMap<Integer, long[]>();
- for (Entry<Integer, long[]> entry : before.entrySet()) {
-  long[] target = after.get(entry.getKey());
-  long dq = (target == null ? 0L : target[0]) - entry.getValue()[0];
-  long dv = (target == null ? 0L : target[1]) - entry.getValue()[1];
-  if (dq != 0L || dv != 0L) {
-   out.put(entry.getKey(), new long[] { dq, dv });
+Map<Integer, long[]> deltas(Map<Integer, long[]> /* before */a, Map<Integer, long[]> /* after */b) {
+ var /* out */c = new LinkedHashMap<Integer, long[]>();
+ for (Entry<Integer, long[]> /* entry */d : a.entrySet()) {
+  long[] /* target */e = b.get(d.getKey());
+  long /* dq */f = (e == null ? 0L : e[0]) - d.getValue()[0];
+  long /* dv */g = (e == null ? 0L : e[1]) - d.getValue()[1];
+  if (f != 0L || g != 0L) {
+   c.put(d.getKey(), new long[] { f, g });
   }
  }
- for (Entry<Integer, long[]> entry : after.entrySet()) {
-  if (!before.containsKey(entry.getKey())) {
-   out.put(entry.getKey(), new long[] { entry.getValue()[0], entry.getValue()[1] });
+ for (Entry<Integer, long[]> /* entry */h : b.entrySet()) {
+  if (!a.containsKey(h.getKey())) {
+   c.put(h.getKey(), new long[] { h.getValue()[0], h.getValue()[1] });
   }
  }
- return out;
+ return c;
 }
 
-Map<Integer, long[]> contribution(Ac transaction) {
- if (transaction == null) return new LinkedHashMap<>();
- return contribution(transaction.tm(), transaction.isCounted(),
- transaction.getCorrection(), transaction.getFlows());
+Map<Integer, long[]> contribution(Ac /* transaction */a) {
+ if (a == null) return new LinkedHashMap<>();
+ return contribution(a.tm(), a.isCounted(),
+ a.getCorrection(), a.getFlows());
 }
 
 /** The contribution the transaction would have under {@code correction} with {@code flows}. */
-Map<Integer, long[]> contribution(Ac transaction, Ah correction, List<Ab> flows) {
- return flows == null ? new LinkedHashMap<>() : contribution(transaction.tm(),
- rd(transaction.vn(), correction), correction, flows);
+Map<Integer, long[]> contribution(Ac /* transaction */a, Ah /* correction */b, List<Ab> /* flows */c) {
+ return c == null ? new LinkedHashMap<>() : contribution(a.tm(),
+ rd(a.vn(), b), b, c);
 }
 
-Map<Integer, Long> sinkQuantities(Ac transaction, Ah correction, List<Ab> flows) {
- return sinkQuantities(transaction.tm(),
- rd(transaction.vn(), correction), correction, flows);
+Map<Integer, Long> sinkQuantities(Ac /* transaction */a, Ah /* correction */b, List<Ab> /* flows */c) {
+ return sinkQuantities(a.tm(),
+ rd(a.vn(), b), b, c);
 }
 
 /** Effective counted state for an explicit correction (REVENUE/COST always count). */
-static boolean rd(boolean automaticallyCounted, Ah correction) {
- Ah effective = correction == null ? AUTO : correction;
- return effective == REVENUE || effective == COST || (effective == AUTO && automaticallyCounted);
+static boolean rd(boolean /* automaticallyCounted */a, Ah /* correction */b) {
+ Ah /* effective */c = b == null ? AUTO : b;
+ return c == REVENUE || c == COST || (c == AUTO && a);
 }
 
 /**
@@ -457,22 +457,22 @@ static boolean rd(boolean automaticallyCounted, Ah correction) {
 * tracked even when the booked value is legitimately zero; unpriced/unknown/deferred sources
 * create no coverage at all.
 */
-static Map<Integer, long[]> contribution(Ai type, boolean counted,
-Ah correction, List<Ab> flows) {
- var out = new LinkedHashMap<Integer, long[]>();
- Ah effective = correction == null ? AUTO : correction;
- if (type == Ai.TRANSFER || effective == TRANSFER || !counted || effective == IGNORE || flows == null) {
-  return out;
+static Map<Integer, long[]> contribution(Ai /* type */a, boolean /* counted */b,
+Ah /* correction */c, List<Ab> /* flows */d) {
+ var /* out */e = new LinkedHashMap<Integer, long[]>();
+ Ah /* effective */f = c == null ? AUTO : c;
+ if (a == Ai.TRANSFER || f == TRANSFER || !b || f == IGNORE || d == null) {
+  return e;
  }
- for (Ab flow : flows) {
-  if (flow == null || flow.quantityDelta <= 0L || wk(flow.itemId)) continue;
-  Av source = flow.getPriceSource();
-  if (source == null || source == UNPRICED || source == UNKNOWN || source == DEFERRED_CLAIM) continue;
-  long revenue = effective == REVENUE ? Ae.abs(flow.valueDelta) : effective == COST ? 0L : nonNeg(flow.valueDelta);
-  long[] total = out.computeIfAbsent(flow.itemId, itemId -> new long[2]);
-  total[0] = safeAdd(total[0], flow.quantityDelta);
-  total[1] = safeAdd(total[1], revenue);
+ for (Ab /* flow */g : d) {
+  if (g == null || g.quantityDelta <= 0L || wk(g.itemId)) continue;
+  Av /* source */h = g.getPriceSource();
+  if (h == null || h == UNPRICED || h == UNKNOWN || h == DEFERRED_CLAIM) continue;
+  long /* revenue */i = f == REVENUE ? Ae.abs(g.valueDelta) : f == COST ? 0L : nonNeg(g.valueDelta);
+  long[] /* total */j = e.computeIfAbsent(g.itemId, /* itemId */k -> new long[2]);
+  j[0] = safeAdd(j[0], g.quantityDelta);
+  j[1] = safeAdd(j[1], i);
  }
- return out;
+ return e;
 }
 }

@@ -24,10 +24,10 @@ boolean combatNpc;
 long releasedAt;
 long lastTargetAt;
 BooleanSupplier ingestion = () -> false;
-BiConsumer<String, Boolean> presentation = (name, combat) -> {};
-void mf(BooleanSupplier ready, BiConsumer<String, Boolean> changed) {
- ingestion = ready == null ? () -> false : ready;
- presentation = changed == null ? (name, combat) -> {} : changed;
+BiConsumer<String, Boolean> presentation = (/* name */b, /* combat */c) -> {};
+void mf(BooleanSupplier /* ready */a, BiConsumer<String, Boolean> /* changed */b) {
+ ingestion = a == null ? () -> false : a;
+ presentation = b == null ? (/* name */c, /* combat */d) -> {} : b;
 }
 
 void clear() {
@@ -38,75 +38,75 @@ void clear() {
 
 /** True while the active owner's target positively identifies PvM (a combat NPC). */
 boolean vi() {
- return ready() && combatNpc && (releasedAt == 0L || System.currentTimeMillis() - releasedAt < RELEASE_GRACE_MILLIS);
+ return ready() && combatNpc && (releasedAt == 0L || Ae.now() - releasedAt < RELEASE_GRACE_MILLIS);
 }
 
 boolean ready() {
- Ad session = engine.getActiveSession();
- String aml = session == null ? "" : session.getId();
- if (!aml.equals(owner)) {
+ Ad /* session */a = engine.getActiveSession();
+ String /* aml */b = a == null ? "" : a.getId();
+ if (!b.equals(owner)) {
   clear();
-  owner = aml;
+  owner = b;
  }
- if (aml.isEmpty() || !config.autoActivityDetection() || !ingestion.getAsBoolean()) {
+ if (b.isEmpty() || !config.autoActivityDetection() || !ingestion.getAsBoolean()) {
   set("", false);
   return false;
  }
  return true;
 }
 
-void onInteractingChanged(InteractingChanged event) {
- if (!ready() || event == null || event.getSource() != client.getLocalPlayer()) return;
- Player local = client.getLocalPlayer();
- if (local == null || local.isDead()) {
+void onInteractingChanged(InteractingChanged /* event */a) {
+ if (!ready() || a == null || a.getSource() != client.getLocalPlayer()) return;
+ Player /* local */b = client.getLocalPlayer();
+ if (b == null || b.isDead()) {
   set("", false);
   return;
  }
- Actor target = event.getTarget();
- if (target instanceof NPC) {
-  NPC npc = (NPC) target;
-  set(npc.getName(), npc.getCombatLevel() > 0);
- } else if (target instanceof Player) {
+ Actor /* target */c = a.getTarget();
+ if (c instanceof NPC) {
+  NPC /* npc */d = (NPC) c;
+  set(d.getName(), d.getCombatLevel() > 0);
+ } else if (c instanceof Player) {
   // Opponent names are never display evidence; PvP reads as its activity.
   set("", false);
  } else {
-  releasedAt = System.currentTimeMillis();
+  releasedAt = Ae.now();
  }
 }
 
 /** Scenery is never an activity; any other intentional action cancels a non-combat target. */
-void onMenuOptionClicked(MenuOptionClicked event) {
- if (!ready() || event == null || event.isConsumed() || event.getMenuAction() == null) return;
- String type = event.getMenuAction().name();
- MenuEntry menuEntry = event.getMenuEntry();
- String clicked = menuEntry == null || menuEntry.getTarget() == null ? "" : menuEntry.getTarget().trim();
- if (combatNpc && !clicked.isEmpty() && clicked.equalsIgnoreCase(name)) {
+void onMenuOptionClicked(MenuOptionClicked /* event */a) {
+ if (!ready() || a == null || a.isConsumed() || a.getMenuAction() == null) return;
+ String /* type */b = a.getMenuAction().name();
+ MenuEntry /* menuEntry */c = a.getMenuEntry();
+ String /* clicked */d = c == null || c.getTarget() == null ? "" : c.getTarget().trim();
+ if (combatNpc && !d.isEmpty() && d.equalsIgnoreCase(name)) {
   // Still attacking the same target: keep the activity label alive.
-  lastTargetAt = System.currentTimeMillis();
+  lastTargetAt = Ae.now();
  }
- if (!(type.startsWith("GAME_OBJECT_") && type.endsWith("_OPTION")) && !combatNpc) set("", false);
+ if (!(b.startsWith("GAME_OBJECT_") && b.endsWith("_OPTION")) && !combatNpc) set("", false);
 }
 
 /** Release grace expiry for non-combat targets; a combat target lives out the label timeout. */
 void onGameTick() {
- long now = System.currentTimeMillis();
- if (releasedAt != 0L && now - releasedAt >= RELEASE_GRACE_MILLIS && !combatNpc) {
+ long /* now */a = Ae.now();
+ if (releasedAt != 0L && a - releasedAt >= RELEASE_GRACE_MILLIS && !combatNpc) {
   set("", false);
   return;
  }
  if (combatNpc && name != null && !name.isEmpty() && lastTargetAt != 0L
- && now - lastTargetAt >= Math.max(1_000L, config.activityLabelSeconds() * 1_000L)) {
+ && a - lastTargetAt >= Math.max(1_000L, config.activityLabelSeconds() * 1_000L)) {
   set("", false);
  }
 }
 
-void set(String next, boolean combat) {
- String n = next == null ? "" : next.trim();
+void set(String /* next */a, boolean /* combat */b) {
+ String n = a == null ? "" : a.trim();
  releasedAt = 0L;
- if (!n.isEmpty()) lastTargetAt = System.currentTimeMillis();
- if (n.equals(name) && combat == combatNpc) return;
+ if (!n.isEmpty()) lastTargetAt = Ae.now();
+ if (n.equals(name) && b == combatNpc) return;
  name = n;
- combatNpc = combat;
- presentation.accept(n, combat);
+ combatNpc = b;
+ presentation.accept(n, b);
 }
 }

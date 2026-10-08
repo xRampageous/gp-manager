@@ -24,7 +24,7 @@ public class ChargeSpendBookingTest
     public void booksOnlyCompleteExactBlowpipeMeasurement()
     {
         MeasuredChargeReadTracker tracker = new MeasuredChargeReadTracker();
-        assertEquals(null, observe(tracker, blowpipe(100, 1_000)));
+        assertEquals(Cm.K.SEED, observe(tracker, blowpipe(100, 1_000)).k);
         Cm delta = observe(tracker, blowpipe(96, 997));
 
         long result = tryBook(
