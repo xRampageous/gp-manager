@@ -33,6 +33,17 @@ public class PvpRiskTest
     }
 
     @Test
+    public void anAvernicDefenderWeighsItsRepairCost()
+    {
+        // Since 2026-07-29 the game ranks it at 600,000 whatever its hilt trades for.
+        List<Ab> gear = Arrays.asList(new Ab(22322, "Avernic defender", 1L, 40_000_000, 40_000_000L),
+            held(1, 1L, 3_000_000), held(2, 1L, 2_000_000), held(3, 1L, 1_000_000));
+        assertEquals("kept below the three dearer items; losing it costs the repair", 600_000L, Bo.risk(gear, false, false));
+        assertEquals("the tradeable hilt keeps its price", 40_000_000L,
+            Bo.pv(new Ab(22477, "Avernic defender hilt", 1L, 40_000_000, 40_000_000L)));
+    }
+
+    @Test
     public void aStackKeepsUnitsNotTheWholeStack()
     {
         List<Ab> darts = Arrays.asList(held(11230, 500L, 1_200), held(7, 1L, 100));

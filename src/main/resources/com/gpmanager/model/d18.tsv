@@ -16,6 +16,22 @@ ayc	^The Eye of Ayak has been charged with demon tears\. It currently has ((\d{1
 ayd	^The Eye of Ayak has been charged with runes\. It currently has ((\d{1,3}(?:,\d{3})+|\d+)) charges?\.$	2
 bag	^You (?:catch|get) (?:an? |some |(\d+) )?(.+?)[.!]$	2
 # A treasure trail's scrolls, boxes and caskets are claims on the casket's loot, held at zero.
+# A player-owned house servant's name as his dialogue shows it (OSRS Wiki: Servant).
+servant	rick|maid|cook|butler|demon butler	2
+# Wood a house servant's sawmill trip takes (logs) or brings back (planks).
+wood	.*(logs|plank)	2
+# A Barrows piece by its name without the 100/75/50/25/0 wear stage (OSRS Wiki: Barrows equipment).
+barrows	((?:ahrim|dharok|guthan|karil|torag|verac)'s [^0-9]+?|amulet of the damned)(?: (?:100|75|50|25|0)| \(full\))?	2
+# What an NPC takes in its dialogue for an item: coins, or a skilling currency (OSRS Wiki, 2026-08-19 update).
+cash	coins|spirit flakes|molch pearl|abyssal pearls	0
+# Every Avernic defender variant (not the tradeable hilt): a death weighs it at its 600,000 repair cost.
+avernic	avernic defender(?! hilt).*	0
+# A chug's line per potion (OSRS Wiki; Dude Where's My Stuff, GIM Hub): the one-dose potion it drank.
+chug	^You have (?:[\d,]+ doses? of|finished all doses of) (.+?)(?: left)? in your barrel\.$	2
+# Bryophyta's staff Check and load lines (owner recording 2026-10-09).
+bry	^(?:The staff currently has|Your Bryophyta's staff now has) (?:([\d,]+) charges?|(one) charge|no charges)\.$	2
+# Uncharging Bryophyta's staff: the charges it destroys (owner recording 2026-10-09).
+bru	^You remove ([\d,]+) charges? from your staff, leaving it empty\.$	2
 clue	^(?:clue scroll|scroll box|challenge scroll|reward casket|clue bottle|clue nest|clue geode) \((?:beginner|easy|medium|hard|elite|master)\)|puzzle box|light box$	2
 
 dfe	^Death charges you ([\d,]+) x Coins\..*$	2

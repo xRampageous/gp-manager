@@ -547,6 +547,16 @@ public class DeathReclaimLifecycleTest
         assertTrue(expired.getExplanation().contains("No item loss or fee was inferred"));
         assertFalse(engine.tt().awaiting);
         assertEquals(0L, engine.getMetrics(1_000_000L).net);
+
+        // Review 2026-10-09: the expired items wait at Death's Office, so collecting them there
+        // later is no income.
+        assertTrue(engine.abe(BossRetrievalCatalogue.a1("Talk-to", "Death"), 40));
+        engine.yz();
+        Ac collected = settle(engine, gear(1L, 1L, 0L, 0L), 1_000_000L);
+        assertNotNull(collected);
+        assertEquals(Ai.TRANSFER, collected.getType());
+        assertFalse(collected.isCounted());
+        assertEquals(0L, engine.getMetrics(2_000_000L).net);
     }
 
     @Test

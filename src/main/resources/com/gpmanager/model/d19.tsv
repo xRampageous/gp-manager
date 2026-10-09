@@ -1,5 +1,7 @@
 # Combat spell names and icons (RuneLite SpriteID); exact recipes live only in d27.
 # Autocasting never clicks a spell, so a Cast with no captured name reads as the one spell here its runes pay for.
+# Rows named by an item show it: minus its item id (owner 2026-10-09).
+Chugging barrel	-30000
 Wind Strike	15
 Water Strike	17
 Earth Strike	19

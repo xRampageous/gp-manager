@@ -20,4 +20,7 @@ RAID_SHARED_BAG	@eb	RAID_SHARED_BAG	@ec
 STASH_UNIT	stash unit|stash 	STASH_UNIT	@a7
 POH_COSTUME	@ed	POH_COSTUME	@ee
 DEPOSIT_BOX	deposit box	DEPOSIT_BOX	@ef
+IMP_BOX	imp-in-a-box	IMP_BOX	Sent to the bank by an imp-in-a-box
+CHUG_BARREL	chugging barrel	CHUG_BARREL	Put in the chugging barrel
+SCROLL_BOOK	master scroll book	SCROLL_BOOK	Master scroll book
 UNKNOWN_NEUTRAL		UNKNOWN_NEUTRAL	@eg

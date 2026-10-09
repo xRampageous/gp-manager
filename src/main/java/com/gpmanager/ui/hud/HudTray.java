@@ -18,7 +18,7 @@ long big = BIG_DROP;
 /** Bounded presentation mirror of canonical receipts eligible for own-drop recovery. */
 static final int MAX_DROP_RECEIPTS = 64;
 enum State {
- RECEIVED(""), PENDING("pending"), CLAIMED("claimed"), LOST("lost"), RECOVERED("recovered"), TRADED("traded");
+ RECEIVED(""), PENDING("pending"), CLAIMED("claimed"), LOST("lost"), RECOVERED("recovered"), TRADED("");
  String tag;
  State(String /* tag */c) {
   this.tag = c;
@@ -98,25 +98,56 @@ synchronized void booked(Ac /* transaction */b, long /* now */c, boolean /* xy *
  String /* dropped */h = Ag.has(b.getNote(), "Dropped", "Destroyed") ? b.getNote() : "";
  boolean /* lost */i = b.tm() == PK_DEATH_LOSS
  || b.getContext() == Aj.PK_DEATH || !h.isEmpty();
+ // Owner 2026-10-09: opening caskets or impling jars is one row per container with its total, so
+ // a stack opened never floods the tray; a big drop still gets its own gold row.
+ Ab /* container */aa = opened(b.getFlows());
+ if (aa != null && !e && !i) {
+  event(c, d, "Opened", null);
+  long /* net */ab = 0L;
+  long /* count */ac = 0L;
+  for (Ab /* flow */ad : b.getFlows()) {
+   if (ad == null) continue;
+   ab += ad.valueDelta;
+   if (ad.isCost() && ad.itemId == aa.itemId) ac -= ad.quantityDelta;
+   if (ad.isGain() && ad.valueDelta >= big) {
+    add(ad.itemId, ad.itemName, State.RECEIVED, ad.unitPrice, ad.quantityDelta, ad.valueDelta, c, 0L).gold = true;
+    bigDrop = ad.itemName;
+    bigDropAt = c;
+   }
+  }
+  add(aa.itemId, aa.itemName, State.RECEIVED, 0L, ac, ab, c, 0L);
+  lastDelta = ab;
+  lastDeltaAt = c;
+  return;
+ }
  boolean /* any */j = false;
  long /* delta */k = 0L;
+ // Owner 2026-10-09: a trade rides the tray as its item, bought or sold, with the coins it took
+ // or brought when it is the one item; its coins never get a row of their own.
+ long /* coins */ae = 0L;
+ int /* items */af = 0;
+ for (Ab /* flow */ag : b.getFlows()) {
+  if (ag != null && ag.itemId == 995) ae += ag.valueDelta;
+  else if (ag != null) af++;
+ }
  for (Ab /* flow */l : b.getFlows()) {
-  if (l == null || l.quantityDelta == 0L) continue;
+  if (l == null || l.quantityDelta == 0L || e && l.itemId == 995) continue;
   boolean /* gain */m = l.quantityDelta > 0L;
   // Routine rune/ammo/charge use never rides the tray, but a pickup is a drop
   // like any other (owner 2026-09-29).
-  if (!m && routine(l.itemName)) continue;
-  if (!m && (e || !i)) continue;
+  if (!m && !e && routine(l.itemName)) continue;
+  if (!m && !e && !i) continue;
   if (!j) {
-   // A drop joins the running trip; on an empty tray it reads "Dropped" (owner 2026-09-28).
-   event(c, d, f ? "Claimed" : !h.isEmpty() ? null : i ? "Lost"
+   // A drop or a GE or player trade joins the running trip; on an empty tray it reads "Dropped"
+   // or "Traded" (owners 2026-09-28, 2026-10-09).
+   event(c, d, f ? "Claimed" : e || !h.isEmpty() ? null : i ? "Lost"
    : verb(b, l.itemName, c), null);
-   if (!h.isEmpty() && entries.isEmpty()) label = h;
+   if ((e || !h.isEmpty()) && entries.isEmpty()) label = e ? "Traded" : h;
    j = true;
   }
   int /* id */n = l.itemId;
   long /* quantity */o = abs(l.quantityDelta);
-  State /* state */p = !m ? State.LOST : e ? State.TRADED : g ? State.RECOVERED
+  State /* state */p = e ? State.TRADED : !m ? State.LOST : g ? State.RECOVERED
   : f ? State.CLAIMED : State.RECEIVED;
   long /* born */q = 0L;
   if (p == State.RECEIVED || p == State.CLAIMED) {
@@ -127,7 +158,7 @@ synchronized void booked(Ac /* transaction */b, long /* now */c, boolean /* xy *
     q = r.born;
    }
   }
-  Entry /* entry */t = add(n, l.itemName, p, l.unitPrice, o, l.valueDelta, c, q);
+  Entry /* entry */t = add(n, l.itemName, p, l.unitPrice, o, !e ? l.valueDelta : af == 1 && ae != 0L ? abs(ae) : abs(l.valueDelta), c, q);
   k += p == State.TRADED ? 0L : l.valueDelta;
   if (m && p != State.TRADED && l.valueDelta >= big) {
    t.gold = true;
@@ -409,6 +440,15 @@ boolean afo(int /* itemId */a, long /* quantity */b, long /* value */c) {
 
 static String key(State /* state */a, int /* itemId */b) {
  return a.name() + ":" + b;
+}
+
+/**
+* The casket or impling jar a booking opened: every cost is one, and something came out of it. A
+* caught impling spends an empty "Impling jar", which is no opening.
+*/
+static Ab opened(List<Ab> /* flows */a) {
+ return Bn.all(a, -1, /* name */b -> Ak.pattern("clue").matcher(b).matches() || b.endsWith(" impling jar"))
+ && Bn.all(a, 1, /* name */c -> true) ? a.stream().filter(Ab::isCost).findFirst().get() : null;
 }
 
 /** Runes, ammunition and charges are routine use: they count in Net but never ride the tray. */

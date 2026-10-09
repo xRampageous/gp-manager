@@ -202,7 +202,8 @@ void lootObserved(boolean /* pending */a, String /* source */b, Collection<ItemS
  String /* batch */g = b + ":" + a + ":" + d + ":" + axv(c);
  // Only reward windows ride the tray (ground loot shows once it is picked up). One reward
  // can arrive through several RuneLite events; show it once.
- if (f != null && a && c != null && !(g.equals(lastLootBatch) && e - lastLootAt < 1_200L)) {
+ // A clue casket's rewards reach the inventory at once and ride the tray as one casket row.
+ if (f != null && a && c != null && !Ag.lower(b).contains("clue") && !(g.equals(lastLootBatch) && e - lastLootAt < 1_200L)) {
   lastLootBatch = g;
   lastLootAt = e;
   for (ItemStack /* item */h : c) {
@@ -368,7 +369,7 @@ long worth(ItemContainer /* container */a) {
   int /* id */d = ix.canon(c.getId());
   // Face value for coins and platinum; the active market route the accounting uses, never the
   // user-preference getter; high alch for untradeables.
-  long /* price */e = Bl.sm(d) > 0 ? Bl.sm(d) : ix.price(d);
+  long /* price */e = Bl.sm(d) > 0 ? Bl.sm(d) : valuation.alch ? 0L : ix.price(d);
   if (e <= 0L) e = ix.comp(d).getHaPrice();
   b += e * c.getQuantity();
  }
@@ -563,7 +564,7 @@ void kit(int /* id */a, ItemContainer /* container */b) {
  Item[] /* before */g = f == null ? null : (Item[]) f.data;
  if (f != null) engine.eb.take(KT, a, 1L, e -> e == f);
  engine.eb.add(KT, a, 1L, Integer.MAX_VALUE, c).data = d;
- if (g != null && !Arrays.equals(g, d)) engine.zh(c, CORRELATION_TICKS);
+ if (g != null && !Arrays.equals(g, d)) zone(c);
 }
 
 /** A tick after a bag pickup, what is still not in the inventory went into the open bag (owner 1.2). */
@@ -647,9 +648,15 @@ public void onAnimationChanged(AnimationChanged /* event */a) {
 @Subscribe
 public void onChatMessage(ChatMessage /* event */b) {
  if (!nh() || b == null) return;
+ // Uncharging Bryophyta's staff destroys its runes; its dialog says how many (recorded 2026-10-09).
+ var /* emptied */e1 = Ak.pattern("bru").matcher(normalize(b.getMessage()));
+ if (e1.matches()) charges.emptied(Ar.acm(e1.group(1)), Ae.now());
  ChatMessageType /* type */c = b.getType();
  if (c != ChatMessageType.SPAM && c != ChatMessageType.GAMEMESSAGE) return;
  String /* message */d = normalize(b.getMessage());
+ // Each potion a chug drinks prints its own barrel line (Dude Where's My Stuff, GIM Hub).
+ var /* chug */a = Ak.pattern("chug").matcher(d);
+ if (a.matches()) charges.chug(a.group(1), Ae.now());
  if (charges.abt(d, Ae.now())) {
   // Charge Check chat is an explicit measurement, never an activity or title signal.
   return;
@@ -803,7 +810,7 @@ public void onMenuOptionClicked(MenuOptionClicked /* event */b) {
  BossRetrievalCatalogue.Service /* retrieval */q = BossRetrievalCatalogue.a1(c, g);
  if (q != null) {
   // Long window: dialogue + confirm + coins + items can take several ticks.
-  boolean /* armed */r = engine.abe(q, max(CORRELATION_TICKS * 4, config.stabilizationTicks() + 30));
+  boolean /* armed */r = engine.abe(q, max(CORRELATION_TICKS * 4, stab(30)));
   if (r) {
    activity.abm("Death reclaim", true);
    return;
@@ -812,15 +819,14 @@ public void onMenuOptionClicked(MenuOptionClicked /* event */b) {
  // Clicks inside the store name the tool ("Withdraw-1 Rake"), never the leprechaun, so the
  // open store window is the storage evidence, as the bank window is below.
  if (Ee.yf(client)) {
-  engine.zh(NeutralStorageClassifier.ajw(NeutralStorageClassifier.Kind.TOOL_LEPRECHAUN),
-  CORRELATION_TICKS);
+  zone(NeutralStorageClassifier.ajw(NeutralStorageClassifier.Kind.TOOL_LEPRECHAUN));
   return;
  }
  // Other stores the same way (Elnock, the seed vault, a cargo hold, Death's coffer, item sets...):
  // the open window, or Quick-withdraw on Elnock (owner 2026-10-08).
  String /* store */s = Ee.store(client);
  if (s != null || "quick-withdraw".equals(c) && g.contains("elnock")) {
-  engine.zh(s == null ? "Elnock's storage" : s, CORRELATION_TICKS);
+  zone(s == null ? "Elnock's storage" : s);
   return;
  }
  // "Deposit" is also ordinary menu vocabulary on unrelated objects. The menu string
@@ -831,7 +837,7 @@ public void onMenuOptionClicked(MenuOptionClicked /* event */b) {
  if (Ee.vp(client) && (Ag.has(h, "bank", "deposit")
  || c.startsWith("withdraw") && !"withdraw-x".equals(c))) {
   if (h.contains("deposit box")) {
-   engine.zh(msg("ej"), CORRELATION_TICKS);
+   zone(msg("ej"));
   } else {
    engine.markContext(Aj.TRANSFER, CORRELATION_TICKS, msg("ek"));
   }
@@ -840,7 +846,7 @@ public void onMenuOptionClicked(MenuOptionClicked /* event */b) {
  NeutralStorageClassifier.Kind /* neutral */t = NeutralStorageClassifier.a1(h);
  if (t == null) t = NeutralStorageClassifier.a1(g);
  if (t != null) {
-  engine.zh(NeutralStorageClassifier.ajw(t), CORRELATION_TICKS);
+  zone(NeutralStorageClassifier.ajw(t));
   return;
  }
  String /* ans */u = UtilityContainerCatalogue.sv(g);
@@ -859,7 +865,7 @@ public void onMenuOptionClicked(MenuOptionClicked /* event */b) {
  if (("destroy".equals(c) || "drop".equals(c)) && g.contains("loot key")) return;
  MinigameTransferClassifier.Event /* minigame */aa = MinigameTransferClassifier.a1(h, qs());
  if (aa != null) {
-  engine.zh(MinigameTransferClassifier.ajw(aa), CORRELATION_TICKS);
+  zone(MinigameTransferClassifier.ajw(aa));
   return;
  }
  if (c.startsWith("buy") || c.startsWith("sell") || c.startsWith("collect")) {
@@ -881,13 +887,23 @@ void trading(int /* ticks */a, String /* note */b) {
 }
 
 /** Consume/drop/altar intent lifetime: animations outlast correlation, plus a coalesced settle window. */
+/** The configured stabilization ticks plus {@code a}. */
+int stab(int /* extra */a) {
+ return config.stabilizationTicks() + a;
+}
+
+/** Marks a neutral storage or minigame zone for the usual correlation window. */
+void zone(String /* name */a) {
+ engine.zh(a, CORRELATION_TICKS);
+}
+
 int vh() {
- return max(CORRELATION_TICKS * 2, config.stabilizationTicks() + 16);
+ return max(CORRELATION_TICKS * 2, stab(16));
 }
 
 /** MARKET context lifetime for GE / player-trade inventory settlement. */
 int aad() {
- return max(CORRELATION_TICKS * 2, config.stabilizationTicks() + 8);
+ return max(CORRELATION_TICKS * 2, stab(8));
 }
 
 int yy() {
@@ -977,7 +993,8 @@ public void onInteractingChanged(InteractingChanged /* event */b) {
 @Subscribe
 public void onActorDeath(ActorDeath /* event */b) {
  Player /* localPlayer */c = client.getLocalPlayer();
- if (!nh() || c == null || b.getActor() != c) {
+ // A staged death in the Gauntlet or the PvP tutorial loses nothing (owner 2026-10-09).
+ if (!nh() || c == null || b.getActor() != c || neutralZoneTracker.isInside() || MinigameRegionHints.xa(qs())) {
   return;
  }
  // Preserve the pre-death held-key evidence before any disposition branch.
@@ -1019,7 +1036,7 @@ public void onActorDeath(ActorDeath /* event */b) {
  // still owns. The wipe is an ownership-neutral transfer; the reclaim window
  // later returns the items and books observed coins as the fee.
  zb();
- engine.zi(max(CORRELATION_TICKS * 2, config.stabilizationTicks() + 16),
+ engine.zi(vh(),
  d == null ? null : d.quantities);
  // Persist the physical death whitelist immediately. A restart before the first
  // inventory wipe must still be able to classify the later loss as a transfer.
@@ -1162,6 +1179,8 @@ public void onGameTick(GameTick /* event */b) {
   return;
  }
  if (persistence.py()) ve();
+ // Any ironman account type (iron, ultimate, hardcore, group) reads 1-6 (OSRS Wiki, RuneLite gameval).
+ valuation.alch = config.ironmanAlch() && client.getVarbitValue(net.runelite.api.gameval.VarbitID.IRONMAN) > 0;
  Ev /* fee */c = engine.eb.peek(FE);
  if (c != null && c.owner == engine.eb.owner && client.getTickCount() - c.at > 2) {
   engine.fee(c, Ae.now());
@@ -1175,7 +1194,14 @@ public void onGameTick(GameTick /* event */b) {
  pvp.onGameTick(e);
  ahp();
  WorldPoint /* tile */f = ajg(e);
- if (f != null) kt(f.getRegionID());
+ // An instance's real map region, as the Gauntlet and arena ids are (owner 2026-10-09).
+ if (f != null) kt(qs());
+ servantTalk();
+ charges.drank(Ae.now());
+ // An NPC conversation or its options on screen: a coins-for-items change is a purchase.
+ if (Ee.visible(client, InterfaceID.ChatLeft.UNIVERSE) || Ee.visible(client, InterfaceID.Chatmenu.UNIVERSE)) {
+  engine.eb.put(DG, 0, 1L, stab(4), null);
+ }
  boolean /* arh */g = e != null && e.getAnimation() != -1;
  boolean /* ari */h = e != null && e.getInteracting() != null;
  // Owner 1.2: moving is not AFK. It holds off AFK pause and wakes an AFK-paused Grind, but
@@ -1187,7 +1213,7 @@ public void onGameTick(GameTick /* event */b) {
  } else kk();
  interactionContextTracker.onGameTick();
  if (d) {
-  engine.ze(max(CORRELATION_TICKS, config.stabilizationTicks() + 2));
+  engine.ze(max(CORRELATION_TICKS, stab(2)));
   // Rising edge only — Banking ends combat soft-stick so Dark wizard
   // cannot reappear the moment the bank closes.
   if (!bankClearedInteractionThisOpen) {
@@ -1264,22 +1290,38 @@ WorldPoint ajg(Player /* localPlayer */a) {
 * closing window after leaving so the restore settles as a transfer too.
 */
 void kt(int /* regionId */a) {
+ // Pete Kayer's PvP tutorial lends gear and supplies inside and takes them back as you leave:
+ // nothing there, or just after, is profit or loss (owner 2026-10-09, coinflow 1.6.0).
+ if (MinigameRegionHints.xa(a)) engine.zh("PvP tutorial", stab(8));
  NeutralZoneTracker.Signal /* signal */b = neutralZoneTracker.awr(a);
  if (b == NeutralZoneTracker.Signal.ENTERED) {
   engine.lw();
-  engine.zh(msg("el"), config.stabilizationTicks() + 4);
+  engine.zh(msg("el"), stab(4));
  } else if (b == NeutralZoneTracker.Signal.INSIDE) {
-  engine.zh(msg("em"), config.stabilizationTicks() + 4);
+  engine.zh(msg("em"), stab(4));
  } else if (b == NeutralZoneTracker.Signal.LEFT) {
-  engine.rg(max(CORRELATION_TICKS * 2, config.stabilizationTicks() + 16));
+  engine.rg(vh());
  }
+}
+
+/**
+* Owner 2026-10-09: while a house servant talks (taking items, or back from the bank or the
+* sawmill) his item moves are neutral. Every house is an instance, so a castle's cook is never
+* him. His own line names a sawmill trip ("the sawmill's fee", not "the bank or the sawmill").
+*/
+void servantTalk() {
+ if (!Ak.pattern("servant").matcher(normalize(Ee.text(client, InterfaceID.ChatLeft.NAME))).matches()
+ || !client.getTopLevelWorldView().isInstance()) return;
+ String /* line */a = normalize(Ee.text(client, InterfaceID.ChatLeft.TEXT));
+ engine.eb.put(SV, 0, 1L, stab(4), null);
+ if (a.contains("sawmill") && !a.contains("bank")) engine.eb.put(SW, 0, 1L, 200, null);
 }
 
 int qs() {
  int /* regionId */a = -1;
  try {
   if (client != null && client.getLocalPlayer() != null && client.getLocalPlayer().getWorldLocation() != null) {
-   a = client.getLocalPlayer().getWorldLocation().getRegionID();
+   a = WorldPoint.fromLocalInstance(client, client.getLocalPlayer().getLocalLocation()).getRegionID();
   }
  } catch (Exception /* ignored */b) {
   // Live signals are best-effort.

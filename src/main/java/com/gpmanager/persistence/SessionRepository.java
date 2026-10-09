@@ -140,14 +140,22 @@ synchronized SavedState load() {
  po();
  if (bound.state.exists()) {
   try {
-   SavedState /* state */b = avc(bound.state);
+   SavedState /* state */b;
+   try {
+    b = avc(bound.state);
+   } catch (FileSystemException /* locked */e) {
+    // Antivirus or Windows Search holding the file is no corruption: read it once more.
+    b = avc(bound.state);
+   }
    // Load establishes disk truth; do not retain a stale in-memory
    // high-water mark from a primary that was later discarded.
    lastKnownDiskRevision = nonNeg(b.revision);
    return b;
   } catch (Exception /* ex */c) {
    log.warn(msg("io"), c);
-   adf(bound);
+   // Only a file that read but failed to parse is set aside as corrupt; a still-locked one stays put,
+   // so the newer save is never lost behind its backup (review 2026-10-09).
+   if (!(c instanceof FileSystemException)) adf(bound);
   }
  }
  if (bound.backup.exists()) {

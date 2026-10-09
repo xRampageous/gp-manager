@@ -38,9 +38,6 @@ String fingerprint() {
 }
 
 String mx() {
- var /* sb */a = new StringBuilder();
- a.append(pluginEnabled).append('|').append(highlightedCsv).append('|').append(hiddenCsv).append('|')
- .append(showHighlightedOnly);
- return a.toString();
+ return pluginEnabled + "|" + highlightedCsv + "|" + hiddenCsv + "|" + showHighlightedOnly;
 }
 }

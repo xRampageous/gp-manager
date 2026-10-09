@@ -38,6 +38,7 @@ static long aav(long /* value */a, long /* numerator */b, long /* denominator */
  if (b >= c) return a;
  BigInteger /* product */d = BigInteger.valueOf(a).multiply(BigInteger.valueOf(b));
  BigInteger /* share */e = d.divide(BigInteger.valueOf(c));
- return e.compareTo(BigInteger.valueOf(Long.MAX_VALUE)) > 0 ? Long.MAX_VALUE : e.longValue();
+ // b < c, so the share is below a and fits a long.
+ return e.longValue();
 }
 }

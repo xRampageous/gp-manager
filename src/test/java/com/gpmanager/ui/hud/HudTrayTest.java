@@ -444,8 +444,8 @@ public class HudTrayTest
         HudTray market = new HudTray();
         market.xp("Smithing", T0);
         market.booked(Tx.of(T0 + 600L, null, Ai.TRADE, Aj.MARKET, "Grand Exchange", "Market", true,
-            Arrays.asList(flow(995, "Coins", 500L, 1))), T0 + 600L, false);
-        assertEquals("Looted", market.label());
+            Arrays.asList(flow(1359, "Rune axe", 1L, 7_000))), T0 + 600L, false);
+        assertEquals("a trade on an empty tray reads Traded, never a skill verb", "Traded", market.label());
     }
 
     @Test
@@ -520,6 +520,29 @@ public class HudTrayTest
     }
 
     /** The tray is open while an entry changed within the stay (Cp also applies the loot filter). */
+    @Test
+    public void aGrandExchangeBuyReadsTraded()
+    {
+        // Owner 2026-10-09: a collected GE buy is no loot.
+        HudTray tray = new HudTray();
+        tray.booked(Tx.of(1_000L, Ai.TRADE, Aj.MARKET, "Bought", true, java.util.List.of(
+            new Ab(22372, "Bryophyta's essence", 1L, 4_940_000, 4_940_000L),
+            new Ab(995, "Coins", -4_940_000L, 1, -4_940_000L))), 1_000L, false);
+        assertEquals("Traded", tray.label());
+        assertEquals("the item bought, at what it cost", 4_940_000L, tray.entries().get(0).value);
+
+        // A sale rides as the item sold with the coins it brought; the coins get no row of their own.
+        HudTray sale = new HudTray();
+        sale.booked(Tx.of(2_000L, Ai.TRADE, Aj.MARKET, "Sold", true, java.util.List.of(
+            new Ab(21820, "Revenant ether", -1_927L, 174, -335_298L),
+            new Ab(995, "Coins", 329_517L, 1, 329_517L))), 2_000L, false);
+        assertEquals(1, sale.entries().size());
+        assertEquals("Revenant ether", sale.entries().get(0).name);
+        assertEquals(1_927L, sale.entries().get(0).quantity);
+        assertEquals(329_517L, sale.entries().get(0).value);
+        assertEquals("Traded", sale.label());
+    }
+
     private static boolean open(HudTray tray, long now)
     {
         return tray.entries().stream().anyMatch(entry -> now - entry.touched < STAY);

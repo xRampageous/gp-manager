@@ -19,7 +19,7 @@ A RuneLite plugin that works out what you actually made. It watches your invento
 - Ground loot doesn't count until it's in your inventory. Loot keys and chests count when you open them.
 - Charged weapons (blowpipe, tridents, the Eye of Ayak and more) are counted as you use them, from the item's own charge recipe; an in-game Check reconciles the running total if you choose to do one.
 - If it isn't sure, it doesn't guess — the row lands in Review with a reason, and you decide.
-- Prices come from RuneLite's GE prices or your own overrides; unpriced items stay unpriced.
+- Prices come from RuneLite's GE prices or your own overrides (ironmen can choose high alch values instead); unpriced items stay unpriced.
 
 ## Where it keeps things
 

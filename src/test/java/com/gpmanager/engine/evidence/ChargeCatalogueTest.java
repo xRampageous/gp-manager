@@ -127,6 +127,11 @@ public class ChargeCatalogueTest
         row(checked, V.MEMOIRS, "Kharedst's memoirs", true, "MEMOIRS", Au.CAST, 1, NONE, NONE,
             new Object[]{ItemID.LAWRUNE, 1L, ItemID.BODYRUNE, 1L, ItemID.MINDRUNE, 1L, ItemID.SOULRUNE, 1L}, null,
             List.of("book of the dead"), ints(ItemID.VEOS_KHAREDSTS_MEMOIRS, ItemID.BOOK_OF_THE_DEAD));
+        row(checked, V.BRYOPHYTA, "Bryophyta's staff", true, "CHARGES", Au.CAST, 1,
+            ints(SpotanimID.LOWLVLALCHEMY_CASTING, SpotanimID.HIGHLVLALCHEMY_CASTING, SpotanimID.SUPERHEATITEM_CASTING,
+                SpotanimID.SPOTANIM_CASTLOWLVLALCHEMY_FIRE, SpotanimID.SPOTANIM_CASTHIGHLVLALCHEMY_FIRE),
+            NONE, new Object[]{ItemID.NATURERUNE, 1L}, null, List.of(),
+            ints(ItemID.NATURE_STAFF_UNCHARGED, ItemID.NATURE_STAFF_CHARGED));
         assertEquals("every family has exactly one checked row", Arrays.asList(V.values()), checked);
     }
 

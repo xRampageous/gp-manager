@@ -97,6 +97,11 @@ long collectedQty;
 long collectedValueGp;
 /** Last canonical settlement transaction id linked to this offer lifecycle. */
 String settlementId = "";
+/**
+* The earlier settlement ids, space-separated: an offer collected in parts books one settlement
+* per collect, and Live and the Ledger fold all of them into its one market row (owner 2026-10-09).
+*/
+String earlierSettlements = "";
 /** Schema-106 pooled tracked-basis reservation captured with the SELL placement principal. */
 long reservedTrackedQty;
 long reservedTrackedBasisGp;
@@ -196,7 +201,10 @@ long afr() {
 }
 
 String getSettlementId() { return axw(settlementId); }
-void setSettlementId(String /* value */a) { settlementId = axw(a); }
+void setSettlementId(String /* value */a) {
+ earlierSettlements = axw(earlierSettlements) + " " + getSettlementId();
+ settlementId = axw(a);
+}
 long getFillTaxGp() { return nonNeg(fillTaxGp); }
 long getSettledTaxGp() { return nonNeg(settledTaxGp); }
 /** A fresh basis can still be frozen at the first matched owned movement. */
@@ -244,8 +252,7 @@ long nd() {
 
 /** True when the offer's last observed state is a terminal fill/cancellation. */
 boolean xs() {
- return "SOLD".equals(getOfferState()) || "BOUGHT".equals(getOfferState())
- || "CANCELLED_SELL".equals(getOfferState()) || "CANCELLED_BUY".equals(getOfferState());
+ return "SOLD".equals(getOfferState()) || "BOUGHT".equals(getOfferState()) || vq();
 }
 
 /** True when the last observed state is an explicit cancellation. */

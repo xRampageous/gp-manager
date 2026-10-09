@@ -292,8 +292,13 @@ Predicate<Ab> /* td */e) {
  if (c != null) {
   for (Row /* market */l : c) {
    if (l == null || d == null || !d.contains(l.scopeSessionId)) continue;
-   if (!l.settlementId.isEmpty()) i.add(l.settlementId);
-   h.add(aap(l, l.settlementId.isEmpty() ? null : j.get(l.settlementId)));
+   // Every collect of the offer folds into its one market row (owner 2026-10-09).
+   var /* settlements */s = new ArrayList<Ac>();
+   for (String /* id */t : (l.settlementId + l.earlierSettlements).split(" ")) {
+    i.add(t);
+    if (j.containsKey(t)) s.add(j.get(t));
+   }
+   h.add(aap(l, s));
   }
  }
  if (b != null) {
@@ -466,7 +471,7 @@ static boolean vz(Ac /* transaction */a,
 List<Af> /* contributions */b, boolean /* neutral */c, boolean /* review */d, boolean /* corrected */e,
 boolean /* split */f, boolean /* alj */g) {
  if (c || d || e || f || g
- || (a.getActionKind() != Au.CAST && a.getActionKind() != Au.FIRE)) {
+ || (a.getActionKind() != Au.CAST && a.getActionKind() != Au.FIRE && a.getActionKind() != Au.DRINK)) {
   return false;
  }
  if (b.size() < 2) return false;
@@ -498,7 +503,9 @@ static Group jx(Ac /* transaction */a, List<Af> /* contributions */b, String /* 
  + ps(b) + ":cov=" + ql(f)
  : "action:" + a.getActionKind().wireName() + ":exact=" + i + ":cov=" + ql(f);
  String /* representative */n = b.get(0).contributionId;
- var /* unit */o = new Group(m, Spells.icon(i), axd(e), k,
+ // A row named by a spell or an item shows its icon; any other shows its first item's.
+ int /* icon */ab = Spells.icon(k);
+ var /* unit */o = new Group(m, ab != -1 ? ab : b.get(0).itemId, axd(e), k,
  l, j, "", false, d, g, coverage(f), -1L, false, true,
  false, false, false, false, "", a.getId(), n, 0);
  for (Af /* contribution */p : b) {
@@ -564,7 +571,7 @@ boolean /* corrected */d, long /* at */e, String /* source */f) {
  return singletonList(m);
 }
 
-static Group aap(Row /* market */b, Ac /* settlement */c) {
+static Group aap(Row /* market */b, List<Ac> /* settlements */c) {
  boolean /* realized */d = b.isRealizedIncluded() && b.realizedResultCorrectionAware;
  // Unknown-basis liquidation has no available Result: never show 0 as if break-even were
  // known. Its one exact contribution is a proven GE tax, which stays a market cost.
@@ -589,9 +596,9 @@ static Group aap(Row /* market */b, Ac /* settlement */c) {
  if (!b.settlementId.isEmpty()) n.searchTerms.add(b.settlementId);
  // D2: a market group owns only its sale item's receipt. Its settlement's Coins leg is never
  // listed as a separate receipt or grouped with an unclaimed row.
- if (c != null) {
-  for (Af /* contribution */o : Af.project(c)) {
-   if (o.itemId == b.itemId) n.receipts.add(receipt(c, o, null, b));
+ for (Ac /* settlement */p : c) {
+  for (Af /* contribution */o : Af.project(p)) {
+   if (o.itemId == b.itemId) n.receipts.add(receipt(p, o, null, b));
   }
  }
  return n;

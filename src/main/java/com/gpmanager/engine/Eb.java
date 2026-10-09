@@ -9,7 +9,7 @@ import java.util.function.Predicate;
 /** CL load target, CK exact Check link, RV uncharge return; command quantities never prove money. */
 /** CX/CP live/stabilizing claims, CT attribution clock, SF/HF soft/hard transfer, BO bank UI. */
 class Eb {
- static final int FE = 1, CH = 2, TK = 3, BG = 4, KT = 5, DI = 6, GE = 7, TA = 8, DO = 9, OD = 10, FA = 11, CN = 12, LT = 13, LP = 14, RD = 15, CL = 16, CK = 17, RV = 18, CX = 19, CP = 20, CT = 21, SF = 22, HF = 23, BO = 24;
+ static final int FE = 1, CH = 2, TK = 3, BG = 4, KT = 5, DI = 6, GE = 7, TA = 8, DO = 9, OD = 10, FA = 11, CN = 12, LT = 13, LP = 14, RD = 15, CL = 16, CK = 17, RV = 18, CX = 19, CP = 20, CT = 21, SF = 22, HF = 23, BO = 24, SV = 25, SW = 26, DG = 27;
  volatile long owner;
  /** Legacy lifecycle ephemera clear here; their durable state keeps its tested lifecycle. */
  Runnable reset = () -> {};

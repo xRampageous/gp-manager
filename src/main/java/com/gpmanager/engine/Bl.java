@@ -81,7 +81,7 @@ public List<Ab> value(Map<Integer, Long> /* quantityDeltas */a) {
 @Override
 public List<Ab> value(Map<Integer, Long> /* quantityDeltas */a, long /* priceCapturedAtEpochMillis */b) {
  var /* flows */c = new ArrayList<Ab>();
- Map<Integer, Integer> /* priceOverrides */d = ItemRuleParser.parsePriceOverrides(config.manualPriceOverrides());
+ Map<Integer, Integer> /* priceOverrides */d = ov();
  for (Map.Entry<Integer, Long> /* entry */e : a.entrySet()) {
   Ab /* flow */f = axg(e.getKey(), e.getValue(), d, b);
   if (f != null) c.add(f);
@@ -100,7 +100,7 @@ public List<Ab> normalizeConsumedFlows(List<Ab> /* flows */a, Au /* actionKind *
  if (a == null || a.isEmpty() || b != Au.DRINK || Bn.isDecant(a)) {
   return a;
  }
- Map<Integer, Integer> /* priceOverrides */d = ItemRuleParser.parsePriceOverrides(config.manualPriceOverrides());
+ Map<Integer, Integer> /* priceOverrides */d = ov();
  List<Bn.Cg> /* pairs */e = Bn.acr(a);
  if (e.isEmpty()) return a;
  // Each exact pair is an atomic accounting unit. Compute both replacement flows before
@@ -177,7 +177,7 @@ private static boolean pm(Ab /* flow */a, Ab /* authority */b) {
 * gate, the explicit active RuneLite market route and UNPRICED otherwise.
 */
 Ab akj(int /* itemId */a, long /* quantityDelta */b, long /* now */c) {
- return axg(a, b, ItemRuleParser.parsePriceOverrides(config.manualPriceOverrides()), c);
+ return axg(a, b, ov(), c);
 }
 
 @Override
@@ -217,6 +217,12 @@ static Bk rh(Collection<WorldType> /* worldTypes */a) {
  }
  return Bk.NORMAL;
 }
+
+/**
+* Owner 2026-10-09 (1.3.0): an ironman who chose high alch values items at their alchemy price;
+* ironmen cannot sell on the Grand Exchange. The plugin sets it each tick from the account type.
+*/
+volatile boolean alch;
 
 Ab axg(int /* itemId */b, long /* quantityDelta */c, Map<Integer, Integer> /* priceOverrides */d, long /* priceCapturedAtEpochMillis */e) {
  boolean /* alp */f = DeferredClaims.of(b);
@@ -277,6 +283,9 @@ Ab axg(int /* itemId */b, long /* quantityDelta */c, Map<Integer, Integer> /* pr
   } else if (j) {
    p = d.get(b);
    q = MANUAL_OVERRIDE;
+  } else if (alch && g != null && g.getHaPrice() > 0) {
+   p = g.getHaPrice();
+   q = HIGH_ALCHEMY;
   } else if (l > 0) {
    // The item's own market quote is a supported observation. Non-GP currencies
    // and untradeables without a quote stay unpriced; an exchange relationship or
@@ -332,5 +341,10 @@ static long agz(long /* quantity */a, int /* price */b) {
  } catch (ArithmeticException /* ex */c) {
   return a >= 0 ? Long.MAX_VALUE : Long.MIN_VALUE;
  }
+}
+
+/** The owner's manual price overrides by item id. */
+Map<Integer, Integer> ov() {
+ return ItemRuleParser.parsePriceOverrides(config.manualPriceOverrides());
 }
 }

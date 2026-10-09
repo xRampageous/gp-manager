@@ -1,6 +1,4 @@
 package com.gpmanager;
-import static com.gpmanager.Ak.msg;
-import lombok.AllArgsConstructor;
 import java.util.*;
 /**
 * Observed player action behind a settled inventory change. Presentation-only evidence:
@@ -13,29 +11,29 @@ import java.util.*;
 * must not acquire a more confident verb — callers fall back to {@link #SUPPLIES} or a
 * generic label rather than guessing.
 */
-@AllArgsConstructor
 enum Au {
 /** Drink intent plus a settled dose/vial decrease. */
-DRINK("drink"),
+DRINK,
 /** Eat intent plus settled food loss (partial foods use the observed portion). */
-EAT("eat"),
+EAT,
 /** Herblore production: ingredients in, potion out. Not every paired transform. */
-MIX("mix"),
+MIX,
 /** Dose-conserving redistribution (3+1 → 4). Never implies doses were drunk. */
-DECANT("decant"), BURY("bury"), OFFER("offer"), SCATTER("scatter"),
+DECANT, BURY, OFFER, SCATTER,
 /** Supported rune consumption. Spell name only when evidenced. Ledger detail only. */
-CAST("cast"),
+CAST,
 /** Supported ammunition consumption. Ledger detail only. */
-FIRE("fire"),
+FIRE,
 /** Routine recovered ammunition (Ava's / quiver return). Ledger detail only. */
-RECOVER_AMMO("recover-ammo"),
+RECOVER_AMMO,
 /** Untradeable key audit rows are inspectable in Ledger only. */
-DEFERRED_CLAIM("deferred-claim"),
+DEFERRED_CLAIM,
 /** Ambiguous charge-load settlements are explanatory Ledger notes only. */
-CHARGE_LOAD_AMBIGUOUS(msg("ep")), COOK("cook"), BURN("burn"),
+CHARGE_LOAD_AMBIGUOUS, COOK, BURN,
 /** Settled supply loss whose specific action is not evidenced. */
-SUPPLIES("supplies");
-String wireName;
+SUPPLIES;
+/** The constant's name, lowercased with hyphens: the wire name saved on every row. */
+String wireName = name().toLowerCase(Locale.ROOT).replace('_', '-');
 /** Stable persisted identifier. */
 String wireName() {
  return wireName;

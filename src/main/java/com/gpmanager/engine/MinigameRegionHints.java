@@ -16,6 +16,11 @@ static boolean xl(int /* regionId */a) {
  return "neutral".equals(KINDS.get(a));
 }
 
+/** The PvP tutorial arena: lent gear and supplies, taken back on the way out. */
+static boolean xa(int /* regionId */a) {
+ return "arena".equals(KINDS.get(a));
+}
+
 static boolean xh(int /* regionId */a) {
  return "lms".equals(KINDS.get(a));
 }

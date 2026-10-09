@@ -414,6 +414,7 @@ static void copyPath(String /* path */a) {
  e.execute(() -> {
   try {
    T /* result */g;
+   persistence.busy = true;
    synchronized (persistence) {
     if (!java.util.Objects.equals(f, persistence.activeIdentity)) {
      SwingUtilities.invokeLater(() -> shell.tell("Account changed", msg("e9"), true));
@@ -424,6 +425,8 @@ static void copyPath(String /* path */a) {
    SwingUtilities.invokeLater(() -> c.accept(g));
   } catch (Exception /* ex */h) {
    SwingUtilities.invokeLater(() -> shell.failed(d, h));
+  } finally {
+   persistence.busy = false;
   }
  });
 }

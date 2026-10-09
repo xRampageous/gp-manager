@@ -24,10 +24,9 @@ static {
 
 /** The spell's spellbook icon as a negated sprite id (the sidebar's sprite lookup reads it), else -1. */
 static int icon(String /* name */a) {
- for (String[] /* spell */b : TABLE) {
-  if (b[0].equals(a)) return -Integer.parseInt(b[1]);
- }
- return -1;
+ // d19 holds a spell's sprite, or minus an item id for a row named by its item (the barrel).
+ String /* icon */b = I.get(a);
+ return b == null ? -1 : -Integer.parseInt(b);
 }
 
 /** 0 when these costs cannot be this spell, 1 when they fit it, 2 when they pay it in full. */

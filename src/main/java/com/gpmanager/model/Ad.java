@@ -763,10 +763,8 @@ long tn() { return retainedCosts; }
 
 static long hourly(long /* value */a, long /* elapsedMillis */b) {
  if (b <= 0L) return 0L;
- double /* rate */c = a * (3_600_000.0d / b);
- if (c >= Long.MAX_VALUE) return Long.MAX_VALUE;
- if (c <= Long.MIN_VALUE) return Long.MIN_VALUE;
- return round(c);
+ // Math.round saturates at the long range by itself.
+ return round(a * (3_600_000.0d / b));
 }
 
 long getElapsedMillis(long /* now */a) {

@@ -42,6 +42,25 @@ public class ChargeLoadAnyItemTest
     }
 
     @Test
+    public void chargingBryophytasStaffBooksNothing()
+    {
+        // Owner 2026-10-09 (recorded): 1,000 nature runes into the staff turned the uncharged staff into the
+        // charged one and went to Review; the runes are now its charges.
+        assertTrue(Ar.xq(Ar.V.BRYOPHYTA, ItemID.NATURERUNE, "Nature rune"));
+        Am engine = HudBuilderTest.engine();
+        engine.rm(T0);
+        engine.setBaseline(new Cc(new HashMap<>(Map.of(ItemID.NATURERUNE, 6_766L, ItemID.NATURE_STAFF_UNCHARGED, 1L))));
+        engine.yx(Ar.V.BRYOPHYTA, ItemID.NATURERUNE, "Nature rune", "149:1:22368:BRYOPHYTA", ChargeIntake.LOAD_TICKS);
+        engine.yz();
+        for (int tick = 1; tick <= 5; tick++)
+        {
+            engine.adj(new Cc(new HashMap<>(Map.of(ItemID.NATURERUNE, 5_766L, ItemID.NATURE_STAFF_CHARGED, 1L))), T0 + tick * 600L);
+        }
+        assertEquals("charging the staff is not a cost", 0L, engine.getMetrics(T0 + 10_000L).net);
+        assertTrue("nor Review", engine.getActiveSession().getTransactions().stream().noneMatch(Eh::aal));
+    }
+
+    @Test
     public void withoutTheLoadTheSameShardsWouldBeALoss()
     {
         assertTrue(settle(false).getMetrics(T0 + 10_000L).net < 0L);

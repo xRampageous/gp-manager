@@ -5,7 +5,6 @@ import java.util.*;
 * Name matching for Loot Tracker EVENT + live reward UIs.
 */
 class RewardChestCatalogue {
-static final List<String[]> SOURCES = Ak.x("d3");
 /** True when this LT/event name is a reward chest / raid / clue pool — not floor loot. */
 
 

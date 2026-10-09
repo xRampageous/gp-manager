@@ -272,7 +272,7 @@ public class ChargeCheckToCheckContractTest
             }
         }
         Collections.sort(implemented);
-        assertEquals(java.util.Arrays.asList("Accursed sceptre", "Blood fury", "Bow of Faerdhinen", "Craw's bow",
+        assertEquals(java.util.Arrays.asList("Accursed sceptre", "Blood fury", "Bow of Faerdhinen", "Bryophyta's staff", "Craw's bow",
             "Crystal bow", "Crystal halberd", "Echo venator bow", "Eye of Ayak", "Holy sanguinesti staff", "Kharedst's memoirs",
             "Pendant of Ates", "Sanguinesti staff", "Thammaron's sceptre", "Tome of fire", "Toxic blowpipe",
             "Trident of the Seas", "Trident of the Seas (e)", "Trident of the Swamp",

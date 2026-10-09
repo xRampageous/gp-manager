@@ -230,6 +230,14 @@ default String manualPriceOverrides() {
 }
 
 @ConfigItem(
+keyName = "ironmanAlch", name = "Ironman: value at high alch",
+description = "On an ironman account, value items at their high alchemy price (coins you can make) instead of the Grand Exchange",
+position = 5, section = accountingSection)
+default boolean ironmanAlch() {
+ return false;
+}
+
+@ConfigItem(
 keyName = "autoActivityDetection", name = "Automatic activity detection",
 description = "Name the activity from what you do", position = 1,
 section = generalSection)

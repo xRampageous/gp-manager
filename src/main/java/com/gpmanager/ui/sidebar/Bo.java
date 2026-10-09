@@ -23,14 +23,22 @@ static long risk(List<Ab> /* held */c, boolean /* skulled */d, boolean /* protec
  for (Ab /* flow */g : c) {
   if (g != null && g.quantityDelta > 0L) f.add(g);
  }
- f.sort((a, b) -> Long.compare(b.unitPrice, a.unitPrice));
+ f.sort((a, b) -> Long.compare(pv(b), pv(a)));
  long /* keep */h = (d ? 0 : 3) + (e ? 1 : 0);
  long /* risk */i = 0L;
  for (Ab /* stack */j : f) {
   long /* kept */k = Math.min(h, j.quantityDelta);
   h -= k;
-  i = Ae.safeAdd(i, Math.max(0L, j.unitPrice) * (j.quantityDelta - k));
+  i = Ae.safeAdd(i, Math.max(0L, pv(j)) * (j.quantityDelta - k));
  }
  return i;
+}
+
+/**
+* What a death weighs the item at. Since 2026-07-29 the game ranks every Avernic defender at
+* 600,000, its repair cost when it breaks unprotected (OSRS Wiki).
+*/
+static long pv(Ab /* stack */a) {
+ return Ak.pattern("avernic").matcher(Ag.lower(a.itemName)).matches() ? 600_000L : a.unitPrice;
 }
 }

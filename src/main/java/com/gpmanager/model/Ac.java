@@ -388,7 +388,7 @@ void aax() {
 */
 String aaz() {
  if (empty(observedActionLabel)) return null;
- if (getActionKind() != CAST) return null;
+ if (getActionKind() != CAST && getActionKind() != Au.DRINK) return null;
  Bb /* normalized */a = Bb.of(observedActionLabel);
  return a == null ? null : a.value();
 }

@@ -10,8 +10,48 @@
 25527	STAR_DUST
 21341	MGUILD_MINERALS
 12012	MOTHERLODE_NUGGET
+# A degrading Amulet of the damned is worth its full self until it turns to dust (OSRS Wiki).
+12853	12851	1	Amulet of the damned
 27285	Abyssal pearl
 24714	HALLOWED_MARK_3
 12746	BH_EMBLEM
 26879	Guardian fragments
 23962	23959	150	PRIF_CRYSTAL_SHARD
+# Imbuing keeps an item's worth: imbued black masks and slayer helmets (NMZ, Soul Wars, PvP Arena)
+# are worth the plain black mask, so an imbue is neutral (owner 2026-10-09).
+11774	8921	1	Black mask (10) (i)
+11775	8921	1	Black mask (9) (i)
+11776	8921	1	Black mask (8) (i)
+11777	8921	1	Black mask (7) (i)
+11778	8921	1	Black mask (6) (i)
+11779	8921	1	Black mask (5) (i)
+11780	8921	1	Black mask (4) (i)
+11781	8921	1	Black mask (3) (i)
+11782	8921	1	Black mask (2) (i)
+11783	8921	1	Black mask (1) (i)
+11784	8921	1	Black mask (i)
+25266	8921	1	Black mask (10) (i)
+25267	8921	1	Black mask (9) (i)
+25268	8921	1	Black mask (8) (i)
+25269	8921	1	Black mask (7) (i)
+25270	8921	1	Black mask (6) (i)
+25271	8921	1	Black mask (5) (i)
+25272	8921	1	Black mask (4) (i)
+25273	8921	1	Black mask (3) (i)
+25274	8921	1	Black mask (2) (i)
+25275	8921	1	Black mask (1) (i)
+25276	8921	1	Black mask (i)
+26771	8921	1	Black mask (10) (i)
+26772	8921	1	Black mask (9) (i)
+26773	8921	1	Black mask (8) (i)
+26774	8921	1	Black mask (7) (i)
+26775	8921	1	Black mask (6) (i)
+26776	8921	1	Black mask (5) (i)
+26777	8921	1	Black mask (4) (i)
+26778	8921	1	Black mask (3) (i)
+26779	8921	1	Black mask (2) (i)
+26780	8921	1	Black mask (1) (i)
+26781	8921	1	Black mask (i)
+11865	8921	1	Slayer helmet (i)
+25177	8921	1	Slayer helmet (i)
+26674	8921	1	Slayer helmet (i)

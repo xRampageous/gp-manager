@@ -85,12 +85,12 @@ public class BagPickupTest
         {
             engine.eb.tick(engine.eb.now + 1);
         }
-        assertTrue("past the 30 s attribution window", engine.yours(BONES));
+        assertTrue("past the 30 s attribution window", (engine.eb.has(Eb.LT, BONES) || engine.eb.has(Eb.OD, BONES)));
         for (int tick = 60; tick < 100; tick++)
         {
             engine.eb.tick(engine.eb.now + 1);
         }
-        assertFalse("forgotten once the minute is over", engine.yours(BONES));
+        assertFalse("forgotten once the minute is over", (engine.eb.has(Eb.LT, BONES) || engine.eb.has(Eb.OD, BONES)));
     }
 
     @Test

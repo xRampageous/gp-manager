@@ -237,7 +237,8 @@ Row row(Entry /* entry */a) {
 }
 
 static String value(Entry /* entry */a) {
- return a.value == 0L && a.unitPrice == 0L ? "?"
+ // A clue drop is worth nothing until its casket opens: no value, never "?" (owner 2026-10-09).
+ return a.value == 0L && a.unitPrice == 0L ? Ak.pattern("clue").matcher(a.name).matches() ? "" : "?"
  : counted(a) || a.state == State.TRADED ? signed(a.value) : compact(a.value);
 }
 

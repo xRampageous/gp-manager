@@ -64,12 +64,12 @@ static String signed(long /* value */a) {
 static String compact(long /* value */a) {
  long /* abs */b = Ae.abs(a);
  if (b < 1_000L) return Long.toString(b);
- if (b < 100_000L) return String.format(ROOT, "%.1fk", b / 1_000d);
- if (b < 1_000_000L) return round(b / 1_000d) + "k";
- if (b < 10_000_000L) return String.format(ROOT, "%.2fM", b / 1_000_000d);
- if (b < 100_000_000L) return String.format(ROOT, "%.1fM", b / 1_000_000d);
- if (b < 1_000_000_000L) return round(b / 1_000_000d) + "M";
- if (b < 10_000_000_000L) return String.format(ROOT, "%.2fB", b / 1_000_000_000d);
+ if (b < 99_950L) return String.format(ROOT, "%.1fk", b / 1_000d);
+ if (b < 999_500L) return round(b / 1_000d) + "k";
+ if (b < 9_995_000L) return String.format(ROOT, "%.2fM", b / 1_000_000d);
+ if (b < 99_950_000L) return String.format(ROOT, "%.1fM", b / 1_000_000d);
+ if (b < 999_500_000L) return round(b / 1_000_000d) + "M";
+ if (b < 9_995_000_000L) return String.format(ROOT, "%.2fB", b / 1_000_000_000d);
  return String.format(ROOT, "%.1fB", b / 1_000_000_000d);
 }
 

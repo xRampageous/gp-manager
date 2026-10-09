@@ -135,7 +135,7 @@ int ageTicks() {
 * @return true only when a local PvM death is awaiting reclaim
 */
 boolean aca(BossRetrievalCatalogue.Service /* service */a, int /* ticks */b) {
- if (a == null || !awaitingReclaim) return false;
+ if (a == null || !awaitingReclaim && deathItems.isEmpty()) return false;
  reclaimService = a;
  reclaimTicks = Math.max(MIN_RECLAIM_ARM_TICKS, b);
  return true;
@@ -152,7 +152,10 @@ String tick(boolean /* deferGravestoneExpiry */a) {
  if (deathWipeTicks > 0 && --deathWipeTicks == 0) nl();
  if (a || !awaitingReclaim || ageTicks < AWAIT_TICKS) return null;
  String /* expired */b = deathItems.isEmpty() ? null : sk();
- reset();
+ // Expired grave items wait at Death's Office for good: still yours, so they stay outstanding
+ // and match only while a retrieval is armed (review 2026-10-09).
+ awaitingReclaim = false;
+ nl();
  return b;
 }
 
@@ -187,7 +190,7 @@ void reset() {
 Bw snapshot() {
  List<Bg> /* outstanding */a = items(deathItems);
  List<Bg> /* held */b = items(carriedAtDeath);
- return !awaitingReclaim || a.isEmpty() && b.isEmpty() ? null
+ return a.isEmpty() && b.isEmpty() ? null
  : new Bw(a, b, deathWipeTicks, ageTicks);
 }
 
@@ -216,7 +219,7 @@ void restore(Bw /* pending */a) {
  carriedAtDeath = deathWipeTicks > 0 && !c.isEmpty() ? c : null;
  deathWipeTicks = carriedAtDeath == null ? 0 : deathWipeTicks;
  ageTicks = a.getGravestoneAgeTicks();
- awaitingReclaim = carriedAtDeath != null || !deathItems.isEmpty();
+ awaitingReclaim = carriedAtDeath != null || !deathItems.isEmpty() && ageTicks < AWAIT_TICKS;
 }
 
 /** Adopt the physical continuity of a staged engine during an owner install. */

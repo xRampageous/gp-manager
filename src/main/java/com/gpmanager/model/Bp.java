@@ -66,7 +66,6 @@ static long[] qg(Ac /* transaction */a) {
 static long[] steps(Ac /* transaction */a) {
  List<Ab> /* flows */b = a.getFlows();
  long[] /* steps */c = new long[b.size()];
- if (a.getCorrection() != Ah.AUTO) return c;
  for (Cg /* pair */d : qb(a)) {
   long /* left */e = b.get(d.remainderIndex).valueDelta;
   if (e > 0L && safeAdd(b.get(d.lossIndex).valueDelta, e) <= 0L) {

@@ -1,5 +1,32 @@
 # GP Manager changelog
 
+## 1.3.0 — 2026-10-09
+
+**New**
+- Barrows gear and the Amulet of the damned wear down without Review; Barrows repairs count their fee.
+- Bryophyta's staff: charging is neutral, each alch or superheat costs a nature rune, uncharging counts the runes lost.
+- Chugging barrel: each chug is one Drank row with the potions it used; filling it is neutral.
+- NPC purchases count, paid in coins or in spirit flakes, molch pearls or abyssal pearls.
+- House servant bank trips are neutral; his wage and sawmill fees count.
+- Hunters' loot sacks, Sailing courier bags and Hallowed sacks count what they hold when opened.
+- Imp-in-a-box and the master scroll book are storage, not losses.
+- Imbuing a black mask or slayer helmet is neutral.
+- Pete Kayer's PvP tutorial and the inside of the Gauntlet book nothing.
+- The PvP risk line values the Avernic defender at 600k, as the game now does.
+- Ironmen can value items at high alch instead of GE prices (setting, off by default).
+
+**Fixed**
+- A Grand Exchange sale collected in parts shows as one sale with its full result.
+- Gear bought back from Death's Office after your gravestone expires is no longer counted as loot.
+- An Eye of Ayak charged with runes no longer costs demon tears.
+- A save file briefly locked by antivirus is never set aside, and backing up no longer freezes the game.
+- 999,600 shows as 1.00M, not 1000k.
+
+**HUD+**
+- Clue drops show on the tray again; opening caskets or impling jars is one row per kind.
+- Trades read "Traded", and sales show the item sold with the coins it brought.
+- Combined rows such as the chugging barrel show an icon.
+
 ## 1.2.1 — 2026-10-09
 
 - **Collect to bank counts.** A Grand Exchange offer collected straight to the bank never showed

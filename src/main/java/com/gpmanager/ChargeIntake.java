@@ -117,12 +117,10 @@ boolean abt(String /* message */b, long /* now */c) {
   f = wornBloodFury();
  }
  if (d.variant == V.EYE_OF_AYAK) {
-  // The line names the mode ("demon tears" or "runes").
+  // No Check click: the line can only mean the worn staff or the pack copy.
+  if (f == null) f = eyeIdentity();
+  // The line names the mode ("demon tears" or "runes"), stored for that staff (review 2026-10-09).
   eyeRunes.put(f, d.componentCounts.containsKey(ItemID.DEATHRUNE));
-  if (f == null) {
-   // No Check click: the line can only mean the worn staff or the pack copy.
-   f = eyeIdentity();
-  }
  }
  if (f == null) {
   // A value without its fresh Check target cannot distinguish another
@@ -133,7 +131,7 @@ boolean abt(String /* message */b, long /* now */c) {
  if (b.toLowerCase(Locale.ROOT).contains("charged with")) {
   // Any charge wording is a load: the components moved into the weapon, never spend.
   // Armed even on the first read, where no delta exists yet (owner 2026-09-30).
-  engine.markContext(Aj.TRANSFER, Math.max(4, config.stabilizationTicks() + 2), Ak.msg("m2"));
+  xfer("m2");
  }
  Cm /* delta */g = engine.abu(d, f, c);
  // Every exact read names its result; quantities still come only from measured decreases.
@@ -142,7 +140,7 @@ boolean abt(String /* message */b, long /* now */c) {
    engine.closeChargeWindow(f);
    return true;
   case LOAD:
-   engine.markContext(Aj.TRANSFER, Math.max(4, config.stabilizationTicks() + 2), Ak.msg("m2"));
+   xfer("m2");
    return true;
   case SEED:
   case MISMATCH:
@@ -226,7 +224,7 @@ void aks(Skill /* skill */a, int /* tick */b, long /* now */c) {
  if (d && pendingFuryHitTick == b) {
   // The hit that opened this fight lands before its XP in the same tick.
   pendingFuryHitTick = -1;
-  ItemContainer /* worn */f = client == null ? null : client.getItemContainer(InventoryID.WORN);
+  ItemContainer /* worn */f = cont(InventoryID.WORN);
   Item /* amulet */g = f == null ? null : f.getItem(EquipmentInventorySlot.AMULET.getSlotIdx());
   if (g != null && g.getId() == ItemID.BLOOD_AMULET) {
    mt(V.BLOOD_FURY, g.getId(), wornBloodFury(), rw(V.BLOOD_FURY), c);
@@ -239,6 +237,48 @@ boolean furyMelee(int /* tick */a) {
  return a <= meleeStanceUntil;
 }
 
+/**
+* Uncharging Bryophyta's staff destroys the nature runes it holds (OSRS Wiki; "You remove 1000
+* charges from your staff, leaving it empty."): those charges are spent, one rune each.
+*/
+void emptied(long /* charges */a, long /* now */b) {
+ engine.mn("bryophyta's staff", V.BRYOPHYTA.displayName, Au.CAST, List.of(valuation.akj(ItemID.NATURERUNE, -a, b)), b);
+}
+
+/** The doses a chug drank this tick, booked as one row on the next game tick. */
+final List<Ab> chugged = new ArrayList<>();
+
+/**
+* A chug drinks one dose of every potion in the chugging barrel, never touching the inventory.
+* The game names each one, as its one-dose potion: "You have 3 doses of Saradomin brew(1) left in
+* your barrel." or "You have finished all doses of ..." (OSRS Wiki; Dude Where's My Stuff).
+*/
+void chug(String /* potion */a, long /* now */b) {
+ for (var /* match */c : ix.find(a)) {
+  if (c.getName().equalsIgnoreCase(a)) {
+   chugged.add(valuation.akj(c.getId(), -1L, b));
+   return;
+  }
+ }
+}
+
+/** Each tick, the doses drunk from the barrel are one Drank row (owner 2026-10-09). */
+void drank(long /* now */a) {
+ if (chugged.isEmpty()) return;
+ engine.chug(new ArrayList<>(chugged), a);
+ chugged.clear();
+}
+
+/** A client item container, or null without a client. */
+ItemContainer cont(int /* containerId */a) {
+ return client == null ? null : client.getItemContainer(a);
+}
+
+/** Marks the next item move as a neutral charge transfer with this message. */
+void xfer(String /* messageKey */a) {
+ engine.markContext(Aj.TRANSFER, Math.max(4, config.stabilizationTicks() + 2), Ak.msg(a));
+}
+
 /** That staff's charging mode; unknown means tears (the default charge type). */
 boolean eyeRune(String /* identity */a) {
  return Boolean.TRUE.equals(eyeRunes.get(a));
@@ -246,14 +286,14 @@ boolean eyeRune(String /* identity */a) {
 
 /** The eye's identity for lines that arrive with no Check click: the worn staff, else the pack. */
 String eyeIdentity() {
- ItemContainer /* worn */a = client == null ? null : client.getItemContainer(InventoryID.WORN);
+ ItemContainer /* worn */a = cont(InventoryID.WORN);
  if (a != null) {
   Item /* weapon */b = a.getItem(EquipmentInventorySlot.WEAPON.getSlotIdx());
   if (b != null && aja(b.getId()) == V.EYE_OF_AYAK) {
    return akz(V.EYE_OF_AYAK, b.getId());
   }
  }
- ItemContainer /* inventory */c = client == null ? null : client.getItemContainer(InventoryID.INV);
+ ItemContainer /* inventory */c = cont(InventoryID.INV);
  if (c == null) return null;
  for (int /* slot */d = 0; d < c.size(); d++) {
   Item /* item */e = c.getItem(d);
@@ -266,7 +306,7 @@ String eyeIdentity() {
 
 /** The worn amulet's identity for its click-free count messages; null when not worn. */
 String wornBloodFury() {
- ItemContainer /* worn */a = client == null ? null : client.getItemContainer(InventoryID.WORN);
+ ItemContainer /* worn */a = cont(InventoryID.WORN);
  if (a == null) return null;
  int /* slot */b = EquipmentInventorySlot.AMULET.getSlotIdx();
  Item /* amulet */c = a.getItem(b);
@@ -480,7 +520,7 @@ static long[] dartLoss(String /* capeName */a) {
 }
 
 String wornCapeName() {
- ItemContainer /* worn */a = client == null ? null : client.getItemContainer(InventoryID.WORN);
+ ItemContainer /* worn */a = cont(InventoryID.WORN);
  Item /* cape */b = a == null ? null : a.getItem(EquipmentInventorySlot.CAPE.getSlotIdx());
  return b == null || b.getId() <= 0 ? "" : itemName(b.getId());
 }
@@ -595,7 +635,7 @@ void watchReturn() {
 
 /** The returned charge is the player's own investment coming back: ownership-neutral. */
 void markReturnTransfer() {
- engine.markContext(Aj.TRANSFER, Math.max(4, config.stabilizationTicks() + 2), Ak.msg("jv"));
+ xfer("jv");
 }
 
 /** A click that answers a chat dialog (the "Really uncharge?" Yes/No), not a new action. */
@@ -620,7 +660,7 @@ String itemName(int /* itemId */a) {
 
 /** Canonical inventory quantities, so noted or placeholder ids compare as the item itself. */
 Map<Integer, Long> inventoryCounts() {
- ItemContainer /* inventory */a = client == null ? null : client.getItemContainer(InventoryID.INV);
+ ItemContainer /* inventory */a = cont(InventoryID.INV);
  var /* counts */b = new HashMap<Integer, Long>();
  if (a == null) return b;
  for (Item /* item */c : a.getItems()) {

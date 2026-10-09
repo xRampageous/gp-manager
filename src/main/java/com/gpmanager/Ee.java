@@ -27,11 +27,15 @@ static String store(Client /* client */a) {
 }
 
 static boolean wq(Client /* client */a) {
- if (a == null) return false;
- Widget /* root */b = a.getWidget(InterfaceID.GeOffers.UNIVERSE);
  // A banker's or clerk's collection box collects offers like the exchange itself (1.2).
- return (b != null && !b.isHidden()) || visible(a, InterfaceID.GeOffersSide.ITEMS)
+ return visible(a, InterfaceID.GeOffers.UNIVERSE) || visible(a, InterfaceID.GeOffersSide.ITEMS)
  || visible(a, InterfaceID.GeCollect.UNIVERSE);
+}
+
+/** A visible widget's text, "" when it is absent or hidden. */
+static String text(Client /* client */a, int /* componentId */b) {
+ Widget /* widget */c = a.getWidget(b);
+ return c == null || c.isHidden() ? "" : String.valueOf(c.getText());
 }
 
 static boolean visible(Client /* client */a, int /* componentId */b) {

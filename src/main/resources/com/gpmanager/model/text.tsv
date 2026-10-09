@@ -37,7 +37,11 @@ gb	Grand Exchange purchase settled: actual spend becomes tracked value; acquisit
 gc	Grand Exchange collection could not be attributed to exact sell executions; the observed cash stays uncounted for review.
 gd	Ownership-neutral Grand Exchange custody movement: principal entering or returning from the exchange is a transfer, not realized economics.
 ge	This lifecycle could not be settled exactly; it needs your review.
-rchk	 Rechecked by 1.2.1: its items alone show what it was, so it no longer waits in Review.
+bwr	Barrows wear
+bww	Barrows gear wore down a stage or was repaired: the same item, so neutral. Repair fees still count.
+chb	Drunk from the chugging barrel: one dose of each potion in it, as the game's own lines name them.
+srv	Servant bank trip
+srw	A house servant fetched, banked or un-noted these items: moved, not gained or spent.
 gbank	 Collected to the bank after filling at several prices: it counts the highest tax it could have paid, so its result is never overstated.
 gf	Filled quantity is not collected yet; nothing is realized.
 gg	Grand Exchange sale settled: known proceeds against consumed tracked basis.
@@ -283,7 +287,6 @@ el	Neutral zone instance
 em	Neutral zone instance
 en	lootPresentationFilter
 eo	Highlighted list only
-ep	charge-load-ambiguous
 eq	Bulk review decision
 er	Charge load transfer
 et	gp-manager-lifecycle

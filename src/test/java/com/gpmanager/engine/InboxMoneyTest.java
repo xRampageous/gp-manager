@@ -67,7 +67,7 @@ public class InboxMoneyTest {
   click.item = BONES; click.at = 10; click.x = 10; click.y = 10;
   p.onItemDespawned(new ItemDespawned(ReviewFollowupTest.tile(10, 10), ReviewFollowupTest.bones()));
   assertEquals(2L, qty(p, Eb.BG));
-  assertFalse(e.yours(BONES));
+  assertFalse((e.eb.has(Eb.LT, BONES) || e.eb.has(Eb.OD, BONES)));
   p.onItemDespawned(new ItemDespawned(ReviewFollowupTest.tile(10, 10), ReviewFollowupTest.bones()));
   tick[0]++;
   p.bagSettle();
@@ -92,7 +92,7 @@ public class InboxMoneyTest {
   Am e = engine();
   e.zk(Map.of(BONES, 1L), 6, "Loot from Guard", "Guard");
   e.qc(List.of(new Ab(BONES, "Bones", 1L, 100, 100L)));
-  assertFalse(e.yours(BONES));
+  assertFalse((e.eb.has(Eb.LT, BONES) || e.eb.has(Eb.OD, BONES)));
   assertEquals(0L, e.eb.reserve(Eb.LT, BONES, 1L, Eb.LP));
  }
 }

@@ -615,7 +615,6 @@ public final class SidebarPreview
 
     private static Dp panel(Am engine, Bo pvp)
     {
-        SummaryParity.check(engine, Ae.now());
         JFrame frame = new JFrame("GP Manager preview");
         frame.setDefaultCloseOperation(JFrame.DISPOSE_ON_CLOSE);
         frame.setLayout(new BorderLayout());

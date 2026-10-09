@@ -4,7 +4,6 @@ import java.util.*;
 import javax.inject.*;
 import net.runelite.api.*;
 import net.runelite.api.gameval.InterfaceID;
-import net.runelite.api.widgets.Widget;
 /** Polls the real loot-key chest interface; menu and chat wording is never key source evidence. */
 @Singleton
 @RequiredArgsConstructor(onConstructor_ = @Inject)
@@ -14,8 +13,7 @@ final Ix ix;
 final Am engine;
 void poll() {
  if (client == null || engine == null) return;
- Widget /* root */a = client.getWidget(InterfaceID.WildyLootChest.UNIVERSE);
- boolean /* visible */b = a != null && !a.isHidden();
+ boolean /* visible */b = Ee.visible(client, InterfaceID.WildyLootChest.UNIVERSE);
  engine.ahs(b);
  if (!b) return;
  for (int /* index */c = 0; c < 5; c++) {

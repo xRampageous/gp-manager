@@ -14,9 +14,11 @@ class ActivityDetector {
 static final long MILLIS_PER_GAME_TICK = 600L;
 final GpManagerConfig config;
 final Am engine;
-String activityCandidate = "General";
+/** The activity with nothing more specific detected. */
+static final String G = "General";
+String activityCandidate = G;
 int activityEvidence;
-String detectedActivity = "General";
+String detectedActivity = G;
 String activitySessionId;
 long productionWindowExpiresAtEpochMillis;
 /**
@@ -57,7 +59,7 @@ void abw(Ac /* transaction */a) {
   break;
   case LOOT:
   String /* amd */b = a.getActivityName();
-  if (b != null && !b.trim().isEmpty() && !"General".equalsIgnoreCase(b.trim())) {
+  if (b != null && !b.trim().isEmpty() && !G.equalsIgnoreCase(b.trim())) {
    abm(b.trim(), true);
   }
   break;
@@ -75,8 +77,8 @@ void ajd() {
  String /* amm */b = a == null ? null : a.getId();
  if (b == null ? activitySessionId == null : b.equals(activitySessionId)) return;
  activitySessionId = b;
- String /* initial */c = a == null ? "General" : a.getActivityHint();
- detectedActivity = awq(c, "General");
+ String /* initial */c = a == null ? G : a.getActivityHint();
+ detectedActivity = awq(c, G);
  activityCandidate = detectedActivity;
  activityEvidence = 0;
 }
@@ -87,11 +89,11 @@ void pe() {
 }
 
 void agp(boolean /* resetHold */a) {
- if (!"General".equalsIgnoreCase(detectedActivity) || a) {
-  detectedActivity = "General";
-  activityCandidate = "General";
+ if (!G.equalsIgnoreCase(detectedActivity) || a) {
+  detectedActivity = G;
+  activityCandidate = G;
   activityEvidence = 0;
-  if (config.autoActivityDetection()) engine.setDetectedActivity("General", Ae.now());
+  if (config.autoActivityDetection()) engine.setDetectedActivity(G, Ae.now());
  }
 }
 

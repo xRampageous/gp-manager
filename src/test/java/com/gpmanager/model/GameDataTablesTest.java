@@ -41,7 +41,14 @@ public class GameDataTablesTest
     static final Set<Integer> CURRENCY_PROXIES = new HashSet<>(Arrays.asList(
         ItemID.TZHAAR_TOKEN, ItemID.GAUNTLET_CRYSTAL_SHARD, ItemID.PRIF_CRYSTAL_SHARD_CRUSHED,
         21649, ItemID.STAR_DUST, ItemID.MGUILD_MINERALS, ItemID.MOTHERLODE_NUGGET, 27285,
-        ItemID.HALLOWED_MARK_3, ItemID.BH_EMBLEM, 26879, ItemID.PRIF_CRYSTAL_SHARD));
+        ItemID.HALLOWED_MARK_3, ItemID.BH_EMBLEM, 26879, ItemID.PRIF_CRYSTAL_SHARD,
+        // 1.3.0: the degrading Amulet of the damned, imbued black masks and slayer helmets.
+        ItemID.DAMNED_AMULET_DEGRADED, ItemID.SLAYER_HELM_I, ItemID.SW_SLAYER_HELM_I, ItemID.PVPA_SLAYER_HELM_I));
+    static {
+        for (int id = 11774; id <= 11784; id++) CURRENCY_PROXIES.add(id);
+        for (int id = 25266; id <= 25276; id++) CURRENCY_PROXIES.add(id);
+        for (int id = 26771; id <= 26781; id++) CURRENCY_PROXIES.add(id);
+    }
 
     static List<String> keyChests()
     {
@@ -261,7 +268,7 @@ public class GameDataTablesTest
     {
         Set<String> used = new java.util.TreeSet<>();
         Set<String> prefixes = new java.util.TreeSet<>();
-        java.util.regex.Pattern literal = java.util.regex.Pattern.compile("\\bmsg\\(\"([^\"]+)\"[,)]");
+        java.util.regex.Pattern literal = java.util.regex.Pattern.compile("\\b(?:msg|xfer)\\(\"([^\"]+)\"[,)]");
         java.util.regex.Pattern prefix = java.util.regex.Pattern.compile("\\bmsg\\(\"([\\w-]+\\.)\"\\s*\\+");
         try (java.util.stream.Stream<java.nio.file.Path> files = java.nio.file.Files.walk(
             java.nio.file.Paths.get("src/main/java")))
@@ -341,7 +348,7 @@ public class GameDataTablesTest
 
     /** d26 contains phrases rather than gameval ids; d13 continues to validate region ids. */
     @Test public void neutralTransferTableHasEveryUsedOutcomeAndNoUnusedRows() {
-        assertEquals(22, Ak.x("d26").size());
+        assertEquals(25, Ak.x("d26").size());
         Set<String> used = new java.util.LinkedHashSet<>(MinigameTransferClassifier.R.keySet());
         used.addAll(NeutralStorageClassifier.R.keySet());
         assertEquals(used, Ak.r("d26").keySet());
@@ -398,9 +405,6 @@ public class GameDataTablesTest
         }
         assertEquals(ids.keySet(), used);
         assertEquals(names, new ArrayList<>(Spells.R.keySet()));
-        assertEquals(Arrays.stream(Spo.TABLE.toArray(new String[0][])).map(a -> a[0])
-            .collect(java.util.stream.Collectors.toList()), names);
-        for (String[] row : Spo.TABLE) assertEquals(row[2], Ak.byName("d27").get(row[0]));
     }
 
     @Test public void activityTableKeepsEveryUsedListAndPredicate() {
@@ -411,8 +415,6 @@ public class GameDataTablesTest
             values.put(row[0], Arrays.stream(row[2].split("\\|"))
                 .map(Ak::t).collect(java.util.stream.Collectors.toList()));
         }
-        assertEquals(Alo.CURATED,values.get("curated"));
-        assertEquals(Alo.CURATED_SHORT,values.get("short")); assertEquals(Alo.COMBAT,values.get("combat"));
         assertEquals(Arrays.asList("PKing","Trading","Death reclaim"),values.get("pursuit"));
         assertEquals(Arrays.asList("General","NPC loot"),values.get("generic"));
         for (net.runelite.api.Skill skill : net.runelite.api.Skill.values())

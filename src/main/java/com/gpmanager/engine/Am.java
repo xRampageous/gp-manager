@@ -169,7 +169,7 @@ synchronized void restore(SavedState /* state */b, long /* now */c) {
  history.clear();
  archive.clear();
  savedGrinds.clear();
- profileTimeZoneId = ZoneId.systemDefault().getId();
+ profileTimeZoneId = b != null && aks(b.getProfileTimeZoneId()) ? b.getProfileTimeZoneId() : ZoneId.systemDefault().getId();
  nc();
  claims.clear();
  chargeLoadReviews.clear();
@@ -182,10 +182,6 @@ synchronized void restore(SavedState /* state */b, long /* now */c) {
  activeSession = null;
  os();
  if (b != null) {
-  profileTimeZoneId = aks(b.getProfileTimeZoneId())
-  ? b.getProfileTimeZoneId() : ZoneId.systemDefault().getId();
-  savedGrinds.clear();
-  if (b == null) return;
   for (Ap /* grind */d : b.getSavedGrinds()) {
    if (d != null && !d.getGrindId().isEmpty() && !d.getName().isEmpty()) savedGrinds.add(d);
   }
@@ -225,30 +221,6 @@ synchronized void restore(SavedState /* state */b, long /* now */c) {
   claims.restore(b, akf());
   archive.pr(c);
   pkHistory.ri(akf(), receiptRetentionDays(), c);
-  recheck();
- }
-}
-
-/**
-* Owner 2026-10-09 (1.2.1): an automatic Review entry whose items alone show what 1.2.1 books
-* is booked that way on load. An opened casket, clue scroll or impling jar (every cost is one)
-* is a gain; a clue step (every item is one) or combined potions move nothing. Corrections and
-* every other entry stay exactly as saved; a rechecked entry is no longer Review, so this runs
-* once in effect.
-*/
-void recheck() {
- for (Ad /* session */a : akf()) {
-  for (Ac /* entry */b : a.getTransactions()) {
-   List<Ab> /* flows */c = b.getFlows();
-   if (!Eh.aal(b) || b.getContext() == Aj.MARKET) continue;
-   boolean /* neutral */d = Bn.all(c, 0, Bn::e1) || Bn.isDecant(c);
-   if (!d && !Bn.all(c, -1, Bn::e1)) continue;
-   b.type = d ? Ai.TRANSFER : GAIN;
-   b.counted = !d;
-   b.confidence = Bd.LIKELY;
-   if (Bn.isDecant(c)) b.note = "Decanted";
-   b.explanation += msg("rchk");
-  }
  }
 }
 
@@ -291,12 +263,6 @@ synchronized boolean sx(long /* now */a) {
  return sy(a, a, b == null ? SessionEndReason.MANUAL : b, false);
 }
 
-/** Finish a named session with an explicit client-owned reason. */
-synchronized boolean sx(long /* now */a, SessionEndReason /* reason */b) {
- if (customSession == null) return false;
- return sy(a, a, b == null ? SessionEndReason.MANUAL : b, false);
-}
-
 boolean sy(long /* endAt */a, long /* resumeGeneralAt */b, SessionEndReason /* reason */c, boolean /* autoEnded */d) {
  if (customSession == null) return false;
  long /* art */e = max(customSession.startedAtEpochMillis, a);
@@ -328,8 +294,7 @@ synchronized void acu(long /* now */a) {
 synchronized boolean resume(long /* now */a, Ed... /* reasons */b) {
  if (activeSession != null && activeSession.paused && Arrays.asList(b).contains(activeSession.getPauseReason())) {
   activeSession.resume(a);
-  agb(true);
-  calibratingUntil = a + CALIBRATING_MILLIS;
+  arm(a);
   return true;
  }
  return false;
@@ -348,9 +313,14 @@ synchronized boolean ait(long /* now */a) {
  if (customSession != null && !customSession.isClosed()) return false;
  if (generalSession != null && !generalSession.isClosed()) return false;
  rm(a);
+ arm(a);
+ return true;
+}
+
+/** Fresh tracking: clear the evidence and calibrate the rate from now. */
+void arm(long /* now */a) {
  agb(true);
  calibratingUntil = a + CALIBRATING_MILLIS;
- return true;
 }
 
 synchronized boolean yp() {
@@ -367,12 +337,10 @@ synchronized void togglePause(long /* now */b) {
  if (activeSession == null) {
   // Start tracking: a new install, or after a factory reset, with Automatic tracking off.
   rm(b);
-  agb(true);
-  calibratingUntil = b + CALIBRATING_MILLIS;
+  arm(b);
  } else if (activeSession.paused) {
   activeSession.resume(b);
-  agb(true);
-  calibratingUntil = b + CALIBRATING_MILLIS;
+  arm(b);
  } else {
   activeSession.pause(b, MANUAL);
   autoStartAtEpochMillis = 0L;
@@ -409,11 +377,6 @@ synchronized boolean calibrating(long /* now */a) {
 */
 synchronized int pg(int /* days */a, long /* now */b) {
  return archive.pg(a, b);
-}
-
-/** Daily UTC maintenance hook. Supplying time keeps lifecycle tests deterministic. */
-synchronized int yt(int /* days */a, long /* now */b) {
- return archive.yt(a, b);
 }
 
 /** Configured UTC retention maintenance used by the game-tick lifecycle. */
@@ -593,16 +556,6 @@ synchronized void carried(long /* value */a) {
  carriedValue = a;
 }
 
-/**
-* The item is yours to pick up: unclaimed loot from your own kill or your own drop, which other
-* players cannot take first, so its vanishing on your Take is your pickup (Codex follow-up 1.2).
-*/
-synchronized boolean yours(int /* itemId */a) {
- if (eb.has(LT, a)) return true;
- if (eb.has(OD, a)) return true;
- return false;
-}
-
 synchronized void noteTake(int /* itemId */a) {
  if (a > 0) eb.set(TA, a, 1L, 49, null);
 }
@@ -751,8 +704,7 @@ synchronized void markContext(Aj /* newContext */a, int /* ticks */b, String /* 
  aiz(a, c);
  if (a == Aj.TRANSFER) {
   // Stale Eat/Bury intents must not reclassify bank deposits as Used/lost.
-  eb.drop(CN);
-  eb.drop(DO);
+  eb.drop(CN, DO);
   abi(max(1, b));
  }
  aho(a, b, c, emptyMap(), null);
@@ -773,8 +725,7 @@ synchronized void ze(int /* ticks */a) {
  boolean /* asr */b = !bo();
  eb.ttl(BO, Integer.MAX_VALUE);
  if (b) {
-  eb.drop(CN);
-  eb.drop(DO);
+  eb.drop(CN, DO);
  }
  eb.ttl(SF, max(eb.left(SF), max(1, a)));
  aho(Aj.TRANSFER, a, "Bank transfer", emptyMap(), null);
@@ -929,8 +880,7 @@ synchronized void zi(int /* ticks */a, Map<Integer, Long> /* heldItemsAtDeath */
 synchronized void zj() {
  claims.nk();
  deathReclaim.reset();
- eb.drop(CN);
- eb.drop(DO);
+ eb.drop(CN, DO);
  om();
  eb.drop(SF);
  eb.drop(BO);
@@ -975,7 +925,7 @@ static Ac tc(Ac... /* candidates */a) {
 */
 Ac aik(List<Ab> /* flows */a, long /* now */b, Map<Integer, Long> /* observedLootQuantities */c,
 boolean /* allowObservedFee */d) {
- if (!deathReclaim.isAwaitingReclaim() || empty(a)) return null;
+ if (empty(a) || !deathReclaim.isAwaitingReclaim() && !deathReclaim.xk()) return null;
  Service /* service */e = deathReclaim.reclaimService;
  Map<Integer, Long> /* sourceBacked */f = positiveEntries(c);
  // Source-backed loot quantities are protected first.
@@ -1051,6 +1001,42 @@ synchronized void zo(String /* label */a, long /* now */b) {
 /** An ownership-neutral storage or minigame move, with the note its classifier already chose. */
 synchronized void zh(String /* note */a, int /* ticks */b) {
  markContext(Aj.TRANSFER, max(1, b), a);
+}
+
+/**
+* Barrows gear stepping 100, 75, 50, 25 to 0 as you fight, or repaired back, is the same item in
+* another state (RuneLite prices every stage but 0 alike): neutral, while its repair fee counts.
+*/
+Ac wear(List<Ab> /* flows */a, long /* now */b) {
+ var /* net by piece */c = new HashMap<String, Long>();
+ for (Ab /* flow */d : a) if (piece(d) != null) c.merge(piece(d), d.quantityDelta, Long::sum);
+ List<Ab> /* stepped */e = claim(a, /* flow */f -> piece(f) != null && c.get(piece(f)) == 0L, (/* flow */g, /* quantity */h) -> h);
+ return e.isEmpty() ? null : mp(b, msg("bwr"), "Barrows", e, msg("bww"), null);
+}
+
+/** The Barrows piece a flow is, whatever its stage; null for anything else. */
+static String piece(Ab /* flow */a) {
+ java.util.regex.Matcher /* name */b = Ak.pattern("barrows").matcher(a.itemName);
+ return b.matches() ? Ag.lower(b.group(1)) : null;
+}
+
+/**
+* A servant fetches from the bank, takes items to it and un-notes them: those moves are neutral.
+* Coins (his wage, a sawmill fee) still count, as do the logs a sawmill trip takes and the
+* planks it brings back, made from them.
+*/
+Ac servant(List<Ab> /* flows */a, long /* now */b) {
+ if (eb.peek(SV) == null) return null;
+ boolean /* sawmill */c = eb.peek(SW) != null;
+ List<Ab> /* moved */d = claim(a, /* flow */e -> e.itemId != ItemID.COINS && !(c && wood(e)), (/* flow */f, /* quantity */g) -> g);
+ // The sawmill trip ends when its planks come back.
+ if (c && a.stream().anyMatch(/* flow */h -> h.isGain() && wood(h))) eb.drop(SW);
+ return d.isEmpty() ? null : mp(b, msg("srv"), "Construction", d, msg("srw"), null);
+}
+
+/** Logs a sawmill trip takes, or the planks it brings back. */
+static boolean wood(Ab /* flow */a) {
+ return Ak.pattern("wood").matcher(a.itemName).matches();
 }
 
 /** Arm the narrow load intent with the target identity later used by Check. */
@@ -1321,7 +1307,7 @@ static Ac sw(Ad /* session */a, String /* id */b) {
 * never owns a movement by itself.
 */
 synchronized void abg(long /* now */a) {
- long /* until */b = max(eb.at(GE), a) + 20_000L;
+ long /* until */b = max(eb.at(GE), a + 20_000L);
  eb.put(GE, -1, 1L, Integer.MAX_VALUE, null).at = b;
 }
 
@@ -1399,6 +1385,11 @@ String /* explanation */d, List<Ab> /* flows */e, Au /* kind */f) {
  g.setActionKind(f);
  add(g, false);
  return g;
+}
+
+/** One chug from the chugging barrel: its doses as one Drank row titled by the barrel. */
+synchronized void chug(List<Ab> /* doses */a, long /* now */b) {
+ if (live()) mo(b, "Chugging barrel", Bd.CONFIRMED, msg("chb"), a, Au.DRINK).ahu(Bb.of("Chugging barrel"));
 }
 
 /**
@@ -1526,9 +1517,9 @@ synchronized Ac ml(long /* feeGp */a, String /* why */b, long /* now */c) {
 synchronized Ac ml(long /* feeGp */a, String /* why */b, long /* now */c, boolean /* pvp */d) {
  if (a <= 0L || !live()) return null;
  var /* asf */e = new Ab(ItemID.COINS, "Coins", -a, 1, -a, Av.FACE_VALUE, c);
+ String /* why */g = b == null ? DeathReclaimFees.vc(false) : b;
  Ac /* transaction */f = mr(c, d ? PK_FEE : CONSUMPTION, d ? PK_DEATH : GENERIC,
- b == null ? DeathReclaimFees.vc(false) : b, "Death reclaim", true, singletonList(e),
- Bd.CONFIRMED, b == null ? DeathReclaimFees.vc(false) : b, null);
+ g, "Death reclaim", true, singletonList(e), Bd.CONFIRMED, g, null);
  add(f, false);
  return f;
 }
@@ -1788,7 +1779,10 @@ Ac settle(Cc /* committed */b, long /* now */c, java.util.function.Consumer<Ac> 
  Ac /* held */e = aio(s);
  if (s.flows.isEmpty()) return e;
  Ac /* returned */f = ais(s);
- if (s.flows.stream().allMatch(/* flow */g -> g.valueDelta == 0L && g.getPriceSource() != Av.UNPRICED)) {
+ if (s.flows.stream().allMatch(/* flow */g -> g.valueDelta == 0L && g.getPriceSource() != Av.UNPRICED)
+ // Owner 2026-10-09: a clue scroll, scroll box or casket picked up is worth nothing yet but is a
+ // drop, so it books and HUD+ shows it; opening, stepping or moving them still books nothing.
+ && !(s.flows.stream().allMatch(Ab::isGain) && Bn.all(s.flows, 0, /* name */g -> Ak.pattern("clue").matcher(g).matches()))) {
   // A change with no value and no unpriced item is nothing to account for; a settled
   // claim still closed the deferred key audit row above. No value threshold exists.
   return tc(f, s.keyAudit);
@@ -1801,6 +1795,12 @@ Ac settle(Cc /* committed */b, long /* now */c, java.util.function.Consumer<Ac> 
   // their actual consumption/loot evidence rather than the old region latch.
   s.clear();
   pa();
+ }
+ for (Ac /* neutral */sv : new Ac[] {servant(s.flows, c), wear(s.flows, c)}) {
+  if (sv != null) {
+   audit(sv);
+   if (s.flows.isEmpty()) return sv;
+  }
  }
  List<Ac> /* sources */i = mu(s);
  // Partial source matches classify the whole remaining settle as loot only
@@ -2192,6 +2192,13 @@ Ac book(Settle s) {
   // Review row (owner 1.2); the doses keep their value until they are drunk.
   h = Ai.TRANSFER;
   s.note = "Decanted";
+ } else if (!s.asTransfer && !s.hard && !s.soft() && h == UNCERTAIN && eb.peek(DG) != null
+ && Bn.all(s.flows, -1, Ak.pattern("cash").asMatchPredicate())) {
+  // Owner 2026-10-09: coins for items while talking to an NPC is a purchase from its dialogue
+  // (Elnock's jars, a ticket), booked like a shop's; without a conversation it stays Review.
+  h = TRADE;
+  s.context = MARKET;
+  s.note = "Bought";
  }
  // Drop settle is always CONSUMPTION so afm + pickup recovery work.
  if (s.dropped && h != Ai.TRANSFER && h != TRADE) h = CONSUMPTION;
@@ -2624,10 +2631,7 @@ Ac aff(Settle s) {
 }
 
 void os() {
- eb.drop(DO);
- eb.drop(OD, RD);
- eb.drop(FA);
- eb.drop(TA);
+ eb.drop(DO, OD, RD, FA, TA);
  playerLocationKnown = false;
 }
 
@@ -2754,8 +2758,6 @@ synchronized void agr(long /* now */b) {
  customSession = null;
  generalSuspendedByCustom = false;
  activeSession = null;
- eb.drop(LT, LP, RD);
- eb.drop(DI);
  // Destructive reset clears the schema-104 custody lifecycles with the rest.
  geCustody.reset();
  trackedBasis.reset();
@@ -2883,7 +2885,7 @@ synchronized List<Ad> pp(String /* grindId */a) {
 */
 synchronized boolean startGrind(String /* name */a, String /* grindId */b, Long /* netTargetGp */c, Long /* activeTimeTargetMillis */d, long /* now */e) {
  String /* cleanName */f = a == null ? "" : a.trim();
- if (f.isEmpty()) return false;
+ if (f.isEmpty() || customSession != null) return false;
  ajl(f, Cx.GENERAL, e);
  Ad /* active */g = activeSession;
  if (g == null) return false;
@@ -2904,13 +2906,8 @@ synchronized void afy(String /* name */a) {
 /** Mid-Grind aim edit: changes the current target snapshot only, never financial truth. */
 synchronized boolean ahq(Long /* netTargetGp */a, Long /* activeTimeTargetMillis */b, long /* now */c) {
  if (activeSession == null) return false;
- if (a == null || a <= 0L) activeSession.setProfitTargetGp(null);
- else activeSession.setProfitTargetGp(a);
- if (b == null || b <= 0L) {
-  activeSession.setActiveTimeTargetMillis(null);
- } else {
-  activeSession.setActiveTimeTargetMillis(b);
- }
+ activeSession.setProfitTargetGp(a == null || a <= 0L ? null : a);
+ activeSession.setActiveTimeTargetMillis(b == null || b <= 0L ? null : b);
  return true;
 }
 

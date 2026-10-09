@@ -8,7 +8,7 @@ cast	^cast	CAST
 supplies	%ct	
 vessel	^empty |=vial|=jug|=beer glass	
 rune	$ rune	
-claim	=coin pouch|%clue|=impling jar|$ impling jar	
+claim	=coin pouch|%clue|=impling jar|$ impling jar|hunters' loot sack|port coin bag|port reward bag|=hallowed sack	
 ingredient	!^grimy 	
 food	%pfood	
 partial	%aj	

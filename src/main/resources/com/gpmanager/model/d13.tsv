@@ -11,5 +11,8 @@
 13665	lms
 # The Gauntlet and Corrupted Gauntlet store gear on entry and restore it on exit. The lobby (12127) is
 # deliberately excluded: the reward chest is claimed there. Ids match Loze-Put/hunllef-helper.
+# Pete Kayer's PvP tutorial (from Ferox Enclave) lends gear and supplies and takes them back on the
+# way out; every lesson runs in this template region (coinflow 1.6.0, verified live there).
+10588	arena
 7512	neutral
 7768	neutral

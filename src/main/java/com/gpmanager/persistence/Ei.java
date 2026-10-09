@@ -36,6 +36,8 @@ TrackingIdentity activeIdentity;
 String readOnlyReason;
 /** A restore or reset is replacing the bound account; ingestion is paused until it re-primes. */
 volatile boolean maintenance;
+/** A sidebar job (backup) holds the lock: the game thread reuses its last readiness instead of waiting. */
+volatile boolean busy, okay;
 /** Lifecycle identity work is serialized off the RuneLite lifecycle/client callbacks. */
 final Object lifecycleExecutorLock = new Object();
 ExecutorService lifecycleExecutor;
@@ -536,8 +538,9 @@ boolean isTrackingReady() {
  // Read without the monitor so a restore/reset holding it pauses ingestion instead of
  // blocking the client thread behind the disk work.
  if (maintenance || lifecyclePending || lifecycleInitializationFailed) return false;
+ if (busy) return okay;
  synchronized (this) {
-  return !maintenance && !lifecyclePending && !lifecycleInitializationFailed
+  return okay = !maintenance && !lifecyclePending && !lifecycleInitializationFailed
   && wv() && readOnlyReason == null && !writer.vw(repository.scopeGeneration);
  }
 }

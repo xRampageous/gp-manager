@@ -86,6 +86,8 @@ static class Row {
  Coverage coverage;
  Lifecycle lifecycle;
  String settlementId;
+ /** The offer's earlier settlement ids, space-separated (a sale collected in parts). */
+ String earlierSettlements;
  /**
  * The session whose scope shows this row: the session holding its booked settlement,
  * otherwise the listing (origin) session.
@@ -131,11 +133,20 @@ static class Row {
   ? null : c.apply(b.getSettlementId());
   this.settlementAtEpochMillis = k == null ? 0L : k.timestampEpochMillis;
   if (k != null) {
-   // Ah-aware: consume the effective canonical truth of the booked settlement.
-   this.realizedResultGp = Bp.transaction(k).getNet();
-   this.realizedResultCorrectionAware = true;
-   this.manualFinancialResult = k.getCorrection() == REVENUE || k.getCorrection() == COST;
-   this.correctionApplied = k.getCorrection() != AUTO;
+   // Ah-aware: consume the effective canonical truth of every booked settlement; an offer
+   // collected in parts has one per collect (owner 2026-10-09).
+   boolean /* missing */q = false;
+   for (String /* id */o : (b.getSettlementId() + Ag.axw(b.earlierSettlements)).split(" ")) {
+    Ac /* settlement */p = o.isEmpty() ? null : c.apply(o);
+    // An earlier receipt compacted away: fall back to the booked accumulator.
+    q |= p == null && !o.isEmpty();
+    if (p == null) continue;
+    this.realizedResultGp += Bp.transaction(p).getNet();
+    this.manualFinancialResult |= p.getCorrection() == REVENUE || p.getCorrection() == COST;
+    this.correctionApplied |= p.getCorrection() != AUTO;
+   }
+   if (q) this.realizedResultGp = b.realizedResultGp;
+   this.realizedResultCorrectionAware = !q;
   } else {
    // The canonical receipt is no longer inspectable; the booked accumulator is
    // exposed but explicitly marked as not correction-recomputed.
@@ -168,6 +179,7 @@ static class Row {
   this.lifecycle = yw(b);
   this.collectionAmbiguous = b.collectionAmbiguous;
   this.settlementId = b.getSettlementId();
+  this.earlierSettlements = Ag.axw(b.earlierSettlements);
  }
  boolean isRealizedIncluded() {
   return lifecycle == Lifecycle.REALIZED || lifecycle == Lifecycle.PARTIALLY_REALIZED;
