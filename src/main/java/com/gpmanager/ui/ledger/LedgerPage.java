@@ -439,8 +439,7 @@ JComponent qw(Cu row) {
  panel.add(note(row.why, LABEL));
  String preview = abx(row, data == null ? 0L : data.net);
  if (!preview.isEmpty()) panel.add(note(preview, TEXT));
- var buttons = new JPanel(new FlowLayout(FlowLayout.LEFT, 2, 0));
- buttons.setOpaque(false);
+ var buttons = row();
  for (Cl decision : Cl.values()) {
   if (row.validDecisions.contains(decision)) {
    buttons.add(button(ahh(decision), false, () -> {

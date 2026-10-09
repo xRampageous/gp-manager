@@ -1,5 +1,13 @@
 # GP Manager changelog
 
+## 1.3.2 — 2026-10-10
+
+**New**
+- A new pixel-art GP Manager icon: a coin sack marked GP, on the Plugin Hub and in the sidebar.
+
+**Fixed**
+- Small internal tidy-ups; nothing you'd notice changes.
+
 ## 1.3.1 — 2026-10-10
 
 **New**

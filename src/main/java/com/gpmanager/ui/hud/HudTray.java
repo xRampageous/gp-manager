@@ -453,10 +453,8 @@ static Ab opened(List<Ab> /* flows */a) {
 
 /** Runes, ammunition and charges are routine use: they count in Net but never ride the tray. */
 static boolean routine(String /* name */a) {
- String /* lower */b = a == null ? "" : a.toLowerCase(ROOT);
- return b.endsWith(" rune") || b.endsWith(" runes") || b.contains("arrow")
- || b.endsWith(" bolts") || b.contains(" bolts (") || b.endsWith(" dart")
- || Ag.has(b, "javelin", "throwing", "zulrah's scales");
+ // Runes, arrows, bolts, darts, javelins, throwing weapons and Zulrah's scales (d18 "routine").
+ return Ak.pattern("routine").matcher(a == null ? "" : a.toLowerCase(ROOT)).matches();
 }
 
 static final List<String[]> VERBS = Ak.rows("d17");

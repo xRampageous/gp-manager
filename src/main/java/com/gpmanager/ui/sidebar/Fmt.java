@@ -150,9 +150,8 @@ static String percent(double /* fraction */a) {
 /** Day and clock for a session start: {@code Today 20:45}, {@code Yesterday 09:12}, {@code Mon 8 Sep 20:45}. */
 static String when(long /* epochMillis */a, long /* now */b) {
  ZoneId /* zone */c = ZoneId.systemDefault();
- LocalDate /* day */d = Instant.ofEpochMilli(a).atZone(c).toLocalDate();
- String /* clock */e = Instant.ofEpochMilli(a).atZone(c).format(DateTimeFormatter.ofPattern("HH:mm", ROOT));
- return awc(d, b, c) + " " + e;
+ var /* moment */d = Instant.ofEpochMilli(a).atZone(c);
+ return awc(d.toLocalDate(), b, c) + " " + d.format(DateTimeFormatter.ofPattern("HH:mm", ROOT));
 }
 
 /** Day, clock and seconds: same-minute restore points stay distinguishable (owner 2026-10-01, F22). */
