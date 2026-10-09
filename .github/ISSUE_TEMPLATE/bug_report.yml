@@ -1,0 +1,33 @@
+name: Bug report
+description: Something was counted wrong, or GP Manager misbehaved
+labels: [bug]
+body:
+  - type: markdown
+    attributes:
+      value: Thanks for the report! A screenshot of the Ledger entry usually explains the problem fastest.
+  - type: input
+    id: version
+    attributes:
+      label: GP Manager version
+      description: Shown in RuneLite's Plugin Hub list, e.g. 1.3.0
+      placeholder: "1.3.0"
+    validations:
+      required: true
+  - type: textarea
+    id: what
+    attributes:
+      label: What happened?
+      description: What you did in game, and what GP Manager showed (Live, Ledger, Grinds or HUD+).
+      placeholder: I sold 500 Revenant ether on the Grand Exchange and the Ledger showed...
+    validations:
+      required: true
+  - type: textarea
+    id: expected
+    attributes:
+      label: What did you expect?
+      placeholder: One sale of +85k, no Review entry.
+  - type: textarea
+    id: screenshots
+    attributes:
+      label: Screenshots
+      description: Drag in a screenshot of the Ledger entry (open the row to show its detail), and of the game if it helps.

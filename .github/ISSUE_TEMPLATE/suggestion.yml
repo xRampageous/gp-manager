@@ -1,0 +1,17 @@
+name: Suggestion
+description: An idea for something GP Manager should track or show
+labels: [suggestion]
+body:
+  - type: textarea
+    id: idea
+    attributes:
+      label: Your idea
+      description: What should GP Manager do, and in which part of the game?
+      placeholder: Count the coins from ... as profit
+    validations:
+      required: true
+  - type: textarea
+    id: why
+    attributes:
+      label: Why it would help
+      placeholder: I do this every trip, and right now it lands in Review.
