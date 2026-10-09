@@ -37,4 +37,4 @@ gradlew run
 
 `releaseBundle -PpublicRelease=true` prepares the public package without development build metadata.
 
-`releaseCheck` runs the tests, the accounting simulations and the safety audit. Contributions and bug reports: open an issue, with a screenshot of the Ledger entry if you can.
+`releaseCheck` runs the tests, the accounting simulations and the safety audit. Contributions and bug reports: open an [issue](https://github.com/xRampageous/gp-manager/issues), with a screenshot of the Ledger entry if you can, or ask in [Discussions](https://github.com/xRampageous/gp-manager/discussions).
