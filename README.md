@@ -15,7 +15,7 @@ See what you actually make while you play. GP Manager tracks your gains, supplie
 
 1. Install **GP Manager** from the Plugin Hub.
 2. Open it from its icon in the RuneLite sidebar.
-3. Play. Tracking starts on its own; press **Start** on the Live page to name a Grind.
+3. Play. Tracking starts on its own; to name what you're doing, press **Grind** on the Live tab (or **Start Grind** on the Grinds tab).
 
 Settings open from the wrench next to GP Manager in RuneLite's plugin list.
 
