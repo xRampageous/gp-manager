@@ -18,7 +18,7 @@ class Sm {
  /** Derived scopes memoize only from the captured facts; they cannot read mutable receipts. */
  final Map<List<Ad>, S> q = new HashMap<>();
  static Sm of(Am a) {
-  List<Ad> b = a.adk();
+  List<Ad> b = a.akf();
   var c = new ArrayList<Object>();
   c.add(a.getRevision()); c.add(a.getActiveSession()); c.add(a.getHistory());
   for (Ad d : b) { c.add(d); c.add(d == null ? 0L : d.saveStamp); c.add(d == null ? "" : d.getGrindId()); }

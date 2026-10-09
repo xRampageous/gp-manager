@@ -242,7 +242,7 @@ boolean furyMelee(int /* tick */a) {
 * charges from your staff, leaving it empty."): those charges are spent, one rune each.
 */
 void emptied(long /* charges */a, long /* now */b) {
- engine.mn("bryophyta's staff", V.BRYOPHYTA.displayName, Au.CAST, List.of(valuation.akj(ItemID.NATURERUNE, -a, b)), b);
+ engine.spent(V.BRYOPHYTA.displayName, List.of(valuation.akj(ItemID.NATURERUNE, -a, b)), b);
 }
 
 /** The doses a chug drank this tick, booked as one row on the next game tick. */
@@ -339,9 +339,7 @@ static boolean lh(String /* option */a) {
 }
 
 /** The pendant's six teleport locations, normalized like menu options. */
-static final Set<String> LOCATIONS = Set.of("darkfrost", "twilight temple", "ralos' rise",
-"north aldarin", "kastori", "nemus retreat", "lunch by the lancalliums", "fisher's flute", "history and hearsay",
-"jewellery of jubilation", "a dark disposition");
+static final List<String> LOCATIONS = Ak.names("d31");
 /**
 * A local cast or shot graphic books this use's pinned recipe as a LIKELY estimate; the next
 * measured Check reconciles it at the captured prices. Any unpriced component fails the whole

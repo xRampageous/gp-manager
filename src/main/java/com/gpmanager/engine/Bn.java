@@ -59,14 +59,6 @@ static Au resolve(Au /* matchedIntent */b, List<Ab> /* flows */c, Ai /* type */d
  boolean /* aoz */l = j && !k;
  if (i && l && all(c, 0, Bn::d1)) return Au.CAST;
  if (i && l && all(c, 0, Bn::vm)) return FIRE;
- // Recovery is passive and cannot be inferred from an ammo-only gain: that may
- // be a ground pickup. Keep it routine only when upstream supplied explicit
- // recovery evidence as the matched intent.
- if (b == RECOVER_AMMO && k && !j && all(c, 0, Bn::vm)
- && d != Ai.LOOT && d != Ai.PK_LOOT
- && d != TRADE && d != Ai.TRANSFER) {
-  return RECOVER_AMMO;
- }
  boolean /* aoa */m = wi(c);
  // Every loss must be one potion's doses (Drink) or one item (Eat/Bury/...): a coalesced
  // shark or bones under the same click is not "Drank", so it falls back to Supplies.

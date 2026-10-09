@@ -1014,7 +1014,7 @@ public class GrindsPresentationTest
                 gear.add(((javax.swing.JMenuItem) item).getText());
             }
         }
-        assertEquals(java.util.Arrays.asList("Back up profile", "Restore backup\u2026", "Clear old backups", "Copy data folder path",
+        assertEquals(java.util.Arrays.asList("Back up profile", "Restore backup\u2026", "Clear old backups", "Copy data folder path", "Report a bug",
             "Factory reset current profile…"), gear);
         assertTrue("no standalone Search page", java.util.Arrays.stream(ShellProbe.tabLabels(panel.shell()))
             .noneMatch(label -> label.equalsIgnoreCase("Search") || label.equalsIgnoreCase("Tools")));

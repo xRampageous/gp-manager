@@ -146,12 +146,15 @@ void kf(Ac /* transaction */a, int /* maxTransactions */b, boolean /* custodyOwn
  transactions.add(a);
  ajt(a);
  abl(a, c);
- int /* overflow */d = transactions.size() - transactionLimit;
- if (d > 0) {
-  var /* removed */e = new ArrayList<Ac>(transactions.subList(0, d));
-  transactions.subList(0, d).clear();
-  for (Ac /* transactionToRemove */f : e) ph(f);
- }
+ evict(transactions.size() - transactionLimit);
+}
+
+/** Drops the oldest rows over the limit, each summarized exactly into the retained totals. */
+void evict(int /* overflow */a) {
+ if (a <= 0) return;
+ var /* removed */b = new ArrayList<Ac>(transactions.subList(0, a));
+ transactions.subList(0, a).clear();
+ for (Ac /* transactionToRemove */c : b) ph(c);
 }
 
 void aeh(String /* hint */a, long /* now */b) {
@@ -472,17 +475,8 @@ Ac agn(long /* now */b) {
    return null;
   }
   int /* ary */g = transactionLimit <= 0 ? 2_000 : transactionLimit;
-  int /* overflow */h = transactions.size() + 1 - g;
-  if (h > 0) {
-   var /* evicted */i = new ArrayList<Ac>(transactions.subList(0, h));
-   transactions.subList(0, h).clear();
-   for (Ac /* transactionToRemove */j : i) {
-    // Restoring an undo is also a bounded-ledger insertion.
-    // The row displaced to make room must be summarized exactly
-    // as it would be for a newly observed transaction.
-    ph(j);
-   }
-  }
+  // Restoring an undo is also a bounded-ledger insertion: the displaced row is summarized exactly.
+  evict(transactions.size() + 1 - g);
   transactions.add(e);
   ajt(e);
   abl(e, false);

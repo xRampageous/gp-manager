@@ -28,6 +28,6 @@ public class WealthLineTest
         assertEquals(7_200_000L, after.bankAge);
         assertEquals("the bank part, for the breakdown", 410_100_000L, after.bank);
         assertEquals("2h ago", Fmt.age(after.bankAge));
-        assertEquals("the card's compact style", "413M", Fmt.compact(after.wealth));
+        assertEquals("the card's compact style, cut off like the game (412.6M)", "412M", Fmt.compact(after.wealth));
     }
 }

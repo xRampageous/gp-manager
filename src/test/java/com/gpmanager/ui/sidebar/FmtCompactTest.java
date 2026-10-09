@@ -4,21 +4,22 @@ import org.junit.Test;
 
 import static org.junit.Assert.assertEquals;
 
-/** Review 2026-10-09: each compact band ends where rounding would carry into the next. */
+/** Owner 1.3.1: compact amounts are cut off, never rounded up, like the game's stack numbers. */
 public class FmtCompactTest
 {
     @Test
-    public void roundingNeverShowsAThousandOfTheSmallerUnit()
+    public void amountsAreCutOffNeverRoundedUp()
     {
-        assertEquals("99.9k", Fmt.compact(99_949L));
-        assertEquals("100k", Fmt.compact(99_960L));
-        assertEquals("999k", Fmt.compact(999_499L));
-        assertEquals("1.00M", Fmt.compact(999_600L));
-        assertEquals("9.99M", Fmt.compact(9_994_999L));
-        assertEquals("10.0M", Fmt.compact(9_996_000L));
-        assertEquals("100M", Fmt.compact(99_960_000L));
-        assertEquals("1.00B", Fmt.compact(999_600_000L));
-        assertEquals("10.0B", Fmt.compact(9_996_000_000L));
-        assertEquals("−1.00M", Fmt.signed(-999_600L));
+        assertEquals("999", Fmt.compact(999L));
+        assertEquals("1.2k", Fmt.compact(1_299L));
+        assertEquals("99.9k", Fmt.compact(99_999L));
+        assertEquals("999k", Fmt.compact(999_600L));
+        assertEquals("1.99M", Fmt.compact(1_999_999L));
+        assertEquals("9.99M", Fmt.compact(9_999_999L));
+        assertEquals("99.9M", Fmt.compact(99_999_999L));
+        assertEquals("999M", Fmt.compact(999_999_999L));
+        assertEquals("1.99B", Fmt.compact(1_999_999_999L));
+        assertEquals("12.4B", Fmt.compact(12_499_999_999L));
+        assertEquals("a loss reads toward zero too", "\u2212999k", Fmt.signed(-999_600L));
     }
 }

@@ -1260,24 +1260,18 @@ synchronized List<Bi.Row> ub() {
 /** Market rows follow the session that holds their booked settlement (cross-Grind sales). */
 SessionLookup marketSessions = new SessionLookup() {
  public Ad holding(String /* transactionId */c) {
-  for (Ad /* session */d : adk()) {
+  for (Ad /* session */d : akf()) {
    if (sw(d, c) != null) return d;
   }
   return null;
  }
  public Ad byId(String /* sessionId */c) {
-  for (Ad /* session */d : adk()) {
+  for (Ad /* session */d : akf()) {
    if (d != null && d.getId().equals(c)) return d;
   }
   return null;
  }
 };
-
-List<Ad> adk() {
- var /* sessions */a = new ArrayList<Ad>(akf());
- a.addAll(history);
- return a;
-}
 
 /**
 * Canonical item identity for GE custody/execution correlation, using the same
@@ -1286,7 +1280,7 @@ List<Ad> adk() {
 */
 /** Effective correction-aware canonical settlement lookup for the derived Market projection. */
 Ac ajs(String /* id */a) {
- for (Ad /* session */b : a == null || a.isEmpty() ? Collections.<Ad>emptyList() : adk()) {
+ for (Ad /* session */b : a == null || a.isEmpty() ? Collections.<Ad>emptyList() : akf()) {
   Ac /* found */c = sw(b, a);
   if (c != null) return c;
  }
@@ -1388,6 +1382,14 @@ String /* explanation */d, List<Ab> /* flows */e, Au /* kind */f) {
 }
 
 /** One chug from the chugging barrel: its doses as one Drank row titled by the barrel. */
+/**
+* Charges the game counted out exactly (uncharging Bryophyta's staff): a measured spend, kept out
+* of the estimate journal so a later Check never reshapes it (1.3.1).
+*/
+synchronized void spent(String /* item */a, List<Ab> /* charges */b, long /* now */c) {
+ if (live()) mo(c, msg("kb") + a, Bd.CONFIRMED, msg("unc") + a + ".", b, CAST);
+}
+
 synchronized void chug(List<Ab> /* doses */a, long /* now */b) {
  if (live()) mo(b, "Chugging barrel", Bd.CONFIRMED, msg("chb"), a, Au.DRINK).ahu(Bb.of("Chugging barrel"));
 }
@@ -1667,8 +1669,7 @@ java.util.function.Consumer<Ac> /* additionalBooking */d) {
  }
  // Death and reclaim windows are real game-tick lifecycles. Advance them before
  // any dirty/stabilization early return so inventory churn cannot pause expiry.
- String /* aod */e = deathReclaim.tick(dirty || pendingSnapshot != null
- || (b != null && baseline != null && !b.equals(baseline)));
+ String /* aod */e = deathReclaim.tick(eb.hold);
  if (e != null) {
   Ac /* expiry */f = mp(c, msg("dh"), "Death reclaim", emptyList(), e, null);
   add(f, false);

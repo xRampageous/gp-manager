@@ -292,6 +292,7 @@ protected void shutDown() {
  persistence.shutdown(config.persistHistory());
  lastSkillExperience.clear();
  interactionContextTracker.clear();
+ Ca.recentKey = Collections.emptyList();
  // Clear the sidebar while the engine is still valid, then remove the button.
  ownerScopeChanged("held");
  interactionContextTracker.mf(null, null);
@@ -548,8 +549,7 @@ public void onItemContainerChanged(ItemContainerChanged /* event */b) {
 }
 
 /** Kits with their own window, by container; RuneLite loads one when its window first opens. */
-static final Map<Integer, String> KITS = Map.of(InventoryID.TACKLE_BOX, "Tackle box", InventoryID.SEED_BOX, "Seed box",
-InventoryID.FORESTRY_KIT, "Forestry kit", InventoryID.HUNTSMANS_KIT, "Huntsman's kit");
+static final Map<Integer, String> KITS = Ak.byId("d30");
 
 /**
 * A click inside a kit's window names the item, never the kit, so the kit's contents changing is
@@ -1170,12 +1170,8 @@ public void onGameTick(GameTick /* event */b) {
  if (!nh()) {
   // A fenced account (login, switch, restore) drops pending bag evidence untouched (Codex review 1.2).
   engine.eb.drop(BG, FE);
-  if (client.getGameState() == LOGGED_IN) {
-   if (persistence.py() && nh()) {
-    ve();
-   }
-   pulse();
-  }
+  // The identity-ready flag waits for a ready tick below; consuming it here lost ve() (1.3.1).
+  if (client.getGameState() == LOGGED_IN) pulse();
   return;
  }
  if (persistence.py()) ve();
@@ -1353,7 +1349,8 @@ void aby(boolean /* pending */a, String /* sourceName */b, Collection<ItemStack>
 @Subscribe
 public void onConfigChanged(ConfigChanged /* event */b) {
  if (b == null || b.getGroup() == null) return;
- if (Bc.GROUP.equals(b.getGroup())) {
+ if (Bc.GROUP.equals(b.getGroup()) || "grounditemsplugin".equals(b.getKey())) {
+  // Ground Items turned on or off (RuneLite saves that as runelite.grounditemsplugin, 1.3.1).
   // The Ground Items list preferences changed: re-read the filter authority and
   // repaint the sidebar. Presentation only; stored receipts never change.
   lootPresentationFilter.refresh();
@@ -1504,7 +1501,8 @@ String itemName(int /* itemId */a) {
 }
 
 String normalize(String /* text */a) {
- return a == null ? "" : a.replaceAll("<[^>]+>", "").trim().toLowerCase(Locale.ROOT);
+ // RuneLite's precompiled tag pattern: this runs on every chat line, click and tick (1.3.1).
+ return a == null ? "" : Text.removeTags(a).trim().toLowerCase(Locale.ROOT);
 }
 
 @Provides

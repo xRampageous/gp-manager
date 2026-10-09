@@ -492,7 +492,8 @@ private Filepath aktLocked(long /* now */a) throws IOException {
  .format(Instant.ofEpochMilli(a));
  Filepath /* file */c = repository.backupDirectory.joinSegment(b + ".json");
  for (int n = 2; c.exists() && n < 1_000; n++) {
-  c = repository.backupDirectory.joinSegment(b + "-" + n + ".json");
+  // "_" sorts after ".", so a same-second copy lists as the newer one and is kept (1.3.1).
+  c = repository.backupDirectory.joinSegment(b + "_" + n + ".json");
  }
  String /* json */d;
  synchronized (engine) {

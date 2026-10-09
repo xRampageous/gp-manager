@@ -64,13 +64,14 @@ static String signed(long /* value */a) {
 static String compact(long /* value */a) {
  long /* abs */b = Ae.abs(a);
  if (b < 1_000L) return Long.toString(b);
- if (b < 99_950L) return String.format(ROOT, "%.1fk", b / 1_000d);
- if (b < 999_500L) return round(b / 1_000d) + "k";
- if (b < 9_995_000L) return String.format(ROOT, "%.2fM", b / 1_000_000d);
- if (b < 99_950_000L) return String.format(ROOT, "%.1fM", b / 1_000_000d);
- if (b < 999_500_000L) return round(b / 1_000_000d) + "M";
- if (b < 9_995_000_000L) return String.format(ROOT, "%.2fB", b / 1_000_000_000d);
- return String.format(ROOT, "%.1fB", b / 1_000_000_000d);
+ // Cut off, never rounded up, like the game's own stack numbers: 999,600 is 999k (owner 1.3.1).
+ if (b < 100_000L) return String.format(ROOT, "%.1fk", b / 100 / 10d);
+ if (b < 1_000_000L) return b / 1_000 + "k";
+ if (b < 10_000_000L) return String.format(ROOT, "%.2fM", b / 10_000 / 100d);
+ if (b < 100_000_000L) return String.format(ROOT, "%.1fM", b / 100_000 / 10d);
+ if (b < 1_000_000_000L) return b / 1_000_000 + "M";
+ if (b < 10_000_000_000L) return String.format(ROOT, "%.2fB", b / 10_000_000 / 100d);
+ return String.format(ROOT, "%.1fB", b / 100_000_000 / 10d);
 }
 
 /** {@code +124,318} with grouping and a true minus sign. */

@@ -70,9 +70,9 @@ public Dimension render(Graphics2D g) {
  FontMetrics /* fg */c = g.getFontMetrics(big);
  int /* key */d = fontSize.ordinal() * 1_000 + config.hudMaxWidth();
  if (s != measured || d != measuredKey) {
+  measure(s, a, b, c);
   measured = s;
   measuredKey = d;
-  measure(s, a, b, c);
  }
  long /* wall */e = Ae.now();
  if (s != clocked) {

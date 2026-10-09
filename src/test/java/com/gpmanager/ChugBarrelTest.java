@@ -97,6 +97,9 @@ public class ChugBarrelTest
         assertTrue(line.matches());
         new ChargeIntake(null, null, CONFIG, engine, valuation).emptied(Ar.acm(line.group(1)), 1_001_000L);
         assertEquals(-138_000L, engine.getMetrics(1_100_000L).net);
+        Ac row = engine.getActiveSession().getTransactions().get(0);
+        assertEquals("an exact count, not an estimate", "Measured charge spend · Bryophyta's staff", row.getNote());
+        assertEquals(Bd.CONFIRMED, row.getConfidence());
     }
 
     private static ItemComposition composition(int id)

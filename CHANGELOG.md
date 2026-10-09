@@ -1,5 +1,17 @@
 # GP Manager changelog
 
+## 1.3.1 — 2026-10-10
+
+**New**
+- "Report a bug" in the ⚙ menu opens GitHub's bug report and suggestion forms.
+
+**Fixed**
+- Uncharging Bryophyta's staff shows as a measured charge spend, not an estimate.
+- Turning RuneLite's Ground Items plugin on or off updates the loot filter straight away.
+- Two backups made in the same second keep the newer one.
+- Short amounts are cut off like the game's own numbers, never rounded up: 999,600 shows as 999k.
+- Less work on every game tick, and a fix for one start-up step that could be skipped.
+
 ## 1.3.0 — 2026-10-09
 
 **New**

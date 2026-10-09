@@ -308,6 +308,7 @@ JPopupMenu mv() {
  a.add(item("Restore backup\u2026", persistence != null, () -> agm()));
  a.add(item("Clear old backups", persistence != null, this::qw));
  a.add(item(msg("fg"), () -> qr()));
+ a.add(item("Report a bug", () -> net.runelite.client.util.LinkBrowser.browse(msg("bug"))));
  a.addSeparator();
  a.add(item(msg("kj"), persistence != null, () -> ti()));
  return a;

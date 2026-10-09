@@ -40,6 +40,8 @@ ge	This lifecycle could not be settled exactly; it needs your review.
 bwr	Barrows wear
 bww	Barrows gear wore down a stage or was repaired: the same item, so neutral. Repair fees still count.
 chb	Drunk from the chugging barrel: one dose of each potion in it, as the game's own lines name them.
+unc	The game counted these charges out when you uncharged 
+bug	https://github.com/xRampageous/gp-manager/issues/new/choose
 srv	Servant bank trip
 srw	A house servant fetched, banked or un-noted these items: moved, not gained or spent.
 gbank	 Collected to the bank after filling at several prices: it counts the highest tax it could have paid, so its result is never overstated.
