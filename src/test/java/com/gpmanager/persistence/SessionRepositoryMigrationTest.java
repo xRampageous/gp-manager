@@ -20,14 +20,14 @@ public class SessionRepositoryMigrationTest
         Files.createDirectories(current);
         Files.writeString(
             current.resolve("sessions.json"),
-            "{\"generalSession\":{\"name\":\"Legacy\",\"transactions\":[]},\"history\":[]}",
+            "{\"schemaVersion\":109,\"generalSession\":{\"name\":\"Legacy\",\"transactions\":[]},\"history\":[]}",
             StandardCharsets.UTF_8);
 
         SavedState state = new SessionRepository(new Gson(), FilepathTestSupport.root(current)).load();
 
         assertEquals("Legacy", state.getActiveSession().getName());
         assertTrue(state.getActiveSession().undoHistory.isEmpty());
-        assertNull(state.getActiveSession().agn(1_000L));
+        assertNull(state.getActiveSession().restoreUndo());
     }
 
     @Test
@@ -38,12 +38,12 @@ public class SessionRepositoryMigrationTest
         Files.createDirectories(current);
         Files.writeString(
             current.resolve("sessions.json"),
-            "{\"generalSession\":{\"name\":\"Broken undo\",\"transactions\":[],\"undoHistory\":[null,{\"timestampEpochMillis\":5}]},\"history\":[]}",
+            "{\"schemaVersion\":109,\"generalSession\":{\"name\":\"Broken undo\",\"transactions\":[],\"undoHistory\":[null,{\"timestampEpochMillis\":5}]},\"history\":[]}",
             StandardCharsets.UTF_8);
 
         SavedState state = new SessionRepository(new Gson(), FilepathTestSupport.root(current)).load();
 
         assertEquals(2, state.getActiveSession().undoHistory.size());
-        assertNull(state.getActiveSession().agn(1_000L));
+        assertNull(state.getActiveSession().restoreUndo());
     }
 }

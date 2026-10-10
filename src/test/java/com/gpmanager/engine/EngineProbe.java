@@ -1,6 +1,5 @@
 package com.gpmanager;
 
-import java.util.List;
 
 /** Test-side reads of engine state; moved out of production to keep the plugin small. */
 public final class EngineProbe
@@ -9,49 +8,56 @@ public final class EngineProbe
     {
     }
 
-    private static Az pool(Am engine, int itemId) {
+    private static BasisPool pool(Engine engine, int itemId) {
         synchronized (engine.trackedBasis) {
             return engine.trackedBasis.pools.get(itemId);
         }
     }
 
-    public static long availableQty(Am engine, int itemId) {
-        Az pool = pool(engine, itemId);
+    public static long availableQty(Engine engine, int itemId) {
+        BasisPool pool = pool(engine, itemId);
         return pool == null ? 0L : pool.getAvailableQty();
     }
 
-    public static long availableBasisGp(Am engine, int itemId) {
-        Az pool = pool(engine, itemId);
+    public static long availableBasisGp(Engine engine, int itemId) {
+        BasisPool pool = pool(engine, itemId);
         return pool == null ? 0L : pool.getAvailableBasisGp();
     }
 
-    public static long reservedQty(Am engine, int itemId) {
-        Az pool = pool(engine, itemId);
-        return pool == null ? 0L : pool.getReservedQty();
+    /** Known coverage held out by the item's open SELL custody records. */
+    public static long reservedQty(Engine engine, int itemId) {
+        long total = 0L;
+        for (GeOffer record : engine.geCustody.records()) {
+            if (record.itemId == itemId && record.getSide() == GeOffer.Side.SELL) total += record.reservedQty();
+        }
+        return total;
     }
 
-    public static long reservedBasisGp(Am engine, int itemId) {
-        Az pool = pool(engine, itemId);
-        return pool == null ? 0L : pool.getReservedBasisGp();
+    public static long reservedBasisGp(Engine engine, int itemId) {
+        long total = 0L;
+        for (GeOffer record : engine.geCustody.records()) {
+            if (record.itemId == itemId && record.getSide() == GeOffer.Side.SELL) total += record.reservedBasis();
+        }
+        return total;
     }
 
     /** Exact known coverage for one canonical item. */
-    public static long knownCoverageQty(Am engine, int itemId) {
+    public static long knownCoverageQty(Engine engine, int itemId) {
         return availableQty(engine, itemId) + reservedQty(engine, itemId);
     }
 
     /** Exact known coverage basis for one canonical item. */
-    public static long knownCoverageBasisGp(Am engine, int itemId) {
+    public static long knownCoverageBasisGp(Engine engine, int itemId) {
         return availableBasisGp(engine, itemId) + reservedBasisGp(engine, itemId);
     }
 
-    public static boolean isBaselinePriming(Am engine) {
+    public static boolean isBaselinePriming(Engine engine) {
         synchronized (engine) {
             return engine.baselinePriming;
         }
     }
 
-    public static boolean isAwaitingDeathReclaim(Am engine)
+    public static boolean isAwaitingDeathReclaim(Engine engine)
     {
         synchronized (engine)
         {
@@ -66,22 +72,5 @@ public final class EngineProbe
         {
             return ledger.pendingSettlementCashGp;
         }
-    }
-
-    /** Profile PvP facts over the retained Sessions' projections and anchors. */
-    public static PkProfileBase profileFacts(PkHistoryArchive archive, List<Ad> sessions)
-    {
-        PkProfileBase facts = new PkProfileBase();
-        if (sessions != null)
-        {
-            for (Ad session : sessions)
-            {
-                if (session != null && session.pkProjection != null)
-                {
-                    facts.merge(session.pkProjection, session.getPkAttributions());
-                }
-            }
-        }
-        return facts;
     }
 }

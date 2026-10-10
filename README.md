@@ -7,7 +7,7 @@ See what you actually make while you play. GP Manager tracks your gains, supplie
 - **Live** – your Net, GP/h, gains, supplies and losses as you play, plus your latest drops. Click the Net to set a GP or time target.
 - **Ledger** – every gain, loss, trade and death, with the reason it counted. Open any row to see the items behind it, and fix anything from one Correct menu. Anything it wasn't sure about waits in Review for you.
 - **Grinds** – name what you're doing (Vorkath, Zulrah, a skilling spot), save it with targets and compare your runs, including loot by the monster that dropped it. Between Grinds it tracks Free play on its own.
-- **All time** – your total Net and GP/h, your best Grinds, and your wealth: your bank plus what you carry.
+- **All time** – your total Net and GP/h and your best Grinds.
 - **HUD+** – an optional box in the game window with your Net, GP/h and a loot tray for the current kill streak.
 - **PvP** – kills, deaths and player loot in dangerous areas, plus what a death there would cost you.
 
@@ -31,7 +31,7 @@ If it isn't sure what happened, it doesn't guess: the entry waits in Review with
 
 ## Your data
 
-Everything stays on your computer, in one profile per account. The **⚙** menu backs up, restores or resets your profile and shows where it's kept. GP Manager makes no network calls of its own and never plays the game for you.
+Everything stays on your computer, in one profile per account. The **⚙** menu backs up or resets your profile and shows where it's kept; to restore a backup, copy it over the profile file while RuneLite is closed. GP Manager makes no network calls of its own and never plays the game for you.
 
 ## Feedback
 

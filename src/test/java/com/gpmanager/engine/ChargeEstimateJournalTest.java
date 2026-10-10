@@ -10,8 +10,8 @@ public class ChargeEstimateJournalTest
     public void aMeasuredCheckClearsItsWeaponsPendingEstimates()
     {
         ChargeEstimateJournal journal = new ChargeEstimateJournal();
-        journal.record("s1", "target", "Crystal bow", "tx1", 23962, 200L);
-        journal.record("s2", "target", "Tome of fire", "tx2", 20718, 20L);
+        journal.record("s1", "target", "tx1", 23962, 200L);
+        journal.record("s2", "target", "tx2", 20718, 20L);
         assertEquals(1, journal.receipts("s1", "target", 23962).size());
 
         journal.clearTarget("s1", "target");

@@ -36,7 +36,7 @@ public class RewardChestBankAllTest
     @Test
     public void bankAllBooksWhatLeavesTheChestOnceAndIgnoresOtherContainers()
     {
-        Am engine = ReviewFixesTest.engine();
+        Engine engine = ReviewFixesTest.engine();
         int[] tick = {100};
         Item[][] chest = {{new Item(ItemID.TWISTED_BOW, 1), new Item(ItemID.DRAGON_ARROW, 50), null}};
         ItemContainer rewards = (ItemContainer) Proxy.newProxyInstance(ItemContainer.class.getClassLoader(),
@@ -59,24 +59,24 @@ public class RewardChestBankAllTest
         plugin.snapshotFactory = new ContainerSnapshotFactory(client, null);
 
         plugin.bankAll(InterfaceID.RAIDS_REWARDS);
-        assertEquals("the click alone books nothing", 0L, engine.baseline.aea(ItemID.TWISTED_BOW));
+        assertEquals("the click alone books nothing", 0L, engine.baseline.quantityOf(ItemID.TWISTED_BOW));
         plugin.chestChanged(InventoryID.RAIDS_REWARDS, rewards);
-        assertEquals("a refused Bank-all moves nothing", 0L, engine.baseline.aea(ItemID.TWISTED_BOW));
+        assertEquals("a refused Bank-all moves nothing", 0L, engine.baseline.quantityOf(ItemID.TWISTED_BOW));
 
         chest[0] = new Item[]{new Item(ItemID.DRAGON_ARROW, 20)};
         tick[0]++;
         plugin.chestChanged(InventoryID.RAIDS_REWARDS, rewards);
-        assertEquals("the bow reads as picked up", -1L, engine.baseline.aea(ItemID.TWISTED_BOW));
-        assertEquals("only the arrows that left", -30L, engine.baseline.aea(ItemID.DRAGON_ARROW));
+        assertEquals("the bow reads as picked up", -1L, engine.baseline.quantityOf(ItemID.TWISTED_BOW));
+        assertEquals("only the arrows that left", -30L, engine.baseline.quantityOf(ItemID.DRAGON_ARROW));
 
         tick[0] += 6;
         plugin.bankAll(InterfaceID.RAIDS_REWARDS);
         plugin.chestChanged(InventoryID.RAIDS_REWARDS, rewards);
-        assertEquals("a repeated click books nothing again", -1L, engine.baseline.aea(ItemID.TWISTED_BOW));
-        assertEquals(-30L, engine.baseline.aea(ItemID.DRAGON_ARROW));
+        assertEquals("a repeated click books nothing again", -1L, engine.baseline.quantityOf(ItemID.TWISTED_BOW));
+        assertEquals(-30L, engine.baseline.quantityOf(ItemID.DRAGON_ARROW));
 
         chest[0] = new Item[0];
         plugin.chestChanged(InventoryID.BANK, rewards);
-        assertEquals("another container is not the chest", -30L, engine.baseline.aea(ItemID.DRAGON_ARROW));
+        assertEquals("another container is not the chest", -30L, engine.baseline.quantityOf(ItemID.DRAGON_ARROW));
     }
 }

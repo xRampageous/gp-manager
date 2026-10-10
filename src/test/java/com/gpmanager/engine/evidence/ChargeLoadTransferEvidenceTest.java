@@ -15,17 +15,17 @@ public final class ChargeLoadTransferEvidenceTest
     @Test
     public void itemOnItemIntentCannotPartitionWithoutQuantity()
     {
-        Am evidence = ReviewFixesTest.engine();
-        assertTrue(evidence.yx(
-            Ar.V.V1b,
+        Engine evidence = ReviewFixesTest.engine();
+        assertTrue(evidence.markChargeLoad(
+            ChargeCheck.ChargedItem.BLOWPIPE,
             12934,
             "Zulrah's scales",
             null,
             5));
 
-        Ab scales = new Ab(12934, "Zulrah's scales", -50L, 100, -5_000L);
-        Ab darts = new Ab(ItemID.RUNE_DART, "Rune dart", -1L, 500, -500L);
-        El partition = evidence.cp(Arrays.asList(scales, darts));
+        Flow scales = new Flow(12934, "Zulrah's scales", -50L, 100, -5_000L);
+        Flow darts = new Flow(ItemID.RUNE_DART, "Rune dart", -1L, 500, -500L);
+        LoadTarget partition = evidence.loadTarget(Arrays.asList(scales, darts));
 
         assertTrue(partition.remaining.isEmpty());
         assertEquals(Arrays.asList(scales, darts), partition.ambiguousCandidates);
@@ -34,13 +34,13 @@ public final class ChargeLoadTransferEvidenceTest
     @Test
     public void allSupportedSameIdCandidatesStayInReview()
     {
-        Am evidence = ReviewFixesTest.engine();
-        assertTrue(evidence.yx(
-            Ar.V.V1b, 12934, "Zulrah's scales", null, 5));
-        Ab first = new Ab(12934, "Zulrah's scales", -20L, 100, -2_000L);
-        Ab second = new Ab(12934, "Zulrah's scales", -30L, 100, -3_000L);
+        Engine evidence = ReviewFixesTest.engine();
+        assertTrue(evidence.markChargeLoad(
+            ChargeCheck.ChargedItem.BLOWPIPE, 12934, "Zulrah's scales", null, 5));
+        Flow first = new Flow(12934, "Zulrah's scales", -20L, 100, -2_000L);
+        Flow second = new Flow(12934, "Zulrah's scales", -30L, 100, -3_000L);
 
-        El partition = evidence.cp(Arrays.asList(first, second));
+        LoadTarget partition = evidence.loadTarget(Arrays.asList(first, second));
 
         assertTrue(partition.remaining.isEmpty());
         assertEquals(Arrays.asList(first, second), partition.ambiguousCandidates);
@@ -49,14 +49,14 @@ public final class ChargeLoadTransferEvidenceTest
     @Test
     public void secondSameIdLossInWindowAlsoFailsClosed()
     {
-        Am evidence = ReviewFixesTest.engine();
-        assertTrue(evidence.yx(
-            Ar.V.V1b, 12934, "Zulrah's scales", null, 5));
-        Ab first = new Ab(12934, "Zulrah's scales", -3L, 100, -300L);
-        Ab second = new Ab(12934, "Zulrah's scales", -2L, 100, -200L);
+        Engine evidence = ReviewFixesTest.engine();
+        assertTrue(evidence.markChargeLoad(
+            ChargeCheck.ChargedItem.BLOWPIPE, 12934, "Zulrah's scales", null, 5));
+        Flow first = new Flow(12934, "Zulrah's scales", -3L, 100, -300L);
+        Flow second = new Flow(12934, "Zulrah's scales", -2L, 100, -200L);
 
-        El firstPartition = evidence.cp(Collections.singletonList(first));
-        El secondPartition = evidence.cp(Collections.singletonList(second));
+        LoadTarget firstPartition = evidence.loadTarget(Collections.singletonList(first));
+        LoadTarget secondPartition = evidence.loadTarget(Collections.singletonList(second));
 
         assertEquals(Collections.singletonList(first), firstPartition.ambiguousCandidates);
         assertEquals(Collections.singletonList(second), secondPartition.ambiguousCandidates);
@@ -65,37 +65,37 @@ public final class ChargeLoadTransferEvidenceTest
     @Test
     public void anotherWeaponComponentAndMismatchedIdentityCannotArm()
     {
-        Am evidence = ReviewFixesTest.engine();
-        assertFalse(evidence.yx(
-            Ar.V.V1b,
+        Engine evidence = ReviewFixesTest.engine();
+        assertFalse(evidence.markChargeLoad(
+            ChargeCheck.ChargedItem.BLOWPIPE,
             ItemID.RUNE_DART,
             "Adamant dart",
             null,
             5));
-        assertTrue(evidence.yx(
-            Ar.V.V1b,
+        assertTrue(evidence.markChargeLoad(
+            ChargeCheck.ChargedItem.BLOWPIPE,
             ItemID.RUNE_DART,
             "Rune dart",
             null,
             5));
 
-        Ab scales = new Ab(12934, "Zulrah's scales", -2L, 100, -200L);
-        El partition = evidence.cp(Collections.singletonList(scales));
+        Flow scales = new Flow(12934, "Zulrah's scales", -2L, 100, -200L);
+        LoadTarget partition = evidence.loadTarget(Collections.singletonList(scales));
         assertEquals(Collections.singletonList(scales), partition.remaining);
     }
 
     @Test
     public void intentExpiresOnTickWithoutInventorySettlement()
     {
-        Am evidence = ReviewFixesTest.engine();
-        assertTrue(evidence.yx(
-            Ar.V.TRIDENT_SEAS,
+        Engine evidence = ReviewFixesTest.engine();
+        assertTrue(evidence.markChargeLoad(
+            ChargeCheck.ChargedItem.TRIDENT_SEAS,
             560,
             "Death rune",
             null,
             2));
-        evidence.eb.tick(evidence.eb.now + 1);
-        evidence.eb.tick(evidence.eb.now + 1);
+        evidence.inbox.tick(evidence.inbox.now + 1);
+        evidence.inbox.tick(evidence.inbox.now + 1);
     }
 
 }

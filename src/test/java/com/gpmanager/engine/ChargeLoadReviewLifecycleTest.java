@@ -22,7 +22,7 @@ public class ChargeLoadReviewLifecycleTest
         JsonCodec.bind(new com.google.gson.Gson());
     }
 
-    private static final String TARGET = "149:0:9764864:12934:V1b";
+    private static final String TARGET = "149:0:9764864:12934:BLOWPIPE";
     private static final GpManagerConfig CONFIG = new GpManagerConfig()
     {
         @Override public int stabilizationTicks() { return 2; }
@@ -32,35 +32,36 @@ public class ChargeLoadReviewLifecycleTest
     @Test
     public void measuredCheckConvertsLoadAndLaterUseBooksOneCost()
     {
-        Am engine = engine();
+        Engine engine = engine();
         long start = 10_000L;
-        engine.rm(start);
+        engine.ensureSession(start);
         engine.setBaseline(snapshot(12934, 100L));
-        ChargeOutcomeTest.none(engine.abu(blowpipe(0, 10), TARGET, start));
+        ChargeOutcomeTest.none(engine.observeCheck(blowpipe(0, 10), TARGET, start));
 
-        engine.yx(Ar.V.V1b,
+        engine.markChargeLoad(ChargeCheck.ChargedItem.BLOWPIPE,
             12934, "Zulrah's scales", TARGET, 8);
-        engine.yz();
-        Ac load = settle(engine, snapshot(12934, 50L), start + 600L);
-        assertEquals("a validated recharge is neutral on arrival", Ai.TRANSFER, load.tm());
+        engine.markDirty();
+        Transaction load = settle(engine, snapshot(12934, 50L), start + 600L);
+        assertEquals("a validated recharge is neutral on arrival", TransactionType.TRANSFER, load.autoType());
         assertFalse(load.isCounted());
         assertEquals("Charge load transfer", load.getNote());
         assertEquals(0L, engine.getMetrics(start + 2_400L).net);
         assertEquals(0L, engine.getMetrics(start + 2_400L).costs);
 
-        ChargeOutcomeTest.none(engine.abu(blowpipe(50, 10), TARGET, start + 3_000L));
-        assertEquals(Ai.TRANSFER, load.tm());
+        assertEquals("the loaded scales are not use", ChargeDelta.CheckResult.SAME,
+            engine.observeCheck(blowpipe(50, 10), TARGET, start + 3_000L).result);
+        assertEquals(TransactionType.TRANSFER, load.autoType());
         assertEquals(0L, engine.getMetrics(start + 3_000L).net);
 
-        Cm use = engine.abu(
+        ChargeDelta use = engine.observeCheck(
             blowpipe(48, 10), TARGET, start + 4_000L);
         assertNotNull(use);
-        Ac spend = engine.mj(
+        Transaction spend = engine.bookChargeSpend(
             use,
             "Toxic blowpipe",
-            Collections.singletonList(new Ab(12934, "Zulrah's scales", -2L, 100,
-                -200L, Av.GRAND_EXCHANGE)),
-            start + 4_000L);
+            Collections.singletonList(new Flow(12934, "Zulrah's scales", -2L, 100,
+                -200L, PriceSource.GRAND_EXCHANGE)),
+            start + 4_000L, null);
         assertTrue(spend != null);
         assertEquals(-200L, spend.getNet());
         assertEquals(200L, engine.getMetrics(start + 4_000L).costs);
@@ -71,48 +72,47 @@ public class ChargeLoadReviewLifecycleTest
     @Test
     public void measuredCheckConversionAdvancesTheRevision()
     {
-        Am engine = engine();
+        Engine engine = engine();
         long start = 10_000L;
-        engine.rm(start);
+        engine.ensureSession(start);
         engine.setBaseline(snapshot(12934, 100L));
-        engine.abu(blowpipe(0, 10), TARGET, start);
-        engine.yx(Ar.V.V1b,
+        engine.observeCheck(blowpipe(0, 10), TARGET, start);
+        engine.markChargeLoad(ChargeCheck.ChargedItem.BLOWPIPE,
             12934, "Zulrah's scales", TARGET, 8);
-        engine.yz();
+        engine.markDirty();
         long before = engine.getRevision();
-        Ac load = settle(engine, snapshot(12934, 50L), start + 600L);
-        assertEquals(Ai.TRANSFER, load.tm());
+        Transaction load = settle(engine, snapshot(12934, 50L), start + 600L);
+        assertEquals(TransactionType.TRANSFER, load.autoType());
         assertTrue("the load transfer is saved", engine.getRevision() > before);
     }
 
     @Test
     public void tridentRecipeCheckConvertsTheCompleteMeasuredLoad()
     {
-        Am engine = engine();
+        Engine engine = engine();
         long start = 15_000L;
         String target = "149:0:9764864:11905:TRIDENT_SEAS";
-        engine.rm(start);
+        engine.ensureSession(start);
         engine.setBaseline(snapshot(mapOf(560, 10L, 562, 10L, 554, 50L, 995, 100L)));
-        ChargeOutcomeTest.none(engine.abu(
-            Ar.acs("Your Trident of the seas has 10 charges."),
+        ChargeOutcomeTest.none(engine.observeCheck(
+            ChargeCheck.parse("Your Trident of the seas has 10 charges."),
             target,
             start));
 
-        engine.yx(Ar.V.TRIDENT_SEAS,
+        engine.markChargeLoad(ChargeCheck.ChargedItem.TRIDENT_SEAS,
             560, "Death rune", target, 8);
-        engine.yz();
-        Ac review = settle(engine,
+        engine.markDirty();
+        Transaction review = settle(engine,
             snapshot(mapOf(560, 8L, 562, 8L, 554, 40L, 995, 80L)),
             start + 600L);
-        assertEquals(Ai.TRANSFER, review.tm());
+        assertEquals(TransactionType.TRANSFER, review.autoType());
         assertEquals(4, review.getFlows().size());
         assertEquals(0L, engine.getMetrics(start + 2_400L).net);
 
-        ChargeOutcomeTest.none(engine.abu(
-            Ar.acs("Your Trident of the seas has 12 charges."),
-            target,
-            start + 3_000L));
-        assertEquals(Ai.TRANSFER, review.tm());
+        assertEquals("the 2 loaded charges are not use", ChargeDelta.CheckResult.SAME,
+            engine.observeCheck(ChargeCheck.parse("Your Trident of the seas has 12 charges."),
+                target, start + 3_000L).result);
+        assertEquals(TransactionType.TRANSFER, review.autoType());
         assertEquals(4, review.getFlows().size());
         assertEquals(0L, engine.getMetrics(start + 3_000L).net);
     }
@@ -120,16 +120,16 @@ public class ChargeLoadReviewLifecycleTest
     @Test
     public void noCheckAfterConfiguredWindowLeavesLossInReview()
     {
-        Am engine = engine();
+        Engine engine = engine();
         long start = 25_000L;
-        engine.rm(start);
+        engine.ensureSession(start);
         engine.setBaseline(snapshot(12934, 100L));
-        engine.yx(Ar.V.V1b,
+        engine.markChargeLoad(ChargeCheck.ChargedItem.BLOWPIPE,
             12934, "Zulrah's scales", TARGET, 8);
-        engine.yz();
-        Ac load = settle(engine, snapshot(12934, 50L), start + 600L);
+        engine.markDirty();
+        Transaction load = settle(engine, snapshot(12934, 50L), start + 600L);
 
-        assertEquals("a validated recharge never waits in Review", Ai.TRANSFER, load.tm());
+        assertEquals("a validated recharge never waits in Review", TransactionType.TRANSFER, load.autoType());
         assertFalse(load.isCounted());
         assertEquals("Charge load transfer", load.getNote());
         assertEquals(0L, engine.getMetrics(start + 11 * 60_000L).net);
@@ -138,21 +138,21 @@ public class ChargeLoadReviewLifecycleTest
     @Test
     public void stalePreLoadCheckCannotConfirmFreshReviewRow()
     {
-        Am engine = engine();
+        Engine engine = engine();
         long start = 50_000L;
-        engine.rm(start);
+        engine.ensureSession(start);
         engine.setBaseline(snapshot(12934, 100L));
-        engine.abu(blowpipe(0, 10), TARGET, start);
+        engine.observeCheck(blowpipe(0, 10), TARGET, start);
 
-        engine.yx(Ar.V.V1b,
+        engine.markChargeLoad(ChargeCheck.ChargedItem.BLOWPIPE,
             12934, "Zulrah's scales", TARGET, 8);
-        engine.yz();
+        engine.markDirty();
         long settleAt = start + 11 * 60_000L;
-        Ac review = settle(engine, snapshot(12934, 50L), settleAt);
-        assertEquals(Ai.TRANSFER, review.tm());
+        Transaction review = settle(engine, snapshot(12934, 50L), settleAt);
+        assertEquals(TransactionType.TRANSFER, review.autoType());
 
-        engine.abu(blowpipe(50, 10), TARGET, settleAt + 3_000L);
-        assertEquals(Ai.TRANSFER, review.tm());
+        engine.observeCheck(blowpipe(50, 10), TARGET, settleAt + 3_000L);
+        assertEquals(TransactionType.TRANSFER, review.autoType());
         assertFalse(review.isCounted());
         assertEquals(0L, engine.getMetrics(settleAt + 3_000L).net);
     }
@@ -160,52 +160,54 @@ public class ChargeLoadReviewLifecycleTest
     @Test
     public void blowpipeCheckConfirmsScalesButLeavesUnmeasuredDartsInReview()
     {
-        Am engine = engine();
+        Engine engine = engine();
         long start = 20_000L;
-        engine.rm(start);
+        engine.ensureSession(start);
         engine.setBaseline(snapshot(mapOf(12934, 100L,  ItemID.RUNE_DART, 10L)));
-        ChargeOutcomeTest.none(engine.abu(blowpipe(0, 10), TARGET, start));
+        ChargeOutcomeTest.none(engine.observeCheck(blowpipe(0, 10), TARGET, start));
 
-        engine.yx(Ar.V.V1b,
+        engine.markChargeLoad(ChargeCheck.ChargedItem.BLOWPIPE,
             12934, "Zulrah's scales", TARGET, 8);
-        engine.yz();
+        engine.markDirty();
         settle(engine, snapshot(mapOf(12934, 50L, ItemID.RUNE_DART, 9L)), start + 600L);
 
-        Cm dartUse = engine.abu(
+        ChargeDelta dartUse = engine.observeCheck(
             blowpipe(50, 9), TARGET, start + 3_000L);
         assertNotNull(dartUse);
-        Ac spent = engine.mj(dartUse,
+        Transaction spent = engine.bookChargeSpend(dartUse,
             "Toxic blowpipe",
-            Collections.singletonList(new Ab(ItemID.RUNE_DART, "Rune dart", -1L, 500,
-                -500L, Av.GRAND_EXCHANGE)),
-            start + 3_000L);
-        List<Ac> rows = engine.getActiveSession().getTransactions();
-        Ac transfer = only(rows, Ai.TRANSFER);
+            Collections.singletonList(new Flow(ItemID.RUNE_DART, "Rune dart", -2L, 500,
+                -1_000L, PriceSource.GRAND_EXCHANGE)),
+            start + 3_000L, null);
+        List<Transaction> rows = engine.getActiveSession().getTransactions();
+        Transaction transfer = only(rows, TransactionType.TRANSFER);
         assertEquals("scales and darts load as one neutral transfer", 2,
             transfer.getFlows().size());
         assertFalse(transfer.isCounted());
+        // The pack's dart went into the pipe with the scales, and the pipe holds one fewer than
+        // the last Check: two darts left it.
         assertTrue("the measured dart use is the cost", spent != null);
-        assertEquals(500L, engine.getMetrics(start + 3_000L).costs);
+        assertEquals(1_000L, engine.getMetrics(start + 3_000L).costs);
     }
 
     @Test
     public void partialCheckConfirmationTransfersOnlyMeasuredScaleQuantity()
     {
-        Am engine = engine();
+        Engine engine = engine();
         long start = 22_000L;
-        engine.rm(start);
+        engine.ensureSession(start);
         engine.setBaseline(snapshot(12934, 100L));
-        engine.abu(blowpipe(0, 10), TARGET, start);
-        engine.yx(Ar.V.V1b,
+        engine.observeCheck(blowpipe(0, 10), TARGET, start);
+        engine.markChargeLoad(ChargeCheck.ChargedItem.BLOWPIPE,
             12934, "Zulrah's scales", TARGET, 8);
-        engine.yz();
-        Ac load = settle(engine, snapshot(12934, 50L), start + 600L);
+        engine.markDirty();
+        Transaction load = settle(engine, snapshot(12934, 50L), start + 600L);
 
-        assertEquals(Ai.TRANSFER, load.tm());
+        assertEquals(TransactionType.TRANSFER, load.autoType());
         assertEquals(-50L, load.getFlows().get(0).quantityDelta);
-        engine.abu(blowpipe(40, 10), TARGET, start + 3_000L);
+        engine.observeCheck(blowpipe(40, 10), TARGET, start + 3_000L);
         assertEquals("a later lower read never repriced the neutral transfer",
-            Ai.TRANSFER, load.tm());
+            TransactionType.TRANSFER, load.autoType());
         assertFalse(load.isCounted());
         assertEquals(0L, engine.getMetrics(start + 3_000L).net);
     }
@@ -213,26 +215,26 @@ public class ChargeLoadReviewLifecycleTest
     @Test
     public void multipleSameTargetLossesStayInReviewAndOwnerCorrectionIsAvailable()
     {
-        Am engine = engine();
+        Engine engine = engine();
         long start = 30_000L;
-        engine.rm(start);
+        engine.ensureSession(start);
         engine.setBaseline(snapshot(12934, 100L));
 
-        engine.yx(Ar.V.V1b,
+        engine.markChargeLoad(ChargeCheck.ChargedItem.BLOWPIPE,
             12934, "Zulrah's scales", TARGET, 8);
-        engine.yz();
+        engine.markDirty();
         settle(engine, snapshot(12934, 90L), start + 600L);
-        engine.yx(Ar.V.V1b,
+        engine.markChargeLoad(ChargeCheck.ChargedItem.BLOWPIPE,
             12934, "Zulrah's scales", TARGET, 8);
-        engine.yz();
+        engine.markDirty();
         settle(engine, snapshot(12934, 80L), start + 3_000L);
 
-        ChargeOutcomeTest.none(engine.abu(blowpipe(0, 10), TARGET, start + 5_000L));
-        ChargeOutcomeTest.none(engine.abu(blowpipe(20, 10), TARGET, start + 6_000L));
-        List<Ac> transfers = new ArrayList<>();
-        for (Ac row : engine.getActiveSession().getTransactions())
+        ChargeOutcomeTest.none(engine.observeCheck(blowpipe(0, 10), TARGET, start + 5_000L));
+        ChargeOutcomeTest.none(engine.observeCheck(blowpipe(20, 10), TARGET, start + 6_000L));
+        List<Transaction> transfers = new ArrayList<>();
+        for (Transaction row : engine.getActiveSession().getTransactions())
         {
-            if (row.tm() == Ai.TRANSFER)
+            if (row.autoType() == TransactionType.TRANSFER)
             {
                 transfers.add(row);
             }
@@ -240,8 +242,8 @@ public class ChargeLoadReviewLifecycleTest
         assertEquals("each validated load transfers on arrival", 2, transfers.size());
         assertFalse(transfers.get(0).isCounted());
         assertFalse(transfers.get(1).isCounted());
-        assertEquals(Au.CHARGE_LOAD_AMBIGUOUS, transfers.get(0).getActionKind());
-        assertEquals(Au.CHARGE_LOAD_AMBIGUOUS, transfers.get(1).getActionKind());
+        assertEquals(ActionKind.CHARGE_LOAD_AMBIGUOUS, transfers.get(0).getActionKind());
+        assertEquals(ActionKind.CHARGE_LOAD_AMBIGUOUS, transfers.get(1).getActionKind());
         assertEquals(0L, engine.getMetrics(start + 6_000L).net);
         assertEquals("a load is value moved, never a cost", 0L,
             engine.getMetrics(start + 7_000L).costs);
@@ -250,19 +252,19 @@ public class ChargeLoadReviewLifecycleTest
     @Test
     public void duplicateSameIdFlowsInsideOneLossStayInReview()
     {
-        Am engine = engineWithSplitScaleFlow();
+        Engine engine = engineWithSplitScaleFlow();
         long start = 35_000L;
-        engine.rm(start);
+        engine.ensureSession(start);
         engine.setBaseline(snapshot(12934, 100L));
-        ChargeOutcomeTest.none(engine.abu(blowpipe(0, 10), TARGET, start));
-        engine.yx(Ar.V.V1b,
+        ChargeOutcomeTest.none(engine.observeCheck(blowpipe(0, 10), TARGET, start));
+        engine.markChargeLoad(ChargeCheck.ChargedItem.BLOWPIPE,
             12934, "Zulrah's scales", TARGET, 8);
-        engine.yz();
-        Ac review = settle(engine, snapshot(12934, 50L), start + 600L);
+        engine.markDirty();
+        Transaction review = settle(engine, snapshot(12934, 50L), start + 600L);
         assertEquals(2, review.getFlows().size());
 
-        engine.abu(blowpipe(50, 10), TARGET, start + 3_000L);
-        assertEquals(Ai.TRANSFER, review.tm());
+        engine.observeCheck(blowpipe(50, 10), TARGET, start + 3_000L);
+        assertEquals(TransactionType.TRANSFER, review.autoType());
         assertEquals(2, review.getFlows().size());
         assertFalse(review.isCounted());
         assertEquals(0L, engine.getMetrics(start + 3_000L).net);
@@ -271,26 +273,26 @@ public class ChargeLoadReviewLifecycleTest
     @Test
     public void aMeasuredSpendBooksOnceTheLoadTransferred()
     {
-        Am engine = engine();
+        Engine engine = engine();
         long start = 40_000L;
-        engine.rm(start);
+        engine.ensureSession(start);
         engine.setBaseline(snapshot(12934, 100L));
-        engine.yx(Ar.V.V1b,
+        engine.markChargeLoad(ChargeCheck.ChargedItem.BLOWPIPE,
             12934, "Zulrah's scales", TARGET, 8);
-        engine.yz();
+        engine.markDirty();
         settle(engine, snapshot(12934, 50L), start + 600L);
 
         MeasuredChargeReadTracker tracker =
             new MeasuredChargeReadTracker();
         tracker.observe(blowpipe(50, 10), TARGET, System.currentTimeMillis());
-        Cm use = tracker.observe(blowpipe(49, 10), TARGET, System.currentTimeMillis());
+        ChargeDelta use = tracker.observe(blowpipe(49, 10), TARGET, System.currentTimeMillis());
         assertNotNull(use);
-        Ac booked = engine.mj(
+        Transaction booked = engine.bookChargeSpend(
             use,
             "Toxic blowpipe",
-            Collections.singletonList(new Ab(12934, "Zulrah's scales", -1L, 100,
-                -100L, Av.GRAND_EXCHANGE)),
-            start + 5_000L);
+            Collections.singletonList(new Flow(12934, "Zulrah's scales", -1L, 100,
+                -100L, PriceSource.GRAND_EXCHANGE)),
+            start + 5_000L, null);
         assertTrue("a validated load blocks nothing: the use is the cost", booked != null);
         assertEquals(100L, engine.getMetrics(start + 5_000L).costs);
     }
@@ -298,47 +300,47 @@ public class ChargeLoadReviewLifecycleTest
     @Test
     public void repeatedMeasuredSpendAndRefillBooksEachDecreaseOnce()
     {
-        Am engine = engine();
+        Engine engine = engine();
         long start = 45_000L;
-        engine.rm(start);
+        engine.ensureSession(start);
 
-        ChargeOutcomeTest.none(engine.abu(blowpipe(100, 10), TARGET, start));
-        Cm first = engine.abu(
+        ChargeOutcomeTest.none(engine.observeCheck(blowpipe(100, 10), TARGET, start));
+        ChargeDelta first = engine.observeCheck(
             blowpipe(98, 10), TARGET, start + 1_000L);
         assertNotNull(first);
-        assertTrue(engine.mj(first, "Toxic blowpipe",
-            Collections.singletonList(new Ab(12934, "Zulrah's scales", -2L, 100,
-                -200L, Av.GRAND_EXCHANGE)), start + 1_000L) != null);
+        assertTrue(engine.bookChargeSpend(first, "Toxic blowpipe",
+            Collections.singletonList(new Flow(12934, "Zulrah's scales", -2L, 100,
+                -200L, PriceSource.GRAND_EXCHANGE)), start + 1_000L, null) != null);
 
         // A refill is an increase, not a cost and becomes the new baseline.
-        ChargeOutcomeTest.none(engine.abu(blowpipe(120, 10), TARGET, start + 2_000L));
-        Cm second = engine.abu(
+        ChargeOutcomeTest.none(engine.observeCheck(blowpipe(120, 10), TARGET, start + 2_000L));
+        ChargeDelta second = engine.observeCheck(
             blowpipe(119, 10), TARGET, start + 3_000L);
         assertNotNull(second);
-        assertTrue(engine.mj(second, "Toxic blowpipe",
-            Collections.singletonList(new Ab(12934, "Zulrah's scales", -1L, 100,
-                -100L, Av.GRAND_EXCHANGE)), start + 3_000L) != null);
+        assertTrue(engine.bookChargeSpend(second, "Toxic blowpipe",
+            Collections.singletonList(new Flow(12934, "Zulrah's scales", -1L, 100,
+                -100L, PriceSource.GRAND_EXCHANGE)), start + 3_000L, null) != null);
 
         assertEquals(300L, engine.getMetrics(start + 3_000L).costs);
         assertEquals(-300L, engine.getMetrics(start + 3_000L).net);
-        assertEquals(2, countTransactions(engine.getActiveSession(), Ai.CONSUMPTION));
+        assertEquals(2, countTransactions(engine.getActiveSession(), TransactionType.CONSUMPTION));
     }
 
     @Test
     public void pauseAndProfileRestoreDiscardAnInFlightChargeBaseline()
     {
-        Am engine = engine();
+        Engine engine = engine();
         long start = 55_000L;
-        engine.rm(start);
-        ChargeOutcomeTest.none(engine.abu(blowpipe(100, 10), TARGET, start));
+        engine.ensureSession(start);
+        ChargeOutcomeTest.none(engine.observeCheck(blowpipe(100, 10), TARGET, start));
 
-        engine.acu(start + 1_000L);
-        engine.resume(start + 2_000L, Ed.LIFECYCLE);
-        ChargeOutcomeTest.none(engine.abu(blowpipe(90, 10), TARGET, start + 3_000L));
+        engine.pauseForLifecycle(start + 1_000L);
+        engine.resume(start + 2_000L, PauseReason.LIFECYCLE);
+        ChargeOutcomeTest.none(engine.observeCheck(blowpipe(90, 10), TARGET, start + 3_000L));
 
-        engine.agl("profile-b", engine.qm(), start + 4_000L);
-        ChargeOutcomeTest.none(engine.abu(blowpipe(80, 10), TARGET, start + 5_000L));
-        Cm afterRestart = engine.abu(
+        engine.restoreProfile("profile-b", engine.savedState(), start + 4_000L);
+        ChargeOutcomeTest.none(engine.observeCheck(blowpipe(80, 10), TARGET, start + 5_000L));
+        ChargeDelta afterRestart = engine.observeCheck(
             blowpipe(79, 10), TARGET, start + 6_000L);
         assertNotNull(afterRestart);
         assertEquals(-1L, afterRestart.getComponentDeltas().get(0).getQuantityDelta());
@@ -347,71 +349,72 @@ public class ChargeLoadReviewLifecycleTest
     @Test
     public void duplicateSameVariantWeaponsKeepTheirOwnBaselines()
     {
-        Am engine = engine();
+        Engine engine = engine();
         long start = 65_000L;
-        engine.rm(start);
-        String second = "149:0:9764864:12934:V1b#2";
-        ChargeOutcomeTest.none(engine.abu(blowpipe(100, 10), TARGET, start));
-        ChargeOutcomeTest.none(engine.abu(blowpipe(40, 10), second, start + 500L));
+        engine.ensureSession(start);
+        String second = "149:0:9764864:12934:BLOWPIPE#2";
+        ChargeOutcomeTest.none(engine.observeCheck(blowpipe(100, 10), TARGET, start));
+        ChargeOutcomeTest.none(engine.observeCheck(blowpipe(40, 10), second, start + 500L));
         // Checking the second pipe again is not a decrease on the first.
-        assertTrue("an unchanged Check is an empty delta", engine.abu(blowpipe(40, 10), second, start + 1_000L)
+        assertTrue("an unchanged Check is an empty delta", engine.observeCheck(blowpipe(40, 10), second, start + 1_000L)
             .getComponentDeltas().isEmpty());
-        Cm firstUse = engine.abu(blowpipe(97, 10), TARGET, start + 2_000L);
+        ChargeDelta firstUse = engine.observeCheck(blowpipe(97, 10), TARGET, start + 2_000L);
         assertNotNull(firstUse);
         assertEquals(-3L, firstUse.getComponentDeltas().get(0).getQuantityDelta());
-        Cm secondUse = engine.abu(blowpipe(39, 10), second, start + 3_000L);
+        ChargeDelta secondUse = engine.observeCheck(blowpipe(39, 10), second, start + 3_000L);
         assertNotNull(secondUse);
         assertEquals(-1L, secondUse.getComponentDeltas().get(0).getQuantityDelta());
-        assertTrue(engine.mj(firstUse, "Toxic blowpipe",
-            Collections.singletonList(new Ab(12934, "Zulrah's scales", -3L, 100, -300L, Av.GRAND_EXCHANGE)), start + 2_000L) != null);
-        assertTrue(engine.mj(secondUse, "Toxic blowpipe",
-            Collections.singletonList(new Ab(12934, "Zulrah's scales", -1L, 100, -100L, Av.GRAND_EXCHANGE)), start + 3_000L) != null);
+        assertTrue(engine.bookChargeSpend(firstUse, "Toxic blowpipe",
+            Collections.singletonList(new Flow(12934, "Zulrah's scales", -3L, 100, -300L, PriceSource.GRAND_EXCHANGE)), start + 2_000L, null) != null);
+        assertTrue(engine.bookChargeSpend(secondUse, "Toxic blowpipe",
+            Collections.singletonList(new Flow(12934, "Zulrah's scales", -1L, 100, -100L, PriceSource.GRAND_EXCHANGE)), start + 3_000L, null) != null);
         assertEquals(400L, engine.getMetrics(start + 3_000L).costs);
-        assertEquals(2, countTransactions(engine.getActiveSession(), Ai.CONSUMPTION));
+        assertEquals(2, countTransactions(engine.getActiveSession(), TransactionType.CONSUMPTION));
     }
 
     /** Owner-approved: a top-up is measured against that weapon's own last Check. */
     @Test
     public void topUpIsMeasuredAgainstTheSameWeaponsLastCheckAcrossAnotherWeaponsCheck()
     {
-        Am engine = engine();
+        Engine engine = engine();
         long start = 70_000L;
-        engine.rm(start);
+        engine.ensureSession(start);
         engine.setBaseline(snapshot(12934, 100L));
-        String second = "149:0:9764864:12934:V1b#2";
-        ChargeOutcomeTest.none(engine.abu(blowpipe(0, 10), TARGET, start));
+        String second = "149:0:9764864:12934:BLOWPIPE#2";
+        ChargeOutcomeTest.none(engine.observeCheck(blowpipe(0, 10), TARGET, start));
 
-        engine.yx(Ar.V.V1b,
+        engine.markChargeLoad(ChargeCheck.ChargedItem.BLOWPIPE,
             12934, "Zulrah's scales", TARGET, 8);
-        engine.yz();
-        Ac review = settle(engine, snapshot(12934, 50L), start + 600L);
-        assertEquals(Ai.TRANSFER, review.tm());
+        engine.markDirty();
+        Transaction review = settle(engine, snapshot(12934, 50L), start + 600L);
+        assertEquals(TransactionType.TRANSFER, review.autoType());
 
         // The other blowpipe is Checked between the load and this pipe's next Check.
-        ChargeOutcomeTest.none(engine.abu(blowpipe(40, 10), second, start + 2_000L));
-        ChargeOutcomeTest.none(engine.abu(blowpipe(50, 10), TARGET, start + 3_000L));
-        assertEquals("the load is confirmed by this pipe's own Check", Ai.TRANSFER,
-            review.tm());
+        ChargeOutcomeTest.none(engine.observeCheck(blowpipe(40, 10), second, start + 2_000L));
+        assertEquals(ChargeDelta.CheckResult.SAME,
+            engine.observeCheck(blowpipe(50, 10), TARGET, start + 3_000L).result);
+        assertEquals("the load is confirmed by this pipe's own Check", TransactionType.TRANSFER,
+            review.autoType());
         assertEquals(0L, engine.getMetrics(start + 3_000L).net);
     }
 
     @Test
     public void aNewSameVariantInstanceInvalidatesTheStaleMeasuredBaseline()
     {
-        Am engine = engine();
+        Engine engine = engine();
         long start = 95_000L;
-        engine.rm(start);
+        engine.ensureSession(start);
         engine.setBaseline(snapshot(ItemID.TOXIC_BLOWPIPE_LOADED, 1L));
-        ChargeOutcomeTest.none(engine.abu(blowpipe(1000, 100), TARGET, start));
+        ChargeOutcomeTest.none(engine.observeCheck(blowpipe(1000, 100), TARGET, start));
 
         // A second blowpipe is withdrawn into the same slot: that slot identity now belongs to
         // a different physical weapon, so the stored baseline must not be compared against it.
         settle(engine, snapshot(ItemID.TOXIC_BLOWPIPE_LOADED, 2L), start + 1_000L);
 
         ChargeOutcomeTest.none("a replacement that retained the slot identity must not book a phantom decrease",
-            engine.abu(blowpipe(100, 100), TARGET, start + 5_000L));
+            engine.observeCheck(blowpipe(100, 100), TARGET, start + 5_000L));
         // The fresh read seeds the new baseline; a later decrease still books normally.
-        Cm use = engine.abu(blowpipe(98, 100), TARGET, start + 6_000L);
+        ChargeDelta use = engine.observeCheck(blowpipe(98, 100), TARGET, start + 6_000L);
         assertNotNull(use);
         assertEquals(-2L, use.getComponentDeltas().get(0).getQuantityDelta());
     }
@@ -419,28 +422,28 @@ public class ChargeLoadReviewLifecycleTest
     @Test
     public void spendIsAttributedToTheActivityBeingPlayed()
     {
-        Am engine = engine();
+        Engine engine = engine();
         long start = 75_000L;
-        engine.rm(start);
+        engine.ensureSession(start);
         engine.getActiveSession().setActivityHint("Zulrah", start);
-        ChargeOutcomeTest.none(engine.abu(blowpipe(100, 10), TARGET, start));
-        Cm use = engine.abu(blowpipe(98, 10), TARGET, start + 1_000L);
-        Ac spend = engine.mj(use, "Toxic blowpipe",
-            Collections.singletonList(new Ab(12934, "Zulrah's scales", -2L, 100, -200L, Av.GRAND_EXCHANGE)), start + 1_000L);
+        ChargeOutcomeTest.none(engine.observeCheck(blowpipe(100, 10), TARGET, start));
+        ChargeDelta use = engine.observeCheck(blowpipe(98, 10), TARGET, start + 1_000L);
+        Transaction spend = engine.bookChargeSpend(use, "Toxic blowpipe",
+            Collections.singletonList(new Flow(12934, "Zulrah's scales", -2L, 100, -200L, PriceSource.GRAND_EXCHANGE)), start + 1_000L, null);
         assertTrue(spend != null);
         assertEquals("Zulrah", spend.getActivityName());
         engine.getActiveSession().setActivityHint("Vorkath", start + 2_000L);
-        Cm later = engine.abu(blowpipe(97, 10), TARGET, start + 3_000L);
-        Ac laterSpend = engine.mj(later, "Toxic blowpipe",
-            Collections.singletonList(new Ab(12934, "Zulrah's scales", -1L, 100, -100L, Av.GRAND_EXCHANGE)), start + 3_000L);
+        ChargeDelta later = engine.observeCheck(blowpipe(97, 10), TARGET, start + 3_000L);
+        Transaction laterSpend = engine.bookChargeSpend(later, "Toxic blowpipe",
+            Collections.singletonList(new Flow(12934, "Zulrah's scales", -1L, 100, -100L, PriceSource.GRAND_EXCHANGE)), start + 3_000L, null);
         assertEquals("Vorkath", laterSpend.getActivityName());
     }
 
 
-    private static int countTransactions(Ad session, Ai type)
+    private static int countTransactions(Session session, TransactionType type)
     {
         int count = 0;
-        for (Ac transaction : session.getTransactions())
+        for (Transaction transaction : session.getTransactions())
         {
             if (transaction.getType() == type)
             {
@@ -450,38 +453,38 @@ public class ChargeLoadReviewLifecycleTest
         return count;
     }
 
-    private static Am engine()
+    private static Engine engine()
     {
-        return new Am(ChargeLoadReviewLifecycleTest::flowsForTest,
+        return new Engine(ChargeLoadReviewLifecycleTest::flowsForTest,
             new TransactionClassifier(), CONFIG);
     }
 
-    private static Am engineWithSplitScaleFlow()
+    private static Engine engineWithSplitScaleFlow()
     {
-        return new Am(deltas -> {
+        return new Engine(deltas -> {
             Long scaleDelta = deltas.get(12934);
             if (scaleDelta == null || scaleDelta >= 0L || scaleDelta != -50L)
             {
                 return flowsForTest(deltas);
             }
             return Arrays.asList(
-                new Ab(12934, "Zulrah's scales", -20L, 100, -2_000L,
-                    Av.GRAND_EXCHANGE),
-                new Ab(12934, "Zulrah's scales", -30L, 100, -3_000L,
-                    Av.GRAND_EXCHANGE));
+                new Flow(12934, "Zulrah's scales", -20L, 100, -2_000L,
+                    PriceSource.GRAND_EXCHANGE),
+                new Flow(12934, "Zulrah's scales", -30L, 100, -3_000L,
+                    PriceSource.GRAND_EXCHANGE));
         }, new TransactionClassifier(), CONFIG);
     }
 
-    private static List<Ab> flowsForTest(Map<Integer, Long> deltas)
+    private static List<Flow> flowsForTest(Map<Integer, Long> deltas)
     {
-        List<Ab> flows = new ArrayList<>();
+        List<Flow> flows = new ArrayList<>();
         for (Map.Entry<Integer, Long> entry : deltas.entrySet())
         {
             int id = entry.getKey();
             String name = itemName(id);
             int price = id == 12934 ? 100 : id == 995 ? 1 : 500;
-            flows.add(new Ab(id, name, entry.getValue(), price, entry.getValue() * price,
-                Av.GRAND_EXCHANGE));
+            flows.add(new Flow(id, name, entry.getValue(), price, entry.getValue() * price,
+                PriceSource.GRAND_EXCHANGE));
         }
         return flows;
     }
@@ -496,12 +499,12 @@ public class ChargeLoadReviewLifecycleTest
         return "Rune dart";
     }
 
-    private static Ac only(List<Ac> rows, Ai type)
+    private static Transaction only(List<Transaction> rows, TransactionType type)
     {
-        Ac match = null;
-        for (Ac row : rows)
+        Transaction match = null;
+        for (Transaction row : rows)
         {
-            if (row.tm() == type)
+            if (row.autoType() == type)
             {
                 assertTrue("expected a single row of type " + type, match == null);
                 match = row;
@@ -511,20 +514,20 @@ public class ChargeLoadReviewLifecycleTest
         return match;
     }
 
-    private static Ar blowpipe(long scales, long darts)
+    private static ChargeCheck blowpipe(long scales, long darts)
     {
-        return Ar.acs(
+        return ChargeCheck.parse(
             "Darts: Rune dart x " + darts + ". Scales: " + scales + " (1.0%).");
     }
 
-    private static Cc snapshot(int id, long quantity)
+    private static ContainerSnapshot snapshot(int id, long quantity)
     {
         return snapshot(mapOf(id, quantity));
     }
 
-    private static Cc snapshot(Map<Integer, Long> quantities)
+    private static ContainerSnapshot snapshot(Map<Integer, Long> quantities)
     {
-        return new Cc(quantities);
+        return new ContainerSnapshot(quantities);
     }
 
     private static Map<Integer, Long> mapOf(Object... values)
@@ -537,13 +540,13 @@ public class ChargeLoadReviewLifecycleTest
         return result;
     }
 
-    private static Ac settle(Am engine, Cc next, long firstTick)
+    private static Transaction settle(Engine engine, ContainerSnapshot next, long firstTick)
     {
-        Ac result = engine.adj(next, firstTick);
+        Transaction result = engine.processIfDirty(next, firstTick);
         assertNull(result);
-        result = engine.adj(next, firstTick + 600L);
+        result = engine.processIfDirty(next, firstTick + 600L);
         assertNull(result);
-        return engine.adj(next, firstTick + 1_200L);
+        return engine.processIfDirty(next, firstTick + 1_200L);
     }
 
 }

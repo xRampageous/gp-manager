@@ -1,141 +1,159 @@
 package com.gpmanager;
+
+import static com.gpmanager.Phrases.*;
+
 import lombok.RequiredArgsConstructor;
+
 import javax.inject.*;
-import static com.gpmanager.Ag.*;
+
 /**
-* Client-thread activity naming: a two-hit candidate that holds until something else is seen, reseeded from the
-* active session on owner change. Accounting never reads the title; the engine only receives
-* {@link Am#setDetectedActivity} (session activity hint / auto-start) and the
-* PRODUCTION context window that lets a transform skill's XP confirm a processing receipt.
-*/
+ * Client-thread activity naming: a two-hit candidate that holds until something else is seen,
+ * reseeded from the active session on owner change. Accounting never reads the title; the engine
+ * only receives {@link Engine#setDetectedActivity} (session activity hint / auto-start) and the
+ * PRODUCTION context window that lets a transform skill's XP confirm a processing receipt.
+ */
 @Singleton
 @RequiredArgsConstructor(onConstructor_ = @Inject)
 class ActivityDetector {
-static final long MILLIS_PER_GAME_TICK = 600L;
-final GpManagerConfig config;
-final Am engine;
-/** The activity with nothing more specific detected. */
-static final String G = "General";
-String activityCandidate = G;
-int activityEvidence;
-String detectedActivity = G;
-String activitySessionId;
-long productionWindowExpiresAtEpochMillis;
-/**
-* The skill a gather click asked for ("Chop down": Woodcutting). A click proves nothing (no axe,
-* still walking), so the skill's first XP names it at once instead (owner 1.1).
-*/
-String gatherSkill = "";
-/** How long a Make-X run stays open for its skill's XP after the last production evidence. */
-long productionRunUntilEpochMillis;
-void abm(String /* activity */a, boolean /* immediate */b) {
- if (!config.autoActivityDetection() || blank(a)) return;
- String /* next */c = a.trim();
- if ("NPC loot".equalsIgnoreCase(c)) {
-  // A generic fallback is not an activity; the previous real label stands.
-  return;
- }
- if (c.equalsIgnoreCase(activityCandidate)) {
-  activityEvidence++;
- } else {
-  activityCandidate = c;
-  activityEvidence = 1;
- }
- if (b || activityEvidence >= 2) {
-  detectedActivity = c;
-  engine.setDetectedActivity(c, Ae.now());
- }
-}
+    static final long MILLIS_PER_GAME_TICK = 600L;
+    final GpManagerConfig config;
+    final Engine engine;
 
-/** Settled transaction types that name the activity (PK, named loot, trade). */
-void abw(Ac /* transaction */a) {
- if (a == null) return;
- switch (a.getType()) {
-  case PK_LOOT:
-  case PK_SUPPLY_COST:
-  case PK_DEATH_LOSS:
-  case PK_FEE:
-  abm("PKing", true);
-  break;
-  case LOOT:
-  String /* amd */b = a.getActivityName();
-  if (b != null && !b.trim().isEmpty() && !G.equalsIgnoreCase(b.trim())) {
-   abm(b.trim(), true);
-  }
-  break;
-  case TRADE:
-  abm("Trading", true);
-  break;
-  default:
-  break;
- }
-}
+    /** The activity with nothing more specific detected. */
+    static final String GENERAL = "General";
 
-/** Active-owner change reseeds the candidate from the session hint. */
-void ajd() {
- Ad /* active */a = engine.getActiveSession();
- String /* amm */b = a == null ? null : a.getId();
- if (b == null ? activitySessionId == null : b.equals(activitySessionId)) return;
- activitySessionId = b;
- String /* initial */c = a == null ? G : a.getActivityHint();
- detectedActivity = awq(c, G);
- activityCandidate = detectedActivity;
- activityEvidence = 0;
-}
+    String activityCandidate = GENERAL;
+    int activityEvidence;
+    String detectedActivity = GENERAL;
+    String activitySessionId;
+    long productionWindowExpiresAtEpochMillis;
 
-/** Local death drops the detected activity so the killer cannot title the next session. */
-void pe() {
- agp(true);
-}
+    /**
+     * The skill a gather click asked for ("Chop down": Woodcutting). A click proves nothing (no
+     * axe, still walking), so the skill's first XP names it at once instead (owner 1.1).
+     */
+    String gatherSkill = "";
 
-void agp(boolean /* resetHold */a) {
- if (!G.equalsIgnoreCase(detectedActivity) || a) {
-  detectedActivity = G;
-  activityCandidate = G;
-  activityEvidence = 0;
-  if (config.autoActivityDetection()) engine.setDetectedActivity(G, Ae.now());
- }
-}
+    /** How long a Make-X run stays open for its skill's XP after the last production evidence. */
+    long productionRunUntilEpochMillis;
 
-/**
-* Positive XP for {@code skill}: names the activity (Agility prefers the course) and, inside
-* an open PRODUCTION window, re-arms the context so the processing receipt can settle.
-*/
-void acj(String /* skillName */b, String /* agilityCourse */c, boolean /* fighting */d, long /* now */e) {
- if ("Agility".equalsIgnoreCase(b) && c != null) abm(c, true);
- // Combat XP, and Magic in a fight, names nothing: the NPC's loot does. Alching is Magic.
- else if (!"Prayer".equalsIgnoreCase(b) && !ActivityLabel.COMBAT.contains(b)
- && !(d && "Magic".equals(b))) abm(b.trim(), b.equalsIgnoreCase(gatherSkill));
- // A Make-X run has actions with no XP (a failed iron smelt), so a production skill's XP
- // re-arms the context for 30 s after the last one, not only inside the six-tick window.
- if (e <= productionWindowExpiresAtEpochMillis
- || Dw.TRANSFORM.containsValue(b) || "Smithing".equals(b)) {
-  qf(b, e);
- }
-}
+    void observe(String activity, boolean immediate) {
+        if (!config.autoActivityDetection() || blank(activity)) return;
+        String next = activity.trim();
+        if ("NPC loot".equalsIgnoreCase(next)) {
+            // A generic fallback is not an activity; the previous real label stands.
+            return;
+        }
+        if (next.equalsIgnoreCase(activityCandidate)) {
+            activityEvidence++;
+        } else {
+            activityCandidate = next;
+            activityEvidence = 1;
+        }
+        if (immediate || activityEvidence >= 2) {
+            detectedActivity = next;
+            engine.setDetectedActivity(next, SafeMath.now());
+        }
+    }
 
-/** Evidence the Make-X run goes on (its XP, a failed smelt): re-arms it within 30 s of the last. */
-void qf(String /* note */a, long /* now */b) {
- if (b <= productionRunUntilEpochMillis) le(a, b);
-}
+    /** Settled transaction types that name the activity (PK, named loot, trade). */
+    void observeTransaction(Transaction transaction) {
+        if (transaction == null) return;
+        switch (transaction.getType()) {
+            case PK_LOOT:
+            case PK_SUPPLY_COST:
+            case PK_DEATH_LOSS:
+                observe("PKing", true);
+                break;
+            case LOOT:
+                String lootActivity = transaction.getActivityName();
+                if (lootActivity != null
+                        && !lootActivity.trim().isEmpty()
+                        && !GENERAL.equalsIgnoreCase(lootActivity.trim())) {
+                    observe(lootActivity.trim(), true);
+                }
+                break;
+            case TRADE:
+                observe("Trading", true);
+                break;
+            default:
+                break;
+        }
+    }
 
-/** Enabling during Make-X needs fresh production XP, without a click made while disabled. */
-void rb(long a) {
- productionWindowExpiresAtEpochMillis = 0L;
- productionRunUntilEpochMillis = a + 30_000L;
- gatherSkill = "";
-}
+    /** Active-owner change reseeds the candidate from the session hint. */
+    void syncSession() {
+        Session active = engine.getActiveSession();
+        String nextSessionId = active == null ? null : active.getId();
+        if (nextSessionId == null
+                ? activitySessionId == null
+                : nextSessionId.equals(activitySessionId)) return;
+        activitySessionId = nextSessionId;
+        String initial = active == null ? GENERAL : active.getActivityHint();
+        detectedActivity = nonBlank(initial, GENERAL);
+        activityCandidate = detectedActivity;
+        activityEvidence = 0;
+    }
 
-/** Station/menu hint: arm PRODUCTION context for the correlation window. */
-void le(String /* skillNote */a) {
- le(a, Ae.now());
-}
+    /** Local death drops the detected activity so the killer cannot title the next session. */
+    void clearOnDeath() {
+        resetToGeneral(true);
+    }
 
-void le(String /* skillNote */a, long /* now */b) {
- int /* ticks */c = 6;
- String /* note */d = awq(a, "Production");
- engine.markContext(Aj.PRODUCTION, c, d);
- productionWindowExpiresAtEpochMillis = b + c * MILLIS_PER_GAME_TICK;
- productionRunUntilEpochMillis = b + 30_000L;
-}
+    void resetToGeneral(boolean resetHold) {
+        if (!GENERAL.equalsIgnoreCase(detectedActivity) || resetHold) {
+            detectedActivity = GENERAL;
+            activityCandidate = GENERAL;
+            activityEvidence = 0;
+            if (config.autoActivityDetection()) engine.setDetectedActivity(GENERAL, SafeMath.now());
+        }
+    }
+
+    /**
+     * Positive XP for {@code skill}: names the activity (Agility prefers the course) and, inside an
+     * open PRODUCTION window, re-arms the context so the processing receipt can settle.
+     */
+    void observeXp(String skillName, String agilityCourse, boolean fighting, long now) {
+        if ("Agility".equalsIgnoreCase(skillName) && agilityCourse != null)
+            observe(agilityCourse, true);
+        // Combat XP, and Magic in a fight, names nothing: the NPC's loot does. Alching is Magic.
+        else if (!"Prayer".equalsIgnoreCase(skillName)
+                && !ActivityLabel.COMBAT.contains(skillName)
+                && !(fighting && "Magic".equals(skillName)))
+            observe(skillName.trim(), skillName.equalsIgnoreCase(gatherSkill));
+        // A Make-X run has actions with no XP (a failed iron smelt), so a production skill's XP
+        // re-arms the context for 30 s after the last one, not only inside the six-tick window.
+        if (now <= productionWindowExpiresAtEpochMillis
+                || ActionSignals.TRANSFORM.containsValue(skillName)
+                || "Smithing".equals(skillName)) {
+            continueProduction(skillName, now);
+        }
+    }
+
+    /**
+     * Evidence the Make-X run goes on (its XP, a failed smelt): re-arms it within 30 s of the last.
+     */
+    void continueProduction(String note, long now) {
+        if (now <= productionRunUntilEpochMillis) armProduction(note, now);
+    }
+
+    /** Enabling during Make-X needs fresh production XP, without a click made while disabled. */
+    void clearProduction(long now) {
+        productionWindowExpiresAtEpochMillis = 0L;
+        productionRunUntilEpochMillis = now + 30_000L;
+        gatherSkill = "";
+    }
+
+    /** Station/menu hint: arm PRODUCTION context for the correlation window. */
+    void armProduction(String skillNote) {
+        armProduction(skillNote, SafeMath.now());
+    }
+
+    void armProduction(String skillNote, long now) {
+        int ticks = 6;
+        String note = nonBlank(skillNote, "Production");
+        engine.markContext(Context.PRODUCTION, ticks, note);
+        productionWindowExpiresAtEpochMillis = now + ticks * MILLIS_PER_GAME_TICK;
+        productionRunUntilEpochMillis = now + 30_000L;
+    }
 }

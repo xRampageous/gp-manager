@@ -19,22 +19,22 @@ public class BankVisibilityRegressionTest
             GpManagerConfig config = new GpManagerConfig() {
                 public int stabilizationTicks() { return 0; }
             };
-            Am engine = new Am(deltas -> {
-                java.util.List<Ab> flows = new java.util.ArrayList<>();
-                deltas.forEach((id, qty) -> flows.add(new Ab(id, "Item " + id, qty, 50, qty * 50)));
+            Engine engine = new Engine(deltas -> {
+                java.util.List<Flow> flows = new java.util.ArrayList<>();
+                deltas.forEach((id, qty) -> flows.add(new Flow(id, "Item " + id, qty, 50, qty * 50)));
                 return flows;
             }, new TransactionClassifier(), config);
-            engine.rm(1000);
-            Cc held = new Cc(Collections.singletonMap(itemId, 1L));
-            engine.setBaseline(consuming ? held : Cc.empty());
+            engine.ensureSession(1000);
+            ContainerSnapshot held = new ContainerSnapshot(Collections.singletonMap(itemId, 1L));
+            engine.setBaseline(consuming ? held : ContainerSnapshot.empty());
             // The same bank visibility decision used by the production tick adapter.
-            if (bankOpen(false)) engine.ze(6);
-            else engine.yu();
-            engine.yz();
-            Cc next = consuming ? Cc.empty() : held;
-            engine.adj(next, 1600);
-            assertEquals(consuming ? Ai.CONSUMPTION : Ai.GAIN,
-                engine.adj(next, 2200).getType());
+            if (bankOpen(false)) engine.bankOpened(6);
+            else engine.bankClosed();
+            engine.markDirty();
+            ContainerSnapshot next = consuming ? ContainerSnapshot.empty() : held;
+            engine.processIfDirty(next, 1600);
+            assertEquals(consuming ? TransactionType.CONSUMPTION : TransactionType.GAIN,
+                engine.processIfDirty(next, 2200).getType());
             assertEquals(consuming ? -50 : 50, engine.getMetrics(2200).net);
         }
     }
@@ -49,8 +49,8 @@ public class BankVisibilityRegressionTest
         Widget shown = proxy(Widget.class, name -> "isHidden".equals(name) ? false : null);
         Client open = proxy(Client.class, name -> "getWidget".equals(name) ? shown : null);
         Client closed = proxy(Client.class, name -> null);
-        assertTrue(Ee.yf(open));
-        assertFalse(Ee.yf(closed));
+        assertTrue(Widgets.isToolStoreOpen(open));
+        assertFalse(Widgets.isToolStoreOpen(closed));
     }
 
     /**
@@ -61,8 +61,8 @@ public class BankVisibilityRegressionTest
     @Test public void storeWindowsAreStorageWhileEitherPanelShows() throws Exception
     {
         Widget shown = proxy(Widget.class, name -> "isHidden".equals(name) ? false : null);
-        assertTrue(Ee.STORES.size() >= 16);
-        for (String[] row : Ee.STORES)
+        assertTrue(Widgets.STORES.size() >= 16);
+        for (String[] row : Widgets.STORES)
         {
             String[] name = row[1].split("\\.");
             int component = Class.forName("net.runelite.api.gameval.InterfaceID$" + name[0])
@@ -71,11 +71,11 @@ public class BankVisibilityRegressionTest
             Client open = (Client) Proxy.newProxyInstance(Client.class.getClassLoader(), new Class<?>[] {Client.class},
                 (obj, method, args) -> "getWidget".equals(method.getName()) && args.length == 1
                     && Integer.valueOf(component).equals(args[0]) ? shown : null);
-            assertEquals(row[1], row[2], Ee.store(open));
-            assertFalse("not the tool store", Ee.yf(open));
-            assertFalse("not the Grand Exchange", Ee.wq(open));
+            assertEquals(row[1], row[2], Widgets.store(open));
+            assertFalse("not the tool store", Widgets.isToolStoreOpen(open));
+            assertFalse("not the Grand Exchange", Widgets.isGeOpen(open));
         }
-        assertNull(Ee.store(proxy(Client.class, name -> null)));
+        assertNull(Widgets.store(proxy(Client.class, name -> null)));
     }
 
     /** A banker's collection box collects Grand Exchange offers: a Collect there is GE evidence. */
@@ -86,8 +86,8 @@ public class BankVisibilityRegressionTest
         Client open = (Client) Proxy.newProxyInstance(Client.class.getClassLoader(), new Class<?>[] {Client.class},
             (obj, method, args) -> "getWidget".equals(method.getName()) && args.length == 1
                 && Integer.valueOf(box).equals(args[0]) ? shown : null);
-        assertTrue(Ee.wq(open));
-        assertFalse(Ee.wq(proxy(Client.class, name -> null)));
+        assertTrue(Widgets.isGeOpen(open));
+        assertFalse(Widgets.isGeOpen(proxy(Client.class, name -> null)));
     }
 
     private boolean bankOpen(boolean visible) throws Exception
@@ -99,7 +99,7 @@ public class BankVisibilityRegressionTest
             if ("getWidget".equals(name)) return widget;
             return null;
         });
-        return Ee.vp(client);
+        return Widgets.isBankOpen(client);
     }
 
     private static <T> T proxy(Class<T> type, java.util.function.Function<String, Object> values)

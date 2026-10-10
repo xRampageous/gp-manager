@@ -23,22 +23,22 @@ public class ChargeLoadAnyItemTest
     @Test
     public void everyItemsOwnChargeMaterialIsALoad()
     {
-        assertTrue(Ar.xq(Ar.V.CRYSTAL_BOW, ItemID.PRIF_CRYSTAL_SHARD, "Crystal shard"));
-        assertTrue(Ar.xq(Ar.V.SANGUINESTI, ItemID.BLOODRUNE, "Blood rune"));
-        assertTrue(Ar.xq(Ar.V.SHADOW, ItemID.SOULRUNE, "Soul rune"));
-        assertTrue(Ar.xq(Ar.V.ATES, ItemID.FROZEN_TEAR, "Frozen tear"));
-        assertTrue(Ar.xq(Ar.V.VENATOR, ItemID.ANCIENT_ESSENCE, "Ancient essence"));
-        assertTrue(Ar.xq(Ar.V.CRAW, ItemID.WILD_CAVE_SHARD, "Revenant ether"));
-        assertTrue("the scythe's vials too", Ar.xq(Ar.V.SCYTHE, ItemID.VIAL_BLOOD, "Vial of blood"));
-        assertFalse("another item is not its charge", Ar.xq(Ar.V.SANGUINESTI, ItemID.FIRERUNE, "Fire rune"));
+        assertTrue(ChargeCheck.isLoadComponent(ChargeCheck.ChargedItem.CRYSTAL_BOW, ItemID.PRIF_CRYSTAL_SHARD, "Crystal shard"));
+        assertTrue(ChargeCheck.isLoadComponent(ChargeCheck.ChargedItem.SANGUINESTI, ItemID.BLOODRUNE, "Blood rune"));
+        assertTrue(ChargeCheck.isLoadComponent(ChargeCheck.ChargedItem.SHADOW, ItemID.SOULRUNE, "Soul rune"));
+        assertTrue(ChargeCheck.isLoadComponent(ChargeCheck.ChargedItem.ATES, ItemID.FROZEN_TEAR, "Frozen tear"));
+        assertTrue(ChargeCheck.isLoadComponent(ChargeCheck.ChargedItem.VENATOR, ItemID.ANCIENT_ESSENCE, "Ancient essence"));
+        assertTrue(ChargeCheck.isLoadComponent(ChargeCheck.ChargedItem.CRAW, ItemID.WILD_CAVE_SHARD, "Revenant ether"));
+        assertTrue("the scythe's vials too", ChargeCheck.isLoadComponent(ChargeCheck.ChargedItem.SCYTHE, ItemID.VIAL_BLOOD, "Vial of blood"));
+        assertFalse("another item is not its charge", ChargeCheck.isLoadComponent(ChargeCheck.ChargedItem.SANGUINESTI, ItemID.FIRERUNE, "Fire rune"));
     }
 
     @Test
     public void chargingACrystalBowBooksNothing()
     {
-        Am engine = settle(true);
+        Engine engine = settle(true);
         assertEquals(0L, engine.getMetrics(T0 + 10_000L).net);
-        assertTrue(engine.getActiveSession().getTransactions().stream().noneMatch(Ac::isCounted));
+        assertTrue(engine.getActiveSession().getTransactions().stream().noneMatch(Transaction::isCounted));
     }
 
     @Test
@@ -46,18 +46,18 @@ public class ChargeLoadAnyItemTest
     {
         // Owner 2026-10-09 (recorded): 1,000 nature runes into the staff turned the uncharged staff into the
         // charged one and went to Review; the runes are now its charges.
-        assertTrue(Ar.xq(Ar.V.BRYOPHYTA, ItemID.NATURERUNE, "Nature rune"));
-        Am engine = HudBuilderTest.engine();
-        engine.rm(T0);
-        engine.setBaseline(new Cc(new HashMap<>(Map.of(ItemID.NATURERUNE, 6_766L, ItemID.NATURE_STAFF_UNCHARGED, 1L))));
-        engine.yx(Ar.V.BRYOPHYTA, ItemID.NATURERUNE, "Nature rune", "149:1:22368:BRYOPHYTA", ChargeIntake.LOAD_TICKS);
-        engine.yz();
+        assertTrue(ChargeCheck.isLoadComponent(ChargeCheck.ChargedItem.BRYOPHYTA, ItemID.NATURERUNE, "Nature rune"));
+        Engine engine = HudBuilderTest.engine();
+        engine.ensureSession(T0);
+        engine.setBaseline(new ContainerSnapshot(new HashMap<>(Map.of(ItemID.NATURERUNE, 6_766L, ItemID.NATURE_STAFF_UNCHARGED, 1L))));
+        engine.markChargeLoad(ChargeCheck.ChargedItem.BRYOPHYTA, ItemID.NATURERUNE, "Nature rune", "149:1:22368:BRYOPHYTA", ChargeIntake.LOAD_TICKS);
+        engine.markDirty();
         for (int tick = 1; tick <= 5; tick++)
         {
-            engine.adj(new Cc(new HashMap<>(Map.of(ItemID.NATURERUNE, 5_766L, ItemID.NATURE_STAFF_CHARGED, 1L))), T0 + tick * 600L);
+            engine.processIfDirty(new ContainerSnapshot(new HashMap<>(Map.of(ItemID.NATURERUNE, 5_766L, ItemID.NATURE_STAFF_CHARGED, 1L))), T0 + tick * 600L);
         }
         assertEquals("charging the staff is not a cost", 0L, engine.getMetrics(T0 + 10_000L).net);
-        assertTrue("nor Review", engine.getActiveSession().getTransactions().stream().noneMatch(Eh::aal));
+        assertTrue("nor Review", engine.getActiveSession().getTransactions().stream().noneMatch(ReviewRules::needsOwnerDecision));
     }
 
     @Test
@@ -69,38 +69,38 @@ public class ChargeLoadAnyItemTest
     @Test
     public void theScytheOnTheVyreWellLoadsItsRunesAndVialsThroughThePrompt()
     {
-        Am engine = HudBuilderTest.engine();
-        engine.rm(T0);
-        engine.setBaseline(new Cc(new HashMap<>(Map.of(ItemID.BLOODRUNE, 1_000L, ItemID.VIAL_BLOOD, 5L))));
+        Engine engine = HudBuilderTest.engine();
+        engine.ensureSession(T0);
+        engine.setBaseline(new ContainerSnapshot(new HashMap<>(Map.of(ItemID.BLOODRUNE, 1_000L, ItemID.VIAL_BLOOD, 5L))));
         Widget scythe = widget(ItemID.SCYTHE_OF_VITUR, 149 << 16, 3);
         Client client = (Client) Proxy.newProxyInstance(Client.class.getClassLoader(), new Class<?>[]{Client.class},
             (proxy, method, args) -> "getSelectedWidget".equals(method.getName()) ? scythe
                 : "getTickCount".equals(method.getName()) ? 10 : null);
         ChargeIntake intake = new ChargeIntake(client, null, HudBuilderTest.config(true, 4), engine, null);
-        intake.lc(click(MenuAction.WIDGET_TARGET_ON_GAME_OBJECT, "Use", null), "use");
-        intake.lc(click(MenuAction.WIDGET_CONTINUE, "Continue", null), "continue");
-        engine.yz();
+        intake.armLoad(click(MenuAction.WIDGET_TARGET_ON_GAME_OBJECT, "Use", null), "use");
+        intake.armLoad(click(MenuAction.WIDGET_CONTINUE, "Continue", null), "continue");
+        engine.markDirty();
         for (int tick = 1; tick <= 5; tick++)
         {
-            engine.adj(new Cc(new HashMap<>(Map.of(ItemID.BLOODRUNE, 800L, ItemID.VIAL_BLOOD, 4L))), T0 + tick * 600L);
+            engine.processIfDirty(new ContainerSnapshot(new HashMap<>(Map.of(ItemID.BLOODRUNE, 800L, ItemID.VIAL_BLOOD, 4L))), T0 + tick * 600L);
         }
         assertEquals("charging the scythe is not a cost", 0L, engine.getMetrics(T0 + 10_000L).net);
     }
 
-    private static Am settle(boolean loaded)
+    private static Engine settle(boolean loaded)
     {
-        Am engine = HudBuilderTest.engine();
-        engine.rm(T0);
-        engine.setBaseline(new Cc(new HashMap<>(Map.of(ItemID.PRIF_CRYSTAL_SHARD, 500L))));
+        Engine engine = HudBuilderTest.engine();
+        engine.ensureSession(T0);
+        engine.setBaseline(new ContainerSnapshot(new HashMap<>(Map.of(ItemID.PRIF_CRYSTAL_SHARD, 500L))));
         if (loaded)
         {
-            engine.yx(Ar.V.CRYSTAL_BOW, ItemID.PRIF_CRYSTAL_SHARD, "Crystal shard", "149:0:23983:CRYSTAL_BOW",
+            engine.markChargeLoad(ChargeCheck.ChargedItem.CRYSTAL_BOW, ItemID.PRIF_CRYSTAL_SHARD, "Crystal shard", "149:0:23983:CRYSTAL_BOW",
                 ChargeIntake.LOAD_TICKS);
         }
-        engine.yz();
+        engine.markDirty();
         for (int tick = 1; tick <= 5; tick++)
         {
-            engine.adj(new Cc(new HashMap<>(Map.of(ItemID.PRIF_CRYSTAL_SHARD, 400L))), T0 + tick * 600L);
+            engine.processIfDirty(new ContainerSnapshot(new HashMap<>(Map.of(ItemID.PRIF_CRYSTAL_SHARD, 400L))), T0 + tick * 600L);
         }
         return engine;
     }

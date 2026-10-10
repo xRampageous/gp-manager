@@ -1,32 +1,15 @@
 package com.gpmanager;
-/** Immutable audit snapshot for a transaction removed through the undo action. */
+
+/** A transaction removed through the undo action, kept so the latest one can be restored. */
 class UndoRecord {
-String transactionId;
-long timestampEpochMillis;
-String activityName;
-Ai type;
-long net;
-Ac transaction;
-boolean restored;
-long restoredAtEpochMillis;
-UndoRecord() {
- // Gson
-}
+    Transaction transaction;
+    boolean restored;
 
-UndoRecord(Ac /* transaction */a, long /* timestampEpochMillis */b) {
- this.transactionId = a == null ? "" : a.getId();
- this.timestampEpochMillis = b;
- this.activityName = a == null ? "Transaction" : a.getActivityName();
- this.type = a == null ? Ai.ADJUSTMENT : a.getType();
- this.net = a == null ? 0L : a.getNet();
- this.transaction = a;
-}
+    UndoRecord() {
+        // Gson
+    }
 
-String getTransactionId() { return Ag.axw(transactionId); }
-String getActivityName() { return Ag.blank(activityName) ? "Transaction" : activityName; }
-Ai getType() { return type == null ? Ai.ADJUSTMENT : type; }
-void zp(long /* now */a) {
- restored = true;
- restoredAtEpochMillis = a;
-}
+    UndoRecord(Transaction transaction) {
+        this.transaction = transaction;
+    }
 }

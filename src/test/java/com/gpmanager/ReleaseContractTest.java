@@ -10,12 +10,12 @@ import static org.junit.Assert.assertNotNull;
 public class ReleaseContractTest
 {
     /**
-     * The release uses save schema 108. Unsupported schemas are not imported.
+     * The release uses save schema 109. Older saves are set aside; newer ones stay read-only.
      */
     @Test
     public void compactDataSchemaIsPinned()
     {
-        assertEquals(108, SavedState.CURRENT_SCHEMA_VERSION);
+        assertEquals(109, SavedState.CURRENT_SCHEMA_VERSION);
     }
 
     @Test

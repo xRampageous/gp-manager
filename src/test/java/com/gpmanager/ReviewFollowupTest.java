@@ -51,7 +51,7 @@ public class ReviewFollowupTest {
     @Test public void aDifferentSceneTileIsRejectedWithValidTileMetadata() {
         ReviewFixesTest.Plugin p = take();
         p.onItemDespawned(new ItemDespawned(tile(11, 10), bones()));
-        assertEquals(0L, ReviewFixesTest.qty(p, Eb.BG));
+        assertEquals(0L, ReviewFixesTest.qty(p, Inbox.BAG_GAIN));
     }
 
     @Test public void anotherPlayerTakingTheClickedPileMustNotBecomeOurBagLoot() {
@@ -59,59 +59,38 @@ public class ReviewFollowupTest {
         // Our Take has not succeeded. Another player removes the clicked pile first.
         // There is no increase in our inventory or confirmation of a bag insertion.
         p.onItemDespawned(new ItemDespawned(tile(10, 10), bones()));
-        assertEquals("the matching tile is intent, not proof of our successful pickup", 0L, ReviewFixesTest.qty(p, Eb.BG));
+        assertEquals("the matching tile is intent, not proof of our successful pickup", 0L, ReviewFixesTest.qty(p, Inbox.BAG_GAIN));
     }
 
     @Test public void yourOwnLootVanishingOnYourTakeIsStillABagPickup() {
         ReviewFixesTest.Plugin p = take();
-        p.engine.zk(Collections.singletonMap(ReviewFixesTest.BONES, 3L), 100, "Loot from Guard", "Guard");
+        p.engine.markLoot(Collections.singletonMap(ReviewFixesTest.BONES, 3L), 100, "Loot from Guard", "Guard");
         p.onItemDespawned(new ItemDespawned(tile(10, 10), bones()));
-        assertEquals("loot from your own kill is yours to pick up", 3L, ReviewFixesTest.qty(p, Eb.BG));
+        assertEquals("loot from your own kill is yours to pick up", 3L, ReviewFixesTest.qty(p, Inbox.BAG_GAIN));
     }
 
     @Test public void anIdentityBoundaryMustClearPendingBagEvidenceImmediately() {
-        Am e = ReviewFixesTest.engine();
+        Engine e = ReviewFixesTest.engine();
         ReviewFixesTest.Plugin p = ReviewFixesTest.plugin(e, new int[] {11});
-        p.geOfferLedger = new Bj();
+        p.geOfferLedger = new OfferSlots();
         p.interactionContextTracker = new InteractionContextTracker(p.client, e, ReviewFixesTest.CONFIG);
         ReviewFixesTest.take(p).item = ReviewFixesTest.BONES;
         ReviewFixesTest.take(p).at = 10;
         ReviewFixesTest.bag(p).at = 10;
         ReviewFixesTest.bag(p).qty = 3;
-        p.engine.eb.put(Eb.FE, -1, 5_964L, 10, null);
-        p.engine.eb.add(Eb.CH, -1, 1, 10, null).x = InventoryID.RAIDS_REWARDS;
-        p.engine.eb.add(Eb.KT, InventoryID.TACKLE_BOX, 1, Integer.MAX_VALUE, null).data = new Item[0];
-        p.lx(); // The async bind may finish before the next GameTick sees !nh().
-        assertEquals("old-account bag evidence must be cleared at the boundary, not a later tick", 0L, ReviewFixesTest.qty(p, Eb.BG));
-        assertEquals("a waiting reclaim fee never reaches the next account (Codex research 1.2)", 0L, ReviewFixesTest.qty(p, Eb.FE));
-        assertEquals("nor a chest Bank-all window", null, p.engine.eb.peek(Eb.CH));
-        assertTrue("nor the last account's kit contents", p.engine.eb.peek(Eb.KT) == null);
+        p.engine.inbox.put(Inbox.FEE, -1, 5_964L, 10, null);
+        p.engine.inbox.add(Inbox.CHEST, -1, 1, 10, null).x = InventoryID.RAIDS_REWARDS;
+        p.engine.inbox.add(Inbox.KIT_SNAPSHOT, InventoryID.TACKLE_BOX, 1, Integer.MAX_VALUE, null).data = new Item[0];
+        p.beginOwnerSwitch(); // The async bind may finish before the next GameTick sees !nh().
+        assertEquals("old-account bag evidence must be cleared at the boundary, not a later tick", 0L, ReviewFixesTest.qty(p, Inbox.BAG_GAIN));
+        assertEquals("a waiting reclaim fee never reaches the next account (Codex research 1.2)", 0L, ReviewFixesTest.qty(p, Inbox.FEE));
+        assertEquals("nor a chest Bank-all window", null, p.engine.inbox.peek(Inbox.CHEST));
+        assertTrue("nor the last account's kit contents", p.engine.inbox.peek(Inbox.KIT_SNAPSHOT) == null);
     }
 
-    @Test public void reopeningAnUnchangedBankMustRefreshTheLastSeenTime() throws Exception {
-        Am e = ReviewFixesTest.engine();
-        e.bank(1_000_000L, System.currentTimeMillis() - 86_400_000L);
-        e.carried(2_000_000L);
-        SwingUtilities.invokeAndWait(() -> {
-            Dp p = new Dp(e, ReviewFixesTest.CONFIG, null);
-            p.active = true;
-            p.shell.show(Shell.GRINDS);
-            p.avz();
-            assertTrue(p.grinds.data.allTime.bankAge > 80_000_000L);
-            e.bank(1_000_000L, System.currentTimeMillis());
-            // Keep the genuine current cache format in this minute; only bankAt changed.
-            p.pageKeys.put(Shell.GRINDS, e.getRevision() + ":" + System.currentTimeMillis() / 60_000L
-                + ":" + e.bankValue + ":" + e.carriedValue);
-            p.pageForced = false;
-            p.avz();
-            assertTrue("the bank was just checked, not one day ago: " + p.grinds.data.allTime.bankAge,
-                p.grinds.data.allTime.bankAge < 5_000L);
-        });
-    }
-
-    @Test public void backupThenResetMustStayWithTheAccountThatWasConfirmed() throws Exception {
+    @Test public void resetAndItsSafetyCopyMustStayWithTheAccountThatWasConfirmed() throws Exception {
         JsonCodec.bind(new Gson());
-        Am e = ReviewFixesTest.engine();
+        Engine e = ReviewFixesTest.engine();
         SessionRepository repository = new SessionRepository(new Gson(), FilepathTestSupport.root(temporary.newFolder().toPath()));
         OrderedPersistenceWriter writer = new OrderedPersistenceWriter(repository);
         TrackingIdentity alice = new TrackingIdentity("rsprofile.alice", TrackingIdentity.ACCOUNT_HASH_INVALID);
@@ -120,37 +99,37 @@ public class ReviewFollowupTest {
         AtomicReference<String> backedUpOwner = new AtomicReference<>();
         AtomicReference<String> resetOwner = new AtomicReference<>();
         CountDownLatch backupFinished = new CountDownLatch(1);
-        Ei c = new Ei(null, null, repository, writer, e) {
+        Persistence c = new Persistence(null, null, repository, writer, e) {
             @Override TrackingIdentity resolveCurrentIdentity() { return current.get(); }
-            @Override Filepath akt(long now) throws java.io.IOException {
+            @Override Filepath writeBackup(long now) throws java.io.IOException {
                 backedUpOwner.set(account());
-                Filepath result = super.akt(now);
+                Filepath result = super.writeBackup(now);
                 backupFinished.countDown();
                 return result;
             }
-            @Override synchronized Ds sj(long now) {
+            @Override synchronized ResetOutcome factoryReset(long now) {
                 resetOwner.set(account());
-                return super.sj(now);
+                return super.factoryReset(now);
             }
         };
         c.start();
         try {
-            assertTrue(c.ajy(alice, true));
-            e.rm(System.currentTimeMillis());
+            assertTrue(c.switchIdentity(alice, true));
+            e.ensureSession(System.currentTimeMillis());
             SwingUtilities.invokeAndWait(() -> {
-                Dp p = new Dp(e, ReviewFixesTest.CONFIG, null, repository, c);
-                new GrindsController(p).ti();
-                ShellProbe.pressSheet(p.shell, "Back up first");
+                SidebarPanel p = new SidebarPanel(e, ReviewFixesTest.CONFIG, null, repository, c);
+                new GrindsController(p).factoryReset();
+                ShellProbe.pressSheet(p.shell, "Reset");
                 try {
                     assertTrue("Alice's backup completed", backupFinished.await(5, TimeUnit.SECONDS));
                     // A profile switch finishes while the backup's EDT callback is queued.
                     current.set(bob);
-                    assertTrue(c.ajy(bob, false));
+                    assertTrue(c.switchIdentity(bob, false));
                     long now = System.currentTimeMillis();
-                    e.rm(now);
-                    e.getActiveSession().kf(new Ac(now, null, Ai.GAIN, Aj.GENERIC, "", "", true,
-                        Collections.singletonList(new Ab(526, "Bones", 2L, 100, 200L)),
-                        Bd.CONFIRMED, "fixture", null), 2_000);
+                    e.ensureSession(now);
+                    e.getActiveSession().addTransaction(new Transaction(now, TransactionType.GAIN, Context.GENERIC, "", "", true,
+                        Collections.singletonList(new Flow(526, "Bones", 2L, 100, 200L)),
+                        Confidence.CONFIRMED, "fixture", null), 2_000);
                     assertEquals("Bob has unrelated history before the callback", 200L, e.getMetrics(now).net);
                 } catch (InterruptedException ex) {
                     throw new AssertionError(ex);

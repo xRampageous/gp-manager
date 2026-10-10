@@ -27,7 +27,7 @@ public class WriterLineageAndIdentityTest
 
     private SavedState named(String name, long revision)
     {
-        SavedState state = new SavedState(new Ad(name, 1_000L), null, false, Collections.emptyList());
+        SavedState state = new SavedState(new Session(name, 1_000L), null, Collections.emptyList());
         state.setRevision(revision);
         return state;
     }
@@ -41,7 +41,7 @@ public class WriterLineageAndIdentityTest
         SessionRepository repository = new SessionRepository(new Gson(), FilepathTestSupport.root(directory))
         {
             @Override
-            public boolean save(Cs intent)
+            public boolean save(WriteIntent intent)
             {
                 if (intent.state.revision == 1L)
                 {
@@ -65,14 +65,14 @@ public class WriterLineageAndIdentityTest
         try
         {
             SavedState first = named("First", 1L);
-            writer.submit(new Cs(null,
+            writer.submit(new WriteIntent(null,
                 repository.scopeGeneration,
                 repository.lastKnownDiskRevision,
                 first));
             assertTrue(entered.await(5, TimeUnit.SECONDS));
 
             SavedState latest = named("Latest", 2L);
-            writer.submit(new Cs(null,
+            writer.submit(new WriteIntent(null,
                 repository.scopeGeneration,
                 repository.lastKnownDiskRevision,
                 latest));
@@ -96,9 +96,9 @@ public class WriterLineageAndIdentityTest
         try
         {
             long generation = repository.scopeGeneration;
-            writer.submit(new Cs(null, generation, 0L, named("A", 1L)));
-            writer.submit(new Cs(null, generation, 0L, named("B", 2L)));
-            writer.submit(new Cs(null, generation, 0L, named("C", 3L)));
+            writer.submit(new WriteIntent(null, generation, 0L, named("A", 1L)));
+            writer.submit(new WriteIntent(null, generation, 0L, named("B", 2L)));
+            writer.submit(new WriteIntent(null, generation, 0L, named("C", 3L)));
             assertTrue(writer.flush(Duration.ofSeconds(5)));
             assertEquals("C", repository.load().getActiveSession().getName());
             assertEquals(3L, repository.load().revision);
@@ -118,7 +118,7 @@ public class WriterLineageAndIdentityTest
 
         SessionRepository external = new SessionRepository(new Gson(), FilepathTestSupport.root(directory));
         external.load();
-        assertTrue(external.save(new Cs(null,
+        assertTrue(external.save(new WriteIntent(null,
             external.scopeGeneration,
             1L,
             named("External", 2L))));
@@ -126,15 +126,15 @@ public class WriterLineageAndIdentityTest
         OrderedPersistenceWriter writer = new OrderedPersistenceWriter(shared);
         try
         {
-            writer.aft(1L);
+            writer.resetRevision(1L);
             // Stale base against external tip must conflict, not overwrite.
-            writer.submit(new Cs(null,
+            writer.submit(new WriteIntent(null,
                 shared.scopeGeneration,
                 1L,
                 named("Local stale", 2L)));
             assertTrue(writer.flush(Duration.ofSeconds(5)));
-            assertTrue(writer.getStatus().auq()
-                || writer.getStatus().state == Ci.State.CONFLICT);
+            assertTrue(writer.getStatus().isFailure()
+                || writer.getStatus().state == SaveStatus.State.CONFLICT);
             assertEquals("External", new SessionRepository(new Gson(), FilepathTestSupport.root(directory)).load()
                 .getActiveSession().getName());
         }
@@ -157,21 +157,21 @@ public class WriterLineageAndIdentityTest
                 return false;
             }
         };
-        Am engine = new Am(
+        Engine engine = new Engine(
             deltas -> Collections.emptyList(),
             new TransactionClassifier(),
             new GpManagerConfig() {});
-        Ei coordinator = new Ei(
+        Persistence coordinator = new Persistence(
             null, null, repository, writer, engine);
 
         TrackingIdentity alice = new TrackingIdentity("rsprofile.alice", TrackingIdentity.ACCOUNT_HASH_INVALID);
         TrackingIdentity bob = new TrackingIdentity("rsprofile.bob", TrackingIdentity.ACCOUNT_HASH_INVALID);
-        assertTrue(coordinator.ajy(alice, true));
-        engine.rm(1_000L);
+        assertTrue(coordinator.switchIdentity(alice, true));
+        engine.ensureSession(1_000L);
         engine.getActiveSession().rename("Alice live");
         assertEquals("Alice live", engine.getActiveSession().getName());
 
-        assertFalse(coordinator.ajy(bob, true));
+        assertFalse(coordinator.switchIdentity(bob, true));
         assertEquals(alice, coordinator.getActiveIdentity());
         assertEquals("Alice live", engine.getActiveSession().getName());
         assertNotNull(PersistenceProbe.identityBlockReason(coordinator));
@@ -185,7 +185,7 @@ public class WriterLineageAndIdentityTest
     public void saveSnapshotIsCopiedUnderTheEngineLock() throws Exception
     {
         Path root = temporary.newFolder().toPath();
-        Am engine = new Am(
+        Engine engine = new Engine(
             deltas -> Collections.emptyList(),
             new TransactionClassifier(),
             new GpManagerConfig() {});
@@ -220,19 +220,18 @@ public class WriterLineageAndIdentityTest
         }).create();
         SessionRepository repository = new SessionRepository(recording, FilepathTestSupport.root(root), true);
         OrderedPersistenceWriter writer = new OrderedPersistenceWriter(repository);
-        Ei coordinator = new Ei(
+        Persistence coordinator = new Persistence(
             null, null, repository, writer, engine);
         try
         {
-            assertTrue(coordinator.ajy(new TrackingIdentity("rsprofile.alice", TrackingIdentity.ACCOUNT_HASH_INVALID), true));
-            engine.rm(1_000L);
+            assertTrue(coordinator.switchIdentity(new TrackingIdentity("rsprofile.alice", TrackingIdentity.ACCOUNT_HASH_INVALID), true));
+            engine.ensureSession(1_000L);
             locked.clear();
-            assertTrue(coordinator.aya());
+            assertTrue(coordinator.saveNow());
             assertEquals("one serialization per save, under the engine lock",
                 Collections.singletonList(true), locked);
-            String disk = SessionRepository.awy(repository.bound.state);
+            String disk = SessionRepository.readText(repository.bound.state);
             SavedState reread = new Gson().fromJson(disk, SavedState.class);
-            reread.aar();
             assertEquals("the file is exactly what the old detached copy wrote", new Gson().toJson(reread), disk);
         }
         finally
@@ -247,19 +246,19 @@ public class WriterLineageAndIdentityTest
         Path root = temporary.newFolder().toPath();
         SessionRepository repository = new SessionRepository(new Gson(), FilepathTestSupport.root(root), true);
         OrderedPersistenceWriter writer = new OrderedPersistenceWriter(repository);
-        Am engine = new Am(
+        Engine engine = new Engine(
             deltas -> Collections.emptyList(),
             new TransactionClassifier(),
             new GpManagerConfig() {});
-        Ei coordinator = new Ei(
+        Persistence coordinator = new Persistence(
             null, null, repository, writer, engine);
         try
         {
             TrackingIdentity alice = new TrackingIdentity("rsprofile.alice", TrackingIdentity.ACCOUNT_HASH_INVALID);
             TrackingIdentity bob = new TrackingIdentity("rsprofile.bob", TrackingIdentity.ACCOUNT_HASH_INVALID);
-            assertTrue(coordinator.ajy(alice, true));
-            engine.rm(1_000L);
-            assertTrue(coordinator.ajy(bob, true));
+            assertTrue(coordinator.switchIdentity(alice, true));
+            engine.ensureSession(1_000L);
+            assertTrue(coordinator.switchIdentity(bob, true));
             assertEquals(bob, coordinator.getActiveIdentity());
             assertTrue(EngineProbe.isBaselinePriming(engine));
         }
@@ -275,20 +274,20 @@ public class WriterLineageAndIdentityTest
         Path root = temporary.newFolder().toPath();
         SessionRepository repository = new SessionRepository(new Gson(), FilepathTestSupport.root(root), true);
         OrderedPersistenceWriter writer = new OrderedPersistenceWriter(repository);
-        Am engine = new Am(
+        Engine engine = new Engine(
             deltas -> Collections.emptyList(),
             new TransactionClassifier(),
             new GpManagerConfig() {});
-        Ei coordinator = new Ei(
+        Persistence coordinator = new Persistence(
             null, null, repository, writer, engine);
         try
         {
             TrackingIdentity alice = new TrackingIdentity("rsprofile.alice", TrackingIdentity.ACCOUNT_HASH_INVALID);
             TrackingIdentity bob = new TrackingIdentity("rsprofile.bob", TrackingIdentity.ACCOUNT_HASH_INVALID);
-            assertTrue(coordinator.ajy(alice, false));
-            engine.rm(1_000L);
+            assertTrue(coordinator.switchIdentity(alice, false));
+            engine.ensureSession(1_000L);
             engine.getActiveSession().rename("Alice ephemeral");
-            assertTrue(coordinator.ajy(bob, false));
+            assertTrue(coordinator.switchIdentity(bob, false));
             assertEquals(bob, coordinator.getActiveIdentity());
             // New account gets a fresh empty restore, not Alice's live session.
             assertTrue(engine.getActiveSession() == null

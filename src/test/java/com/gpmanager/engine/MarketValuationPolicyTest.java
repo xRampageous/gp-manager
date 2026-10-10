@@ -43,13 +43,13 @@ public class MarketValuationPolicyTest
     {
         Seam seam = new Seam();
         seam.quote = 184;
-        Bl service = service(new GpManagerConfig() {}, seam, NORMAL);
+        Valuation service = service(new GpManagerConfig() {}, seam, NORMAL);
 
-        Ab flow = service.value(Collections.singletonMap(560, 200L), T0 + 5L).get(0);
+        Flow flow = service.value(Collections.singletonMap(560, 200L), T0 + 5L).get(0);
 
         assertEquals(184, flow.unitPrice);
         assertEquals(36_800L, flow.valueDelta);
-        assertEquals(Av.GRAND_EXCHANGE, flow.getPriceSource());
+        assertEquals(PriceSource.GRAND_EXCHANGE, flow.getPriceSource());
         assertEquals("RuneLite market", flow.getPriceSource().toString());
         assertEquals("the explicit active route is requested", Collections.singletonList(true),
             seam.activeFlags);
@@ -63,11 +63,11 @@ public class MarketValuationPolicyTest
     {
         Seam seam = new Seam();
         seam.quote = 100;
-        Bl service = service(new GpManagerConfig() {}, seam, NORMAL);
+        Valuation service = service(new GpManagerConfig() {}, seam, NORMAL);
 
-        Ab first = service.value(Collections.singletonMap(560, 2L), T0).get(0);
+        Flow first = service.value(Collections.singletonMap(560, 2L), T0).get(0);
         seam.quote = 190;
-        Ab later = service.value(Collections.singletonMap(560, 2L), T0 + 1L).get(0);
+        Flow later = service.value(Collections.singletonMap(560, 2L), T0 + 1L).get(0);
 
         assertEquals(200L, first.valueDelta);
         assertEquals(380L, later.valueDelta);
@@ -81,12 +81,12 @@ public class MarketValuationPolicyTest
         Seam seam = new Seam();
         seam.failIfAsked = true;
         GpManagerConfig config = override("560=150");
-        Bl service = service(config, seam, NORMAL);
+        Valuation service = service(config, seam, NORMAL);
 
-        Ab flow = service.value(Collections.singletonMap(560, 2L), T0).get(0);
+        Flow flow = service.value(Collections.singletonMap(560, 2L), T0).get(0);
 
         assertEquals(300L, flow.valueDelta);
-        assertEquals(Av.MANUAL_OVERRIDE, flow.getPriceSource());
+        assertEquals(PriceSource.MANUAL_OVERRIDE, flow.getPriceSource());
         assertTrue("manual override never queries the automatic market", seam.asked.isEmpty());
     }
 
@@ -95,16 +95,16 @@ public class MarketValuationPolicyTest
     {
         Seam seam = new Seam();
         seam.failIfAsked = true;
-        Bl service = service(new GpManagerConfig() {}, seam, UNSUPPORTED_SPECIAL);
+        Valuation service = service(new GpManagerConfig() {}, seam, UNSUPPORTED_SPECIAL);
 
-        Ab coins = service.value(Collections.singletonMap(ItemID.COINS, 7L)).get(0);
-        Ab platinum = service.value(Collections.singletonMap(ItemID.PLATINUM, 2L)).get(0);
+        Flow coins = service.value(Collections.singletonMap(ItemID.COINS, 7L)).get(0);
+        Flow platinum = service.value(Collections.singletonMap(ItemID.PLATINUM, 2L)).get(0);
 
         assertEquals(1, coins.unitPrice);
-        assertEquals(Av.FACE_VALUE, coins.getPriceSource());
+        assertEquals(PriceSource.FACE_VALUE, coins.getPriceSource());
         assertEquals(7L, coins.valueDelta);
         assertEquals(1_000, platinum.unitPrice);
-        assertEquals(Av.FACE_VALUE, platinum.getPriceSource());
+        assertEquals(PriceSource.FACE_VALUE, platinum.getPriceSource());
         assertEquals(2_000L, platinum.valueDelta);
         assertTrue("face value is deterministic and never a market observation", seam.asked.isEmpty());
     }
@@ -114,25 +114,25 @@ public class MarketValuationPolicyTest
     {
         Seam seam = new Seam();
         seam.failIfAsked = true;
-        Bl service = service(new GpManagerConfig() {}, seam, NORMAL);
+        Valuation service = service(new GpManagerConfig() {}, seam, NORMAL);
 
-        Ab flow = service.value(Collections.singletonMap(ItemID.KONAR_KEY, 1L), T0).get(0);
+        Flow flow = service.value(Collections.singletonMap(ItemID.KONAR_KEY, 1L), T0).get(0);
 
-        assertEquals(Av.DEFERRED_CLAIM, flow.getPriceSource());
+        assertEquals(PriceSource.DEFERRED_CLAIM, flow.getPriceSource());
         assertEquals(0L, flow.valueDelta);
     }
 
     @Test
     public void unsupportedMappingStaysUnpricedDespiteAnAvailableQuote()
     {
-        Bl service = new Bl(new GpManagerConfig() {}, id -> null,
+        Valuation service = new Valuation(new GpManagerConfig() {}, id -> null,
             (id, active) -> 5_000, id -> id == 21_341, NORMAL);
 
-        Ab minerals = service.value(Collections.singletonMap(21_341, 1L)).get(0);
-        Ab ordinary = service.value(Collections.singletonMap(560, 1L)).get(0);
+        Flow minerals = service.value(Collections.singletonMap(21_341, 1L)).get(0);
+        Flow ordinary = service.value(Collections.singletonMap(560, 1L)).get(0);
 
         assertEquals("a convenience mapping is not economic evidence",
-            Av.UNPRICED, minerals.getPriceSource());
+            PriceSource.UNPRICED, minerals.getPriceSource());
         assertEquals(0L, minerals.valueDelta);
         assertEquals(5_000, ordinary.unitPrice);
     }
@@ -142,25 +142,25 @@ public class MarketValuationPolicyTest
     {
         Seam seam = new Seam();
         seam.quote = 0;
-        Bl service = service(new GpManagerConfig() {}, seam, NORMAL);
-        assertEquals(Av.UNPRICED,
+        Valuation service = service(new GpManagerConfig() {}, seam, NORMAL);
+        assertEquals(PriceSource.UNPRICED,
             service.value(Collections.singletonMap(560, 1L)).get(0).getPriceSource());
 
         seam.quote = -5;
-        assertEquals(Av.UNPRICED,
+        assertEquals(PriceSource.UNPRICED,
             service.value(Collections.singletonMap(560, 1L)).get(0).getPriceSource());
     }
 
     @Test
     public void beyondMaxCashQuoteStaysUnpricedInsteadOfClamping()
     {
-        assertEquals("an in-range quote is preserved", 184, Bl.unitPriceOf(184L));
+        assertEquals("an in-range quote is preserved", 184, Valuation.unitPriceOf(184L));
         assertEquals("the last representable quote is preserved",
-            Integer.MAX_VALUE, Bl.unitPriceOf(Integer.MAX_VALUE));
+            Integer.MAX_VALUE, Valuation.unitPriceOf(Integer.MAX_VALUE));
         assertEquals("a beyond-max-cash quote is not representable and stays unpriced",
-            0, Bl.unitPriceOf(Integer.MAX_VALUE + 1L));
-        assertEquals(0, Bl.unitPriceOf(0L));
-        assertEquals(0, Bl.unitPriceOf(-5L));
+            0, Valuation.unitPriceOf(Integer.MAX_VALUE + 1L));
+        assertEquals(0, Valuation.unitPriceOf(0L));
+        assertEquals(0, Valuation.unitPriceOf(-5L));
     }
 
     @Test
@@ -176,7 +176,7 @@ public class MarketValuationPolicyTest
     @Test
     public void sourceCommentDescribesTheActiveRouteDecision()
     {
-        String source = read("src/main/java/com/gpmanager/engine/Bl.java");
+        String source = read("src/main/java/com/gpmanager/engine/Valuation.java");
         assertTrue("the comment names GP Manager's own active market route",
             source.contains("active market route"));
         assertTrue("the comment states the user preference is ignored",
@@ -195,11 +195,11 @@ public class MarketValuationPolicyTest
     {
         Seam seam = new Seam();
         seam.quote = 100;
-        Bl service = service(new GpManagerConfig() {}, seam, NORMAL);
+        Valuation service = service(new GpManagerConfig() {}, seam, NORMAL);
 
-        Ab component = service.akj(12934, -4L, T0 + 9L);
+        Flow component = service.valueComponent(12934, -4L, T0 + 9L);
 
-        assertEquals(Av.GRAND_EXCHANGE, component.getPriceSource());
+        assertEquals(PriceSource.GRAND_EXCHANGE, component.getPriceSource());
         assertEquals(-400L, component.valueDelta);
         assertEquals("charge components also request the explicit active route",
             Collections.singletonList(true), seam.activeFlags);
@@ -212,11 +212,11 @@ public class MarketValuationPolicyTest
     {
         Seam seam = new Seam();
         seam.failIfAsked = true;
-        Bl service = service(override("12934=250"), seam, NORMAL);
+        Valuation service = service(override("12934=250"), seam, NORMAL);
 
-        Ab component = service.akj(12934, -4L, T0);
+        Flow component = service.valueComponent(12934, -4L, T0);
 
-        assertEquals(Av.MANUAL_OVERRIDE, component.getPriceSource());
+        assertEquals(PriceSource.MANUAL_OVERRIDE, component.getPriceSource());
         assertEquals(-1_000L, component.valueDelta);
         assertTrue(seam.asked.isEmpty());
     }
@@ -255,37 +255,37 @@ public class MarketValuationPolicyTest
         };
         for (String[] family : families)
         {
-            Am engine = new Am(
-                deltas -> Collections.<Ab>emptyList(), new TransactionClassifier(), config());
-            engine.rm(T0);
+            Engine engine = new Engine(
+                deltas -> Collections.<Flow>emptyList(), new TransactionClassifier(), config());
+            engine.ensureSession(T0);
             assertNull(family[2], observe(engine, family[0], T0));
-            Cm delta = observe(engine, family[1], T0 + 600L);
+            ChargeDelta delta = observe(engine, family[1], T0 + 600L);
             assertNotNull(family[2], delta);
 
             Seam seam = new Seam();
             seam.quote = 100;
-            Bl service = service(new GpManagerConfig() {}, seam, NORMAL);
-            List<Ab> losses = new ArrayList<>();
-            for (Cm.ComponentDelta component : delta.getComponentDeltas())
+            Valuation service = service(new GpManagerConfig() {}, seam, NORMAL);
+            List<Flow> losses = new ArrayList<>();
+            for (ChargeDelta.ComponentDelta component : delta.getComponentDeltas())
             {
                 int id = component.getItemId();
-                Ab valued = service.akj(id, component.getQuantityDelta(), T0 + 600L);
+                Flow valued = service.valueComponent(id, component.getQuantityDelta(), T0 + 600L);
                 int unit = valued.unitPrice;
                 assertTrue(family[2] + " component " + id + " must be priceable", unit > 0);
-                int perItem = Ar.akr(delta.getVariant(), id);
+                int perItem = ChargeCheck.unitsPerItem(delta.getVariant(), id);
                 if (perItem > 1)
                 {
                     unit = Math.max(1, unit / perItem);
                 }
                 long value = component.getQuantityDelta() * unit;
-                losses.add(new Ab(id, "Item " + id, component.getQuantityDelta(), unit, value,
+                losses.add(new Flow(id, "Item " + id, component.getQuantityDelta(), unit, value,
                     valued.getPriceSource(), T0 + 600L));
                 assertFalse(family[2] + " component " + id + " must not be mapping-blocked",
-                    Bl.vb(
+                    Valuation.hasUnsupportedMapping(
                         net.runelite.client.game.ItemMapping.map(id)));
             }
 
-            Ac result = engine.mj(delta, family[2], losses, T0 + 600L);
+            Transaction result = engine.bookChargeSpend(delta, family[2], losses, T0 + 600L, null);
             assertTrue(family[2] + " books its measured spend", result != null && result.getNet() < 0L);
         }
     }
@@ -299,7 +299,7 @@ public class MarketValuationPolicyTest
         seam.quote = 6;
         Market market = new Market(service(new GpManagerConfig() {}, seam, NORMAL));
         market.inventory = with(market.inventory, RUNE, 10L);
-        market.engine.setBaseline(new Cc(market.inventory));
+        market.engine.setBaseline(new ContainerSnapshot(market.inventory));
 
         market.offer(0, GrandExchangeOfferState.SELLING, RUNE, 10, 0, 7, 0);
         market.settle(with(market.inventory, RUNE, 0L));
@@ -307,14 +307,12 @@ public class MarketValuationPolicyTest
         market.offer(0, GrandExchangeOfferState.SOLD, RUNE, 10, 10, 7, 70);
         market.settle(with(market.inventory, ItemID.COINS, 100_070L));
 
-        Bi.Row row = market.engine.ub().get(0);
+        MarketRows.Row row = market.engine.marketRows().get(0);
         assertEquals("reference frozen at the placement quote", 60L, MarketFacts.basisValueGp(MarketFacts.record(market.engine, row)));
         assertEquals(70L, row.observedSettlementGp);
-        assertEquals("a later quote never reprices the frozen reference", 60L,
-            row.geReferenceGp);
-        assertEquals("GE difference is execution information only", 10L, row.geDifferenceGp);
+        assertEquals("a later quote never reprices the frozen reference", 6L, row.basisUnitPrice);
         assertEquals("pre-existing stock is UNKNOWN coverage, never zero",
-            Bi.Coverage.FULLY_UNKNOWN, row.coverage);
+            MarketRows.Coverage.FULLY_UNKNOWN, row.coverage);
         assertEquals("unknown liquidation never becomes automatic Net", 0L,
             market.engine.getMetrics(market.now).net);
     }
@@ -334,7 +332,7 @@ public class MarketValuationPolicyTest
         seam.failIfAsked = true;
         Market market = new Market(service(config, seam, NORMAL));
         market.inventory = with(market.inventory, RUNE, 10L);
-        market.engine.setBaseline(new Cc(market.inventory));
+        market.engine.setBaseline(new ContainerSnapshot(market.inventory));
 
         market.offer(0, GrandExchangeOfferState.SELLING, RUNE, 10, 0, 7, 0);
         market.settle(with(market.inventory, RUNE, 0L));
@@ -342,11 +340,9 @@ public class MarketValuationPolicyTest
         market.offer(0, GrandExchangeOfferState.SOLD, RUNE, 10, 10, 7, 70);
         market.settle(with(market.inventory, ItemID.COINS, 100_070L));
 
-        Bi.Row row = market.engine.ub().get(0);
-        assertEquals("editing an override never reprices the frozen reference", 1_470L,
-            row.geReferenceGp);
-        assertEquals("after-tax cash against the tax-adjusted frozen reference", -1_400L,
-            row.geDifferenceGp);
+        MarketRows.Row row = market.engine.marketRows().get(0);
+        assertEquals("editing an override never reprices the frozen reference", 1_500L,
+            MarketFacts.basisValueGp(MarketFacts.record(market.engine, row)));
         assertEquals(0L, market.engine.getMetrics(market.now).net);
     }
 
@@ -362,14 +358,13 @@ public class MarketValuationPolicyTest
         market.offer(0, GrandExchangeOfferState.BOUGHT, RUNE, 200, 200, 180, 36_000);
         market.settle(with(market.inventory, ItemID.COINS, 100_000L - 36_000L, RUNE, 200L));
 
-        Bi.Row row = market.engine.ub().get(0);
+        MarketRows.Row row = market.engine.marketRows().get(0);
         assertEquals("the frozen reference stays the placement quote", 37_200L,
             MarketFacts.basisValueGp(MarketFacts.record(market.engine, row)));
         assertEquals(36_000L, row.observedSettlementGp);
         assertEquals("the asset value is the exact spend", 36_000L,
             row.trackedBasisConsumedGp);
         assertEquals("a NEW BUY is Net-neutral", 0L, row.realizedResultGp);
-        assertEquals("GE difference = reference - spend", 1_200L, row.geDifferenceGp);
         assertEquals(0L, market.engine.getMetrics(market.now).net);
         assertEquals("the acquired quantity becomes known coverage", 200L,
             EngineProbe.knownCoverageQty(market.engine, RUNE));
@@ -381,18 +376,18 @@ public class MarketValuationPolicyTest
     @Test
     public void deathReclaimFeeCoinsUseFaceValueWithoutChangingAmounts()
     {
-        Am engine = new Am(
-            deltas -> Collections.<Ab>emptyList(), new TransactionClassifier(), config());
-        engine.rm(T0);
+        Engine engine = new Engine(
+            deltas -> Collections.<Flow>emptyList(), new TransactionClassifier(), config());
+        engine.ensureSession(T0);
 
-        Ac fee = engine.ml(1_000L, "Grave fee", T0 + 1L);
+        Transaction fee = engine.bookDeathFee(1_000L, "Grave fee", T0 + 1L);
 
         assertNotNull(fee);
-        assertEquals(Ai.PK_FEE, fee.getType());
+        assertEquals(TransactionType.CONSUMPTION, fee.getType());
         assertTrue(fee.isCounted());
-        Ab flow = fee.getFlows().get(0);
+        Flow flow = fee.getFlows().get(0);
         assertEquals(ItemID.COINS, flow.itemId);
-        assertEquals(Av.FACE_VALUE, flow.getPriceSource());
+        assertEquals(PriceSource.FACE_VALUE, flow.getPriceSource());
         assertEquals(-1_000L, flow.valueDelta);
         assertEquals(-1_000L, engine.getMetrics(T0 + 1L).net);
     }
@@ -401,7 +396,7 @@ public class MarketValuationPolicyTest
     public void fixedCurrencyConstructionCensusFindsNoOtherGrandExchangeStamp()
     {
         assertFalse("the death-reclaim fee no longer claims market provenance",
-            read("src/main/java/com/gpmanager/engine/Am.java")
+            read("src/main/java/com/gpmanager/engine/Engine.java")
                 .contains("Av.GRAND_EXCHANGE"));
         assertFalse("charge intake no longer prices components itself",
             read("src/main/java/com/gpmanager/ChargeIntake.java").contains("getItemPrice("));
@@ -412,22 +407,22 @@ public class MarketValuationPolicyTest
     {
         Seam seam = new Seam();
         seam.quote = 190;
-        Bl service = service(new GpManagerConfig() {}, seam, NORMAL);
-        Am engine = new Am(service, new TransactionClassifier(), config());
-        engine.rm(T0);
-        Ad session = engine.getActiveSession();
+        Valuation service = service(new GpManagerConfig() {}, seam, NORMAL);
+        Engine engine = new Engine(service, new TransactionClassifier(), config());
+        engine.ensureSession(T0);
+        Session session = engine.getActiveSession();
 
         // An older receipt frozen under the previous explicit route: unit 184, no capture time.
-        session.kf(new Ac(T0 + 1L, null, Ai.GAIN,
-            Aj.GENERIC, "", "Old drop", true,
-            Collections.singletonList(new Ab(560, "Death rune", 200L, 184, 36_800L,
-                Av.GRAND_EXCHANGE)),
-            Bd.CONFIRMED, "", null), 100);
+        session.addTransaction(new Transaction(T0 + 1L, TransactionType.GAIN,
+            Context.GENERIC, "", "Old drop", true,
+            Collections.singletonList(new Flow(560, "Death rune", 200L, 184, 36_800L,
+                PriceSource.GRAND_EXCHANGE)),
+            Confidence.CONFIRMED, "", null), 100);
         // A new receipt booked under the unified policy.
-        Ab newFlow = service.value(Collections.singletonMap(560, 200L), T0 + 2L).get(0);
-        session.kf(new Ac(T0 + 2L, null, Ai.GAIN,
-            Aj.GENERIC, "", "New drop", true, Collections.singletonList(newFlow),
-            Bd.CONFIRMED, "", null), 100);
+        Flow newFlow = service.value(Collections.singletonMap(560, 200L), T0 + 2L).get(0);
+        session.addTransaction(new Transaction(T0 + 2L, TransactionType.GAIN,
+            Context.GENERIC, "", "New drop", true, Collections.singletonList(newFlow),
+            Confidence.CONFIRMED, "", null), 100);
 
         assertEquals(184, session.getTransactions().get(0).getFlows().get(0).unitPrice);
         assertEquals(190, session.getTransactions().get(1).getFlows().get(0).unitPrice);
@@ -438,13 +433,13 @@ public class MarketValuationPolicyTest
     @Test
     public void schemaIs107AndNoWikiPriceSourceWasAdded()
     {
-        assertEquals(108, SavedState.CURRENT_SCHEMA_VERSION);
-        for (Av source : Av.values())
+        assertEquals(109, SavedState.CURRENT_SCHEMA_VERSION);
+        for (PriceSource source : PriceSource.values())
         {
             assertFalse("no new active/wiki enum constant: " + source,
                 source.name().contains("WIKI"));
         }
-        assertEquals("RuneLite market", Av.GRAND_EXCHANGE.toString());
+        assertEquals("RuneLite market", PriceSource.GRAND_EXCHANGE.toString());
     }
 
     // ── fixtures ───────────────────────────────────────────────────────────────────────────────
@@ -457,10 +452,10 @@ public class MarketValuationPolicyTest
         boolean failIfAsked;
     }
 
-    private static Bl service(GpManagerConfig config, Seam seam,
-        Bl.Bk state)
+    private static Valuation service(GpManagerConfig config, Seam seam,
+        Valuation.Economy state)
     {
-        return new Bl(config, id -> null, (id, active) ->
+        return new Valuation(config, id -> null, (id, active) ->
         {
             if (seam.failIfAsked)
             {
@@ -494,11 +489,11 @@ public class MarketValuationPolicyTest
         };
     }
 
-    private static Cm observe(Am engine, String chat, long now)
+    private static ChargeDelta observe(Engine engine, String chat, long now)
     {
-        Ar read = Ar.acs(chat);
+        ChargeCheck read = ChargeCheck.parse(chat);
         assertNotNull(chat, read);
-        Cm delta = engine.abu(read, "149:5:0:22323:X", now);
+        ChargeDelta delta = engine.observeCheck(read, "149:5:0:22323:X", now);
         return delta == null || delta.getComponentDeltas().isEmpty() ? null : delta;
     }
 
@@ -531,28 +526,28 @@ public class MarketValuationPolicyTest
 
     private static final class Market
     {
-        final Am engine;
-        final Bj ledger = new Bj();
+        final Engine engine;
+        final OfferSlots ledger = new OfferSlots();
         long now = T0;
         Map<Integer, Long> inventory = new HashMap<>();
 
-        Market(Bl service)
+        Market(Valuation service)
         {
-            engine = new Am(service, new TransactionClassifier(), config());
-            engine.ajl("Trading", Cx.AUTO, now);
+            engine = new Engine(service, new TransactionClassifier(), config());
+            engine.startCustom("Trading", now);
             inventory.put(ItemID.COINS, 100_000L);
-            engine.setBaseline(new Cc(inventory));
+            engine.setBaseline(new ContainerSnapshot(inventory));
         }
 
         void offer(int slot, GrandExchangeOfferState state, int item, int total, int traded,
             int price, int spent)
         {
             now += 600L;
-            Bj.Transition transition = ledger.observe(
-                new Bj.Snapshot(slot, state, item, total, traded, price, spent)).orElse(null);
+            OfferSlots.Transition transition = ledger.observe(
+                new OfferSlots.Snapshot(slot, state, item, total, traded, price, spent)).orElse(null);
             if (transition != null)
             {
-                engine.abh(transition,
+                engine.noteGeOffer(transition,
                     name(transition.current.itemId), now);
             }
         }
@@ -561,20 +556,20 @@ public class MarketValuationPolicyTest
         {
             now += 600L;
             inventory = new HashMap<>(next);
-            engine.yz();
-            Cc snapshot = new Cc(inventory);
+            engine.markDirty();
+            ContainerSnapshot snapshot = new ContainerSnapshot(inventory);
             for (int i = 0; i < 3; i++)
             {
-                engine.adj(snapshot, now);
+                engine.processIfDirty(snapshot, now);
                 now += 600L;
             }
         }
     }
 
-    private static final Bl.Bk NORMAL =
-        Bl.Bk.NORMAL;
-    private static final Bl.Bk UNSUPPORTED_SPECIAL =
-        Bl.Bk.UNSUPPORTED_SPECIAL;
+    private static final Valuation.Economy NORMAL =
+        Valuation.Economy.NORMAL;
+    private static final Valuation.Economy UNSUPPORTED_SPECIAL =
+        Valuation.Economy.UNSUPPORTED_SPECIAL;
 
     private static String read(String relative)
     {

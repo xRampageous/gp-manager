@@ -17,114 +17,114 @@ public class GrindsPersistenceTest
     public void profileLoadKeepsThatProfilesGrindsAndNoOtherProfiles() throws Exception
     {
         JsonCodec.bind(new com.google.gson.Gson());
-        Am source = PresentationLifecycleTest.engine();
+        Engine source = PresentationLifecycleTest.engine();
         long now = System.currentTimeMillis();
-        SavedState.Ap grind = source.avg("Vorkath", 5_000_000L, null, true, null);
+        SavedState.SavedGrind grind = source.saveGrind("Vorkath", 5_000_000L, null, true, null);
         assertNotNull(grind);
-        SavedState alice = source.qm();
+        SavedState alice = source.savedState();
 
-        Am live = PresentationLifecycleTest.engine();
-        live.agl("alice", alice, now);
+        Engine live = PresentationLifecycleTest.engine();
+        live.restoreProfile("alice", alice, now);
         assertEquals("a loaded profile shows its Grinds", 1, live.getSavedGrinds(true).size());
-        assertEquals("and the next save keeps them", 1, live.qm().getSavedGrinds().size());
+        assertEquals("and the next save keeps them", 1, live.savedState().getSavedGrinds().size());
 
-        live.agl("bob", new SavedState(), now + 1_000L);
+        live.restoreProfile("bob", new SavedState(), now + 1_000L);
         assertEquals("another profile never inherits them", 0, live.getSavedGrinds(true).size());
-        assertEquals(0, live.qm().getSavedGrinds().size());
+        assertEquals(0, live.savedState().getSavedGrinds().size());
     }
 
     @Test
     public void schemaIsAdditiveAndFutureVersionsStayReadOnly() throws Exception
     {
-        assertEquals(108, SavedState.CURRENT_SCHEMA_VERSION);
+        assertEquals(109, SavedState.CURRENT_SCHEMA_VERSION);
         SavedState old = new SavedState();
         old.setSchemaVersion(103);
-        assertFalse("pre-1.0 states are never read", old.ye());
+        assertFalse("pre-1.0 states are never read", old.isSupportedSchema());
         assertFalse((old.schemaVersion > SavedState.CURRENT_SCHEMA_VERSION));
         SavedState future = new SavedState();
         future.setSchemaVersion(SavedState.CURRENT_SCHEMA_VERSION + 1);
         assertTrue((future.schemaVersion > SavedState.CURRENT_SCHEMA_VERSION));
-        assertFalse("a newer state is never written back", future.ye());
+        assertFalse("a newer state is never written back", future.isSupportedSchema());
     }
 
     @Test
     public void schema102UpgradeLeavesFinancialTotalsUntouchedAndAddsEmptyGrindState() throws Exception
     {
-        Am source = PresentationLifecycleTest.engine();
+        Engine source = PresentationLifecycleTest.engine();
         long now = System.currentTimeMillis();
-        source.ajl("Legacy grind", Cx.GENERAL, now);
-        source.getActiveSession().kf(booked(now + 1_000L, "Dragon bones", 1, 2, 3_200, 6_400), 2_000);
-        source.sx(now + 2_000L);
-        SavedState legacy = source.qm();
+        source.startCustom("Legacy grind", now);
+        source.getActiveSession().addTransaction(booked(now + 1_000L, "Dragon bones", 1, 2, 3_200, 6_400), 2_000);
+        source.finishCustom(now + 2_000L);
+        SavedState legacy = source.savedState();
         legacy.setSchemaVersion(102);
 
-        Am upgraded = PresentationLifecycleTest.engine();
+        Engine upgraded = PresentationLifecycleTest.engine();
         upgraded.restore(legacy, now + 3_000L);
         assertEquals("no inference during upgrade", 0, upgraded.getSavedGrinds(true).size());
         assertEquals("history survives", 1, upgraded.getHistory().size());
         assertEquals("financial totals are untouched", 6_400L,
-            upgraded.tz(upgraded.getHistory().get(0).getId(), now + 3_000L).net);
+            upgraded.historyMetrics(upgraded.getHistory().get(0).getId(), now + 3_000L).net);
         assertFalse("old sessions are not auto-linked",
-            upgraded.getHistory().get(0).xf());
+            upgraded.getHistory().get(0).isLinked());
     }
 
     @Test
     public void noRetroactiveNameMatchingDuringRestore() throws Exception
     {
-        Am engine = PresentationLifecycleTest.engine();
+        Engine engine = PresentationLifecycleTest.engine();
         long now = System.currentTimeMillis();
-        engine.ajl("Vorkath", Cx.GENERAL, now);
-        engine.getActiveSession().kf(booked(now + 1_000L, "Dragon bones", 1, 1, 3_200, 3_200), 2_000);
-        engine.sx(now + 2_000L);
-        SavedState state = engine.qm();
-        SavedState.Ap grind = engine.avg("Vorkath", null, null, false, null);
+        engine.startCustom("Vorkath", now);
+        engine.getActiveSession().addTransaction(booked(now + 1_000L, "Dragon bones", 1, 1, 3_200, 3_200), 2_000);
+        engine.finishCustom(now + 2_000L);
+        SavedState state = engine.savedState();
+        SavedState.SavedGrind grind = engine.saveGrind("Vorkath", null, null, false, null);
         assertNotNull(grind);
         state.setSavedGrinds(engine.getSavedGrinds(true));
 
-        Am restored = PresentationLifecycleTest.engine();
+        Engine restored = PresentationLifecycleTest.engine();
         restored.restore(state, now + 3_000L);
         assertEquals(1, restored.getSavedGrinds(true).size());
         assertEquals("display names never link history", 0,
-            restored.yk(grind.getGrindId()).size());
+            restored.linkedSessions(grind.getGrindId()).size());
     }
 
     @Test
     public void nativeRoundTripKeepsGrindsTargetsAndLineage() throws Exception
     {
-        Am engine = PresentationLifecycleTest.engine();
+        Engine engine = PresentationLifecycleTest.engine();
         long now = System.currentTimeMillis();
-        engine.ajl("Vorkath", Cx.GENERAL, now);
+        engine.startCustom("Vorkath", now);
         engine.getActiveSession().setProfitTargetGp(5_000_000L);
         engine.getActiveSession().setActiveTimeTargetMillis(3L * 3_600_000L);
         String sessionId = engine.getActiveSession().getId();
-        SavedState.Ap grind = engine.avg("Vorkath", 5_000_000L, 3L * 3_600_000L, true, sessionId);
+        SavedState.SavedGrind grind = engine.saveGrind("Vorkath", 5_000_000L, 3L * 3_600_000L, true, sessionId);
         assertNotNull(grind);
-        engine.sx(now + 1_000L);
-        SavedState state = engine.qm();
+        engine.finishCustom(now + 1_000L);
+        SavedState state = engine.savedState();
 
-        Am restored = PresentationLifecycleTest.engine();
+        Engine restored = PresentationLifecycleTest.engine();
         restored.restore(state, now + 2_000L);
-        SavedState.Ap reloaded = restored.um(grind.getGrindId());
+        SavedState.SavedGrind reloaded = restored.savedGrind(grind.getGrindId());
         assertNotNull("the definition round-trips", reloaded);
         assertEquals("Vorkath", reloaded.getName());
         assertEquals(Long.valueOf(5_000_000L), reloaded.getNetTargetGp());
         assertEquals(Long.valueOf(3L * 3_600_000L), reloaded.getActiveTimeTargetMillis());
         assertTrue(reloaded.favorite);
         assertEquals("lineage round-trips by stable id", 1,
-            restored.yk(grind.getGrindId()).size());
+            restored.linkedSessions(grind.getGrindId()).size());
         assertEquals("the actual target snapshot round-trips", Long.valueOf(5_000_000L),
-            restored.ua(sessionId).getProfitTargetGp());
+            restored.historySession(sessionId).getProfitTargetGp());
         assertEquals(Long.valueOf(3L * 3_600_000L),
-            restored.ua(sessionId).getActiveTimeTargetMillis());
+            restored.historySession(sessionId).getActiveTimeTargetMillis());
     }
 
     @Test
     public void savedGrindsAreProfileScoped() throws Exception
     {
-        Am engine = PresentationLifecycleTest.engine();
-        SavedState profileA = engine.qm();
-        engine.avg("Vorkath", 5_000_000L, null, false, null);
-        profileA = engine.qm();
+        Engine engine = PresentationLifecycleTest.engine();
+        SavedState profileA = engine.savedState();
+        engine.saveGrind("Vorkath", 5_000_000L, null, false, null);
+        profileA = engine.savedState();
 
         SavedState profileB = new SavedState();
         profileB.setOwnerKey("profile-b");
@@ -144,9 +144,9 @@ public class GrindsPersistenceTest
         legacy.setSchemaVersion(102);
         assertTrue("no NPE on a legacy state without the list", legacy.getSavedGrinds().isEmpty());
 
-        Am engine = PresentationLifecycleTest.engine();
+        Engine engine = PresentationLifecycleTest.engine();
         long now = System.currentTimeMillis();
-        engine.ajl("Vorkath", Cx.GENERAL, now);
+        engine.startCustom("Vorkath", now);
         assertEquals("no inferred lineage for a new instance", "", engine.getActiveSession().getGrindId());
         assertNull(engine.getActiveSession().getActiveTimeTargetMillis());
         engine.getActiveSession().setGrindId(null);
@@ -158,22 +158,22 @@ public class GrindsPersistenceTest
     @Test
     public void clearingTargetsWorksWithoutTouchingFinancialState() throws Exception
     {
-        Am engine = PresentationLifecycleTest.engine();
+        Engine engine = PresentationLifecycleTest.engine();
         long now = System.currentTimeMillis();
-        engine.ajl("Vorkath", Cx.GENERAL, now);
-        engine.getActiveSession().kf(booked(now + 1_000L, "Dragon bones", 1, 1, 3_200, 3_200), 2_000);
-        engine.ahq(5_000_000L, 3L * 3_600_000L, now + 2_000L);
+        engine.startCustom("Vorkath", now);
+        engine.getActiveSession().addTransaction(booked(now + 1_000L, "Dragon bones", 1, 1, 3_200, 3_200), 2_000);
+        engine.setTargets(5_000_000L, 3L * 3_600_000L, now + 2_000L);
         long net = engine.getMetrics(now + 2_000L).net;
-        engine.ahq(null, null, now + 3_000L);
+        engine.setTargets(null, null, now + 3_000L);
         assertNull(engine.getActiveSession().getProfitTargetGp());
         assertNull(engine.getActiveSession().getActiveTimeTargetMillis());
         assertEquals("clearing a target changes no money", net, engine.getMetrics(now + 3_000L).net);
     }
 
-    private static Ac booked(long at, String name, int itemId, long quantity, int unitPrice, long value)
+    private static Transaction booked(long at, String name, int itemId, long quantity, int unitPrice, long value)
     {
-        return new Ac(at, null, Ai.GAIN, Aj.GENERIC, "", "Vorkath", true,
-            Collections.singletonList(new Ab(itemId, name, quantity, unitPrice, value)),
-            Bd.LIKELY, "Test sample.", null);
+        return new Transaction(at, TransactionType.GAIN, Context.GENERIC, "", "Vorkath", true,
+            Collections.singletonList(new Flow(itemId, name, quantity, unitPrice, value)),
+            Confidence.LIKELY, "Test sample.", null);
     }
 }

@@ -33,11 +33,11 @@ public class WearAndCurrencyTest
         HELM_75, 1_200_000, HELM_0, 60_000, KEY_HALF, 9_543, FLAKES, 20, FISH_BARREL, 0);
 
     private final Map<Integer, Long> inventory = new HashMap<>(Map.of(COINS, 1_000_000L, HELM, 1L, FLAKES, 6_000L));
-    private final Am engine = new Am(deltas ->
+    private final Engine engine = new Engine(deltas ->
     {
-        List<Ab> flows = new ArrayList<>();
-        deltas.forEach((id, quantity) -> flows.add(new Ab(id, NAMES.get(id), quantity, PRICES.get(id),
-            quantity * PRICES.get(id), id == COINS ? Av.FACE_VALUE : Av.GRAND_EXCHANGE)));
+        List<Flow> flows = new ArrayList<>();
+        deltas.forEach((id, quantity) -> flows.add(new Flow(id, NAMES.get(id), quantity, PRICES.get(id),
+            quantity * PRICES.get(id), id == COINS ? PriceSource.FACE_VALUE : PriceSource.GRAND_EXCHANGE)));
         return flows;
     }, new TransactionClassifier(), new GpManagerConfig()
     {
@@ -57,52 +57,52 @@ public class WearAndCurrencyTest
         change(HELM_100, -1L, HELM_75, 1L);
         change(HELM_75, -1L, HELM_0, 1L);
         assertEquals("wearing down books nothing", 0L, net());
-        assertTrue("and nothing waits in Review", engine.getActiveSession().getTransactions().stream().noneMatch(Eh::aal));
+        assertTrue("and nothing waits in Review", engine.getActiveSession().getTransactions().stream().noneMatch(ReviewRules::needsOwnerDecision));
 
-        engine.eb.put(Eb.DG, 0, 1L, 4, null);
-        Ac repair = change(HELM_0, -1L, COINS, -100_000L, HELM, 1L);
+        engine.inbox.put(Inbox.DIALOGUE, 0, 1L, 4, null);
+        Transaction repair = change(HELM_0, -1L, COINS, -100_000L, HELM, 1L);
         assertTrue(repair.isCounted());
         assertEquals("only the fee counts", -100_000L, net());
 
-        assertNull("an ordinary Barrows buy is not wear", Am.piece(new Ab(COINS, "Coins", 1L, 1, 1L)));
-        assertEquals("dharok's helm", Am.piece(new Ab(HELM_75, "Dharok's helm 75", 1L, 0, 0L)));
+        assertNull("an ordinary Barrows buy is not wear", Engine.piece(new Flow(COINS, "Coins", 1L, 1, 1L)));
+        assertEquals("dharok's helm", Engine.piece(new Flow(HELM_75, "Dharok's helm 75", 1L, 0, 0L)));
     }
 
     @Test
     public void anNpcPaidInSkillingCurrencyIsAPurchase()
     {
         start();
-        engine.eb.put(Eb.DG, 0, 1L, 4, null);
-        Ac bought = change(FLAKES, -6_000L, FISH_BARREL, 1L);
-        assertSame(Ai.TRADE, bought.getType());
-        assertSame(Aj.MARKET, bought.getContext());
-        assertTrue("not Review", !Eh.aal(bought));
+        engine.inbox.put(Inbox.DIALOGUE, 0, 1L, 4, null);
+        Transaction bought = change(FLAKES, -6_000L, FISH_BARREL, 1L);
+        assertSame(TransactionType.TRADE, bought.getType());
+        assertSame(Context.MARKET, bought.getContext());
+        assertTrue("not Review", !ReviewRules.needsOwnerDecision(bought));
     }
 
     @Test
     public void anImpInABoxBanksAndAKeyHalfIsAGain()
     {
-        assertSame(NeutralStorageClassifier.Kind.IMP_BOX, NeutralStorageClassifier.a1("use dragon bones -> imp-in-a-box(2)"));
-        assertSame(NeutralStorageClassifier.Kind.SCROLL_BOOK, NeutralStorageClassifier.a1("use teleport to house -> master scroll book"));
-        assertTrue("a loot sack is held at zero until opened", Bn.e1("Hunters' loot sack (expert)"));
+        assertEquals("Sent to the bank by an imp-in-a-box", NeutralTransfers.storage("use dragon bones -> imp-in-a-box(2)"));
+        assertEquals("Master scroll book", NeutralTransfers.storage("use teleport to house -> master scroll book"));
+        assertTrue("a loot sack is held at zero until opened", ActionReader.isClaim("Hunters' loot sack (expert)"));
         for (String bag : new String[] {"Tiny port coin bag", "Port coin bag", "Large port reward bag", "Hallowed sack"})
         {
-            assertTrue(bag + " is held at zero until opened", Bn.e1(bag));
+            assertTrue(bag + " is held at zero until opened", ActionReader.isClaim(bag));
         }
-        assertTrue("an empty sack is no claim", !Bn.e1("Empty sack"));
+        assertTrue("an empty sack is no claim", !ActionReader.isClaim("Empty sack"));
         start();
-        Ac half = change(KEY_HALF, 1L);
-        assertSame(Ai.GAIN, half.getType());
+        Transaction half = change(KEY_HALF, 1L);
+        assertSame(TransactionType.GAIN, half.getType());
         assertEquals(9_543L, net());
     }
 
     private void start()
     {
-        engine.ajl("Barrows", Cx.GENERAL, now);
-        engine.setBaseline(new Cc(new HashMap<>(inventory)));
+        engine.startCustom("Barrows", now);
+        engine.setBaseline(new ContainerSnapshot(new HashMap<>(inventory)));
     }
 
-    private Ac change(Object... idsAndDeltas)
+    private Transaction change(Object... idsAndDeltas)
     {
         for (int index = 0; index < idsAndDeltas.length; index += 2)
         {
@@ -111,9 +111,9 @@ public class WearAndCurrencyTest
         inventory.values().removeIf(quantity -> quantity == 0L);
         int before = engine.getActiveSession().getTransactions().size();
         now += 3_000L;
-        engine.adj(new Cc(new HashMap<>(inventory)), now);
-        engine.adj(new Cc(new HashMap<>(inventory)), now + 600L);
-        List<Ac> all = engine.getActiveSession().getTransactions();
+        engine.processIfDirty(new ContainerSnapshot(new HashMap<>(inventory)), now);
+        engine.processIfDirty(new ContainerSnapshot(new HashMap<>(inventory)), now + 600L);
+        List<Transaction> all = engine.getActiveSession().getTransactions();
         return all.size() > before ? all.get(all.size() - 1) : null;
     }
 

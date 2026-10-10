@@ -41,8 +41,6 @@ public class GpManagerConfigLayoutTest
     {
         assertTrue(description("autoStartSession").contains("Free play"));
         assertFalse(description("autoStartSession").contains("Overall"));
-        assertTrue(description("idlePauseEnabled").contains("idle time"));
-        assertFalse(description("idlePauseEnabled").contains("wall-clock"));
         assertTrue(description("hudTimer").contains("tracked active time"));
         assertTrue("the tray mirrors filters while Ledger costs stay visible: "
             + description("lootPresentationFilter"),

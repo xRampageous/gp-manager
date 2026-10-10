@@ -53,7 +53,7 @@ public class ClueClaimTest
     };
 
     private final Map<Integer, Long> inventory = new HashMap<>();
-    private final Am engine = new Am(new Bl(CONFIG, ClueClaimTest::composition,
+    private final Engine engine = new Engine(new Valuation(CONFIG, ClueClaimTest::composition,
         id -> id == PLATEBODY ? 38_000 : id == ECLECTIC ? 20_000 : id == EMPTY_JAR ? 290 : 0), new TransactionClassifier(), CONFIG);
     private long now = 1_000_000L;
 
@@ -64,20 +64,20 @@ public class ClueClaimTest
             "Reward casket (medium)", "Clue bottle (easy)", "Clue nest (hard)", "Clue geode (elite)",
             "Challenge scroll (hard)", "Puzzle box", "Light box"})
         {
-            assertTrue(name, Ak.pattern("clue").matcher(name).matches());
+            assertTrue(name, GameData.pattern("clue").matcher(name).matches());
         }
         for (String name : new String[] {"Casket", "Clue scroll", "Scroll box (hard) extra", "Bird nest",
             "Clue hunter garb", "Mystery box"})
         {
-            assertFalse(name, Ak.pattern("clue").matcher(name).matches());
+            assertFalse(name, GameData.pattern("clue").matcher(name).matches());
         }
     }
 
     @Test
     public void aWholeTrailBooksOnlyTheCasketsLoot()
     {
-        engine.ajl("Clues", Cx.GENERAL, now);
-        engine.setBaseline(new Cc(new HashMap<>(inventory)));
+        engine.startCustom("Clues", now);
+        engine.setBaseline(new ContainerSnapshot(new HashMap<>(inventory)));
 
         change(BOX, 1L);
         change(BOX, -1L, CLUE, 1L);
@@ -96,9 +96,9 @@ public class ClueClaimTest
     public void aCasketOpenedThroughItsRewardWindowCountsItsLoot()
     {
         inventory.put(CASKET, 1L);
-        engine.ajl("Clues", Cx.GENERAL, now);
-        engine.setBaseline(new Cc(new HashMap<>(inventory)));
-        engine.ls("loot:Clue Scroll (Hard)", "Clue Scroll (Hard)");
+        engine.startCustom("Clues", now);
+        engine.setBaseline(new ContainerSnapshot(new HashMap<>(inventory)));
+        engine.beginCluePath("loot:Clue Scroll (Hard)", "Clue Scroll (Hard)");
 
         change(CASKET, -1L, PLATEBODY, 1L, COINS, 5_000L);
         assertEquals(43_000L, net());
@@ -110,8 +110,8 @@ public class ClueClaimTest
     public void catchingAndLootingAnImplingCountsWithoutReview()
     {
         inventory.put(EMPTY_JAR, 2L);
-        engine.ajl("Hunter", Cx.GENERAL, now);
-        engine.setBaseline(new Cc(new HashMap<>(inventory)));
+        engine.startCustom("Hunter", now);
+        engine.setBaseline(new ContainerSnapshot(new HashMap<>(inventory)));
 
         change(EMPTY_JAR, -1L, ECLECTIC, 1L);
         assertEquals("the caught impling is worth its jar less the empty one", 19_710L, net());
@@ -129,11 +129,11 @@ public class ClueClaimTest
     @Test
     public void anUntradeableThatIsNoClueKeepsItsUnknownPrice()
     {
-        engine.ajl("Clues", Cx.GENERAL, now);
-        engine.setBaseline(new Cc(new HashMap<>(inventory)));
+        engine.startCustom("Clues", now);
+        engine.setBaseline(new ContainerSnapshot(new HashMap<>(inventory)));
         change(MYSTERY, 1L);
-        Ab flow = engine.getActiveSession().getTransactions().get(0).getFlows().get(0);
-        assertEquals(Av.UNPRICED, flow.getPriceSource());
+        Flow flow = engine.getActiveSession().getTransactions().get(0).getFlows().get(0);
+        assertEquals(PriceSource.UNPRICED, flow.getPriceSource());
     }
 
     private void change(Object... idsAndDeltas)
@@ -144,8 +144,8 @@ public class ClueClaimTest
         }
         inventory.values().removeIf(quantity -> quantity == 0L);
         now += 3_000L;
-        engine.adj(new Cc(new HashMap<>(inventory)), now);
-        engine.adj(new Cc(new HashMap<>(inventory)), now + 600L);
+        engine.processIfDirty(new ContainerSnapshot(new HashMap<>(inventory)), now);
+        engine.processIfDirty(new ContainerSnapshot(new HashMap<>(inventory)), now + 600L);
     }
 
     private long net()
@@ -156,9 +156,9 @@ public class ClueClaimTest
     private int reviews()
     {
         int count = 0;
-        for (Ac transaction : engine.getActiveSession().getTransactions())
+        for (Transaction transaction : engine.getActiveSession().getTransactions())
         {
-            if (Eh.aal(transaction))
+            if (ReviewRules.needsOwnerDecision(transaction))
             {
                 count++;
             }

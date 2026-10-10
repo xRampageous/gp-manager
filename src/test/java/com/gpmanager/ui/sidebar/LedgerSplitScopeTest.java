@@ -20,9 +20,9 @@ public class LedgerSplitScopeTest
     public void mixedItemReceiptsRefuseWithAnExplanation() throws Exception
     {
         Fixture fixture = new Fixture();
-        Ac transaction = fixture.book(
-            new Ab(536, "Dragon bones", 2L, 2_000, 4_000L),
-            new Ab(1753, "Blue dragonhide", 1L, 2_000, 2_000L));
+        Transaction transaction = fixture.book(
+            new Flow(536, "Dragon bones", 2L, 2_000, 4_000L),
+            new Flow(1753, "Blue dragonhide", 1L, 2_000, 2_000L));
 
         fixture.split(transaction.getId());
 
@@ -36,7 +36,7 @@ public class LedgerSplitScopeTest
     public void aSingleUnitReceiptRefuses() throws Exception
     {
         Fixture fixture = new Fixture();
-        Ac transaction = fixture.book(new Ab(536, "Dragon bones", 1L, 2_000, 2_000L));
+        Transaction transaction = fixture.book(new Flow(536, "Dragon bones", 1L, 2_000, 2_000L));
 
         fixture.split(transaction.getId());
 
@@ -49,9 +49,9 @@ public class LedgerSplitScopeTest
     public void duplicateFlowsOfOneItemStillSplit() throws Exception
     {
         Fixture fixture = new Fixture();
-        Ac transaction = fixture.book(
-            new Ab(536, "Dragon bones", 1L, 2_000, 2_000L),
-            new Ab(536, "Dragon bones", 1L, 2_000, 2_000L));
+        Transaction transaction = fixture.book(
+            new Flow(536, "Dragon bones", 1L, 2_000, 2_000L),
+            new Flow(536, "Dragon bones", 1L, 2_000, 2_000L));
 
         fixture.split(transaction.getId());
         assertEquals("the prompt names the entry", "Split entry", ShellProbe.sheetTitle(fixture.shell()));
@@ -65,7 +65,7 @@ public class LedgerSplitScopeTest
     public void keepMustLeaveAtLeastOneForTheOtherSide() throws Exception
     {
         Fixture fixture = new Fixture();
-        Ac transaction = fixture.book(new Ab(536, "Dragon bones", 2L, 2_000, 4_000L));
+        Transaction transaction = fixture.book(new Flow(536, "Dragon bones", 2L, 2_000, 4_000L));
 
         fixture.split(transaction.getId());
         fixture.type("2");
@@ -84,7 +84,7 @@ public class LedgerSplitScopeTest
     public void aReceiptThatChangesWhileThePromptIsOpenSplitsNothing() throws Exception
     {
         Fixture fixture = new Fixture();
-        Ac transaction = fixture.book(new Ab(536, "Dragon bones", 2L, 2_000, 4_000L));
+        Transaction transaction = fixture.book(new Flow(536, "Dragon bones", 2L, 2_000, 4_000L));
         String owner = fixture.engine.getActiveSession().getId();
 
         fixture.split(transaction.getId());
@@ -94,14 +94,14 @@ public class LedgerSplitScopeTest
 
         assertTrue(ShellProbe.noticeText(fixture.shell()).startsWith("Not split"));
         assertEquals("the viewed receipt is untouched", 2L,
-            fixture.engine.ua(owner).sw(transaction.getId()).quantity(536, true));
+            fixture.engine.historySession(owner).findTransaction(transaction.getId()).quantity(536, true));
     }
 
     @Test
     public void aRefusedEngineSplitSaysSo() throws Exception
     {
         Fixture fixture = new Fixture(new RefusingEngine());
-        Ac transaction = fixture.book(new Ab(536, "Dragon bones", 2L, 2_000, 4_000L));
+        Transaction transaction = fixture.book(new Flow(536, "Dragon bones", 2L, 2_000, 4_000L));
 
         fixture.split(transaction.getId());
         fixture.type("1");
@@ -116,7 +116,7 @@ public class LedgerSplitScopeTest
     public void theSplitPreviewsItsNetFirstAndTheResultMatches() throws Exception
     {
         Fixture fixture = new Fixture();
-        Ac transaction = fixture.book(new Ab(536, "Dragon bones", 4L, 2_000, 8_000L));
+        Transaction transaction = fixture.book(new Flow(536, "Dragon bones", 4L, 2_000, 8_000L));
         long before = fixture.engine.getMetrics(NOW + 2_000L).net;
         fixture.confirm = false;
 
@@ -143,12 +143,12 @@ public class LedgerSplitScopeTest
     public void aBookingAfterThePreviewSplitsNothing() throws Exception
     {
         Fixture fixture = new Fixture();
-        Ac transaction = fixture.book(new Ab(536, "Dragon bones", 4L, 2_000, 8_000L));
+        Transaction transaction = fixture.book(new Flow(536, "Dragon bones", 4L, 2_000, 8_000L));
         fixture.confirm = false;
         fixture.split(transaction.getId());
         fixture.type("1");
         fixture.press("OK");
-        fixture.book(new Ab(995, "Coins", 10L, 1, 10L));
+        fixture.book(new Flow(995, "Coins", 10L, 1, 10L));
 
         onEdt(() ->
         {
@@ -161,23 +161,23 @@ public class LedgerSplitScopeTest
 
     private static final class Fixture
     {
-        final Am engine;
-        final Dp panel;
+        final Engine engine;
+        final SidebarPanel panel;
         final LedgerController controller;
 
         Fixture() throws Exception
         {
-            this(new Am(deltas -> Collections.emptyList(), new TransactionClassifier(),
+            this(new Engine(deltas -> Collections.emptyList(), new TransactionClassifier(),
                 new GpManagerConfig() {}));
         }
 
-        Fixture(Am engine) throws Exception
+        Fixture(Engine engine) throws Exception
         {
             this.engine = engine;
             JsonCodec.bind(new com.google.gson.Gson());
-            panel = onEdt(() -> new Dp(engine, new GpManagerConfig() {}, null));
+            panel = onEdt(() -> new SidebarPanel(engine, new GpManagerConfig() {}, null));
             controller = new LedgerController(panel);
-            engine.ajl("Vorkath", Cx.GENERAL, NOW);
+            engine.startCustom("Vorkath", NOW);
         }
 
         Shell shell()
@@ -185,15 +185,15 @@ public class LedgerSplitScopeTest
             return panel.shell();
         }
 
-        Ac book(Ab... flows)
+        Transaction book(Flow... flows)
         {
-            Ac transaction = new Ac(NOW + 1_000L, null, Ai.LOOT, Aj.LOOT, "", "Vorkath", true,
-                Arrays.asList(flows), Bd.CONFIRMED, "fixture", null);
-            engine.getActiveSession().kf(transaction, 2_000);
+            Transaction transaction = new Transaction(NOW + 1_000L, TransactionType.LOOT, Context.LOOT, "", "Vorkath", true,
+                Arrays.asList(flows), Confidence.CONFIRMED, "fixture", null);
+            engine.getActiveSession().addTransaction(transaction, 2_000);
             return transaction;
         }
 
-        Ao.Ef previewed;
+        LedgerData.CorrectionPreview previewed;
         long[] pending;
         boolean confirm = true;
 
@@ -232,13 +232,13 @@ public class LedgerSplitScopeTest
 
         void closeAndStartAnotherRun()
         {
-            engine.sx(NOW + 2_000L);
-            engine.ajl("Other", Cx.GENERAL, NOW + 3_000L);
+            engine.finishCustom(NOW + 2_000L);
+            engine.startCustom("Other", NOW + 3_000L);
         }
     }
 
     /** Refuses every split, so the controller's refusal feedback can be pinned. */
-    private static final class RefusingEngine extends Am
+    private static final class RefusingEngine extends Engine
     {
         RefusingEngine()
         {
@@ -247,7 +247,7 @@ public class LedgerSplitScopeTest
         }
 
         @Override
-        synchronized boolean kr(String transactionId, int itemId, long keepQuantity, long now,
+        synchronized boolean splitItem(String transactionId, int itemId, long keepQuantity, long now,
             String optionalNote)
         {
             return false;

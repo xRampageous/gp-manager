@@ -7,12 +7,12 @@ final class AccountingInvariants
     {
     }
 
-    static boolean transferNeverCounts(Ac tx)
+    static boolean transferNeverCounts(Transaction tx)
     {
         if (tx == null)
         {
             return true;
         }
-        return tx.getType() != Ai.TRANSFER || !tx.isCounted();
+        return tx.getType() != TransactionType.TRANSFER || !tx.isCounted();
     }
 }

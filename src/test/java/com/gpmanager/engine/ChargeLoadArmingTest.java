@@ -80,12 +80,12 @@ public class ChargeLoadArmingTest
         return new MenuOptionClicked(entry);
     }
 
-    private static Am engine()
+    private static Engine engine()
     {
-        return new Am(deltas -> Collections.emptyList(), new TransactionClassifier(), new GpManagerConfig() {});
+        return new Engine(deltas -> Collections.emptyList(), new TransactionClassifier(), new GpManagerConfig() {});
     }
 
-    private static ChargeIntake intake(Client client, Am engine)
+    private static ChargeIntake intake(Client client, Engine engine)
     {
         return new ChargeIntake(client, null, new GpManagerConfig() {}, engine, null)
         {
@@ -98,61 +98,61 @@ public class ChargeLoadArmingTest
     }
 
     private static final String BLOWPIPE_IDENTITY = (InterfaceID.Inventory.ITEMS >>> 16) + ":" + BLOWPIPE_SLOT + ":"
-        + ItemID.TOXIC_BLOWPIPE_LOADED + ":" + Ar.V.V1b.name();
+        + ItemID.TOXIC_BLOWPIPE_LOADED + ":" + ChargeCheck.ChargedItem.BLOWPIPE.name();
 
     @Test
     public void scalesUsedOnTheBlowpipeArmTheLoad()
     {
-        Am engine = engine();
+        Engine engine = engine();
         Widget blowpipe = item(ItemID.TOXIC_BLOWPIPE_LOADED, BLOWPIPE_SLOT);
         Widget scales = item(ItemID.SNAKEBOSS_SCALE, SCALES_SLOT);
-        intake(selecting(scales), engine).lc(
+        intake(selecting(scales), engine).armLoad(
             click(MenuAction.WIDGET_TARGET_ON_WIDGET, "Use", blowpipe), "");
-        assertEquals(Ar.V.V1b, (engine.eb.peek(Eb.CL) == null ? null : engine.eb.peek(Eb.CL).v));
+        assertEquals(ChargeCheck.ChargedItem.BLOWPIPE, (engine.inbox.peek(Inbox.LOAD_TARGET) == null ? null : engine.inbox.peek(Inbox.LOAD_TARGET).variant));
         assertEquals("the item in hand is the source", ItemID.SNAKEBOSS_SCALE,
-            engine.eb.item(Eb.CL));
-        assertEquals("the weapon's own slot", BLOWPIPE_IDENTITY, (engine.eb.peek(Eb.CL) == null ? null : engine.eb.peek(Eb.CL).id));
+            engine.inbox.item(Inbox.LOAD_TARGET));
+        assertEquals("the weapon's own slot", BLOWPIPE_IDENTITY, (engine.inbox.peek(Inbox.LOAD_TARGET) == null ? null : engine.inbox.peek(Inbox.LOAD_TARGET).id));
     }
 
     @Test
     public void theBlowpipeUsedOnScalesArmsTheSameLoad()
     {
-        Am engine = engine();
+        Engine engine = engine();
         Widget blowpipe = item(ItemID.TOXIC_BLOWPIPE_LOADED, BLOWPIPE_SLOT);
         Widget scales = item(ItemID.SNAKEBOSS_SCALE, SCALES_SLOT);
-        intake(selecting(blowpipe), engine).lc(
+        intake(selecting(blowpipe), engine).armLoad(
             click(MenuAction.WIDGET_TARGET_ON_WIDGET, "Use", scales), "");
-        assertEquals(Ar.V.V1b, (engine.eb.peek(Eb.CL) == null ? null : engine.eb.peek(Eb.CL).v));
-        assertEquals(ItemID.SNAKEBOSS_SCALE, engine.eb.item(Eb.CL));
+        assertEquals(ChargeCheck.ChargedItem.BLOWPIPE, (engine.inbox.peek(Inbox.LOAD_TARGET) == null ? null : engine.inbox.peek(Inbox.LOAD_TARGET).variant));
+        assertEquals(ItemID.SNAKEBOSS_SCALE, engine.inbox.item(Inbox.LOAD_TARGET));
         assertEquals("the identity follows the weapon, not the clicked scales", BLOWPIPE_IDENTITY,
-            (engine.eb.peek(Eb.CL) == null ? null : engine.eb.peek(Eb.CL).id));
+            (engine.inbox.peek(Inbox.LOAD_TARGET) == null ? null : engine.inbox.peek(Inbox.LOAD_TARGET).id));
     }
 
     @Test
     public void anUnrelatedItemOrPlainClickArmsNothing()
     {
-        Am engine = engine();
+        Engine engine = engine();
         Widget blowpipe = item(ItemID.TOXIC_BLOWPIPE_LOADED, BLOWPIPE_SLOT);
-        intake(selecting(item(ItemID.BIG_BONES, 2)), engine).lc(
+        intake(selecting(item(ItemID.BIG_BONES, 2)), engine).armLoad(
             click(MenuAction.WIDGET_TARGET_ON_WIDGET, "Use", blowpipe), "");
-        assertNull((engine.eb.peek(Eb.CL) == null ? null : engine.eb.peek(Eb.CL).v));
-        intake(selecting(item(ItemID.SNAKEBOSS_SCALE, SCALES_SLOT)), engine).lc(
+        assertNull((engine.inbox.peek(Inbox.LOAD_TARGET) == null ? null : engine.inbox.peek(Inbox.LOAD_TARGET).variant));
+        intake(selecting(item(ItemID.SNAKEBOSS_SCALE, SCALES_SLOT)), engine).armLoad(
             click(MenuAction.CC_OP, "Check", blowpipe), "");
-        assertNull("only a use-on click arms a load", (engine.eb.peek(Eb.CL) == null ? null : engine.eb.peek(Eb.CL).v));
+        assertNull("only a use-on click arms a load", (engine.inbox.peek(Inbox.LOAD_TARGET) == null ? null : engine.inbox.peek(Inbox.LOAD_TARGET).variant));
     }
 
     @Test
     public void anyOtherActionEndsTheUnchargeWatchButAnsweringThePromptKeepsIt()
     {
-        Am engine = engine();
-        engine.rm(1_000L);
+        Engine engine = engine();
+        engine.ensureSession(1_000L);
         ChargeIntake intake = intake(selecting(null), engine);
         Widget trident = item(ItemID.TOTS_CHARGED, 0);
         intake.onMenuOptionClicked(click(MenuAction.CC_OP, "uncharge", trident), "uncharge", "trident of the seas");
-        assertEquals(Ar.V.TRIDENT_SEAS, (intake.engine.eb.peek(Eb.RV) == null ? null : intake.engine.eb.peek(Eb.RV).v));
+        assertEquals(ChargeCheck.ChargedItem.TRIDENT_SEAS, (intake.engine.inbox.peek(Inbox.UNCHARGE) == null ? null : intake.engine.inbox.peek(Inbox.UNCHARGE).variant));
         intake.onMenuOptionClicked(click(MenuAction.WIDGET_CONTINUE, "continue", null), "continue", "");
-        assertEquals("answering the prompt keeps watching", Ar.V.TRIDENT_SEAS, (intake.engine.eb.peek(Eb.RV) == null ? null : intake.engine.eb.peek(Eb.RV).v));
+        assertEquals("answering the prompt keeps watching", ChargeCheck.ChargedItem.TRIDENT_SEAS, (intake.engine.inbox.peek(Inbox.UNCHARGE) == null ? null : intake.engine.inbox.peek(Inbox.UNCHARGE).variant));
         intake.onMenuOptionClicked(click(MenuAction.WALK, "walk here", null), "walk here", "");
-        assertNull("walking away ends it, so later runes stay loot", (intake.engine.eb.peek(Eb.RV) == null ? null : intake.engine.eb.peek(Eb.RV).v));
+        assertNull("walking away ends it, so later runes stay loot", (intake.engine.inbox.peek(Inbox.UNCHARGE) == null ? null : intake.engine.inbox.peek(Inbox.UNCHARGE).variant));
     }
 }

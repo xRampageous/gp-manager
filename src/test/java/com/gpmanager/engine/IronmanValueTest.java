@@ -16,19 +16,19 @@ import static org.junit.Assert.assertSame;
 public class IronmanValueTest
 {
     private static final int WHIP = 4151;
-    private final Bl valuation = new Bl(new GpManagerConfig() { }, IronmanValueTest::composition, id -> id == WHIP ? 1_500_000 : 0);
+    private final Valuation valuation = new Valuation(new GpManagerConfig() { }, IronmanValueTest::composition, id -> id == WHIP ? 1_500_000 : 0);
 
     @Test
     public void highAlchOnlyWhenChosen()
     {
-        assertEquals("the GE price by default", 1_500_000, valuation.akj(WHIP, 1L, 0L).unitPrice);
+        assertEquals("the GE price by default", 1_500_000, valuation.valueComponent(WHIP, 1L, 0L).unitPrice);
         valuation.alch = true;
-        Ab whip = valuation.akj(WHIP, 1L, 0L);
+        Flow whip = valuation.valueComponent(WHIP, 1L, 0L);
         assertEquals("its high alchemy price", 72_000, whip.unitPrice);
-        assertSame(Av.HIGH_ALCHEMY, whip.getPriceSource());
-        assertEquals("coins stay coins", 1, valuation.akj(995, 1L, 0L).unitPrice);
+        assertSame(PriceSource.HIGH_ALCHEMY, whip.getPriceSource());
+        assertEquals("coins stay coins", 1, valuation.valueComponent(995, 1L, 0L).unitPrice);
         assertEquals("your own override still wins", 2_000_000,
-            valuation.axg(WHIP, 1L, Map.of(WHIP, 2_000_000), 0L).unitPrice);
+            valuation.valueOne(WHIP, 1L, Map.of(WHIP, 2_000_000), 0L).unitPrice);
     }
 
     private static ItemComposition composition(int id)

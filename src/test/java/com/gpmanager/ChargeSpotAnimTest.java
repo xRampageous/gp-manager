@@ -18,7 +18,7 @@ public class ChargeSpotAnimTest
     private final ChargeIntake intake = new ChargeIntake(null, null, null, null, null)
     {
         @Override
-        void ach(int graphicId, long now)
+        void onGraphic(int graphicId, long now)
         {
             casts.add(graphicId);
         }

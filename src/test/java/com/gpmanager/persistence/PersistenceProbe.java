@@ -20,11 +20,11 @@ public final class PersistenceProbe
     }
 
     /** A destructive replacement based on the disk revision observed now. */
-    public static SessionRepository.Bm replaceStateDetailed(SessionRepository repository, SavedState state)
+    public static SessionRepository.ReplaceOutcome replaceStateDetailed(SessionRepository repository, SavedState state)
     {
         if (state == null)
         {
-            return SessionRepository.Bm.failedUnchanged("state was null");
+            return SessionRepository.ReplaceOutcome.failedUnchanged("state was null");
         }
         synchronized (repository)
         {
@@ -32,37 +32,37 @@ public final class PersistenceProbe
         }
     }
 
-    private static Cs intentFromDisk(SessionRepository repository, SavedState state)
+    private static WriteIntent intentFromDisk(SessionRepository repository, SavedState state)
     {
         SessionRepository.ScopeFiles files = repository.bound;
         if (files.state.exists())
         {
             try
             {
-                repository.avc(files.state);
+                repository.readState(files.state);
             }
             catch (Exception ex)
             {
-                repository.adf(files);
-                repository.lastKnownDiskRevision = repository.adm(files.backup).orElse(0L);
+                repository.setAside(files);
+                repository.lastKnownDiskRevision = repository.backupRevision(files.backup).orElse(0L);
             }
         }
         if (repository.lastKnownDiskRevision <= 0L)
         {
-            repository.lastKnownDiskRevision = repository.ado(files.state)
-                .orElse(repository.adm(files.backup).orElse(0L));
+            repository.lastKnownDiskRevision = repository.peekRevision(files.state)
+                .orElse(repository.backupRevision(files.backup).orElse(0L));
         }
         long base = repository.lastKnownDiskRevision;
         return repository.boundIdentity == null
-            ? new Cs(null, repository.scopeGeneration, base, state)
-            : new Cs(repository.boundIdentity, repository.scopeGeneration, base, state);
+            ? new WriteIntent(null, repository.scopeGeneration, base, state)
+            : new WriteIntent(repository.boundIdentity, repository.scopeGeneration, base, state);
     }
 
     /**
      * Waits for maintenance the Grinds controller ran off Swing's thread (Codex review 1.2), then for
      * its result back on Swing's thread; {@code steps} covers a chain such as backup-then-reset.
      */
-    public static void drain(Ei persistence, int steps) throws Exception
+    public static void drain(Persistence persistence, int steps) throws Exception
     {
         for (int step = 0; step < steps; step++)
         {
@@ -76,7 +76,7 @@ public final class PersistenceProbe
     {
         synchronized (repository)
         {
-            repository.afp();
+            repository.requireInit();
             int count = 0;
             for (int index = 1; index <= 3; index++)
             {
@@ -93,7 +93,7 @@ public final class PersistenceProbe
 
     /** Why writes are held for the current identity, or null when the bound account may write. */
     @Nullable
-    public static String identityBlockReason(Ei coordinator)
+    public static String identityBlockReason(Persistence coordinator)
     {
         synchronized (coordinator)
         {
@@ -114,7 +114,7 @@ public final class PersistenceProbe
             }
             if (!current.equals(coordinator.activeIdentity))
             {
-                Ci status = coordinator.writer.getStatus();
+                SaveStatus status = coordinator.writer.getStatus();
                 String detail = status == null || status.detail == null || status.detail.isEmpty()
                     ? "previous account save did not finish"
                     : status.detail;

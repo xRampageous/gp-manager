@@ -21,12 +21,12 @@ public class SidebarWidthStressTest
     @Test
     public void heroBoundsALongNameAndKeepsTheFullTextInItsTooltip() throws Exception
     {
-        Am engine = PresentationLifecycleTest.engine();
+        Engine engine = PresentationLifecycleTest.engine();
         String name = "Fishing trawler veteran of the north";
-        engine.ajl(name, Cx.GENERAL, NOW);
-        Dp panel = onEdt(() ->
+        engine.startCustom(name, NOW);
+        SidebarPanel panel = onEdt(() ->
         {
-            Dp created = new Dp(engine, PresentationLifecycleTest.config(), null);
+            SidebarPanel created = new SidebarPanel(engine, PresentationLifecycleTest.config(), null);
             SidebarPanelProbe.refresh(created);
             return created;
         });
@@ -42,14 +42,14 @@ public class SidebarWidthStressTest
     @Test
     public void ledgerToolbarCarriesItsActionsAndFits() throws Exception
     {
-        Am engine = PresentationLifecycleTest.engine();
-        engine.ajl("Fishing trawler veteran of the north", Cx.GENERAL, NOW);
-        engine.getActiveSession().kf(booked(NOW + 1_000L, "Twisted bow", 20997, 1L,
+        Engine engine = PresentationLifecycleTest.engine();
+        engine.startCustom("Fishing trawler veteran of the north", NOW);
+        engine.getActiveSession().addTransaction(booked(NOW + 1_000L, "Twisted bow", 20997, 1L,
             2_147_483_647, 2_147_483_647L), 2_000);
-        engine.ahq(2_147_483_647L, null, NOW + 2_000L);
-        Dp panel = onEdt(() ->
+        engine.setTargets(2_147_483_647L, null, NOW + 2_000L);
+        SidebarPanel panel = onEdt(() ->
         {
-            Dp created = new Dp(engine, PresentationLifecycleTest.config(), null);
+            SidebarPanel created = new SidebarPanel(engine, PresentationLifecycleTest.config(), null);
             created.shell().show(Shell.LEDGER);
             SidebarPanelProbe.refresh(created);
             return created;
@@ -86,14 +86,14 @@ public class SidebarWidthStressTest
     @Test
     public void theLossesPickerOffersEveryViewWithItsCount() throws Exception
     {
-        Dp panel = onEdt(() -> new Dp(PresentationLifecycleTest.engine(),
+        SidebarPanel panel = onEdt(() -> new SidebarPanel(PresentationLifecycleTest.engine(),
             PresentationLifecycleTest.config(), null));
-        javax.swing.JPopupMenu menu = onEdt(() -> panel.ledger.menu(Ao.Bs.SUPPLIES,
+        javax.swing.JPopupMenu menu = onEdt(() -> panel.ledger.menu(LedgerData.CostView.SUPPLIES,
             new int[] {2_000, 2_000, 2_000, 2_000}));
         assertTrue("every choice stays present", onEdt(() -> menu.getComponentCount()) == 4);
         assertTrue(onEdt(() -> ((javax.swing.JMenuItem) menu.getComponent(1)).getText())
             .equals("\u2713 Supplies 2,000"));
-        javax.swing.JButton pick = onEdt(() -> panel.ledger.auf(Ao.Bs.SUPPLIES, new int[4]));
+        javax.swing.JButton pick = onEdt(() -> panel.ledger.costPicker(LedgerData.CostView.SUPPLIES, new int[4]));
         assertTrue("the picker stays short: " + onEdt(() -> pick.getPreferredSize()),
             onEdt(() -> pick.getPreferredSize().width) <= 80);
     }
@@ -116,11 +116,11 @@ public class SidebarWidthStressTest
             onEdt(() -> table.header.getPreferredSize().width) <= SIDEBAR);
     }
 
-    private static Ac booked(long at, String name, int itemId, long quantity, int unitPrice, long value)
+    private static Transaction booked(long at, String name, int itemId, long quantity, int unitPrice, long value)
     {
-        return new Ac(at, null, Ai.GAIN, Aj.GENERIC, "", "Vorkath", true,
-            Collections.singletonList(new Ab(itemId, name, quantity, unitPrice, value)),
-            Bd.LIKELY, "Test sample.", null);
+        return new Transaction(at, TransactionType.GAIN, Context.GENERIC, "", "Vorkath", true,
+            Collections.singletonList(new Flow(itemId, name, quantity, unitPrice, value)),
+            Confidence.LIKELY, "Test sample.", null);
     }
 
     private static <T> T onEdt(java.util.concurrent.Callable<T> callable) throws Exception

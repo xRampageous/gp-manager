@@ -1,751 +1,922 @@
 package com.gpmanager;
-import static com.gpmanager.Eb.*;
-import static com.gpmanager.Ar.*;
-import com.gpmanager.Ar.V;
+
+import static com.gpmanager.ChargeCheck.*;
+import static com.gpmanager.Inbox.*;
+
+import com.gpmanager.ChargeCheck.ChargedItem;
+
 import lombok.RequiredArgsConstructor;
-import java.util.*;
-import javax.inject.*;
+
 import net.runelite.api.*;
 import net.runelite.api.events.MenuOptionClicked;
-import net.runelite.api.widgets.Widget;
+import net.runelite.api.gameval.InterfaceID;
 import net.runelite.api.gameval.InventoryID;
 import net.runelite.api.gameval.ItemID;
-import net.runelite.api.gameval.InterfaceID;
+import net.runelite.api.widgets.Widget;
+
+import java.util.*;
+
+import javax.inject.*;
+
 /**
-* Client-thread intake for the exact Check-to-Check charge contract: a Check click binds a
-* short-lived identity, the numeric chat read is the only source of counts, and a Use-on-item
-* click arms one narrow load. Local graphics, hitsplats and location clicks book LIKELY estimates.
-*/
+ * Client-thread intake for the exact Check-to-Check charge contract: a Check click binds a
+ * short-lived identity, the numeric chat read is the only source of counts, and a Use-on-item click
+ * arms one narrow load. Local graphics, hitsplats and location clicks book LIKELY estimates.
+ */
 @Singleton
 @RequiredArgsConstructor(onConstructor_ = @Inject)
 class ChargeIntake {
-final Client client;
-final Ix ix;
-final GpManagerConfig config;
-final Am engine;
-/** The single GP Manager valuation authority; null only in narrow synthetic tests. */
-final Bl valuation;
-/** Fractional component carry per variant+item so whole units book when they accrue. */
-final Map<String, Long> chargeCarry = new HashMap<>();
-/** Exact cumulative value per fractional component: units consumed and value already booked. */
-final Map<String, long[]> valueCarry = new HashMap<>();
-int lastCastTick = -1;
-/** The blowpipe's loaded dart from its last Check or load; -1 until one says. */
-int blowpipeDart = -1;
-int lastCastGraphic;
-/** The player's spot anims at the last change, by id and start cycle. */
-Set<Long> playingAnims = new HashSet<>();
-int lastAttackTick = -1;
-/** Learnable eye cast triggers: local graphics or animations proven by same-tick magic XP. */
-final Set<Integer> eyeGraphics = new HashSet<>();
-final Set<Integer> eyeAnimations = new HashSet<>();
-int eyeCandidateGraphic;
-int eyeCandidateAnimation;
-int eyeCandidateTick = -1;
-int eyeCandidateWeaponId;
-String eyeCandidateIdentity;
-/** A melee hit awaiting its same-tick XP confirmation, so a login's first hit counts. */
-int pendingFuryHitTick = -1;
-/** True when the staff's own line said runes: each cast then spends 2 death and 1 chaos. */
-/** Eye charging mode per target identity: true when that staff's own line said runes. */
-final Map<String, Boolean> eyeRunes = new HashMap<>();
-/** An Uncharge/Unload waiting for its components to land (a confirm prompt can take a while). */
-/** How long an Uncharge click waits for its returned components: 50 ticks, 30 seconds. */
-static final int RETURN_TICKS = 50;
-/** A Check command has one physical target and a short inclusive client-tick window. */
-Ev ck() { return engine.eb.peek(CK); }
-boolean ck(V /* variant */a, String /* id */b, int /* tick */c, int /* ticks */d) {
- engine.eb.drop(CK);
- if (a == null || !a.implemented || Ag.blank(b) || d <= 0) return false;
- Ev e = engine.eb.add(CK, -1, 1L, d, null);
- e.v = a;
- e.id = b;
- e.at = c + d;
- return true;
-}
-String ck(Ar /* read */a, int /* tick */b) {
- Ev e = ck();
- String /* id */c = e != null && b <= e.at && a != null && a.bookable && a.variant == e.v ? e.id : null;
- engine.eb.drop(CK);
- return c;
-}
+    final Client client;
+    final ItemLookup lookup;
+    final GpManagerConfig config;
+    final Engine engine;
 
-/** Any unrelated chat/menu between click and numeric response drops the target link. */
-void oi() {
- engine.eb.drop(CK);
-}
+    /** The single GP Manager valuation authority; null only in narrow synthetic tests. */
+    final Valuation valuation;
 
-/** Login/hop/profile change: transient baselines and load intents never survive. */
-void ags() {
- engine.eb.drop(CK);
- chargeCarry.clear();
- valueCarry.clear();
- eyeGraphics.clear();
- eyeAnimations.clear();
- eyeCandidateGraphic = 0;
- eyeCandidateAnimation = 0;
- eyeCandidateTick = -1;
- eyeCandidateWeaponId = 0;
- eyeCandidateIdentity = null;
- pendingFuryHitTick = -1;
- eyeRunes.clear();
- blowpipeDart = -1;
- engine.eb.drop(RV);
- lastAttackTick = -1;
- engine.afu();
- engine.oh();
-}
+    /** Fractional component carry per variant+item so whole units book when they accrue. */
+    final Map<String, Long> chargeCarry = new HashMap<>();
 
-/**
-* Feed only exact numeric Check messages into the measured charge baseline. Chat is
-* deliberately not activity/title evidence. Booking rejects the complete delta on a missing
-* supported component valuation or any arithmetic overflow.
-*
-* @return true when the message was a charge Check read (consumed, even if unbooked)
-*/
-boolean abt(String /* message */b, long /* now */c) {
- Ar /* read */d = acs(b);
- if (d == null) return false;
- if (d.variant == V.V1b) blowpipeDart = d.dartItemId;
- V /* clicked */e = ck() == null ? null : ck().v;
- // A revenant Check says only "bow", "sceptre" or "chainmace": the clicked weapon names the row.
- if (e != null && e.check != null && e != d.variant && e.check == d.variant.check) d.variant = e;
- String /* targetIdentity */f = ck(d, client.getTickCount());
- if (f == null && d.variant == V.BLOOD_FURY) {
-  // The amulet's count arrives on its own, without a Check click: bind it to the
-  // worn amulet's neck slot (owner 2026-09-29).
-  f = wornBloodFury();
- }
- if (d.variant == V.EYE_OF_AYAK) {
-  // No Check click: the line can only mean the worn staff or the pack copy.
-  if (f == null) f = eyeIdentity();
-  // The line names the mode ("demon tears" or "runes"), stored for that staff (review 2026-10-09).
-  eyeRunes.put(f, d.componentCounts.containsKey(ItemID.DEATHRUNE));
- }
- if (f == null) {
-  // A value without its fresh Check target cannot distinguish another
-  // same-variant weapon; discard any older comparison baseline.
-  engine.afu();
-  return true;
- }
- if (b.toLowerCase(Locale.ROOT).contains("charged with")) {
-  // Any charge wording is a load: the components moved into the weapon, never spend.
-  // Armed even on the first read, where no delta exists yet (owner 2026-09-30).
-  xfer("m2");
- }
- Cm /* delta */g = engine.abu(d, f, c);
- // Every exact read names its result; quantities still come only from measured decreases.
- switch (g.k) {
-  case SAME:
-   engine.closeChargeWindow(f);
-   return true;
-  case LOAD:
-   xfer("m2");
-   return true;
-  case SEED:
-  case MISMATCH:
-   return true;
-  case SPEND:
-   break;
- }
- if (ix == null) return true;
- if (d.variant == V.EYE_OF_AYAK) {
-  boolean /* rune */i = d.componentCounts.containsKey(ItemID.DEATHRUNE) || d.componentCounts.containsKey(ItemID.CHAOSRUNE);
-  if (g.componentDeltas.stream().anyMatch(/* component */j -> (j.getItemId() == ItemID.DEMON_TEAR) == i)) {
-   // A mode switch's vanished component is a load or unload, never spend.
-   return true;
-  }
- }
- var /* losses */k = new ArrayList<Ab>();
- for (Cm.ComponentDelta /* component */l : g.componentDeltas) {
-  int /* itemId */m = l.itemId;
-  int /* canonicalId */n = ix.canon(m);
-  ItemComposition /* composition */o = m <= 0 || n <= 0 ? null : ix.comp(n);
-  if (o == null || Ag.blank(o.getName())) return true;
-  // Every component's base unit valuation comes from the one shared GP Manager
-  // policy: face value, explicit manual override, the RuneLite mapping guard,
-  // the world/economy gate and the explicit active market route. Booking rejects
-  // the whole measured delta when any component lacks a supported valuation.
-  Ab /* valued */p = valuation == null ? null : valuation.akj(n, l.quantityDelta, c);
-  int /* unitPrice */q = p == null ? 0 : p.unitPrice;
-  // A component measured in fractions of the priced item (a page feeds 20 charges).
-  int /* perItem */r = akr(d.variant, m);
-  long /* units */t = l.quantityDelta;
-  long /* value */u = Ae.agz(t, q);
-  if (r > 1 && q > 0) {
-   u = -carriedValue(d.variant, m, Math.abs(t), q, r);
-   q = Math.max(1, q / r);
-  }
-  k.add(new Ab(m, o.getName(), t, q, u,
-  p == null ? Av.UNPRICED : p.getPriceSource(), c));
- }
- engine.mj(g, d.variant.displayName, k, c, f);
- // The measured read reconciles only this weapon's estimates; another of the same kind keeps
- // its own until its own Check (Codex research 1.2).
- engine.clearPendingEstimates(f);
- return true;
-}
+    /** Exact cumulative value per fractional component: units consumed and value already booked. */
+    final Map<String, long[]> valueCarry = new HashMap<>();
 
-/** The tick through which recent combat XP proves a melee stance; -1 when it does not. */
-int meleeStanceUntil = -1;
-int stanceXpTick = -1;
-boolean meleeXpThisTick;
-boolean otherXpThisTick;
-/**
-* Combat XP reveals the attack style with no per-weapon animation table: Attack/Strength/
-* Defence confirm melee, Ranged/Magic deny it, so every melee weapon qualifies (owner 2026-09-29).
-*/
-void aks(Skill /* skill */a, int /* tick */b, long /* now */c) {
- if (a == Skill.MAGIC && eyeCandidateTick >= 0 && b - eyeCandidateTick <= 1) {
-  if (eyeCandidateAnimation > 0) eyeAnimations.add(eyeCandidateAnimation);
-  if (eyeCandidateGraphic > 0) eyeGraphics.add(eyeCandidateGraphic);
-  if (eyeCandidateIdentity != null && b != lastAttackTick) {
-   // The cast that proved the trigger books once, through the same tick dedupe.
-   lastAttackTick = b;
-   mt(V.EYE_OF_AYAK, eyeCandidateWeaponId, eyeCandidateIdentity, Au.CAST, c);
-  }
-  eyeCandidateAnimation = 0;
-  eyeCandidateGraphic = 0;
-  eyeCandidateTick = -1;
-  eyeCandidateWeaponId = 0;
-  eyeCandidateIdentity = null;
- }
- boolean /* melee */d = a == Skill.ATTACK || a == Skill.STRENGTH || a == Skill.DEFENCE;
- boolean /* other */e = a == Skill.RANGED || a == Skill.MAGIC;
- if (!d && !e) return;
- if (b != stanceXpTick) {
-  stanceXpTick = b;
-  meleeXpThisTick = false;
-  otherXpThisTick = false;
- }
- meleeXpThisTick |= d;
- otherXpThisTick |= e;
- meleeStanceUntil = otherXpThisTick ? -1 : meleeXpThisTick ? b + 8 : meleeStanceUntil;
- if (d && pendingFuryHitTick == b) {
-  // The hit that opened this fight lands before its XP in the same tick.
-  pendingFuryHitTick = -1;
-  ItemContainer /* worn */f = cont(InventoryID.WORN);
-  Item /* amulet */g = f == null ? null : f.getItem(EquipmentInventorySlot.AMULET.getSlotIdx());
-  if (g != null && g.getId() == ItemID.BLOOD_AMULET) {
-   mt(V.BLOOD_FURY, g.getId(), wornBloodFury(), rw(V.BLOOD_FURY), c);
-  }
- }
-}
+    int lastCastTick = -1;
 
-/** Whether the recent XP pattern proves the player is meleeing right now. */
-boolean furyMelee(int /* tick */a) {
- return a <= meleeStanceUntil;
-}
+    /** The blowpipe's loaded dart from its last Check or load; -1 until one says. */
+    int blowpipeDart = -1;
 
-/**
-* Uncharging Bryophyta's staff destroys the nature runes it holds (OSRS Wiki; "You remove 1000
-* charges from your staff, leaving it empty."): those charges are spent, one rune each.
-*/
-void emptied(long /* charges */a, long /* now */b) {
- engine.spent(V.BRYOPHYTA.displayName, List.of(valuation.akj(ItemID.NATURERUNE, -a, b)), b);
-}
+    int lastCastGraphic;
 
-/** The doses a chug drank this tick, booked as one row on the next game tick. */
-final List<Ab> chugged = new ArrayList<>();
+    /** The player's spot anims at the last change, by id and start cycle. */
+    Set<Long> playingAnims = new HashSet<>();
 
-/**
-* A chug drinks one dose of every potion in the chugging barrel, never touching the inventory.
-* The game names each one, as its one-dose potion: "You have 3 doses of Saradomin brew(1) left in
-* your barrel." or "You have finished all doses of ..." (OSRS Wiki; Dude Where's My Stuff).
-*/
-void chug(String /* potion */a, long /* now */b) {
- for (var /* match */c : ix.find(a)) {
-  if (c.getName().equalsIgnoreCase(a)) {
-   chugged.add(valuation.akj(c.getId(), -1L, b));
-   return;
-  }
- }
-}
+    int lastAttackTick = -1;
 
-/** Each tick, the doses drunk from the barrel are one Drank row (owner 2026-10-09). */
-void drank(long /* now */a) {
- if (chugged.isEmpty()) return;
- engine.chug(new ArrayList<>(chugged), a);
- chugged.clear();
-}
+    /** Learnable eye cast triggers: local graphics or animations proven by same-tick magic XP. */
+    final Set<Integer> eyeGraphics = new HashSet<>();
 
-/** A client item container, or null without a client. */
-ItemContainer cont(int /* containerId */a) {
- return client == null ? null : client.getItemContainer(a);
-}
+    final Set<Integer> eyeAnimations = new HashSet<>();
+    int eyeCandidateGraphic;
+    int eyeCandidateAnimation;
+    int eyeCandidateTick = -1;
+    int eyeCandidateWeaponId;
+    String eyeCandidateIdentity;
 
-/** Marks the next item move as a neutral charge transfer with this message. */
-void xfer(String /* messageKey */a) {
- engine.markContext(Aj.TRANSFER, Math.max(4, config.stabilizationTicks() + 2), Ak.msg(a));
-}
+    /** A melee hit awaiting its same-tick XP confirmation, so a login's first hit counts. */
+    int pendingFuryHitTick = -1;
 
-/** That staff's charging mode; unknown means tears (the default charge type). */
-boolean eyeRune(String /* identity */a) {
- return Boolean.TRUE.equals(eyeRunes.get(a));
-}
+    /** True when the staff's own line said runes: each cast then spends 2 death and 1 chaos. */
+    /** Eye charging mode per target identity: true when that staff's own line said runes. */
+    final Map<String, Boolean> eyeRunes = new HashMap<>();
 
-/** The eye's identity for lines that arrive with no Check click: the worn staff, else the pack. */
-String eyeIdentity() {
- ItemContainer /* worn */a = cont(InventoryID.WORN);
- if (a != null) {
-  Item /* weapon */b = a.getItem(EquipmentInventorySlot.WEAPON.getSlotIdx());
-  if (b != null && aja(b.getId()) == V.EYE_OF_AYAK) {
-   return akz(V.EYE_OF_AYAK, b.getId());
-  }
- }
- ItemContainer /* inventory */c = cont(InventoryID.INV);
- if (c == null) return null;
- for (int /* slot */d = 0; d < c.size(); d++) {
-  Item /* item */e = c.getItem(d);
-  if (e != null && aja(e.getId()) == V.EYE_OF_AYAK) {
-   return (InterfaceID.Inventory.ITEMS >>> 16) + ":" + d + ":" + e.getId() + ":" + V.EYE_OF_AYAK.name();
-  }
- }
- return null;
-}
+    /**
+     * An Uncharge/Unload waiting for its components to land (a confirm prompt can take a while).
+     */
+    /** How long an Uncharge click waits for its returned components: 50 ticks, 30 seconds. */
+    static final int RETURN_TICKS = 50;
 
-/** The worn amulet's identity for its click-free count messages; null when not worn. */
-String wornBloodFury() {
- ItemContainer /* worn */a = cont(InventoryID.WORN);
- if (a == null) return null;
- int /* slot */b = EquipmentInventorySlot.AMULET.getSlotIdx();
- Item /* amulet */c = a.getItem(b);
- if (c == null || c.getId() != ItemID.BLOOD_AMULET) return null;
- return (InterfaceID.Wornitems.UNIVERSE >>> 16) + ":" + b + ":" + c.getId() + ":" + V.BLOOD_FURY.name();
-}
+    /** A Check command has one physical target and a short inclusive client-tick window. */
+    Observation checkIntent() {
+        return engine.inbox.peek(CHECK_LINK);
+    }
 
-/** Every menu click: supersede a pending Check link, then arm Check / unload / load intents. */
-void onMenuOptionClicked(MenuOptionClicked /* event */b, String /* option */c, String /* target */d) {
- // Answering the Uncharge prompt keeps the return watch; any other action ends it, so a
- // declined prompt never turns later loot of the same runes or scales into a transfer.
- if (!isDialogAnswer(b, c)) engine.eb.drop(RV);
- ld(b, c, d);
- lc(b, c);
- // The memoirs are charged at the Old Memorial: the runes move into the book (owner 1.2).
- if ("inspect".equals(c) && d.contains("old memorial")) engine.yx(V.MEMOIRS, ItemID.LAWRUNE, "law rune", null, LOAD_TICKS);
- if (!lh(c)) return;
- int /* itemId */e = ns(b);
- V v = aja(e);
- if (v != V.ATES && v != V.MEMOIRS) return;
- String /* identity */f = nt(b, v, e);
- if (f != null) mt(v, e, f, Au.SUPPLIES, Ae.now());
-}
+    boolean startCheck(ChargedItem variant, String id, int tick, int ticks) {
+        engine.inbox.drop(CHECK_LINK);
+        if (variant == null || !variant.implemented || Phrases.blank(id) || ticks <= 0)
+            return false;
+        Observation e = engine.inbox.add(CHECK_LINK, -1, 1L, ticks, null);
+        e.variant = variant;
+        e.id = id;
+        e.at = tick + ticks;
+        return true;
+    }
 
-/** A pendant or memoirs teleport click spends one charge; bank, inventory and interface options are plumbing. */
-static boolean lh(String /* option */a) {
- String /* name */b = a == null ? "" : a.replace('\u2019', '\'');
- if (b.startsWith("the ")) b = b.substring(4);
- return LOCATIONS.contains(b);
-}
+    String resolveCheck(ChargeCheck read, int tick) {
+        Observation e = checkIntent();
+        String id =
+                e != null
+                                && tick <= e.at
+                                && read != null
+                                && read.bookable
+                                && read.variant == e.variant
+                        ? e.id
+                        : null;
+        engine.inbox.drop(CHECK_LINK);
+        return id;
+    }
 
-/** The pendant's six teleport locations, normalized like menu options. */
-static final List<String> LOCATIONS = Ak.names("d31");
-/**
-* A local cast or shot graphic books this use's pinned recipe as a LIKELY estimate; the next
-* measured Check reconciles it at the captured prices. Any unpriced component fails the whole
-* estimate closed. A repeated graphic in one tick is one use.
-*/
-/**
-* Spot anims play on for several ticks and the player can hold several, so only one that was not
-* playing at the last change is a new cast.
-*/
-void spotAnims(Iterable<ActorSpotAnim> /* anims */a, long /* now */b) {
- var /* playing */c = new HashSet<Long>();
- for (ActorSpotAnim /* anim */d : a) {
-  if (d == null) continue;
-  long /* key */e = (long) d.getId() << 32 | d.getStartCycle() & 0xFFFFFFFFL;
-  if (c.add(e) && !playingAnims.contains(e)) ach(d.getId(), b);
- }
- playingAnims = c;
-}
+    /** Any unrelated chat/menu between click and numeric response drops the target link. */
+    void clearCheck() {
+        engine.inbox.drop(CHECK_LINK);
+    }
 
-void ach(int /* graphicId */b, long /* now */c) {
- Item /* weapon */d = ala();
- V /* variant */e = d == null ? null : aja(d.getId());
- if (e == null || b <= 0) return;
- boolean /* eye */f = e == V.EYE_OF_AYAK;
- if (!wa(e, b) && !(f && eyeGraphics.contains(b))) {
-  if (f) {
-   // The eye's cast trigger is pinned in no table: learn it from the magic XP every
-   // cast drops (owner 2026-09-29), then each cast books one tear like a spell.
-   eyeCandidateGraphic = b;
-   eyeCandidateTick = client.getTickCount();
-   eyeCandidateWeaponId = d.getId();
-   eyeCandidateIdentity = akz(V.EYE_OF_AYAK, d.getId());
-  }
-  return;
- }
- int /* tick */g = client.getTickCount();
- if (g == lastCastTick && b == lastCastGraphic || f && g == lastAttackTick) return;
- lastCastTick = g;
- lastCastGraphic = b;
- if (f) lastAttackTick = g;
- mt(e, d.getId(), akz(e, d.getId()), rw(e), c);
-}
+    /** Login/hop/profile change: transient baselines and load intents never survive. */
+    void resetTransient() {
+        engine.inbox.drop(CHECK_LINK);
+        chargeCarry.clear();
+        valueCarry.clear();
+        eyeGraphics.clear();
+        eyeAnimations.clear();
+        eyeCandidateGraphic = 0;
+        eyeCandidateAnimation = 0;
+        eyeCandidateTick = -1;
+        eyeCandidateWeaponId = 0;
+        eyeCandidateIdentity = null;
+        pendingFuryHitTick = -1;
+        eyeRunes.clear();
+        blowpipeDart = -1;
+        engine.inbox.drop(UNCHARGE);
+        lastAttackTick = -1;
+        engine.resetChecks(null);
+        engine.clearChargeLoad();
+    }
 
-/**
-* A landed hit on the target. The scythe books one charge per damaging hit; the blowpipe books
-* any shot while its attack animation is live, because a 2-tick attack restarts the same
-* animation and never fires a second AnimationChanged. At most once per tick.
-*/
-void aci(int /* damage */b, long /* now */c) {
- Item /* weapon */d = ala();
- V /* variant */e = d == null ? null : aja(d.getId());
- // Blood fury: one charge per melee hit. Combat XP proves melee for every weapon
- // (owner 2026-09-29); a hit whose XP has not landed yet this tick stays pending
- // until that same tick's XP confirms the stance (owner 2026-10-01).
- if (b > 0) {
-  int /* tick */f = client.getTickCount();
-  ItemContainer /* worn */g = client.getItemContainer(InventoryID.WORN);
-  Item /* amulet */h = g == null ? null : g.getItem(EquipmentInventorySlot.AMULET.getSlotIdx());
-  if (h != null && h.getId() == ItemID.BLOOD_AMULET) {
-   if (furyMelee(f)) mt(V.BLOOD_FURY, h.getId(), wornBloodFury(), rw(V.BLOOD_FURY), c);
-   else pendingFuryHitTick = f;
-  }
- }
- if (e == null) return;
- // Each landed splat books: a multi-target swing is several hits, not one attack.
- boolean /* scythe */i = e == V.SCYTHE && b > 0;
- Actor /* local */j = client.getLocalPlayer();
- boolean /* shot */k = e == V.V1b && j != null && j.getAnimation() == lm(e);
- if (!i && !k) return;
- if (k) {
-  int /* tick */l = client.getTickCount();
-  if (l == lastAttackTick) return;
-  lastAttackTick = l;
- }
- mt(e, d.getId(), akz(e, d.getId()), rw(e), c);
-}
+    /**
+     * Feed only exact numeric Check messages into the measured charge baseline. Chat is
+     * deliberately not activity/title evidence. Booking rejects the complete delta on a missing
+     * supported component valuation or any arithmetic overflow.
+     *
+     * @return true when the message was a charge Check read (consumed, even if unbooked)
+     */
+    boolean observeCheck(String message, long now) {
+        ChargeCheck read = parse(message);
+        if (read == null) return false;
+        if (read.variant == ChargedItem.BLOWPIPE) blowpipeDart = read.dartItemId;
+        ChargedItem clicked = checkIntent() == null ? null : checkIntent().variant;
+        // A revenant Check says only "bow", "sceptre" or "chainmace": the clicked weapon names the
+        // row.
+        if (clicked != null
+                && clicked.check != null
+                && clicked != read.variant
+                && clicked.check == read.variant.check) read.variant = clicked;
+        String targetIdentity = resolveCheck(read, client.getTickCount());
+        if (targetIdentity == null && read.variant == ChargedItem.BLOOD_FURY) {
+            // The amulet's count arrives on its own, without a Check click: bind it to the
+            // worn amulet's neck slot (owner 2026-09-29).
+            targetIdentity = wornBloodFury();
+        }
+        if (read.variant == ChargedItem.EYE_OF_AYAK) {
+            // No Check click: the line can only mean the worn staff or the pack copy.
+            if (targetIdentity == null) targetIdentity = eyeIdentity();
+            // The line names the mode ("demon tears" or "runes"), stored for that staff (review
+            // 2026-10-09).
+            eyeRunes.put(targetIdentity, read.componentCounts.containsKey(ItemID.DEATHRUNE));
+        }
+        if (targetIdentity == null) {
+            // A value without its fresh Check target cannot distinguish another
+            // same-variant weapon; discard any older comparison baseline of that kind.
+            engine.resetChecks(read.variant);
+            return true;
+        }
+        if (message.toLowerCase(Locale.ROOT).contains("charged with")) {
+            // Any charge wording is a load: the components moved into the weapon, never spend.
+            // Armed even on the first read, where no delta exists yet (owner 2026-09-30).
+            transfer("charge-load");
+        }
+        ChargeDelta delta = engine.observeCheck(read, targetIdentity, now);
+        // Every exact read names its result; quantities still come only from measured decreases.
+        if (delta.result == ChargeDelta.CheckResult.SAME) {
+            engine.closeChargeWindow(targetIdentity);
+            return true;
+        }
+        if (delta.result == ChargeDelta.CheckResult.LOAD) transfer("charge-load");
+        List<Flow> losses =
+                delta.result == ChargeDelta.CheckResult.SPEND
+                        ? measuredLosses(read, delta, now)
+                        : null;
+        if (losses != null)
+            engine.bookChargeSpend(delta, read.variant.displayName, losses, now, targetIdentity);
+        // The measured read reconciles only this weapon's estimates; another of the same kind keeps
+        // its own until its own Check (Codex research 1.2). Any other read is a fresh start:
+        // earlier estimates stay as booked, and the next Check, measured from here, never
+        // reconciles them.
+        engine.clearPendingEstimates(
+                targetIdentity, losses == null ? Collections.emptySet() : delta.unchanged);
+        return true;
+    }
 
-/** A local attack animation books the pinned per-attack charge for crystal weapons. */
-void acj(int /* animationId */a, long /* now */b) {
- Item /* weapon */c = ala();
- V /* variant */d = c == null ? null : aja(c.getId());
- if (d == null) return;
- if (d == V.EYE_OF_AYAK) {
-  if (!eyeAnimations.contains(a)) {
-   // Candidate cast animation; the same tick's magic XP proves it, like the graphic.
-   eyeCandidateAnimation = a;
-   eyeCandidateTick = client.getTickCount();
-   eyeCandidateWeaponId = c.getId();
-   eyeCandidateIdentity = akz(V.EYE_OF_AYAK, c.getId());
-   return;
-  }
- } else if (!lg(d, a)) {
-  return;
- }
- int /* tick */e = client.getTickCount();
- if (e == lastAttackTick) return;
- lastAttackTick = e;
- mt(d, c.getId(), akz(d, c.getId()), rw(d), b);
-}
+    /** The measured decrease priced as losses; null when it cannot be booked as spend. */
+    List<Flow> measuredLosses(ChargeCheck read, ChargeDelta delta, long now) {
+        if (lookup == null) return null;
+        if (read.variant == ChargedItem.EYE_OF_AYAK) {
+            boolean rune =
+                    read.componentCounts.containsKey(ItemID.DEATHRUNE)
+                            || read.componentCounts.containsKey(ItemID.CHAOSRUNE);
+            if (delta.componentDeltas.stream()
+                    .anyMatch(component -> (component.getItemId() == ItemID.DEMON_TEAR) == rune)) {
+                // A mode switch's vanished component is a load or unload, never spend.
+                return null;
+            }
+        }
+        var losses = new ArrayList<Flow>();
+        for (ChargeDelta.ComponentDelta component : delta.componentDeltas) {
+            int itemId = component.itemId;
+            int canonicalId = lookup.canon(itemId);
+            ItemComposition composition =
+                    itemId <= 0 || canonicalId <= 0 ? null : lookup.composition(canonicalId);
+            if (composition == null || Phrases.blank(composition.getName())) return null;
+            // Every component's base unit valuation comes from the one shared GP Manager
+            // policy: face value, explicit manual override, the RuneLite mapping guard,
+            // the world/economy gate and the explicit active market route. Booking rejects
+            // the whole measured delta when any component lacks a supported valuation.
+            Flow valued =
+                    valuation == null
+                            ? null
+                            : valuation.valueComponent(canonicalId, component.quantityDelta, now);
+            int unitPrice = valued == null ? 0 : valued.unitPrice;
+            // A component measured in fractions of the priced item (a page feeds 20 charges).
+            int perItem = unitsPerItem(read.variant, itemId);
+            long units = component.quantityDelta;
+            long value = SafeMath.safeMultiply(units, unitPrice);
+            if (perItem > 1 && unitPrice > 0) {
+                value = -carriedValue(read.variant, itemId, Math.abs(units), unitPrice, perItem);
+                unitPrice = Math.max(1, unitPrice / perItem);
+            }
+            losses.add(
+                    new Flow(
+                            itemId,
+                            composition.getName(),
+                            units,
+                            unitPrice,
+                            value,
+                            valued == null ? PriceSource.UNPRICED : valued.getPriceSource(),
+                            now));
+        }
+        return losses;
+    }
 
-Item ala() {
- ItemContainer /* worn */a = client.getItemContainer(InventoryID.WORN);
- return a == null ? null : a.getItem(EquipmentInventorySlot.WEAPON.getSlotIdx());
-}
+    /** The tick through which recent combat XP proves a melee stance; -1 when it does not. */
+    int meleeStanceUntil = -1;
 
-void mt(V /* variant */a, int /* weaponId */b, String /* identity */c, Au /* kind */d, long /* now */e) {
- // A hit is gameplay: resume the pauses gameplay ends (logout/idle/recovery) and start
- // tracking when automatic startup is on, before booking — so the very first attack after
- // logging in counts instead of arriving while the session is still catching up.
- engine.resume(e, Ed.LIFECYCLE, Ed.IDLE, Ed.RECOVERY);
- if (!engine.live()) engine.ait(e);
- List<Ab> /* recipe */f = rx(a, c, e);
- if (f == null || f.isEmpty()) return;
- Ac /* receipt */g = engine.mn(c, a.displayName, d, f, e);
- if (g != null) g.aym = b;
-}
+    int stanceXpTick = -1;
+    boolean meleeXpThisTick;
+    boolean otherXpThisTick;
 
-/** A family may cast with more than one local graphic (Sanguinesti's Justiciar variant). */
-static boolean wa(V /* variant */a, int /* graphicId */b) {
- return b > 0 && Arrays.stream(a.graphics).anyMatch(/* id */c -> c == b);
-}
+    /**
+     * Combat XP reveals the attack style with no per-weapon animation table: Attack/Strength/
+     * Defence confirm melee, Ranged/Magic deny it, so every melee weapon qualifies (owner
+     * 2026-09-29).
+     */
+    void learnEyeCast(Skill skill, int tick, long now) {
+        if (skill == Skill.MAGIC && eyeCandidateTick >= 0 && tick - eyeCandidateTick <= 1) {
+            if (eyeCandidateAnimation > 0) eyeAnimations.add(eyeCandidateAnimation);
+            if (eyeCandidateGraphic > 0) eyeGraphics.add(eyeCandidateGraphic);
+            if (eyeCandidateIdentity != null && tick != lastAttackTick) {
+                // The cast that proved the trigger books once, through the same tick dedupe.
+                lastAttackTick = tick;
+                bookAttackEstimate(
+                        ChargedItem.EYE_OF_AYAK,
+                        eyeCandidateWeaponId,
+                        eyeCandidateIdentity,
+                        ActionKind.CAST,
+                        now);
+            }
+            eyeCandidateAnimation = 0;
+            eyeCandidateGraphic = 0;
+            eyeCandidateTick = -1;
+            eyeCandidateWeaponId = 0;
+            eyeCandidateIdentity = null;
+        }
+        boolean melee = skill == Skill.ATTACK || skill == Skill.STRENGTH || skill == Skill.DEFENCE;
+        boolean other = skill == Skill.RANGED || skill == Skill.MAGIC;
+        if (!melee && !other) return;
+        if (tick != stanceXpTick) {
+            stanceXpTick = tick;
+            meleeXpThisTick = false;
+            otherXpThisTick = false;
+        }
+        meleeXpThisTick |= melee;
+        otherXpThisTick |= other;
+        meleeStanceUntil = otherXpThisTick ? -1 : meleeXpThisTick ? tick + 8 : meleeStanceUntil;
+        if (melee && pendingFuryHitTick == tick) {
+            // The hit that opened this fight lands before its XP in the same tick.
+            pendingFuryHitTick = -1;
+            if (furyAmulet() != null) bookFury(now);
+        }
+    }
 
-/** The attack animation pinned for per-shot estimates; 0 means none. */
-static int lm(V /* variant */a) {
- return a == V.V1b ? 5061 : 0;
-}
+    /** Whether the recent XP pattern proves the player is meleeing right now. */
+    boolean furyMelee(int tick) {
+        return tick <= meleeStanceUntil;
+    }
 
-/** The attack animations pinned for per-attack estimates (d20); false means none. */
-static boolean lg(V /* variant */a, int /* animationId */b) {
- return Arrays.stream(a.animations).anyMatch(/* id */c -> c == b);
-}
+    /**
+     * Uncharging Bryophyta's staff destroys the nature runes it holds (OSRS Wiki; "You remove 1000
+     * charges from your staff, leaving it empty."): those charges are spent, one rune each.
+     */
+    void emptied(long charges, long now) {
+        engine.spent(
+                ChargedItem.BRYOPHYTA.displayName,
+                List.of(valuation.valueComponent(ItemID.NATURERUNE, -charges, now)),
+                now);
+    }
 
-/** The action a variant's estimate represents: a built-in cast, a bow shot or a melee use. */
-static Au rw(V /* variant */a) {
- return a.action;
-}
+    /** The doses a chug drank this tick, booked as one row on the next game tick. */
+    final List<Flow> chugged = new ArrayList<>();
 
-/** The equipment-side identity a worn Check uses: container group, weapon slot, item, variant. */
-static String akz(V /* variant */a, int /* weaponItemId */b) {
- int /* widgetId */c = InterfaceID.Wornitems.UNIVERSE;
- return (c >>> 16) + ":" + EquipmentInventorySlot.WEAPON.getSlotIdx() + ":" + b + ":" + a.name();
-}
+    /**
+     * A chug drinks one dose of every potion in the chugging barrel, never touching the inventory.
+     * The game names each one, as its one-dose potion: "You have 3 doses of Saradomin brew(1) left
+     * in your barrel." or "You have finished all doses of ..." (OSRS Wiki; Dude Where's My Stuff).
+     */
+    void chug(String potion, long now) {
+        for (var match : lookup.find(potion)) {
+            if (match.getName().equalsIgnoreCase(potion)) {
+                chugged.add(valuation.valueComponent(match.getId(), -1L, now));
+                return;
+            }
+        }
+    }
 
-/** The eye's mode-aware per-cast recipe, keyed off its own charge line's wording (owner 2026-09-30). */
-static Map<Integer, Long> eyeRecipe(boolean /* runeCharged */a) {
- var /* recipe */b = new LinkedHashMap<Integer, Long>();
- if (a) {
-  b.put(ItemID.DEATHRUNE, 2L);
-  b.put(ItemID.CHAOSRUNE, 1L);
- } else {
-  b.put(ItemID.DEMON_TEAR, 1L);
- }
- return b;
-}
+    /** Each tick, the doses drunk from the barrel are one Drank row (owner 2026-10-09). */
+    void drank(long now) {
+        if (chugged.isEmpty()) return;
+        engine.chug(new ArrayList<>(chugged), now);
+        chugged.clear();
+    }
 
-/** One cast's pinned component quantities per family (d20), as a copy the caller may extend. */
-static Map<Integer, Long> recipeOf(V /* variant */a) {
- return new LinkedHashMap<>(a.recipe);
-}
+    /** A client item container, or null without a client. */
+    ItemContainer container(int containerId) {
+        return client == null ? null : client.getItemContainer(containerId);
+    }
 
-/** Fractional per-use components: [itemId, numerator, denominator] accruing toward one item. */
-static long[] tw(V /* variant */a) {
- return a.fraction;
-}
+    /** Marks the next item move as a neutral charge transfer with this message. */
+    void transfer(String messageKey) {
+        engine.markContext(
+                Context.TRANSFER,
+                Math.max(4, config.stabilizationTicks() + 2),
+                GameData.msg(messageKey));
+    }
 
-/**
-* Darts a blowpipe shot spends, as {numerator, denominator}, by the cape slot (OSRS wiki): an
-* assembler or Dizana's quiver saves 80%, the accumulator 72%, the attractor 60%; none saves none.
-*/
-static long[] dartLoss(String /* capeName */a) {
- String /* cape */b = a == null ? "" : a.toLowerCase(Locale.ROOT);
- if (b.contains("assembler") || b.contains("dizana")) return new long[] {1L, 5L};
- if (b.contains("accumulator")) return new long[] {7L, 25L};
- if (b.contains("attractor")) return new long[] {2L, 5L};
- return new long[] {1L, 1L};
-}
+    /** That staff's charging mode; unknown means tears (the default charge type). */
+    boolean eyeRune(String identity) {
+        return Boolean.TRUE.equals(eyeRunes.get(identity));
+    }
 
-String wornCapeName() {
- ItemContainer /* worn */a = cont(InventoryID.WORN);
- Item /* cape */b = a == null ? null : a.getItem(EquipmentInventorySlot.CAPE.getSlotIdx());
- return b == null || b.getId() <= 0 ? "" : itemName(b.getId());
-}
+    /**
+     * The eye's identity for lines that arrive with no Check click: the worn staff, else the pack.
+     */
+    String eyeIdentity() {
+        ItemContainer worn = container(InventoryID.WORN);
+        if (worn != null) {
+            Item weapon = worn.getItem(EquipmentInventorySlot.WEAPON.getSlotIdx());
+            if (weapon != null && supportedForId(weapon.getId()) == ChargedItem.EYE_OF_AYAK) {
+                return wornIdentity(ChargedItem.EYE_OF_AYAK, weapon.getId());
+            }
+        }
+        ItemContainer inventory = container(InventoryID.INV);
+        if (inventory == null) return null;
+        for (int slot = 0; slot < inventory.size(); slot++) {
+            Item item = inventory.getItem(slot);
+            if (item != null && supportedForId(item.getId()) == ChargedItem.EYE_OF_AYAK) {
+                return weaponIdentity(
+                        InterfaceID.Inventory.ITEMS, slot, item.getId(), ChargedItem.EYE_OF_AYAK);
+            }
+        }
+        return null;
+    }
 
-/** Whole units to book now and the remainder to keep, for a fractional component. */
-static long[] accrue(long /* carry */a, long /* numerator */b, long /* denominator */c) {
- long /* total */d = a + b;
- return new long[]{d / c, d % c};
-}
+    /** The worn amulet of blood fury, or null when another amulet (or none) is worn. */
+    Item furyAmulet() {
+        ItemContainer worn = container(InventoryID.WORN);
+        Item amulet =
+                worn == null ? null : worn.getItem(EquipmentInventorySlot.AMULET.getSlotIdx());
+        return amulet != null && amulet.getId() == ItemID.BLOOD_AMULET ? amulet : null;
+    }
 
-/**
-* Exact cumulative value for a fractional priced item: charges are booked in units of
-* {@code 1/perItem} of the item, so each whole item's price is divided without losing its
-* remainder to truncation. Returns the value this booking adds.
-*/
-long carriedValue(V /* variant */a, int /* itemId */b, long /* units */c, int /* price */d, int /* perItem */e) {
- if (c <= 0L || d <= 0 || e <= 1) return Math.max(0L, c * Math.max(0, d));
- // Only the new units are priced, at today's quote; earlier use keeps the price it was booked
- // at (Codex review 1.2). The sub-gp remainder carries, and so does any 1 gp floor overpaid.
- long[] /* carry */f = valueCarry.computeIfAbsent(a.name() + ":" + b, /* ignored */g -> new long[1]);
- long /* total */h = f[0] + c * d;
- long /* booked */i = Math.max(1L, h / e);
- f[0] = h - i * e;
- return i;
-}
+    /** The worn amulet's identity for its click-free count messages; null when not worn. */
+    String wornBloodFury() {
+        Item amulet = furyAmulet();
+        return amulet == null
+                ? null
+                : weaponIdentity(
+                        InterfaceID.Wornitems.UNIVERSE,
+                        EquipmentInventorySlot.AMULET.getSlotIdx(),
+                        amulet.getId(),
+                        ChargedItem.BLOOD_FURY);
+    }
 
-/** One cast's priced recipe, or null when a component lacks a supported valuation. */
-List<Ab> rx(V /* variant */b, String /* identity */c, long /* now */d) {
- var /* recipe */e = recipeOf(b);
- if (b == V.EYE_OF_AYAK) e = eyeRecipe(eyeRune(c));
- long[] /* fraction */f = tw(b);
- if (f != null) {
-  String /* key */g = b.name() + ":" + f[0];
-  long[] /* arf */h = accrue(chargeCarry.getOrDefault(g, 0L), f[1], f[2]);
-  chargeCarry.put(g, h[1]);
-  if (h[0] > 0L) e.put((int) f[0], h[0]);
- }
- if (b == V.V1b && blowpipeDart > 0) {
-  // Owner 1.1: each shot spends its dart unless an Ava's device saves it; the expected share
-  // accrues like the scales, and a Check reconciles it.
-  long[] /* loss */i = dartLoss(wornCapeName());
-  String /* key */j = "V1b:" + blowpipeDart;
-  long[] /* darts */k = accrue(chargeCarry.getOrDefault(j, 0L), i[0], i[1]);
-  chargeCarry.put(j, k[1]);
-  if (k[0] > 0L) e.put(blowpipeDart, k[0]);
- }
- var /* flows */l = new ArrayList<Ab>();
- for (Map.Entry<Integer, Long> /* entry */m : e.entrySet()) {
-  int /* canonicalId */n = ix == null ? -1 : ix.canon(m.getKey());
-  ItemComposition /* composition */o = n <= 0 ? null : ix.comp(n);
-  if (o == null || Ag.blank(o.getName())) return null;
-  Ab /* valued */p = valuation == null ? null : valuation.akj(n, -m.getValue(), d);
-  int /* unitPrice */q = p == null ? 0 : p.unitPrice;
-  if (q <= 0) return null;
-  // Charge-fed components book in charge units; the priced item covers several, and the
-  // value carry keeps every whole item's price exact across those fractional bookings.
-  int /* perItem */r = akr(b, m.getKey());
-  long /* units */t = m.getValue();
-  long /* value */u = Ae.agz(-t, q);
-  if (r > 1) {
-   u = -carriedValue(b, m.getKey(), t, q, r);
-   q = Math.max(1, q / r);
-  }
-  l.add(new Ab(n, o.getName(), -t, q, u, p.getPriceSource(), d));
- }
- return l;
-}
+    /** One blood fury charge for a melee hit. */
+    void bookFury(long now) {
+        bookAttackEstimate(
+                ChargedItem.BLOOD_FURY,
+                ItemID.BLOOD_AMULET,
+                wornBloodFury(),
+                kindFor(ChargedItem.BLOOD_FURY),
+                now);
+    }
 
-/**
-* Link one numeric Check response to the item slot that was actually checked. The
-* click contains identity only; any other menu action supersedes the pending link.
-*/
-void ld(MenuOptionClicked /* event */b, String /* option */c, String /* target */d) {
- engine.eb.drop(CK);
- int /* aps */f = ns(b);
- V /* amb */g = aja(f);
- if (g == null) g = ajb(d);
- if (("uncharge".equals(c) || "unload".equals(c) || "empty".equals(c)) && g != null) {
-  // These actions can return loaded components. A later lower Check value
-  // cannot be treated as consumed charges across that unmeasured return.
-  engine.afu();
-  // The return is the player's own charge investment coming back: an
-  // ownership-neutral transfer, never income (owner 2026-09-29).
-  markReturnTransfer();
-  // Most weapons ask to confirm first, so the components can land long after this short
-  // context: keep watching for them (watchReturn) instead of booking them as a gain.
-  if (client != null) {
-   Ev e = engine.eb.put(RV, -1, 1L, RETURN_TICKS, null);
-   e.v = g;
-   e.at = client.getTickCount() + RETURN_TICKS;
-   e.data = inventoryCounts();
-  }
-  return;
- }
- if (!"check".equals(c) || g == null || !g.implemented) return;
- String /* targetIdentity */h = nt(b, g, f);
- if (h != null) ck(g, h, client.getTickCount(), 2);
-}
+    /** One use of the worn weapon at its pinned recipe. */
+    void bookWorn(ChargedItem variant, Item weapon, long now) {
+        bookAttackEstimate(
+                variant,
+                weapon.getId(),
+                wornIdentity(variant, weapon.getId()),
+                kindFor(variant),
+                now);
+    }
 
-/** Each tick before booking: an Uncharge's own components landing make that change a transfer. */
-void watchReturn() {
- Ev e = engine.eb.peek(RV);
- if (e == null || client == null) return;
- if (client.getTickCount() > e.at) {
-  engine.eb.drop(RV);
-  return;
- }
- if (!returnLanded(e.v, (Map<Integer, Long>) e.data, inventoryCounts(), this::itemName)) return;
- markReturnTransfer();
- engine.eb.drop(RV);
-}
+    /** Every menu click: supersede a pending Check link, then arm Check / unload / load intents. */
+    void onMenuOptionClicked(MenuOptionClicked event, String option, String target) {
+        // Answering the Uncharge prompt keeps the return watch; any other action ends it, so a
+        // declined prompt never turns later loot of the same runes or scales into a transfer.
+        if (!isDialogAnswer(event, option)) engine.inbox.drop(UNCHARGE);
+        armCheck(event, option, target);
+        armLoad(event, option);
+        // The memoirs are charged at the Old Memorial: the runes move into the book (owner 1.2).
+        if ("inspect".equals(option) && target.contains("old memorial"))
+            engine.markChargeLoad(
+                    ChargedItem.MEMOIRS, ItemID.LAWRUNE, "law rune", null, LOAD_TICKS);
+        if (!isAtesLocation(option)) return;
+        int itemId = weaponItemId(event);
+        ChargedItem variant = supportedForId(itemId);
+        if (variant != ChargedItem.ATES && variant != ChargedItem.MEMOIRS) return;
+        String identity = clickedIdentity(event, variant, itemId);
+        if (identity != null)
+            bookAttackEstimate(variant, itemId, identity, ActionKind.SUPPLIES, SafeMath.now());
+    }
 
-/** The returned charge is the player's own investment coming back: ownership-neutral. */
-void markReturnTransfer() {
- xfer("jv");
-}
+    /**
+     * A pendant or memoirs teleport click spends one charge; bank, inventory and interface options
+     * are plumbing.
+     */
+    static boolean isAtesLocation(String option) {
+        String name = option == null ? "" : option.replace('\u2019', '\'');
+        if (name.startsWith("the ")) name = name.substring(4);
+        return LOCATIONS.contains(name);
+    }
 
-/** A click that answers a chat dialog (the "Really uncharge?" Yes/No), not a new action. */
-static boolean isDialogAnswer(MenuOptionClicked /* event */a, String /* option */b) {
- return a.getMenuAction() == MenuAction.WIDGET_CONTINUE || "yes".equals(b) || "continue".equals(b);
-}
+    /** The pendant's six teleport locations, normalized like menu options. */
+    static final List<String> LOCATIONS = GameData.names("ates_locations");
 
-/** True when an item that loads this weapon (its scales, darts or runes) increased. */
-static boolean returnLanded(V /* variant */a, Map<Integer, Long> /* before */b, Map<Integer, Long> /* after */c,
-java.util.function.IntFunction<String> /* names */d) {
- for (Map.Entry<Integer, Long> /* item */e : c.entrySet()) {
-  if (e.getValue() > b.getOrDefault(e.getKey(), 0L)
-  && xq(a, e.getKey(), d.apply(e.getKey()))) return true;
- }
- return false;
-}
+    /**
+     * A local cast or shot graphic books this use's pinned recipe as a LIKELY estimate; the next
+     * measured Check reconciles it at the captured prices. Any unpriced component fails the whole
+     * estimate closed. A repeated graphic in one tick is one use.
+     */
+    /**
+     * Spot anims play on for several ticks and the player can hold several, so only one that was
+     * not playing at the last change is a new cast.
+     */
+    void spotAnims(Iterable<ActorSpotAnim> anims, long now) {
+        var playing = new HashSet<Long>();
+        for (ActorSpotAnim anim : anims) {
+            if (anim == null) continue;
+            long key = (long) anim.getId() << 32 | anim.getStartCycle() & 0xFFFFFFFFL;
+            if (playing.add(key) && !playingAnims.contains(key)) onGraphic(anim.getId(), now);
+        }
+        playingAnims = playing;
+    }
 
-String itemName(int /* itemId */a) {
- ItemComposition /* composition */b = ix == null ? null : ix.comp(a);
- return b == null ? null : b.getName();
-}
+    void onGraphic(int graphicId, long now) {
+        Item weapon = wornWeapon();
+        ChargedItem variant = weapon == null ? null : supportedForId(weapon.getId());
+        if (variant == null || graphicId <= 0) return;
+        boolean eye = variant == ChargedItem.EYE_OF_AYAK;
+        if (!isCastGraphic(variant, graphicId) && !(eye && eyeGraphics.contains(graphicId))) {
+            if (eye) {
+                // The eye's cast trigger is pinned in no table: learn it from the magic XP every
+                // cast drops (owner 2026-09-29), then each cast books one tear like a spell.
+                eyeCandidateGraphic = graphicId;
+                eyeCandidateTick = client.getTickCount();
+                eyeCandidateWeaponId = weapon.getId();
+                eyeCandidateIdentity = wornIdentity(ChargedItem.EYE_OF_AYAK, weapon.getId());
+            }
+            return;
+        }
+        int tick = client.getTickCount();
+        if (tick == lastCastTick && graphicId == lastCastGraphic || eye && tick == lastAttackTick)
+            return;
+        lastCastTick = tick;
+        lastCastGraphic = graphicId;
+        if (eye) lastAttackTick = tick;
+        bookWorn(variant, weapon, now);
+    }
 
-/** Canonical inventory quantities, so noted or placeholder ids compare as the item itself. */
-Map<Integer, Long> inventoryCounts() {
- ItemContainer /* inventory */a = cont(InventoryID.INV);
- var /* counts */b = new HashMap<Integer, Long>();
- if (a == null) return b;
- for (Item /* item */c : a.getItems()) {
-  if (c == null || c.getId() <= 0 || c.getQuantity() <= 0) continue;
-  int /* id */d = ix == null ? c.getId() : ix.canon(c.getId());
-  b.merge(d, (long) c.getQuantity(), Long::sum);
- }
- return b;
-}
+    /**
+     * A landed hit on the target. The scythe books one charge per damaging hit; the blowpipe books
+     * any shot while its attack animation is live, because a 2-tick attack restarts the same
+     * animation and never fires a second AnimationChanged. At most once per tick.
+     */
+    void onHit(int damage, long now) {
+        Item weapon = wornWeapon();
+        ChargedItem variant = weapon == null ? null : supportedForId(weapon.getId());
+        // Blood fury: one charge per melee hit. Combat XP proves melee for every weapon
+        // (owner 2026-09-29); a hit whose XP has not landed yet this tick stays pending
+        // until that same tick's XP confirms the stance (owner 2026-10-01).
+        if (damage > 0) {
+            int tick = client.getTickCount();
+            if (furyAmulet() != null) {
+                if (furyMelee(tick)) bookFury(now);
+                else pendingFuryHitTick = tick;
+            }
+        }
+        if (variant == null) return;
+        // Each landed splat books: a multi-target swing is several hits, not one attack.
+        boolean scythe = variant == ChargedItem.SCYTHE && damage > 0;
+        Actor local = client.getLocalPlayer();
+        boolean shot =
+                variant == ChargedItem.BLOWPIPE
+                        && local != null
+                        && local.getAnimation() == attackAnimation(variant);
+        if (!scythe && !shot) return;
+        if (shot) {
+            int tick = client.getTickCount();
+            if (tick == lastAttackTick) return;
+            lastAttackTick = tick;
+        }
+        bookWorn(variant, weapon, now);
+    }
 
-/** Room to type a charge amount; any other click still ends the load. */
-static final int LOAD_TICKS = 25;
-/**
-* Arm one narrowly-scoped, ownership-neutral load only for a real Use-on-item action
-* against an exact supported weapon and a source component whose canonical id and
-* item name both match that weapon's recipe.
-*/
-void lc(MenuOptionClicked /* event */b, String /* option */c) {
- // Answering the "How many charges?" prompt is part of the same load (owner 1.2).
- if (isDialogAnswer(b, c)) return;
- // On a widget-target click the clicked widget is the target; the item being used is the
- // client's selected widget. Either order loads: scales on the blowpipe, or the blowpipe on them.
- Widget /* clicked */d = b.getWidget();
- Widget /* selected */e = client == null ? null : client.getSelectedWidget();
- V /* used */f = e == null ? null : aja(e.getItemId());
- if (b.getMenuAction() == MenuAction.WIDGET_TARGET_ON_GAME_OBJECT && f != null) {
-  // A weapon used on an object (the scythe on the Vyre well) loads its recipe from the pack.
-  int /* part */g = f.recipe.isEmpty() ? (int) f.fraction[0] : f.recipe.keySet().iterator().next();
-  engine.yx(f, g, String.valueOf(g), weaponIdentity(e.getId(), e.getIndex(),
-  e.getItemId(), f), LOAD_TICKS);
-  return;
- }
- if (b.getMenuAction() != MenuAction.WIDGET_TARGET_ON_WIDGET || d == null || e == null) {
-  engine.oh();
-  return;
- }
- boolean /* weaponClicked */h = aja(d.getItemId()) != null;
- Widget /* weapon */i = h ? d : e;
- V /* variant */j = aja(i.getItemId());
- int /* aqo */k = canonical((h ? e : d).getItemId());
- String /* name */l = k <= 0 ? null : itemName(k);
- if (j == null || l == null || !xq(j, k, l)) {
-  engine.oh();
-  return;
- }
- if (j == V.V1b && Ar.DARTS.containsValue(k)) blowpipeDart = k;
- String /* targetIdentity */m = weaponIdentity(i.getId(), i.getIndex(), i.getItemId(), j);
- engine.yx(j, k, l, m, LOAD_TICKS);
-}
+    /** A local attack animation books the pinned per-attack charge for crystal weapons. */
+    void onAnimation(int animationId, long now) {
+        Item weapon = wornWeapon();
+        ChargedItem variant = weapon == null ? null : supportedForId(weapon.getId());
+        if (variant == null) return;
+        if (variant == ChargedItem.EYE_OF_AYAK) {
+            if (!eyeAnimations.contains(animationId)) {
+                // Candidate cast animation; the same tick's magic XP proves it, like the graphic.
+                eyeCandidateAnimation = animationId;
+                eyeCandidateTick = client.getTickCount();
+                eyeCandidateWeaponId = weapon.getId();
+                eyeCandidateIdentity = wornIdentity(ChargedItem.EYE_OF_AYAK, weapon.getId());
+                return;
+            }
+        } else if (!isPinnedAttack(variant, animationId)) {
+            return;
+        }
+        int tick = client.getTickCount();
+        if (tick == lastAttackTick) return;
+        lastAttackTick = tick;
+        bookWorn(variant, weapon, now);
+    }
 
-int canonical(int /* itemId */a) {
- return ix == null || a <= 0 ? a : ix.canon(a);
-}
+    Item wornWeapon() {
+        ItemContainer worn = client.getItemContainer(InventoryID.WORN);
+        return worn == null ? null : worn.getItem(EquipmentInventorySlot.WEAPON.getSlotIdx());
+    }
 
-/** Resolve the weapon targeted by the menu action, distinct from an item-on-item source. */
-static int ns(MenuOptionClicked /* event */a) {
- if (a == null) return -1;
- int /* id */b = a.getId();
- if (aja(b) != null) return b;
- int /* itemId */c = a.getItemId();
- if (aja(c) != null) return c;
- if (a.getWidget() != null) {
-  int /* widgetItemId */d = a.getWidget().getItemId();
-  if (aja(d) != null) return d;
- }
- return -1;
-}
+    void bookAttackEstimate(
+            ChargedItem variant, int weaponId, String identity, ActionKind kind, long now) {
+        // A hit is gameplay: resume the pauses gameplay ends (logout/idle/recovery) and start
+        // tracking when automatic startup is on, before booking — so the very first attack after
+        // logging in counts instead of arriving while the session is still catching up.
+        engine.resume(now, PauseReason.LIFECYCLE, PauseReason.IDLE, PauseReason.RECOVERY);
+        if (!engine.live()) engine.autoStart(now);
+        List<Flow> recipe = estimateRecipe(variant, identity, now);
+        if (recipe == null || recipe.isEmpty()) return;
+        Transaction receipt =
+                engine.bookEstimatedCharge(identity, variant.displayName, kind, recipe, now);
+        if (receipt != null) receipt.castItemId = weaponId;
+    }
 
-/**
-* Same item/container/slot identity for the clicked weapon across Use-on-item and
-* Check. Without all location fields, a charge load remains Review only.
-*/
-static String nt(MenuOptionClicked /* event */a, V /* variant */b, int /* weaponItemId */c) {
- if (a == null) return null;
- int /* widgetId */d = a.getParam1();
- if (d <= 0 && a.getWidget() != null) d = a.getWidget().getId();
- return weaponIdentity(d, a.getParam0(), c, b);
-}
+    /** A family may cast with more than one local graphic (Sanguinesti's Justiciar variant). */
+    static boolean isCastGraphic(ChargedItem variant, int graphicId) {
+        return graphicId > 0 && Arrays.stream(variant.graphics).anyMatch(id -> id == graphicId);
+    }
 
-/**
-* Container group, slot, item and variant uniquely identify one weapon: the same item in
-* inventory and equipment (or two slots in either container) cannot share a baseline, and a
-* worn estimate builds the identical identity from the equipment slot.
-*/
-static String weaponIdentity(int /* widgetId */a, int /* slot */b, int /* weaponItemId */c, V /* variant */d) {
- int /* arb */e = a >>> 16;
- if (d == null || c <= 0 || b < 0 || a <= 0 || e <= 0) return null;
- return e + ":" + b + ":" + c + ":" + d.name();
-}
+    /** The attack animation pinned for per-shot estimates; 0 means none. */
+    static int attackAnimation(ChargedItem variant) {
+        return variant == ChargedItem.BLOWPIPE ? 5061 : 0;
+    }
+
+    /** The attack animations pinned for per-attack estimates (d20); false means none. */
+    static boolean isPinnedAttack(ChargedItem variant, int animationId) {
+        return Arrays.stream(variant.animations).anyMatch(id -> id == animationId);
+    }
+
+    /** The action a variant's estimate represents: a built-in cast, a bow shot or a melee use. */
+    static ActionKind kindFor(ChargedItem variant) {
+        return variant.action;
+    }
+
+    /**
+     * The equipment-side identity a worn Check uses: container group, weapon slot, item, variant.
+     */
+    static String wornIdentity(ChargedItem variant, int weaponItemId) {
+        return weaponIdentity(
+                InterfaceID.Wornitems.UNIVERSE,
+                EquipmentInventorySlot.WEAPON.getSlotIdx(),
+                weaponItemId,
+                variant);
+    }
+
+    /**
+     * The eye's mode-aware per-cast recipe, keyed off its own charge line's wording (owner
+     * 2026-09-30).
+     */
+    static Map<Integer, Long> eyeRecipe(boolean runeCharged) {
+        var recipe = new LinkedHashMap<Integer, Long>();
+        if (runeCharged) {
+            recipe.put(ItemID.DEATHRUNE, 2L);
+            recipe.put(ItemID.CHAOSRUNE, 1L);
+        } else {
+            recipe.put(ItemID.DEMON_TEAR, 1L);
+        }
+        return recipe;
+    }
+
+    /** One cast's pinned component quantities per family (d20), as a copy the caller may extend. */
+    static Map<Integer, Long> recipeOf(ChargedItem variant) {
+        return new LinkedHashMap<>(variant.recipe);
+    }
+
+    /** Fractional per-use components: [itemId, numerator, denominator] accruing toward one item. */
+    static long[] fractionOf(ChargedItem variant) {
+        return variant.fraction;
+    }
+
+    /**
+     * Darts a blowpipe shot spends, as {numerator, denominator}, by the cape slot (OSRS wiki): an
+     * assembler or Dizana's quiver saves 80%, the accumulator 72%, the attractor 60%; none saves
+     * none.
+     */
+    static long[] dartLoss(String capeName) {
+        String cape = capeName == null ? "" : capeName.toLowerCase(Locale.ROOT);
+        if (cape.contains("assembler") || cape.contains("dizana")) return new long[] {1L, 5L};
+        if (cape.contains("accumulator")) return new long[] {7L, 25L};
+        if (cape.contains("attractor")) return new long[] {2L, 5L};
+        return new long[] {1L, 1L};
+    }
+
+    String wornCapeName() {
+        ItemContainer worn = container(InventoryID.WORN);
+        Item cape = worn == null ? null : worn.getItem(EquipmentInventorySlot.CAPE.getSlotIdx());
+        return cape == null || cape.getId() <= 0 ? "" : itemName(cape.getId());
+    }
+
+    /** Whole units to book now and the remainder to keep, for a fractional component. */
+    static long[] accrue(long carry, long numerator, long denominator) {
+        long total = carry + numerator;
+        return new long[] {total / denominator, total % denominator};
+    }
+
+    /**
+     * Exact cumulative value for a fractional priced item: charges are booked in units of {@code
+     * 1/perItem} of the item, so each whole item's price is divided without losing its remainder to
+     * truncation. Returns the value this booking adds.
+     */
+    long carriedValue(ChargedItem variant, int itemId, long units, int price, int perItem) {
+        if (units <= 0L || price <= 0 || perItem <= 1)
+            return Math.max(0L, units * Math.max(0, price));
+        // Only the new units are priced, at today's quote; earlier use keeps the price it was
+        // booked
+        // at (Codex review 1.2). The sub-gp remainder carries, and so does any 1 gp floor overpaid.
+        long[] carry =
+                valueCarry.computeIfAbsent(variant.name() + ":" + itemId, ignored -> new long[1]);
+        long total = carry[0] + units * price;
+        long booked = Math.max(1L, total / perItem);
+        carry[0] = total - booked * perItem;
+        return booked;
+    }
+
+    /** One cast's priced recipe, or null when a component lacks a supported valuation. */
+    List<Flow> estimateRecipe(ChargedItem variant, String identity, long now) {
+        var recipe = recipeOf(variant);
+        if (variant == ChargedItem.EYE_OF_AYAK) recipe = eyeRecipe(eyeRune(identity));
+        long[] fraction = fractionOf(variant);
+        if (fraction != null) {
+            String key = variant.name() + ":" + fraction[0];
+            long[] accrued = accrue(chargeCarry.getOrDefault(key, 0L), fraction[1], fraction[2]);
+            chargeCarry.put(key, accrued[1]);
+            if (accrued[0] > 0L) recipe.put((int) fraction[0], accrued[0]);
+        }
+        if (variant == ChargedItem.BLOWPIPE && blowpipeDart > 0) {
+            // Owner 1.1: each shot spends its dart unless an Ava's device saves it; the expected
+            // share
+            // accrues like the scales, and a Check reconciles it.
+            long[] loss = dartLoss(wornCapeName());
+            String key = "BLOWPIPE:" + blowpipeDart;
+            long[] darts = accrue(chargeCarry.getOrDefault(key, 0L), loss[0], loss[1]);
+            chargeCarry.put(key, darts[1]);
+            if (darts[0] > 0L) recipe.put(blowpipeDart, darts[0]);
+        }
+        var flows = new ArrayList<Flow>();
+        for (Map.Entry<Integer, Long> entry : recipe.entrySet()) {
+            int canonicalId = lookup == null ? -1 : lookup.canon(entry.getKey());
+            ItemComposition composition = canonicalId <= 0 ? null : lookup.composition(canonicalId);
+            if (composition == null || Phrases.blank(composition.getName())) return null;
+            Flow valued =
+                    valuation == null
+                            ? null
+                            : valuation.valueComponent(canonicalId, -entry.getValue(), now);
+            int unitPrice = valued == null ? 0 : valued.unitPrice;
+            if (unitPrice <= 0) return null;
+            // Charge-fed components book in charge units; the priced item covers several, and the
+            // value carry keeps every whole item's price exact across those fractional bookings.
+            int perItem = unitsPerItem(variant, entry.getKey());
+            long units = entry.getValue();
+            long value = SafeMath.safeMultiply(-units, unitPrice);
+            if (perItem > 1) {
+                value = -carriedValue(variant, entry.getKey(), units, unitPrice, perItem);
+                unitPrice = Math.max(1, unitPrice / perItem);
+            }
+            flows.add(
+                    new Flow(
+                            canonicalId,
+                            composition.getName(),
+                            -units,
+                            unitPrice,
+                            value,
+                            valued.getPriceSource(),
+                            now));
+        }
+        return flows;
+    }
+
+    /**
+     * Link one numeric Check response to the item slot that was actually checked. The click
+     * contains identity only; any other menu action supersedes the pending link.
+     */
+    void armCheck(MenuOptionClicked event, String option, String target) {
+        engine.inbox.drop(CHECK_LINK);
+        int rawItemId = weaponItemId(event);
+        ChargedItem itemVariant = supportedForId(rawItemId);
+        if (itemVariant == null) itemVariant = supportedForName(target);
+        if ("configure-charges".equals(option)) {
+            // The bank's Configure-Charges loads or removes charges with bank items the plugin
+            // never sees, so no Check of that kind can be compared across it (OSRS Wiki, 5 March
+            // 2025).
+            engine.resetChecks(itemVariant);
+            return;
+        }
+        if (("uncharge".equals(option) || "unload".equals(option) || "empty".equals(option))
+                && itemVariant != null) {
+            // These actions can return loaded components. A later lower Check value
+            // cannot be treated as consumed charges across that unmeasured return.
+            engine.resetChecks(itemVariant);
+            // The return is the player's own charge investment coming back: an
+            // ownership-neutral transfer, never income (owner 2026-09-29).
+            markReturnTransfer();
+            // Most weapons ask to confirm first, so the components can land long after this short
+            // context: keep watching for them (watchReturn) instead of booking them as a gain.
+            if (client != null) {
+                Observation e = engine.inbox.put(UNCHARGE, -1, 1L, RETURN_TICKS, null);
+                e.variant = itemVariant;
+                e.at = client.getTickCount() + RETURN_TICKS;
+                e.data = inventoryCounts();
+            }
+            return;
+        }
+        if (!"check".equals(option) || itemVariant == null || !itemVariant.implemented) return;
+        String targetIdentity = clickedIdentity(event, itemVariant, rawItemId);
+        if (targetIdentity != null)
+            startCheck(itemVariant, targetIdentity, client.getTickCount(), 2);
+    }
+
+    /**
+     * Each tick before booking: an Uncharge's own components landing make that change a transfer.
+     */
+    void watchReturn() {
+        Observation e = engine.inbox.peek(UNCHARGE);
+        if (e == null || client == null) return;
+        if (client.getTickCount() > e.at) {
+            engine.inbox.drop(UNCHARGE);
+            return;
+        }
+        if (!returnLanded(
+                e.variant, (Map<Integer, Long>) e.data, inventoryCounts(), this::itemName)) return;
+        markReturnTransfer();
+        engine.inbox.drop(UNCHARGE);
+    }
+
+    /** The returned charge is the player's own investment coming back: ownership-neutral. */
+    void markReturnTransfer() {
+        transfer("charge-unload");
+    }
+
+    /** A click that answers a chat dialog (the "Really uncharge?" Yes/No), not a new action. */
+    static boolean isDialogAnswer(MenuOptionClicked event, String option) {
+        return event.getMenuAction() == MenuAction.WIDGET_CONTINUE
+                || "yes".equals(option)
+                || "continue".equals(option);
+    }
+
+    /** True when an item that loads this weapon (its scales, darts or runes) increased. */
+    static boolean returnLanded(
+            ChargedItem variant,
+            Map<Integer, Long> before,
+            Map<Integer, Long> after,
+            java.util.function.IntFunction<String> names) {
+        for (Map.Entry<Integer, Long> item : after.entrySet()) {
+            if (item.getValue() > before.getOrDefault(item.getKey(), 0L)
+                    && isLoadComponent(variant, item.getKey(), names.apply(item.getKey())))
+                return true;
+        }
+        return false;
+    }
+
+    String itemName(int itemId) {
+        ItemComposition composition = lookup == null ? null : lookup.composition(itemId);
+        return composition == null ? null : composition.getName();
+    }
+
+    /** Canonical inventory quantities, so noted or placeholder ids compare as the item itself. */
+    Map<Integer, Long> inventoryCounts() {
+        ItemContainer inventory = container(InventoryID.INV);
+        var counts = new HashMap<Integer, Long>();
+        if (inventory == null) return counts;
+        for (Item item : inventory.getItems()) {
+            if (item == null || item.getId() <= 0 || item.getQuantity() <= 0) continue;
+            int id = lookup == null ? item.getId() : lookup.canon(item.getId());
+            counts.merge(id, (long) item.getQuantity(), Long::sum);
+        }
+        return counts;
+    }
+
+    /** Room to type a charge amount; any other click still ends the load. */
+    static final int LOAD_TICKS = 25;
+
+    /**
+     * Arm one narrowly-scoped, ownership-neutral load only for a real Use-on-item action against an
+     * exact supported weapon and a source component whose canonical id and item name both match
+     * that weapon's recipe.
+     */
+    void armLoad(MenuOptionClicked event, String option) {
+        // Answering the "How many charges?" prompt is part of the same load (owner 1.2).
+        if (isDialogAnswer(event, option)) return;
+        // On a widget-target click the clicked widget is the target; the item being used is the
+        // client's selected widget. Either order loads: scales on the blowpipe, or the blowpipe on
+        // them.
+        Widget clicked = event.getWidget();
+        Widget selected = client == null ? null : client.getSelectedWidget();
+        ChargedItem used = selected == null ? null : supportedForId(selected.getItemId());
+        if (event.getMenuAction() == MenuAction.WIDGET_TARGET_ON_GAME_OBJECT && used != null) {
+            // A weapon used on an object (the scythe on the Vyre well) loads its recipe from the
+            // pack.
+            int part =
+                    used.recipe.isEmpty()
+                            ? (int) used.fraction[0]
+                            : used.recipe.keySet().iterator().next();
+            engine.markChargeLoad(
+                    used,
+                    part,
+                    String.valueOf(part),
+                    weaponIdentity(
+                            selected.getId(), selected.getIndex(), selected.getItemId(), used),
+                    LOAD_TICKS);
+            return;
+        }
+        if (event.getMenuAction() != MenuAction.WIDGET_TARGET_ON_WIDGET
+                || clicked == null
+                || selected == null) {
+            engine.clearChargeLoad();
+            return;
+        }
+        boolean weaponClicked = supportedForId(clicked.getItemId()) != null;
+        Widget weapon = weaponClicked ? clicked : selected;
+        ChargedItem variant = supportedForId(weapon.getItemId());
+        int sourceItemId = canonical((weaponClicked ? selected : clicked).getItemId());
+        String name = sourceItemId <= 0 ? null : itemName(sourceItemId);
+        if (variant == null || name == null || !isLoadComponent(variant, sourceItemId, name)) {
+            engine.clearChargeLoad();
+            return;
+        }
+        if (variant == ChargedItem.BLOWPIPE && ChargeCheck.DARTS.containsValue(sourceItemId))
+            blowpipeDart = sourceItemId;
+        String targetIdentity =
+                weaponIdentity(weapon.getId(), weapon.getIndex(), weapon.getItemId(), variant);
+        engine.markChargeLoad(variant, sourceItemId, name, targetIdentity, LOAD_TICKS);
+    }
+
+    int canonical(int itemId) {
+        return lookup == null || itemId <= 0 ? itemId : lookup.canon(itemId);
+    }
+
+    /** Resolve the weapon targeted by the menu action, distinct from an item-on-item source. */
+    static int weaponItemId(MenuOptionClicked event) {
+        if (event == null) return -1;
+        int id = event.getId();
+        if (supportedForId(id) != null) return id;
+        int itemId = event.getItemId();
+        if (supportedForId(itemId) != null) return itemId;
+        if (event.getWidget() != null) {
+            int widgetItemId = event.getWidget().getItemId();
+            if (supportedForId(widgetItemId) != null) return widgetItemId;
+        }
+        return -1;
+    }
+
+    /**
+     * Same item/container/slot identity for the clicked weapon across Use-on-item and Check.
+     * Without all location fields, a charge load remains Review only.
+     */
+    static String clickedIdentity(MenuOptionClicked event, ChargedItem variant, int weaponItemId) {
+        if (event == null) return null;
+        int widgetId = event.getParam1();
+        if (widgetId <= 0 && event.getWidget() != null) widgetId = event.getWidget().getId();
+        return weaponIdentity(widgetId, event.getParam0(), weaponItemId, variant);
+    }
+
+    /**
+     * Container group, slot, item and variant uniquely identify one weapon: the same item in
+     * inventory and equipment (or two slots in either container) cannot share a baseline, and a
+     * worn estimate builds the identical identity from the equipment slot.
+     */
+    static String weaponIdentity(int widgetId, int slot, int weaponItemId, ChargedItem variant) {
+        int widgetGroup = widgetId >>> 16;
+        if (variant == null || weaponItemId <= 0 || slot < 0 || widgetId <= 0 || widgetGroup <= 0)
+            return null;
+        return widgetGroup + ":" + slot + ":" + weaponItemId + ":" + variant.name();
+    }
 }

@@ -20,14 +20,14 @@ public class SameSecondBackupTest
     {
         SessionRepository repository = new SessionRepository(JsonCodec.gson(),
             FilepathTestSupport.root(Files.createTempDirectory("gp-same-second")));
-        Ei persistence = new Ei(null, null, repository, new OrderedPersistenceWriter(repository, null),
+        Persistence persistence = new Persistence(null, null, repository, new OrderedPersistenceWriter(repository, null),
             PresentationLifecycleTest.engine());
         long now = 1_791_500_000_000L;
-        Filepath first = persistence.akt(now);
-        Filepath second = persistence.akt(now);
+        Filepath first = persistence.writeBackup(now);
+        Filepath second = persistence.writeBackup(now);
         assertTrue(String.valueOf(second.getFileName()).endsWith("_2.json"));
         assertEquals("the later copy lists first", second.getFileName(), persistence.backups().get(0).getFileName());
-        persistence.adz(1);
+        persistence.pruneBackups(1);
         assertEquals(1, persistence.backups().size());
         assertEquals("keeping one keeps the newer", second.getFileName(), persistence.backups().get(0).getFileName());
         assertTrue(!first.exists());

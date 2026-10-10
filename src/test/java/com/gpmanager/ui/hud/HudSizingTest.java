@@ -25,8 +25,8 @@ public class HudSizingTest
     public void fitShortensWithOneEllipsisAndLeavesShortTextAlone()
     {
         FontMetrics metrics = G.getFontMetrics(FontManager.getRunescapeFont());
-        assertEquals("Logs ×4", De.fit(metrics, "Logs ×4", 200));
-        String cut = De.fit(metrics, "Superior dragon bones ×2", 60);
+        assertEquals("Logs ×4", HudOverlay.fit(metrics, "Logs ×4", 200));
+        String cut = HudOverlay.fit(metrics, "Superior dragon bones ×2", 60);
         assertTrue(cut, cut.endsWith("…"));
         assertTrue(metrics.stringWidth(cut) <= 60);
     }
@@ -36,10 +36,10 @@ public class HudSizingTest
     public void aLongNameShortensButKeepsItsCount()
     {
         GpManagerConfig config = config(true, 4);
-        Cp builder = new Cp(config, null);
-        De overlay = new De(builder, config);
-        builder.tray().booked(receipt(NOW, Ai.LOOT, flow(21817, "Bracelet of ethereum (uncharged)", 2L, 90_000)), NOW, false);
-        builder.tray().booked(receipt(NOW + 1L, Ai.LOOT, flow(1, "An extraordinarily long item name that "
+        HudBuilder builder = new HudBuilder(config, null);
+        HudOverlay overlay = new HudOverlay(builder, config);
+        builder.tray().booked(receipt(NOW, TransactionType.LOOT, flow(21817, "Bracelet of ethereum (uncharged)", 2L, 90_000)), NOW, false);
+        builder.tray().booked(receipt(NOW + 1L, TransactionType.LOOT, flow(1, "An extraordinarily long item name that "
             + "would never fit any sensible overlay", 3L, 10)), NOW + 1L, false);
         builder.update(grind(46L, null), f -> true, NOW + 10L);
         overlay.render(G);
@@ -63,14 +63,14 @@ public class HudSizingTest
     public void autoWidthHugsContentAndStopsAtTheCeiling()
     {
         GpManagerConfig config = config(true, 4);
-        Cp builder = new Cp(config, null);
-        De overlay = new De(builder, config);
+        HudBuilder builder = new HudBuilder(config, null);
+        HudOverlay overlay = new HudOverlay(builder, config);
         builder.update(grind(46L, null), f -> true, NOW);
         Dimension resting = overlay.render(G);
         assertTrue("short content leaves room below the ceiling", resting.width < config.hudMaxWidth());
-        assertTrue(resting.width >= De.MIN_WIDTH);
+        assertTrue(resting.width >= HudOverlay.MIN_WIDTH);
 
-        builder.tray().booked(receipt(NOW, Ai.LOOT, flow(1, "An extraordinarily long item name that "
+        builder.tray().booked(receipt(NOW, TransactionType.LOOT, flow(1, "An extraordinarily long item name that "
             + "would never fit any sensible overlay", 1L, 10)), NOW, false);
         builder.update(grind(46L, null), f -> true, NOW + 10L);
         assertEquals("long rows stop at Max width and shorten instead", config.hudMaxWidth(), overlay.render(G).width);
@@ -81,8 +81,8 @@ public class HudSizingTest
     public void theRateSharesTheNetLineWhenItFits()
     {
         GpManagerConfig config = config(true, 4);
-        Cp builder = new Cp(config, null);
-        De overlay = new De(builder, config);
+        HudBuilder builder = new HudBuilder(config, null);
+        HudOverlay overlay = new HudOverlay(builder, config);
         builder.update(grind(-3_800L, 5_000_000L), f -> true, NOW);
         assertTrue("room to spare", overlay.render(G).width < config.hudMaxWidth());
         assertEquals("no line of its own", 0, overlay.moneyY[3]);
@@ -92,16 +92,16 @@ public class HudSizingTest
     public void tickingDigitsNeverWobbleTheWidth()
     {
         GpManagerConfig config = config(true, 4);
-        Cp builder = new Cp(config, null);
-        De overlay = new De(builder, config);
+        HudBuilder builder = new HudBuilder(config, null);
+        HudOverlay overlay = new HudOverlay(builder, config);
         builder.interaction("Ancient Wyvern of the Long Tail", true);
-        Am engine = HudBuilderTest.engine();
-        engine.ajl("Vorkath", Cx.GENERAL, NOW);
-        builder.update(Ca.capture(engine, NOW + 11_000L, null),
+        Engine engine = HudBuilderTest.engine();
+        engine.startCustom("Vorkath", NOW);
+        builder.update(LiveSnapshot.capture(engine, NOW + 11_000L, null),
             f -> true, NOW + 11_000L);
         int narrowDigits = overlay.render(G).width;
-        assertTrue("the title needs more than the minimum", narrowDigits > De.MIN_WIDTH);
-        builder.update(Ca.capture(engine, NOW + 18_000L, null),
+        assertTrue("the title needs more than the minimum", narrowDigits > HudOverlay.MIN_WIDTH);
+        builder.update(LiveSnapshot.capture(engine, NOW + 18_000L, null),
             f -> true, NOW + 18_000L);
         assertEquals(narrowDigits, overlay.render(G).width);
     }
@@ -109,30 +109,30 @@ public class HudSizingTest
     @Test
     public void emptyFreePlayFitsTimerAndRateOnOneLineAtEveryTextSize()
     {
-        for (GpManagerConfig.Cr textSize : GpManagerConfig.Cr.values())
+        for (GpManagerConfig.TextSize textSize : GpManagerConfig.TextSize.values())
         {
             GpManagerConfig config = new GpManagerConfig()
             {
                 @Override
                 public boolean hudHideWhenIdle() { return false; }
                 @Override
-                public Cr hudTextSize() { return textSize; }
+                public TextSize hudTextSize() { return textSize; }
             };
-            Am engine = HudBuilderTest.engine();
-            engine.rm(NOW);
-            Cp builder = new Cp(config, null);
-            Cb snapshot = builder.update(Ca.capture(engine, NOW + 533_000L, null),
+            Engine engine = HudBuilderTest.engine();
+            engine.ensureSession(NOW);
+            HudBuilder builder = new HudBuilder(config, null);
+            HudFrame snapshot = builder.update(LiveSnapshot.capture(engine, NOW + 533_000L, null),
                 f -> true, NOW + 533_000L);
             assertEquals("8m53s", snapshot.timer);
             assertEquals("0/h", snapshot.rate);
-            De overlay = new De(builder, config);
+            HudOverlay overlay = new HudOverlay(builder, config);
             Dimension rendered = overlay.render(G);
             assertTrue("empty " + textSize + " HUD fits below the old floor", rendered.width < 120);
-            assertEquals("only one line remains", De.PAD * 2 + G.getFontMetrics(overlay.bold()).getHeight(),
+            assertEquals("only one line remains", HudOverlay.PAD * 2 + G.getFontMetrics(overlay.bold()).getHeight(),
                 rendered.height);
             FontMetrics metrics = G.getFontMetrics(overlay.body());
-            assertTrue("timer and rate retain a gap", De.PAD + 11 + De.width(metrics, snapshot.timer) + 8
-                <= rendered.width - De.PAD - De.width(metrics, snapshot.rate));
+            assertTrue("timer and rate retain a gap", HudOverlay.PAD + 11 + HudOverlay.width(metrics, snapshot.timer) + 8
+                <= rendered.width - HudOverlay.PAD - HudOverlay.width(metrics, snapshot.rate));
         }
     }
 
@@ -149,11 +149,11 @@ public class HudSizingTest
                 @Override
                 public boolean reducedMotion() { return true; }
             };
-            Cp builder = new Cp(config, null);
-            builder.tray().booked(receipt(NOW, Ai.LOOT,
+            HudBuilder builder = new HudBuilder(config, null);
+            builder.tray().booked(receipt(NOW, TransactionType.LOOT,
                 flow(1, "Whip", 1L, 1_500_000)), NOW, false);
             builder.update(grind(1_500_000L, 100_000_000L), f -> false, NOW + 10L);
-            De overlay = new De(builder, config);
+            HudOverlay overlay = new HudOverlay(builder, config);
             Dimension rendered = overlay.render(G);
             assertTrue(rendered.width <= ceiling);
             if (ceiling == 320) wideHeight = rendered.height;

@@ -1,0 +1,25 @@
+# Ordered neutral-transfer rules: key, clauses, outcome (a label for readers), receipt note.
+m0	last man standing+leave|last man standing+exit|last man standing+restore|lms+leave|lms+exit|lms+restore	LMS_EXIT	@lms-invent-restore
+m1	last man standing+enter|last man standing+join|last man standing+wipe|last man standing+loadout|lms+enter|lms+join|lms+wipe|lms+loadout	LMS_ENTER	@lms-invent-wipe
+m2	raid bag+clear|raid bag+end|raid bag+wipe|private storage+clear|private storage+end|private storage+wipe|cox storage+clear|cox storage+end|cox storage+wipe|toa storage+clear|toa storage+end|toa storage+wipe	RAID_BAG_CLEAR	@raid-bag
+m3	raid bag+withdraw|raid bag+take|private storage+withdraw|private storage+take|cox storage+withdraw|cox storage+take|toa storage+withdraw|toa storage+take	RAID_BAG_WITHDRAW	Raid bag withdraw
+m4	raid bag|private storage|cox storage|toa storage	RAID_BAG_STORE	Raid bag store
+m5	group storage+withdraw|group storage+take|shared storage+withdraw|shared storage+take|gim+withdraw|gim+take	GIM_SHARED_WITHDRAW	@gim-shared-storage-withdraw
+m6	group storage|shared storage|gim	GIM_SHARED_DEPOSIT	@gim-shared-storage
+m7.lms	leave|exit	LMS_EXIT	@lms-invent-restore
+m8.lms	=|enter|join|wipe	LMS_ENTER	@lms-invent-wipe
+SEED_VAULT	seed vault	SEED_VAULT	@seed-vault
+TOOL_LEPRECHAUN	@leprechaun-tool	TOOL_LEPRECHAUN	@tool-leprechaun
+NMZ_COFFER	@nightmare-zone	NMZ_COFFER	@nmz-coffer
+BLAST_FURNACE_COFFER	@blast-furnace-coffer	BLAST_FURNACE_COFFER	@blast-furnace-coffer-transfer
+LMS_COFFER	@last-man	LMS_COFFER	@lms-coffer
+MLM_HOPPER	@pay-dirt	MLM_HOPPER	@motherlode-hopper
+GIM_SHARED	@group-storage	GIM_SHARED	@gim-shared-storage-transfer
+RAID_PRIVATE_BAG	@raid-party	RAID_PRIVATE_BAG	@raid-private
+RAID_SHARED_BAG	@shared-raid	RAID_SHARED_BAG	@raid-shared
+STASH_UNIT	stash unit|stash 	STASH_UNIT	@stash-unit
+POH_COSTUME	@costume-room	POH_COSTUME	@poh-costume
+DEPOSIT_BOX	deposit box	DEPOSIT_BOX	@deposit-box-transfer
+IMP_BOX	imp-in-a-box	IMP_BOX	Sent to the bank by an imp-in-a-box
+CHUG_BARREL	chugging barrel	CHUG_BARREL	Put in the chugging barrel
+SCROLL_BOOK	master scroll book	SCROLL_BOOK	Master scroll book

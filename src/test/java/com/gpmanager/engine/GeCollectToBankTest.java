@@ -36,8 +36,8 @@ public class GeCollectToBankTest
     }
 
     private final Map<Integer, Long> inventory = new HashMap<>(Map.of(COINS, 1_000_000L, RUNE, 100L));
-    private final Bj ledger = new Bj();
-    private final Am engine = engine(inventory);
+    private final OfferSlots ledger = new OfferSlots();
+    private final Engine engine = engine(inventory);
 
     @Test
     public void aBuyCollectedToTheBankIsAPurchase()
@@ -48,12 +48,12 @@ public class GeCollectToBankTest
         settle(t + 100L);
         offer(0, BOUGHT, 1_000, 180, 1_000, 176_000, t + 1_000L);
         offer(0, EMPTY, 0, 0, 0, 0, t + 2_000L);
-        engine.ajv(t + 2_000L + LATER);
+        engine.tickGe(t + 2_000L + LATER);
 
         assertEquals("no Review", 0, reviewRows());
         assertTrue("one purchase", trades() == 1);
         assertEquals("buying is Net-neutral", 0L, net());
-        engine.ajv(t + 2_000L + 11L * 60_000L);
+        engine.tickGe(t + 2_000L + 11L * 60_000L);
         assertEquals("still nothing in Review ten minutes later", 0, reviewRows());
     }
 
@@ -63,9 +63,9 @@ public class GeCollectToBankTest
         long t = T0 + 10_000L;
         sell(40L, 5_600L, SOLD, t);
         offer(0, EMPTY, 0, 0, 0, 0, t + 2_000L);
-        engine.ajv(t + 2_000L + 10_000L);
+        engine.tickGe(t + 2_000L + 10_000L);
         assertEquals("not before the bank wait", 0, trades());
-        engine.ajv(t + 2_000L + LATER);
+        engine.tickGe(t + 2_000L + LATER);
 
         assertEquals("140 each pays 2 each", -80L, net());
         assertEquals(0, reviewRows());
@@ -78,7 +78,7 @@ public class GeCollectToBankTest
         long t = T0 + 10_000L;
         sell(25L, 3_513L, SOLD, t);
         offer(0, EMPTY, 0, 0, 0, 0, t + 2_000L);
-        engine.ajv(t + 2_000L + LATER);
+        engine.tickGe(t + 2_000L + LATER);
 
         assertEquals("3,513 / 50 = 70 at most, never less than the truth", -70L, net());
         assertEquals(0, reviewRows());
@@ -93,11 +93,11 @@ public class GeCollectToBankTest
         offer(0, SELLING, 40, 140, 10, 1_400, t + 1_000L);
         offer(0, CANCELLED_SELL, 40, 140, 10, 1_400, t + 1_500L);
         offer(0, EMPTY, 0, 0, 0, 0, t + 2_000L);
-        engine.ajv(t + 2_000L + LATER);
+        engine.tickGe(t + 2_000L + LATER);
 
         assertEquals("only the 10 sold pay tax", -20L, net());
         assertEquals("the 30 unsold went back neutrally", 0, reviewRows());
-        engine.ajv(t + 2_000L + 11L * 60_000L);
+        engine.tickGe(t + 2_000L + 11L * 60_000L);
         assertEquals(0, reviewRows());
     }
 
@@ -107,10 +107,10 @@ public class GeCollectToBankTest
         long t = T0 + 10_000L;
         sell(40L, 5_600L, SOLD, t);
         offer(0, EMPTY, 0, 0, 0, 0, t + 2_000L);
-        engine.abg(t + 2_100L);
+        engine.noteGeCollect(t + 2_100L);
         inventory.put(COINS, inventory.get(COINS) + 5_600L - 80L);
         settle(t + 2_200L);
-        engine.ajv(t + 2_000L + LATER);
+        engine.tickGe(t + 2_000L + LATER);
 
         assertEquals(-80L, net());
         assertEquals("settled once, from the coins", 1, trades());
@@ -133,9 +133,9 @@ public class GeCollectToBankTest
     private int reviewRows()
     {
         int count = 0;
-        for (Ac transaction : engine.getActiveSession().getTransactions())
+        for (Transaction transaction : engine.getActiveSession().getTransactions())
         {
-            if (Eh.aal(transaction)) count++;
+            if (ReviewRules.needsOwnerDecision(transaction)) count++;
         }
         return count;
     }
@@ -143,19 +143,19 @@ public class GeCollectToBankTest
     private int trades()
     {
         int count = 0;
-        for (Ac transaction : engine.getActiveSession().getTransactions())
+        for (Transaction transaction : engine.getActiveSession().getTransactions())
         {
-            if (transaction.tm() == Ai.TRADE) count++;
+            if (transaction.autoType() == TransactionType.TRADE) count++;
         }
         return count;
     }
 
-    private Ac lastTrade()
+    private Transaction lastTrade()
     {
-        Ac last = null;
-        for (Ac transaction : engine.getActiveSession().getTransactions())
+        Transaction last = null;
+        for (Transaction transaction : engine.getActiveSession().getTransactions())
         {
-            if (transaction.tm() == Ai.TRADE) last = transaction;
+            if (transaction.autoType() == TransactionType.TRADE) last = transaction;
         }
         return last;
     }
@@ -163,29 +163,29 @@ public class GeCollectToBankTest
     private void offer(int slot, GrandExchangeOfferState state, int total, int price, int traded, int spent, long at)
     {
         int item = state == EMPTY ? 0 : state == BUYING || state == BOUGHT ? ItemID.WILD_CAVE_SHARD : RUNE;
-        ledger.observe(new Bj.Snapshot(slot, state, item, total, traded, price, spent))
-            .ifPresent(transition -> engine.abh(transition, "Item " + item, at));
+        ledger.observe(new OfferSlots.Snapshot(slot, state, item, total, traded, price, spent))
+            .ifPresent(transition -> engine.noteGeOffer(transition, "Item " + item, at));
     }
 
     private void settle(long at)
     {
-        engine.yz();
-        Cc snapshot = new Cc(new HashMap<>(inventory));
-        engine.adj(snapshot, at);
-        engine.adj(snapshot, at + 1L);
+        engine.markDirty();
+        ContainerSnapshot snapshot = new ContainerSnapshot(new HashMap<>(inventory));
+        engine.processIfDirty(snapshot, at);
+        engine.processIfDirty(snapshot, at + 1L);
     }
 
-    private static Am engine(Map<Integer, Long> inventory)
+    private static Engine engine(Map<Integer, Long> inventory)
     {
-        Am engine = new Am(deltas ->
+        Engine engine = new Engine(deltas ->
         {
-            List<Ab> flows = new ArrayList<>();
+            List<Flow> flows = new ArrayList<>();
             for (Map.Entry<Integer, Long> delta : deltas.entrySet())
             {
                 int id = delta.getKey();
                 long unit = id == COINS ? 1L : 137L;
-                flows.add(new Ab(id, id == COINS ? "Coins" : "Item " + id, delta.getValue(), (int) unit,
-                    delta.getValue() * unit, id == COINS ? Av.FACE_VALUE : Av.GRAND_EXCHANGE));
+                flows.add(new Flow(id, id == COINS ? "Coins" : "Item " + id, delta.getValue(), (int) unit,
+                    delta.getValue() * unit, id == COINS ? PriceSource.FACE_VALUE : PriceSource.GRAND_EXCHANGE));
             }
             return flows;
         }, new TransactionClassifier(), new GpManagerConfig()
@@ -196,8 +196,8 @@ public class GeCollectToBankTest
                 return 0;
             }
         });
-        engine.ajl("Trading", Cx.AUTO, T0);
-        engine.setBaseline(new Cc(new HashMap<>(inventory)));
+        engine.startCustom("Trading", T0);
+        engine.setBaseline(new ContainerSnapshot(new HashMap<>(inventory)));
         return engine;
     }
 }

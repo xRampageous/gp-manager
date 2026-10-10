@@ -19,18 +19,18 @@ public class ContainerExtrasTest
     @Test
     public void dizanasQuiverAmmoCountsAsCarried()
     {
-        Cc held = capture(Map.of(InventoryID.WORN, items(ItemID.DIZANAS_QUIVER_INFINITE, 1),
+        ContainerSnapshot held = capture(Map.of(InventoryID.WORN, items(ItemID.DIZANAS_QUIVER_INFINITE, 1),
             InventoryID.DIZANAS_QUIVER_AMMO, items(ItemID.DRAGON_ARROW, 250)), 0);
-        assertEquals(250L, held.aea(ItemID.DRAGON_ARROW));
+        assertEquals(250L, held.quantityOf(ItemID.DRAGON_ARROW));
     }
 
     @Test
     public void aCarriedAshSanctifierHoldsDeathRunesTenChargesEach()
     {
-        Cc held = capture(Map.of(InventoryID.INV, items(ItemID.ASH_SANCTIFIER, 1, ItemID.DEATHRUNE, 40)), 125);
-        assertEquals("40 loose runes and 125 charges = 12 more runes", 52L, held.aea(ItemID.DEATHRUNE));
-        Cc banked = capture(Map.of(InventoryID.INV, items(ItemID.DEATHRUNE, 40)), 125);
-        assertEquals("a banked sanctifier's charges are not carried", 40L, banked.aea(ItemID.DEATHRUNE));
+        ContainerSnapshot held = capture(Map.of(InventoryID.INV, items(ItemID.ASH_SANCTIFIER, 1, ItemID.DEATHRUNE, 40)), 125);
+        assertEquals("40 loose runes and 125 charges = 12 more runes", 52L, held.quantityOf(ItemID.DEATHRUNE));
+        ContainerSnapshot banked = capture(Map.of(InventoryID.INV, items(ItemID.DEATHRUNE, 40)), 125);
+        assertEquals("a banked sanctifier's charges are not carried", 40L, banked.quantityOf(ItemID.DEATHRUNE));
     }
 
     private static Item[] items(int... idQuantity)
@@ -43,7 +43,7 @@ public class ContainerExtrasTest
         return items;
     }
 
-    private static Cc capture(Map<Integer, Item[]> containers, int sanctifierCharges)
+    private static ContainerSnapshot capture(Map<Integer, Item[]> containers, int sanctifierCharges)
     {
         Map<Integer, ItemContainer> byId = new HashMap<>();
         containers.forEach((id, items) -> byId.put(id, (ItemContainer) Proxy.newProxyInstance(

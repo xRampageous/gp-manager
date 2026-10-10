@@ -52,10 +52,10 @@ public class IconFitTest
                 @Override public boolean hudHideWhenIdle() { return false; }
                 @Override public boolean showItemIcons() { return show; }
             };
-            Cp builder = new Cp(config, (id, quantity) -> sprite(2, 2, 20, 20));
+            HudBuilder builder = new HudBuilder(config, (id, quantity) -> sprite(2, 2, 20, 20));
             builder.update(HudBuilderTest.grind(1_000L, null), f -> true, NOW);
-            builder.tray().booked(receipt(NOW + 1L, Ai.LOOT, flow(1420, "Iron mace", 1L, 42)), NOW + 1L, false);
-            Cb s = builder.update(HudBuilderTest.grind(1_042L, null), f -> true, NOW + 2L);
+            builder.tray().booked(receipt(NOW + 1L, TransactionType.LOOT, flow(1420, "Iron mace", 1L, 42)), NOW + 1L, false);
+            HudFrame s = builder.update(HudBuilderTest.grind(1_042L, null), f -> true, NOW + 2L);
             if (show) assertNotNull(s.rows.get(0).icon);
             else assertNull("item icons off", s.rows.get(0).icon);
         }

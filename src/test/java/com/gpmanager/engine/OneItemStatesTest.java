@@ -47,7 +47,8 @@ public class OneItemStatesTest
             {ItemID.MM_SECONDARY_POUCH_OPEN, ItemID.MM_SECONDARY_POUCH},
             {ItemID.SLAYER_HERB_SACK_SILK_OPEN, ItemID.SLAYER_HERB_SACK_SILK},
             {ItemID.GEM_POUCH_OPEN, ItemID.GEM_POUCH}, {ItemID.GEM_SATCHEL_OPEN, ItemID.GEM_SATCHEL},
-            {ItemID.GEM_TOTE_OPEN, ItemID.GEM_TOTE}, {ItemID.GEM_SACK_OPEN, ItemID.GEM_SACK}};
+            {ItemID.GEM_TOTE_OPEN, ItemID.GEM_TOTE}, {ItemID.GEM_SACK_OPEN, ItemID.GEM_SACK},
+            {ItemID.NZONE_HERBBOX_OPENED, ItemID.NZONE_HERBBOX}};
         Map<Integer, Integer> map = new HashMap<>();
         for (int[] pair : pairs)
         {
@@ -65,15 +66,15 @@ public class OneItemStatesTest
     @Test
     public void lightingALanternOrOpeningABagChangesNoSnapshot()
     {
-        Cc before = snapshot(ItemID.BULLSEYE_LANTERN_UNLIT, ItemID.SLAYER_HERB_SACK, ItemID.SHARK);
-        Cc after = snapshot(ItemID.BULLSEYE_LANTERN_LIT, ItemID.SLAYER_HERB_SACK_OPEN, ItemID.SHARK);
+        ContainerSnapshot before = snapshot(ItemID.BULLSEYE_LANTERN_UNLIT, ItemID.SLAYER_HERB_SACK, ItemID.SHARK);
+        ContainerSnapshot after = snapshot(ItemID.BULLSEYE_LANTERN_LIT, ItemID.SLAYER_HERB_SACK_OPEN, ItemID.SHARK);
         assertEquals(before, after);
         assertEquals("the engine sees no change to book", Map.of(), after.diff(before));
         assertEquals("ordinary items keep their id", ItemID.SHARK,
             new ContainerSnapshotFactory(null, null).canonical(ItemID.SHARK));
     }
 
-    private static Cc snapshot(int... ids)
+    private static ContainerSnapshot snapshot(int... ids)
     {
         Item[] items = new Item[ids.length];
         for (int i = 0; i < ids.length; i++)

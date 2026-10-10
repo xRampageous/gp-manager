@@ -49,15 +49,14 @@ public class MarketReceiptDetailTest
         assertTrue(texts.contains("Previously counted"));
         assertTrue(texts.contains(Fmt.exact(3_150L) + " gp"));
         assertTrue(texts.contains("Result"));
-        assertTrue(texts.contains(Fmt.ru(-90L) + " gp"));
-        assertTrue(texts.contains("GE difference"));
-        assertTrue(texts.contains(Fmt.ru(-30L) + " gp"));
+        assertTrue(texts.contains(Fmt.exactSigned(-90L) + " gp"));
+        assertFalse(texts.contains("GE difference"));
         assertFalse("the full proof is not repeated in the main receipt",
             texts.contains("Gross sale"));
         assertFalse(texts.contains("GE tax (inferred)"));
         assertFalse(texts.contains("GE reference"));
         String sold = "Sold \u00b7 " + Fmt.age(Math.max(0L, market.now + 1_000L
-            - market.engine.ub().get(0).settlementAtEpochMillis));
+            - market.engine.marketRows().get(0).settlementAtEpochMillis));
         assertTrue("the settlement-relative age is shown", texts.stream().anyMatch(text -> text.contains(sold)));
         assertFalse("a full fill needs no fill-state row", texts.contains("Filled 30 / 30"));
         assertFalse("the generic WHY is suppressed for a clean realized trade",
@@ -88,9 +87,8 @@ public class MarketReceiptDetailTest
         assertTrue(texts.contains("Previously counted") && texts.contains("Unknown"));
         assertTrue(texts.contains("Result") && texts.contains("\u2014"));
         assertTrue("the booked proven tax is the answer row, not the full proof",
-            texts.contains("GE tax") && texts.contains(Fmt.ru(-200L) + " gp"));
-        assertTrue(texts.contains("GE difference")
-            && texts.contains(Fmt.ru(100L) + " gp"));
+            texts.contains("GE tax") && texts.contains(Fmt.exactSigned(-200L) + " gp"));
+        assertFalse(texts.contains("GE difference"));
         assertFalse("the main receipt never repeats the full proof",
             texts.contains("Gross sale")
                 || texts.contains("GE reference") || texts.contains("Net reference"));
@@ -109,13 +107,12 @@ public class MarketReceiptDetailTest
         assertTrue(texts.contains("Spent"));
         assertTrue(texts.contains(Fmt.exact(3_060L) + " gp"));
         assertTrue(texts.contains("Tracked value"));
-        assertTrue(texts.contains("GE reference"));
-        assertTrue(texts.contains("105 gp ea"));
-        assertTrue(texts.contains("GE difference"));
+        assertFalse(texts.contains("GE reference"));
+        assertFalse(texts.contains("GE difference"));
         assertTrue(texts.contains("Result"));
         assertFalse("current BUY semantics have no adjustment", texts.contains("Adjustment"));
         String bought = "Bought \u00b7 " + Fmt.age(Math.max(0L, market.now + 1_000L
-            - market.engine.ub().get(0).settlementAtEpochMillis));
+            - market.engine.marketRows().get(0).settlementAtEpochMillis));
         assertTrue("the BUY age is settlement-relative", texts.stream().anyMatch(text -> text.contains(bought)));
     }
 
@@ -132,7 +129,7 @@ public class MarketReceiptDetailTest
         assertTrue(texts.contains("Received each"));
         assertTrue(texts.contains("Result"));
         assertFalse(texts.contains("GE reference"));
-        assertTrue(texts.contains("GE difference"));
+        assertFalse(texts.contains("GE difference"));
     }
 
     // ── quantity scope, stored basis, rounding, reconciliation ────────────────────────────────
@@ -140,8 +137,8 @@ public class MarketReceiptDetailTest
     @Test
     public void filledMoreThanCollectedUsesCollectedScopeForEveryFinancialLine()
     {
-        Bi.Row row = syntheticRow(200L, 50L, 5_000L, 30L, 3_120L, 3_060L, 105L);
-        List<String> lines = Dc.zs(row, false);
+        MarketRows.Row row = syntheticRow(200L, 50L, 5_000L, 30L, 3_120L, 3_060L, 105L);
+        List<String> lines = MarketText.humanLines(row, false);
 
         assertEquals(30L, row.settledQty);
         assertEquals("realized gross is settlement minus adjustment", 3_120L,
@@ -152,41 +149,39 @@ public class MarketReceiptDetailTest
         assertTrue(lines.contains("Filled 50 / 200 \u00b7 collected 30"));
         assertTrue(lines.contains("Received|" + Fmt.exact(3_060L) + " gp"));
         assertTrue(lines.contains("Received each|" + Fmt.exact(102L) + " gp"));
-        assertTrue(lines.contains("Result|" + Fmt.ru(-90L) + " gp"));
+        assertTrue(lines.contains("Result|" + Fmt.exactSigned(-90L) + " gp"));
         assertFalse("the aggregate 5,000 / 50 unit price must never appear",
             lines.contains("GE reference|100 gp ea"));
         assertFalse("the gross proof never shows",
             lines.stream().anyMatch(line -> line.startsWith("Gross sale")));
         assertFalse("a realized receipt never shows Acquired at", lines.contains("Acquired at"));
-        assertEquals("the tax-adjusted reference uses the collected scope, never a gross aggregate",
-            Fmt.exact(3_090L), Fmt.exact(row.geReferenceGp));
-        assertEquals("the aggregate 5,000 / 50 reference must never be used",
-            3_090L, row.geReferenceGp);
+        assertFalse("GE reference lines are gone",
+            lines.stream().anyMatch(line -> line.startsWith("GE reference")));
     }
 
     @Test
     public void exactDivisionRendersWithoutApproximationMarker()
     {
-        Bi.Row row = syntheticRow(30L, 30L, 3_120L, 30L, 3_120L, 3_060L, 105L);
-        List<String> lines = Dc.zs(row, false);
+        MarketRows.Row row = syntheticRow(30L, 30L, 3_120L, 30L, 3_120L, 3_060L, 105L);
+        List<String> lines = MarketText.humanLines(row, false);
         assertTrue(lines.contains("Received each|" + Fmt.exact(102L) + " gp"));
-        assertTrue(lines.contains("GE difference|" + Fmt.ru(-30L) + " gp"));
+        assertFalse(lines.stream().anyMatch(line -> line.startsWith("GE difference")));
     }
 
     @Test
     public void sapphireTaxBreakdownUsesObservedCashOnlyOnce()
     {
-        Bi.Row row = syntheticRow(26L, 26L, 5_460L,
+        MarketRows.Row row = syntheticRow(26L, 26L, 5_460L,
             26L, 5_460L, 5_356L, 207L);
-        List<String> lines = Dc.zs(row, false);
+        List<String> lines = MarketText.humanLines(row, false);
 
         assertEquals(104L, row.inferredGeTaxGp);
         assertEquals("5,356 / 26 is exactly 206", 206L, row.receivedEachGp);
         assertTrue(lines.contains("Received|5,356 gp"));
         assertTrue(lines.contains("Received each|206 gp"));
-        assertTrue(lines.contains("GE difference|" + Fmt.ru(78L) + " gp"));
+        assertFalse(lines.stream().anyMatch(line -> line.startsWith("GE difference")));
         assertFalse("tax is not added as another financial cost",
-            lines.contains("Adjustment|" + Fmt.ru(-104L) + " gp"));
+            lines.contains("Adjustment|" + Fmt.exactSigned(-104L) + " gp"));
         assertFalse("the gross-to-net proof is not repeated in the main receipt",
             lines.stream().anyMatch(line -> line.startsWith("Gross sale")));
         assertFalse(lines.stream().anyMatch(line -> line.startsWith("GE tax")));
@@ -196,49 +191,46 @@ public class MarketReceiptDetailTest
     @Test
     public void unexplainedGrossToCashGapRemainsAdjustment()
     {
-        Bi.Row row = syntheticRow(26L, 26L, 5_460L,
+        MarketRows.Row row = syntheticRow(26L, 26L, 5_460L,
             26L, 5_460L, 5_355L, 207L);
-        List<String> lines = Dc.zs(row, false);
+        List<String> lines = MarketText.humanLines(row, false);
 
         assertEquals(0L, row.inferredGeTaxGp);
-        assertTrue(lines.contains("Adjustment|" + Fmt.ru(-105L) + " gp"));
+        assertTrue(lines.contains("Adjustment|" + Fmt.exactSigned(-105L) + " gp"));
         assertFalse(lines.stream().anyMatch(line -> line.startsWith("GE tax")));
     }
 
     @Test
     public void nonEvenDivisionKeepsTheExactCollectedScopeValues()
     {
-        Bi.Row row = syntheticRow(30L, 30L, 3_121L, 30L, 3_121L, 3_061L, 105L);
-        List<String> lines = Dc.zs(row, false);
+        MarketRows.Row row = syntheticRow(30L, 30L, 3_121L, 30L, 3_121L, 3_061L, 105L);
+        List<String> lines = MarketText.humanLines(row, false);
         assertTrue(lines.contains("Received|" + Fmt.exact(3_061L) + " gp"));
         assertFalse("a non-integral actual unit value is never silently rounded",
             lines.stream().anyMatch(line -> line.startsWith("Received each")));
-        assertEquals("the exact tax-adjusted reference aggregate stays available",
-            Fmt.exact(105L * 30L - 60L) + " gp across " + Fmt.exact(row.settledQty) + " collected",
-            Fmt.exact(row.geReferenceGp) + " gp across " + Fmt.exact(row.settledQty)
-                + " collected");
-        assertTrue(lines.contains("GE difference|" + Fmt.ru(3_061L - 3_090L) + " gp"));
+        assertFalse("GE difference lines are gone",
+            lines.stream().anyMatch(line -> line.startsWith("GE difference")));
     }
 
     @Test
-    public void approximateUnitPriceKeepsTheExactAggregateInTheRenderedTooltip() throws Exception
+    public void approximateUnitPriceShowsOnlyTheExactReceivedTotal() throws Exception
     {
         Market market = new Market();
         market.sell(0, CHAOS, 30L, 104, 3_121L, 3_061L);
         LedgerPage page = openExactReceipt(market, receipt -> receipt.itemId == CHAOS);
+        List<String> texts = LedgerPageProbe.detailTexts(page);
 
-        assertTrue("the exact tax-adjusted reference aggregate stays reachable in the tooltip",
-            LedgerPageProbe.detailTooltips(page).stream().anyMatch(tip ->
-                tip.contains("3,090 gp across 30 collected")));
-        assertTrue(LedgerPageProbe.detailTexts(page).contains("GE difference"));
+        assertTrue(texts.contains("Received") && texts.contains(Fmt.exact(3_061L) + " gp"));
+        assertFalse("a non-integral unit value is never rendered", texts.contains("Received each"));
+        assertFalse(texts.contains("GE difference"));
     }
 
     @Test
     public void basisUnavailableOmitsTheReferenceAndUnavailableResultNeverRendersFakeZero()
     {
-        Aa record = syntheticRecord(30L, 30L, 3_120L, 30L, 3_120L, 3_060L, 0L, "");
-        Bi.Row row = MarketFacts.row(record);
-        List<String> lines = Dc.zs(row, false);
+        GeOffer record = syntheticRecord(30L, 30L, 3_120L, 30L, 3_120L, 3_060L, 0L, "");
+        MarketRows.Row row = MarketFacts.row(record);
+        List<String> lines = MarketText.humanLines(row, false);
 
         assertTrue("no fabricated GE reference without a stored unit basis",
             lines.stream().noneMatch(line -> line.startsWith("GE reference|")));
@@ -252,12 +244,12 @@ public class MarketReceiptDetailTest
     {
         Market market = new Market();
         market.sellUnknown(0, CHAOS, 15L, 12, 180L);
-        Ao data = captureWithGroup(market, groupIdOf(market));
-        Bi.Row row = market.engine.ub().get(0);
-        assertEquals(Bi.Coverage.FULLY_UNKNOWN, row.coverage);
-        assertTrue(Dc.zs(row, false).contains("Received|180 gp"));
-        assertTrue(Dc.zs(row, false).contains("Result|\u2014"));
-        for (Br.Receipt receipt : data.detail.receipts)
+        LedgerData data = captureWithGroup(market, groupIdOf(market));
+        MarketRows.Row row = market.engine.marketRows().get(0);
+        assertEquals(MarketRows.Coverage.FULLY_UNKNOWN, row.coverage);
+        assertTrue(MarketText.humanLines(row, false).contains("Received|180 gp"));
+        assertTrue(MarketText.humanLines(row, false).contains("Result|\u2014"));
+        for (Semantics.Receipt receipt : data.detail.receipts)
         {
             if (receipt.marketSettlement != null)
             {
@@ -275,22 +267,22 @@ public class MarketReceiptDetailTest
     {
         Market market = new Market();
         market.sellUnknown(0, CHAOS, 15L, 12, 180L);
-        String settlementId = market.engine.ub().get(0).settlementId;
-        assertTrue(market.engine.qi(settlementId, Ah.REVENUE,
+        String settlementId = market.engine.marketRows().get(0).settlementId;
+        assertTrue(market.engine.correctTransaction(settlementId, Correction.REVENUE,
             market.now, "owner decision"));
 
-        Bi.Row row = market.engine.ub().get(0);
-        List<String> lines = Dc.zs(row, true);
+        MarketRows.Row row = market.engine.marketRows().get(0);
+        List<String> lines = MarketText.humanLines(row, true);
         assertTrue(row.manualFinancialResult);
         assertTrue(lines.contains("Previously counted|Unknown"));
-        assertTrue(lines.contains("Result|" + Fmt.ru(row.realizedResultGp)
+        assertTrue(lines.contains("Result|" + Fmt.exactSigned(row.realizedResultGp)
             + " gp \u00b7 Corrected"));
     }
 
     @Test
     public void fullSellReconcilesExactlyOverTheCollectedQuantity()
     {
-        Bi.Row row = syntheticRow(30L, 30L, 3_120L, 30L, 3_120L, 3_060L, 105L);
+        MarketRows.Row row = syntheticRow(30L, 30L, 3_120L, 30L, 3_120L, 3_060L, 105L);
         assertEquals("tracked basis consumed + Result == observed settlement",
             row.observedSettlementGp,
             row.trackedBasisConsumedGp + row.realizedResultGp);
@@ -304,18 +296,18 @@ public class MarketReceiptDetailTest
     {
         Market market = new Market();
         market.sell(0, CHAOS, 30L, 104, 3_120L, 3_060L);
-        String settlementId = market.engine.ub().get(0).settlementId;
-        market.engine.qi(settlementId, Ah.IGNORE, market.now, "test");
+        String settlementId = market.engine.marketRows().get(0).settlementId;
+        market.engine.correctTransaction(settlementId, Correction.IGNORE, market.now, "test");
 
         LedgerPage page = openExactReceipt(market, receipt -> receipt.itemId == CHAOS);
         List<String> texts = LedgerPageProbe.detailTexts(page);
 
         assertTrue("the corrected canonical result is shown",
-            texts.contains(Fmt.ru(0L) + " gp \u00b7 Corrected"));
+            texts.contains(Fmt.exactSigned(0L) + " gp \u00b7 Corrected"));
         assertTrue("proven evidence is not rewritten to force reconciliation",
             texts.contains("Received") && texts.contains(Fmt.exact(3_060L) + " gp"));
         assertTrue(texts.contains("Received each") && texts.contains("102 gp"));
-        assertTrue(texts.contains("GE difference"));
+        assertFalse(texts.contains("GE difference"));
         assertFalse("the proof is not duplicated in the main receipt",
             texts.contains("Gross sale") || texts.contains("GE tax"));
         assertTrue(LedgerPageProbe.detailTooltips(page).contains("Result includes a manual correction."));
@@ -348,8 +340,8 @@ public class MarketReceiptDetailTest
     {
         Market market = new Market();
         market.sellAfterDelay(0, CHAOS, 30L, 104, 3_120L, 3_060L, 60 * 60_000L);
-        Ao data = captureWithGroup(market, groupIdOf(market));
-        Bi.Row row = data.zu(data.detail.group.marketPresentationId);
+        LedgerData data = captureWithGroup(market, groupIdOf(market));
+        MarketRows.Row row = data.marketRow(data.detail.group.marketPresentationId);
         assertNotNull(row);
         assertTrue("settlement time is retained by the read model", row.settlementAtEpochMillis > 0L);
         assertTrue("placement and settlement are materially apart",
@@ -371,19 +363,19 @@ public class MarketReceiptDetailTest
     {
         Market market = new Market();
         market.pendingSell(0, CHAOS, 200L, 104);
-        Ao data = Ao.capture(market.engine, market.now + 1_000L,
-            Ao.Entry.current());
-        Br.Group group = marketGroup(data);
+        LedgerData data = LedgerData.capture(market.engine, market.now + 1_000L,
+            LedgerData.Entry.current());
+        Semantics.Group group = marketGroup(data);
         assertNotNull(group);
         assertFalse("pending stays incomplete coverage",
-            group.coverage == Br.Coverage.COMPLETE);
+            group.coverage == Semantics.Coverage.COMPLETE);
 
-        Ao grouped = captureWithGroup(market, group.semanticGroupId);
+        LedgerData grouped = captureWithGroup(market, group.semanticGroupId);
         assertTrue("no settlement receipt exists before collection", grouped.detail.receipts.isEmpty());
-        Bi.Row row = grouped.zu(group.marketPresentationId);
+        MarketRows.Row row = grouped.marketRow(group.marketPresentationId);
         assertNotNull(row);
         assertEquals("the human Market block shows only the fill state",
-            Collections.singletonList("Filled 0 / 200"), Dc.zs(row, false));
+            Collections.singletonList("Filled 0 / 200"), MarketText.humanLines(row, false));
     }
 
     // ── disclosure / selected-group total ──────────────────────────────────────────────────────
@@ -396,12 +388,12 @@ public class MarketReceiptDetailTest
         market.sell(0, CHAOS, 50L, 2_802, 133_450L, 130_800L);
         LedgerPage page = openExactReceipt(market, receipt -> receipt.itemId == CHAOS);
 
-        List<String> lines = Dc.zs(
-            market.engine.ub().get(0), false);
+        List<String> lines = MarketText.humanLines(
+            market.engine.marketRows().get(0), false);
         assertTrue(lines.contains("Received|130,800 gp"));
         assertTrue("130,800 / 50 is exactly 2,616", lines.contains("Received each|2,616 gp"));
         assertTrue(lines.contains("Previously counted|140,100 gp"));
-        assertTrue(lines.contains("GE difference|" + Fmt.ru(-6_500L) + " gp"));
+        assertFalse(lines.stream().anyMatch(line -> line.startsWith("GE difference")));
         assertFalse("the main receipt never repeats the full cash/reference proof",
             lines.stream().anyMatch(line -> line.startsWith("Gross sale")));
         assertFalse(lines.stream().anyMatch(line -> line.startsWith("GE tax")));
@@ -412,14 +404,14 @@ public class MarketReceiptDetailTest
     public void redundantSelectedGroupTotalIsHiddenForASingleReceiptGroup() throws Exception
     {
         Market market = new Market();
-        market.engine.getActiveSession().kf(new Ac(market.now - 5_000L, null,
-            Ai.GAIN, Aj.GENERIC, "", "Chaos rune", true,
-            Collections.singletonList(new Ab(CHAOS, "Chaos rune", 1L, 105, 105L)),
-            Bd.CONFIRMED, "", null), 100);
-        Ao base = Ao.capture(market.engine, market.now + 1_000L,
-            Ao.Entry.current());
-        Br.Group gain = null;
-        for (Br.Group group : base.gains.groups)
+        market.engine.getActiveSession().addTransaction(new Transaction(market.now - 5_000L,
+            TransactionType.GAIN, Context.GENERIC, "", "Chaos rune", true,
+            Collections.singletonList(new Flow(CHAOS, "Chaos rune", 1L, 105, 105L)),
+            Confidence.CONFIRMED, "", null), 100);
+        LedgerData base = LedgerData.capture(market.engine, market.now + 1_000L,
+            LedgerData.Entry.current());
+        Semantics.Group gain = null;
+        for (Semantics.Group group : base.gains.groups)
         {
             if (group.primaryName.equals("Chaos rune"))
             {
@@ -434,10 +426,10 @@ public class MarketReceiptDetailTest
     @Test
     public void noAcquiredAtLabelExistsInTheMarketReceiptPath()
     {
-        assertTrue(Dc.zs(
+        assertTrue(MarketText.humanLines(
             syntheticRow(30L, 30L, 3_120L, 30L, 3_120L, 3_060L, 105L), false)
             .stream().noneMatch(line -> line.startsWith("Acquired at")));
-        assertFalse(Dc.zs(
+        assertFalse(MarketText.humanLines(
             syntheticRow(200L, 50L, 5_000L, 30L, 3_120L, 3_060L, 105L), false)
             .stream().anyMatch(line -> line.contains("Acquired")));
     }
@@ -445,35 +437,32 @@ public class MarketReceiptDetailTest
     @Test
     public void orderStateLabelsMatchTheAcceptedWording()
     {
-        Aa pending = syntheticRecord(11L, 0L, 0L, 0L, 0L, 0L, 0L, "");
+        GeOffer pending = syntheticRecord(11L, 0L, 0L, 0L, 0L, 0L, 0L, "");
         assertEquals("Offering",
-            Dc.acp(MarketFacts.row(pending)));
+            MarketText.orderStateText(MarketFacts.row(pending)));
 
-        Aa partial = syntheticRecord(11L, 5L, 35L, 0L, 0L, 0L, 0L, "");
+        GeOffer partial = syntheticRecord(11L, 5L, 35L, 0L, 0L, 0L, 0L, "");
         assertEquals("Part sold 5/11 \u00b7 Pending",
-            Dc.acp(MarketFacts.row(partial)));
+            MarketText.orderStateText(MarketFacts.row(partial)));
 
-        Aa canceled = syntheticRecord(11L, 0L, 0L, 0L, 0L, 0L, 0L, "");
+        GeOffer canceled = syntheticRecord(11L, 0L, 0L, 0L, 0L, 0L, 0L, "");
         canceled.setOfferState("CANCELLED_SELL");
         canceled.setReturnedQty(11L);
         assertEquals("Returned \u00b7 Canceled",
-            Dc.acp(MarketFacts.row(canceled)));
+            MarketText.orderStateText(MarketFacts.row(canceled)));
     }
 
     @Test
     public void unknownBankStockKeepsResultUnavailable()
     {
-        Aa record = syntheticRecord(50L, 50L, 133_450L, 50L, 133_450L,
+        GeOffer record = syntheticRecord(50L, 50L, 133_450L, 50L, 133_450L,
             130_800L, 2_802L, "GRAND_EXCHANGE");
         record.setConsumedTrackedQty(0L);
         record.setConsumedTrackedBasisGp(0L);
-        Bi.Row row = MarketFacts.row(record);
+        MarketRows.Row row = MarketFacts.row(record);
 
-        assertEquals(Bi.Coverage.FULLY_UNKNOWN, row.coverage);
-        assertEquals("the frozen reference still supports a tax-adjusted comparison",
-            137_300L, row.geReferenceGp);
-        assertEquals(-6_500L, row.geDifferenceGp);
-        List<String> lines = Dc.zs(row, false);
+        assertEquals(MarketRows.Coverage.FULLY_UNKNOWN, row.coverage);
+        List<String> lines = MarketText.humanLines(row, false);
         assertTrue(lines.contains("Previously counted|Unknown"));
         assertTrue(lines.contains("Result|\u2014"));
         assertFalse(lines.contains("Result|0 gp"));
@@ -484,7 +473,7 @@ public class MarketReceiptDetailTest
     {
         Market market = new Market();
         market.sell(0, CHAOS, 30L, 104, 3_120L, 3_060L);
-        Ac settlement = market.engine.getActiveSession().getTransactions().get(0);
+        Transaction settlement = market.engine.getActiveSession().getTransactions().get(0);
         long netBefore = market.engine.getMetrics(market.now).net;
         long transactionBefore = settlement.getNet();
 
@@ -493,33 +482,33 @@ public class MarketReceiptDetailTest
         assertEquals(netBefore, market.engine.getMetrics(market.now).net);
         assertEquals(transactionBefore, settlement.getNet());
         assertEquals("the frozen basis is untouched by reading the human receipt", 105L,
-            market.engine.ub().get(0).basisUnitPrice);
+            market.engine.marketRows().get(0).basisUnitPrice);
     }
 
     @Test
     public void schemaAndValuationPolicyRemainUntouched()
     {
-        assertEquals(108, SavedState.CURRENT_SCHEMA_VERSION);
-        assertEquals("RuneLite market", Av.GRAND_EXCHANGE.toString());
+        assertEquals(109, SavedState.CURRENT_SCHEMA_VERSION);
+        assertEquals("RuneLite market", PriceSource.GRAND_EXCHANGE.toString());
     }
 
     // ── fixtures ───────────────────────────────────────────────────────────────────────────────
 
-    private static Bi.Row syntheticRow(long offered, long filled, long spent,
+    private static MarketRows.Row syntheticRow(long offered, long filled, long spent,
         long settled, long settledExecution, long settledCash, long basisUnitPrice)
     {
-        return Bi.rows(Collections.singletonList(syntheticRecord(offered, filled,
+        return MarketRows.rows(Collections.singletonList(syntheticRecord(offered, filled,
             spent, settled, settledExecution, settledCash, basisUnitPrice, "GRAND_EXCHANGE")),
             id -> syntheticSettlement(settledCash, basisUnitPrice * settled), null).get(0);
     }
 
-    private static Aa syntheticRecord(long offered, long filled, long spent, long settled,
+    private static GeOffer syntheticRecord(long offered, long filled, long spent, long settled,
         long settledExecution, long settledCash, long basisUnitPrice, String basisSource)
     {
-        Aa record = new Aa("offer-1", 0, Aa.Side.SELL, CHAOS,
+        GeOffer record = new GeOffer("offer-1", 0, GeOffer.Side.SELL, CHAOS,
             "Chaos rune", offered, 104L, T0, "session");
-        record.setStage(Aa.Stage.OPEN);
-        record.setConfidence(Aa.Confidence.CONFIRMED);
+        record.setStage(GeOffer.Stage.OPEN);
+        record.setConfidence(GeOffer.CustodyConfidence.CONFIRMED);
         record.setCapturedQty(offered);
         record.setFilledQty(filled);
         record.setSpentGp(spent);
@@ -532,7 +521,7 @@ public class MarketReceiptDetailTest
         if (basisUnitPrice > 0L && !basisSource.isEmpty())
         {
             record.setBasisUnitPrice(basisUnitPrice);
-            record.setBasisSource(basisSource);
+            record.setBasisSource(PriceSource.valueOf(basisSource));
             record.setBasisCapturedAtEpochMillis(T0);
         }
         record.setSettlementId("settlement-1");
@@ -540,54 +529,54 @@ public class MarketReceiptDetailTest
     }
 
     /** A correction-aware canonical settlement with the exact realized result. */
-    private static Ac syntheticSettlement(long cash, long basis)
+    private static Transaction syntheticSettlement(long cash, long basis)
     {
-        return new Ac(T0 + 60_000L, null, Ai.TRADE,
-            Aj.MARKET, "Grand Exchange", "Market", true,
+        return new Transaction(T0 + 60_000L, TransactionType.TRADE,
+            Context.MARKET, "Grand Exchange", "Market", true,
             java.util.Arrays.asList(
-                new Ab(CHAOS, "Chaos rune", -30L, (int) (basis / 30L), -basis,
-                    Av.GRAND_EXCHANGE),
-                new Ab(COINS, "Coins", cash, 1, cash, Av.FACE_VALUE)),
-            Bd.CONFIRMED, "", null);
+                new Flow(CHAOS, "Chaos rune", -30L, (int) (basis / 30L), -basis,
+                    PriceSource.GRAND_EXCHANGE),
+                new Flow(COINS, "Coins", cash, 1, cash, PriceSource.FACE_VALUE)),
+            Confidence.CONFIRMED, "", null);
     }
 
     private static final class Market
     {
         final int[] quote = {105};
-        final Am engine;
-        final Bj ledger = new Bj();
+        final Engine engine;
+        final OfferSlots ledger = new OfferSlots();
         final Map<Integer, Long> inventory = new HashMap<>();
         long now = T0;
 
         Market()
         {
-            engine = new Am(deltas ->
+            engine = new Engine(deltas ->
             {
-                List<Ab> flows = new ArrayList<>();
+                List<Flow> flows = new ArrayList<>();
                 for (Map.Entry<Integer, Long> delta : deltas.entrySet())
                 {
                     int id = delta.getKey();
                     int unit = id == COINS ? 1 : quote[0];
-                    Av source = id == COINS ? Av.FACE_VALUE
-                        : Av.GRAND_EXCHANGE;
-                    flows.add(new Ab(id, id == COINS ? "Coins" : "Chaos rune", delta.getValue(),
+                    PriceSource source = id == COINS ? PriceSource.FACE_VALUE
+                        : PriceSource.GRAND_EXCHANGE;
+                    flows.add(new Flow(id, id == COINS ? "Coins" : "Chaos rune", delta.getValue(),
                         unit, delta.getValue() * unit, source));
                 }
                 return flows;
             }, new TransactionClassifier(), new GpManagerConfig()
             {
-                @Override public Db receiptRetentionDays()
+                @Override public Retention receiptRetentionDays()
                 {
-                    return Db.DAYS_365;
+                    return Retention.DAYS_365;
                 }
                 @Override public boolean keepTransferAuditRows()
                 {
                     return true;
                 }
             });
-            engine.ajl("Trading", Cx.AUTO, now);
+            engine.startCustom("Trading", now);
             inventory.put(COINS, 1_000_000L);
-            engine.setBaseline(new Cc(inventory));
+            engine.setBaseline(new ContainerSnapshot(inventory));
         }
 
         int[] quote()
@@ -603,7 +592,7 @@ public class MarketReceiptDetailTest
         void sellUnknown(int slot, int item, long qty, int limit, long cash)
         {
             inventory.put(item, qty);
-            engine.setBaseline(new Cc(inventory));
+            engine.setBaseline(new ContainerSnapshot(inventory));
             offer(slot, GrandExchangeOfferState.SELLING, item, (int) qty, 0, limit, 0);
             inventory.remove(item);
             settle();
@@ -617,7 +606,7 @@ public class MarketReceiptDetailTest
         void sellUnknownGross(int slot, int item, long qty, int limit, long spent, long cash)
         {
             inventory.put(item, qty);
-            engine.setBaseline(new Cc(inventory));
+            engine.setBaseline(new ContainerSnapshot(inventory));
             offer(slot, GrandExchangeOfferState.SELLING, item, (int) qty, 0, limit, 0);
             inventory.remove(item);
             settle();
@@ -641,13 +630,13 @@ public class MarketReceiptDetailTest
         {
             // Known coverage at the listing reference, so the receipt's known-basis Result is the
             // exact reference-versus-cash comparison these receipt tests assert.
-            engine.getActiveSession().kf(new Ac(now - 1_000L, null,
-                Ai.GAIN, Aj.GENERIC, "", "Chaos rune", true,
-                Collections.singletonList(new Ab(item, "Chaos rune", filled, quote[0],
-                    filled * quote[0], Av.GRAND_EXCHANGE)),
-                Bd.CONFIRMED, "", null), 500);
+            engine.getActiveSession().addTransaction(new Transaction(now - 1_000L,
+                TransactionType.GAIN, Context.GENERIC, "", "Chaos rune", true,
+                Collections.singletonList(new Flow(item, "Chaos rune", filled, quote[0],
+                    filled * quote[0], PriceSource.GRAND_EXCHANGE)),
+                Confidence.CONFIRMED, "", null), 500);
             inventory.put(item, offered);
-            engine.setBaseline(new Cc(inventory));
+            engine.setBaseline(new ContainerSnapshot(inventory));
             offer(slot, GrandExchangeOfferState.SELLING, item, (int) offered, 0, limit, 0);
             inventory.remove(item);
             settle();
@@ -670,7 +659,7 @@ public class MarketReceiptDetailTest
         void pendingSell(int slot, int item, long offered, int limit)
         {
             inventory.put(item, offered);
-            engine.setBaseline(new Cc(inventory));
+            engine.setBaseline(new ContainerSnapshot(inventory));
             offer(slot, GrandExchangeOfferState.SELLING, item, (int) offered, 0, limit, 0);
             inventory.remove(item);
             settle();
@@ -679,11 +668,11 @@ public class MarketReceiptDetailTest
         private void settle()
         {
             now += 5_000L;
-            engine.yz();
-            Cc snapshot = new Cc(inventory);
+            engine.markDirty();
+            ContainerSnapshot snapshot = new ContainerSnapshot(inventory);
             for (int i = 0; i < 3; i++)
             {
-                engine.adj(snapshot, now);
+                engine.processIfDirty(snapshot, now);
                 now += 5_000L;
             }
         }
@@ -692,28 +681,28 @@ public class MarketReceiptDetailTest
             int price, int spent)
         {
             now += 5_000L;
-            Bj.Transition transition = ledger.observe(
-                new Bj.Snapshot(slot, state, item, total, traded, price, spent)).orElse(null);
+            OfferSlots.Transition transition = ledger.observe(
+                new OfferSlots.Snapshot(slot, state, item, total, traded, price, spent)).orElse(null);
             if (transition != null)
             {
-                engine.abh(transition, "Chaos rune", now);
+                engine.noteGeOffer(transition, "Chaos rune", now);
             }
         }
     }
 
     private static String groupIdOf(Market market)
     {
-        Ao data = Ao.capture(market.engine, market.now + 1_000L,
-            Ao.Entry.current());
-        Br.Group group = marketGroup(data);
+        LedgerData data = LedgerData.capture(market.engine, market.now + 1_000L,
+            LedgerData.Entry.current());
+        Semantics.Group group = marketGroup(data);
         assertNotNull(group);
         return group.semanticGroupId;
     }
 
     @Nullable
-    private static Br.Group marketGroup(Ao data)
+    private static Semantics.Group marketGroup(LedgerData data)
     {
-        for (Br.Group group : data.market.groups)
+        for (Semantics.Group group : data.market.groups)
         {
             if (group.market)
             {
@@ -723,21 +712,21 @@ public class MarketReceiptDetailTest
         return null;
     }
 
-    private static Ao captureWithGroup(Market market, String groupId)
+    private static LedgerData captureWithGroup(Market market, String groupId)
     {
-        Ao data = Ao.capture(market.engine, market.now + 1_000L,
-            new Ao.Entry(Ao.Scope.CURRENT_GRIND, null, null,
-                Ao.Bs.SUPPLIES, "", null, null, groupId, null));
+        LedgerData data = LedgerData.capture(market.engine, market.now + 1_000L,
+            new LedgerData.Entry(LedgerData.Scope.CURRENT_GRIND, null, null,
+                LedgerData.CostView.SUPPLIES, "", null, null, groupId, null));
         assertNotNull(data.detail);
         return data;
     }
 
     private static LedgerPage openExactReceipt(Market market,
-        java.util.function.Predicate<Br.Receipt> pick) throws Exception
+        java.util.function.Predicate<Semantics.Receipt> pick) throws Exception
     {
-        Ao grouped = captureWithGroup(market, groupIdOf(market));
-        Br.Receipt receipt = null;
-        for (Br.Receipt candidate : grouped.detail.receipts)
+        LedgerData grouped = captureWithGroup(market, groupIdOf(market));
+        Semantics.Receipt receipt = null;
+        for (Semantics.Receipt candidate : grouped.detail.receipts)
         {
             if (pick.test(candidate))
             {
@@ -748,16 +737,16 @@ public class MarketReceiptDetailTest
         if (receipt == null)
         {
             StringBuilder dump = new StringBuilder("no receipt matched: ");
-            for (Br.Receipt candidate : grouped.detail.receipts)
+            for (Semantics.Receipt candidate : grouped.detail.receipts)
             {
                 dump.append('[').append(candidate.itemId).append(':').append(candidate.itemName)
                     .append(':').append(candidate.category).append("] ");
             }
             throw new AssertionError(dump.toString());
         }
-        Ao data = Ao.capture(market.engine, market.now + 1_000L,
-            new Ao.Entry(Ao.Scope.CURRENT_GRIND, null, null,
-                Ao.Bs.SUPPLIES, "", receipt.transactionId, receipt.contributionId,
+        LedgerData data = LedgerData.capture(market.engine, market.now + 1_000L,
+            new LedgerData.Entry(LedgerData.Scope.CURRENT_GRIND, null, null,
+                LedgerData.CostView.SUPPLIES, "", receipt.transactionId, receipt.contributionId,
                 grouped.detail.group.semanticGroupId, null));
         assertNotNull(data.detail);
         assertNotNull(data.detail.exact);
@@ -772,12 +761,12 @@ public class MarketReceiptDetailTest
     private static LedgerPage openExactReceiptForGroup(Market market, String groupId)
         throws Exception
     {
-        Ao grouped = captureWithGroup(market, groupId);
+        LedgerData grouped = captureWithGroup(market, groupId);
         assertFalse(grouped.detail.receipts.isEmpty());
-        Br.Receipt receipt = grouped.detail.receipts.get(0);
-        Ao data = Ao.capture(market.engine, market.now + 1_000L,
-            new Ao.Entry(Ao.Scope.CURRENT_GRIND, null, null,
-                Ao.Bs.SUPPLIES, "", receipt.transactionId, receipt.contributionId,
+        Semantics.Receipt receipt = grouped.detail.receipts.get(0);
+        LedgerData data = LedgerData.capture(market.engine, market.now + 1_000L,
+            new LedgerData.Entry(LedgerData.Scope.CURRENT_GRIND, null, null,
+                LedgerData.CostView.SUPPLIES, "", receipt.transactionId, receipt.contributionId,
                 groupId, null));
         return onEdt(() ->
         {
@@ -812,21 +801,20 @@ public class MarketReceiptDetailTest
     private static final class LedgerNoop implements LedgerPage.Actions
     {
         @Override public void openScopeMenu(javax.swing.JComponent anchor) { }
-        @Override public void costViewChanged(Ao.Bs view) { }
+        @Override public void costViewChanged(LedgerData.CostView view) { }
         @Override public void searchChanged(String text) { }
-        @Override public Ao.Ef preview(String id,
-            Ah correction)
+        @Override public LedgerData.CorrectionPreview preview(String id,
+            Correction correction)
         {
             return null;
         }
-        @Override public LedgerPage.Ea correct(String id,
-            Ah correction, long previewRevision)
+        @Override public LedgerPage.CorrectionOutcome correct(String id,
+            Correction correction, long previewRevision)
         {
-            return LedgerPage.Ea.REFUSED;
+            return LedgerPage.CorrectionOutcome.REFUSED;
         }
-        @Override public void split(String id, java.util.function.BiConsumer<long[], Ao.Ef> previewed) { }
+        @Override public void split(String id, java.util.function.BiConsumer<long[], LedgerData.CorrectionPreview> previewed) { }
         @Override public void undoCorrection() { }
-        @Override public void decideAll(Cl decision) { }
         @Override public void refresh() { }
     }
 }

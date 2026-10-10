@@ -13,7 +13,7 @@ public class RoutineSupplyTest
         String b = name == null ? "" : name.toLowerCase(Locale.ROOT);
         return b.endsWith(" rune") || b.endsWith(" runes") || b.contains("arrow")
             || b.endsWith(" bolts") || b.contains(" bolts (") || b.endsWith(" dart")
-            || Ag.has(b, "javelin", "throwing", "zulrah's scales");
+            || Phrases.has(b, "javelin", "throwing", "zulrah's scales");
     }
 
     @Test

@@ -1,6 +1,0 @@
-# Activity predicates and original public list values; normalization belongs to the caller.
-curated	theatre of blood|chambers of xeric|tombs of amascut|@fe|barbarian assault|tempoross|wintertodt|inferno|fight caves|colosseum|nightmare|gauntlet	theatre of blood|chambers of xeric|tombs of amascut|@fe|barbarian assault|tempoross|wintertodt|inferno|fight caves|colosseum|nightmare|gauntlet
-short	=tob|=cox|=toa|=gotr	tob|cox|toa|gotr
-combat	=Attack|=Strength|=Defence|=Ranged|=Hitpoints	Attack|Strength|Defence|Ranged|Hitpoints
-pursuit	=PKing|=Trading|=Death reclaim	PKing|Trading|Death reclaim
-generic	~General|~NPC loot	General|NPC loot

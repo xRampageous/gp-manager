@@ -1,282 +1,348 @@
 package com.gpmanager;
-import static com.gpmanager.Ak.msg;
-import java.awt.*;
-import javax.swing.*;
+
+import static com.gpmanager.GameData.msg;
+
+import lombok.RequiredArgsConstructor;
+
 import net.runelite.client.ui.*;
+
+import java.awt.*;
+import java.awt.image.BufferedImage;
+import java.util.Map;
+import java.util.function.Function;
+
+import javax.swing.*;
+
 /**
-* Palette, fonts and small builders shared by the sidebar and HUD+.
-* Colour always means a category, never a sign.
-*/
+ * Palette, fonts and small builders shared by the sidebar and HUD+. Colour always means a category,
+ * never a sign.
+ */
 class Kit {
-static final Color PANEL = ColorScheme.DARK_GRAY_COLOR;
-static final Color CARD = ColorScheme.DARKER_GRAY_COLOR;
-static final Color LINE = ColorScheme.BORDER_COLOR;
-static final Color SELECTED = ColorScheme.DARKER_GRAY_HOVER_COLOR;
-static final Color TEXT = ColorScheme.TEXT_COLOR;
-static final Color LABEL = ColorScheme.LIGHT_GRAY_COLOR;
-static final Color OFF = ColorScheme.MEDIUM_GRAY_COLOR;
-static final Color ACCENT = ColorScheme.BRAND_ORANGE;
-static final int ROW = 20;
-/** Icon rows: every sprite is cropped and fitted into one ICON_BOX square (owner 1.1). */
-static final int ICON_ROW = 28;
-static final int ICON_WIDTH = 28;
-static final int ICON_BOX = 24;
-static final int HEADER = 22;
-static final int GAP = 6;
-static final int VALUE_WIDTH = 46;
-/** What a value is, which decides its colour. */
-enum Tone {
- GAIN(ColorScheme.GRAND_EXCHANGE_PRICE), SUPPLY(ColorScheme.GRAND_EXCHANGE_ALCH), LOSS(new Color(255, 122, 107)),
- MARKET(new Color(90, 180, 255)), REVIEW(ColorScheme.PROGRESS_INPROGRESS_COLOR), PLAIN(Color.WHITE),
- DIM(ColorScheme.LIGHT_GRAY_COLOR);
- Color color;
- Tone(Color color) {
-  this.color = color;
- }
- /** Gain above zero, loss below it. */
- static Tone sign(long value) {
-  return value > 0L ? GAIN : value < 0L ? LOSS : PLAIN;
- }
- /** A booked category's tone; fees read as losses, audit-only rows as dim. */
- static Tone of(Af.Category category) {
-  if (category == null) return DIM;
-  switch (category) {
-   case GAIN: return GAIN;
-   case SUPPLY: return SUPPLY;
-   case MARKET: return MARKET;
-   case LOSS:
-   case FEE: return LOSS;
-   default: return DIM;
-  }
- }
-}
+    static final Color PANEL = ColorScheme.DARK_GRAY_COLOR;
+    static final Color CARD = ColorScheme.DARKER_GRAY_COLOR;
+    static final Color LINE = ColorScheme.BORDER_COLOR;
+    static final Color SELECTED = ColorScheme.DARKER_GRAY_HOVER_COLOR;
+    static final Color TEXT = ColorScheme.TEXT_COLOR;
+    static final Color LABEL = ColorScheme.LIGHT_GRAY_COLOR;
+    static final Color OFF = ColorScheme.MEDIUM_GRAY_COLOR;
+    static final Color ACCENT = ColorScheme.BRAND_ORANGE;
+    static final int ROW = 20;
 
-static JMenuItem item(String text, Runnable action) {
- return item(text, true, action);
-}
-
-static JMenuItem item(String text, boolean enabled, Runnable action) {
- JMenuItem item = new JMenuItem(text);
- item.setEnabled(enabled);
- item.addActionListener(e -> action.run());
- return item;
-}
-
-/** A left-aligned transparent row of controls. */
-static JPanel row(Component... components) {
- var row = new JPanel(new FlowLayout(FlowLayout.LEFT, 2, 0));
- row.setOpaque(false);
- for (Component component : components) row.add(component);
- return row;
-}
-
-static Font small() {
- return FontManager.getRunescapeSmallFont();
-}
-
-static Font body() {
- return FontManager.getRunescapeFont();
-}
-
-static Font bold() {
- return FontManager.getRunescapeBoldFont();
-}
-
-/** One page toolbar band: controls left, actions right; Ledger and Grinds share the same shape. */
-static JPanel toolbar(JComponent[] controls, JComponent[] actions) {
- var row = new JPanel(new BorderLayout(4, 0));
- row.setOpaque(false);
- var left = new JPanel(new FlowLayout(FlowLayout.LEFT, 4, 2));
- left.setOpaque(false);
- for (JComponent control : controls) left.add(control);
- row.add(left, BorderLayout.CENTER);
- var right = new JPanel(new FlowLayout(FlowLayout.RIGHT, 2, 2));
- right.setOpaque(false);
- for (JComponent action : actions) right.add(action);
- row.add(right, BorderLayout.EAST);
- return row;
-}
-
-/** Attach the common Ledger/Grinds header band to its existing page holder. */
-static void h1(JPanel a, JComponent[] b, JComponent[] c) {
- a.setOpaque(false);
- a.add(toolbar(b, c), BorderLayout.NORTH);
-}
-
-/** The empty table line, with the existing font, tone and inset dimensions. */
-static JLabel e1(String a) {
- JLabel b = label(a, small(), LABEL);
- pad(b, 3, 6, 3, 6);
- return b;
-}
-
-/** Table and sheet page count; retain the original integer boundary behavior. */
-static int p1(int a, int b) { return Math.max(1, (a + b - 1) / b); }
-
-/** Clamp a requested table/sheet page to the existing nonempty page range. */
-static int p2(int a, int b) { return Math.max(0, Math.min(a, b - 1)); }
-
-/** Apply pager text and navigation state; callers retain their different text formats. */
-static void p3(JLabel a, JButton b, JButton c, int d, int e, String f) {
- a.setText(f);
- b.setEnabled(d > 0);
- c.setEnabled(d < e - 1);
-}
-
-/** The same ordered row/Grind menu: labels, listeners and Swing defaults remain intact. */
-static JPopupMenu m1(java.util.List<Table.Menu> a) {
- var b = new JPopupMenu();
- for (Table.Menu c : a) {
-  var d = new JMenuItem(c.label);
-  d.addActionListener(e -> c.action.run());
-  b.add(d);
- }
- return b;
-}
-
-/** The text shortened with "\u2026" to fit a pixel budget; the full text belongs in the tooltip. */
-static String fit(JLabel label, String text, int budget) {
- if (text == null) return "";
- FontMetrics metrics = label.getFontMetrics(label.getFont());
- if (budget <= 0 || metrics.stringWidth(text) <= budget) return text;
- int ellipsis = metrics.stringWidth("\u2026");
- int low = 0;
- int high = text.length();
- while (low < high) {
-  int middle = (low + high + 1) >>> 1;
-  if (metrics.stringWidth(text.substring(0, middle)) <= budget - ellipsis) low = middle;
-  else high = middle - 1;
- }
- return text.substring(0, low) + "\u2026";
-}
-
-static JLabel label(String text, Font font, Color color) {
- var label = new JLabel(Ag.axw(text));
- // Symbols the RuneScape font cannot draw fall back to the platform face at the same size.
- label.setFont(label.getText().isEmpty() || font.canDisplayUpTo(label.getText()) < 0 ? font
- : new Font(Font.DIALOG, font.getStyle(), font.getSize()));
- label.setForeground(color);
- return label;
-}
-
-/** A label fixed to {@code width}, right-aligned, for columns that must line up. */
-static JLabel column(String text, Font font, Color color, int width) {
- return column(text, font, color, width, ROW);
-}
-
-static JLabel column(String text, Font font, Color color, int width, int height) {
- JLabel label = label(text, font, color);
- label.setHorizontalAlignment(JLabel.RIGHT);
- var size = new Dimension(width, height);
- label.setPreferredSize(size);
- label.setMinimumSize(size);
- label.setMaximumSize(size);
- return label;
-}
-
-/** Full-width children at their preferred heights, {@code gap} apart; hidden ones take no room. */
-static JPanel stack(Color background, int gap) {
- var panel = new JPanel(new LayoutManager() {
-  public void addLayoutComponent(String name, Component comp) {
-  }
-  public void removeLayoutComponent(Component comp) {
-  }
-  public Dimension preferredLayoutSize(Container parent) {
-   Insets in = parent.getInsets();
-   int width = 0;
-   int height = 0;
-   for (Component child : parent.getComponents()) {
-    if (child.isVisible()) {
-     Dimension size = child.getPreferredSize();
-     width = Math.max(width, size.width);
-     height += (height == 0 ? 0 : gap) + size.height;
+    /** The item's sprite as an icon, cached per item until the sprite image changes. */
+    static ImageIcon icon(
+            Map<Integer, ImageIcon> cache, Function<Integer, BufferedImage> sprites, int itemId) {
+        BufferedImage image = sprites.apply(itemId);
+        if (image == null) return null;
+        ImageIcon icon = cache.get(itemId);
+        if (icon == null || icon.getImage() != image) {
+            icon = new ImageIcon(image);
+            cache.put(itemId, icon);
+        }
+        return icon;
     }
-   }
-   return new Dimension(width + in.left + in.right, height + in.top + in.bottom);
-  }
-  public Dimension minimumLayoutSize(Container parent) {
-   return preferredLayoutSize(parent);
-  }
-  public void layoutContainer(Container parent) {
-   Insets in = parent.getInsets();
-   int y = in.top;
-   int width = parent.getWidth() - in.left - in.right;
-   for (Component child : parent.getComponents()) {
-    if (child.isVisible()) {
-     int height = child.getPreferredSize().height;
-     child.setBounds(in.left, y, width, height);
-     y += height + gap;
+
+    /** Icon rows: every sprite is cropped and fitted into one ICON_BOX square (owner 1.1). */
+    static final int ICON_ROW = 28;
+
+    static final int ICON_WIDTH = 28;
+    static final int ICON_BOX = 24;
+    static final int HEADER = 22;
+    static final int GAP = 6;
+    static final int VALUE_WIDTH = 46;
+
+    /** What a value is, which decides its colour. */
+    @RequiredArgsConstructor
+    enum Tone {
+        GAIN(ColorScheme.GRAND_EXCHANGE_PRICE),
+        SUPPLY(ColorScheme.GRAND_EXCHANGE_ALCH),
+        LOSS(new Color(255, 122, 107)),
+        MARKET(new Color(90, 180, 255)),
+        REVIEW(ColorScheme.PROGRESS_INPROGRESS_COLOR),
+        PLAIN(Color.WHITE),
+        DIM(ColorScheme.LIGHT_GRAY_COLOR);
+        final Color color;
+
+        /** Gain above zero, loss below it. */
+        static Tone sign(long value) {
+            return value > 0L ? GAIN : value < 0L ? LOSS : PLAIN;
+        }
+
+        /** A booked category's tone; fees read as losses, audit-only rows as dim. */
+        static Tone of(Contribution.Category category) {
+            if (category == null) return DIM;
+            switch (category) {
+                case GAIN:
+                    return GAIN;
+                case SUPPLY:
+                    return SUPPLY;
+                case MARKET:
+                    return MARKET;
+                case LOSS:
+                    return LOSS;
+                default:
+                    return DIM;
+            }
+        }
     }
-   }
-  }
- });
- panel.setBackground(background);
- return panel;
-}
 
-/** A dim note that wraps to the sidebar width. */
-static JLabel note(String text, Color color) {
- String safe = (Ag.axw(text)).replace("&", "&amp;").replace("<", "&lt;");
- JLabel label = label(msg("bf") + safe + "</div></html>", small(), color);
- pad(label, 0, GAP, 0, GAP);
- return label;
-}
+    static JMenuItem item(String text, Runnable action) {
+        return item(text, true, action);
+    }
 
-/** A flat text button; {@code primary} draws the brand-orange border. */
-static JButton button(String text, boolean primary, Runnable action) {
- JButton button = new JButton(text);
- button.setFont(small());
- button.setForeground(TEXT);
- button.setBackground(CARD);
- button.setFocusPainted(false);
- button.setBorder(BorderFactory.createCompoundBorder(
- BorderFactory.createLineBorder(primary ? ACCENT : LINE), BorderFactory.createEmptyBorder(3, 8, 3, 8)));
- button.addActionListener(e -> action.run());
- return button;
-}
+    static JMenuItem item(String text, boolean enabled, Runnable action) {
+        JMenuItem item = new JMenuItem(text);
+        item.setEnabled(enabled);
+        item.addActionListener(e -> action.run());
+        return item;
+    }
 
-/** Padding of {@code top, left, bottom, right}. */
-static void pad(JComponent component, int top, int left, int bottom, int right) {
- component.setBorder(BorderFactory.createEmptyBorder(top, left, bottom, right));
-}
+    /** A left-aligned transparent row of controls. */
+    static JPanel row(Component... components) {
+        var row = new JPanel(new FlowLayout(FlowLayout.LEFT, 2, 0));
+        row.setOpaque(false);
+        for (Component component : components) row.add(component);
+        return row;
+    }
 
-/** The sprite's visible pixels: transparent margins cut away. */
-static Rectangle visible(java.awt.image.BufferedImage image) {
- int w = image.getWidth();
- int h = image.getHeight();
- int[] argb = image.getRGB(0, 0, w, h, null, 0, w);
- int left = w;
- int top = h;
- int right = -1;
- int bottom = -1;
- for (int i = 0; i < argb.length; i++) {
-  if (argb[i] >>> 24 != 0) {
-   left = Math.min(left, i % w);
-   right = Math.max(right, i % w);
-   top = Math.min(top, i / w);
-   bottom = i / w;
-  }
- }
- return right < 0 ? new Rectangle(w, h) : new Rectangle(left, top, right - left + 1, bottom - top + 1);
-}
+    static Font small() {
+        return FontManager.getRunescapeSmallFont();
+    }
 
-/**
-* A sprite cropped to its visible pixels, scaled down (never up, so pixel art stays sharp) to fit
-* a {@code box} square, and centred: every icon sits the same way in every row.
-*/
-static java.awt.image.BufferedImage fitIcon(java.awt.image.BufferedImage image, int box) {
- Rectangle c = visible(image);
- double scale = Math.min(1d, box / (double) Math.max(c.width, c.height));
- int w = Math.max(1, (int) Math.round(c.width * scale));
- int h = Math.max(1, (int) Math.round(c.height * scale));
- var out = new java.awt.image.BufferedImage(box, box, java.awt.image.BufferedImage.TYPE_INT_ARGB);
- Graphics2D g = out.createGraphics();
- g.setRenderingHint(RenderingHints.KEY_INTERPOLATION, scale < 1d
- ? RenderingHints.VALUE_INTERPOLATION_BILINEAR : RenderingHints.VALUE_INTERPOLATION_NEAREST_NEIGHBOR);
- int x = (box - w) / 2;
- int y = (box - h) / 2;
- g.drawImage(image, x, y, x + w, y + h, c.x, c.y, c.x + c.width, c.y + c.height, null);
- g.dispose();
- return out;
-}
+    static Font body() {
+        return FontManager.getRunescapeFont();
+    }
+
+    static Font bold() {
+        return FontManager.getRunescapeBoldFont();
+    }
+
+    /**
+     * One page toolbar band: controls left, actions right; Ledger and Grinds share the same shape.
+     */
+    static JPanel toolbar(JComponent[] controls, JComponent[] actions) {
+        var row = new JPanel(new BorderLayout(4, 0));
+        row.setOpaque(false);
+        var left = new JPanel(new FlowLayout(FlowLayout.LEFT, 4, 2));
+        left.setOpaque(false);
+        for (JComponent control : controls) left.add(control);
+        row.add(left, BorderLayout.CENTER);
+        var right = new JPanel(new FlowLayout(FlowLayout.RIGHT, 2, 2));
+        right.setOpaque(false);
+        for (JComponent action : actions) right.add(action);
+        row.add(right, BorderLayout.EAST);
+        return row;
+    }
+
+    /** Attach the common Ledger/Grinds header band to its existing page holder. */
+    static void headerBand(JPanel holder, JComponent[] left, JComponent[] right) {
+        holder.setOpaque(false);
+        holder.add(toolbar(left, right), BorderLayout.NORTH);
+    }
+
+    /** The empty table line, with the existing font, tone and inset dimensions. */
+    static JLabel emptyLine(String text) {
+        JLabel label = label(text, small(), LABEL);
+        pad(label, 3, 6, 3, 6);
+        return label;
+    }
+
+    /** Table and sheet page count; retain the original integer boundary behavior. */
+    static int pageCount(int count, int perPage) {
+        return Math.max(1, (count + perPage - 1) / perPage);
+    }
+
+    /** Clamp a requested table/sheet page to the existing nonempty page range. */
+    static int clampPage(int page, int pages) {
+        return Math.max(0, Math.min(page, pages - 1));
+    }
+
+    /** Apply pager text and navigation state; callers retain their different text formats. */
+    static void applyPager(
+            JLabel label, JButton previous, JButton next, int page, int pages, String text) {
+        label.setText(text);
+        previous.setEnabled(page > 0);
+        next.setEnabled(page < pages - 1);
+    }
+
+    /** The same ordered row/Grind menu: labels, listeners and Swing defaults remain intact. */
+    static JPopupMenu menuOf(java.util.List<Table.Menu> items) {
+        var menu = new JPopupMenu();
+        for (Table.Menu item : items) {
+            var menuItem = new JMenuItem(item.label);
+            menuItem.addActionListener(e -> item.action.run());
+            menu.add(menuItem);
+        }
+        return menu;
+    }
+
+    /**
+     * The text shortened with "\u2026" to fit a pixel budget; the full text belongs in the tooltip.
+     */
+    static String fit(JLabel label, String text, int budget) {
+        if (text == null) return "";
+        FontMetrics metrics = label.getFontMetrics(label.getFont());
+        if (budget <= 0 || metrics.stringWidth(text) <= budget) return text;
+        int ellipsis = metrics.stringWidth("\u2026");
+        int low = 0;
+        int high = text.length();
+        while (low < high) {
+            int middle = (low + high + 1) >>> 1;
+            if (metrics.stringWidth(text.substring(0, middle)) <= budget - ellipsis) low = middle;
+            else high = middle - 1;
+        }
+        return text.substring(0, low) + "\u2026";
+    }
+
+    static JLabel label(String text, Font font, Color color) {
+        var label = new JLabel(Phrases.orEmpty(text));
+        // Symbols the RuneScape font cannot draw fall back to the platform face at the same size.
+        label.setFont(
+                label.getText().isEmpty() || font.canDisplayUpTo(label.getText()) < 0
+                        ? font
+                        : new Font(Font.DIALOG, font.getStyle(), font.getSize()));
+        label.setForeground(color);
+        return label;
+    }
+
+    static JLabel column(String text, Font font, Color color, int width, int height) {
+        JLabel label = label(text, font, color);
+        label.setHorizontalAlignment(JLabel.RIGHT);
+        var size = new Dimension(width, height);
+        label.setPreferredSize(size);
+        label.setMinimumSize(size);
+        label.setMaximumSize(size);
+        return label;
+    }
+
+    /**
+     * Full-width children at their preferred heights, {@code gap} apart; hidden ones take no room.
+     */
+    static JPanel stack(Color background, int gap) {
+        var panel =
+                new JPanel(
+                        new LayoutManager() {
+                            public void addLayoutComponent(String name, Component comp) {}
+
+                            public void removeLayoutComponent(Component comp) {}
+
+                            public Dimension preferredLayoutSize(Container parent) {
+                                Insets in = parent.getInsets();
+                                int width = 0;
+                                int height = 0;
+                                for (Component child : parent.getComponents()) {
+                                    if (child.isVisible()) {
+                                        Dimension size = child.getPreferredSize();
+                                        width = Math.max(width, size.width);
+                                        height += (height == 0 ? 0 : gap) + size.height;
+                                    }
+                                }
+                                return new Dimension(
+                                        width + in.left + in.right, height + in.top + in.bottom);
+                            }
+
+                            public Dimension minimumLayoutSize(Container parent) {
+                                return preferredLayoutSize(parent);
+                            }
+
+                            public void layoutContainer(Container parent) {
+                                Insets in = parent.getInsets();
+                                int y = in.top;
+                                int width = parent.getWidth() - in.left - in.right;
+                                for (Component child : parent.getComponents()) {
+                                    if (child.isVisible()) {
+                                        int height = child.getPreferredSize().height;
+                                        child.setBounds(in.left, y, width, height);
+                                        y += height + gap;
+                                    }
+                                }
+                            }
+                        });
+        panel.setBackground(background);
+        return panel;
+    }
+
+    /** A dim note that wraps to the sidebar width. */
+    static JLabel note(String text, Color color) {
+        String safe = (Phrases.orEmpty(text)).replace("&", "&amp;").replace("<", "&lt;");
+        JLabel label = label(msg("text") + safe + "</div></html>", small(), color);
+        pad(label, 0, GAP, 0, GAP);
+        return label;
+    }
+
+    /** A flat text button; {@code primary} draws the brand-orange border. */
+    static JButton button(String text, boolean primary, Runnable action) {
+        JButton button = new JButton(text);
+        button.setFont(small());
+        button.setForeground(TEXT);
+        button.setBackground(CARD);
+        button.setFocusPainted(false);
+        button.setBorder(
+                BorderFactory.createCompoundBorder(
+                        BorderFactory.createLineBorder(primary ? ACCENT : LINE),
+                        BorderFactory.createEmptyBorder(3, 8, 3, 8)));
+        button.addActionListener(e -> action.run());
+        return button;
+    }
+
+    /** Padding of {@code top, left, bottom, right}. */
+    static void pad(JComponent component, int top, int left, int bottom, int right) {
+        component.setBorder(BorderFactory.createEmptyBorder(top, left, bottom, right));
+    }
+
+    /** The sprite's visible pixels: transparent margins cut away. */
+    static Rectangle visible(java.awt.image.BufferedImage image) {
+        int w = image.getWidth();
+        int h = image.getHeight();
+        int[] argb = image.getRGB(0, 0, w, h, null, 0, w);
+        int left = w;
+        int top = h;
+        int right = -1;
+        int bottom = -1;
+        for (int i = 0; i < argb.length; i++) {
+            if (argb[i] >>> 24 != 0) {
+                left = Math.min(left, i % w);
+                right = Math.max(right, i % w);
+                top = Math.min(top, i / w);
+                bottom = i / w;
+            }
+        }
+        return right < 0
+                ? new Rectangle(w, h)
+                : new Rectangle(left, top, right - left + 1, bottom - top + 1);
+    }
+
+    /**
+     * A sprite cropped to its visible pixels, scaled down (never up, so pixel art stays sharp) to
+     * fit a {@code box} square, and centred: every icon sits the same way in every row.
+     */
+    static java.awt.image.BufferedImage fitIcon(java.awt.image.BufferedImage image, int box) {
+        Rectangle crop = visible(image);
+        double scale = Math.min(1d, box / (double) Math.max(crop.width, crop.height));
+        int w = Math.max(1, (int) Math.round(crop.width * scale));
+        int h = Math.max(1, (int) Math.round(crop.height * scale));
+        var out =
+                new java.awt.image.BufferedImage(
+                        box, box, java.awt.image.BufferedImage.TYPE_INT_ARGB);
+        Graphics2D g = out.createGraphics();
+        g.setRenderingHint(
+                RenderingHints.KEY_INTERPOLATION,
+                scale < 1d
+                        ? RenderingHints.VALUE_INTERPOLATION_BILINEAR
+                        : RenderingHints.VALUE_INTERPOLATION_NEAREST_NEIGHBOR);
+        int x = (box - w) / 2;
+        int y = (box - h) / 2;
+        g.drawImage(
+                image,
+                x,
+                y,
+                x + w,
+                y + h,
+                crop.x,
+                crop.y,
+                crop.x + crop.width,
+                crop.y + crop.height,
+                null);
+        g.dispose();
+        return out;
+    }
 }

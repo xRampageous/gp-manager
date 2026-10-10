@@ -21,11 +21,11 @@ public class KitWithdrawTest
             new Class<?>[]{ItemContainer.class}, (proxy, method, args) -> "getItems".equals(method.getName()) ? items : null);
     }
 
-    static Am withdraw(int kitEvents)
+    static Engine withdraw(int kitEvents)
     {
-        Am engine = HudBuilderTest.engine();
-        engine.rm(1_000_000L);
-        engine.setBaseline(new Cc(new HashMap<>()));
+        Engine engine = HudBuilderTest.engine();
+        engine.ensureSession(1_000_000L);
+        engine.setBaseline(new ContainerSnapshot(new HashMap<>()));
         GpManagerPlugin plugin = new GpManagerPlugin();
         plugin.engine = engine;
         if (kitEvents > 0)
@@ -36,10 +36,10 @@ public class KitWithdrawTest
         {
             plugin.kit(InventoryID.TACKLE_BOX, holding());
         }
-        engine.yz();
+        engine.markDirty();
         for (int tick = 1; tick <= 5; tick++)
         {
-            engine.adj(new Cc(new HashMap<>(Map.of(ItemID.DRAGON_HARPOON, 1L))), 1_000_000L + tick * 600L);
+            engine.processIfDirty(new ContainerSnapshot(new HashMap<>(Map.of(ItemID.DRAGON_HARPOON, 1L))), 1_000_000L + tick * 600L);
         }
         return engine;
     }
@@ -47,10 +47,10 @@ public class KitWithdrawTest
     @Test
     public void takingAHarpoonOutOfTheTackleBoxIsNotLoot()
     {
-        Am engine = withdraw(2);
+        Engine engine = withdraw(2);
         assertEquals(0L, engine.getMetrics(1_010_000L).net);
         assertTrue(engine.getActiveSession().getTransactions().toString(),
-            engine.getActiveSession().getTransactions().stream().noneMatch(Ac::isCounted));
+            engine.getActiveSession().getTransactions().stream().noneMatch(Transaction::isCounted));
     }
 
     @Test

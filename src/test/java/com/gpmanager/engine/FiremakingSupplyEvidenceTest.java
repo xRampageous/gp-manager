@@ -16,43 +16,43 @@ public class FiremakingSupplyEvidenceTest
         assertFuelAction("Tend-to", "Blisterwood logs");
         assertFuelAction("Tend to", "Juniper logs");
         assertTrue("existing Use Tinderbox evidence remains supported",
-            Dw.d1("Use", "Tinderbox -> Willow logs"));
+            ActionSignals.lightsFire("Use", "Tinderbox -> Willow logs"));
     }
 
     @Test
     public void unexplainedLossAndArbitraryUseRemainLosses()
     {
-        Ac unexplained = transaction("Logs");
-        assertNull(Bn.resolve(null, unexplained.getFlows(), unexplained.getType(), "Firemaking"));
+        Transaction unexplained = transaction("Logs");
+        assertNull(ActionReader.resolve(null, unexplained.getFlows(), unexplained.getType(), "Firemaking"));
         assertEquals(CostKind.LOSS, CostKind.of(unexplained, unexplained.getFlows().get(0)));
 
-        Au arbitraryUse = Bn.a1("Use");
+        ActionKind arbitraryUse = ActionReader.verbOf("Use");
         assertNull(arbitraryUse);
-        assertNull(Bn.resolve(arbitraryUse, unexplained.getFlows(),
+        assertNull(ActionReader.resolve(arbitraryUse, unexplained.getFlows(),
             unexplained.getType(), "Firemaking"));
         assertEquals(CostKind.LOSS, CostKind.of(unexplained, unexplained.getFlows().get(0)));
 
-        Au mismatchedFuelIntent = Bn.resolve(Bn.a1("Light"),
-            Collections.singletonList(new Ab(946, "Knife", -1L, 1, -1L)),
-            Ai.CONSUMPTION, "Firemaking");
+        ActionKind mismatchedFuelIntent = ActionReader.resolve(ActionReader.verbOf("Light"),
+            Collections.singletonList(new Flow(946, "Knife", -1L, 1, -1L)),
+            TransactionType.CONSUMPTION, "Firemaking");
         assertNull("Light does not turn a non-fuel loss into Supplies", mismatchedFuelIntent);
     }
 
     private static void assertFuelAction(String menuOption, String name)
     {
-        Ac transaction = transaction(name);
-        Au resolved = Bn.resolve(Bn.a1(menuOption),
+        Transaction transaction = transaction(name);
+        ActionKind resolved = ActionReader.resolve(ActionReader.verbOf(menuOption),
             transaction.getFlows(), transaction.getType(), "Firemaking");
-        assertEquals(Au.SUPPLIES, resolved);
+        assertEquals(ActionKind.SUPPLIES, resolved);
         transaction.setActionKind(resolved);
         assertEquals(CostKind.SUPPLIES, CostKind.of(transaction, transaction.getFlows().get(0)));
     }
 
-    private static Ac transaction(String name)
+    private static Transaction transaction(String name)
     {
-        return new Ac(1_000L, null, Ai.CONSUMPTION,
-            Aj.GENERIC, "", "Firemaking", true,
-            Collections.singletonList(new Ab(1519, name, -1L, 100, -100L)),
-            Bd.CONFIRMED, "explicit evidence test", null);
+        return new Transaction(1_000L, TransactionType.CONSUMPTION,
+            Context.GENERIC, "", "Firemaking", true,
+            Collections.singletonList(new Flow(1519, name, -1L, 100, -100L)),
+            Confidence.CONFIRMED, "explicit evidence test", null);
     }
 }

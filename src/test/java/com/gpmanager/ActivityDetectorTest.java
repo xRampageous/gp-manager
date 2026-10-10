@@ -20,15 +20,15 @@ public class ActivityDetectorTest
                 return 0;
             }
         };
-        Am engine = new Am(deltas -> Collections.emptyList(),
+        Engine engine = new Engine(deltas -> Collections.emptyList(),
             new TransactionClassifier(), config);
-        engine.rm(1_000L);
+        engine.ensureSession(1_000L);
         ActivityDetector detector = new ActivityDetector(config, engine);
 
-        detector.abm("Woodcutting", true);
+        detector.observe("Woodcutting", true);
         assertEquals("Woodcutting", engine.getMetrics(1_100L).activityHint);
 
-        detector.abm("NPC loot", true);
+        detector.observe("NPC loot", true);
         assertEquals("a fallback is not an activity", "Woodcutting", engine.getMetrics(1_200L).activityHint);
     }
 
@@ -43,19 +43,19 @@ public class ActivityDetectorTest
                 return 0;
             }
         };
-        Am engine = new Am(deltas -> Collections.emptyList(),
+        Engine engine = new Engine(deltas -> Collections.emptyList(),
             new TransactionClassifier(), config);
-        engine.rm(1_000L);
+        engine.ensureSession(1_000L);
         ActivityDetector detector = new ActivityDetector(config, engine);
 
         // Clicking a tree with no axe, or before reaching it.
-        detector.gatherSkill = Dw.ka("chop down");
+        detector.gatherSkill = ActionSignals.gatherActivity("chop down");
         assertEquals("General", engine.getMetrics(1_100L).activityHint);
         // Other XP still needs its second drop.
-        detector.acj("Mining", null, false, 1_200L);
+        detector.observeXp("Mining", null, false, 1_200L);
         assertEquals("General", engine.getMetrics(1_300L).activityHint);
         // The first log's XP names the run at once.
-        detector.acj("Woodcutting", null, false, 1_400L);
+        detector.observeXp("Woodcutting", null, false, 1_400L);
         assertEquals("Woodcutting", engine.getMetrics(1_500L).activityHint);
     }
 
@@ -68,23 +68,23 @@ public class ActivityDetectorTest
     public void aSmeltingRunSurvivesFailedSmeltsWithoutXp()
     {
         GpManagerConfig config = new GpManagerConfig() {};
-        Am engine = new Am(deltas -> Collections.emptyList(),
+        Engine engine = new Engine(deltas -> Collections.emptyList(),
             new TransactionClassifier(), config);
-        engine.rm(1_000L);
+        engine.ensureSession(1_000L);
         ActivityDetector detector = new ActivityDetector(config, engine);
         long now = 1_000_000L;
 
-        detector.le("Smelting", now);
-        engine.eb.drop(Eb.CT); // two failed smelts: the six-tick window has lapsed
-        detector.acj("Smithing", null, false, now + 12_000L);
-        assertEquals(Aj.PRODUCTION, engine.ac().context);
-        assertTrue("Smithing XP re-arms the run", engine.ct() > 0);
+        detector.armProduction("Smelting", now);
+        engine.inbox.drop(Inbox.CLOCK); // two failed smelts: the six-tick window has lapsed
+        detector.observeXp("Smithing", null, false, now + 12_000L);
+        assertEquals(Context.PRODUCTION, engine.liveClue().context);
+        assertTrue("Smithing XP re-arms the run", engine.clockLeft() > 0);
 
-        engine.eb.drop(Eb.CT);
-        detector.acj("Attack", null, false, now + 17_000L);
-        assertEquals("combat XP never opens production", 0, engine.ct());
+        engine.inbox.drop(Inbox.CLOCK);
+        detector.observeXp("Attack", null, false, now + 17_000L);
+        assertEquals("combat XP never opens production", 0, engine.clockLeft());
 
-        detector.acj("Smithing", null, false, now + 12_000L + 31_000L);
-        assertEquals("past the run window XP no longer re-arms", 0, engine.ct());
+        detector.observeXp("Smithing", null, false, now + 12_000L + 31_000L);
+        assertEquals("past the run window XP no longer re-arms", 0, engine.clockLeft());
     }
 }

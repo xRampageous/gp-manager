@@ -35,8 +35,8 @@ public class CodexResearchFixesTest
 
     static long despawn(int ownership)
     {
-        Am engine = engine();
-        engine.zk(Map.of(BONES, 2L), 50, "Loot from Guard", "Guard");
+        Engine engine = engine();
+        engine.markLoot(Map.of(BONES, 2L), 50, "Loot from Guard", "Guard");
         ReviewFixesTest.Plugin p = plugin(engine, new int[]{11});
         ReviewFixesTest.take(p).item = BONES;
         ReviewFixesTest.take(p).at = 10;
@@ -50,7 +50,7 @@ public class CodexResearchFixesTest
         itemValues.put("getQuantity", 3);
         itemValues.put("getOwnership", ownership);
         p.onItemDespawned(new ItemDespawned(proxy(Tile.class, tileValues), proxy(TileItem.class, itemValues)));
-        return ReviewFixesTest.qty(p, Eb.BG);
+        return ReviewFixesTest.qty(p, Inbox.BAG_GAIN);
     }
 
     /** Finding 4: a reclaim fee still waiting its two ticks never reaches the next account. */
@@ -58,25 +58,25 @@ public class CodexResearchFixesTest
     public void aWaitingBankFeeIsDroppedAtTheAccountFence()
     {
         ReviewFixesTest.Plugin p = plugin(engine(), new int[]{11});
-        p.engine.eb.put(Eb.FE, -1, 5_964L, 10, null);
+        p.engine.inbox.put(Inbox.FEE, -1, 5_964L, 10, null);
         p.ready = false;
         p.onGameTick(new GameTick());
-        assertEquals(0L, ReviewFixesTest.qty(p, Eb.FE));
+        assertEquals(0L, ReviewFixesTest.qty(p, Inbox.FEE));
     }
 
     /** Finding 5: a Check that reads the same as the last one is a compatible "nothing used". */
     @Test
     public void anUnchangedCheckRemovesTheOverestimate()
     {
-        Am e = engine();
+        Engine e = engine();
         String target = "same-staff";
-        e.abu(Ar.acs("Your Trident of the seas has 100 charges."), target, T0);
-        e.mn(target, Ar.V.TRIDENT_SEAS.getDisplayName(), Au.CAST,
-            List.of(new Ab(ItemID.DEATHRUNE, "Death rune", -1, 100, -100, Av.GRAND_EXCHANGE)), T0 + 1_000L);
+        e.observeCheck(ChargeCheck.parse("Your Trident of the seas has 100 charges."), target, T0);
+        e.bookEstimatedCharge(target, ChargeCheck.ChargedItem.TRIDENT_SEAS.getDisplayName(), ActionKind.CAST,
+            List.of(new Flow(ItemID.DEATHRUNE, "Death rune", -1, 100, -100, PriceSource.GRAND_EXCHANGE)), T0 + 1_000L);
         assertTrue(e.getMetrics(T0 + 1_500L).costs > 0L);
         ReviewFixesTest.Plugin p = plugin(e, new int[]{100});
-        p.charges.ck(Ar.V.TRIDENT_SEAS, target, 100, 2);
-        assertTrue(p.charges.abt("Your Trident of the seas has 100 charges.", T0 + 2_000L));
+        p.charges.startCheck(ChargeCheck.ChargedItem.TRIDENT_SEAS, target, 100, 2);
+        assertTrue(p.charges.observeCheck("Your Trident of the seas has 100 charges.", T0 + 2_000L));
         assertEquals("the matching Check proves no charge was used", 0L, e.getMetrics(T0 + 5_000L).costs);
     }
 
@@ -84,12 +84,12 @@ public class CodexResearchFixesTest
     @Test
     public void checkingOneStaffKeepsTheOtherStaffsEstimates()
     {
-        Am e = engine();
-        String family = Ar.V.TRIDENT_SEAS.getDisplayName();
-        List<Ab> use = List.of(new Ab(ItemID.DEATHRUNE, "Death rune", -1, 100, -100, Av.GRAND_EXCHANGE));
-        e.mn("staff-a", family, Au.CAST, use, T0 + 1_000L);
-        e.mn("staff-b", family, Au.CAST, use, T0 + 1_001L);
-        e.clearPendingEstimates("staff-a");
+        Engine e = engine();
+        String family = ChargeCheck.ChargedItem.TRIDENT_SEAS.getDisplayName();
+        List<Flow> use = List.of(new Flow(ItemID.DEATHRUNE, "Death rune", -1, 100, -100, PriceSource.GRAND_EXCHANGE));
+        e.bookEstimatedCharge("staff-a", family, ActionKind.CAST, use, T0 + 1_000L);
+        e.bookEstimatedCharge("staff-b", family, ActionKind.CAST, use, T0 + 1_001L);
+        e.clearPendingEstimates("staff-a", java.util.Collections.emptySet());
         String session = e.getActiveSession().getId();
         assertTrue(e.chargeEstimateJournal.receiptsFor(session, "staff-a").isEmpty());
         assertFalse("staff B keeps its own credit", e.chargeEstimateJournal.receiptsFor(session, "staff-b").isEmpty());
@@ -99,14 +99,14 @@ public class CodexResearchFixesTest
     @Test
     public void aSplitCatchBooksOnlyWhatIsMissingFromTheInventory()
     {
-        Am e = engine();
+        Engine e = engine();
         ReviewFixesTest.Plugin p = plugin(e, new int[]{11});
         p.snapshotFactory = new ContainerSnapshotFactory(p.client, null)
         {
             @Override
-            Cc capture(boolean equipment, boolean pouch)
+            ContainerSnapshot capture(boolean equipment, boolean pouch)
             {
-                return new Cc(Map.of(335, 1L));
+                return new ContainerSnapshot(Map.of(335, 1L));
             }
         };
         ReviewFixesTest.take(p).item = 335;
@@ -114,6 +114,6 @@ public class CodexResearchFixesTest
         ReviewFixesTest.bag(p).at = 10;
         ReviewFixesTest.bag(p).qty = 2;
         p.bagSettle();
-        assertEquals("one in the pack, one in the barrel", -1L, e.baseline.aea(335));
+        assertEquals("one in the pack, one in the barrel", -1L, e.baseline.quantityOf(335));
     }
 }

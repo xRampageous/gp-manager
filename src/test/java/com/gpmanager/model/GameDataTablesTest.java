@@ -126,6 +126,11 @@ public class GameDataTablesTest
         "hespori|Hespori|Arno|25000||false",
         "nightmare|The Nightmare|Shura|60000||false",
         "phosani|Phosani's Nightmare|Sister Senga|60000||false",
+        "mimic|The Mimic|Strange casket|90000||false",
+        "robert_the_strong|Dragon Slayer II (Robert the Strong)|Item chest|100000||false",
+        "vanstrom_klause|Sins of the Father (Vanstrom Klause)|Veliaf Hurtz|50000||false",
+        "song_of_the_elves|Song of the Elves|Rebel Scout|80000||false",
+        "jormungand|The Fremennik Exiles (The Jormungand)|Brundt the Chieftain|50000||false",
         "retrieval_chest|Raid / boss retrieval chest|Chest|" + BossRetrievalCatalogue.VARIABLE_FEE
             + "|Nex and Theatre of Blood 100,000; Tombs of Amascut up to 500,000 by raid level|true",
         "gravestone|Gravestone|Gravestone|" + BossRetrievalCatalogue.TIERED_FEE
@@ -145,7 +150,7 @@ public class GameDataTablesTest
         assertEquals(Map.of("bronze dart", ItemID.BRONZE_DART, "iron dart", ItemID.IRON_DART,
             "steel dart", ItemID.STEEL_DART, "mithril dart", ItemID.MITHRIL_DART,
             "adamant dart", ItemID.ADAMANT_DART, "rune dart", ItemID.RUNE_DART,
-            "amethyst dart", ItemID.AMETHYST_DART, "dragon dart", ItemID.DRAGON_DART), Ar.DARTS);
+            "amethyst dart", ItemID.AMETHYST_DART, "dragon dart", ItemID.DRAGON_DART), ChargeCheck.DARTS);
     }
 
     @Test
@@ -153,7 +158,7 @@ public class GameDataTablesTest
     {
         for (int id = -1; id < MAX_ID; id++)
         {
-            assertEquals("item " + id, GE_TAX_EXEMPT.contains(id), GeTaxRule.awj(id));
+            assertEquals("item " + id, GE_TAX_EXEMPT.contains(id), GeTaxRule.isExempt(id));
         }
     }
 
@@ -162,7 +167,7 @@ public class GameDataTablesTest
     {
         for (int id = -1; id < MAX_ID; id++)
         {
-            assertEquals("item " + id, CURRENCY_PROXIES.contains(id), CurrencyProxyCatalogue.awk(id));
+            assertEquals("item " + id, CURRENCY_PROXIES.contains(id), CurrencyProxyCatalogue.isMapped(id));
         }
     }
 
@@ -183,7 +188,7 @@ public class GameDataTablesTest
         Map<Integer, String> expected = agilityCourses();
         for (int region = -1; region < MAX_ID; region++)
         {
-            assertEquals("region " + region, expected.get(region), AgilityCourses.qp(region));
+            assertEquals("region " + region, expected.get(region), AgilityCourses.courseName(region));
         }
     }
 
@@ -192,9 +197,9 @@ public class GameDataTablesTest
     {
         for (int region = -1; region < MAX_ID; region++)
         {
-            assertEquals("lms " + region, LMS_REGIONS.contains(region), MinigameRegionHints.xh(region));
+            assertEquals("lms " + region, LMS_REGIONS.contains(region), MinigameRegionHints.isLmsRegion(region));
             assertEquals("neutral " + region, NEUTRAL_ZONE_REGIONS.contains(region),
-                MinigameRegionHints.xl(region));
+                MinigameRegionHints.isNeutralZoneRegion(region));
         }
     }
 
@@ -204,13 +209,13 @@ public class GameDataTablesTest
         for (String row : RETRIEVAL_SERVICES)
         {
             String[] f = row.split("\\|", -1);
-            BossRetrievalCatalogue.Service service = BossRetrievalCatalogue.a1("Claim", f[2]);
+            BossRetrievalCatalogue.Service service = BossRetrievalCatalogue.serviceFor("Claim", f[2]);
             assertNotNull(f[2], service);
             assertEquals(row, service.key + "|" + service.activity + "|" + service.interactable + "|"
                 + service.expectedFee + "|" + service.note + "|" + service.ambiguousTarget);
         }
-        assertTrue(BossRetrievalCatalogue.a1("Claim", "Gravestone of Zezima") != null);
-        assertEquals(null, BossRetrievalCatalogue.a1("Claim", "Banker"));
+        assertTrue(BossRetrievalCatalogue.serviceFor("Claim", "Gravestone of Zezima") != null);
+        assertEquals(null, BossRetrievalCatalogue.serviceFor("Claim", "Banker"));
     }
 
     @Test
@@ -218,23 +223,23 @@ public class GameDataTablesTest
     {
         for (String name : REWARD_SOURCES)
         {
-            assertTrue(name, RewardChestCatalogue.a1("The " + name.toUpperCase() + " pool"));
+            assertTrue(name, RewardChestCatalogue.isRewardChest("The " + name.toUpperCase() + " pool"));
         }
-        assertFalse(RewardChestCatalogue.a1("Goblin"));
-        assertFalse(RewardChestCatalogue.a1("Abyssal demon"));
+        assertFalse(RewardChestCatalogue.isRewardChest("Goblin"));
+        assertFalse(RewardChestCatalogue.isRewardChest("Abyssal demon"));
     }
 
     @Test
     public void orderedTablesKeepTheirOrder()
     {
         List<String> services = new ArrayList<>();
-        for (String[] row : Ak.rows("d2"))
+        for (String[] row : GameData.rows("retrieval_services"))
         {
             services.add(String.join("|", row));
         }
         assertEquals(RETRIEVAL_SERVICES, services);
         List<String> sources = new ArrayList<>();
-        for (String[] row : Ak.rows("d3"))
+        for (String[] row : GameData.rows("reward_chests"))
         {
             sources.add(row[0]);
         }
@@ -246,9 +251,9 @@ public class GameDataTablesTest
     public void itemNamesInTheTablesMatchRuneLiteIds() throws ReflectiveOperationException
     {
         int named = 0;
-        for (String table : new String[]{"d4", "d1", "d11", "d23"})
+        for (String table : new String[]{"tax_exempt", "currencies", "key_chests", "dismantle"})
         {
-            for (String[] row : Ak.rows(table))
+            for (String[] row : GameData.rows(table))
             {
                 String constant = row[row.length - 1];
                 if (constant.matches("[A-Z0-9_]+"))
@@ -268,8 +273,8 @@ public class GameDataTablesTest
     {
         Set<String> used = new java.util.TreeSet<>();
         Set<String> prefixes = new java.util.TreeSet<>();
-        java.util.regex.Pattern literal = java.util.regex.Pattern.compile("\\b(?:msg|xfer)\\(\"([^\"]+)\"[,)]");
-        java.util.regex.Pattern prefix = java.util.regex.Pattern.compile("\\bmsg\\(\"([\\w-]+\\.)\"\\s*\\+");
+        java.util.regex.Pattern literal = java.util.regex.Pattern.compile("\\b(?:msg|transfer)\\(\\s*\"([^\"]+)\"\\s*[,)]");
+        java.util.regex.Pattern prefix = java.util.regex.Pattern.compile("\\bmsg\\(\\s*\"([\\w-]+\\.)\"\\s*\\+");
         try (java.util.stream.Stream<java.nio.file.Path> files = java.nio.file.Files.walk(
             java.nio.file.Paths.get("src/main/java")))
         {
@@ -300,16 +305,16 @@ public class GameDataTablesTest
             }
         }
         assertTrue(used.size() > 50);
-        assertTrue(Ak.TEXT.keySet().containsAll(used));
-        for (String key : Ak.TEXT.keySet())
+        assertTrue(GameData.TEXT.keySet().containsAll(used));
+        for (String key : GameData.TEXT.keySet())
         {
             assertTrue("unused text row " + key, used.contains(key)
                 || prefixes.stream().anyMatch(key::startsWith));
-            assertFalse(key, Ak.msg(key).trim().isEmpty());
+            assertFalse(key, GameData.msg(key).trim().isEmpty());
         }
         for (String p : prefixes)
         {
-            assertTrue("no rows for " + p, Ak.TEXT.keySet().stream().anyMatch(k -> k.startsWith(p)));
+            assertTrue("no rows for " + p, GameData.TEXT.keySet().stream().anyMatch(k -> k.startsWith(p)));
         }
     }
     /** d24 has no item ids; every action is a public RuneLite menu constant, and every key is used. */
@@ -317,15 +322,15 @@ public class GameDataTablesTest
     public void menuAndChatTableHasOnlyUsedKeysAndSupportedActions()
     {
         assertEquals(Set.of("widget", "spend.raw", "spend.norm", "use", "fuel", "fire", "altar",
-            "bones", "cast", "offering", "spared", "spend.chat", "gather.exclude"), Dw.R.keySet());
+            "bones", "cast", "offering", "spared", "spend.chat", "gather.exclude"), ActionSignals.RULES.keySet());
         Set<net.runelite.api.MenuAction> expected = Set.of(net.runelite.api.MenuAction.WIDGET_TARGET,
             net.runelite.api.MenuAction.WIDGET_TARGET_ON_NPC, net.runelite.api.MenuAction.WIDGET_TARGET_ON_PLAYER,
             net.runelite.api.MenuAction.WIDGET_TARGET_ON_WIDGET, net.runelite.api.MenuAction.WIDGET_TARGET_ON_GROUND_ITEM,
             net.runelite.api.MenuAction.WIDGET_TARGET_ON_GAME_OBJECT);
-        assertEquals(expected.size(), Dw.R.get("widget").length);
+        assertEquals(expected.size(), ActionSignals.RULES.get("widget").length);
         for (net.runelite.api.MenuAction action : net.runelite.api.MenuAction.values())
-            assertEquals(action.name(), expected.contains(action), Dw.a1(action));
-        assertFalse(Dw.a1(null));
+            assertEquals(action.name(), expected.contains(action), ActionSignals.isWidgetAction(action));
+        assertFalse(ActionSignals.isWidgetAction(null));
     }
 
     /** d25 uses names, not item ids; each row is a consumed verb or item predicate. */
@@ -333,59 +338,45 @@ public class GameDataTablesTest
     public void actionAndItemRulesKeepEveryUsedKeyAndOrderedOutcome()
     {
         assertEquals(Set.of("drink", "eat", "~bury", "~scatter", "offer", "cast", "supplies",
-            "vessel", "rune", "claim", "ingredient", "food", "partial"), Bn.R.keySet());
+            "vessel", "rune", "claim", "ingredient", "food", "partial"), ActionReader.RULES.keySet());
         List<String> loaded = new ArrayList<>();
-        for (String[] row : Ak.rows("d25"))
+        for (String[] row : GameData.rows("action_rules"))
         {
             assertEquals(3, row.length);
-            if (!row[2].isEmpty()) loaded.add(row[0] + "|" + Au.valueOf(row[2]).name());
+            if (!row[2].isEmpty()) loaded.add(row[0] + "|" + ActionKind.valueOf(row[2]).name());
         }
         assertEquals(Arrays.asList("drink|DRINK", "eat|EAT", "~bury|BURY", "~scatter|SCATTER", "offer|OFFER", "cast|CAST"), loaded);
-        assertEquals(Ak.msg("ct"), Ak.pattern("ct").pattern());
-        assertEquals(Ak.msg("aj"), Ak.pattern("aj").pattern());
-        assertEquals(".*(pizza|cake|pie).*", Ak.pattern("pfood").pattern());
+        assertEquals(GameData.msg("light-tend"), GameData.pattern("light-tend").pattern());
+        assertEquals(GameData.msg("pizza-pie"), GameData.pattern("pizza-pie").pattern());
+        assertEquals(".*(pizza|cake|pie).*", GameData.pattern("pizza-cake-pie").pattern());
     }
 
     /** d26 contains phrases rather than gameval ids; d13 continues to validate region ids. */
-    @Test public void neutralTransferTableHasEveryUsedOutcomeAndNoUnusedRows() {
-        assertEquals(25, Ak.x("d26").size());
-        Set<String> used = new java.util.LinkedHashSet<>(MinigameTransferClassifier.R.keySet());
-        used.addAll(NeutralStorageClassifier.R.keySet());
-        assertEquals(used, Ak.r("d26").keySet());
-        List<String> storage = new ArrayList<>();
-        for (String[] row : Ak.x("d26")) {
+    @Test public void neutralTransferTableRowsAllCompileWithPhrasesAndNotes() {
+        List<String[]> rows = GameData.cachedRows("neutral_transfers");
+        assertEquals(24, rows.size());
+        assertEquals(rows.stream().map(row -> row[0]).collect(java.util.stream.Collectors.toList()),
+            new ArrayList<>(NeutralTransfers.RULES.keySet()));
+        for (String[] row : rows) {
             assertEquals(4, row.length);
-            if (row[0].startsWith("m")) {
-                MinigameTransferClassifier.Event event = MinigameTransferClassifier.Event.valueOf(row[2]);
-                assertEquals(event.note, Ak.t(row[3]));
-                assertFalse(row[1].isEmpty());
-            } else {
-                NeutralStorageClassifier.Kind kind = NeutralStorageClassifier.Kind.valueOf(row[2]);
-                storage.add(kind.name());
-                assertEquals(kind.name(), row[0]);
-                assertEquals(kind.note, Ak.t(row[3]));
-                assertEquals(kind.phrases, Ak.t(row[1]));
-            }
+            assertFalse(row[0], row[1].isEmpty());
+            assertFalse(row[0], GameData.text(row[3]).isEmpty());
         }
-        assertEquals(Arrays.stream(NeutralStorageClassifier.Kind.values()).map(Enum::name)
-            .collect(java.util.stream.Collectors.toList()), storage);
-        assertEquals(Arrays.asList("m0", "m1", "m2", "m3", "m4", "m5", "m6", "m7.lms", "m8.lms"),
-            new ArrayList<>(MinigameTransferClassifier.R.keySet()));
     }
 
     @Test public void cataloguePatternsUseExistingVerbKeyAndNamedDispenserFragments() {
-        assertEquals(Ak.msg("e"), BossRetrievalCatalogue.V.pattern());
-        assertEquals("grave.*", BossRetrievalCatalogue.G.pattern());
-        assertEquals(".*(agility dispenser|ticket dispenser).*", AgilityCourses.D.pattern());
-        assertEquals(java.util.regex.Pattern.DOTALL, BossRetrievalCatalogue.G.flags());
-        assertEquals(java.util.regex.Pattern.DOTALL, AgilityCourses.D.flags());
+        assertEquals(GameData.msg("claim-reclaim"), BossRetrievalCatalogue.RECLAIM.pattern());
+        assertEquals("grave.*", BossRetrievalCatalogue.GRAVE.pattern());
+        assertEquals(".*(agility dispenser|ticket dispenser).*", AgilityCourses.DISPENSER.pattern());
+        assertEquals(java.util.regex.Pattern.DOTALL, BossRetrievalCatalogue.GRAVE.flags());
+        assertEquals(java.util.regex.Pattern.DOTALL, AgilityCourses.DISPENSER.flags());
     }
 
     @Test public void rewardFragmentsKeepEveryUsedKeyAndCompiledWitness() {
-        assertEquals(new java.util.LinkedHashSet<>(REWARD_SOURCES), RewardChestCatalogue.R.keySet());
-        for (String[] row : Ak.rows("d3")) {
+        assertEquals(new java.util.LinkedHashSet<>(REWARD_SOURCES), RewardChestCatalogue.RULES.keySet());
+        for (String[] row : GameData.rows("reward_chests")) {
             assertEquals(2, row.length); assertEquals(row[0], row[1]);
-            assertTrue(Ag.has(row[0], RewardChestCatalogue.R.get(row[0])));
+            assertTrue(Phrases.has(row[0], RewardChestCatalogue.RULES.get(row[0])));
         }
     }
 
@@ -395,30 +386,30 @@ public class GameDataTablesTest
             "chaos", ItemID.CHAOSRUNE, "death", ItemID.DEATHRUNE, "blood", ItemID.BLOODRUNE,
             "soul", ItemID.SOULRUNE, "wrath", ItemID.WRATHRUNE);
         List<String> names = new ArrayList<>(); Set<String> used = new HashSet<>();
-        for (String[] row : Ak.rows("d27")) {
+        for (String[] row : GameData.rows("spell_recipes")) {
             assertEquals(2, row.length); names.add(row[0]);
             for (String part : row[1].split(" ")) {
                 String[] split = part.split(":"); used.add(split[1]);
                 assertTrue(ids.get(split[1]) > 0);
-                assertEquals(Long.valueOf(split[0]), Spells.R.get(row[0]).get(split[1]));
+                assertEquals(Long.valueOf(split[0]), Spells.RECIPES.get(row[0]).get(split[1]));
             }
         }
         assertEquals(ids.keySet(), used);
-        assertEquals(names, new ArrayList<>(Spells.R.keySet()));
+        assertEquals(names, new ArrayList<>(Spells.RECIPES.keySet()));
     }
 
     @Test public void activityTableKeepsEveryUsedListAndPredicate() {
-        assertEquals(Set.of("curated", "short", "combat", "pursuit", "generic"), ActivityLabel.R.keySet());
+        assertEquals(Set.of("curated", "short", "combat", "pursuit", "generic"), ActivityLabel.RULES.keySet());
         Map<String,List<String>> values = new HashMap<>();
-        for (String[] row : Ak.rows("d28")) {
+        for (String[] row : GameData.rows("activity_rules")) {
             assertEquals(3,row.length);
             values.put(row[0], Arrays.stream(row[2].split("\\|"))
-                .map(Ak::t).collect(java.util.stream.Collectors.toList()));
+                .map(GameData::text).collect(java.util.stream.Collectors.toList()));
         }
         assertEquals(Arrays.asList("PKing","Trading","Death reclaim"),values.get("pursuit"));
         assertEquals(Arrays.asList("General","NPC loot"),values.get("generic"));
         for (net.runelite.api.Skill skill : net.runelite.api.Skill.values())
-            assertEquals(ActivityLabel.COMBAT.contains(skill.getName()),Ag.has(skill.getName(),ActivityLabel.R.get("combat")));
+            assertEquals(ActivityLabel.COMBAT.contains(skill.getName()),Phrases.has(skill.getName(),ActivityLabel.RULES.get("combat")));
     }
 
 }

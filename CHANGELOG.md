@@ -1,5 +1,49 @@
 # GP Manager changelog
 
+## 1.3.3 — 2026-10-11
+
+Your GP Manager history starts fresh with this update; the old save is kept beside the new one as `sessions.schema108-….json`.
+
+**New**
+- Picking up something you dropped a few minutes ago shrinks its Dropped row instead of adding a gain.
+- Picking up arrows, bolts and blowpipe darts you fired shrinks the shot the same way; a blowpipe shot keeps its Zulrah's scales cost.
+- With the game's ammo-picking setting, darts you pick up straight into the blowpipe recover the shot too, and the next Check still counts them once.
+- Dwarf multicannon: setting it up and picking it up book nothing; only the cannonballs it fires count, and balls you get back shrink the load.
+- The Toxic staff of the dead and the serpentine, tanzanite and magma helms count the Zulrah's scales your Checks show they used.
+- An abyssal tentacle that runs out or is dissolved books its whip as a loss instead of asking in Review.
+- Herb boxes are worth nothing until opened, like a casket: each Take-one counts its herb with no Review or "?". Bank-all counts nothing, since the game only says how many herbs went to the bank.
+
+**Fixed**
+- A Check counts darts, scales and runes you loaded since the last Check, so reloading picked-up darts or topping up to the same count no longer hides what you fired.
+- A Check that shows the darts unchanged while the scales fall removes the dart estimates, as a Check that changed nothing already did.
+- A dart a Check already accounted for books as a normal gain when picked up, instead of vanishing.
+- Picking up one item from a drop of several keeps the others' cost.
+- The bank's Configure-Charges, Uncharge and Unload no longer read as charges spent at the next Check, and only restart that item's Checks.
+- Casts and shots before a recharge or a first Check stay counted; the next Check no longer removes them as overestimates.
+- Dropped items and fired ammo nobody picks up leave the purchase-price record once they can no longer be picked up, so later GE sales of the same item show the right profit.
+- The Losses table's All view lists newest first, like Gains.
+- Opening a gain from Live shows the Losses table on All, not Supplies.
+- A private boss instance paid partly from the bank counts the bank part too, not just the coffer part.
+- Reclaim fees at the Mimic's strange casket and at the Dragon Slayer II, Sins of the Father, Song of the Elves and Fremennik Exiles retrieval points name their service.
+- An old GE sale whose receipt was compacted shows its result as unavailable instead of asking for Review.
+- After a relog, a GE offer GP Manager couldn't trust stays untrusted.
+- Coins from an alch or a shop sale while a GE sale waits to be collected are no longer booked as that sale.
+- The Reset sheet says a safety copy is saved first (it always was), and the retention setting says it compacts entries, not just closed sessions.
+
+**Changed**
+- PvP keeps kills, deaths, streaks and best kill per Grind in a smaller save.
+
+**Removed**
+- The Bank · Carried wealth line under All time.
+- Decide all in Review.
+- HUD+ moments.
+- The Restore backup and Clear old backups menu items.
+- Grind recap extras.
+- AFK pause and End Grind after AFK.
+- The Ledger Deaths table and death panel; death losses still show under Costs · Loss.
+- The GE reference and GE difference lines on GE receipts; Received, Spent, Result and GE tax stay.
+- Back up first on the Factory reset sheet; Reset already saves its own safety copy first.
+
 ## 1.3.2 — 2026-10-10
 
 **New**

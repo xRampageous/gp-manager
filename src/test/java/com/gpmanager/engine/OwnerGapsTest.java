@@ -33,16 +33,16 @@ public class OwnerGapsTest
         THIRD_AGE, 900_000_000, TEAK_PLANK, 600, TEAK_LOGS, 90, JAR, 290);
 
     private final Map<Integer, Long> inventory = new HashMap<>(Map.of(COINS, 100_000L));
-    private final Am engine = new Am(deltas ->
+    private final Engine engine = new Engine(deltas ->
     {
-        List<Ab> flows = new ArrayList<>();
+        List<Flow> flows = new ArrayList<>();
         deltas.forEach((id, quantity) ->
         {
             String name = NAMES.getOrDefault(id, "Item " + id);
-            boolean clue = Ak.pattern("clue").matcher(name).matches();
+            boolean clue = GameData.pattern("clue").matcher(name).matches();
             int unit = clue ? 0 : PRICES.getOrDefault(id, 0);
-            flows.add(new Ab(id, name, quantity, unit, quantity * unit,
-                id == COINS ? Av.FACE_VALUE : clue ? Av.DEFERRED_CLAIM : Av.GRAND_EXCHANGE));
+            flows.add(new Flow(id, name, quantity, unit, quantity * unit,
+                id == COINS ? PriceSource.FACE_VALUE : clue ? PriceSource.DEFERRED_CLAIM : PriceSource.GRAND_EXCHANGE));
         });
         return flows;
     }, new TransactionClassifier(), new GpManagerConfig()
@@ -59,13 +59,13 @@ public class OwnerGapsTest
     public void aClueDropRidesTheTrayWithNoQuestionMark()
     {
         start();
-        Ac drop = change(CLUE, 1L);
+        Transaction drop = change(CLUE, 1L);
         assertTrue("a clue drop books now", drop != null);
         HudTray tray = new HudTray();
         tray.booked(drop, now, false);
         HudTray.Entry entry = tray.entries().get(0);
         assertEquals("Clue scroll (hard)", entry.name);
-        assertEquals("worth nothing yet, and no question mark", "", Cp.value(entry));
+        assertEquals("worth nothing yet, and no question mark", "", HudBuilder.value(entry));
         assertNull("opening it books nothing", change(CLUE, -1L, CASKET, 1L));
     }
 
@@ -86,24 +86,24 @@ public class OwnerGapsTest
         assertTrue("a big drop keeps its own gold row", tray.entries().stream()
             .anyMatch(entry -> entry.itemId == THIRD_AGE && entry.gold));
 
-        Ab empty = new Ab(JAR, "Impling jar", -1L, 290, -290L);
-        Ab full = new Ab(11248, "Eclectic impling jar", 1L, 20_000, 20_000L);
+        Flow empty = new Flow(JAR, "Impling jar", -1L, 290, -290L);
+        Flow full = new Flow(11248, "Eclectic impling jar", 1L, 20_000, 20_000L);
         assertNull("catching an impling is no opening", HudTray.opened(List.of(empty, full)));
-        assertEquals("looting the jar is", 11248, HudTray.opened(List.of(new Ab(11248, "Eclectic impling jar", -1L, 20_000, -20_000L),
-            new Ab(PLATEBODY, "Rune platebody", 1L, 38_000, 38_000L))).itemId);
+        assertEquals("looting the jar is", 11248, HudTray.opened(List.of(new Flow(11248, "Eclectic impling jar", -1L, 20_000, -20_000L),
+            new Flow(PLATEBODY, "Rune platebody", 1L, 38_000, 38_000L))).itemId);
     }
 
     @Test
     public void coinsForAnItemWhileTalkingToAnNpcIsAPurchase()
     {
         start();
-        assertTrue("without a conversation it stays Review", Eh.aal(change(COINS, -2_000L, JAR, 1L)));
-        engine.eb.put(Eb.DG, 0, 1L, 4, null);
-        Ac bought = change(COINS, -2_000L, JAR, 1L);
-        assertSame(Ai.TRADE, bought.getType());
-        assertSame(Aj.MARKET, bought.getContext());
+        assertTrue("without a conversation it stays Review", ReviewRules.needsOwnerDecision(change(COINS, -2_000L, JAR, 1L)));
+        engine.inbox.put(Inbox.DIALOGUE, 0, 1L, 4, null);
+        Transaction bought = change(COINS, -2_000L, JAR, 1L);
+        assertSame(TransactionType.TRADE, bought.getType());
+        assertSame(Context.MARKET, bought.getContext());
         assertTrue(bought.isCounted());
-        assertTrue("not Review", !Eh.aal(bought));
+        assertTrue("not Review", !ReviewRules.needsOwnerDecision(bought));
         assertEquals("paid 2,000 for a 290 jar; the first is still in Review", -1_710L, net());
     }
 
@@ -111,22 +111,22 @@ public class OwnerGapsTest
     public void aServantsBankTripsAreNeutralButHisWageAndTheSawmillCount()
     {
         start();
-        engine.eb.put(Eb.SV, 0, 1L, 4, null);
+        engine.inbox.put(Inbox.SERVANT, 0, 1L, 4, null);
         change(TEAK_PLANK, 26L);
         assertEquals("planks fetched from the bank", 0L, net());
 
-        engine.eb.put(Eb.SV, 0, 1L, 4, null);
+        engine.inbox.put(Inbox.SERVANT, 0, 1L, 4, null);
         change(COINS, -10_000L, TEAK_PLANK, 26L);
         assertEquals("his wage counts; the planks he brought do not", -10_000L, net());
 
-        engine.eb.put(Eb.SV, 0, 1L, 4, null);
-        engine.eb.put(Eb.SW, 0, 1L, 200, null);
+        engine.inbox.put(Inbox.SERVANT, 0, 1L, 4, null);
+        engine.inbox.put(Inbox.SAWMILL, 0, 1L, 200, null);
         change(TEAK_LOGS, -26L, COINS, -13_000L);
-        engine.eb.put(Eb.SV, 0, 1L, 4, null);
+        engine.inbox.put(Inbox.SERVANT, 0, 1L, 4, null);
         change(TEAK_PLANK, 26L);
         assertEquals("the sawmill: logs and fee spent, planks made", -10_000L - 26L * 90L - 13_000L + 26L * 600L, net());
 
-        engine.eb.put(Eb.SV, 0, 1L, 4, null);
+        engine.inbox.put(Inbox.SERVANT, 0, 1L, 4, null);
         change(TEAK_PLANK, -26L);
         assertEquals("taking planks to the bank after the sawmill trip is neutral again",
             -10_000L - 26L * 90L - 13_000L + 26L * 600L, net());
@@ -135,25 +135,25 @@ public class OwnerGapsTest
     @Test
     public void thePvpTutorialArenaIsALendingZone()
     {
-        assertTrue(MinigameRegionHints.xa(10588));
-        assertTrue("Ferox Enclave itself is not", !MinigameRegionHints.xa(12344));
-        assertTrue("the Gauntlet keeps its own rule", MinigameRegionHints.xl(7512) && !MinigameRegionHints.xa(7512));
+        assertTrue(MinigameRegionHints.isPvpTutorial(10588));
+        assertTrue("Ferox Enclave itself is not", !MinigameRegionHints.isPvpTutorial(12344));
+        assertTrue("the Gauntlet keeps its own rule", MinigameRegionHints.isNeutralZoneRegion(7512) && !MinigameRegionHints.isPvpTutorial(7512));
     }
 
-    private Ac opened(int reward, long value)
+    private Transaction opened(int reward, long value)
     {
-        return Tx.of(now, Ai.GAIN, Aj.GENERIC, "", true, List.of(
-            new Ab(CASKET, "Reward casket (hard)", -1L, 0, 0L, Av.DEFERRED_CLAIM),
-            new Ab(reward, NAMES.get(reward), 1L, (int) Math.min(Integer.MAX_VALUE, value), value)));
+        return Tx.of(now, TransactionType.GAIN, Context.GENERIC, "", true, List.of(
+            new Flow(CASKET, "Reward casket (hard)", -1L, 0, 0L, PriceSource.DEFERRED_CLAIM),
+            new Flow(reward, NAMES.get(reward), 1L, (int) Math.min(Integer.MAX_VALUE, value), value)));
     }
 
     private void start()
     {
-        engine.ajl("Gaps", Cx.GENERAL, now);
-        engine.setBaseline(new Cc(new HashMap<>(inventory)));
+        engine.startCustom("Gaps", now);
+        engine.setBaseline(new ContainerSnapshot(new HashMap<>(inventory)));
     }
 
-    private Ac change(Object... idsAndDeltas)
+    private Transaction change(Object... idsAndDeltas)
     {
         for (int index = 0; index < idsAndDeltas.length; index += 2)
         {
@@ -162,9 +162,9 @@ public class OwnerGapsTest
         inventory.values().removeIf(quantity -> quantity == 0L);
         int before = engine.getActiveSession().getTransactions().size();
         now += 3_000L;
-        engine.adj(new Cc(new HashMap<>(inventory)), now);
-        engine.adj(new Cc(new HashMap<>(inventory)), now + 600L);
-        List<Ac> all = engine.getActiveSession().getTransactions();
+        engine.processIfDirty(new ContainerSnapshot(new HashMap<>(inventory)), now);
+        engine.processIfDirty(new ContainerSnapshot(new HashMap<>(inventory)), now + 600L);
+        List<Transaction> all = engine.getActiveSession().getTransactions();
         return all.size() > before ? all.get(all.size() - 1) : null;
     }
 

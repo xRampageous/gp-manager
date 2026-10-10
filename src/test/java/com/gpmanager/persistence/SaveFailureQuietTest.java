@@ -33,17 +33,17 @@ public class SaveFailureQuietTest
         SessionRepository repository = new SessionRepository(new Gson(), FilepathTestSupport.root(dir))
         {
             @Override
-            void ma(Filepath source, Filepath target) throws java.io.IOException
+            void atomicMove(Filepath source, Filepath target) throws java.io.IOException
             {
                 if (attempts[0]++ == 0)
                 {
                     throw new AccessDeniedException(String.valueOf(source));
                 }
-                super.ma(source, target);
+                super.atomicMove(source, target);
             }
         };
         Filepath root = FilepathTestSupport.root(dir);
-        repository.afl(root.joinSegment("sessions.next.json"), root.joinSegment("sessions.json"));
+        repository.replaceFile(root.joinSegment("sessions.next.json"), root.joinSegment("sessions.json"));
         assertEquals("one retry", 2, attempts[0]);
         assertTrue("the save landed", Files.exists(dir.resolve("sessions.json")));
     }
@@ -56,7 +56,7 @@ public class SaveFailureQuietTest
             FilepathTestSupport.root(temporary.newFolder("writer").toPath()))
         {
             @Override
-            synchronized boolean save(Cs intent)
+            synchronized boolean save(WriteIntent intent)
             {
                 return !fail[0];
             }
@@ -68,17 +68,17 @@ public class SaveFailureQuietTest
             {
                 save(writer, repository, attempt);
                 assertNotEquals("a one-off failure stays quiet (attempt " + attempt + ")",
-                    Ci.State.FAILED, writer.getStatus().state);
+                    SaveStatus.State.FAILED, writer.getStatus().state);
             }
             save(writer, repository, 3);
-            assertEquals("the third failure in a row warns", Ci.State.FAILED, writer.getStatus().state);
+            assertEquals("the third failure in a row warns", SaveStatus.State.FAILED, writer.getStatus().state);
 
             fail[0] = false;
             save(writer, repository, 4);
-            assertEquals(Ci.State.OK, writer.getStatus().state);
+            assertEquals(SaveStatus.State.OK, writer.getStatus().state);
             fail[0] = true;
             save(writer, repository, 5);
-            assertNotEquals("a success starts the count again", Ci.State.FAILED, writer.getStatus().state);
+            assertNotEquals("a success starts the count again", SaveStatus.State.FAILED, writer.getStatus().state);
         }
         finally
         {
@@ -90,7 +90,7 @@ public class SaveFailureQuietTest
     {
         SavedState state = new SavedState();
         state.setRevision(revision);
-        writer.submit(new Cs(null, repository.scopeGeneration, repository.lastKnownDiskRevision, state));
+        writer.submit(new WriteIntent(null, repository.scopeGeneration, repository.lastKnownDiskRevision, state));
         assertTrue(writer.flush(Duration.ofSeconds(5)));
     }
 }

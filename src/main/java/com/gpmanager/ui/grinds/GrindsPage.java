@@ -1,382 +1,518 @@
 package com.gpmanager;
-import com.gpmanager.Table.Menu;
-import com.gpmanager.SavedState.Ap;
+
+import static com.gpmanager.Fmt.*;
+import static com.gpmanager.GameData.msg;
+import static com.gpmanager.Kit.*;
+import static com.gpmanager.Kit.Tone.*;
+
+import com.gpmanager.GrindsData.*;
 import com.gpmanager.Hero.Cell;
-import com.gpmanager.Kit.Tone;
+import com.gpmanager.SavedState.SavedGrind;
 import com.gpmanager.Table.*;
-import com.gpmanager.As.*;
+import com.gpmanager.Table.Menu;
+
+import lombok.*;
+
 import java.awt.*;
 import java.time.*;
 import java.util.*;
 import java.util.List;
+
 import javax.swing.*;
-import lombok.*;
-import static com.gpmanager.Kit.Tone.*;
-import static com.gpmanager.Kit.*;
-import static com.gpmanager.Fmt.*;
-import static com.gpmanager.Ak.msg;
+
 /**
-* Grinds = management (SIDEBAR_SPEC.md §3): the Running line linking to Live, the My Grinds table
-* with the selected row's panel, and Recent grinds opening Grind detail (hero, highlights, vs
-* previous, personal bests). The page renders a {@link As} and holds no engine.
-*/
+ * Grinds = management (SIDEBAR_SPEC.md §3): the Running line linking to Live, the My Grinds table
+ * with the selected row's panel, and Recent grinds opening Grind detail (hero, highlights, vs
+ * previous, personal bests). The page renders a {@link GrindsData} and holds no engine.
+ */
 class GrindsPage implements Shell.Page {
-interface Actions {
- /** Shows Live. */
- void back();
- void openLedger(String sessionId);
- void endGrind();
- void startGrind(String grindId, Long netOverride, Long timeOverride, String nameOverride);
- void openTargets();
- /** Saves the viewed run as a My Grind (F20): the id selects the run, never the active one. */
- void saveThisGrind(String sessionId);
- /** Opens the Start Grind sheet. */
- void newGrind();
- /** Saves a new, empty My Grind from a name. */
- void addGrind();
- /** Updates a saved Grind's defaults from the viewed run (F20): the session id names the run. */
- void updateSavedGrind(String grindId, String sessionId);
- void editSavedGrind(String grindId);
- void startWithChanges(String grindId);
- void archiveSavedGrind(String grindId, boolean archived);
- void deleteSavedGrind(String grindId);
- void startAgain(String sessionId);
- void openDetail(String sessionId);
- void deleteHistorical(String sessionId);
- /** The Grinds ⋯ menu: backups and recovery. */
- void openDataMenu(JComponent anchor);
- void refresh();
-}
+    interface Actions {
+        /** Shows Live. */
+        void back();
 
-Actions actions;
-JPanel body = stack(PANEL, GAP);
-JPanel bar = new JPanel(new BorderLayout(4, 0));
-JPanel list = stack(PANEL, GAP);
-JPanel detail = stack(PANEL, GAP);
-JPanel running = new JPanel(new BorderLayout(GAP, 0));
-JLabel runningName = label("", bold(), TEXT);
-JLabel runningNet = label("", Kit.body(), TEXT);
-Table mine = new Table("MY GRINDS");
-JPanel selectedPanel = stack(CARD, 0);
-Table recent = new Table("RECENT GRINDS");
-/** All time as one compact strip; hovering it gives the full breakdown. */
-JPanel allTime = stack(CARD, 0);
-Hero hero = new Hero();
-As data;
-String selectedId;
-GrindsPage(Actions actions) {
- this.actions = actions;
- JButton start = button("Start Grind", true, actions::newGrind);
- JButton add = button("+ Add Grind", false, actions::addGrind);
- JButton more = button("\u00b7\u00b7\u00b7", false, () -> { });
- more.setToolTipText("Grinds options");
- more.getAccessibleContext().setAccessibleName("Grinds options");
- more.addActionListener(e -> actions.openDataMenu(more));
- // Owner 2026-10-01: the same toolbar band as the Ledger; the controls live in the header.
- Kit.h1(bar, new JComponent[] {start, add}, new JComponent[] {more});
- running.setBackground(CARD);
- pad(running, 2, 6, 2, 2);
- runningName.setText("● ");
- runningName.setForeground(TEXT);
- running.add(runningName, BorderLayout.WEST);
- runningNet.setHorizontalAlignment(JLabel.RIGHT);
- running.add(runningNet, BorderLayout.CENTER);
- var amy = new JPanel(new FlowLayout(FlowLayout.RIGHT, 2, 0));
- amy.setOpaque(false);
- JButton live = button("Live ›", false, actions::back);
- live.setToolTipText("Open Live");
- JButton end = button("End", false, actions::endGrind);
- end.setForeground(LOSS.color);
- end.setToolTipText(msg("q"));
- amy.add(live);
- amy.add(end);
- running.add(amy, BorderLayout.EAST);
- mine.setEmptyText(msg("gx"));
- recent.setEmptyText(msg("by")).setFill(true);
- pad(selectedPanel, 0, 0, 4, 0);
- // Owner 2026-09-28: My Grinds and Recent grinds first; All time closes the page.
- for (JComponent part : new JComponent[] {running, mine, selectedPanel, recent, allTime}) list.add(part);
- pad(body, 0, GAP, GAP, 0);
- body.add(list);
- body.add(detail);
-}
+        void openLedger(String sessionId);
 
-public String id() {
- return Shell.GRINDS;
-}
+        void endGrind();
 
-public JComponent pageBar() {
- return bar;
-}
+        void startGrind(String grindId, String nameOverride);
 
-public JComponent body() {
- return body;
-}
+        void openTargets();
 
-void apply(As next) {
- data = next;
- list.setVisible(next.detail == null);
- detail.setVisible(next.detail != null);
- if (next.detail != null) {
-  mw(next);
- } else {
-  ky(next);
-  kn(next.allTime);
-  aud(next);
-  kx(next);
- }
- body.revalidate();
- body.repaint();
-}
+        /**
+         * Saves the viewed run as a My Grind (F20): the id selects the run, never the active one.
+         */
+        void saveThisGrind(String sessionId);
 
-// ---- list ---------------------------------------------------------------------------------
-void ky(As d) {
- running.setVisible(d.hasActive);
- if (!d.hasActive) return;
- var menu = new ArrayList<Act>();
- menu.add(new Act("Open in Ledger", () -> actions.openLedger(d.activeSessionId)));
- menu.add(new Act("Targets…", actions::openTargets));
- menu.add(d.activeGrindId.isEmpty() ? new Act("Save This Grind", () -> actions.saveThisGrind(d.activeSessionId))
- : new Act("Update Saved Grind", () -> actions.updateSavedGrind(d.activeGrindId, d.activeSessionId)));
- runningName.setText(msg("cr") + d.activeName.replace("<", "&lt;") + "</html>");
- runningNet.setText(signed(d.activeNet));
- runningNet.setForeground(sign(d.activeNet).color);
- running.setToolTipText(aww(d.activeRateEstablished, d.activeGpPerHour) + " · "
- + duration(d.activeMillis) + " active · " + aju(d.activeNetTarget, d.activeTimeTarget));
- runningNet.setToolTipText(ru(d.activeNet) + " gp");
- running.setComponentPopupMenu(popup(menu));
-}
+        /** Opens the Start Grind sheet. */
+        void newGrind();
 
-/** Every retained session, Free play included; bests are finished Grinds only. */
-void kn(As.AllTime a) {
- var tip = new StringBuilder("<html>All time · ").append(a.grinds).append(a.grinds == 1 ? " Grind" : " Grinds")
- .append("<br>Net ").append(ru(a.net)).append(" gp<br>Active ").append(duration(a.activeMillis));
- if (a.splitAvailable) {
-  tip.append("<br>Supplies ").append(signed(-a.supplies)).append(" · Losses ").append(signed(-a.losses));
- }
- if (a.bestRateName != null) {
-  tip.append("<br>Best GP/h ").append(a.bestRateName).append(" · ").append(rate(a.bestRate));
- }
- String best = a.bestNetName == null ? "" : "Best · " + a.bestNetName + " " + signed(a.bestNet);
- allTime.removeAll();
- JLabel title = label("ALL TIME · " + a.grinds, small(), LABEL);
- pad(title, 3, 6, 3, 6);
- allTime.add(title);
- allTime.add(Hero.strip(List.of(new Cell("NET", signed(a.net), sign(a.net), ru(a.net) + " gp", null),
- new Cell("GP/H", a.gpPerHour == null ? "—" : rate(a.gpPerHour), PLAIN, null, null),
- new Cell("ACTIVE", ra(a.activeMillis), PLAIN, duration(a.activeMillis), null))));
- if (!best.isEmpty()) {
-  JLabel anm = label(best, small(), sign(a.bestNet).color);
-  pad(anm, 3, 6, 4, 6);
-  allTime.add(anm);
- }
- if (a.wealth > 0L) {
-  // Owner 1.2: the bank (when last seen) and what you carry, side by side.
-  long carried = a.wealth - a.bank;
-  JLabel worth = label(a.bankAge < 0L ? "Carried " + compact(carried) + msg("cx")
-  : "Bank " + compact(a.bank) + " · Carried " + compact(carried), small(), LABEL);
-  pad(worth, 0, 6, 4, 6);
-  worth.setToolTipText("Bank " + ru(a.bank) + " gp" + (a.bankAge < 0L ? "" : ", checked " + age(a.bankAge))
-  + msg("cw") + ru(carried) + " gp");
-  allTime.add(worth);
- }
- allTime.setToolTipText(tip.append("</html>").toString());
- for (Component child : allTime.getComponents()) {
-  if (child instanceof JComponent && ((JComponent) child).getToolTipText() == null) {
-   ((JComponent) child).setToolTipText(allTime.getToolTipText());
-  }
- }
- allTime.revalidate();
-}
+        /** Saves a new, empty My Grind from a name. */
+        void addGrind();
 
-void aud(As d) {
- var rows = new ArrayList<Row>();
- MyGrind selected = null;
- for (MyGrind grind : d.myGrinds) {
-  Ap def = grind.definition;
-  String id = def.getGrindId();
-  boolean isSelected = id.equals(selectedId);
-  if (isSelected) selected = grind;
-  rows.add(new Row(id, null, (def.favorite ? "★ " : "") + def.getName(),
-  grind.yk == 0 ? "NEW" : grind.yk + (grind.yk == 1 ? " run" : " runs"),
-  grind.hasLast ? signed(grind.lastNet) : "—", grind.hasLast ? sign(grind.lastNet) : DIM,
-  def.getName() + " · " + aju(def.getNetTargetGp(), def.getActiveTimeTargetMillis()),
-  grind.hasLast ? "Last run " + ru(grind.lastNet) + " gp" : "", isSelected,
-  () -> select(isSelected ? null : id), axz(aun(grind))));
- }
- mine.r1("MY GRINDS", rows);
- if (selected == null) selectedId = null;
- kz(selected);
-}
+        /**
+         * Updates a saved Grind's defaults from the viewed run (F20): the session id names the run.
+         */
+        void updateSavedGrind(String grindId, String sessionId);
 
-void select(String id) {
- selectedId = id;
- if (data != null) {
-  aud(data);
-  body.revalidate();
- }
-}
+        void editSavedGrind(String grindId);
 
-void kz(MyGrind grind) {
- selectedPanel.removeAll();
- selectedPanel.setVisible(grind != null);
- if (grind == null) return;
- Ap def = grind.definition;
- var facts = new Dd(null);
- facts.put("Last run", grind.hasLast ? signed(grind.lastNet) + " · "
- + when(grind.lastStartedAt, Ae.now()) : "—", grind.hasLast ? sign(grind.lastNet) : DIM);
- facts.put("Best", grind.hasBest ? signed(grind.bestNet) : "—", grind.hasBest ? sign(grind.bestNet) : DIM);
- facts.put("Target", aju(def.getNetTargetGp(), def.getActiveTimeTargetMillis()), PLAIN);
- selectedPanel.add(facts);
- var buttons = new JPanel(new FlowLayout(FlowLayout.LEFT, 4, 2));
- buttons.setOpaque(false);
- // Owner 2026-10-01 (F14): the selected saved Grind starts right here, beside its menu.
- JButton start = button("Start", true, () -> actions.startGrind(def.getGrindId(), null, null, null));
- start.setToolTipText("Start " + def.getName());
- buttons.add(start);
- JButton more = button("···", false, () -> { });
- more.setToolTipText("More for this Grind");
- more.addActionListener(e -> popup(aun(grind)).show(more, 0, more.getHeight()));
- buttons.add(more);
- selectedPanel.add(buttons);
-}
+        void startWithChanges(String grindId);
 
-List<Act> aun(MyGrind grind) {
- Ap def = grind.definition;
- String id = def.getGrindId();
- return Arrays.asList(new Act("Start", () -> actions.startGrind(id, null, null, null)),
- new Act(msg("cv"), () -> actions.startWithChanges(id)), new Act("Edit…", () -> actions.editSavedGrind(id)),
- new Act(def.archived ? "Unarchive" : "Archive", () -> actions.archiveSavedGrind(id, !def.archived)),
- new Act("Delete…", () -> actions.deleteSavedGrind(id)));
-}
+        void archiveSavedGrind(String grindId, boolean archived);
 
-void kx(As d) {
- long now = Ae.now();
- var rows = new ArrayList<Row>();
- for (Recent run : d.recent) {
-  String id = run.sessionId;
-  ZoneId zone = d.profileZone == null ? ZoneId.systemDefault() : d.profileZone;
-  String when = awc(Instant.ofEpochMilli(run.startedAt).atZone(zone).toLocalDate(), now, zone);
-  rows.add(new Row(id, null, run.name, when, avo(run.net),
-  sign(run.net), run.name + " · " + qe(run, now, d.profileZone),
-  ru(run.net) + " gp", false, () -> actions.openDetail(id), Arrays.asList(
-  new Menu("Open in Ledger", () -> actions.openLedger(id)), new Menu("Start again", () -> actions.startAgain(id)),
-  new Menu("Delete…", () -> actions.deleteHistorical(id)))));
- }
- recent.r1("RECENT GRINDS", rows);
-}
+        void deleteSavedGrind(String grindId);
 
-// ---- detail -------------------------------------------------------------------------------
-void mw(As d) {
- As.Detail g = d.detail;
- detail.removeAll();
- JButton back = button("‹ Grinds", false, () -> actions.openDetail(null));
- var top = new JPanel(new BorderLayout());
- top.setOpaque(false);
- top.add(back, BorderLayout.WEST);
- top.add(label(when(g.startedAt, Ae.now()).toUpperCase(Locale.ROOT),
- small(), LABEL), BorderLayout.EAST);
- pad(top, 0, 0, 0, 6);
- detail.add(top);
- hero.status(g.closed ? OFF : GAIN.color, g.closed ? "Finished" : "Running", g.name, g.closed ? "COMPLETE" : "", null);
- hero.big(signed(g.net), sign(g.net), ru(g.net) + " gp",
- g.rateEstablished ? rate(g.gpPerHour) + "/h" : "—", g.rateEstablished, duration(g.activeMillis) + " ACTIVE");
- // Owner 2026-10-01 (F12): a completed run's rate is the whole-run basis.
- hero.rate.setToolTipText(g.rateEstablished ? msg("cb") : null);
- var strip = new ArrayList<Cell>();
- strip.add(new Cell("GAINS", signed(g.revenue), GAIN, exact(g.revenue) + " gp", null));
- if (g.splitAvailable) {
-  strip.add(new Cell("SUPPLY", signed(-g.supplies), SUPPLY, exact(g.supplies) + " gp", null));
-  strip.add(new Cell("LOSS", signed(-g.losses), LOSS, exact(g.losses) + " gp", null));
- } else {
-  long costs = g.revenue - g.net;
-  strip.add(new Cell("COSTS", signed(-costs), LOSS, msg("ba"), null));
- }
- hero.strips(Collections.singletonList(strip));
- detail.add(hero);
- var outcome = new Dd("HIGHLIGHTS");
- if (g.closed && g.history != null) highlights(outcome, g.history.recap);
- outcome.put("Target", g.aay(), PLAIN);
- if (g.activeTimeTargetMillis != null) outcome.put("Time", g.akd(), PLAIN);
- if (d.activePace != null && d.activePace.present && d.activePace.available && g.sessionId.equals(d.activeSessionId)) {
-  outcome.put("Pace", d.activePace.line, DIM);
-  // Owner 2026-10-01 (F10): a combined target also shows its required average.
-  if (d.activePace.second != null) outcome.put("", d.activePace.second, DIM);
- }
- detail.add(outcome);
- if (g.closed && g.history != null && !g.history.recap.sources.isEmpty()) {
-  var sources = new Dd("LOOT BY SOURCE");
-  for (Ba.Highlight source : g.history.recap.sources) {
-   sources.put(source.name, source.avo(), GAIN);
-  }
-  detail.add(sources);
- }
- if (g.compacted) detail.add(note(msg("fs"), LABEL));
- var buttons = new JPanel(new FlowLayout(FlowLayout.LEFT, 4, 2));
- buttons.setOpaque(false);
- buttons.add(button("Start again", true, () -> actions.startAgain(g.sessionId)));
- buttons.add(button("Open in Ledger", false, () -> actions.openLedger(g.sessionId)));
- var menu = new ArrayList<Act>();
- menu.add(g.linkedGrindId.isEmpty() ? new Act("Save This Grind", () -> actions.saveThisGrind(g.sessionId))
- : new Act("Update Saved Grind", () -> actions.updateSavedGrind(g.linkedGrindId, g.sessionId)));
- if (g.closed) {
-  menu.add(new Act("Delete…", () -> actions.deleteHistorical(g.sessionId)));
- }
- JButton more = button("···", false, () -> { });
- more.addActionListener(e -> popup(menu).show(more, 0, more.getHeight()));
- buttons.add(more);
- detail.add(buttons);
- detail.add(note(msg("z"), LABEL));
-}
+        void startAgain(String sessionId);
 
-static void highlights(Dd kv, Ba.Recap recap) {
- if (recap.highlightsUnavailable) kv.put(msg("bl"), "", DIM);
- if (recap.biggestGain != null) kv.put(recap.biggestGain.name, recap.biggestGain.avo(), GAIN);
- if (recap.lz != null) kv.put(recap.lz.name, recap.lz.avo(), LOSS);
-}
+        void openDetail(String sessionId);
 
-/** A menu entry usable both as a row's right-click menu and a ⋯ popup. */
-@AllArgsConstructor
-static class Act {
- String label;
- Runnable run;
-}
+        void deleteHistorical(String sessionId);
 
-static List<Menu> axz(List<Act> items) {
- var menu = new ArrayList<Menu>();
- for (Act item : items) menu.add(new Menu(item.label, item.run));
- return menu;
-}
+        /** The Grinds ⋯ menu: backups and recovery. */
+        void openDataMenu(JComponent anchor);
 
-static JPopupMenu popup(List<Act> items) {
- return Kit.m1(axz(items));
-}
+        void refresh();
+    }
 
-// ---- text ---------------------------------------------------------------------------------
-/** Date and duration context: Today/Yesterday/date plus Active Time, never internal ids. */
-static String qe(Recent recent, long now) {
- return qe(recent, now, ZoneId.systemDefault());
-}
+    Actions actions;
+    JPanel body = stack(PANEL, GAP);
+    JPanel bar = new JPanel(new BorderLayout(4, 0));
+    JPanel list = stack(PANEL, GAP);
+    JPanel detail = stack(PANEL, GAP);
+    JPanel running = new JPanel(new BorderLayout(GAP, 0));
+    JLabel runningName = label("", bold(), TEXT);
+    JLabel runningNet = label("", Kit.body(), TEXT);
+    Table mine = new Table("MY GRINDS");
+    JPanel selectedPanel = stack(CARD, 0);
+    Table recent = new Table("RECENT GRINDS");
 
-static String qe(Recent recent, long now, ZoneId zone) {
- ZoneId z = zone == null ? ZoneId.systemDefault() : zone;
- return awc(Instant.ofEpochMilli(recent.startedAt).atZone(z).toLocalDate(), now, z)
- + " · " + ra(recent.activeMillis);
-}
+    /** All time as one compact strip; hovering it gives the full breakdown. */
+    JPanel allTime = stack(CARD, 0);
 
-/** Understandable signed money: explicit "0 GP" for zero, never a bare 0. */
-static String avo(long net) {
- return net == 0L ? "0 GP" : signed(net);
-}
+    Hero hero = new Hero();
+    GrindsData data;
+    String selectedId;
 
-static String aww(boolean established, long gpPerHour) {
- return established ? rate(gpPerHour) + "/h" : "—  GP/h";
-}
+    GrindsPage(Actions actions) {
+        this.actions = actions;
+        JButton start = button("Start Grind", true, actions::newGrind);
+        JButton add = button("+ Add Grind", false, actions::addGrind);
+        JButton more = button("\u00b7\u00b7\u00b7", false, () -> {});
+        more.setToolTipText("Grinds options");
+        more.getAccessibleContext().setAccessibleName("Grinds options");
+        more.addActionListener(e -> actions.openDataMenu(more));
+        // Owner 2026-10-01: the same toolbar band as the Ledger; the controls live in the header.
+        Kit.headerBand(bar, new JComponent[] {start, add}, new JComponent[] {more});
+        running.setBackground(CARD);
+        pad(running, 2, 6, 2, 2);
+        runningName.setText("● ");
+        runningName.setForeground(TEXT);
+        running.add(runningName, BorderLayout.WEST);
+        runningNet.setHorizontalAlignment(JLabel.RIGHT);
+        running.add(runningNet, BorderLayout.CENTER);
+        var runningButtons = new JPanel(new FlowLayout(FlowLayout.RIGHT, 2, 0));
+        runningButtons.setOpaque(false);
+        JButton live = button("Live ›", false, actions::back);
+        live.setToolTipText("Open Live");
+        JButton end = button("End", false, actions::endGrind);
+        end.setForeground(LOSS.color);
+        end.setToolTipText(msg("end-grind"));
+        runningButtons.add(live);
+        runningButtons.add(end);
+        running.add(runningButtons, BorderLayout.EAST);
+        mine.setEmptyText(msg("saved-grinds"));
+        recent.setEmptyText(msg("finished-grinds")).setFill(true);
+        pad(selectedPanel, 0, 0, 4, 0);
+        // Owner 2026-09-28: My Grinds and Recent grinds first; All time closes the page.
+        for (JComponent part : new JComponent[] {running, mine, selectedPanel, recent, allTime})
+            list.add(part);
+        pad(body, 0, GAP, GAP, 0);
+        body.add(list);
+        body.add(detail);
+    }
 
-static String aju(Long netTargetGp, Long activeTimeTargetMillis) {
- var parts = new ArrayList<String>();
- if (netTargetGp != null) parts.add(compact(netTargetGp) + " Net");
- if (activeTimeTargetMillis != null) parts.add(duration(activeTimeTargetMillis) + " active");
- return parts.isEmpty() ? "No targets" : String.join(" · ", parts);
-}
+    public String id() {
+        return Shell.GRINDS;
+    }
+
+    public JComponent pageBar() {
+        return bar;
+    }
+
+    public JComponent body() {
+        return body;
+    }
+
+    void apply(GrindsData next) {
+        data = next;
+        list.setVisible(next.detail == null);
+        detail.setVisible(next.detail != null);
+        if (next.detail != null) {
+            buildDetail(next);
+        } else {
+            applyRunning(next);
+            applyAllTime(next.allTime);
+            applyMine(next);
+            applyRecent(next);
+        }
+        body.revalidate();
+        body.repaint();
+    }
+
+    // ---- list ---------------------------------------------------------------------------------
+    void applyRunning(GrindsData data) {
+        running.setVisible(data.hasActive);
+        if (!data.hasActive) return;
+        var menu = new ArrayList<RowAction>();
+        menu.add(new RowAction("Open in Ledger", () -> actions.openLedger(data.activeSessionId)));
+        menu.add(new RowAction("Targets…", actions::openTargets));
+        menu.add(
+                data.activeGrindId.isEmpty()
+                        ? new RowAction(
+                                "Save This Grind",
+                                () -> actions.saveThisGrind(data.activeSessionId))
+                        : new RowAction(
+                                "Update Saved Grind",
+                                () ->
+                                        actions.updateSavedGrind(
+                                                data.activeGrindId, data.activeSessionId)));
+        runningName.setText(msg("text-2") + data.activeName.replace("<", "&lt;") + "</html>");
+        runningNet.setText(signed(data.activeNet));
+        runningNet.setForeground(sign(data.activeNet).color);
+        running.setToolTipText(
+                rateLine(data.activeRateEstablished, data.activeGpPerHour)
+                        + " · "
+                        + duration(data.activeMillis)
+                        + " active · "
+                        + targetsLine(data.activeNetTarget, data.activeTimeTarget));
+        runningNet.setToolTipText(exactSigned(data.activeNet) + " gp");
+        running.setComponentPopupMenu(popup(menu));
+    }
+
+    /** Every retained session, Free play included; bests are finished Grinds only. */
+    void applyAllTime(GrindsData.AllTime allTime) {
+        var tip =
+                new StringBuilder("<html>All time · ")
+                        .append(allTime.grinds)
+                        .append(allTime.grinds == 1 ? " Grind" : " Grinds")
+                        .append("<br>Net ")
+                        .append(exactSigned(allTime.net))
+                        .append(" gp<br>Active ")
+                        .append(duration(allTime.activeMillis));
+        if (allTime.splitAvailable) {
+            tip.append("<br>Supplies ")
+                    .append(signed(-allTime.supplies))
+                    .append(" · Losses ")
+                    .append(signed(-allTime.losses));
+        }
+        if (allTime.bestRateName != null) {
+            tip.append("<br>Best GP/h ")
+                    .append(allTime.bestRateName)
+                    .append(" · ")
+                    .append(rate(allTime.bestRate));
+        }
+        String best =
+                allTime.bestNetName == null
+                        ? ""
+                        : "Best · " + allTime.bestNetName + " " + signed(allTime.bestNet);
+        this.allTime.removeAll();
+        JLabel title = label("ALL TIME · " + allTime.grinds, small(), LABEL);
+        pad(title, 3, 6, 3, 6);
+        this.allTime.add(title);
+        this.allTime.add(
+                Hero.strip(
+                        List.of(
+                                new Cell(
+                                        "NET",
+                                        signed(allTime.net),
+                                        sign(allTime.net),
+                                        exactSigned(allTime.net) + " gp",
+                                        null),
+                                new Cell(
+                                        "GP/H",
+                                        allTime.gpPerHour == null ? "—" : rate(allTime.gpPerHour),
+                                        PLAIN,
+                                        null,
+                                        null),
+                                new Cell(
+                                        "ACTIVE",
+                                        durationShort(allTime.activeMillis),
+                                        PLAIN,
+                                        duration(allTime.activeMillis),
+                                        null))));
+        if (!best.isEmpty()) {
+            JLabel bestLine = label(best, small(), sign(allTime.bestNet).color);
+            pad(bestLine, 3, 6, 4, 6);
+            this.allTime.add(bestLine);
+        }
+        this.allTime.setToolTipText(tip.append("</html>").toString());
+        for (Component child : this.allTime.getComponents()) {
+            if (child instanceof JComponent && ((JComponent) child).getToolTipText() == null) {
+                ((JComponent) child).setToolTipText(this.allTime.getToolTipText());
+            }
+        }
+        this.allTime.revalidate();
+    }
+
+    void applyMine(GrindsData data) {
+        var rows = new ArrayList<Row>();
+        MyGrind selected = null;
+        for (MyGrind grind : data.myGrinds) {
+            SavedGrind def = grind.definition;
+            String id = def.getGrindId();
+            boolean isSelected = id.equals(selectedId);
+            if (isSelected) selected = grind;
+            rows.add(
+                    new Row(
+                            id,
+                            null,
+                            (def.favorite ? "★ " : "") + def.getName(),
+                            grind.linkedCount == 0
+                                    ? "NEW"
+                                    : grind.linkedCount
+                                            + (grind.linkedCount == 1 ? " run" : " runs"),
+                            grind.hasLast ? signed(grind.lastNet) : "—",
+                            grind.hasLast ? sign(grind.lastNet) : DIM,
+                            def.getName()
+                                    + " · "
+                                    + targetsLine(
+                                            def.getNetTargetGp(), def.getActiveTimeTargetMillis()),
+                            grind.hasLast ? "Last run " + exactSigned(grind.lastNet) + " gp" : "",
+                            isSelected,
+                            () -> select(isSelected ? null : id),
+                            rowMenu(grindMenu(grind))));
+        }
+        mine.countedTitle("MY GRINDS", rows);
+        if (selected == null) selectedId = null;
+        applySelected(selected);
+    }
+
+    void select(String id) {
+        selectedId = id;
+        if (data != null) {
+            applyMine(data);
+            body.revalidate();
+        }
+    }
+
+    void applySelected(MyGrind grind) {
+        selectedPanel.removeAll();
+        selectedPanel.setVisible(grind != null);
+        if (grind == null) return;
+        SavedGrind def = grind.definition;
+        var facts = new KeyValue(null);
+        facts.put(
+                "Last run",
+                grind.hasLast
+                        ? signed(grind.lastNet) + " · " + when(grind.lastStartedAt, SafeMath.now())
+                        : "—",
+                grind.hasLast ? sign(grind.lastNet) : DIM);
+        facts.put(
+                "Best",
+                grind.hasBest ? signed(grind.bestNet) : "—",
+                grind.hasBest ? sign(grind.bestNet) : DIM);
+        facts.put(
+                "Target",
+                targetsLine(def.getNetTargetGp(), def.getActiveTimeTargetMillis()),
+                PLAIN);
+        selectedPanel.add(facts);
+        var buttons = new JPanel(new FlowLayout(FlowLayout.LEFT, 4, 2));
+        buttons.setOpaque(false);
+        // Owner 2026-10-01 (F14): the selected saved Grind starts right here, beside its menu.
+        JButton start = button("Start", true, () -> actions.startGrind(def.getGrindId(), null));
+        start.setToolTipText("Start " + def.getName());
+        buttons.add(start);
+        JButton more = button("···", false, () -> {});
+        more.setToolTipText("More for this Grind");
+        more.addActionListener(e -> popup(grindMenu(grind)).show(more, 0, more.getHeight()));
+        buttons.add(more);
+        selectedPanel.add(buttons);
+    }
+
+    List<RowAction> grindMenu(MyGrind grind) {
+        SavedGrind def = grind.definition;
+        String id = def.getGrindId();
+        return Arrays.asList(
+                new RowAction("Start", () -> actions.startGrind(id, null)),
+                new RowAction(msg("start-changes"), () -> actions.startWithChanges(id)),
+                new RowAction("Edit…", () -> actions.editSavedGrind(id)),
+                new RowAction(
+                        def.archived ? "Unarchive" : "Archive",
+                        () -> actions.archiveSavedGrind(id, !def.archived)),
+                new RowAction("Delete…", () -> actions.deleteSavedGrind(id)));
+    }
+
+    void applyRecent(GrindsData data) {
+        long now = SafeMath.now();
+        var rows = new ArrayList<Row>();
+        for (Recent run : data.recent) {
+            String id = run.sessionId;
+            ZoneId zone = data.profileZone == null ? ZoneId.systemDefault() : data.profileZone;
+            String when =
+                    dayLabel(
+                            Instant.ofEpochMilli(run.startedAt).atZone(zone).toLocalDate(),
+                            now,
+                            zone);
+            rows.add(
+                    new Row(
+                            id,
+                            null,
+                            run.name,
+                            when,
+                            valueText(run.net),
+                            sign(run.net),
+                            run.name + " · " + contextLine(run, now, data.profileZone),
+                            exactSigned(run.net) + " gp",
+                            false,
+                            () -> actions.openDetail(id),
+                            Arrays.asList(
+                                    new Menu("Open in Ledger", () -> actions.openLedger(id)),
+                                    new Menu("Start again", () -> actions.startAgain(id)),
+                                    new Menu("Delete…", () -> actions.deleteHistorical(id)))));
+        }
+        recent.countedTitle("RECENT GRINDS", rows);
+    }
+
+    // ---- detail -------------------------------------------------------------------------------
+    void buildDetail(GrindsData data) {
+        GrindsData.Detail detail = data.detail;
+        this.detail.removeAll();
+        JButton back = button("‹ Grinds", false, () -> actions.openDetail(null));
+        var top = new JPanel(new BorderLayout());
+        top.setOpaque(false);
+        top.add(back, BorderLayout.WEST);
+        top.add(
+                label(
+                        when(detail.startedAt, SafeMath.now()).toUpperCase(Locale.ROOT),
+                        small(),
+                        LABEL),
+                BorderLayout.EAST);
+        pad(top, 0, 0, 0, 6);
+        this.detail.add(top);
+        hero.status(
+                detail.closed ? OFF : GAIN.color,
+                detail.closed ? "Finished" : "Running",
+                detail.name,
+                detail.closed ? "COMPLETE" : "",
+                null);
+        hero.big(
+                signed(detail.net),
+                sign(detail.net),
+                exactSigned(detail.net) + " gp",
+                detail.rateEstablished ? rate(detail.gpPerHour) + "/h" : "—",
+                detail.rateEstablished,
+                duration(detail.activeMillis) + " ACTIVE");
+        // Owner 2026-10-01 (F12): a completed run's rate is the whole-run basis.
+        hero.rate.setToolTipText(detail.rateEstablished ? msg("gp-h") : null);
+        var strip = new ArrayList<Cell>();
+        strip.add(
+                new Cell(
+                        "GAINS",
+                        signed(detail.revenue),
+                        GAIN,
+                        exact(detail.revenue) + " gp",
+                        null));
+        if (detail.splitAvailable) {
+            strip.add(
+                    new Cell(
+                            "SUPPLY",
+                            signed(-detail.supplies),
+                            SUPPLY,
+                            exact(detail.supplies) + " gp",
+                            null));
+            strip.add(
+                    new Cell(
+                            "LOSS",
+                            signed(-detail.losses),
+                            LOSS,
+                            exact(detail.losses) + " gp",
+                            null));
+        } else {
+            long costs = detail.revenue - detail.net;
+            strip.add(new Cell("COSTS", signed(-costs), LOSS, msg("supply-loss-split"), null));
+        }
+        hero.strips(Collections.singletonList(strip));
+        this.detail.add(hero);
+        var outcome = new KeyValue("HIGHLIGHTS");
+        outcome.put("Target", detail.netOutcome(), PLAIN);
+        if (detail.activeTimeTargetMillis != null) outcome.put("Time", detail.timeOutcome(), PLAIN);
+        if (data.activePace != null
+                && data.activePace.present
+                && data.activePace.available
+                && detail.sessionId.equals(data.activeSessionId)) {
+            outcome.put("Pace", data.activePace.line, DIM);
+            // Owner 2026-10-01 (F10): a combined target also shows its required average.
+            if (data.activePace.second != null) outcome.put("", data.activePace.second, DIM);
+        }
+        this.detail.add(outcome);
+        if (detail.compacted) this.detail.add(note(msg("summary-detailed"), LABEL));
+        var buttons = new JPanel(new FlowLayout(FlowLayout.LEFT, 4, 2));
+        buttons.setOpaque(false);
+        buttons.add(button("Start again", true, () -> actions.startAgain(detail.sessionId)));
+        buttons.add(button("Open in Ledger", false, () -> actions.openLedger(detail.sessionId)));
+        var menu = new ArrayList<RowAction>();
+        menu.add(
+                detail.linkedGrindId.isEmpty()
+                        ? new RowAction(
+                                "Save This Grind", () -> actions.saveThisGrind(detail.sessionId))
+                        : new RowAction(
+                                "Update Saved Grind",
+                                () ->
+                                        actions.updateSavedGrind(
+                                                detail.linkedGrindId, detail.sessionId)));
+        if (detail.closed) {
+            menu.add(new RowAction("Delete…", () -> actions.deleteHistorical(detail.sessionId)));
+        }
+        JButton more = button("···", false, () -> {});
+        more.addActionListener(e -> popup(menu).show(more, 0, more.getHeight()));
+        buttons.add(more);
+        this.detail.add(buttons);
+        this.detail.add(note(msg("open-ledger"), LABEL));
+    }
+
+    /** A menu entry usable both as a row's right-click menu and a ⋯ popup. */
+    @AllArgsConstructor
+    static class RowAction {
+        String label;
+        Runnable run;
+    }
+
+    static List<Menu> rowMenu(List<RowAction> items) {
+        var menu = new ArrayList<Menu>();
+        for (RowAction item : items) menu.add(new Menu(item.label, item.run));
+        return menu;
+    }
+
+    static JPopupMenu popup(List<RowAction> items) {
+        return Kit.menuOf(rowMenu(items));
+    }
+
+    // ---- text ---------------------------------------------------------------------------------
+    /** Date and duration context: Today/Yesterday/date plus Active Time, never internal ids. */
+    static String contextLine(Recent recent, long now) {
+        return contextLine(recent, now, ZoneId.systemDefault());
+    }
+
+    static String contextLine(Recent recent, long now, ZoneId zone) {
+        ZoneId z = zone == null ? ZoneId.systemDefault() : zone;
+        return dayLabel(Instant.ofEpochMilli(recent.startedAt).atZone(z).toLocalDate(), now, z)
+                + " · "
+                + durationShort(recent.activeMillis);
+    }
+
+    /** Understandable signed money: explicit "0 GP" for zero, never a bare 0. */
+    static String valueText(long net) {
+        return net == 0L ? "0 GP" : signed(net);
+    }
+
+    static String rateLine(boolean established, long gpPerHour) {
+        return established ? rate(gpPerHour) + "/h" : "—  GP/h";
+    }
+
+    static String targetsLine(Long netTargetGp, Long activeTimeTargetMillis) {
+        var parts = new ArrayList<String>();
+        if (netTargetGp != null) parts.add(compact(netTargetGp) + " Net");
+        if (activeTimeTargetMillis != null) parts.add(duration(activeTimeTargetMillis) + " active");
+        return parts.isEmpty() ? "No targets" : String.join(" · ", parts);
+    }
 }

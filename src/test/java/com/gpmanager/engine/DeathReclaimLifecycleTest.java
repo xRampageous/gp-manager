@@ -48,13 +48,13 @@ public class DeathReclaimLifecycleTest
 
     private final FlowValuator valuator = deltas ->
     {
-        List<Ab> flows = new ArrayList<>();
+        List<Flow> flows = new ArrayList<>();
         for (Map.Entry<Integer, Long> entry : deltas.entrySet())
         {
             int id = entry.getKey();
             int price = id == COINS ? 1 : id == SHARK ? 800 : id == WHIP ? 2_000_000 : 15_000_000;
             String name = id == COINS ? "Coins" : id == SHARK ? "Shark" : id == WHIP ? "Abyssal whip" : "Amulet of torture";
-            flows.add(new Ab(id, name, entry.getValue(), price, entry.getValue() * price));
+            flows.add(new Flow(id, name, entry.getValue(), price, entry.getValue() * price));
         }
         return flows;
     };
@@ -62,60 +62,60 @@ public class DeathReclaimLifecycleTest
     @Test
     public void catalogueMatchesServicesByNameAndRetrievalVerb()
     {
-        BossRetrievalCatalogue.Service zulrah = BossRetrievalCatalogue.a1("Talk-to", "Priestess Zul-Gwenwynig");
+        BossRetrievalCatalogue.Service zulrah = BossRetrievalCatalogue.serviceFor("Talk-to", "Priestess Zul-Gwenwynig");
         assertNotNull(zulrah);
         assertEquals(100_000L, zulrah.expectedFee);
         assertFalse(zulrah.ambiguousTarget);
-        assertEquals(60_000L, BossRetrievalCatalogue.a1("Claim", "Shura").expectedFee);
-        assertEquals(50_000L, BossRetrievalCatalogue.a1("Search", "Magical chest").expectedFee);
-        assertEquals(25_000L, BossRetrievalCatalogue.a1("Talk-to", "Arno").expectedFee);
-        BossRetrievalCatalogue.Service chest = BossRetrievalCatalogue.a1("Open", "Chest");
+        assertEquals(60_000L, BossRetrievalCatalogue.serviceFor("Claim", "Shura").expectedFee);
+        assertEquals(50_000L, BossRetrievalCatalogue.serviceFor("Search", "Magical chest").expectedFee);
+        assertEquals(25_000L, BossRetrievalCatalogue.serviceFor("Talk-to", "Arno").expectedFee);
+        BossRetrievalCatalogue.Service chest = BossRetrievalCatalogue.serviceFor("Open", "Chest");
         assertNotNull(chest);
         assertTrue(chest.ambiguousTarget);
         assertEquals(BossRetrievalCatalogue.VARIABLE_FEE, chest.expectedFee);
-        assertTrue(BossRetrievalCatalogue.a1("Loot", "Gravestone").ambiguousTarget);
+        assertTrue(BossRetrievalCatalogue.serviceFor("Loot", "Gravestone").ambiguousTarget);
         // Non-retrieval verbs and unrelated NPCs never match.
-        assertNull(BossRetrievalCatalogue.a1("Attack", "Priestess Zul-Gwenwynig"));
-        assertNull(BossRetrievalCatalogue.a1("Talk-to", "Banker"));
-        assertNull(BossRetrievalCatalogue.a1("Use", "Chest"));
+        assertNull(BossRetrievalCatalogue.serviceFor("Attack", "Priestess Zul-Gwenwynig"));
+        assertNull(BossRetrievalCatalogue.serviceFor("Talk-to", "Banker"));
+        assertNull(BossRetrievalCatalogue.serviceFor("Use", "Chest"));
     }
 
     @Test
     public void whyLineCarriesPublishedFeeAndFlagsAMismatch()
     {
-        BossRetrievalCatalogue.Service zulrah = BossRetrievalCatalogue.a1("Talk-to", "Priestess Zul-Gwenwynig");
+        BossRetrievalCatalogue.Service zulrah = BossRetrievalCatalogue.serviceFor("Talk-to", "Priestess Zul-Gwenwynig");
         assertEquals(
             "Item retrieval fee — Zulrah (Priestess Zul-Gwenwynig), published 100,000. Free below 50 kills and for Ultimate Ironmen",
             zulrah.why(100_000L));
         assertTrue(zulrah.why(90_000L).contains("observed 90,000"));
-        assertTrue(BossRetrievalCatalogue.a1("Open", "Chest").why(250_000L).contains("fee varies"));
+        assertTrue(BossRetrievalCatalogue.serviceFor("Open", "Chest").why(250_000L).contains("fee varies"));
     }
 
     @Test
     public void lifecycleAcceptsAmbiguousTargetsOnlyWhileAwaitingReclaim()
     {
         DeathReclaimLifecycle lifecycle = new DeathReclaimLifecycle();
-        BossRetrievalCatalogue.Service chest = BossRetrievalCatalogue.a1("Open", "Chest");
-        BossRetrievalCatalogue.Service torfinn = BossRetrievalCatalogue.a1("Talk-to", "Torfinn");
-        assertFalse("random chest without a death is not a reclaim", lifecycle.aca(chest, 10));
-        assertFalse("a generic Talk-to at a service NPC is not enough", lifecycle.aca(torfinn, 10));
-        lifecycle.ace(java.util.Collections.singletonMap(WHIP, 1L));
+        BossRetrievalCatalogue.Service chest = BossRetrievalCatalogue.serviceFor("Open", "Chest");
+        BossRetrievalCatalogue.Service torfinn = BossRetrievalCatalogue.serviceFor("Talk-to", "Torfinn");
+        assertFalse("random chest without a death is not a reclaim", lifecycle.noteReclaimIntent(chest, 10));
+        assertFalse("a generic Talk-to at a service NPC is not enough", lifecycle.noteReclaimIntent(torfinn, 10));
+        lifecycle.onPvmDeath(java.util.Collections.singletonMap(WHIP, 1L));
         lifecycle.onDeathItemsRemoved(java.util.Collections.singletonList(
-            new Ab(WHIP, "Abyssal whip", -1L, 15_000_000, -15_000_000L)));
+            new Flow(WHIP, "Abyssal whip", -1L, 15_000_000, -15_000_000L)));
         assertTrue(lifecycle.isAwaitingReclaim());
-        assertTrue("a named service is accepted after a local PvM death", lifecycle.aca(torfinn, 10));
-        assertTrue(lifecycle.aca(chest, 10));
-        BossRetrievalCatalogue.Service grave = BossRetrievalCatalogue.a1("Check", "Grave");
+        assertTrue("a named service is accepted after a local PvM death", lifecycle.noteReclaimIntent(torfinn, 10));
+        assertTrue(lifecycle.noteReclaimIntent(chest, 10));
+        BossRetrievalCatalogue.Service grave = BossRetrievalCatalogue.serviceFor("Check", "Grave");
         assertNotNull(grave);
-        assertTrue("a Grave Check re-arms an awaiting reclaim", lifecycle.aca(grave, 1));
-        assertTrue(lifecycle.xk());
+        assertTrue("a Grave Check re-arms an awaiting reclaim", lifecycle.noteReclaimIntent(grave, 1));
+        assertTrue(lifecycle.isReclaimArmed());
         for (int i = 0; i < DeathReclaimLifecycle.MIN_RECLAIM_ARM_TICKS - 1; i++)
         {
             lifecycle.tick(false);
         }
-        assertTrue("reclaim stays armed through its two-minute minimum", lifecycle.xk());
+        assertTrue("reclaim stays armed through its two-minute minimum", lifecycle.isReclaimArmed());
         lifecycle.tick(false);
-        assertFalse("window expires", lifecycle.xk());
+        assertFalse("window expires", lifecycle.isReclaimArmed());
         assertTrue("death still awaits", lifecycle.isAwaitingReclaim());
         lifecycle.reset();
         assertFalse(lifecycle.isAwaitingReclaim());
@@ -125,26 +125,26 @@ public class DeathReclaimLifecycleTest
     public void missingDeathSnapshotCannotAuthorizeNeutralizingLosses()
     {
         DeathReclaimLifecycle lifecycle = new DeathReclaimLifecycle();
-        lifecycle.ace((Map<Integer, Long>) null);
+        lifecycle.onPvmDeath((Map<Integer, Long>) null);
 
         assertFalse("no canonical snapshot means no reclaim whitelist",
-            lifecycle.wh());
+            lifecycle.wipePending());
         assertFalse(lifecycle.isAwaitingReclaim());
         assertTrue(lifecycle.onDeathItemsRemoved(java.util.Collections.singletonList(
-            new Ab(WHIP, "Abyssal whip", -1L, 2_000_000, -2_000_000L))).isEmpty());
+            new Flow(WHIP, "Abyssal whip", -1L, 2_000_000, -2_000_000L))).isEmpty());
     }
 
     @Test
     public void missingEngineDeathSnapshotLeavesMeasuredLossCounted()
     {
-        Am engine = started(gear(1L, 0L, 0L, 0L));
-        engine.zi(20, null);
-        engine.yz();
+        Engine engine = started(gear(1L, 0L, 0L, 0L));
+        engine.markPvmDeath(20, null);
+        engine.markDirty();
 
-        Ac loss = settle(engine, Cc.empty(), 1_600L);
+        Transaction loss = settle(engine, ContainerSnapshot.empty(), 1_600L);
 
         assertNotNull(loss);
-        assertEquals(Ai.CONSUMPTION, loss.getType());
+        assertEquals(TransactionType.CONSUMPTION, loss.getType());
         assertTrue("without the canonical death snapshot the loss remains counted", loss.isCounted());
         assertFalse(EngineProbe.isAwaitingDeathReclaim(engine));
     }
@@ -152,55 +152,55 @@ public class DeathReclaimLifecycleTest
     @Test
     public void delayedDeathWipeUsesCapturedStacksAfterDeathContextExpiresAndDirectLootIsNeutral()
     {
-        Cc carried = gear(1L, 1L, 0L, 0L);
-        Am engine = started(carried);
-        engine.zi(1, carried.quantities);
+        ContainerSnapshot carried = gear(1L, 1L, 0L, 0L);
+        Engine engine = started(carried);
+        engine.markPvmDeath(1, carried.quantities);
 
         // Let the short-lived transfer context expire before the post-respawn inventory
         // removal settles. The separate captured-stack evidence remains live.
         for (int i = 0; i < 5; i++)
         {
-            assertNull(engine.adj(carried, 1_100L + i * 600L));
+            assertNull(engine.processIfDirty(carried, 1_100L + i * 600L));
         }
-        engine.yz();
-        Ac wipe = settle(engine, Cc.empty(), 5_000L);
+        engine.markDirty();
+        Transaction wipe = settle(engine, ContainerSnapshot.empty(), 5_000L);
 
         assertNotNull(wipe);
-        assertEquals(Ai.TRANSFER, wipe.getType());
+        assertEquals(TransactionType.TRANSFER, wipe.getType());
         assertFalse(wipe.isCounted());
         assertEquals("Death: items held by gravestone / retrieval service", wipe.getNote());
-        assertEquals(2L, engine.tt().outstandingItemCount);
-        assertTrue(engine.tt().awaiting);
-        assertTrue(engine.tt().ageTicks >= 5L);
+        assertEquals(2L, engine.deathStatus().outstandingItemCount);
+        assertTrue(engine.deathStatus().awaiting);
+        assertTrue(engine.deathStatus().ageTicks >= 5L);
 
         // A direct gravestone Loot needs no still-live reclaim menu window.
-        engine.setBaseline(Cc.empty());
-        engine.yz();
-        Ac returned = settle(engine, carried, 8_000L);
+        engine.setBaseline(ContainerSnapshot.empty());
+        engine.markDirty();
+        Transaction returned = settle(engine, carried, 8_000L);
         assertNotNull(returned);
-        assertEquals(Ai.TRANSFER, returned.getType());
+        assertEquals(TransactionType.TRANSFER, returned.getType());
         assertFalse(returned.isCounted());
         assertEquals("Death reclaim: items recovered", returned.getNote());
-        assertFalse(engine.tt().awaiting);
+        assertFalse(engine.deathStatus().awaiting);
         assertEquals(0L, engine.getMetrics(12_000L).net);
     }
 
     @Test
     public void deathWipeOnlyTransfersItemsActuallyHeldAtDeath()
     {
-        Cc baseline = gear(1L, 1L, 0L, 0L);
-        Am engine = started(baseline);
-        engine.zi(1, gear(1L, 0L, 0L, 0L).quantities);
-        engine.yz();
-        Ac residualLoss = settle(engine, Cc.empty(), 1_600L);
+        ContainerSnapshot baseline = gear(1L, 1L, 0L, 0L);
+        Engine engine = started(baseline);
+        engine.markPvmDeath(1, gear(1L, 0L, 0L, 0L).quantities);
+        engine.markDirty();
+        Transaction residualLoss = settle(engine, ContainerSnapshot.empty(), 1_600L);
 
         assertNotNull(residualLoss);
-        assertEquals("unobserved ownership follows ordinary accounting", Ai.CONSUMPTION,
+        assertEquals("unobserved ownership follows ordinary accounting", TransactionType.CONSUMPTION,
             residualLoss.getType());
         assertTrue(residualLoss.isCounted());
         assertEquals(-15_000_000L, residualLoss.getNet());
-        assertEquals(1L, engine.tt().outstandingItemCount);
-        Ac deathTransfer = sw(engine,
+        assertEquals(1L, engine.deathStatus().outstandingItemCount);
+        Transaction deathTransfer = sw(engine,
             "Death: items held by gravestone / retrieval service");
         assertNotNull(deathTransfer);
         assertFalse(deathTransfer.isCounted());
@@ -210,43 +210,43 @@ public class DeathReclaimLifecycleTest
     @Test
     public void splitInventoryAndEquipmentLossesBothUseTheRemainingDeathWhitelist()
     {
-        Cc carried = gear(1L, 1L, 0L, 0L);
-        Am engine = started(carried);
-        engine.zi(1, carried.quantities);
+        ContainerSnapshot carried = gear(1L, 1L, 0L, 0L);
+        Engine engine = started(carried);
+        engine.markPvmDeath(1, carried.quantities);
 
-        engine.yz();
-        Ac firstWipe = settle(engine, gear(0L, 1L, 0L, 0L), 1_600L);
+        engine.markDirty();
+        Transaction firstWipe = settle(engine, gear(0L, 1L, 0L, 0L), 1_600L);
         assertNotNull(firstWipe);
-        assertEquals(Ai.TRANSFER, firstWipe.getType());
-        assertTrue(engine.tt().awaiting);
+        assertEquals(TransactionType.TRANSFER, firstWipe.getType());
+        assertTrue(engine.deathStatus().awaiting);
         assertEquals("only the still-held item remains outstanding", 1L,
-            engine.tt().outstandingItemCount);
+            engine.deathStatus().outstandingItemCount);
 
         engine.setBaseline(gear(0L, 1L, 0L, 0L));
-        engine.yz();
-        Ac secondWipe = settle(engine, Cc.empty(), 3_000L);
+        engine.markDirty();
+        Transaction secondWipe = settle(engine, ContainerSnapshot.empty(), 3_000L);
         assertNotNull(secondWipe);
-        assertEquals(Ai.TRANSFER, secondWipe.getType());
+        assertEquals(TransactionType.TRANSFER, secondWipe.getType());
         assertFalse(secondWipe.isCounted());
-        assertEquals(2L, engine.tt().outstandingItemCount);
+        assertEquals(2L, engine.deathStatus().outstandingItemCount);
     }
 
     @Test
     public void delayedCoinOnlyDeathWipeIsNeutralEvenAfterDeathContextExpires()
     {
-        Cc carried = gear(0L, 0L, 75_000L, 0L);
-        Am engine = started(carried);
-        engine.zi(1, carried.quantities);
+        ContainerSnapshot carried = gear(0L, 0L, 75_000L, 0L);
+        Engine engine = started(carried);
+        engine.markPvmDeath(1, carried.quantities);
         for (int i = 0; i < 5; i++)
         {
-            assertNull(engine.adj(carried, 1_100L + i * 600L));
+            assertNull(engine.processIfDirty(carried, 1_100L + i * 600L));
         }
 
-        engine.yz();
-        Ac wipe = settle(engine, Cc.empty(), 5_000L);
+        engine.markDirty();
+        Transaction wipe = settle(engine, ContainerSnapshot.empty(), 5_000L);
 
         assertNotNull(wipe);
-        assertEquals(Ai.TRANSFER, wipe.getType());
+        assertEquals(TransactionType.TRANSFER, wipe.getType());
         assertFalse(wipe.isCounted());
         assertEquals("Death: items held by gravestone / retrieval service", wipe.getNote());
         assertEquals(0L, engine.getMetrics(8_000L).net);
@@ -255,14 +255,14 @@ public class DeathReclaimLifecycleTest
     @Test
     public void armedReclaimDoesNotMislabelCoinLossAlongsideDelayedDeathWipeAsFee()
     {
-        Cc carried = gear(1L, 0L, 200_000L, 0L);
-        Am engine = started(carried);
-        engine.zi(20, carried.quantities);
-        assertTrue(engine.abe(
-            BossRetrievalCatalogue.a1("Talk-to", "Torfinn"), 40));
-        engine.yz();
+        ContainerSnapshot carried = gear(1L, 0L, 200_000L, 0L);
+        Engine engine = started(carried);
+        engine.markPvmDeath(20, carried.quantities);
+        assertTrue(engine.noteReclaimIntent(
+            BossRetrievalCatalogue.serviceFor("Talk-to", "Torfinn"), 40));
+        engine.markDirty();
 
-        Ac ambiguousWipe = settle(engine, gear(0L, 0L, 180_000L, 0L), 1_600L);
+        Transaction ambiguousWipe = settle(engine, gear(0L, 0L, 180_000L, 0L), 1_600L);
 
         assertNotNull(ambiguousWipe);
         assertTrue("ambiguous coin outflow stays an ordinary measured cost", ambiguousWipe.isCounted());
@@ -274,8 +274,8 @@ public class DeathReclaimLifecycleTest
             "Death: items held by gravestone / retrieval service").getFlows().size());
 
         engine.setBaseline(gear(0L, 0L, 180_000L, 0L));
-        engine.yz();
-        Ac observedFee = settle(engine, gear(1L, 0L, 80_000L, 0L), 4_000L);
+        engine.markDirty();
+        Transaction observedFee = settle(engine, gear(1L, 0L, 80_000L, 0L), 4_000L);
 
         assertNotNull(observedFee);
         assertEquals("a separate observed outflow with a matching returned item remains a fee",
@@ -286,92 +286,92 @@ public class DeathReclaimLifecycleTest
     @Test
     public void pendingDeathSnapshotCannotHideLaterUnclaimedGeMovement()
     {
-        Cc carried = gear(1L, 0L, 0L, 0L);
-        Am engine = started(carried);
-        engine.zi(1, carried.quantities);
+        ContainerSnapshot carried = gear(1L, 0L, 0L, 0L);
+        Engine engine = started(carried);
+        engine.markPvmDeath(1, carried.quantities);
         for (int i = 0; i < 3; i++)
         {
-            assertNull(engine.adj(carried, 1_100L + i * 600L));
+            assertNull(engine.processIfDirty(carried, 1_100L + i * 600L));
         }
-        engine.markContext(Aj.MARKET, 100, "Grand Exchange sale");
-        engine.yz();
+        engine.markContext(Context.MARKET, 100, "Grand Exchange sale");
+        engine.markDirty();
 
-        Ac movement = settle(engine, gear(0L, 0L, 15_000_000L, 0L), 1_600L);
+        Transaction movement = settle(engine, gear(0L, 0L, 15_000_000L, 0L), 1_600L);
 
         assertNotNull(movement);
-        assertEquals(Aj.MARKET, movement.getContext());
-        assertEquals(Ai.UNCERTAIN, movement.getType());
+        assertEquals(Context.MARKET, movement.getContext());
+        assertEquals(TransactionType.UNCERTAIN, movement.getType());
         assertFalse("without custody, the GE movement waits for owner review", movement.isCounted());
         assertEquals(0L, engine.getMetrics(1_600L).net);
         assertFalse("the stronger market evidence closes the stale wipe whitelist",
-            engine.tt().awaiting);
+            engine.deathStatus().awaiting);
     }
 
     @Test
     public void confirmedConsumptionOfSameItemOutranksPendingDeathSnapshot()
     {
-        Cc carried = gear(1L, 0L, 0L, 0L);
-        Am engine = started(carried);
-        engine.zi(1, carried.quantities);
+        ContainerSnapshot carried = gear(1L, 0L, 0L, 0L);
+        Engine engine = started(carried);
+        engine.markPvmDeath(1, carried.quantities);
         for (int i = 0; i < 3; i++)
         {
-            assertNull(engine.adj(carried, 1_100L + i * 600L));
+            assertNull(engine.processIfDirty(carried, 1_100L + i * 600L));
         }
-        engine.ci(WHIP, 20);
-        engine.yz();
+        engine.noteConsume(WHIP, 20, false);
+        engine.markDirty();
 
-        Ac consumed = settle(engine, Cc.empty(), 3_000L);
+        Transaction consumed = settle(engine, ContainerSnapshot.empty(), 3_000L);
 
         assertNotNull(consumed);
-        assertEquals(Ai.CONSUMPTION, consumed.getType());
+        assertEquals(TransactionType.CONSUMPTION, consumed.getType());
         assertTrue(consumed.isCounted());
-        assertFalse(engine.tt().awaiting);
+        assertFalse(engine.deathStatus().awaiting);
     }
 
     @Test
     public void mixedDeathWipeAndNamedConsumptionPartitionByItemId()
     {
-        Cc carried = gear(1L, 0L, 0L, 1L);
-        Am engine = started(carried);
-        engine.zi(1, carried.quantities);
-        engine.ci(SHARK, 30);
-        engine.yz();
+        ContainerSnapshot carried = gear(1L, 0L, 0L, 1L);
+        Engine engine = started(carried);
+        engine.markPvmDeath(1, carried.quantities);
+        engine.noteConsume(SHARK, 30, false);
+        engine.markDirty();
 
-        Ac consumption = settle(engine, Cc.empty(), 1_600L);
+        Transaction consumption = settle(engine, ContainerSnapshot.empty(), 1_600L);
 
         assertNotNull(consumption);
-        assertEquals(Ai.CONSUMPTION, consumption.getType());
+        assertEquals(TransactionType.CONSUMPTION, consumption.getType());
         assertTrue(consumption.isCounted());
-        Ac deathTransfer = sw(engine,
+        Transaction deathTransfer = sw(engine,
             "Death: items held by gravestone / retrieval service");
         assertNotNull("unrelated whip loss remains an ownership-neutral death transfer", deathTransfer);
         assertFalse(deathTransfer.isCounted());
         assertEquals(WHIP, deathTransfer.getFlows().get(0).itemId);
-        assertEquals(1L, engine.tt().outstandingItemCount);
+        assertEquals(1L, engine.deathStatus().outstandingItemCount);
     }
 
     @Test
     public void finalGravestoneReturnSettlingOnExpiryTickWinsBeforeExpiryAudit()
     {
-        Cc carried = gear(1L, 0L, 0L, 0L);
-        Am engine = started(carried);
-        engine.zi(1, carried.quantities);
-        engine.yz();
-        assertNotNull(settle(engine, Cc.empty(), 1_600L));
-        engine.setBaseline(Cc.empty());
+        ContainerSnapshot carried = gear(1L, 0L, 0L, 0L);
+        Engine engine = started(carried);
+        engine.markPvmDeath(1, carried.quantities);
+        engine.markDirty();
+        assertNotNull(settle(engine, ContainerSnapshot.empty(), 1_600L));
+        engine.setBaseline(ContainerSnapshot.empty());
 
-        while (engine.tt().ageTicks
+        while (engine.deathStatus().ageTicks
             < DeathReclaimLifecycle.AWAIT_TICKS - 1L)
         {
-            assertNull(engine.adj(Cc.empty(), 4_000L));
+            assertNull(engine.processIfDirty(ContainerSnapshot.empty(), 4_000L));
         }
         // The final return can be observed before a delayed/missed dirty callback.
-        Ac returned = settle(engine, carried, 5_000L);
+        Transaction returned = settle(engine, carried, 5_000L);
 
         assertNotNull(returned);
-        assertEquals(Ai.TRANSFER, returned.getType());
+        assertEquals(TransactionType.TRANSFER, returned.getType());
         assertEquals("Death reclaim: items recovered", returned.getNote());
-        assertFalse(engine.tt().awaiting);
+        assertFalse(engine.deathStatus().awaiting);
         assertNull(sw(engine, "Death reclaim expired"));
     }
 
@@ -379,14 +379,14 @@ public class DeathReclaimLifecycleTest
     public void deathWipeWhitelistExpiresAtItsOneMinuteEvidenceCap()
     {
         DeathReclaimLifecycle lifecycle = new DeathReclaimLifecycle();
-        lifecycle.ace(java.util.Collections.singletonMap(WHIP, 1L));
+        lifecycle.onPvmDeath(java.util.Collections.singletonMap(WHIP, 1L));
         for (int i = 0; i < DeathReclaimLifecycle.DEATH_WIPE_WINDOW_TICKS - 1; i++)
         {
             lifecycle.tick(false);
         }
-        assertTrue(lifecycle.wh());
+        assertTrue(lifecycle.wipePending());
         lifecycle.tick(false);
-        assertFalse(lifecycle.wh());
+        assertFalse(lifecycle.wipePending());
         assertFalse(lifecycle.isAwaitingReclaim());
     }
 
@@ -408,24 +408,24 @@ public class DeathReclaimLifecycleTest
                 return true;
             }
         };
-        Cc carried = gear(1L, 0L, 0L, 1L);
-        Am engine = started(carried, changingConfig);
-        engine.zi(1, carried.quantities);
-        engine.yz();
-        assertNotNull(settle(engine, Cc.empty(), 1_600L));
-        assertEquals(2L, engine.tt().outstandingItemCount);
+        ContainerSnapshot carried = gear(1L, 0L, 0L, 1L);
+        Engine engine = started(carried, changingConfig);
+        engine.markPvmDeath(1, carried.quantities);
+        engine.markDirty();
+        assertNotNull(settle(engine, ContainerSnapshot.empty(), 1_600L));
+        assertEquals(2L, engine.deathStatus().outstandingItemCount);
 
         stabilization[0] = DeathReclaimLifecycle.AWAIT_TICKS + 100;
-        engine.setBaseline(Cc.empty());
-        engine.yz();
-        Cc changing = new Cc(
+        engine.setBaseline(ContainerSnapshot.empty());
+        engine.markDirty();
+        ContainerSnapshot changing = new ContainerSnapshot(
             java.util.Collections.singletonMap(99_999, 1L));
-        Ac expired = null;
-        Ac unrelatedGain = null;
+        Transaction expired = null;
+        Transaction unrelatedGain = null;
         int maxWait = DeathReclaimLifecycle.AWAIT_TICKS + stabilization[0] + 5;
         for (int i = 0; i < maxWait; i++)
         {
-            Ac tick = engine.adj(changing, 4_000L + i * 600L);
+            Transaction tick = engine.processIfDirty(changing, 4_000L + i * 600L);
             if (tick != null && "Death reclaim expired".equals(tick.getNote()))
             {
                 expired = tick;
@@ -441,32 +441,32 @@ public class DeathReclaimLifecycleTest
         assertNotNull("an unrelated settled change still books normally", unrelatedGain);
         assertTrue(unrelatedGain.isCounted());
         assertTrue(expired.getFlows().isEmpty());
-        assertFalse(engine.tt().awaiting);
-        engine.adj(changing, 4_000L + maxWait * 600L);
+        assertFalse(engine.deathStatus().awaiting);
+        engine.processIfDirty(changing, 4_000L + maxWait * 600L);
     }
 
     @Test
     public void observedCoinFeeAndReturnedItemsSplitIntoSeparateRows()
     {
-        Cc carried = gear(1L, 0L, 150_000L, 0L);
-        Am engine = started(carried);
-        engine.zi(1, carried.quantities);
-        engine.yz();
-        assertNotNull(settle(engine, Cc.empty(), 1_600L));
+        ContainerSnapshot carried = gear(1L, 0L, 150_000L, 0L);
+        Engine engine = started(carried);
+        engine.markPvmDeath(1, carried.quantities);
+        engine.markDirty();
+        assertNotNull(settle(engine, ContainerSnapshot.empty(), 1_600L));
         engine.setBaseline(gear(0L, 0L, 150_000L, 0L));
 
-        assertTrue(engine.abe(
-            BossRetrievalCatalogue.a1("Loot", "Gravestone"), 1));
-        assertTrue(engine.tt().armed);
-        engine.yz();
-        Ac fee = settle(engine, gear(1L, 0L, 50_000L, 0L), 4_000L);
+        assertTrue(engine.noteReclaimIntent(
+            BossRetrievalCatalogue.serviceFor("Loot", "Gravestone"), 1));
+        assertTrue(engine.deathStatus().armed);
+        engine.markDirty();
+        Transaction fee = settle(engine, gear(1L, 0L, 50_000L, 0L), 4_000L);
 
         assertNotNull(fee);
-        assertEquals(Ai.CONSUMPTION, fee.getType());
+        assertEquals(TransactionType.CONSUMPTION, fee.getType());
         assertEquals(-100_000L, fee.getNet());
         assertTrue(fee.getExplanation().contains("Gravestone"));
-        assertFalse(engine.tt().awaiting);
-        Ac recovered = sw(engine, "Death reclaim: items recovered");
+        assertFalse(engine.deathStatus().awaiting);
+        Transaction recovered = sw(engine, "Death reclaim: items recovered");
         assertNotNull(recovered);
         assertFalse(recovered.isCounted());
         assertEquals(WHIP, recovered.getFlows().get(0).itemId);
@@ -490,48 +490,48 @@ public class DeathReclaimLifecycleTest
                 return true;
             }
         };
-        Cc carried = gear(0L, 0L, 0L, 1L);
-        Am engine = started(carried, minimum);
-        engine.zi(1, carried.quantities);
-        engine.yz();
-        Ac wipe = settle(engine, Cc.empty(), 1_600L);
+        ContainerSnapshot carried = gear(0L, 0L, 0L, 1L);
+        Engine engine = started(carried, minimum);
+        engine.markPvmDeath(1, carried.quantities);
+        engine.markDirty();
+        Transaction wipe = settle(engine, ContainerSnapshot.empty(), 1_600L);
 
         assertNotNull(wipe);
-        assertEquals(Ai.TRANSFER, wipe.getType());
-        engine.setBaseline(Cc.empty());
-        engine.yz();
-        Ac returned = settle(engine, carried, 4_000L);
+        assertEquals(TransactionType.TRANSFER, wipe.getType());
+        engine.setBaseline(ContainerSnapshot.empty());
+        engine.markDirty();
+        Transaction returned = settle(engine, carried, 4_000L);
 
         assertNotNull("the measured return is partitioned before the minimum-value gate", returned);
-        assertEquals(Ai.TRANSFER, returned.getType());
+        assertEquals(TransactionType.TRANSFER, returned.getType());
         assertFalse(returned.isCounted());
         assertEquals("Death reclaim: items recovered", returned.getNote());
-        assertFalse(engine.tt().awaiting);
+        assertFalse(engine.deathStatus().awaiting);
         assertEquals(0L, engine.getMetrics(8_000L).net);
     }
 
     @Test
     public void partialLootReportsOutstandingItemsThenExpiresWithoutGuessingLoss()
     {
-        Cc carried = gear(1L, 1L, 0L, 0L);
-        Am engine = started(carried);
-        engine.zi(1, carried.quantities);
-        engine.yz();
-        assertNotNull(settle(engine, Cc.empty(), 1_600L));
-        engine.setBaseline(Cc.empty());
-        engine.yz();
-        Ac firstReturn = settle(engine, gear(1L, 0L, 0L, 0L), 4_000L);
+        ContainerSnapshot carried = gear(1L, 1L, 0L, 0L);
+        Engine engine = started(carried);
+        engine.markPvmDeath(1, carried.quantities);
+        engine.markDirty();
+        assertNotNull(settle(engine, ContainerSnapshot.empty(), 1_600L));
+        engine.setBaseline(ContainerSnapshot.empty());
+        engine.markDirty();
+        Transaction firstReturn = settle(engine, gear(1L, 0L, 0L, 0L), 4_000L);
 
         assertNotNull(firstReturn);
-        assertEquals(Ai.TRANSFER, firstReturn.getType());
-        assertTrue(engine.tt().awaiting);
-        assertEquals(1L, engine.tt().outstandingItemCount);
+        assertEquals(TransactionType.TRANSFER, firstReturn.getType());
+        assertTrue(engine.deathStatus().awaiting);
+        assertEquals(1L, engine.deathStatus().outstandingItemCount);
 
-        Ac expired = null;
-        Cc afterPartialReturn = gear(1L, 0L, 0L, 0L);
+        Transaction expired = null;
+        ContainerSnapshot afterPartialReturn = gear(1L, 0L, 0L, 0L);
         for (int i = 0; i < DeathReclaimLifecycle.AWAIT_TICKS; i++)
         {
-            Ac tick = engine.adj(afterPartialReturn, 6_000L + i * 600L);
+            Transaction tick = engine.processIfDirty(afterPartialReturn, 6_000L + i * 600L);
             if (tick != null)
             {
                 expired = tick;
@@ -540,21 +540,21 @@ public class DeathReclaimLifecycleTest
 
         assertNotNull("timer expiry is retained as an audit event", expired);
         assertEquals("Death reclaim expired", expired.getNote());
-        assertEquals(Ai.TRANSFER, expired.getType());
+        assertEquals(TransactionType.TRANSFER, expired.getType());
         assertFalse(expired.isCounted());
         assertTrue(expired.getFlows().isEmpty());
         assertTrue(expired.getExplanation().contains("Amulet of torture"));
         assertTrue(expired.getExplanation().contains("No item loss or fee was inferred"));
-        assertFalse(engine.tt().awaiting);
+        assertFalse(engine.deathStatus().awaiting);
         assertEquals(0L, engine.getMetrics(1_000_000L).net);
 
         // Review 2026-10-09: the expired items wait at Death's Office, so collecting them there
         // later is no income.
-        assertTrue(engine.abe(BossRetrievalCatalogue.a1("Talk-to", "Death"), 40));
-        engine.yz();
-        Ac collected = settle(engine, gear(1L, 1L, 0L, 0L), 1_000_000L);
+        assertTrue(engine.noteReclaimIntent(BossRetrievalCatalogue.serviceFor("Talk-to", "Death"), 40));
+        engine.markDirty();
+        Transaction collected = settle(engine, gear(1L, 1L, 0L, 0L), 1_000_000L);
         assertNotNull(collected);
-        assertEquals(Ai.TRANSFER, collected.getType());
+        assertEquals(TransactionType.TRANSFER, collected.getType());
         assertFalse(collected.isCounted());
         assertEquals(0L, engine.getMetrics(2_000_000L).net);
     }
@@ -562,59 +562,59 @@ public class DeathReclaimLifecycleTest
     @Test
     public void secondDeathMergesOutstandingItemsIntoNewGravestone()
     {
-        Cc firstHeld = gear(1L, 0L, 0L, 0L);
-        Am engine = started(firstHeld);
-        engine.zi(1, firstHeld.quantities);
-        engine.yz();
-        assertNotNull(settle(engine, Cc.empty(), 1_600L));
+        ContainerSnapshot firstHeld = gear(1L, 0L, 0L, 0L);
+        Engine engine = started(firstHeld);
+        engine.markPvmDeath(1, firstHeld.quantities);
+        engine.markDirty();
+        assertNotNull(settle(engine, ContainerSnapshot.empty(), 1_600L));
 
-        Cc secondHeld = gear(0L, 1L, 0L, 0L);
+        ContainerSnapshot secondHeld = gear(0L, 1L, 0L, 0L);
         engine.setBaseline(secondHeld);
-        engine.zi(1, secondHeld.quantities);
-        engine.yz();
-        assertNotNull(settle(engine, Cc.empty(), 4_000L));
-        assertTrue(engine.tt().awaiting);
-        assertEquals(2L, engine.tt().outstandingItemCount);
+        engine.markPvmDeath(1, secondHeld.quantities);
+        engine.markDirty();
+        assertNotNull(settle(engine, ContainerSnapshot.empty(), 4_000L));
+        assertTrue(engine.deathStatus().awaiting);
+        assertEquals(2L, engine.deathStatus().outstandingItemCount);
 
-        engine.setBaseline(Cc.empty());
-        engine.yz();
-        Ac recovered = settle(engine, gear(1L, 1L, 0L, 0L), 6_000L);
+        engine.setBaseline(ContainerSnapshot.empty());
+        engine.markDirty();
+        Transaction recovered = settle(engine, gear(1L, 1L, 0L, 0L), 6_000L);
         assertNotNull(recovered);
-        assertEquals(Ai.TRANSFER, recovered.getType());
+        assertEquals(TransactionType.TRANSFER, recovered.getType());
         assertEquals("Death reclaim: items recovered", recovered.getNote());
-        assertFalse(engine.tt().awaiting);
+        assertFalse(engine.deathStatus().awaiting);
         assertEquals(0L, engine.getMetrics(10_000L).net);
     }
 
     @Test
     public void pvmDeathWipeIsATransferAndZulrahReclaimReturnsItemsAndBooksTheFee()
     {
-        Am engine = started(gear(1L, 1L, 150_000L, 0L));
+        Engine engine = started(gear(1L, 1L, 150_000L, 0L));
         long before = engine.getMetrics(1_000L).net;
 
         // Death: everything leaves the inventory in one settle.
-        engine.zi(20, gear(1L, 1L, 150_000L, 0L).quantities);
-        engine.yz();
-        Ac wipe = settle(engine, Cc.empty(), 1_600L);
+        engine.markPvmDeath(20, gear(1L, 1L, 150_000L, 0L).quantities);
+        engine.markDirty();
+        Transaction wipe = settle(engine, ContainerSnapshot.empty(), 1_600L);
         assertNotNull(wipe);
-        assertEquals(Ai.TRANSFER, wipe.getType());
+        assertEquals(TransactionType.TRANSFER, wipe.getType());
         assertFalse(wipe.isCounted());
         assertTrue(wipe.getNote(), wipe.getNote().startsWith("Death: items held"));
         assertTrue(wipe.getExplanation(), wipe.getExplanation().startsWith("Ownership-neutral transfer: Death"));
         assertTrue(EngineProbe.isAwaitingDeathReclaim(engine));
 
         // Respawn with the coins for the fee (coins are kept on death in this fixture).
-        engine.yz();
-        assertNull(engine.adj(gear(0L, 0L, 150_000L, 0L), 4_000L));
+        engine.markDirty();
+        assertNull(engine.processIfDirty(gear(0L, 0L, 150_000L, 0L), 4_000L));
         engine.setBaseline(gear(0L, 0L, 150_000L, 0L));
 
         // Reclaim at Zul-Gwenwynig: 100k leaves, whip + torture return in the same settle.
-        assertTrue(engine.abe(
-            BossRetrievalCatalogue.a1("Talk-to", "Priestess Zul-Gwenwynig"), 40));
-        engine.yz();
-        Ac fee = settle(engine, gear(1L, 1L, 50_000L, 0L), 6_000L);
+        assertTrue(engine.noteReclaimIntent(
+            BossRetrievalCatalogue.serviceFor("Talk-to", "Priestess Zul-Gwenwynig"), 40));
+        engine.markDirty();
+        Transaction fee = settle(engine, gear(1L, 1L, 50_000L, 0L), 6_000L);
         assertNotNull(fee);
-        assertEquals(Ai.CONSUMPTION, fee.getType());
+        assertEquals(TransactionType.CONSUMPTION, fee.getType());
         assertTrue(fee.isCounted());
         assertEquals(-100_000L, fee.getNet());
         assertEquals("Death reclaim", fee.getActivityName());
@@ -624,9 +624,9 @@ public class DeathReclaimLifecycleTest
         assertFalse(EngineProbe.isAwaitingDeathReclaim(engine));
 
         // The returned gear is an uncounted transfer row, not revenue.
-        List<Ac> rows = engine.getActiveSession().getTransactions();
-        Ac recovered = null;
-        for (Ac row : rows)
+        List<Transaction> rows = engine.getActiveSession().getTransactions();
+        Transaction recovered = null;
+        for (Transaction row : rows)
         {
             if ("Death reclaim: items recovered".equals(row.getNote()))
             {
@@ -634,7 +634,7 @@ public class DeathReclaimLifecycleTest
             }
         }
         assertNotNull(recovered);
-        assertEquals(Ai.TRANSFER, recovered.getType());
+        assertEquals(TransactionType.TRANSFER, recovered.getType());
         assertFalse(recovered.isCounted());
         assertFalse(recovered.getExplanation().contains("Death evidence"));
         assertEquals(2, recovered.getFlows().size());
@@ -645,20 +645,20 @@ public class DeathReclaimLifecycleTest
     @Test
     public void reclaimWindowLeavesUnrelatedConsumptionToNormalClassification()
     {
-        Am engine = started(gear(0L, 0L, 0L, 2L));
-        engine.zi(20, gear(0L, 0L, 0L, 2L).quantities);
-        engine.yz();
-        Ac wipe = settle(engine, Cc.empty(), 1_600L);
+        Engine engine = started(gear(0L, 0L, 0L, 2L));
+        engine.markPvmDeath(20, gear(0L, 0L, 0L, 2L).quantities);
+        engine.markDirty();
+        Transaction wipe = settle(engine, ContainerSnapshot.empty(), 1_600L);
         assertNotNull(wipe);
         engine.setBaseline(gear(0L, 0L, 0L, 2L));
-        assertTrue(engine.abe(BossRetrievalCatalogue.a1("Talk-to", "Torfinn"), 40));
-        engine.ci(SHARK, 6);
-        engine.yz();
+        assertTrue(engine.noteReclaimIntent(BossRetrievalCatalogue.serviceFor("Talk-to", "Torfinn"), 40));
+        engine.noteConsume(SHARK, 6, false);
+        engine.markDirty();
 
-        Ac eat = settle(engine, gear(0L, 0L, 0L, 1L), 1_600L);
+        Transaction eat = settle(engine, gear(0L, 0L, 0L, 1L), 1_600L);
 
         assertNotNull(eat);
-        assertEquals("a shark eaten in the window is still a consume", Ai.CONSUMPTION, eat.getType());
+        assertEquals("a shark eaten in the window is still a consume", TransactionType.CONSUMPTION, eat.getType());
         assertEquals(-800L, eat.getNet());
         assertFalse("Death reclaim".equals(eat.getActivityName()));
     }
@@ -666,33 +666,33 @@ public class DeathReclaimLifecycleTest
     @Test
     public void unrelatedLootDoesNotConsumeReclaimWindowOrBecomeRecoveredDeathGear()
     {
-        Am engine = started(gear(1L, 0L, 150_000L, 0L));
-        engine.zi(20, gear(1L, 0L, 150_000L, 0L).quantities);
-        engine.yz();
-        Ac wipe = settle(engine, gear(0L, 0L, 150_000L, 0L), 1_600L);
+        Engine engine = started(gear(1L, 0L, 150_000L, 0L));
+        engine.markPvmDeath(20, gear(1L, 0L, 150_000L, 0L).quantities);
+        engine.markDirty();
+        Transaction wipe = settle(engine, gear(0L, 0L, 150_000L, 0L), 1_600L);
         assertNotNull(wipe);
-        assertEquals(Ai.TRANSFER, wipe.getType());
+        assertEquals(TransactionType.TRANSFER, wipe.getType());
         assertTrue(EngineProbe.isAwaitingDeathReclaim(engine));
 
-        assertTrue(engine.abe(BossRetrievalCatalogue.a1("Talk-to", "Torfinn"), 40));
-        engine.yz();
-        Ac loot = settle(engine, gear(0L, 0L, 150_000L, 1L), 4_000L);
+        assertTrue(engine.noteReclaimIntent(BossRetrievalCatalogue.serviceFor("Talk-to", "Torfinn"), 40));
+        engine.markDirty();
+        Transaction loot = settle(engine, gear(0L, 0L, 150_000L, 1L), 4_000L);
 
         assertNotNull(loot);
-        assertEquals("ordinary loot keeps its normal counted classification", Ai.GAIN, loot.getType());
+        assertEquals("ordinary loot keeps its normal counted classification", TransactionType.GAIN, loot.getType());
         assertTrue(loot.isCounted());
         assertEquals(800L, loot.getNet());
         assertTrue("the unrelated gain must not finish the reclaim", EngineProbe.isAwaitingDeathReclaim(engine));
 
-        engine.yz();
-        Ac fee = settle(engine, gear(1L, 0L, 50_000L, 1L), 6_000L);
+        engine.markDirty();
+        Transaction fee = settle(engine, gear(1L, 0L, 50_000L, 1L), 6_000L);
         assertNotNull(fee);
-        assertEquals(Ai.CONSUMPTION, fee.getType());
+        assertEquals(TransactionType.CONSUMPTION, fee.getType());
         assertEquals(-100_000L, fee.getNet());
         assertFalse(EngineProbe.isAwaitingDeathReclaim(engine));
 
-        Ac recovered = null;
-        for (Ac row : engine.getActiveSession().getTransactions())
+        Transaction recovered = null;
+        for (Transaction row : engine.getActiveSession().getTransactions())
         {
             if ("Death reclaim: items recovered".equals(row.getNote()))
             {
@@ -708,21 +708,21 @@ public class DeathReclaimLifecycleTest
     @Test
     public void observedLootWithSameItemIdAsDeathGearStaysCounted()
     {
-        Am engine = started(gear(1L, 0L, 0L, 0L));
-        engine.zi(20, gear(1L, 0L, 0L, 0L).quantities);
-        engine.yz();
-        Ac wipe = settle(engine, Cc.empty(), 1_600L);
+        Engine engine = started(gear(1L, 0L, 0L, 0L));
+        engine.markPvmDeath(20, gear(1L, 0L, 0L, 0L).quantities);
+        engine.markDirty();
+        Transaction wipe = settle(engine, ContainerSnapshot.empty(), 1_600L);
         assertNotNull(wipe);
-        assertTrue(engine.abe(
-            BossRetrievalCatalogue.a1("Talk-to", "Torfinn"), 40));
+        assertTrue(engine.noteReclaimIntent(
+            BossRetrievalCatalogue.serviceFor("Talk-to", "Torfinn"), 40));
 
-        engine.zk(
+        engine.markLoot(
             java.util.Collections.singletonMap(WHIP, 1L), 20, "Loot from Dragon", "Dragon");
-        engine.yz();
-        Ac loot = settle(engine, gear(1L, 0L, 0L, 0L), 4_000L);
+        engine.markDirty();
+        Transaction loot = settle(engine, gear(1L, 0L, 0L, 0L), 4_000L);
 
         assertNotNull(loot);
-        assertEquals(Ai.LOOT, loot.getType());
+        assertEquals(TransactionType.LOOT, loot.getType());
         assertTrue("RuneLite's matched loot source stays counted", loot.isCounted());
         assertEquals(2_000_000L, loot.getNet());
         assertEquals("Loot from Dragon", loot.getNote());
@@ -732,28 +732,28 @@ public class DeathReclaimLifecycleTest
     @Test
     public void sameIdLootAndReclaimedGearPartitionByMatchedQuantity()
     {
-        Am engine = started(gear(1L, 0L, 0L, 0L));
-        engine.zi(20, gear(1L, 0L, 0L, 0L).quantities);
-        engine.yz();
-        assertNotNull(settle(engine, Cc.empty(), 1_600L));
-        assertTrue(engine.abe(
-            BossRetrievalCatalogue.a1("Talk-to", "Torfinn"), 40));
+        Engine engine = started(gear(1L, 0L, 0L, 0L));
+        engine.markPvmDeath(20, gear(1L, 0L, 0L, 0L).quantities);
+        engine.markDirty();
+        assertNotNull(settle(engine, ContainerSnapshot.empty(), 1_600L));
+        assertTrue(engine.noteReclaimIntent(
+            BossRetrievalCatalogue.serviceFor("Talk-to", "Torfinn"), 40));
 
-        engine.zk(
+        engine.markLoot(
             java.util.Collections.singletonMap(WHIP, 1L), 20, "Loot from Dragon", "Dragon");
-        engine.yz();
-        Ac loot = settle(engine,
-            new Cc(java.util.Collections.singletonMap(WHIP, 2L)), 4_000L);
+        engine.markDirty();
+        Transaction loot = settle(engine,
+            new ContainerSnapshot(java.util.Collections.singletonMap(WHIP, 2L)), 4_000L);
 
         assertNotNull(loot);
-        assertEquals("only the source-backed quantity is a counted drop", Ai.LOOT, loot.getType());
+        assertEquals("only the source-backed quantity is a counted drop", TransactionType.LOOT, loot.getType());
         assertTrue(loot.isCounted());
         assertEquals(2_000_000L, loot.getNet());
         assertEquals(1L, loot.getFlows().get(0).quantityDelta);
         assertFalse("returning the final wiped item closes the reclaim", EngineProbe.isAwaitingDeathReclaim(engine));
 
-        Ac recovered = null;
-        for (Ac row : engine.getActiveSession().getTransactions())
+        Transaction recovered = null;
+        for (Transaction row : engine.getActiveSession().getTransactions())
         {
             if ("Death reclaim: items recovered".equals(row.getNote()))
             {
@@ -768,17 +768,17 @@ public class DeathReclaimLifecycleTest
     @Test
     public void hardBankTransferDuringReclaimDoesNotBecomeADeathFee()
     {
-        Am engine = started(gear(0L, 0L, 150_000L, 0L));
-        engine.zi(20, gear(0L, 0L, 150_000L, 0L).quantities);
-        assertTrue(engine.abe(
-            BossRetrievalCatalogue.a1("Talk-to", "Torfinn"), 40));
-        engine.markContext(Aj.TRANSFER, 20, "Bank deposit");
-        engine.yz();
+        Engine engine = started(gear(0L, 0L, 150_000L, 0L));
+        engine.markPvmDeath(20, gear(0L, 0L, 150_000L, 0L).quantities);
+        assertTrue(engine.noteReclaimIntent(
+            BossRetrievalCatalogue.serviceFor("Talk-to", "Torfinn"), 40));
+        engine.markContext(Context.TRANSFER, 20, "Bank deposit");
+        engine.markDirty();
 
-        Ac deposit = settle(engine, gear(0L, 0L, 149_000L, 0L), 1_600L);
+        Transaction deposit = settle(engine, gear(0L, 0L, 149_000L, 0L), 1_600L);
 
         assertNotNull(deposit);
-        assertEquals(Ai.TRANSFER, deposit.getType());
+        assertEquals(TransactionType.TRANSFER, deposit.getType());
         assertFalse(deposit.isCounted());
         assertFalse("bank movement is not labelled as a reclaim fee",
             "Death reclaim".equals(deposit.getActivityName()));
@@ -788,16 +788,16 @@ public class DeathReclaimLifecycleTest
     @Test
     public void laterExplicitMarketContextSupersedesDeathWipeMarker()
     {
-        Am engine = started(gear(1L, 0L, 0L, 0L));
-        engine.zi(20,
+        Engine engine = started(gear(1L, 0L, 0L, 0L));
+        engine.markPvmDeath(20,
             java.util.Collections.singletonMap(WHIP, 1L));
-        engine.markContext(Aj.MARKET, 20, "Market sale");
-        engine.yz();
+        engine.markContext(Context.MARKET, 20, "Market sale");
+        engine.markDirty();
 
-        Ac sale = settle(engine, Cc.empty(), 1_600L);
+        Transaction sale = settle(engine, ContainerSnapshot.empty(), 1_600L);
 
         assertNotNull(sale);
-        assertEquals("the explicit market evidence owns this loss", Aj.MARKET,
+        assertEquals("the explicit market evidence owns this loss", Context.MARKET,
             sale.getContext());
         assertTrue("the sale remains counted", sale.isCounted());
         assertFalse("it must not be neutralized as a death transfer",
@@ -809,25 +809,25 @@ public class DeathReclaimLifecycleTest
     @Test
     public void mixedReclaimAndLootPartitionsReturnsAndKeepsWindowOpen()
     {
-        Am engine = started(gear(1L, 1L, 150_000L, 0L));
-        engine.zi(20, gear(1L, 1L, 150_000L, 0L).quantities);
-        engine.yz();
-        Ac wipe = settle(engine, gear(0L, 0L, 150_000L, 0L), 1_600L);
+        Engine engine = started(gear(1L, 1L, 150_000L, 0L));
+        engine.markPvmDeath(20, gear(1L, 1L, 150_000L, 0L).quantities);
+        engine.markDirty();
+        Transaction wipe = settle(engine, gear(0L, 0L, 150_000L, 0L), 1_600L);
         assertNotNull(wipe);
         assertTrue(EngineProbe.isAwaitingDeathReclaim(engine));
 
-        assertTrue(engine.abe(BossRetrievalCatalogue.a1("Talk-to", "Torfinn"), 40));
-        engine.yz();
-        Ac loot = settle(engine, gear(1L, 0L, 150_000L, 1L), 4_000L);
+        assertTrue(engine.noteReclaimIntent(BossRetrievalCatalogue.serviceFor("Talk-to", "Torfinn"), 40));
+        engine.markDirty();
+        Transaction loot = settle(engine, gear(1L, 0L, 150_000L, 1L), 4_000L);
 
         assertNotNull(loot);
-        assertEquals(Ai.GAIN, loot.getType());
+        assertEquals(TransactionType.GAIN, loot.getType());
         assertTrue(loot.isCounted());
         assertEquals(800L, loot.getNet());
         assertTrue("an unmatched gain must not close a partially returned reclaim", EngineProbe.isAwaitingDeathReclaim(engine));
 
-        Ac recovered = null;
-        for (Ac row : engine.getActiveSession().getTransactions())
+        Transaction recovered = null;
+        for (Transaction row : engine.getActiveSession().getTransactions())
         {
             if ("Death reclaim: items recovered".equals(row.getNote()))
             {
@@ -838,10 +838,10 @@ public class DeathReclaimLifecycleTest
         assertEquals(1, recovered.getFlows().size());
         assertEquals(WHIP, recovered.getFlows().get(0).itemId);
 
-        engine.yz();
-        Ac fee = settle(engine, gear(1L, 1L, 50_000L, 1L), 6_000L);
+        engine.markDirty();
+        Transaction fee = settle(engine, gear(1L, 1L, 50_000L, 1L), 6_000L);
         assertNotNull(fee);
-        assertEquals(Ai.CONSUMPTION, fee.getType());
+        assertEquals(TransactionType.CONSUMPTION, fee.getType());
         assertEquals(-100_000L, fee.getNet());
         assertFalse(EngineProbe.isAwaitingDeathReclaim(engine));
     }
@@ -849,46 +849,46 @@ public class DeathReclaimLifecycleTest
     @Test
     public void unclassifiedLocalDeathClearsEarlierReclaimEvidence()
     {
-        Am engine = started(gear(1L, 0L, 150_000L, 0L));
-        engine.zi(20, gear(1L, 0L, 150_000L, 0L).quantities);
-        engine.yz();
-        Ac wipe = settle(engine, gear(0L, 0L, 150_000L, 0L), 1_600L);
+        Engine engine = started(gear(1L, 0L, 150_000L, 0L));
+        engine.markPvmDeath(20, gear(1L, 0L, 150_000L, 0L).quantities);
+        engine.markDirty();
+        Transaction wipe = settle(engine, gear(0L, 0L, 150_000L, 0L), 1_600L);
         assertNotNull(wipe);
         assertTrue(EngineProbe.isAwaitingDeathReclaim(engine));
 
-        engine.zj();
+        engine.markUnknownDeath();
 
         assertFalse(EngineProbe.isAwaitingDeathReclaim(engine));
-        assertFalse("unclassified death must not arm retrieval accounting", engine.abe(
-            BossRetrievalCatalogue.a1("Talk-to", "Torfinn"), 40));
-        engine.yz();
-        Ac returned = settle(engine, gear(1L, 0L, 150_000L, 0L), 4_000L);
+        assertFalse("unclassified death must not arm retrieval accounting", engine.noteReclaimIntent(
+            BossRetrievalCatalogue.serviceFor("Talk-to", "Torfinn"), 40));
+        engine.markDirty();
+        Transaction returned = settle(engine, gear(1L, 0L, 150_000L, 0L), 4_000L);
 
         assertNotNull(returned);
-        assertEquals(Ai.GAIN, returned.getType());
+        assertEquals(TransactionType.GAIN, returned.getType());
         assertTrue(returned.isCounted());
     }
 
     @Test
     public void partialDeathItemReturnKeepsRemainingItemsEligibleForReclaim()
     {
-        Am engine = started(gear(1L, 1L, 150_000L, 0L));
-        engine.zi(20, gear(1L, 1L, 150_000L, 0L).quantities);
-        engine.yz();
-        Ac wipe = settle(engine, gear(0L, 0L, 150_000L, 0L), 1_600L);
+        Engine engine = started(gear(1L, 1L, 150_000L, 0L));
+        engine.markPvmDeath(20, gear(1L, 1L, 150_000L, 0L).quantities);
+        engine.markDirty();
+        Transaction wipe = settle(engine, gear(0L, 0L, 150_000L, 0L), 1_600L);
         assertNotNull(wipe);
         assertTrue(EngineProbe.isAwaitingDeathReclaim(engine));
 
-        assertTrue(engine.abe(BossRetrievalCatalogue.a1("Talk-to", "Torfinn"), 40));
-        engine.yz();
-        Ac firstReturn = settle(engine, gear(1L, 0L, 150_000L, 0L), 4_000L);
+        assertTrue(engine.noteReclaimIntent(BossRetrievalCatalogue.serviceFor("Talk-to", "Torfinn"), 40));
+        engine.markDirty();
+        Transaction firstReturn = settle(engine, gear(1L, 0L, 150_000L, 0L), 4_000L);
         assertNotNull(firstReturn);
         assertEquals("Death reclaim: items recovered", firstReturn.getNote());
         assertTrue("returning only part of the death wipe must leave the reclaim active",
             EngineProbe.isAwaitingDeathReclaim(engine));
 
-        engine.yz();
-        Ac finalReturn = settle(engine, gear(1L, 1L, 150_000L, 0L), 6_000L);
+        engine.markDirty();
+        Transaction finalReturn = settle(engine, gear(1L, 1L, 150_000L, 0L), 6_000L);
         assertNotNull(finalReturn);
         assertEquals("Death reclaim: items recovered", finalReturn.getNote());
         assertFalse(EngineProbe.isAwaitingDeathReclaim(engine));
@@ -897,25 +897,25 @@ public class DeathReclaimLifecycleTest
     @Test
     public void reclaimStateIsClearedWhenAnotherIdentityIsRestored()
     {
-        Am engine = started(gear(1L, 0L, 0L, 0L));
-        engine.zi(20, gear(1L, 0L, 0L, 0L).quantities);
-        engine.yz();
-        Ac wipe = settle(engine, Cc.empty(), 1_600L);
+        Engine engine = started(gear(1L, 0L, 0L, 0L));
+        engine.markPvmDeath(20, gear(1L, 0L, 0L, 0L).quantities);
+        engine.markDirty();
+        Transaction wipe = settle(engine, ContainerSnapshot.empty(), 1_600L);
         assertNotNull(wipe);
         assertTrue(EngineProbe.isAwaitingDeathReclaim(engine));
 
         engine.restore(new SavedState());
-        engine.rm(4_000L);
-        engine.setBaseline(Cc.empty());
+        engine.ensureSession(4_000L);
+        engine.setBaseline(ContainerSnapshot.empty());
 
         assertFalse("account restore cannot retain another owner's death whitelist",
             EngineProbe.isAwaitingDeathReclaim(engine));
-        assertFalse(engine.abe(
-            BossRetrievalCatalogue.a1("Talk-to", "Torfinn"), 40));
-        engine.yz();
-        Ac newOwnerGain = settle(engine, gear(1L, 0L, 0L, 0L), 5_000L);
+        assertFalse(engine.noteReclaimIntent(
+            BossRetrievalCatalogue.serviceFor("Talk-to", "Torfinn"), 40));
+        engine.markDirty();
+        Transaction newOwnerGain = settle(engine, gear(1L, 0L, 0L, 0L), 5_000L);
         assertNotNull(newOwnerGain);
-        assertEquals(Ai.GAIN, newOwnerGain.getType());
+        assertEquals(TransactionType.GAIN, newOwnerGain.getType());
         assertTrue(newOwnerGain.isCounted());
         assertEquals(2_000_000L, newOwnerGain.getNet());
     }
@@ -923,27 +923,27 @@ public class DeathReclaimLifecycleTest
     @Test
     public void reclaimStateSurvivesPauseAndResumeAfterTheDeathWipeSettles()
     {
-        Am engine = started(gear(1L, 0L, 0L, 0L));
-        engine.zi(20, gear(1L, 0L, 0L, 0L).quantities);
-        engine.yz();
-        Ac wipe = settle(engine, Cc.empty(), 1_600L);
+        Engine engine = started(gear(1L, 0L, 0L, 0L));
+        engine.markPvmDeath(20, gear(1L, 0L, 0L, 0L).quantities);
+        engine.markDirty();
+        Transaction wipe = settle(engine, ContainerSnapshot.empty(), 1_600L);
         assertNotNull(wipe);
         assertTrue(EngineProbe.isAwaitingDeathReclaim(engine));
 
-        engine.acu(3_000L);
-        assertNull("paused inventory churn is ignored", engine.adj(gear(0L, 0L, 0L, 1L), 3_200L));
-        engine.resume(4_000L, Ed.LIFECYCLE);
-        engine.setBaseline(Cc.empty());
+        engine.pauseForLifecycle(3_000L);
+        assertNull("paused inventory churn is ignored", engine.processIfDirty(gear(0L, 0L, 0L, 1L), 3_200L));
+        engine.resume(4_000L, PauseReason.LIFECYCLE);
+        engine.setBaseline(ContainerSnapshot.empty());
         assertTrue("pause must not discard same-owner death ownership evidence",
             EngineProbe.isAwaitingDeathReclaim(engine));
-        assertTrue(engine.abe(
-            BossRetrievalCatalogue.a1("Talk-to", "Torfinn"), 40));
+        assertTrue(engine.noteReclaimIntent(
+            BossRetrievalCatalogue.serviceFor("Talk-to", "Torfinn"), 40));
 
-        engine.yz();
-        Ac returned = settle(engine, gear(1L, 0L, 0L, 0L), 5_000L);
+        engine.markDirty();
+        Transaction returned = settle(engine, gear(1L, 0L, 0L, 0L), 5_000L);
 
         assertNotNull(returned);
-        assertEquals(Ai.TRANSFER, returned.getType());
+        assertEquals(TransactionType.TRANSFER, returned.getType());
         assertFalse(returned.isCounted());
         assertEquals(0L, engine.getMetrics(8_000L).net);
     }
@@ -951,58 +951,58 @@ public class DeathReclaimLifecycleTest
     @Test
     public void persistedDeathEvidenceKeepsReclaimNeutralAcrossRestart()
     {
-        Am first = started(gear(1L, 0L, 0L, 0L));
-        first.zi(20, gear(1L, 0L, 0L, 0L).quantities);
-        first.yz();
-        assertNotNull(settle(first, Cc.empty(), 1_600L));
+        Engine first = started(gear(1L, 0L, 0L, 0L));
+        first.markPvmDeath(20, gear(1L, 0L, 0L, 0L).quantities);
+        first.markDirty();
+        assertNotNull(settle(first, ContainerSnapshot.empty(), 1_600L));
         assertTrue(EngineProbe.isAwaitingDeathReclaim(first));
 
-        SavedState direct = first.qm();
+        SavedState direct = first.savedState();
         assertNotNull("pending record on the live snapshot", direct.pendingDeathReclaim);
         SavedState persisted = roundTrip(direct);
         assertNotNull("the pending death record must persist", persisted.pendingDeathReclaim);
         assertEquals(1, persisted.pendingDeathReclaim.getOutstandingItems().size());
         assertEquals(WHIP, persisted.pendingDeathReclaim.getOutstandingItems().get(0).itemId);
 
-        Am restarted = new Am(valuator, new TransactionClassifier(), CONFIG);
+        Engine restarted = new Engine(valuator, new TransactionClassifier(), CONFIG);
         restarted.restore(persisted, 10_000L);
-        restarted.resume(11_000L, Ed.IDLE, Ed.RECOVERY);
-        restarted.setBaseline(Cc.empty());
+        restarted.resume(11_000L, PauseReason.IDLE, PauseReason.RECOVERY);
+        restarted.setBaseline(ContainerSnapshot.empty());
         assertTrue("a restart restores the pending reclaim", EngineProbe.isAwaitingDeathReclaim(restarted));
-        assertTrue(restarted.abe(
-            BossRetrievalCatalogue.a1("Talk-to", "Torfinn"), 40));
+        assertTrue(restarted.noteReclaimIntent(
+            BossRetrievalCatalogue.serviceFor("Talk-to", "Torfinn"), 40));
 
-        restarted.yz();
-        Ac returned = settle(restarted, gear(1L, 0L, 0L, 0L), 12_000L);
+        restarted.markDirty();
+        Transaction returned = settle(restarted, gear(1L, 0L, 0L, 0L), 12_000L);
 
         assertNotNull(returned);
-        assertEquals(Ai.TRANSFER, returned.getType());
+        assertEquals(TransactionType.TRANSFER, returned.getType());
         assertFalse(returned.isCounted());
         assertEquals("reclaimed gear must not become revenue", 0L, restarted.getMetrics(20_000L).revenue);
         assertEquals(0L, restarted.getMetrics(20_000L).net);
         assertFalse("a full reclaim clears the pending state", EngineProbe.isAwaitingDeathReclaim(restarted));
-        assertNull(roundTrip(restarted.qm()).pendingDeathReclaim);
+        assertNull(roundTrip(restarted.savedState()).pendingDeathReclaim);
     }
 
     @Test
     public void persistedDeathEvidenceBeforeWipeSurvivesRestart()
     {
-        Cc carried = gear(1L, 0L, 0L, 0L);
-        Am first = started(carried);
-        first.zi(20, carried.quantities);
+        ContainerSnapshot carried = gear(1L, 0L, 0L, 0L);
+        Engine first = started(carried);
+        first.markPvmDeath(20, carried.quantities);
 
-        SavedState persisted = roundTrip(first.qm());
+        SavedState persisted = roundTrip(first.savedState());
         assertNotNull("death evidence is persisted before the inventory wipe", persisted.pendingDeathReclaim);
 
-        Am restarted = new Am(valuator, new TransactionClassifier(), CONFIG);
+        Engine restarted = new Engine(valuator, new TransactionClassifier(), CONFIG);
         restarted.restore(persisted, 10_000L);
-        restarted.resume(11_000L, Ed.IDLE, Ed.RECOVERY);
+        restarted.resume(11_000L, PauseReason.IDLE, PauseReason.RECOVERY);
         restarted.setBaseline(carried);
-        restarted.yz();
-        Ac wipe = settle(restarted, Cc.empty(), 12_000L);
+        restarted.markDirty();
+        Transaction wipe = settle(restarted, ContainerSnapshot.empty(), 12_000L);
 
         assertNotNull(wipe);
-        assertEquals(Ai.TRANSFER, wipe.getType());
+        assertEquals(TransactionType.TRANSFER, wipe.getType());
         assertFalse("the post-restart death wipe remains ownership-neutral", wipe.isCounted());
         assertTrue(EngineProbe.isAwaitingDeathReclaim(restarted));
     }
@@ -1010,64 +1010,64 @@ public class DeathReclaimLifecycleTest
     @Test
     public void partialReclaimRemainderSurvivesRestart()
     {
-        Am first = started(gear(1L, 1L, 0L, 0L));
-        first.zi(20, gear(1L, 1L, 0L, 0L).quantities);
-        first.yz();
-        assertNotNull(settle(first, Cc.empty(), 1_600L));
-        assertTrue(first.abe(
-            BossRetrievalCatalogue.a1("Talk-to", "Torfinn"), 40));
-        first.yz();
-        Ac partial = settle(first, gear(1L, 0L, 0L, 0L), 3_000L);
+        Engine first = started(gear(1L, 1L, 0L, 0L));
+        first.markPvmDeath(20, gear(1L, 1L, 0L, 0L).quantities);
+        first.markDirty();
+        assertNotNull(settle(first, ContainerSnapshot.empty(), 1_600L));
+        assertTrue(first.noteReclaimIntent(
+            BossRetrievalCatalogue.serviceFor("Talk-to", "Torfinn"), 40));
+        first.markDirty();
+        Transaction partial = settle(first, gear(1L, 0L, 0L, 0L), 3_000L);
         assertNotNull(partial);
-        assertEquals(Ai.TRANSFER, partial.getType());
-        assertEquals("one item remains outstanding", 1L, first.tt().outstandingItemCount);
+        assertEquals(TransactionType.TRANSFER, partial.getType());
+        assertEquals("one item remains outstanding", 1L, first.deathStatus().outstandingItemCount);
 
-        SavedState persisted = roundTrip(first.qm());
+        SavedState persisted = roundTrip(first.savedState());
         assertNotNull(persisted.pendingDeathReclaim);
         assertEquals(1, persisted.pendingDeathReclaim.getOutstandingItems().size());
 
-        Am restarted = new Am(valuator, new TransactionClassifier(), CONFIG);
+        Engine restarted = new Engine(valuator, new TransactionClassifier(), CONFIG);
         restarted.restore(persisted, 10_000L);
-        restarted.resume(11_000L, Ed.IDLE, Ed.RECOVERY);
+        restarted.resume(11_000L, PauseReason.IDLE, PauseReason.RECOVERY);
         restarted.setBaseline(gear(1L, 0L, 0L, 0L));
-        assertEquals(1L, restarted.tt().outstandingItemCount);
-        assertTrue(restarted.abe(
-            BossRetrievalCatalogue.a1("Talk-to", "Torfinn"), 40));
-        restarted.yz();
-        Ac remainder = settle(restarted, gear(1L, 1L, 0L, 0L), 12_000L);
+        assertEquals(1L, restarted.deathStatus().outstandingItemCount);
+        assertTrue(restarted.noteReclaimIntent(
+            BossRetrievalCatalogue.serviceFor("Talk-to", "Torfinn"), 40));
+        restarted.markDirty();
+        Transaction remainder = settle(restarted, gear(1L, 1L, 0L, 0L), 12_000L);
 
         assertNotNull(remainder);
-        assertEquals(Ai.TRANSFER, remainder.getType());
+        assertEquals(TransactionType.TRANSFER, remainder.getType());
         assertEquals(0L, restarted.getMetrics(20_000L).net);
         assertFalse(EngineProbe.isAwaitingDeathReclaim(restarted));
-        assertNull(roundTrip(restarted.qm()).pendingDeathReclaim);
+        assertNull(roundTrip(restarted.savedState()).pendingDeathReclaim);
     }
 
     @Test
     public void closedReclaimCannotReclassifyLaterGainsAfterRestart()
     {
-        Am first = started(gear(1L, 0L, 0L, 0L));
-        first.zi(20, gear(1L, 0L, 0L, 0L).quantities);
-        first.yz();
-        assertNotNull(settle(first, Cc.empty(), 1_600L));
-        assertTrue(first.abe(
-            BossRetrievalCatalogue.a1("Talk-to", "Torfinn"), 40));
-        first.yz();
+        Engine first = started(gear(1L, 0L, 0L, 0L));
+        first.markPvmDeath(20, gear(1L, 0L, 0L, 0L).quantities);
+        first.markDirty();
+        assertNotNull(settle(first, ContainerSnapshot.empty(), 1_600L));
+        assertTrue(first.noteReclaimIntent(
+            BossRetrievalCatalogue.serviceFor("Talk-to", "Torfinn"), 40));
+        first.markDirty();
         assertNotNull(settle(first, gear(1L, 0L, 0L, 0L), 3_000L));
-        assertNull(roundTrip(first.qm()).pendingDeathReclaim);
+        assertNull(roundTrip(first.savedState()).pendingDeathReclaim);
 
-        Am restarted = new Am(valuator, new TransactionClassifier(), CONFIG);
-        restarted.restore(roundTrip(first.qm()), 10_000L);
-        restarted.resume(11_000L, Ed.IDLE, Ed.RECOVERY);
-        restarted.setBaseline(Cc.empty());
+        Engine restarted = new Engine(valuator, new TransactionClassifier(), CONFIG);
+        restarted.restore(roundTrip(first.savedState()), 10_000L);
+        restarted.resume(11_000L, PauseReason.IDLE, PauseReason.RECOVERY);
+        restarted.setBaseline(ContainerSnapshot.empty());
         assertFalse(EngineProbe.isAwaitingDeathReclaim(restarted));
-        assertFalse("closed reclaim evidence cannot arm again", restarted.abe(
-            BossRetrievalCatalogue.a1("Talk-to", "Torfinn"), 40));
+        assertFalse("closed reclaim evidence cannot arm again", restarted.noteReclaimIntent(
+            BossRetrievalCatalogue.serviceFor("Talk-to", "Torfinn"), 40));
 
-        restarted.yz();
-        Ac later = settle(restarted, gear(1L, 0L, 0L, 0L), 12_000L);
+        restarted.markDirty();
+        Transaction later = settle(restarted, gear(1L, 0L, 0L, 0L), 12_000L);
         assertNotNull(later);
-        assertEquals(Ai.GAIN, later.getType());
+        assertEquals(TransactionType.GAIN, later.getType());
         assertTrue(later.isCounted());
         assertEquals(2_000_000L, restarted.getMetrics(20_000L).revenue);
     }
@@ -1075,52 +1075,52 @@ public class DeathReclaimLifecycleTest
     @Test
     public void ownerSwitchAndDestructiveResetClearPersistedDeathEvidence()
     {
-        Am engine = started(gear(1L, 0L, 0L, 0L));
-        engine.zi(20, gear(1L, 0L, 0L, 0L).quantities);
-        engine.yz();
-        assertNotNull(settle(engine, Cc.empty(), 1_600L));
-        assertNotNull(engine.qm().pendingDeathReclaim);
+        Engine engine = started(gear(1L, 0L, 0L, 0L));
+        engine.markPvmDeath(20, gear(1L, 0L, 0L, 0L).quantities);
+        engine.markDirty();
+        assertNotNull(settle(engine, ContainerSnapshot.empty(), 1_600L));
+        assertNotNull(engine.savedState().pendingDeathReclaim);
 
         // Another owner's state carries no pending record and must not inherit this one.
-        engine.agl("profile-b", new SavedState(), 3_000L);
+        engine.restoreProfile("profile-b", new SavedState(), 3_000L);
         assertFalse(EngineProbe.isAwaitingDeathReclaim(engine));
-        assertNull(engine.qm().pendingDeathReclaim);
+        assertNull(engine.savedState().pendingDeathReclaim);
 
-        Am reset = started(gear(1L, 0L, 0L, 0L));
-        reset.zi(20, gear(1L, 0L, 0L, 0L).quantities);
-        reset.yz();
-        assertNotNull(settle(reset, Cc.empty(), 1_600L));
-        reset.agr(3_000L);
+        Engine reset = started(gear(1L, 0L, 0L, 0L));
+        reset.markPvmDeath(20, gear(1L, 0L, 0L, 0L).quantities);
+        reset.markDirty();
+        assertNotNull(settle(reset, ContainerSnapshot.empty(), 1_600L));
+        reset.resetData(3_000L);
         assertFalse(EngineProbe.isAwaitingDeathReclaim(reset));
-        assertNull(reset.qm().pendingDeathReclaim);
+        assertNull(reset.savedState().pendingDeathReclaim);
     }
 
     @Test
     public void observedReclaimFeeAfterRestartBooksOnce()
     {
-        Am first = started(gear(1L, 0L, 150_000L, 0L));
-        first.zi(20, gear(1L, 0L, 150_000L, 0L).quantities);
-        first.yz();
-        assertNotNull(settle(first, Cc.empty(), 1_600L));
+        Engine first = started(gear(1L, 0L, 150_000L, 0L));
+        first.markPvmDeath(20, gear(1L, 0L, 150_000L, 0L).quantities);
+        first.markDirty();
+        assertNotNull(settle(first, ContainerSnapshot.empty(), 1_600L));
 
-        Am restarted = new Am(valuator, new TransactionClassifier(), CONFIG);
-        restarted.restore(roundTrip(first.qm()), 10_000L);
-        restarted.resume(11_000L, Ed.IDLE, Ed.RECOVERY);
+        Engine restarted = new Engine(valuator, new TransactionClassifier(), CONFIG);
+        restarted.restore(roundTrip(first.savedState()), 10_000L);
+        restarted.resume(11_000L, PauseReason.IDLE, PauseReason.RECOVERY);
         restarted.setBaseline(gear(0L, 0L, 150_000L, 0L));
-        assertTrue(restarted.abe(
-            BossRetrievalCatalogue.a1("Talk-to", "Priestess Zul-Gwenwynig"), 40));
-        restarted.yz();
-        Ac fee = settle(restarted, gear(1L, 0L, 50_000L, 0L), 12_000L);
+        assertTrue(restarted.noteReclaimIntent(
+            BossRetrievalCatalogue.serviceFor("Talk-to", "Priestess Zul-Gwenwynig"), 40));
+        restarted.markDirty();
+        Transaction fee = settle(restarted, gear(1L, 0L, 50_000L, 0L), 12_000L);
 
         assertNotNull(fee);
-        assertEquals(Ai.CONSUMPTION, fee.getType());
+        assertEquals(TransactionType.CONSUMPTION, fee.getType());
         assertTrue(fee.isCounted());
         assertEquals(-100_000L, fee.getNet());
         assertEquals(100_000L, restarted.getMetrics(20_000L).costs);
         assertEquals(0L, restarted.getMetrics(20_000L).revenue);
 
         // Replaying the same settled state cannot book a second fee.
-        restarted.yz();
+        restarted.markDirty();
         assertNull(settle(restarted, gear(1L, 0L, 50_000L, 0L), 20_000L));
         assertEquals(100_000L, restarted.getMetrics(30_000L).costs);
     }
@@ -1131,20 +1131,20 @@ public class DeathReclaimLifecycleTest
         return gson.fromJson(gson.toJson(state), SavedState.class);
     }
 
-    private Am started(Cc baseline)
+    private Engine started(ContainerSnapshot baseline)
     {
         return started(baseline, CONFIG);
     }
 
-    private Am started(Cc baseline, GpManagerConfig config)
+    private Engine started(ContainerSnapshot baseline, GpManagerConfig config)
     {
-        Am engine = new Am(valuator, new TransactionClassifier(), config);
-        engine.rm(1_000L);
+        Engine engine = new Engine(valuator, new TransactionClassifier(), config);
+        engine.ensureSession(1_000L);
         engine.setBaseline(baseline);
         return engine;
     }
 
-    private static Cc gear(long whip, long torture, long coins, long sharks)
+    private static ContainerSnapshot gear(long whip, long torture, long coins, long sharks)
     {
         Map<Integer, Long> values = new HashMap<>();
         if (whip > 0L)
@@ -1163,19 +1163,19 @@ public class DeathReclaimLifecycleTest
         {
             values.put(SHARK, sharks);
         }
-        return new Cc(values);
+        return new ContainerSnapshot(values);
     }
 
-    private static Ac settle(Am engine, Cc snapshot, long firstTick)
+    private static Transaction settle(Engine engine, ContainerSnapshot snapshot, long firstTick)
     {
-        assertNull(engine.adj(snapshot, firstTick));
-        assertNull(engine.adj(snapshot, firstTick + 600L));
-        return engine.adj(snapshot, firstTick + 1_200L);
+        assertNull(engine.processIfDirty(snapshot, firstTick));
+        assertNull(engine.processIfDirty(snapshot, firstTick + 600L));
+        return engine.processIfDirty(snapshot, firstTick + 1_200L);
     }
 
-    private static Ac sw(Am engine, String note)
+    private static Transaction sw(Engine engine, String note)
     {
-        for (Ac transaction : engine.getActiveSession().getTransactions())
+        for (Transaction transaction : engine.getActiveSession().getTransactions())
         {
             if (note.equals(transaction.getNote()))
             {

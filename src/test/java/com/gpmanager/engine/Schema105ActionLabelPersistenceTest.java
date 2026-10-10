@@ -37,152 +37,151 @@ public class Schema105ActionLabelPersistenceTest
     @Test
     public void exactLabelIsDurableInSchema105StateAndReloads()
     {
-        Ad session = new Ad("General", 1_000L);
-        Ac labelled = cast("Ice Burst", 2_000L);
-        Ac generic = genericCast(3_000L);
-        session.kf(labelled, 100);
-        session.kf(generic, 100);
-        SavedState state = new SavedState(session, null, false, Collections.emptyList());
-        assertEquals(108, state.schemaVersion);
+        Session session = new Session("General", 1_000L);
+        Transaction labelled = cast("Ice Burst", 2_000L);
+        Transaction generic = genericCast(3_000L);
+        session.addTransaction(labelled, 100);
+        session.addTransaction(generic, 100);
+        SavedState state = new SavedState(session, null, Collections.emptyList());
+        assertEquals(109, state.schemaVersion);
         String json = new Gson().toJson(state);
         assertTrue("the bounded label is a stable JSON field",
             json.contains("\"observedActionLabel\":\"Ice Burst\""));
 
         SavedState loaded = new Gson().fromJson(json, SavedState.class);
-        loaded.aar();
-        Ac restored = loaded.getActiveSession().getTransactions().get(0);
-        assertNotNull(restored.uc());
-        assertEquals("Ice Burst", restored.uc().value());
+        Transaction restored = loaded.getActiveSession().getTransactions().get(0);
+        assertNotNull(restored.actionLabel());
+        assertEquals("Ice Burst", restored.actionLabel().value());
         assertEquals("the reloaded receipt keeps its money", labelled.getNet(), restored.getNet());
         assertNull("an unlabelled receipt stays generic",
-            loaded.getActiveSession().getTransactions().get(1).uc());
+            loaded.getActiveSession().getTransactions().get(1).actionLabel());
     }
 
     @Test
     public void malformedOversizedControlAndGenericLabelsNormalizeToNull()
     {
         assertNull("invalid punctuation is rejected",
-            normalizedWire("\"Ice Burst!!!\"", false).uc());
+            normalizedWire("\"Ice Burst!!!\"", false).actionLabel());
         assertNull("oversized labels are rejected",
-            normalizedWire("\"" + repeat("Ice Burst ", 7) + "\"", false).uc());
+            normalizedWire("\"" + repeat("Ice Burst ", 7) + "\"", false).actionLabel());
         assertNull("control characters are rejected",
-            normalizedWire("\"Ice\\u0000Burst\"", false).uc());
+            normalizedWire("\"Ice\\u0000Burst\"", false).actionLabel());
         assertNull("generic Cast text never becomes an exact label",
-            normalizedWire("\"Cast\"", false).uc());
+            normalizedWire("\"Cast\"", false).actionLabel());
         assertNull("Autocast text never becomes an exact label",
-            normalizedWire("\"Autocast\"", false).uc());
+            normalizedWire("\"Autocast\"", false).actionLabel());
 
-        Ac sanitized = normalizedWire("\"<col=ff9040>Ice Burst</col>\"", false);
-        assertNotNull(sanitized.uc());
+        Transaction sanitized = normalizedWire("\"<col=ff9040>Ice Burst</col>\"", false);
+        assertNotNull(sanitized.actionLabel());
         assertEquals("markup is stripped, never displayed", "Ice Burst",
-            sanitized.uc().value());
-        assertFalse(sanitized.uc().value().contains("<"));
+            sanitized.actionLabel().value());
+        assertFalse(sanitized.actionLabel().value().contains("<"));
 
-        Ac nonCast = normalizedWire("\"Ice Burst\"", true);
+        Transaction nonCast = normalizedWire("\"Ice Burst\"", true);
         assertNull("a non-CAST receipt cannot keep a stale spell label",
-            nonCast.uc());
+            nonCast.actionLabel());
     }
 
     @Test
     public void labelMutationsNeverDriftFinancialFingerprint()
     {
-        Am engine = engine();
-        engine.ajl("Vorkath", Cx.GENERAL, T0);
-        Ac transaction = cast(null, T0 + 100L);
-        engine.getActiveSession().kf(transaction, 100);
+        Engine engine = engine();
+        engine.startCustom("Vorkath", T0);
+        Transaction transaction = cast(null, T0 + 100L);
+        engine.getActiveSession().addTransaction(transaction, 100);
         String before = fingerprint(transaction);
         long netBefore = engine.getMetrics(T0 + 200L).net;
 
-        transaction.ahu(Bb.of("Ice Burst"));
+        transaction.setActionLabel(ActionLabel.of("Ice Burst"));
         assertEquals("setting a label never changes money", before, fingerprint(transaction));
-        transaction.ahu(Bb.of("Smoke Barrage"));
+        transaction.setActionLabel(ActionLabel.of("Smoke Barrage"));
         assertEquals("changing a label never changes money", before, fingerprint(transaction));
-        transaction.ahu(null);
+        transaction.setActionLabel(null);
         assertEquals("clearing a label never changes money", before, fingerprint(transaction));
         assertEquals(netBefore, engine.getMetrics(T0 + 200L).net);
 
-        Ac trade = trade();
+        Transaction trade = trade();
         String tradeBefore = fingerprint(trade);
-        trade.ahu(Bb.of("Ice Burst"));
-        assertNull("a non-CAST receipt never reads a spell label", trade.uc());
+        trade.setActionLabel(ActionLabel.of("Ice Burst"));
+        assertNull("a non-CAST receipt never reads a spell label", trade.actionLabel());
         assertEquals("GE-shaped receipts stay financially identical", tradeBefore, fingerprint(trade));
     }
 
     @Test
     public void ownerFenceKeepsBookedLabelsAndClearsOnlyPendingEvidence()
     {
-        Am engine = engine();
-        engine.ajl("Vorkath", Cx.GENERAL, T0);
-        Ac cast = cast("Ice Burst", T0 + 100L);
-        engine.getActiveSession().kf(cast, 100);
+        Engine engine = engine();
+        engine.startCustom("Vorkath", T0);
+        Transaction cast = cast("Ice Burst", T0 + 100L);
+        engine.getActiveSession().addTransaction(cast, 100);
         long net = engine.getMetrics(T0 + 200L).net;
 
-        engine.ov();
+        engine.clearActionEvidence();
 
         assertNotNull("booked labels survive the presentation owner fence",
-            cast.uc());
-        assertEquals("Ice Burst", cast.uc().value());
+            cast.actionLabel());
+        assertEquals("Ice Burst", cast.actionLabel().value());
         assertEquals("the fence never touches money", net, engine.getMetrics(T0 + 200L).net);
     }
 
     @Test
-    public void onlyTheOneZeroSchemaIsRead()
+    public void onlyTheCurrentSchemaIsRead()
     {
-        assertEquals(108, SavedState.CURRENT_SCHEMA_VERSION);
+        assertEquals(109, SavedState.CURRENT_SCHEMA_VERSION);
         SavedState old = new SavedState();
         old.setSchemaVersion(107);
-        assertFalse("a pre-1.0 schema is never read", old.ye());
+        assertFalse("an older schema is never read", old.isSupportedSchema());
         assertFalse((old.schemaVersion > SavedState.CURRENT_SCHEMA_VERSION));
         SavedState future = new SavedState();
-        future.setSchemaVersion(109);
+        future.setSchemaVersion(SavedState.CURRENT_SCHEMA_VERSION + 1);
         assertTrue((future.schemaVersion > SavedState.CURRENT_SCHEMA_VERSION));
-        assertFalse("a newer schema is refused/read-only", future.ye());
-        assertEquals("a restored profile saves as the current schema", 108,
-            engine().qm().schemaVersion);
+        assertFalse("a newer schema is refused/read-only", future.isSupportedSchema());
+        assertEquals("a restored profile saves as the current schema", 109,
+            engine().savedState().schemaVersion);
     }
 
     @Test
     public void exactSpellGroupsSurviveRestartAndMergeLaterCasts()
     {
         long now = System.currentTimeMillis();
-        Am source = engine();
-        source.ajl("Vorkath", Cx.GENERAL, now);
-        source.getActiveSession().kf(cast("Ice Burst", now + 1_000L), 100);
-        source.getActiveSession().kf(cast("Ice Burst", now + 2_000L), 100);
+        Engine source = engine();
+        source.startCustom("Vorkath", now);
+        source.getActiveSession().addTransaction(cast("Ice Burst", now + 1_000L), 100);
+        source.getActiveSession().addTransaction(cast("Ice Burst", now + 2_000L), 100);
         // Runes that name no spell (a staff covered them) keep the click; runes that do name one win.
-        Ac smoke = genericCast(now + 3_000L);
-        smoke.ahu(Bb.of("Smoke Barrage"));
-        source.getActiveSession().kf(smoke, 100);
-        source.getActiveSession().kf(genericCast(now + 4_000L), 100);
-        SavedState detached = source.qm();
+        Transaction smoke = genericCast(now + 3_000L);
+        smoke.setActionLabel(ActionLabel.of("Smoke Barrage"));
+        source.getActiveSession().addTransaction(smoke, 100);
+        source.getActiveSession().addTransaction(genericCast(now + 4_000L), 100);
+        SavedState detached = source.savedState();
         assertEquals("detach keeps the bounded label", "Ice Burst",
-            detached.getActiveSession().getTransactions().get(0).uc().value());
+            detached.getActiveSession().getTransactions().get(0).actionLabel().value());
 
-        Am restored = engine();
+        Engine restored = engine();
         restored.restore(detached, now + 5_000L);
-        Ad session = restored.getActiveSession();
-        List<Ac> restoredTransactions = session.getTransactions();
-        assertEquals("Ice Burst", restoredTransactions.get(0).uc().value());
+        Session session = restored.getActiveSession();
+        List<Transaction> restoredTransactions = session.getTransactions();
+        assertEquals("Ice Burst", restoredTransactions.get(0).actionLabel().value());
 
-        Br.Result before = Br.capture(
+        Semantics.Result before = Semantics.capture(
             restoredTransactions, null, session.getId(), null);
-        Br.Group burst = groupNamed(before.groups, "Ice Burst");
+        Semantics.Group burst = groupNamed(before.groups, "Ice Burst");
         assertNotNull(burst);
         assertEquals(2, burst.receiptCount);
         String stableGroupId = burst.semanticGroupId;
         assertTrue("search terms survive restore", burst.searchTerms.contains("Ice Burst"));
 
-        session.kf(cast("Ice Burst", now + 6_000L), 100);
-        Br.Result after = Br.capture(
+        session.addTransaction(cast("Ice Burst", now + 6_000L), 100);
+        Semantics.Result after = Semantics.capture(
             session.getTransactions(), null, session.getId(), null);
-        Br.Group merged = groupNamed(after.groups, "Ice Burst");
+        Semantics.Group merged = groupNamed(after.groups, "Ice Burst");
         assertNotNull(merged);
         assertEquals("a later exact cast merges into the restored group", 3, merged.receiptCount);
         assertEquals("semantic identity stays stable for search and deep links",
             stableGroupId, merged.semanticGroupId);
         assertNotNull("Smoke Barrage stays separate",
             groupNamed(after.groups, "Smoke Barrage"));
-        Br.Group generic = groupNamed(after.groups, "Cast");
+        Semantics.Group generic = groupNamed(after.groups, "Cast");
         assertNotNull("the old generic Cast stays generic", generic);
         assertNotEquals(merged.semanticGroupId, generic.semanticGroupId);
     }
@@ -191,23 +190,23 @@ public class Schema105ActionLabelPersistenceTest
     public void repositoryRoundTripAndBackupRotationPreserveTheLabel() throws Exception
     {
         Path directory = temporary.newFolder().toPath();
-        Ad session = new Ad("General", 1_000L);
-        Ac labelled = cast("Ice Burst", 2_000L);
-        session.kf(labelled, 100);
-        SavedState state = new SavedState(session, null, false, Collections.emptyList());
+        Session session = new Session("General", 1_000L);
+        Transaction labelled = cast("Ice Burst", 2_000L);
+        session.addTransaction(labelled, 100);
+        SavedState state = new SavedState(session, null, Collections.emptyList());
         SessionRepository repository = new SessionRepository(new Gson(), FilepathTestSupport.root(directory));
         PersistenceProbe.save(repository, state);
         // Ordinary next save rotates the previous labelled generation into the backup file.
-        session.kf(cast("Smoke Barrage", 3_000L), 100);
-        PersistenceProbe.save(repository, new SavedState(session, null, false, Collections.emptyList()));
+        session.addTransaction(cast("Smoke Barrage", 3_000L), 100);
+        PersistenceProbe.save(repository, new SavedState(session, null, Collections.emptyList()));
 
         SavedState reloaded = new SessionRepository(new Gson(), FilepathTestSupport.root(directory)).load();
-        assertEquals(108, reloaded.schemaVersion);
-        Ac restored = reloaded.getActiveSession().getTransactions().get(0);
+        assertEquals(109, reloaded.schemaVersion);
+        Transaction restored = reloaded.getActiveSession().getTransactions().get(0);
         assertEquals(labelled.getId(), restored.getId());
         assertEquals(labelled.getFlows().size(), restored.getFlows().size());
         assertEquals(labelled.getNet(), restored.getNet());
-        assertEquals("Ice Burst", restored.uc().value());
+        assertEquals("Ice Burst", restored.actionLabel().value());
         assertTrue("backup rotation does not strip the field",
             Files.readString(directory.resolve("sessions.backup.json")).contains("Ice Burst"));
     }
@@ -216,19 +215,19 @@ public class Schema105ActionLabelPersistenceTest
     public void compactionDoesNotArchiveOrInferActionNames()
     {
         long old = T0 - 400L * 24L * 60L * 60L * 1_000L;
-        Am engine = engine();
-        engine.ajl("Old Grind", Cx.GENERAL, old);
-        engine.getActiveSession().kf(cast("Ice Burst", old + 1_000L), 100);
+        Engine engine = engine();
+        engine.startCustom("Old Grind", old);
+        engine.getActiveSession().addTransaction(cast("Ice Burst", old + 1_000L), 100);
         String sessionId = engine.getActiveSession().getId();
-        engine.sx(old + 2_000L);
-        engine.pg(1, T0);
+        engine.finishCustom(old + 2_000L);
+        engine.compactOlderThan(1, T0);
 
-        Ad compacted = engine.ua(sessionId);
+        Session compacted = engine.historySession(sessionId);
         assertNotNull(compacted);
         assertTrue("the receipt detail is compacted away",
             compacted.getTransactions().isEmpty());
         assertTrue(compacted.compactedTransactionCount > 0);
-        String json = new Gson().toJson(engine.qm());
+        String json = new Gson().toJson(engine.savedState());
         assertFalse("a compacted receipt takes its action name with it",
             json.contains("Ice Burst"));
         assertFalse("no sidecar action-label archive exists",
@@ -237,91 +236,90 @@ public class Schema105ActionLabelPersistenceTest
 
     // ── fixtures ───────────────────────────────────────────────────────────────────────────────
 
-    private static Am engine()
+    private static Engine engine()
     {
-        return new Am(deltas -> Collections.emptyList(), new TransactionClassifier(),
+        return new Engine(deltas -> Collections.emptyList(), new TransactionClassifier(),
             new GpManagerConfig()
             {
                 @Override
-                public Db receiptRetentionDays()
+                public Retention receiptRetentionDays()
                 {
-                    return Db.DAYS_365;
+                    return Retention.DAYS_365;
                 }
             });
     }
 
-    private static SavedState stateWith(Ac transaction)
+    private static SavedState stateWith(Transaction transaction)
     {
-        Ad session = new Ad("General", 1_000L);
-        session.kf(transaction, 100);
-        return new SavedState(session, null, false, Collections.emptyList());
+        Session session = new Session("General", 1_000L);
+        session.addTransaction(transaction, 100);
+        return new SavedState(session, null, Collections.emptyList());
     }
 
-    /** Serialize, inject one raw wire value, reload and run the production normalization pass. */
-    private static Ac normalizedWire(String rawJsonValue, boolean nonCast)
+    /** Serialize, inject one raw wire value and reload; every read revalidates the label. */
+    private static Transaction normalizedWire(String rawJsonValue, boolean nonCast)
     {
-        Ac source = nonCast ? eat("Ice Burst") : cast("Ice Burst", 2_000L);
+        Transaction source = nonCast ? eat("Ice Burst") : cast("Ice Burst", 2_000L);
         String json = new Gson().toJson(stateWith(source))
             .replace("\"observedActionLabel\":\"Ice Burst\"", "\"observedActionLabel\":" + rawJsonValue);
         SavedState loaded = new Gson().fromJson(json, SavedState.class);
-        loaded.aar();
         return loaded.getActiveSession().getTransactions().get(0);
     }
 
-    private static Ac cast(String label, long at)
+    private static Transaction cast(String label, long at)
     {
-        Ac transaction = new Ac(at, null, Ai.CONSUMPTION,
-            Aj.GENERIC, "", "Vorkath", true, Arrays.asList(
-                new Ab(560, "Death rune", -2L, 188, -376L, Av.GRAND_EXCHANGE),
-                new Ab(562, "Chaos rune", -4L, 106, -424L, Av.GRAND_EXCHANGE),
-                new Ab(555, "Water rune", -4L, 5, -20L, Av.GRAND_EXCHANGE)),
-            Bd.CONFIRMED, "Exact fixture", null);
-        transaction.setActionKind(Au.CAST);
+        Transaction transaction = new Transaction(at, TransactionType.CONSUMPTION,
+            Context.GENERIC, "", "Vorkath", true, Arrays.asList(
+                new Flow(560, "Death rune", -2L, 188, -376L, PriceSource.GRAND_EXCHANGE),
+                new Flow(562, "Chaos rune", -4L, 106, -424L, PriceSource.GRAND_EXCHANGE),
+                new Flow(555, "Water rune", -4L, 5, -20L, PriceSource.GRAND_EXCHANGE)),
+            Confidence.CONFIRMED, "Exact fixture", null);
+        transaction.setActionKind(ActionKind.CAST);
         if (label != null)
         {
-            transaction.ahu(Bb.of(label));
+            transaction.setActionLabel(ActionLabel.of(label));
         }
         return transaction;
     }
 
     /** A Cast whose runes no spell pays (a Nature rune too), so it stays generic, never Ice Burst. */
-    private static Ac genericCast(long at)
+    private static Transaction genericCast(long at)
     {
-        Ac transaction = new Ac(at, null, Ai.CONSUMPTION,
-            Aj.GENERIC, "", "Vorkath", true, Arrays.asList(
-                new Ab(560, "Death rune", -2L, 188, -376L, Av.GRAND_EXCHANGE),
-                new Ab(561, "Nature rune", -1L, 100, -100L, Av.GRAND_EXCHANGE)),
-            Bd.CONFIRMED, "Exact fixture", null);
-        transaction.setActionKind(Au.CAST);
+        Transaction transaction = new Transaction(at, TransactionType.CONSUMPTION,
+            Context.GENERIC, "", "Vorkath", true, Arrays.asList(
+                new Flow(560, "Death rune", -2L, 188, -376L, PriceSource.GRAND_EXCHANGE),
+                new Flow(561, "Nature rune", -1L, 100, -100L, PriceSource.GRAND_EXCHANGE)),
+            Confidence.CONFIRMED, "Exact fixture", null);
+        transaction.setActionKind(ActionKind.CAST);
         return transaction;
     }
 
-    private static Ac eat(String label)
+    private static Transaction eat(String label)
     {
-        Ac transaction = new Ac(T0 + 100L, null,
-            Ai.CONSUMPTION, Aj.GENERIC, "", "Vorkath", true,
-            Collections.singletonList(new Ab(385, "Shark", -1L, 950, -950L,
-                Av.GRAND_EXCHANGE)),
-            Bd.CONFIRMED, "Food", null);
-        transaction.setActionKind(Au.EAT);
+        Transaction transaction = new Transaction(T0 + 100L,
+            TransactionType.CONSUMPTION, Context.GENERIC, "", "Vorkath", true,
+            Collections.singletonList(new Flow(385, "Shark", -1L, 950, -950L,
+                PriceSource.GRAND_EXCHANGE)),
+            Confidence.CONFIRMED, "Food", null);
+        transaction.setActionKind(ActionKind.EAT);
         if (label != null)
         {
-            transaction.ahu(Bb.of(label));
+            transaction.setActionLabel(ActionLabel.of(label));
         }
         return transaction;
     }
 
-    private static Ac trade()
+    private static Transaction trade()
     {
-        Ac transaction = new Ac(T0 + 100L, null, Ai.TRADE,
-            Aj.GENERIC, "", "Vorkath", true,
-            Collections.singletonList(new Ab(561, "Nature rune", -10L, 100, -1_000L,
-                Av.GRAND_EXCHANGE)),
-            Bd.CONFIRMED, "GE sale", null);
+        Transaction transaction = new Transaction(T0 + 100L, TransactionType.TRADE,
+            Context.GENERIC, "", "Vorkath", true,
+            Collections.singletonList(new Flow(561, "Nature rune", -10L, 100, -1_000L,
+                PriceSource.GRAND_EXCHANGE)),
+            Confidence.CONFIRMED, "GE sale", null);
         return transaction;
     }
 
-    private static String fingerprint(Ac transaction)
+    private static String fingerprint(Transaction transaction)
     {
         return transaction.getNet() + "|" + transaction.getRevenue() + "|" + transaction.getCosts()
             + "|" + transaction.isCounted() + "|" + transaction.getType() + "|"
@@ -340,10 +338,10 @@ public class Schema105ActionLabelPersistenceTest
         return out.toString();
     }
 
-    private static Br.Group groupNamed(
-        List<Br.Group> groups, String name)
+    private static Semantics.Group groupNamed(
+        List<Semantics.Group> groups, String name)
     {
-        for (Br.Group group : groups)
+        for (Semantics.Group group : groups)
         {
             if (name.equals(group.primaryName))
             {

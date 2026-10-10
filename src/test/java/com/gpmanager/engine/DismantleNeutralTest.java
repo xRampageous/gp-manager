@@ -21,27 +21,27 @@ public class DismantleNeutralTest
         ItemID.DRAGON_HARPOON, 3_000_000, ItemID.PRIF_TOOL_SEED, 1_000_000, ItemID.PRIF_CRYSTAL_SHARD, 2_000,
         ItemID.AGS, 12_000_000, ItemID.GODWARS_GODSWORD_BLADE1_2_3, 1_000_000, ItemID.GODWARS_GODSWORD_HILT_ARMADYL, 10_500_000);
 
-    private static Am settle(int clicked, Map<Integer, Long> before, Map<Integer, Long> after)
+    private static Engine settle(int clicked, Map<Integer, Long> before, Map<Integer, Long> after)
     {
-        Am engine = new Am(deltas ->
+        Engine engine = new Engine(deltas ->
         {
-            List<Ab> flows = new ArrayList<>();
-            deltas.forEach((id, quantity) -> flows.add(new Ab(id, NAMES.get(id), quantity, PRICES.get(id),
+            List<Flow> flows = new ArrayList<>();
+            deltas.forEach((id, quantity) -> flows.add(new Flow(id, NAMES.get(id), quantity, PRICES.get(id),
                 quantity * PRICES.get(id))));
             return flows;
         }, new TransactionClassifier(), new GpManagerConfig()
         {
         });
-        engine.rm(1_000_000L);
-        engine.setBaseline(new Cc(new HashMap<>(before)));
-        engine.yz();
+        engine.ensureSession(1_000_000L);
+        engine.setBaseline(new ContainerSnapshot(new HashMap<>(before)));
+        engine.markDirty();
         if (clicked > 0)
         {
             engine.dismantle(clicked);
         }
         for (int tick = 1; tick <= 5; tick++)
         {
-            engine.adj(new Cc(new HashMap<>(after)), 1_000_000L + tick * 600L);
+            engine.processIfDirty(new ContainerSnapshot(new HashMap<>(after)), 1_000_000L + tick * 600L);
         }
         return engine;
     }
@@ -52,11 +52,11 @@ public class DismantleNeutralTest
     @Test
     public void revertingACrystalToolCostsOnlyItsShards()
     {
-        Am engine = settle(ItemID.CRYSTAL_HARPOON, HARPOON, PARTS);
-        List<Ac> rows = engine.getActiveSession().getTransactions();
+        Engine engine = settle(ItemID.CRYSTAL_HARPOON, HARPOON, PARTS);
+        List<Transaction> rows = engine.getActiveSession().getTransactions();
         assertEquals(rows.toString(), 1, rows.size());
-        Ac shards = rows.get(0);
-        assertEquals(Ai.CONSUMPTION, shards.tm());
+        Transaction shards = rows.get(0);
+        assertEquals(TransactionType.CONSUMPTION, shards.autoType());
         assertEquals("Dismantled Crystal harpoon", shards.getNote());
         assertEquals(ItemID.PRIF_CRYSTAL_SHARD, shards.getFlows().get(0).itemId);
         assertEquals(-120L, shards.getFlows().get(0).quantityDelta);
@@ -66,14 +66,14 @@ public class DismantleNeutralTest
     @Test
     public void withoutTheClickTheSameChangeStillNeedsReview()
     {
-        Am engine = settle(-1, HARPOON, PARTS);
-        assertTrue(engine.getActiveSession().getTransactions().stream().anyMatch(row -> row.tm() == Ai.UNCERTAIN));
+        Engine engine = settle(-1, HARPOON, PARTS);
+        assertTrue(engine.getActiveSession().getTransactions().stream().anyMatch(row -> row.autoType() == TransactionType.UNCERTAIN));
     }
 
     @Test
     public void dismantlingAGodswordBooksNothing()
     {
-        Am engine = settle(ItemID.AGS, Map.of(ItemID.AGS, 1L), Map.of(ItemID.GODWARS_GODSWORD_BLADE1_2_3, 1L, ItemID.GODWARS_GODSWORD_HILT_ARMADYL, 1L));
+        Engine engine = settle(ItemID.AGS, Map.of(ItemID.AGS, 1L), Map.of(ItemID.GODWARS_GODSWORD_BLADE1_2_3, 1L, ItemID.GODWARS_GODSWORD_HILT_ARMADYL, 1L));
         assertTrue(engine.getActiveSession().getTransactions().toString(),
             engine.getActiveSession().getTransactions().isEmpty());
         assertEquals(0L, engine.getMetrics(1_010_000L).net);

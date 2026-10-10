@@ -13,22 +13,22 @@ import static org.junit.Assert.assertTrue;
 /** Owner report 2026-09-28: autocast Ice Barrage read "Cast · 3 rune types" with no icon. */
 public class SpellsTest
 {
-    private static Ab rune(String name, long spent)
+    private static Flow rune(String name, long spent)
     {
-        return new Ab(1, name, -spent, 100, -spent * 100L);
+        return new Flow(1, name, -spent, 100, -spent * 100L);
     }
 
     @Test
     public void theOwnersAutocastReadsAsIceBarrage()
     {
         // The owner's receipts: 4 Death, 2 Blood, 6 Water per cast, no Cast click.
-        assertEquals("Ice Barrage", Spells.a1(Arrays.asList(rune("Death rune", 4), rune("Blood rune", 2),
+        assertEquals("Ice Barrage", Spells.spellFor(Arrays.asList(rune("Death rune", 4), rune("Blood rune", 2),
             rune("Water rune", 6))));
-        assertEquals("two casts in one settle", "Ice Barrage", Spells.a1(Arrays.asList(rune("Death rune", 8),
+        assertEquals("two casts in one settle", "Ice Barrage", Spells.spellFor(Arrays.asList(rune("Death rune", 8),
             rune("Blood rune", 4), rune("Water rune", 12))));
-        assertEquals("Blood Barrage", Spells.a1(Arrays.asList(rune("Death rune", 4), rune("Blood rune", 4),
+        assertEquals("Blood Barrage", Spells.spellFor(Arrays.asList(rune("Death rune", 4), rune("Blood rune", 4),
             rune("Soul rune", 1))));
-        assertEquals("a steam rune pays water", "Ice Barrage", Spells.a1(Arrays.asList(rune("Death rune", 4),
+        assertEquals("a steam rune pays water", "Ice Barrage", Spells.spellFor(Arrays.asList(rune("Death rune", 4),
             rune("Blood rune", 2), rune("Steam rune", 6))));
         assertEquals(-328, Spells.icon("Ice Barrage"));
         assertEquals("no spell, no icon", -1, Spells.icon(""));
@@ -38,13 +38,13 @@ public class SpellsTest
     public void anAmbiguousOrForeignCostStaysACast()
     {
         // A water staff covers the water, and a smoke staff would make Smoke Barrage cost the same.
-        assertNull(Spells.a1(Arrays.asList(rune("Death rune", 4), rune("Blood rune", 2))));
-        assertNull("uneven casts", Spells.a1(Arrays.asList(rune("Death rune", 4), rune("Blood rune", 3),
+        assertNull(Spells.spellFor(Arrays.asList(rune("Death rune", 4), rune("Blood rune", 2))));
+        assertNull("uneven casts", Spells.spellFor(Arrays.asList(rune("Death rune", 4), rune("Blood rune", 3),
             rune("Water rune", 6))));
-        assertNull("a rune the spell never uses", Spells.a1(Arrays.asList(rune("Death rune", 4),
+        assertNull("a rune the spell never uses", Spells.spellFor(Arrays.asList(rune("Death rune", 4),
             rune("Blood rune", 2), rune("Water rune", 6), rune("Nature rune", 1))));
-        assertNull("not only runes", Spells.a1(Arrays.asList(rune("Death rune", 4), rune("Blood rune", 2),
-            new Ab(2, "Steel dart", -1L, 4, -4L))));
+        assertNull("not only runes", Spells.spellFor(Arrays.asList(rune("Death rune", 4), rune("Blood rune", 2),
+            new Flow(2, "Steel dart", -1L, 4, -4L))));
     }
 
     @Test
@@ -65,13 +65,13 @@ public class SpellsTest
             }
             assertTrue("every spell has a rune a staff cannot cover: " + spell[0], nonElemental);
             // Its own full cost always names itself.
-            List<Ab> exact = new java.util.ArrayList<>();
+            List<Flow> exact = new java.util.ArrayList<>();
             for (String part : spell[2].split(" "))
             {
                 String[] kv = part.split(":");
                 exact.add(rune(Character.toUpperCase(kv[1].charAt(0)) + kv[1].substring(1) + " rune", Long.parseLong(kv[0])));
             }
-            assertEquals(spell[0], Spells.a1(exact));
+            assertEquals(spell[0], Spells.spellFor(exact));
         }
     }
 }

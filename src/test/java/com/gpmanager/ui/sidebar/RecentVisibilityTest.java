@@ -14,29 +14,29 @@ public class RecentVisibilityTest
     {
         ConfigManager manager = IsolatedConfigManager.create(null);
         GpManagerConfig config = manager.getConfig(GpManagerConfig.class);
-        Am engine = PresentationLifecycleTest.engine();
+        Engine engine = PresentationLifecycleTest.engine();
         long now = 1_700_000_000_000L;
-        engine.ajl("Fishing", Cx.GENERAL, now);
-        Ac gain = Tx.of(now, Ai.GAIN, Aj.GENERIC, "", true,
-            List.of(new Ab(385, "Shark", 2L, 900, 1_800L)));
-        engine.getActiveSession().kf(gain, 2_000);
+        engine.startCustom("Fishing", now);
+        Transaction gain = Tx.of(now, TransactionType.GAIN, Context.GENERIC, "", true,
+            List.of(new Flow(385, "Shark", 2L, 900, 1_800L)));
+        engine.getActiveSession().addTransaction(gain, 2_000);
         RecentFilter filter = new RecentFilter()
         {
-            public boolean isFlowIncluded(Ab flow) { return true; }
+            public boolean isFlowIncluded(Flow flow) { return true; }
             public boolean showRecent(String name, long quantity)
             {
-                return LootPresentationFilterService.aus("", config.hiddenRecentItems(), name, quantity)
+                return LootPresentationFilterService.listState("", config.hiddenRecentItems(), name, quantity)
                     != LootPresentationFilterService.HIDDEN;
             }
             public String version() { return config.hiddenRecentItems(); }
         };
-        Dz context = new Dz(false, filter, 0L, Bo.NONE, "", false, "");
-        Ca before = Ca.capture(engine, now + 600L, context);
+        LiveContext context = new LiveContext(false, filter, 0L, PvpState.NONE, "", false, "");
+        LiveSnapshot before = LiveSnapshot.capture(engine, now + 600L, context);
         LivePage page = new LivePage(new LivePage.Actions()
         {
             public void togglePause() { }
             public void editTarget() { }
-            public void openLedger(Ao.Entry entry) { }
+            public void openLedger(LedgerData.Entry entry) { }
             public void hideRecent(String name)
             {
                 manager.setConfiguration(GpManagerConfig.GROUP, "hiddenRecentItems", Text.toCSV(List.of(name)));
@@ -45,16 +45,16 @@ public class RecentVisibilityTest
         Table.Row row = page.rowOf(before.recent.get(0));
         row.menu.stream().filter(menu -> "Hide from recent".equals(menu.label))
             .findFirst().orElseThrow(AssertionError::new).action.run();
-        Ca hidden = Ca.capture(engine, now + 1_200L, context);
+        LiveSnapshot hidden = LiveSnapshot.capture(engine, now + 1_200L, context);
         assertTrue(hidden.recent.isEmpty());
         assertEquals(before.net, hidden.net);
         assertEquals(before.gains, hidden.gains);
         assertEquals(1, engine.getActiveSession().getTransactions().size());
-        assertNotNull(Ao.capture(engine, now + 1_200L,
-            LivePage.yn(before.recent.get(0))).detail);
+        assertNotNull(LedgerData.capture(engine, now + 1_200L,
+            LivePage.entryFor(before.recent.get(0))).detail);
         assertEquals("Shark", manager.getConfig(GpManagerConfig.class).hiddenRecentItems());
         manager.setConfiguration(GpManagerConfig.GROUP, "hiddenRecentItems", "");
-        assertEquals(1, Ca.capture(engine, now + 1_800L, context).recent.size());
+        assertEquals(1, LiveSnapshot.capture(engine, now + 1_800L, context).recent.size());
     }
 
     @Test
@@ -65,23 +65,23 @@ public class RecentVisibilityTest
         {
             public void togglePause() { }
             public void editTarget() { }
-            public void openLedger(Ao.Entry entry) { }
+            public void openLedger(LedgerData.Entry entry) { }
         }, id -> null);
         assertTrue(hides(page, recent(554, "Fire rune", true, false)));
         assertFalse("an offer still on the exchange stays listed",
             hides(page, recent(554, "Fire rune", true, true)));
         assertFalse("a spell's runes are no single item", hides(page, recent(554, "Fire Strike", false, false)));
-        assertTrue(hides(page, new Ca.Recent(385, "Shark", null, 900L, false, false, null, 1, "r", "c",
+        assertTrue(hides(page, new LiveSnapshot.Recent(385, "Shark", null, 900L, false, false, null, 1, "r", "c",
             "", 1L, false, false, true, null, false, 0L, false, "", false)));
     }
 
-    static Ca.Recent recent(int itemId, String name, boolean market, boolean open)
+    static LiveSnapshot.Recent recent(int itemId, String name, boolean market, boolean open)
     {
-        return new Ca.Recent(itemId, name, null, 1_000L, false, false, market ? "market" : null, 1, "r", "c",
+        return new LiveSnapshot.Recent(itemId, name, null, 1_000L, false, false, market ? "market" : null, 1, "r", "c",
             "", 200L, true, market, true, null, false, 0L, market, market ? "Sold" : "", open);
     }
 
-    static boolean hides(LivePage page, Ca.Recent row)
+    static boolean hides(LivePage page, LiveSnapshot.Recent row)
     {
         return page.rowOf(row).menu.stream().anyMatch(menu -> "Hide from recent".equals(menu.label));
     }
@@ -89,22 +89,22 @@ public class RecentVisibilityTest
     @Test
     public void aSmeltingRunsOreIsOneRowOfFailedOverAll()
     {
-        Am engine = PresentationLifecycleTest.engine();
+        Engine engine = PresentationLifecycleTest.engine();
         long now = 1_700_000_000_000L;
-        engine.ajl("Smithing", Cx.GENERAL, now);
-        engine.getActiveSession().kf(Tx.of(now, Ai.PROCESSING, Aj.PRODUCTION, "Smithing", true,
-            List.of(new Ab(2351, "Iron bar", 1L, 187, 187L), new Ab(440, "Iron ore", -1L, 72, -72L))), 2_000);
-        engine.getActiveSession().kf(Tx.of(now + 3_000L, Ai.CONSUMPTION, Aj.PRODUCTION, "Smelting", true,
-            List.of(new Ab(440, "Iron ore", -1L, 72, -72L))), 2_000);
-        Ca live = Ca.capture(engine, now + 3_600L, new Dz(false, null, 0L, Bo.NONE, "", false, ""));
+        engine.startCustom("Smithing", now);
+        engine.getActiveSession().addTransaction(Tx.of(now, TransactionType.PROCESSING, Context.PRODUCTION, "Smithing", true,
+            List.of(new Flow(2351, "Iron bar", 1L, 187, 187L), new Flow(440, "Iron ore", -1L, 72, -72L))), 2_000);
+        engine.getActiveSession().addTransaction(Tx.of(now + 3_000L, TransactionType.CONSUMPTION, Context.PRODUCTION, "Smelting", true,
+            List.of(new Flow(440, "Iron ore", -1L, 72, -72L))), 2_000);
+        LiveSnapshot live = LiveSnapshot.capture(engine, now + 3_600L, new LiveContext(false, null, 0L, PvpState.NONE, "", false, ""));
         LivePage page = new LivePage(new LivePage.Actions()
         {
             public void togglePause() { }
             public void editTarget() { }
-            public void openLedger(Ao.Entry entry) { }
+            public void openLedger(LedgerData.Entry entry) { }
         }, id -> null);
-        var ore = new ArrayList<Ca.Recent>();
-        for (Ca.Recent recent : live.recent) if (recent.itemId == 440) ore.add(recent);
+        var ore = new ArrayList<LiveSnapshot.Recent>();
+        for (LiveSnapshot.Recent recent : live.recent) if (recent.itemId == 440) ore.add(recent);
         assertEquals("one ore row", 1, ore.size());
         assertEquals("Iron ore", page.rowOf(ore.get(0)).name);
         assertEquals("1 of the 2 ores failed", "1/2", ore.get(0).qty);
@@ -112,22 +112,22 @@ public class RecentVisibilityTest
         assertTrue(LivePage.tipOf(ore.get(0)), LivePage.tipOf(ore.get(0)).contains("1 of 2 failed"));
 
         // Before any bar, failed ore stands alone and says so.
-        Am alone = PresentationLifecycleTest.engine();
-        alone.ajl("Smithing", Cx.GENERAL, now);
-        alone.getActiveSession().kf(Tx.of(now, Ai.CONSUMPTION, Aj.PRODUCTION, "Smelting", true,
-            List.of(new Ab(440, "Iron ore", -1L, 72, -72L))), 2_000);
-        Ca first = Ca.capture(alone, now + 600L, new Dz(false, null, 0L, Bo.NONE, "", false, ""));
+        Engine alone = PresentationLifecycleTest.engine();
+        alone.startCustom("Smithing", now);
+        alone.getActiveSession().addTransaction(Tx.of(now, TransactionType.CONSUMPTION, Context.PRODUCTION, "Smelting", true,
+            List.of(new Flow(440, "Iron ore", -1L, 72, -72L))), 2_000);
+        LiveSnapshot first = LiveSnapshot.capture(alone, now + 600L, new LiveContext(false, null, 0L, PvpState.NONE, "", false, ""));
         assertEquals("Iron ore (failed)", page.rowOf(first.recent.get(0)).name);
 
         // The Ledger shows the same single row, and its detail keeps both kinds of receipt.
-        Br.Result ledger = Br.capture(engine.getActiveSession().getTransactions(), List.of(), "", null);
-        var oreGroups = new ArrayList<Br.Group>();
-        for (Br.Group group : ledger.groups) if (group.itemId == 440) oreGroups.add(group);
+        Semantics.Result ledger = Semantics.capture(engine.getActiveSession().getTransactions(), List.of(), "", null);
+        var oreGroups = new ArrayList<Semantics.Group>();
+        for (Semantics.Group group : ledger.groups) if (group.itemId == 440) oreGroups.add(group);
         assertEquals("one Ledger ore row", 1, oreGroups.size());
         assertEquals("1/2", oreGroups.get(0).failedOf());
         assertEquals(2, oreGroups.get(0).receipts.size());
-        Dp panel = new Dp(PresentationLifecycleTest.engine(), PresentationLifecycleTest.config(), null);
-        Table.Row row = panel.ledger.awh(oreGroups.get(0), Kit.Tone.SUPPLY);
+        SidebarPanel panel = new SidebarPanel(PresentationLifecycleTest.engine(), PresentationLifecycleTest.config(), null);
+        Table.Row row = panel.ledger.groupRow(oreGroups.get(0), Kit.Tone.SUPPLY);
         assertEquals("Iron ore", row.name);
         assertEquals("1/2", row.qty);
     }
@@ -135,28 +135,28 @@ public class RecentVisibilityTest
     @Test
     public void coinPouchesMergeInRecentAndTheOpenCarriesItsNet()
     {
-        Ab pouchPickup = new Ab(ItemID.PICKPOCKET_COIN_POUCH_ELF, "Coin pouch", 1L, 0, 0L,
-            Av.DEFERRED_CLAIM);
-        Ab pouchSpend = new Ab(ItemID.PICKPOCKET_COIN_POUCH_ELF, "Coin pouch", -1L, 0, 0L,
-            Av.DEFERRED_CLAIM);
-        List<Ac> receipts = List.of(
-            Tx.of(1_000L, Ai.GAIN, Aj.GENERIC, "", true, List.of(pouchPickup)),
-            Tx.of(2_000L, Ai.GAIN, Aj.GENERIC, "", true, List.of(pouchPickup)),
-            Tx.of(3_000L, Ai.GAIN, Aj.GENERIC, "", true, List.of(pouchSpend,
-                new Ab(995, "Coins", 300L, 1, 300L, Av.FACE_VALUE))));
-        Dz context = new Dz(false, flow -> true, 0L, Bo.NONE, "", false, "");
-        List<Ca.Recent> visible = LiveProbe.recent(receipts, context);
+        Flow pouchPickup = new Flow(ItemID.PICKPOCKET_COIN_POUCH_ELF, "Coin pouch", 1L, 0, 0L,
+            PriceSource.DEFERRED_CLAIM);
+        Flow pouchSpend = new Flow(ItemID.PICKPOCKET_COIN_POUCH_ELF, "Coin pouch", -1L, 0, 0L,
+            PriceSource.DEFERRED_CLAIM);
+        List<Transaction> receipts = List.of(
+            Tx.of(1_000L, TransactionType.GAIN, Context.GENERIC, "", true, List.of(pouchPickup)),
+            Tx.of(2_000L, TransactionType.GAIN, Context.GENERIC, "", true, List.of(pouchPickup)),
+            Tx.of(3_000L, TransactionType.GAIN, Context.GENERIC, "", true, List.of(pouchSpend,
+                new Flow(995, "Coins", 300L, 1, 300L, PriceSource.FACE_VALUE))));
+        LiveContext context = new LiveContext(false, flow -> true, 0L, PvpState.NONE, "", false, "");
+        List<LiveSnapshot.Recent> visible = LiveProbe.recent(receipts, context);
         assertEquals("one merged pickup row and one merged open row", 2, visible.size());
-        Ca.Recent open = visible.stream().filter(row -> "Coin pouch".equals(row.name)
+        LiveSnapshot.Recent open = visible.stream().filter(row -> "Coin pouch".equals(row.name)
             && "\u22121".equals(row.qty)).findFirst().orElseThrow(AssertionError::new);
         assertEquals("the open's one row carries both the count and the net", 300L, open.value);
         assertFalse(open.neutral);
-        Ca.Recent pickups = visible.stream().filter(row -> "Coin pouch".equals(row.name)
+        LiveSnapshot.Recent pickups = visible.stream().filter(row -> "Coin pouch".equals(row.name)
             && "\u00d72".equals(row.qty)).findFirst().orElseThrow(AssertionError::new);
         assertEquals(2L, pickups.quantity);
         assertTrue(pickups.neutral);
         assertEquals(0L, pickups.value);
-        assertEquals("\u2014", LivePage.avo(pickups));
+        assertEquals("\u2014", LivePage.valueText(pickups));
     }
 
     @Test
@@ -164,13 +164,13 @@ public class RecentVisibilityTest
     {
         // The minimum loot value would hide a small coin gain; the open's net is the action's
         // income, so the merged row stays visible with both the count and the net.
-        Dz context = new Dz(false, null, 100L, Bo.NONE, "", false, "");
-        List<Ac> receipts = List.of(Tx.of(3_000L, Ai.GAIN, Aj.GENERIC, "", true, List.of(
-            new Ab(ItemID.PICKPOCKET_COIN_POUCH_ELF, "Coin pouch", -3L, 0, 0L, Av.DEFERRED_CLAIM),
-            new Ab(995, "Coins", 9L, 1, 9L, Av.FACE_VALUE))));
-        List<Ca.Recent> visible = LiveProbe.recent(receipts, context);
+        LiveContext context = new LiveContext(false, null, 100L, PvpState.NONE, "", false, "");
+        List<Transaction> receipts = List.of(Tx.of(3_000L, TransactionType.GAIN, Context.GENERIC, "", true, List.of(
+            new Flow(ItemID.PICKPOCKET_COIN_POUCH_ELF, "Coin pouch", -3L, 0, 0L, PriceSource.DEFERRED_CLAIM),
+            new Flow(995, "Coins", 9L, 1, 9L, PriceSource.FACE_VALUE))));
+        List<LiveSnapshot.Recent> visible = LiveProbe.recent(receipts, context);
         assertEquals(1, visible.size());
-        Ca.Recent row = visible.get(0);
+        LiveSnapshot.Recent row = visible.get(0);
         assertEquals("Coin pouch", row.name);
         assertEquals("\u22123", row.qty);
         assertEquals("the net is the action's gain", 9L, row.value);
@@ -181,18 +181,18 @@ public class RecentVisibilityTest
     public void groundItemsNameWildcardAndQuantityRulesStillFilterOnlyGains()
     {
         LootPresentationFilterService ground = new LootPresentationFilterService(
-            new Bc(true, "", "Dragon*, Shark<3", false));
-        List<Ac> receipts = List.of(
-            Tx.of(1L, Ai.GAIN, Aj.GENERIC, "", true,
-                List.of(new Ab(536, "Dragon bones", 1L, 2_000, 2_000L))),
-            Tx.of(2L, Ai.GAIN, Aj.GENERIC, "", true,
-                List.of(new Ab(385, "Shark", 2L, 900, 1_800L))),
-            Tx.of(3L, Ai.CONSUMPTION, Aj.GENERIC, "Dropped", true,
-                List.of(new Ab(385, "Shark", -1L, 900, -900L))));
-        Dz context = new Dz(false,
-            flow -> ground.isFlowIncluded(flow, Dl.FOLLOW_GROUND_ITEMS),
-            0L, Bo.NONE, "", false, "");
-        List<Ca.Recent> visible = LiveProbe.recent(receipts, context);
+            new GroundItemsPrefs(true, "", "Dragon*, Shark<3", false));
+        List<Transaction> receipts = List.of(
+            Tx.of(1L, TransactionType.GAIN, Context.GENERIC, "", true,
+                List.of(new Flow(536, "Dragon bones", 1L, 2_000, 2_000L))),
+            Tx.of(2L, TransactionType.GAIN, Context.GENERIC, "", true,
+                List.of(new Flow(385, "Shark", 2L, 900, 1_800L))),
+            Tx.of(3L, TransactionType.CONSUMPTION, Context.GENERIC, "Dropped", true,
+                List.of(new Flow(385, "Shark", -1L, 900, -900L))));
+        LiveContext context = new LiveContext(false,
+            flow -> ground.isFlowIncluded(flow, LootFilter.FOLLOW_GROUND_ITEMS),
+            0L, PvpState.NONE, "", false, "");
+        List<LiveSnapshot.Recent> visible = LiveProbe.recent(receipts, context);
         assertEquals("hidden gains stay off Recent; costs remain discoverable", 1, visible.size());
         assertEquals(-900L, visible.get(0).value);
         assertEquals("Shark", visible.get(0).name);

@@ -43,6 +43,6 @@ public class ChargeBlowpipeDartTest
     {
         ChargeIntake intake = new ChargeIntake(null, null, null, null, null);
         intake.blowpipeDart = -1;
-        org.junit.Assert.assertTrue("the dart table knows dragon darts", Ar.DARTS.containsValue(11230));
+        org.junit.Assert.assertTrue("the dart table knows dragon darts", ChargeCheck.DARTS.containsValue(11230));
     }
 }

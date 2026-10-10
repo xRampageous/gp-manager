@@ -82,28 +82,28 @@ public final class FinancialFingerprint
     }
 
     /** Captures the engine's effective correction-aware money, PvP metrics and archives at {@code now}. */
-    public static FinancialFingerprint fingerprint(Am engine, long now)
+    public static FinancialFingerprint fingerprint(Engine engine, long now)
     {
         StringBuilder out = new StringBuilder();
-        Map<String, Ad> sessions = new LinkedHashMap<>();
-        Ad general = engine.getGeneralSession();
-        Ad active = engine.getActiveSession();
+        Map<String, Session> sessions = new LinkedHashMap<>();
+        Session general = engine.getGeneralSession();
+        Session active = engine.getActiveSession();
         if (general != null) sessions.put(general.getId(), general);
         if (active != null) sessions.put(active.getId(), active);
-        for (Ad session : engine.getHistory())
+        for (Session session : engine.getHistory())
         {
             if (session != null) sessions.put(session.getId(), session);
         }
-        List<Ad> ordered = new ArrayList<>(sessions.values());
-        ordered.sort(Comparator.comparing(Ad::getId));
+        List<Session> ordered = new ArrayList<>(sessions.values());
+        ordered.sort(Comparator.comparing(Session::getId));
         out.append("sessions=").append(ordered.size()).append('\n');
-        for (Ad session : ordered)
+        for (Session session : ordered)
         {
             boolean isActive = active != null && active.getId().equals(session.getId());
-            Bu metrics = session.metrics(now);
-            Dt pk = session.ava();
+            Metrics metrics = session.metrics(now);
+            PkTally pk = session.pk();
             out.append("session ").append(session.getId())
-                .append(" owner=").append(session.getOwnerKind())
+                .append(" grind=").append(session.grind)
                 .append(" closed=").append(session.isClosed())
                 .append(" active=").append(isActive)
                 .append('\n');
@@ -128,28 +128,18 @@ public final class FinancialFingerprint
                     .append(" transfers=").append(SessionCounts.transfers(session))
                     .append('\n');
             }
-            if (pk == null)
-            {
-                out.append("  pvp unavailable\n");
-            }
-            else
-            {
-                out.append("  pvp kills=").append(pk.kills)
-                    .append(" deaths=").append(pk.deaths)
-                    .append(" net=").append(pk.net)
-                    .append(" bestKill=").append(pk.bestKill)
-                    .append(" worstDeath=").append(pk.largestDeathLoss)
-                    .append(" killNet=").append(pk.totalKillNet)
-                    .append(" deathLoss=").append(pk.totalDeathLoss)
-                    .append(" streak=").append(pk.currentStreak)
-                    .append('\n');
-            }
+            out.append("  pvp kills=").append(pk.kills)
+                .append(" deaths=").append(pk.deaths)
+                .append(" bestKill=").append(session.bestKill())
+                .append(" streak=").append(pk.streak)
+                .append(" bestStreak=").append(pk.bestStreak)
+                .append('\n');
             out.append("  retainedRows=").append(session.getTransactions().size())
                 .append(" compactedRows=").append(session.compactedTransactionCount)
                 .append('\n');
-            List<Ac> rows = new ArrayList<>(session.getTransactions());
-            rows.sort(Comparator.comparing(Ac::getId));
-            for (Ac row : rows)
+            List<Transaction> rows = new ArrayList<>(session.getTransactions());
+            rows.sort(Comparator.comparing(Transaction::getId));
+            for (Transaction row : rows)
             {
                 out.append("  row ").append(row.getId())
                     .append(" type=").append(row.getType())
@@ -161,7 +151,7 @@ public final class FinancialFingerprint
                     .append(" net=").append(row.getNet())
                     .append(" encounter=").append(row.getEncounterId())
                     .append('\n');
-                for (Ab flow : row.getFlows())
+                for (Flow flow : row.getFlows())
                 {
                     out.append("    flow item=").append(flow.itemId)
                         .append(" qty=").append(flow.quantityDelta)
@@ -170,17 +160,6 @@ public final class FinancialFingerprint
                         .append(" source=").append(flow.getPriceSource())
                         .append('\n');
                 }
-            }
-            List<Bx> encounters = new ArrayList<>(session.getPkEncounters());
-            encounters.sort(Comparator.comparing(Bx::getId));
-            for (Bx encounter : encounters)
-            {
-                out.append("  encounter ").append(encounter.getId())
-                    .append(" type=").append(encounter.getType())
-                    .append(" at=").append(encounter.timestampEpochMillis)
-                    .append(" net=").append(encounter.ur())
-                    .append(" loss=").append(encounter.uk())
-                    .append('\n');
             }
         }
 

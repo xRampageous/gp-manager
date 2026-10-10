@@ -15,7 +15,7 @@ import static org.junit.Assert.assertNotNull;
  */
 public class ImbueAndDamnedTest
 {
-    private final Bl valuation = new Bl(new GpManagerConfig() { }, ImbueAndDamnedTest::composition,
+    private final Valuation valuation = new Valuation(new GpManagerConfig() { }, ImbueAndDamnedTest::composition,
         id -> id == 8921 ? 1_000_000 : id == 12851 ? 29_000 : 0);
 
     @Test
@@ -23,17 +23,17 @@ public class ImbueAndDamnedTest
     {
         for (int imbued : new int[] {11784, 11774, 25276, 26771, 11865, 25177, 26674})
         {
-            assertEquals("item " + imbued, 1_000_000, valuation.akj(imbued, 1L, 0L).unitPrice);
+            assertEquals("item " + imbued, 1_000_000, valuation.valueComponent(imbued, 1L, 0L).unitPrice);
         }
     }
 
     @Test
     public void theAmuletOfTheDamnedWearsLikeBarrowsAndIsWorthItsFullSelf()
     {
-        assertEquals(29_000, valuation.akj(12853, 1L, 0L).unitPrice);
-        String full = Am.piece(new Ab(12851, "Amulet of the Damned (full)", -1L, 29_000, -29_000L));
+        assertEquals(29_000, valuation.valueComponent(12853, 1L, 0L).unitPrice);
+        String full = Engine.piece(new Flow(12851, "Amulet of the Damned (full)", -1L, 29_000, -29_000L));
         assertNotNull(full);
-        assertEquals("the same piece degrading", full, Am.piece(new Ab(12853, "Amulet of the Damned", 1L, 29_000, 29_000L)));
+        assertEquals("the same piece degrading", full, Engine.piece(new Flow(12853, "Amulet of the Damned", 1L, 29_000, 29_000L)));
     }
 
     private static ItemComposition composition(int id)

@@ -1,246 +1,324 @@
 package com.gpmanager;
-import com.gpmanager.LedgerPage.Ea;
-import java.util.*;
-import javax.swing.*;
-import static com.gpmanager.Ag.*;
-import static com.gpmanager.Ao.Scope.*;
-import static java.lang.Math.*;
+
+import static com.gpmanager.GameData.msg;
 import static com.gpmanager.Kit.*;
-import static com.gpmanager.Ak.msg;
+import static com.gpmanager.LedgerData.Scope.*;
+import static com.gpmanager.Phrases.*;
+
+import static java.lang.Math.*;
+
+import com.gpmanager.LedgerPage.CorrectionOutcome;
+
+import java.util.*;
+
+import javax.swing.*;
+
 /** Ledger actions: scope menu, search, selection, corrections, splits and review decisions. */
 class LedgerController implements LedgerPage.Actions {
-Dp panel;
-Am engine;
-LedgerController(Dp /* panel */a) {
- this.panel = a;
- this.engine = a.engine;
-}
+    SidebarPanel panel;
+    Engine engine;
 
-void mutate(Runnable /* domain */a) {
- panel.mutate(a);
-}
+    LedgerController(SidebarPanel panel) {
+        this.panel = panel;
+        this.engine = panel.engine;
+    }
 
-public void openScopeMenu(JComponent /* anchor */a) {
- panel.historyScopeMenuPage = 0;
- ail(a, panel.historyScopeMenuPage);
-}
+    void mutate(Runnable domain) {
+        panel.mutate(domain);
+    }
 
-void ail(JComponent /* anchor */a, int /* pageIndex */b) {
- var /* menu */c = new JPopupMenu();
- c.add(item("Current Grind", () -> aia(CURRENT_GRIND, null, null)));
- c.add(item("Runs today", () -> aia(TODAY, null, null)));
- var /* history */d = new ArrayList<Ad>(engine.getHistory());
- d.removeIf(Objects::isNull);
- d.sort(Comparator.comparingLong((Ad /* itemData */e) -> e.startedAtEpochMillis).reversed()
- .thenComparing(Ad::getId));
- if (!d.isEmpty()) {
-  c.addSeparator();
-  int /* size */f = 10;
-  int /* pages */g = max(1, (d.size() + f - 1) / f);
-  panel.historyScopeMenuPage = max(0, min(b, g - 1));
-  int /* from */h = panel.historyScopeMenuPage * f;
-  int /* to */i = min(d.size(), h + f);
-  var /* status */j = new JMenuItem("History " + (h + 1) + "–" + i + " of " + d.size());
-  j.setEnabled(false);
-  c.add(j);
-  if (g > 1) {
-   c.add(item("Previous page", panel.historyScopeMenuPage > 0, () -> SwingUtilities.invokeLater(
-   () -> ail(a, panel.historyScopeMenuPage - 1))));
-   c.add(item("Next page", panel.historyScopeMenuPage + 1 < g, () -> SwingUtilities.invokeLater(
-   () -> ail(a, panel.historyScopeMenuPage + 1))));
-   c.addSeparator();
-  }
-  for (Ad /* session */k : d.subList(h, i)) {
-   c.add(item(msg("kl") + k.getName(), () -> aia(HISTORY,
-   k.getId(), k.getName())));
-  }
- }
- c.show(a, 0, a.getHeight() + 2);
-}
+    public void openScopeMenu(JComponent anchor) {
+        panel.historyScopeMenuPage = 0;
+        showScopeMenu(anchor, panel.historyScopeMenuPage);
+    }
 
-void aia(Ao.Scope /* scope */a, String /* historyId */b, String /* historyName */c) {
- panel.ledgerEntry = panel.ledgerEntry.withScope(a, b, c);
- refresh();
-}
+    void showScopeMenu(JComponent anchor, int pageIndex) {
+        var menu = new JPopupMenu();
+        menu.add(item("Current Grind", () -> selectScope(CURRENT_GRIND, null, null)));
+        menu.add(item("Runs today", () -> selectScope(TODAY, null, null)));
+        var history = new ArrayList<Session>(engine.getHistory());
+        history.removeIf(Objects::isNull);
+        history.sort(
+                Comparator.comparingLong((Session itemData) -> itemData.startedAtEpochMillis)
+                        .reversed()
+                        .thenComparing(Session::getId));
+        if (!history.isEmpty()) {
+            menu.addSeparator();
+            int size = 10;
+            int pages = max(1, (history.size() + size - 1) / size);
+            panel.historyScopeMenuPage = max(0, min(pageIndex, pages - 1));
+            int from = panel.historyScopeMenuPage * size;
+            int to = min(history.size(), from + size);
+            var status =
+                    new JMenuItem("History " + (from + 1) + "–" + to + " of " + history.size());
+            status.setEnabled(false);
+            menu.add(status);
+            if (pages > 1) {
+                menu.add(
+                        item(
+                                "Previous page",
+                                panel.historyScopeMenuPage > 0,
+                                () ->
+                                        SwingUtilities.invokeLater(
+                                                () ->
+                                                        showScopeMenu(
+                                                                anchor,
+                                                                panel.historyScopeMenuPage - 1))));
+                menu.add(
+                        item(
+                                "Next page",
+                                panel.historyScopeMenuPage + 1 < pages,
+                                () ->
+                                        SwingUtilities.invokeLater(
+                                                () ->
+                                                        showScopeMenu(
+                                                                anchor,
+                                                                panel.historyScopeMenuPage + 1))));
+                menu.addSeparator();
+            }
+            for (Session session : history.subList(from, to)) {
+                menu.add(
+                        item(
+                                msg("recent-grind") + session.getName(),
+                                () -> selectScope(HISTORY, session.getId(), session.getName())));
+            }
+        }
+        menu.show(anchor, 0, anchor.getHeight() + 2);
+    }
 
-public void costViewChanged(Ao.Bs /* view */a) {
- panel.ledgerEntry = panel.ledgerEntry.withCostView(a);
- refresh();
-}
+    void selectScope(LedgerData.Scope scope, String historyId, String historyName) {
+        panel.ledgerEntry = panel.ledgerEntry.withScope(scope, historyId, historyName);
+        refresh();
+    }
 
-public void searchChanged(String /* text */a) {
- panel.ledgerSearch = axw(a);
- panel.ledgerEntry = panel.ledgerEntry.withSearch(panel.ledgerSearch);
- refresh();
-}
+    public void costViewChanged(LedgerData.CostView view) {
+        panel.ledgerEntry = panel.ledgerEntry.withCostView(view);
+        refresh();
+    }
 
-@Override
-public void selectionChanged(String /* transactionId */a, String /* contributionId */b, String /* groupId */c) {
- String /* transaction */d = empty(a) ? null : a;
- String /* contribution */e = empty(b) ? null : b;
- String /* group */f = empty(c) ? null : c;
- panel.ledgerEntry = panel.ledgerEntry.withSelection(d, e, f);
- refresh();
-}
+    public void searchChanged(String text) {
+        panel.ledgerSearch = orEmpty(text);
+        panel.ledgerEntry = panel.ledgerEntry.withSearch(panel.ledgerSearch);
+        refresh();
+    }
 
-public Ao.Ef preview(String /* transactionId */a, Ah /* correction */b) {
- return Ao.preview(engine, a, b, Ae.now());
-}
+    @Override
+    public void selectionChanged(String transactionId, String contributionId, String groupId) {
+        String transaction = empty(transactionId) ? null : transactionId;
+        String contribution = empty(contributionId) ? null : contributionId;
+        String group = empty(groupId) ? null : groupId;
+        panel.ledgerEntry = panel.ledgerEntry.withSelection(transaction, contribution, group);
+        refresh();
+    }
 
-public Ea correct(String /* transactionId */a, Ah /* correction */b, long /* previewRevision */c) {
- if (engine.getRevision() != c) return Ea.STALE;
- boolean /* applied */d = engine.qi(a, b, Ae.now(), "Ledger correction");
- return d ? Ea.APPLIED : Ea.REFUSED;
-}
+    public LedgerData.CorrectionPreview preview(String transactionId, Correction correction) {
+        return LedgerData.preview(engine, transactionId, correction, SafeMath.now());
+    }
 
-public void split(String /* transactionId */a, java.util.function.BiConsumer<long[], Ao.Ef> /* previewed */b) {
- Ad /* session */c = engine.getActiveSession();
- Ac /* transaction */d = c == null ? null : c.sw(a);
- int /* itemId */e = -1;
- long /* total */f = 0L;
- String /* itemName */g = "";
- if (d != null) {
-  for (Ab /* flow */h : d.getFlows()) {
-   if (h == null || h.quantityDelta <= 0L) continue;
-   if (e == -1) {
-    e = h.itemId;
-    g = h.itemName;
-   } else if (e != h.itemId) {
-    e = -1;
-    break;
-   }
-   f += h.quantityDelta;
-  }
- }
- if (e <= 0 || f < 2L) {
-  // Owner 2026-10-01 (F02): only one kind of item in two or more units can be split.
-  panel.shell().tell("Not split", d == null ? msg("f1")
-  : msg("km"), true);
-  return;
- }
- int /* splitItem */i = e;
- long /* splitTotal */j = f;
- String /* splitName */k = g == null || g.isEmpty() ? "this item" : g;
- String /* owner */l = c.getId();
- panel.shell().prompt("Split entry",
- "Keep how many of " + k + " \u00d7" + f + " for your share?", "", /* value */m -> {
-  long /* keep */n;
-  try {
-   n = Long.parseLong(m.replace(",", ""));
-  } catch (NumberFormatException /* ex */o) {
-   n = -1L;
-  }
-  if (n <= 0L || n >= j) {
-   panel.shell().tell("Not split", msg("kn") + (j - 1), true);
-   return;
-  }
-  Ad /* now */p = engine.getActiveSession();
-  if (p == null || !l.equals(p.getId()) || !splittableSplit(p.sw(a), i, j)) {
-   panel.shell().tell("Not split", msg("ko"), true);
-   return;
-  }
-  // Owner 1.1: the split shows its Net preview first, like every other correction.
-  b.accept(new long[] {i, n, j},
-  Ao.splitPreview(engine, a, i, n, Ae.now()));
- });
-}
+    public CorrectionOutcome correct(
+            String transactionId, Correction correction, long previewRevision) {
+        if (engine.getRevision() != previewRevision) return CorrectionOutcome.STALE;
+        boolean applied =
+                engine.correctTransaction(
+                        transactionId, correction, SafeMath.now(), "Ledger correction");
+        return applied ? CorrectionOutcome.APPLIED : CorrectionOutcome.REFUSED;
+    }
 
-public void applySplit(String /* transactionId */a, long[] /* split */b, long /* previewRevision */c) {
- String /* owner */d = engine.getActiveSession() == null ? "" : engine.getActiveSession().getId();
- mutate(() -> {
-  // The sheet may be stale: re-check the session and the exact receipt before mutating.
-  Ad /* now */e = engine.getActiveSession();
-  Ac /* current */f = e == null || !d.equals(e.getId()) ? null : e.sw(a);
-  if (engine.getRevision() != c) {
-   panel.shell().tell("Not split", msg("gz"), true);
-   return;
-  }
-  if (!splittableSplit(f, (int) b[0], b[2])) {
-   panel.shell().tell("Not split", msg("ko"), true);
-   return;
-  }
-  if (!engine.kr(a, (int) b[0], b[1], Ae.now(), "Ledger split")) {
-   panel.shell().tell("Not split", msg("f0"), true);
-  }
- });
-}
+    public void split(
+            String transactionId,
+            java.util.function.BiConsumer<long[], LedgerData.CorrectionPreview> previewed) {
+        Session session = engine.getActiveSession();
+        Transaction transaction = session == null ? null : session.findTransaction(transactionId);
+        int itemId = -1;
+        long total = 0L;
+        String itemName = "";
+        if (transaction != null) {
+            for (Flow flow : transaction.getFlows()) {
+                if (flow == null || flow.quantityDelta <= 0L) continue;
+                if (itemId == -1) {
+                    itemId = flow.itemId;
+                    itemName = flow.itemName;
+                } else if (itemId != flow.itemId) {
+                    itemId = -1;
+                    break;
+                }
+                total += flow.quantityDelta;
+            }
+        }
+        if (itemId <= 0 || total < 2L) {
+            // Owner 2026-10-01 (F02): only one kind of item in two or more units can be split.
+            panel.shell()
+                    .tell(
+                            "Not split",
+                            transaction == null ? msg("entry-longer") : msg("split-needs"),
+                            true);
+            return;
+        }
+        int splitItem = itemId;
+        long splitTotal = total;
+        String splitName = itemName == null || itemName.isEmpty() ? "this item" : itemName;
+        String owner = session.getId();
+        panel.shell()
+                .prompt(
+                        "Split entry",
+                        "Keep how many of " + splitName + " \u00d7" + total + " for your share?",
+                        "",
+                        value -> {
+                            long keep;
+                            try {
+                                keep = Long.parseLong(value.replace(",", ""));
+                            } catch (NumberFormatException ex) {
+                                keep = -1L;
+                            }
+                            if (keep <= 0L || keep >= splitTotal) {
+                                panel.shell()
+                                        .tell(
+                                                "Not split",
+                                                msg("enter-number") + (splitTotal - 1),
+                                                true);
+                                return;
+                            }
+                            Session now = engine.getActiveSession();
+                            if (now == null
+                                    || !owner.equals(now.getId())
+                                    || !splittableSplit(
+                                            now.findTransaction(transactionId),
+                                            splitItem,
+                                            splitTotal)) {
+                                panel.shell().tell("Not split", msg("entry-changed"), true);
+                                return;
+                            }
+                            // Owner 1.1: the split shows its Net preview first, like every other
+                            // correction.
+                            previewed.accept(
+                                    new long[] {splitItem, keep, splitTotal},
+                                    LedgerData.splitPreview(
+                                            engine,
+                                            transactionId,
+                                            splitItem,
+                                            keep,
+                                            SafeMath.now()));
+                        });
+    }
 
-/** One item kind only, and the quantity captured at the prompt is still exact. */
-static boolean splittableSplit(Ac /* transaction */a, int /* itemId */b, long /* total */c) {
- if (a == null) return false;
- int /* found */d = -1;
- long /* sum */e = 0L;
- for (Ab /* flow */f : a.getFlows()) {
-  if (f == null || f.quantityDelta <= 0L) continue;
-  if (d == -1) d = f.itemId;
-  else if (d != f.itemId) return false;
-  e += f.quantityDelta;
- }
- return d == b && e == c;
-}
+    public void applySplit(String transactionId, long[] split, long previewRevision) {
+        String owner = engine.getActiveSession() == null ? "" : engine.getActiveSession().getId();
+        mutate(
+                () -> {
+                    // The sheet may be stale: re-check the session and the exact receipt before
+                    // mutating.
+                    Session now = engine.getActiveSession();
+                    Transaction current =
+                            now == null || !owner.equals(now.getId())
+                                    ? null
+                                    : now.findTransaction(transactionId);
+                    if (engine.getRevision() != previewRevision) {
+                        panel.shell().tell("Not split", msg("entries-changed"), true);
+                        return;
+                    }
+                    if (!splittableSplit(current, (int) split[0], split[2])) {
+                        panel.shell().tell("Not split", msg("entry-changed"), true);
+                        return;
+                    }
+                    if (!engine.splitItem(
+                            transactionId,
+                            (int) split[0],
+                            split[1],
+                            SafeMath.now(),
+                            "Ledger split")) {
+                        panel.shell().tell("Not split", msg("split-applied"), true);
+                    }
+                });
+    }
 
-String menuTarget = "";
-/** Pins an open mutation menu; the callback re-checks it against the live session. */
-@Override
-public String pinMenuTarget() {
- Ad /* active */a = engine.getActiveSession();
- menuTarget = a == null ? "" : a.getId();
- return menuTarget;
-}
+    /** One item kind only, and the quantity captured at the prompt is still exact. */
+    static boolean splittableSplit(Transaction transaction, int itemId, long total) {
+        if (transaction == null) return false;
+        int found = -1;
+        long sum = 0L;
+        for (Flow flow : transaction.getFlows()) {
+            if (flow == null || flow.quantityDelta <= 0L) continue;
+            if (found == -1) found = flow.itemId;
+            else if (found != flow.itemId) return false;
+            sum += flow.quantityDelta;
+        }
+        return found == itemId && sum == total;
+    }
 
-/** Owner 2026-10-01 (F01): a stale menu never mutates; scope and session are re-checked here. */
-boolean undoAllowed() {
- Ad /* active */a = engine.getActiveSession();
- return !Ao.readOnly(panel.ledgerEntry)
- && a != null && !menuTarget.isEmpty() && menuTarget.equals(a.getId());
-}
+    String menuTarget = "";
 
-public void undoCorrection() {
- if (!undoAllowed()) return;
- mutate(() -> engine.akb(Ae.now()));
-}
+    /** Pins an open mutation menu; the callback re-checks it against the live session. */
+    @Override
+    public String pinMenuTarget() {
+        Session active = engine.getActiveSession();
+        menuTarget = active == null ? "" : active.getId();
+        return menuTarget;
+    }
 
-@Override
-public void undoLast() {
- if (!undoAllowed()) return;
- mutate(() -> engine.akc(Ae.now()));
-}
+    /**
+     * Owner 2026-10-01 (F01): a stale menu never mutates; scope and session are re-checked here.
+     */
+    boolean undoAllowed() {
+        Session active = engine.getActiveSession();
+        return !LedgerData.readOnly(panel.ledgerEntry)
+                && active != null
+                && !menuTarget.isEmpty()
+                && menuTarget.equals(active.getId());
+    }
 
-@Override
-public void restoreUndo() {
- if (!undoAllowed()) return;
- mutate(() -> engine.agn(Ae.now()));
-}
+    public void undoCorrection() {
+        if (!undoAllowed()) return;
+        mutate(() -> engine.undoCorrection(SafeMath.now()));
+    }
 
-public void decideAll(Cl /* decision */a) {
- decide(a, /* row */b -> b != null && Ao.aaf(b, panel.ledgerSearch), false);
-}
+    @Override
+    public void undoLast() {
+        if (!undoAllowed()) return;
+        mutate(engine::undoTransaction);
+    }
 
-@Override
-public void decide(String /* transactionId */a, Cl /* decision */b) {
- decide(b, /* row */c -> c != null && a.equals(c.transactionId), true);
-}
+    @Override
+    public void restoreUndo() {
+        if (!undoAllowed()) return;
+        mutate(engine::restoreUndo);
+    }
 
-/** Previews one decision over the chosen Review rows, confirms, then applies it as one undoable batch. */
-void decide(Cl /* decision */a, java.util.function.Predicate<Cu> /* rows */b, boolean /* single */c) {
- Am.DecideAllPreview /* preview */d = engine.adu(a, b, Ae.now());
- int /* count */e = d.rowCount();
- if (e == 0 || c && e != 1) return;
- String /* message */f = qj(a.ajo())
- + (c ? " for this entry" : " for " + e + (e == 1 ? " entry" : " entries"))
- + ". Net changes by " + Fmt.signed(d.netDelta) + " gp." + (c ? "" : msg("kp"));
- panel.shell().confirm(c ? "Review decision" : "Decide all", f, "Apply", () -> mutate(() -> {
-  if (engine.kp(d, Ae.now()) < 0) {
-   SwingUtilities.invokeLater(() -> panel.ledger.aiu(msg("gz")));
-  }
- }));
-}
+    @Override
+    /** Previews one Review decision, confirms it with its Net change, then applies it undoably. */
+    public void decide(String transactionId, Decision decision) {
+        Engine.DecisionPreview preview =
+                engine.previewDecision(
+                        decision,
+                        row -> row != null && transactionId.equals(row.transactionId),
+                        SafeMath.now());
+        if (preview.rowCount() != 1) return;
+        String message =
+                correctionLabel(decision.toCorrection())
+                        + " for this entry. Net changes by "
+                        + Fmt.signed(preview.netDelta)
+                        + " gp.";
+        panel.shell()
+                .confirm(
+                        "Review decision",
+                        message,
+                        "Apply",
+                        () ->
+                                mutate(
+                                        () -> {
+                                            if (engine.applyDecision(preview, SafeMath.now()) < 0) {
+                                                SwingUtilities.invokeLater(
+                                                        () ->
+                                                                panel.ledger.showNotice(
+                                                                        msg("entries-changed")));
+                                            }
+                                        }));
+    }
 
-public void refresh() {
- panel.refresh();
-}
+    public void refresh() {
+        panel.refresh();
+    }
 
-static String qj(Ah /* correction */a) {
- return LedgerPage.qj(a);
-}
+    static String correctionLabel(Correction correction) {
+        return LedgerPage.correctionLabel(correction);
+    }
 }

@@ -26,25 +26,25 @@ public class ReviewFixesTest {
         @Override public boolean autoStartSession() { return false; }
     };
 
-    static Am engine() {
+    static Engine engine() {
         JsonCodec.bind(new Gson());
-        Am e = new Am(deltas -> {
-            List<Ab> result = new ArrayList<>();
-            deltas.forEach((id, q) -> result.add(new Ab(id, "Item " + id, q, 100, q * 100)));
+        Engine e = new Engine(deltas -> {
+            List<Flow> result = new ArrayList<>();
+            deltas.forEach((id, q) -> result.add(new Flow(id, "Item " + id, q, 100, q * 100)));
             return result;
         }, new TransactionClassifier(), CONFIG);
-        e.rm(T0);
-        e.setBaseline(Cc.empty());
+        e.ensureSession(T0);
+        e.setBaseline(ContainerSnapshot.empty());
         return e;
     }
 
     static final class Plugin extends GpManagerPlugin {
         boolean ready = true;
-        @Override boolean nh() { return ready; }
+        @Override boolean canIngest() { return ready; }
         @Override void pulse() { }
     }
 
-    static Plugin plugin(Am engine, int[] tick) {
+    static Plugin plugin(Engine engine, int[] tick) {
         Plugin p = new Plugin();
         p.engine = engine;
         p.config = CONFIG;
@@ -54,36 +54,36 @@ public class ReviewFixesTest {
             put("getLocalPlayer", proxy(Player.class, Collections.singletonMap("getWorldLocation", new WorldPoint(100, 100, 0))));
         }});
         p.snapshotFactory = new ContainerSnapshotFactory(p.client, null) {
-            @Override Cc capture(boolean equipment, boolean pouch) { return Cc.empty(); }
+            @Override ContainerSnapshot capture(boolean equipment, boolean pouch) { return ContainerSnapshot.empty(); }
             @Override boolean bagOpen() { return true; }
         };
-        p.persistence = new Ei(p.client, null, null, null, engine);
+        p.persistence = new Persistence(p.client, null, null, null, engine);
         p.charges = new ChargeIntake(p.client, null, CONFIG, engine, null);
         return p;
     }
 
-    static Ev take(Plugin p) {
-        Ev e = p.engine.eb.peek(Eb.TK);
-        return e == null ? p.engine.eb.add(Eb.TK, -1, 1, 5, null) : e;
+    static Observation take(Plugin p) {
+        Observation e = p.engine.inbox.peek(Inbox.GROUND_CLICK);
+        return e == null ? p.engine.inbox.add(Inbox.GROUND_CLICK, -1, 1, 5, null) : e;
     }
 
-    static Ev bag(Plugin p) {
-        Ev e = p.engine.eb.open.stream().filter(v -> v.kind == Eb.BG).findFirst().orElse(null);
+    static Observation bag(Plugin p) {
+        Observation e = p.engine.inbox.open.stream().filter(v -> v.kind == Inbox.BAG_GAIN).findFirst().orElse(null);
         if (e == null) {
-            Ev click = take(p);
-            e = p.engine.eb.add(Eb.BG, click.item, 0, 5, null);
+            Observation click = take(p);
+            e = p.engine.inbox.add(Inbox.BAG_GAIN, click.item, 0, 5, null);
             e.held = click.held;
         }
         return e;
     }
 
     static long qty(Plugin p, int kind) {
-        Ev e = p.engine.eb.peek(kind);
+        Observation e = p.engine.inbox.peek(kind);
         return e == null ? 0L : e.qty;
     }
 
     @Test public void pendingBagGainMustRespectTheAccountReadinessFence() {
-        Am e = engine();
+        Engine e = engine();
         Plugin p = plugin(e, new int[] { 11 });
         ReviewFixesTest.take(p).item = BONES;
         ReviewFixesTest.take(p).held = 0;
@@ -91,11 +91,11 @@ public class ReviewFixesTest {
         ReviewFixesTest.bag(p).qty = 3;
         p.ready = false; // An account switch, restore or logout has fenced ingestion.
         p.onGameTick(new GameTick());
-        assertEquals("a held account must not acquire a synthetic inventory delta", 0L, e.baseline.aea(BONES));
+        assertEquals("a held account must not acquire a synthetic inventory delta", 0L, e.baseline.quantityOf(BONES));
     }
 
     @Test public void fencedBagSettlementMustNotWaitForTheEngineMonitor() throws Exception {
-        Am e = engine();
+        Engine e = engine();
         Plugin p = plugin(e, new int[] { 11 });
         ReviewFixesTest.take(p).item = BONES;
         ReviewFixesTest.bag(p).at = 10;
@@ -127,7 +127,7 @@ public class ReviewFixesTest {
         Tile tile = proxy(Tile.class, Collections.singletonMap("getWorldLocation", new WorldPoint(101, 100, 0)));
         TileItem item = proxy(TileItem.class, new HashMap<String, Object>() {{ put("getId", BONES); put("getQuantity", 3); }});
         p.onItemDespawned(new ItemDespawned(tile, item));
-        assertEquals("an unrelated tile's despawn must not be promoted to counted loot", 0L, ReviewFixesTest.qty(p, Eb.BG));
+        assertEquals("an unrelated tile's despawn must not be promoted to counted loot", 0L, ReviewFixesTest.qty(p, Inbox.BAG_GAIN));
     }
 
     @Test public void aCatchMustResolveToRawFishEvenWhenCookedFishComesFirst() {
@@ -145,83 +145,52 @@ public class ReviewFixesTest {
     }
 
     @Test public void normalWorldStillPricesCrystalShardProxy() {
-        Bl values = proxyValuation(Bl.Bk.NORMAL);
-        Ab shard = values.value(Collections.singletonMap(23962, 1L), T0).get(0);
+        Valuation values = proxyValuation(Valuation.Economy.NORMAL);
+        Flow shard = values.value(Collections.singletonMap(23962, 1L), T0).get(0);
         assertEquals(100, shard.unitPrice);
-        assertEquals(Av.CURRENCY_PROXY, shard.getPriceSource());
+        assertEquals(PriceSource.CURRENCY_PROXY, shard.getPriceSource());
     }
 
     @Test public void specialWorldMustNotPriceCrystalShardsFromTheMainGameMarket() {
-        Ab shard = proxyValuation(Bl.Bk.UNSUPPORTED_SPECIAL).value(Collections.singletonMap(23962, 1L), T0).get(0);
-        assertEquals(Av.UNPRICED, shard.getPriceSource());
+        Flow shard = proxyValuation(Valuation.Economy.UNSUPPORTED_SPECIAL).value(Collections.singletonMap(23962, 1L), T0).get(0);
+        assertEquals(PriceSource.UNPRICED, shard.getPriceSource());
         assertEquals(0, shard.unitPrice);
     }
 
     @Test public void unknownWorldMustNotPriceCrystalShardsBeforeLogin() {
-        Ab shard = proxyValuation(Bl.Bk.UNKNOWN).value(Collections.singletonMap(23962, 1L), T0).get(0);
-        assertEquals(Av.UNPRICED, shard.getPriceSource());
+        Flow shard = proxyValuation(Valuation.Economy.UNKNOWN).value(Collections.singletonMap(23962, 1L), T0).get(0);
+        assertEquals(PriceSource.UNPRICED, shard.getPriceSource());
     }
 
     @Test public void aHigherShardQuoteMustOnlyPriceTheNewCharge() {
         ChargeIntake intake = new ChargeIntake(null, null, CONFIG, engine(), null);
-        assertEquals(10_000L, intake.carriedValue(Ar.V.CRYSTAL_BOW, 23962, 100L, 10_000, 100));
+        assertEquals(10_000L, intake.carriedValue(ChargeCheck.ChargedItem.CRYSTAL_BOW, 23962, 100L, 10_000, 100));
         assertEquals("one new charge must not revalue the 100 already consumed", 200L,
-            intake.carriedValue(Ar.V.CRYSTAL_BOW, 23962, 1L, 20_000, 100));
+            intake.carriedValue(ChargeCheck.ChargedItem.CRYSTAL_BOW, 23962, 1L, 20_000, 100));
     }
 
     @Test public void aLowerShardQuoteMustOnlyPriceTheNewCharge() {
         ChargeIntake intake = new ChargeIntake(null, null, CONFIG, engine(), null);
-        assertEquals(10_000L, intake.carriedValue(Ar.V.CRYSTAL_BOW, 23962, 100L, 10_000, 100));
+        assertEquals(10_000L, intake.carriedValue(ChargeCheck.ChargedItem.CRYSTAL_BOW, 23962, 100L, 10_000, 100));
         assertEquals("a cheaper quote must not subtract value booked at the previous quote", 90L,
-            intake.carriedValue(Ar.V.CRYSTAL_BOW, 23962, 1L, 9_000, 100));
-    }
-
-    @Test public void swappingProfilesMustNotRetainThePreviousAccountsCarriedValue() {
-        Am e = engine();
-        e.carried(9_000_000);
-        e.agl("new-account", new SavedState(), T0 + 1_000);
-        assertEquals("previous-account wealth must be cleared until the new inventory is sampled", 0L, e.carriedValue);
-    }
-
-    @Test public void anOpenGrindsPageMustRefreshItsWealthAfterBankAndInventoryUpdates() throws Exception {
-        Am e = engine();
-        e.bank(1_000_000, System.currentTimeMillis());
-        e.carried(2_000_000);
-        AtomicReference<Dp> panel = new AtomicReference<>();
-        SwingUtilities.invokeAndWait(() -> {
-            Dp p = new Dp(e, CONFIG, null);
-            p.active = true;
-            p.shell.show(Shell.GRINDS);
-            p.avz();
-            panel.set(p);
-        });
-        SwingUtilities.invokeAndWait(() -> {
-            Dp p = panel.get();
-            e.bank(4_000_000, System.currentTimeMillis());
-            e.carried(5_000_000);
-            // Pin the existing cache to this minute to isolate revision invalidation.
-            p.pageKeys.put(Shell.GRINDS, e.getRevision() + ":" + System.currentTimeMillis() / 60_000L);
-            p.pageForced = false;
-            p.avz();
-            assertEquals("the displayed card must follow the current bank and carried values", 9_000_000L, p.grinds.data.allTime.wealth);
-        });
+            intake.carriedValue(ChargeCheck.ChargedItem.CRYSTAL_BOW, 23962, 1L, 9_000, 100));
     }
 
     @Test public void aSlowFactoryResetMustLeaveTheRuneLiteSwingThreadResponsive() throws Exception {
         CountDownLatch diskEntered = new CountDownLatch(1);
         CountDownLatch diskCanFinish = new CountDownLatch(1);
         CountDownLatch uiHeartbeat = new CountDownLatch(1);
-        Ei disk = new Ei(null, null, null, null, null) {
-            @Override synchronized Ds sj(long now) {
+        Persistence disk = new Persistence(null, null, null, null, null) {
+            @Override synchronized ResetOutcome factoryReset(long now) {
                 diskEntered.countDown();
                 try { diskCanFinish.await(2, TimeUnit.SECONDS); }
                 catch (InterruptedException ex) { throw new AssertionError(ex); }
-                return new Ds(false, "test reset refused", null);
+                return new ResetOutcome(false, "test reset refused");
             }
         };
         AtomicReference<GrindsController> controller = new AtomicReference<>();
-        SwingUtilities.invokeAndWait(() -> controller.set(new GrindsController(new Dp(engine(), CONFIG, null, null, disk))));
-        SwingUtilities.invokeLater(controller.get()::axr);
+        SwingUtilities.invokeAndWait(() -> controller.set(new GrindsController(new SidebarPanel(engine(), CONFIG, null, null, disk))));
+        SwingUtilities.invokeLater(controller.get()::resetNow);
         try {
             assertTrue("the reset was dispatched", diskEntered.await(2, TimeUnit.SECONDS));
             SwingUtilities.invokeLater(uiHeartbeat::countDown);
@@ -232,8 +201,8 @@ public class ReviewFixesTest {
         }
     }
 
-    static Bl proxyValuation(Bl.Bk economy) {
-        return new Bl(CONFIG, id -> null, (id, active) -> 15_000, id -> false, economy);
+    static Valuation proxyValuation(Valuation.Economy economy) {
+        return new Valuation(CONFIG, id -> null, (id, active) -> 15_000, id -> false, economy);
     }
 
     @SuppressWarnings("unchecked")

@@ -19,7 +19,7 @@ public class BackupNoStallTest
     {
         SessionRepository repository = new SessionRepository(new com.google.gson.Gson(),
             FilepathTestSupport.root(Files.createTempDirectory("gp-busy")));
-        Ei persistence = new Ei(null, null, repository, new OrderedPersistenceWriter(repository, null), null);
+        Persistence persistence = new Persistence(null, null, repository, new OrderedPersistenceWriter(repository, null), null);
         persistence.okay = true;
         CountDownLatch held = new CountDownLatch(1);
         CountDownLatch release = new CountDownLatch(1);

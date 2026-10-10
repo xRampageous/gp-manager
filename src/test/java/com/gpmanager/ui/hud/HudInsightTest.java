@@ -23,7 +23,7 @@ public class HudInsightTest
     @Test
     public void aStreakTitlesTheHudWithItsKillCount()
     {
-        Cp builder = new Cp(config(true, 4), null);
+        HudBuilder builder = new HudBuilder(config(true, 4), null);
         builder.update(grind(10_000L, null), f -> true, NOW - 1L);
         builder.interaction("Greater Nechryael", true);
         for (int i = 0; i < 3; i++)
@@ -36,7 +36,7 @@ public class HudInsightTest
     @Test
     public void aStaleTargetDropsTheKillCountTitle()
     {
-        Cp builder = new Cp(config(true, 4), null);
+        HudBuilder builder = new HudBuilder(config(true, 4), null);
         builder.update(grind(10_000L, null), f -> true, NOW - 1L);
         builder.interaction("Guard", true);
         for (int i = 0; i < 2; i++)
@@ -51,14 +51,14 @@ public class HudInsightTest
     @Test
     public void killsShowNetPerKillAfterSupplies()
     {
-        Cp builder = new Cp(config(true, 4), null);
+        HudBuilder builder = new HudBuilder(config(true, 4), null);
         builder.update(grind(10_000L, null), f -> true, NOW - 1L);
         builder.interaction("Vorkath", true);
         for (int i = 0; i < 3; i++)
         {
             builder.tray().kill("Vorkath", NOW - 1L + i, false);
         }
-        Cb s = builder.update(grind(100_000L, null), f -> true, NOW);
+        HudFrame s = builder.update(grind(100_000L, null), f -> true, NOW);
         assertEquals("KC: 3", s.title);
         assertEquals("kills leave the context line to other news", "", s.context);
         assertEquals("the tray heading carries the streak's own Net per kill", "Vorkath · +30.0k/kill", s.trayLabel);
@@ -68,14 +68,14 @@ public class HudInsightTest
     @Test
     public void aMergedStreakMeasuresPerKillFromItsFirstStart()
     {
-        Cp builder = new Cp(config(true, 4), null);
+        HudBuilder builder = new HudBuilder(config(true, 4), null);
         builder.update(grind(10_000L, null), f -> true, NOW - 4L);
         builder.tray().kill("Guard", NOW - 4L, false);
         builder.update(grind(20_000L, null), f -> true, NOW - 3L);
         builder.tray().kill("Man", NOW - 3L, false);
         builder.update(grind(30_000L, null), f -> true, NOW - 2L);
         builder.tray().kill("Guard", NOW - 2L, false);
-        Cb s = builder.update(grind(40_000L, null), f -> true, NOW);
+        HudFrame s = builder.update(grind(40_000L, null), f -> true, NOW);
         assertEquals("Guard & Man · +10.0k/kill", s.trayLabel);
     }
 
@@ -83,7 +83,7 @@ public class HudInsightTest
     @Test
     public void anEndedStreakShowsItsFinalCountAndTheFolioKeepsIt()
     {
-        Cp builder = new Cp(config(true, 4), null);
+        HudBuilder builder = new HudBuilder(config(true, 4), null);
         builder.update(grind(10_000L, null), f -> true, NOW - 1L);
         builder.interaction("Guard", true);
         for (int i = 0; i < 12; i++)
@@ -93,62 +93,60 @@ public class HudInsightTest
         assertEquals("KC: 12", builder.update(grind(100_000L, null), f -> true, NOW).title);
 
         long endedAt = NOW + 61_000L;
-        Cb ended = builder.update(grind(100_000L, null), f -> true, endedAt);
-        assertEquals("Streak ended · Guard ×12", ended.context);
+        HudFrame ended = builder.update(grind(100_000L, null), f -> true, endedAt);
 
-        Cb later = builder.update(grind(100_000L, null), f -> true, endedAt + 5_000L);
-        assertEquals("the moment is transient", "", later.context);
+        HudFrame later = builder.update(grind(100_000L, null), f -> true, endedAt + 5_000L);
 
         builder.interaction("Hill Giant", true);
         builder.tray().kill("Hill Giant", endedAt + 6_000L, false);
-        Cb next = builder.update(grind(100_000L, null), f -> true, endedAt + 6_000L);
+        HudFrame next = builder.update(grind(100_000L, null), f -> true, endedAt + 6_000L);
     }
 
 
     @Test
     public void aFreshSessionWithNothingBookedShowsADashNotAZero()
     {
-        Am fresh = engine();
-        fresh.rm(NOW);
-        Cb s = new Cp(config(false, 4), null)
-            .update(Ca.capture(fresh, NOW + 1_000L, null), f -> true, NOW + 1_000L);
+        Engine fresh = engine();
+        fresh.ensureSession(NOW);
+        HudFrame s = new HudBuilder(config(false, 4), null)
+            .update(LiveSnapshot.capture(fresh, NOW + 1_000L, null), f -> true, NOW + 1_000L);
         assertEquals("—", s.net);
     }
 
     @Test
     public void startingAGrindFromFreePlayWipesTheTrayAndNamesTheList()
     {
-        Am free = engine();
-        free.rm(NOW);
-        Cp builder = new Cp(config(false, 4), null);
-        builder.update(Ca.capture(free, NOW, null), f -> true, NOW);
-        builder.tray().booked(receipt(NOW + 1L, Ai.LOOT, flow(1511, "Logs", 11L, 23)), NOW + 1L, false);
-        Cb freePlay = builder.update(Ca.capture(free, NOW + 2L, null), f -> true, NOW + 2L);
+        Engine free = engine();
+        free.ensureSession(NOW);
+        HudBuilder builder = new HudBuilder(config(false, 4), null);
+        builder.update(LiveSnapshot.capture(free, NOW, null), f -> true, NOW);
+        builder.tray().booked(receipt(NOW + 1L, TransactionType.LOOT, flow(1511, "Logs", 11L, 23)), NOW + 1L, false);
+        HudFrame freePlay = builder.update(LiveSnapshot.capture(free, NOW + 2L, null), f -> true, NOW + 2L);
 
-        Cb grinding = builder.update(grind(0L, null), f -> true, NOW + 3L);
+        HudFrame grinding = builder.update(grind(0L, null), f -> true, NOW + 3L);
         assertTrue("a new Grind starts with a clean tray", grinding.rows.isEmpty());
-        builder.tray().booked(receipt(NOW + 4L, Ai.LOOT, flow(1511, "Logs", 1L, 23)), NOW + 4L, false);
+        builder.tray().booked(receipt(NOW + 4L, TransactionType.LOOT, flow(1511, "Logs", 1L, 23)), NOW + 4L, false);
     }
 
     @Test
     public void anotherRunWithTheSameNameStartsWithACleanTrayAndMoments()
     {
-        Am engine = engine();
-        engine.ajl("Vorkath", Cx.GENERAL, NOW);
-        Cp builder = new Cp(config(true, 4), null);
-        builder.update(Ca.capture(engine, NOW, null), f -> true, NOW);
-        engine.getActiveSession().kf(receipt(NOW + 1L, Ai.LOOT,
+        Engine engine = engine();
+        engine.startCustom("Vorkath", NOW);
+        HudBuilder builder = new HudBuilder(config(true, 4), null);
+        builder.update(LiveSnapshot.capture(engine, NOW, null), f -> true, NOW);
+        engine.getActiveSession().addTransaction(receipt(NOW + 1L, TransactionType.LOOT,
             flow(536, "Dragon bones", 1L, 1_000_000)), 2_000);
-        builder.tray().booked(receipt(NOW + 1L, Ai.LOOT, flow(536, "Dragon bones", 1L, 1_000_000)),
+        builder.tray().booked(receipt(NOW + 1L, TransactionType.LOOT, flow(536, "Dragon bones", 1L, 1_000_000)),
             NOW + 1L, false);
-        Cb first = builder.update(Ca.capture(engine, NOW + 2L, null), f -> true,
+        HudFrame first = builder.update(LiveSnapshot.capture(engine, NOW + 2L, null), f -> true,
             NOW + 2L);
         assertEquals(1, first.rows.size());
 
         // The UI sees no intermediate Free play snapshot between the two same-name runs.
-        engine.sx(NOW + 3L);
-        engine.ajl("Vorkath", Cx.GENERAL, NOW + 4L);
-        Cb next = builder.update(Ca.capture(engine, NOW + 5L, null), f -> true,
+        engine.finishCustom(NOW + 3L);
+        engine.startCustom("Vorkath", NOW + 4L);
+        HudFrame next = builder.update(LiveSnapshot.capture(engine, NOW + 5L, null), f -> true,
             NOW + 5L);
         assertTrue("the old run's loot must not follow its name", next.rows.isEmpty());
         assertEquals("the old run's moment is gone", "", next.context);

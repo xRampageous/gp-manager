@@ -110,15 +110,16 @@ public final class DurableStateContract
         "lootKeyProvenance", "deferredClaimProvenance", "manifestQuantities", "provenance", "evidence",
         "runs", "runHistory", "runRetainedAggregates", "activitySegments",
         "hudState", "trayState", "unknownJsonFields", "receiptRetentionDeferredUntilDayChange",
+        "lastReceiptRetentionDayUtc",
         "activeSession"));
 
     /** Top-level members a compact payload is allowed to carry. */
     public static final Set<String> ALLOWED_TOP_LEVEL = new HashSet<>(Arrays.asList(
         "schemaVersion", "savedAtEpochMillis", "revision", "ownerKey",
-        "generalSession", "customSession", "generalSuspendedByCustom", "history",
-        "tileLayout", "lastReceiptRetentionDayUtc", "profileTimeZoneId",
+        "generalSession", "customSession", "history",
+        "tileLayout", "profileTimeZoneId",
         "dailyRollups", "lifetimeArchive", "coinStores", "currentWealth", "pendingClaims",
-        "pkHistory", "pendingDeathReclaim", "savedGrinds", "geCustody", "trackedBasis"));
+        "pendingDeathReclaim", "savedGrinds", "geCustody", "trackedBasis"));
 
     /** Structured allow/deny audit of one serialized compact state. */
     public static void assertDurableStateContract(JsonObject json)

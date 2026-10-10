@@ -24,10 +24,10 @@ public class QuickSaveTest
         for (Gson gson : new Gson[] {new Gson(), new GsonBuilder().serializeNulls().create(),
             new GsonBuilder().disableHtmlEscaping().create(), new GsonBuilder().setPrettyPrinting().create()})
         {
-            Am engine = engine();
-            Ei coordinator = coordinator(gson, engine);
-            assertEquals(plain(gson, engine), strip(coordinator.aiw(null, false)));
-            assertEquals(plain(gson, engine), strip(coordinator.aiw(null, true)));
+            Engine engine = engine();
+            Persistence coordinator = coordinator(gson, engine);
+            assertEquals(plain(gson, engine), strip(coordinator.snapshotJson(null, false)));
+            assertEquals(plain(gson, engine), strip(coordinator.snapshotJson(null, true)));
         }
     }
 
@@ -35,55 +35,55 @@ public class QuickSaveTest
     public void emptyHistoryAndNoSessionsStillMatch() throws Exception
     {
         Gson gson = new Gson();
-        Am engine = new Am(deltas -> Collections.emptyList(), new TransactionClassifier(), new GpManagerConfig() {});
-        Ei coordinator = coordinator(gson, engine);
-        assertEquals(plain(gson, engine), strip(coordinator.aiw(null, true)));
+        Engine engine = new Engine(deltas -> Collections.emptyList(), new TransactionClassifier(), new GpManagerConfig() {});
+        Persistence coordinator = coordinator(gson, engine);
+        assertEquals(plain(gson, engine), strip(coordinator.snapshotJson(null, true)));
     }
 
     @Test
     public void quickSaveFollowsChangesThatStampTheSession() throws Exception
     {
         Gson gson = new Gson();
-        Am engine = engine();
-        Ei coordinator = coordinator(gson, engine);
-        coordinator.aiw(null, false);
-        Ad closed = engine.history.get(1);
+        Engine engine = engine();
+        Persistence coordinator = coordinator(gson, engine);
+        coordinator.snapshotJson(null, false);
+        Session closed = engine.history.get(1);
         String row = closed.getTransactions().get(3).getId();
-        closed.qi(row, Ah.IGNORE, T0, "test");
-        assertEquals(plain(gson, engine), strip(coordinator.aiw(null, true)));
-        closed.pj(closed.startedAtEpochMillis + 5_000L, null);
-        assertEquals(plain(gson, engine), strip(coordinator.aiw(null, true)));
-        Ad newlyClosed = new Ad("Fresh", T0);
-        newlyClosed.kf(receipt(T0 + 1L), 2_000);
+        closed.correctTransaction(row, Correction.IGNORE, T0, "test");
+        assertEquals(plain(gson, engine), strip(coordinator.snapshotJson(null, true)));
+        closed.compactBefore(closed.startedAtEpochMillis + 5_000L, null);
+        assertEquals(plain(gson, engine), strip(coordinator.snapshotJson(null, true)));
+        Session newlyClosed = new Session("Fresh", T0);
+        newlyClosed.addTransaction(receipt(T0 + 1L), 2_000);
         newlyClosed.close(T0 + 10L);
         engine.history.add(0, newlyClosed);
-        assertEquals(plain(gson, engine), strip(coordinator.aiw(null, true)));
-        engine.getActiveSession().kf(receipt(T0 + 2L), 2_000);
-        assertEquals(plain(gson, engine), strip(coordinator.aiw(null, true)));
+        assertEquals(plain(gson, engine), strip(coordinator.snapshotJson(null, true)));
+        engine.getActiveSession().addTransaction(receipt(T0 + 2L), 2_000);
+        assertEquals(plain(gson, engine), strip(coordinator.snapshotJson(null, true)));
     }
 
     @Test
     public void everyTenthQuickSaveAndEveryFullSaveWriteEverythingAfresh() throws Exception
     {
         Gson gson = new Gson();
-        Am engine = engine();
-        Ei coordinator = coordinator(gson, engine);
-        coordinator.qn(false);
+        Engine engine = engine();
+        Persistence coordinator = coordinator(gson, engine);
+        coordinator.currentIntent(false);
         // A rename never stamps the session: only sidebar edits rename, and they save in full.
         engine.history.get(0).rename("Renamed");
         for (int quick = 1; quick < 10; quick++)
         {
-            assertNotEquals(plain(gson, engine), strip(coordinator.qn(true).json));
+            assertNotEquals(plain(gson, engine), strip(coordinator.currentIntent(true).json));
         }
-        assertEquals(plain(gson, engine), strip(coordinator.qn(true).json));
+        assertEquals(plain(gson, engine), strip(coordinator.currentIntent(true).json));
         engine.history.get(0).rename("Again");
-        assertEquals(plain(gson, engine), strip(coordinator.qn(false).json));
-        assertEquals(plain(gson, engine), strip(coordinator.qn(true).json));
+        assertEquals(plain(gson, engine), strip(coordinator.currentIntent(false).json));
+        assertEquals(plain(gson, engine), strip(coordinator.currentIntent(true).json));
     }
 
-    private static String plain(Gson gson, Am engine)
+    private static String plain(Gson gson, Engine engine)
     {
-        return strip(gson.toJson(engine.qm()));
+        return strip(gson.toJson(engine.savedState()));
     }
 
     /** Each snapshot stamps the time, and a save's header its revision; compare the rest. */
@@ -92,35 +92,35 @@ public class QuickSaveTest
         return json.replaceFirst("\"savedAtEpochMillis\": ?\\d+,\\s*\"revision\": ?\\d+,", "");
     }
 
-    private static Am engine()
+    private static Engine engine()
     {
-        Am engine = new Am(deltas -> Collections.emptyList(), new TransactionClassifier(), new GpManagerConfig() {});
+        Engine engine = new Engine(deltas -> Collections.emptyList(), new TransactionClassifier(), new GpManagerConfig() {});
         for (int grind = 0; grind < 5; grind++)
         {
-            Ad done = new Ad("Grind <" + grind + "> & 'co'", T0 - (5 - grind) * 3_600_000L);
+            Session done = new Session("Grind <" + grind + "> & 'co'", T0 - (5 - grind) * 3_600_000L);
             for (int i = 0; i < 8; i++)
             {
-                done.kf(receipt(done.startedAtEpochMillis + i * 1_000L), 2_000);
+                done.addTransaction(receipt(done.startedAtEpochMillis + i * 1_000L), 2_000);
             }
             done.close(done.startedAtEpochMillis + 30_000L);
             engine.history.add(0, done);
         }
         engine.history.add(2, null);
-        engine.ajl("Greater Nechryael", Cx.GENERAL, T0);
-        engine.getActiveSession().kf(receipt(T0), 2_000);
+        engine.startCustom("Greater Nechryael", T0);
+        engine.getActiveSession().addTransaction(receipt(T0), 2_000);
         return engine;
     }
 
-    private static Ei coordinator(Gson gson, Am engine) throws Exception
+    private static Persistence coordinator(Gson gson, Engine engine) throws Exception
     {
         SessionRepository repository = new SessionRepository(gson,
             FilepathTestSupport.root(Files.createTempDirectory("gp-quick")));
-        return new Ei(null, null, repository, new OrderedPersistenceWriter(repository, null), engine);
+        return new Persistence(null, null, repository, new OrderedPersistenceWriter(repository, null), engine);
     }
 
-    private static Ac receipt(long at)
+    private static Transaction receipt(long at)
     {
-        return new Ac(at, null, Ai.LOOT, Aj.LOOT, "", "Guard", true,
-            Collections.singletonList(new Ab(560, "Death rune", 46L, 187, 8_602L)), Bd.CONFIRMED, "test", null);
+        return new Transaction(at, TransactionType.LOOT, Context.LOOT, "", "Guard", true,
+            Collections.singletonList(new Flow(560, "Death rune", 46L, 187, 8_602L)), Confidence.CONFIRMED, "test", null);
     }
 }

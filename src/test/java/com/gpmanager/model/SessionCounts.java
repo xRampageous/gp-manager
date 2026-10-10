@@ -1,24 +1,15 @@
 package com.gpmanager;
 
-import java.lang.reflect.Field;
-
-/** Test fingerprint support for persisted counters that presentation no longer reads. */
+/** Test fingerprint support: counted and transfer rows still held by a session. */
 final class SessionCounts {
-    static int counted(Ad session) { return count(session, false); }
-    static int transfers(Ad session) { return count(session, true); }
+    static int counted(Session session) { return count(session, false); }
+    static int transfers(Session session) { return count(session, true); }
 
-    private static int count(Ad session, boolean transfers) {
-        int count;
-        try {
-            Field field = Ad.class.getDeclaredField(transfers ? "retainedTransfers" : "retainedCountedTransactions");
-            field.setAccessible(true);
-            count = field.getInt(session);
-        } catch (ReflectiveOperationException ex) {
-            throw new AssertionError(ex);
-        }
-        for (Ac transaction : session.getTransactions()) {
+    private static int count(Session session, boolean transfers) {
+        int count = 0;
+        for (Transaction transaction : session.getTransactions()) {
             if (transaction == null) { continue; }
-            Bp.Ax amounts = Bp.transaction(transaction);
+            Accounting.Amounts amounts = Accounting.transaction(transaction);
             if (amounts.transfer ? transfers : !transfers && amounts.available && amounts.included) {
                 count++;
             }

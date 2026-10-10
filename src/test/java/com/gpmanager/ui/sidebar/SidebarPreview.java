@@ -27,12 +27,12 @@ public final class SidebarPreview
     /** Fixed clock for pixel comparisons; restore it when called in another test JVM. */
     public static void main(String[] args) throws Exception
     {
-     java.util.function.LongSupplier c = Ae.clock;
+     java.util.function.LongSupplier c = SafeMath.clock;
      try {
-      Ae.clock = () -> java.time.Instant.parse("2026-10-06T07:57:00Z").toEpochMilli();
+      SafeMath.clock = () -> java.time.Instant.parse("2026-10-06T07:57:00Z").toEpochMilli();
       sh(args);
      } finally {
-      Ae.clock = c;
+      SafeMath.clock = c;
      }
     }
 
@@ -96,43 +96,44 @@ public final class SidebarPreview
     /** A. Normal / negative: negative Net, GP/h, breakdown, one Recent row, no target, no review. */
     private static void normalNegative(File out) throws IOException
     {
-        Am engine = engine();
-        long now = Ae.now() - 20 * 60_000L;
-        engine.ajl("Vorkath", Cx.GENERAL, now);
-        engine.getActiveSession().kf(consumed(now + 1_000L, "Prayer potion(4)", 3, -12, 9_800, -117_600L), 2_000);
-        liveShot(out, "a-live-normal-negative.png", engine, Bo.NONE);
+        Engine engine = engine();
+        long now = SafeMath.now() - 20 * 60_000L;
+        engine.startCustom("Vorkath", now);
+        engine.getActiveSession().addTransaction(consumed(now + 1_000L, "Prayer potion(4)", 3, -12, 9_800, -117_600L), 2_000);
+        liveShot(out, "a-live-normal-negative.png", engine, PvpState.NONE);
     }
 
     /** B. Full / positive: positive Net, five Recent rows, two-row target, Needs Review. */
     private static void fullPositive(File out) throws IOException
     {
-        Am engine = engine();
-        long now = Ae.now() - 45 * 60_000L;
-        engine.ajl("Vorkath", Cx.GENERAL, now);
-        engine.getActiveSession().kf(booked(now + 1_000L, "Dragon bones", 1, 2, 3_200, 6_400), 2_000);
-        engine.getActiveSession().kf(booked(now + 2_000L, "Battlestaff", 2, 5, 4_400, 22_000), 2_000);
-        engine.getActiveSession().kf(consumed(now + 3_000L, "Prayer potion(4)", 3, -2, 9_800, -19_600L), 2_000);
-        engine.getActiveSession().kf(booked(now + 4_000L, "Vorkath's head", 5, 1, 1_450_000, 1_450_000), 2_000);
-        engine.getActiveSession().kf(review(now + 5_000L, "Unidentified mineral", 8, 2L), 2_000);
+        Engine engine = engine();
+        long now = SafeMath.now() - 45 * 60_000L;
+        engine.startCustom("Vorkath", now);
+        engine.getActiveSession().addTransaction(booked(now + 1_000L, "Dragon bones", 1, 2, 3_200, 6_400), 2_000);
+        engine.getActiveSession().addTransaction(booked(now + 2_000L, "Battlestaff", 2, 5, 4_400, 22_000), 2_000);
+        engine.getActiveSession().addTransaction(consumed(now + 3_000L, "Prayer potion(4)", 3, -2, 9_800, -19_600L), 2_000);
+        engine.getActiveSession().addTransaction(booked(now + 4_000L, "Vorkath's head", 5, 1, 1_450_000, 1_450_000), 2_000);
+        engine.getActiveSession().addTransaction(review(now + 5_000L, "Unidentified mineral", 8, 2L), 2_000);
         engine.getActiveSession().setProfitTargetGp(1_000_000L);
-        liveShot(out, "b-live-full-positive.png", engine, Bo.NONE);
+        liveShot(out, "b-live-full-positive.png", engine, PvpState.NONE);
     }
 
     /** C. Empty / waiting: no session, no fake grind launcher, no dead cards. */
     private static void emptyWaiting(File out) throws IOException
     {
-        liveShot(out, "c-live-empty-waiting.png", engine(), Bo.NONE);
+        liveShot(out, "c-live-empty-waiting.png", engine(), PvpState.NONE);
     }
 
     /** D. PvP context: truthful skull / Protect Item marks and the PvP grind tint, nothing tactical. */
     private static void pvpContext(File out) throws IOException
     {
-        Am engine = engine();
-        long now = Ae.now() - 15 * 60_000L;
-        engine.ajl("Wilderness", Cx.PK, now);
-        engine.getActiveSession().kf(booked(now + 1_000L, "Dragon bones", 1, 1, 3_200, 3_200), 2_000);
-        engine.getActiveSession().kf(pkDeath(now + 2_000L), 2_000);
-        liveShot(out, "d-live-pvp-context.png", engine, new Bo(true, true, true, 0L));
+        Engine engine = engine();
+        long now = SafeMath.now() - 15 * 60_000L;
+        engine.startCustom("Wilderness", now);
+        engine.getActiveSession().addTransaction(booked(now + 1_000L, "Dragon bones", 1, 1, 3_200, 3_200), 2_000);
+        engine.getActiveSession().addTransaction(pkDeath(now + 2_000L), 2_000);
+        engine.getActiveSession().addEncounter(false, now + 2_000L);
+        liveShot(out, "d-live-pvp-context.png", engine, new PvpState(true, true, true, 0L));
     }
 
     // ---- Ledger ------------------------------------------------------------------------------
@@ -144,14 +145,14 @@ public final class SidebarPreview
 
     private static void ledgerReview(File out) throws IOException
     {
-        Dp panel = panel(mixedEngine(), Bo.NONE);
-        SidebarPanelProbe.openLedger(panel, Ao.Entry.current(Ao.Audit.REVIEW, null));
+        SidebarPanel panel = panel(mixedEngine(), PvpState.NONE);
+        SidebarPanelProbe.openLedger(panel, LedgerData.Entry.current(LedgerData.Audit.REVIEW, null));
         paint(panel, new File(out, "led-b-ledger-review.png"));
     }
 
     private static void ledgerDetail(File out) throws IOException
     {
-        Am engine = mixedEngine();
+        Engine engine = mixedEngine();
         ledgerShot(out, "led-c-ledger-detail.png", engine,
             engine.getActiveSession().getTransactions().get(0).getId(), null);
     }
@@ -159,19 +160,19 @@ public final class SidebarPreview
     /** Owner 2026-10-03: a charged weapon's row lists what its uses spent, item by item. */
     private static void ledgerChargeUsed(File out) throws IOException
     {
-        Am engine = engine();
-        long now = Ae.now() - 20 * 60_000L;
-        engine.ajl("Theatre of Blood", Cx.GENERAL, now);
-        Ac first = null;
+        Engine engine = engine();
+        long now = SafeMath.now() - 20 * 60_000L;
+        engine.startCustom("Theatre of Blood", now);
+        Transaction first = null;
         for (int hit = 0; hit < 62; hit++)
         {
-            java.util.List<Ab> spent = new java.util.ArrayList<>(java.util.List.of(
-                new Ab(565, "Blood rune", -2L, 410, -820L)));
+            java.util.List<Flow> spent = new java.util.ArrayList<>(java.util.List.of(
+                new Flow(565, "Blood rune", -2L, 410, -820L)));
             if (hit % 50 == 49)
             {
-                spent.add(new Ab(22446, "Vial of blood", -1L, 46_000, -46_000L));
+                spent.add(new Flow(22446, "Vial of blood", -1L, 46_000, -46_000L));
             }
-            Ac booked = engine.mn("worn:scythe", "Scythe of vitur", Au.SUPPLIES, spent, now + hit * 2_400L);
+            Transaction booked = engine.bookEstimatedCharge("worn:scythe", "Scythe of vitur", ActionKind.SUPPLIES, spent, now + hit * 2_400L);
             first = first == null ? booked : first;
         }
         ledgerShot(out, "led-f-ledger-charge-used.png", engine, first == null ? null : first.getId(), null);
@@ -180,31 +181,31 @@ public final class SidebarPreview
     /** Owner 1.2: a single scythe hit still names the blood runes it spent. */
     private static void ledgerChargeOneHit(File out) throws IOException
     {
-        Am engine = engine();
-        long now = Ae.now() - 5 * 60_000L;
-        engine.ajl("Theatre of Blood", Cx.GENERAL, now);
-        Ac hit = engine.mn("worn:scythe", "Scythe of vitur", Au.SUPPLIES,
-            java.util.List.of(new Ab(565, "Blood rune", -2L, 333, -666L)), now);
+        Engine engine = engine();
+        long now = SafeMath.now() - 5 * 60_000L;
+        engine.startCustom("Theatre of Blood", now);
+        Transaction hit = engine.bookEstimatedCharge("worn:scythe", "Scythe of vitur", ActionKind.SUPPLIES,
+            java.util.List.of(new Flow(565, "Blood rune", -2L, 333, -666L)), now);
         ledgerShot(out, "led-g-ledger-charge-one-hit.png", engine, hit == null ? null : hit.getId(), null);
     }
 
     private static void ledgerCorrectionPreview(File out) throws IOException
     {
-        Am engine = mixedEngine();
+        Engine engine = mixedEngine();
         ledgerShot(out, "led-d-correction-preview.png", engine,
-            engine.getActiveSession().getTransactions().get(0).getId(), Ah.TRANSFER);
+            engine.getActiveSession().getTransactions().get(0).getId(), Correction.TRANSFER);
     }
 
     private static void ledgerCompacted(File out) throws IOException
     {
-        Am engine = engine();
-        long now = Ae.now() - 48 * 60 * 60_000L;
-        engine.ajl("Old grind", Cx.GENERAL, now);
+        Engine engine = engine();
+        long now = SafeMath.now() - 48 * 60 * 60_000L;
+        engine.startCustom("Old grind", now);
         for (int i = 0; i < 8; i++)
         {
-            engine.getActiveSession().kf(booked(now + i, "Old bone " + i, 1, 1, 100, 100), 2_000);
+            engine.getActiveSession().addTransaction(booked(now + i, "Old bone " + i, 1, 1, 100, 100), 2_000);
         }
-        engine.getActiveSession().pj(now + 7L, transaction -> false);
+        engine.getActiveSession().compactBefore(now + 7L, transaction -> false);
         ledgerShot(out, "led-e-ledger-compacted.png", engine, null, null);
     }
 
@@ -214,22 +215,22 @@ public final class SidebarPreview
     /** A. Fresh Live Grind: zero Net and an unavailable rate must never read as 0/h. */
     private static void r31FreshLive(File out) throws IOException
     {
-        Am engine = engine();
-        long now = Ae.now();
-        engine.ajl("2323", Cx.GENERAL, now - 20_000L);
-        engine.getActiveSession().kf(booked(now - 15_000L, "Willow logs", 3, 5, 42, 210), 2_000);
-        engine.getActiveSession().kf(consumed(now - 10_000L, "Prayer potion(4)", 3, -1, 210, -210L), 2_000);
-        liveShot(out, "r31-a-fresh-live.png", engine, Bo.NONE);
+        Engine engine = engine();
+        long now = SafeMath.now();
+        engine.startCustom("2323", now - 20_000L);
+        engine.getActiveSession().addTransaction(booked(now - 15_000L, "Willow logs", 3, 5, 42, 210), 2_000);
+        engine.getActiveSession().addTransaction(consumed(now - 10_000L, "Prayer potion(4)", 3, -1, 210, -210L), 2_000);
+        liveShot(out, "r31-a-fresh-live.png", engine, PvpState.NONE);
     }
 
     /** B. Current Grind with no targets: no Pace question, so no Pace row and no dead space. */
     private static void r31GrindsNoTargets(File out) throws IOException
     {
-        Am engine = engine();
-        long now = Ae.now();
-        engine.ajl("Vorkath", Cx.GENERAL, now - 20_000L);
-        engine.getActiveSession().kf(booked(now - 15_000L, "Dragon bones", 1, 1, 3_200, 3_200), 2_000);
-        Dp panel = panel(engine, Bo.NONE);
+        Engine engine = engine();
+        long now = SafeMath.now();
+        engine.startCustom("Vorkath", now - 20_000L);
+        engine.getActiveSession().addTransaction(booked(now - 15_000L, "Dragon bones", 1, 1, 3_200, 3_200), 2_000);
+        SidebarPanel panel = panel(engine, PvpState.NONE);
         panel.shell().show(Shell.GRINDS);
         paint(panel, new File(out, "r31-b-grinds-no-targets.png"));
     }
@@ -237,12 +238,12 @@ public final class SidebarPreview
     /** C. Target set but the rate is immature: the honest Calculating state, not a projection. */
     private static void r31GrindsTargetCalculating(File out) throws IOException
     {
-        Am engine = engine();
-        long now = Ae.now();
-        engine.ajl("Vorkath", Cx.GENERAL, now - 20_000L);
-        engine.getActiveSession().kf(booked(now - 15_000L, "Dragon bones", 1, 1, 3_200, 3_200), 2_000);
+        Engine engine = engine();
+        long now = SafeMath.now();
+        engine.startCustom("Vorkath", now - 20_000L);
+        engine.getActiveSession().addTransaction(booked(now - 15_000L, "Dragon bones", 1, 1, 3_200, 3_200), 2_000);
         engine.getActiveSession().setProfitTargetGp(5_000_000L);
-        Dp panel = panel(engine, Bo.NONE);
+        SidebarPanel panel = panel(engine, PvpState.NONE);
         panel.shell().show(Shell.GRINDS);
         paint(panel, new File(out, "r31-c-grinds-target-calculating.png"));
     }
@@ -252,8 +253,8 @@ public final class SidebarPreview
     /** E. Completed Grind detail: recap, targets, highlights, previous comparison, PB. */
     private static void r4GrindDetailComplete(File out) throws IOException
     {
-        Am engine = insightsFixture();
-        Dp panel = panel(engine, Bo.NONE);
+        Engine engine = insightsFixture();
+        SidebarPanel panel = panel(engine, PvpState.NONE);
         panel.shell().show(Shell.GRINDS);
         SidebarPanelProbe.openGrindsDetail(panel, latestSessionNamed(engine, "Vorkath"));
         paint(panel, new File(out, "r4-e-grind-detail-complete.png"));
@@ -262,10 +263,10 @@ public final class SidebarPreview
     /** F. Completed Grind detail with no linked previous run: no fake comparison, no dead gap. */
     private static void r4GrindDetailNoPrevious(File out) throws IOException
     {
-        Am engine = engine();
-        long now = Ae.now();
+        Engine engine = engine();
+        long now = SafeMath.now();
         finishedGrind(engine, "Muspah", now - 3 * 3_600_000L, 612_000L);
-        Dp panel = panel(engine, Bo.NONE);
+        SidebarPanel panel = panel(engine, PvpState.NONE);
         panel.shell().show(Shell.GRINDS);
         SidebarPanelProbe.openGrindsDetail(panel, latestSessionNamed(engine, "Muspah"));
         paint(panel, new File(out, "r4-f-grind-detail-no-previous.png"));
@@ -274,20 +275,20 @@ public final class SidebarPreview
     /** G. Compacted Grind: aggregate recap survives; the exact highlight fails closed. */
     private static void r4GrindDetailCompacted(File out) throws IOException
     {
-        Am engine = engine();
-        long now = Ae.now();
+        Engine engine = engine();
+        long now = SafeMath.now();
         finishedLinked(engine, "Vorkath", now - 4 * 3_600_000L, 3_600_000L, 400_000L, 3 * 3_600_000L);
-        engine.getHistory().get(0).pj(now - 2 * 3_600_000L, transaction -> false);
-        Dp panel = panel(engine, Bo.NONE);
+        engine.getHistory().get(0).compactBefore(now - 2 * 3_600_000L, transaction -> false);
+        SidebarPanel panel = panel(engine, PvpState.NONE);
         panel.shell().show(Shell.GRINDS);
         SidebarPanelProbe.openGrindsDetail(panel, latestSessionNamed(engine, "Vorkath"));
         paint(panel, new File(out, "r4-g-grind-detail-compacted.png"));
     }
 
-    private static Am insightsFixture()
+    private static Engine insightsFixture()
     {
-        Am engine = engine();
-        long now = Ae.now();
+        Engine engine = engine();
+        long now = SafeMath.now();
         long day = 24L * 3_600_000L;
         finishedLinked(engine, "Vorkath", now - 2 * day, 4_200_000L, 620_000L, 2 * 3_600_000L);
         finishedLinked(engine, "Vorkath", now - 6 * 3_600_000L, 2_840_000L, 180_000L, 1 * 3_600_000L);
@@ -295,11 +296,11 @@ public final class SidebarPreview
         return engine;
     }
 
-    private static void finishedLinked(Am engine, String name, long startedAt, long gain, long cost,
+    private static void finishedLinked(Engine engine, String name, long startedAt, long gain, long cost,
         long activeMillis)
     {
-        SavedState.Ap definition = null;
-        for (SavedState.Ap saved : engine.getSavedGrinds(true))
+        SavedState.SavedGrind definition = null;
+        for (SavedState.SavedGrind saved : engine.getSavedGrinds(true))
         {
             if (name.equals(saved.getName()))
             {
@@ -308,24 +309,24 @@ public final class SidebarPreview
         }
         if (definition == null)
         {
-            definition = engine.avg(name, null, null, false, null);
+            definition = engine.saveGrind(name, null, null, false, null);
         }
         engine.startGrind(name, definition.getGrindId(), null, null, startedAt);
-        engine.getActiveSession().kf(booked(startedAt + 1_000L, "Dragon bones", 1, 1,
+        engine.getActiveSession().addTransaction(booked(startedAt + 1_000L, "Dragon bones", 1, 1,
             (int) gain, gain), 2_000);
-        Ac supply = consumed(startedAt + 2_000L, "Prayer potion(4)", 3, -1,
+        Transaction supply = consumed(startedAt + 2_000L, "Prayer potion(4)", 3, -1,
             (int) Math.max(1L, cost / 3L), -cost);
-        supply.setActionKind(Au.DRINK);
-        engine.getActiveSession().kf(supply, 2_000);
-        engine.sx(startedAt + activeMillis);
+        supply.setActionKind(ActionKind.DRINK);
+        engine.getActiveSession().addTransaction(supply, 2_000);
+        engine.finishCustom(startedAt + activeMillis);
     }
 
     @Nullable
-    private static String latestSessionNamed(Am engine, String name)
+    private static String latestSessionNamed(Engine engine, String name)
     {
         String found = null;
         long at = Long.MIN_VALUE;
-        for (Ad session : engine.getHistory())
+        for (Session session : engine.getHistory())
         {
             if (session != null && name.equals(session.getName()) && session.endedAtEpochMillis > at)
             {
@@ -341,29 +342,29 @@ public final class SidebarPreview
     /** F. Ledger receipt rows: long item and long distinct activity at real width. */
     private static void r41LedgerLongRow(File out) throws IOException
     {
-        Am engine = engine();
-        long now = Ae.now() - 5 * 60_000L;
-        engine.ajl("Vorkath", Cx.GENERAL, now);
-        engine.getActiveSession().kf(booked(now + 1_000L, "Cooked chicken", 2140, 1, 740, 740L), 2_000);
-        Ac drink = consumed(now + 2_000L, "Super attack potion(4)", 3, -1, 9_800, -19_600L);
-        drink.setActionKind(Au.DRINK);
-        engine.getActiveSession().kf(drink, 2_000);
-        engine.getActiveSession().kf(new Ac(now + 3_000L, null, Ai.GAIN,
-            Aj.GENERIC, "", "Wilderness Agility", true,
-            Collections.singletonList(new Ab(1,
+        Engine engine = engine();
+        long now = SafeMath.now() - 5 * 60_000L;
+        engine.startCustom("Vorkath", now);
+        engine.getActiveSession().addTransaction(booked(now + 1_000L, "Cooked chicken", 2140, 1, 740, 740L), 2_000);
+        Transaction drink = consumed(now + 2_000L, "Super attack potion(4)", 3, -1, 9_800, -19_600L);
+        drink.setActionKind(ActionKind.DRINK);
+        engine.getActiveSession().addTransaction(drink, 2_000);
+        engine.getActiveSession().addTransaction(new Transaction(now + 3_000L, TransactionType.GAIN,
+            Context.GENERIC, "", "Wilderness Agility", true,
+            Collections.singletonList(new Flow(1,
                 "Extremely long ancient item name for width", 1, 99_900_000, 99_900_000L)),
-            Bd.LIKELY, "Preview sample.", null), 2_000);
-        Dp panel = panel(engine, Bo.NONE);
+            Confidence.LIKELY, "Preview sample.", null), 2_000);
+        SidebarPanel panel = panel(engine, PvpState.NONE);
         panel.shell().show(Shell.LEDGER);
         paint(panel, new File(out, "r41-f-ledger-long-row.png"));
     }
 
-    private static Am openOnlyFixture()
+    private static Engine openOnlyFixture()
     {
-        Am engine = engine();
-        long now = Ae.now();
-        engine.ajl("Vorkath", Cx.GENERAL, now - 3_600_000L);
-        engine.getActiveSession().kf(booked(now - 3_500_000L, "Dragon bones", 1, 1, 3_200, 3_200L),
+        Engine engine = engine();
+        long now = SafeMath.now();
+        engine.startCustom("Vorkath", now - 3_600_000L);
+        engine.getActiveSession().addTransaction(booked(now - 3_500_000L, "Dragon bones", 1, 1, 3_200, 3_200L),
             2_000);
         return engine;
     }
@@ -373,7 +374,7 @@ public final class SidebarPreview
     /** A. Ledger with a real dummy icon, long item/source and a large positive value. */
     private static void r41aLedgerIconPositive(File out) throws IOException
     {
-        Dp panel = panel(ledgerIconEngine(99_900_000L), Bo.NONE);
+        SidebarPanel panel = panel(ledgerIconEngine(99_900_000L), PvpState.NONE);
         SidebarPanelProbe.bindSprites(panel, id -> dummySprite());
         panel.shell().show(Shell.LEDGER);
         paint(panel, new File(out, "r41a-a-ledger-icon-positive.png"));
@@ -382,42 +383,42 @@ public final class SidebarPreview
     /** B. Ledger with a real dummy icon, long item/source and a large negative value. */
     private static void r41aLedgerIconNegative(File out) throws IOException
     {
-        Dp panel = panel(ledgerIconEngine(-99_900_000L), Bo.NONE);
+        SidebarPanel panel = panel(ledgerIconEngine(-99_900_000L), PvpState.NONE);
         SidebarPanelProbe.bindSprites(panel, id -> dummySprite());
         panel.shell().show(Shell.LEDGER);
         paint(panel, new File(out, "r41a-b-ledger-icon-negative.png"));
     }
 
-    private static Am ledgerIconEngine(long longValue)
+    private static Engine ledgerIconEngine(long longValue)
     {
-        Am engine = engine();
-        long now = Ae.now() - 5 * 60_000L;
-        engine.ajl("Vorkath", Cx.GENERAL, now);
-        engine.getActiveSession().kf(consumed(now + 1_000L, "Cooked chicken", 2140, 1, 740, -740L),
+        Engine engine = engine();
+        long now = SafeMath.now() - 5 * 60_000L;
+        engine.startCustom("Vorkath", now);
+        engine.getActiveSession().addTransaction(consumed(now + 1_000L, "Cooked chicken", 2140, 1, 740, -740L),
             2_000);
-        engine.getActiveSession().kf(new Ac(now + 2_000L, null,
-            longValue >= 0L ? Ai.GAIN : Ai.CONSUMPTION, Aj.GENERIC, "",
+        engine.getActiveSession().addTransaction(new Transaction(now + 2_000L,
+            longValue >= 0L ? TransactionType.GAIN : TransactionType.CONSUMPTION, Context.GENERIC, "",
             "Extremely Long Wilderness Activity Name", true,
-            Collections.singletonList(new Ab(1, "Extremely long ancient item name for width", 1,
+            Collections.singletonList(new Flow(1, "Extremely long ancient item name for width", 1,
                 (int) Math.abs(longValue), longValue)),
-            Bd.LIKELY, "Preview sample.", null), 2_000);
+            Confidence.LIKELY, "Preview sample.", null), 2_000);
         return engine;
     }
 
-    private static Am longNameFixture()
+    private static Engine longNameFixture()
     {
-        Am engine = engine();
-        long now = Ae.now();
+        Engine engine = engine();
+        long now = SafeMath.now();
         longNameLinked(engine, now - 5 * 3_600_000L, now - 4 * 3_600_000L, 2_000_000L);
         longNameLinked(engine, now - 3 * 3_600_000L, now - 1 * 3_600_000L, 3_000_000L);
         return engine;
     }
 
-    private static void longNameLinked(Am engine, long start, long end, long net)
+    private static void longNameLinked(Engine engine, long start, long end, long net)
     {
         String name = "Extremely Long Vorkath V With A Very Long Suffix";
-        SavedState.Ap definition = null;
-        for (SavedState.Ap saved : engine.getSavedGrinds(true))
+        SavedState.SavedGrind definition = null;
+        for (SavedState.SavedGrind saved : engine.getSavedGrinds(true))
         {
             if (name.equals(saved.getName()))
             {
@@ -426,12 +427,12 @@ public final class SidebarPreview
         }
         if (definition == null)
         {
-            definition = engine.avg(name, null, null, false, null);
+            definition = engine.saveGrind(name, null, null, false, null);
         }
         engine.startGrind(name, definition.getGrindId(), null, null, start);
-        engine.getActiveSession().kf(booked(start + 1_000L, "Dragon bones", 1, 1,
+        engine.getActiveSession().addTransaction(booked(start + 1_000L, "Dragon bones", 1, 1,
             (int) net, net), 2_000);
-        engine.sx(end);
+        engine.finishCustom(end);
     }
 
     /** Deterministic visible item imagery so the icon-present row path is actually exercised. */
@@ -454,16 +455,16 @@ public final class SidebarPreview
         return image;
     }
 
-    private static Am mixedEngine()
+    private static Engine mixedEngine()
     {
-        Am engine = engine();
-        long now = Ae.now() - 30 * 60_000L;
-        engine.ajl("Vorkath", Cx.GENERAL, now);
-        engine.getActiveSession().kf(booked(now + 1_000L, "Willow logs", 3, 5, 42, 210), 2_000);
-        engine.getActiveSession().kf(consumed(now + 2_000L, "Prayer potion(4)", 3, -2, 9_800, -19_600L), 2_000);
-        engine.getActiveSession().kf(booked(now + 3_000L, "Battlestaff", 2, 5, 4_400, 22_000), 2_000);
-        engine.getActiveSession().kf(pkDeath(now + 4_000L), 2_000);
-        engine.getActiveSession().kf(review(now + 5_000L, "Unidentified mineral", 8, 2L), 2_000);
+        Engine engine = engine();
+        long now = SafeMath.now() - 30 * 60_000L;
+        engine.startCustom("Vorkath", now);
+        engine.getActiveSession().addTransaction(booked(now + 1_000L, "Willow logs", 3, 5, 42, 210), 2_000);
+        engine.getActiveSession().addTransaction(consumed(now + 2_000L, "Prayer potion(4)", 3, -2, 9_800, -19_600L), 2_000);
+        engine.getActiveSession().addTransaction(booked(now + 3_000L, "Battlestaff", 2, 5, 4_400, 22_000), 2_000);
+        engine.getActiveSession().addTransaction(pkDeath(now + 4_000L), 2_000);
+        engine.getActiveSession().addTransaction(review(now + 5_000L, "Unidentified mineral", 8, 2L), 2_000);
         return engine;
     }
 
@@ -472,48 +473,48 @@ public final class SidebarPreview
 
     private static void grindsCurrent(File out) throws IOException
     {
-        Am engine = grindsFixture();
-        Dp panel = panel(engine, Bo.NONE);
+        Engine engine = grindsFixture();
+        SidebarPanel panel = panel(engine, PvpState.NONE);
         panel.shell().show(Shell.GRINDS);
         paint(panel, new File(out, "g-a-grinds-current.png"));
     }
 
     private static void grindsMy(File out) throws IOException
     {
-        Am engine = grindsFixture();
-        Dp panel = panel(engine, Bo.NONE);
+        Engine engine = grindsFixture();
+        SidebarPanel panel = panel(engine, PvpState.NONE);
         panel.shell().show(Shell.GRINDS);
         paint(panel, new File(out, "g-b-my-grinds.png"));
     }
 
     private static void grindsRecent(File out) throws IOException
     {
-        Am engine = engine();
+        Engine engine = engine();
         long day = 24L * 3_600_000L;
-        long now = Ae.now();
+        long now = SafeMath.now();
         finishedGrind(engine, "Vorkath", now - day, 2_840_000L);
         finishedGrind(engine, "Zulrah", now - 2 * day, -412_000L);
         finishedGrind(engine, "Muspah", now - 3 * day, 612_000L);
-        Dp panel = panel(engine, Bo.NONE);
+        SidebarPanel panel = panel(engine, PvpState.NONE);
         panel.shell().show(Shell.GRINDS);
         paint(panel, new File(out, "g-c-recent-grinds.png"));
     }
 
-    private static void finishedGrind(Am engine, String name, long startedAt, long net)
+    private static void finishedGrind(Engine engine, String name, long startedAt, long net)
     {
-        engine.ajl(name, Cx.GENERAL, startedAt);
-        engine.getActiveSession().kf(booked(startedAt + 1_000L, "Willow logs", 3, 5, 42,
+        engine.startCustom(name, startedAt);
+        engine.getActiveSession().addTransaction(booked(startedAt + 1_000L, "Willow logs", 3, 5, 42,
             Math.abs(net) / 5), 2_000);
-        engine.getActiveSession().kf(consumed(startedAt + 2_000L, "Prayer potion(4)", 3, -5, 100,
+        engine.getActiveSession().addTransaction(consumed(startedAt + 2_000L, "Prayer potion(4)", 3, -5, 100,
             net < 0 ? net * 4 / 5 : -Math.abs(net) / 5), 2_000);
-        engine.sx(startedAt + 3_000L);
+        engine.finishCustom(startedAt + 3_000L);
     }
 
     private static void grindsDetail(File out) throws IOException
     {
-        Am engine = grindsFixture();
+        Engine engine = grindsFixture();
         String historyId = engine.getHistory().isEmpty() ? null : engine.getHistory().get(0).getId();
-        Dp panel = panel(engine, Bo.NONE);
+        SidebarPanel panel = panel(engine, PvpState.NONE);
         panel.shell().show(Shell.GRINDS);
         if (historyId != null)
         {
@@ -524,9 +525,9 @@ public final class SidebarPreview
 
     private static void grindsStartWithChanges(File out) throws IOException
     {
-        Am engine = grindsFixture();
+        Engine engine = grindsFixture();
         String grindId = engine.getSavedGrinds(false).get(0).getGrindId();
-        Dp panel = panel(engine, Bo.NONE);
+        SidebarPanel panel = panel(engine, PvpState.NONE);
         panel.shell().show(Shell.GRINDS);
         javax.swing.JPanel form = SidebarPanelProbe.startWithChangesForm(panel, grindId);
         SidebarPanelProbe.disposeFrame(panel);
@@ -536,8 +537,8 @@ public final class SidebarPreview
 
     private static void grindsDataMenu(File out) throws IOException
     {
-        Am engine = grindsFixture();
-        Dp panel = panel(engine, Bo.NONE);
+        Engine engine = grindsFixture();
+        SidebarPanel panel = panel(engine, PvpState.NONE);
         panel.shell().show(Shell.GRINDS);
         javax.swing.JPopupMenu menu = SidebarPanelProbe.dataMenu(panel);
         SidebarPanelProbe.disposeFrame(panel);
@@ -547,22 +548,22 @@ public final class SidebarPreview
         paintComponent(menu, new File(out, "g-f-data-recovery-menu.png"));
     }
 
-    private static Am grindsFixture()
+    private static Engine grindsFixture()
     {
-        Am engine = engine();
-        long now = Ae.now() - 2 * 3_600_000L;
-        engine.ajl("Vorkath", Cx.GENERAL, now);
-        engine.getActiveSession().kf(booked(now + 1_000L, "Dragon bones", 1, 2, 3_200, 6_400), 2_000);
-        engine.getActiveSession().kf(booked(now + 2_000L, "Battlestaff", 2, 5, 4_400, 22_000), 2_000);
-        engine.getActiveSession().kf(consumed(now + 3_000L, "Prayer potion(4)", 3, -2, 9_800, -19_600L), 2_000);
+        Engine engine = engine();
+        long now = SafeMath.now() - 2 * 3_600_000L;
+        engine.startCustom("Vorkath", now);
+        engine.getActiveSession().addTransaction(booked(now + 1_000L, "Dragon bones", 1, 2, 3_200, 6_400), 2_000);
+        engine.getActiveSession().addTransaction(booked(now + 2_000L, "Battlestaff", 2, 5, 4_400, 22_000), 2_000);
+        engine.getActiveSession().addTransaction(consumed(now + 3_000L, "Prayer potion(4)", 3, -2, 9_800, -19_600L), 2_000);
         engine.getActiveSession().setProfitTargetGp(5_000_000L);
         engine.getActiveSession().setActiveTimeTargetMillis(3L * 3_600_000L);
-        engine.avg("Vorkath", 5_000_000L, 3L * 3_600_000L, true, engine.getActiveSession().getId());
-        engine.sx(now + 10_000L);
+        engine.saveGrind("Vorkath", 5_000_000L, 3L * 3_600_000L, true, engine.getActiveSession().getId());
+        engine.finishCustom(now + 10_000L);
 
-        engine.ajl("Zulrah", Cx.GENERAL, Ae.now() - 60_000L);
-        engine.getActiveSession().kf(booked(Ae.now() - 50_000L, "Magic logs", 5, 5, 1_000, 5_000), 2_000);
-        engine.avg("Zulrah", 2_000_000L, null, false, engine.getActiveSession().getId());
+        engine.startCustom("Zulrah", SafeMath.now() - 60_000L);
+        engine.getActiveSession().addTransaction(booked(SafeMath.now() - 50_000L, "Magic logs", 5, 5, 1_000, 5_000), 2_000);
+        engine.saveGrind("Zulrah", 2_000_000L, null, false, engine.getActiveSession().getId());
         engine.getActiveSession().setProfitTargetGp(5_000_000L);
         engine.getActiveSession().setActiveTimeTargetMillis(3L * 3_600_000L);
         return engine;
@@ -586,18 +587,18 @@ public final class SidebarPreview
 
     // ---- capture -----------------------------------------------------------------------------
 
-    private static void liveShot(File out, String name, Am engine, Bo pvp) throws IOException
+    private static void liveShot(File out, String name, Engine engine, PvpState pvp) throws IOException
     {
-        Dp panel = panel(engine, pvp);
+        SidebarPanel panel = panel(engine, pvp);
         panel.shell().show(Shell.LIVE);
         SidebarPanelProbe.refresh(panel);
         paint(panel, new File(out, name));
     }
 
-    private static void ledgerShot(File out, String name, Am engine, @Nullable String transactionId,
-        @Nullable Ah correction) throws IOException
+    private static void ledgerShot(File out, String name, Engine engine, @Nullable String transactionId,
+        @Nullable Correction correction) throws IOException
     {
-        Dp panel = panel(engine, Bo.NONE);
+        SidebarPanel panel = panel(engine, PvpState.NONE);
         panel.shell().show(Shell.LEDGER);
         SidebarPanelProbe.refresh(panel);
         if (transactionId != null && !transactionId.isEmpty())
@@ -605,23 +606,23 @@ public final class SidebarPreview
             LedgerPageProbe.select(SidebarPanelProbe.ledgerPage(panel), transactionId);
             if (correction != null)
             {
-                LedgerPageProbe.preview(SidebarPanelProbe.ledgerPage(panel), Ao.preview(engine, transactionId,
-                    correction, Ae.now()), correction);
+                LedgerPageProbe.preview(SidebarPanelProbe.ledgerPage(panel), LedgerData.preview(engine, transactionId,
+                    correction, SafeMath.now()), correction);
             }
             SidebarPanelProbe.refresh(panel);
         }
         paint(panel, new File(out, name));
     }
 
-    private static Dp panel(Am engine, Bo pvp)
+    private static SidebarPanel panel(Engine engine, PvpState pvp)
     {
         JFrame frame = new JFrame("GP Manager preview");
         frame.setDefaultCloseOperation(JFrame.DISPOSE_ON_CLOSE);
         frame.setLayout(new BorderLayout());
-        Dp panel = new Dp(engine, config(), null);
+        SidebarPanel panel = new SidebarPanel(engine, config(), null);
         DevBadge.apply(panel, BuildInfo.of("1.2.0", "1.2.0-dev", "108",
             "2026-10-06T07:57:00Z", "preview", "1.13.1", true));
-        panel.axo(() -> pvp);
+        panel.bindPvp(() -> pvp);
         SidebarPanelProbe.bindSprites(panel, id -> dummySprite());
         Container content = frame.getContentPane();
         content.add(panel, BorderLayout.CENTER);
@@ -634,7 +635,7 @@ public final class SidebarPreview
         return panel;
     }
 
-    private static void paint(Dp panel, File file) throws IOException
+    private static void paint(SidebarPanel panel, File file) throws IOException
     {
         SidebarPanelProbe.refresh(panel);
         panel.validate();
@@ -655,52 +656,52 @@ public final class SidebarPreview
 
     // ---- fixtures ----------------------------------------------------------------------------
 
-    private static Ac booked(long at, String name, int itemId, long quantity, int unitPrice, long value)
+    private static Transaction booked(long at, String name, int itemId, long quantity, int unitPrice, long value)
     {
-        return new Ac(at, null, Ai.LOOT, Aj.LOOT, "Loot from Vorkath", "Vorkath", true,
-            Collections.singletonList(new Ab(itemId, name, quantity, unitPrice, value)),
-            Bd.LIKELY, "Preview sample.", null);
+        return new Transaction(at, TransactionType.LOOT, Context.LOOT, "Loot from Vorkath", "Vorkath", true,
+            Collections.singletonList(new Flow(itemId, name, quantity, unitPrice, value)),
+            Confidence.LIKELY, "Preview sample.", null);
     }
 
-    private static Ac consumed(long at, String name, int itemId, long quantity, int unitPrice, long value)
+    private static Transaction consumed(long at, String name, int itemId, long quantity, int unitPrice, long value)
     {
         if (name.endsWith("(4)"))
         {
             // A potion is drunk a dose at a time: each sip turns a (4) into a (3), as in game.
             int left = unitPrice * 3 / 4;
-            Ac sips = new Ac(at, null, Ai.CONSUMPTION, Aj.GENERIC,
+            Transaction sips = new Transaction(at, TransactionType.CONSUMPTION, Context.GENERIC,
                 "", "Vorkath", true, java.util.Arrays.asList(
-                    new Ab(itemId, name, quantity, unitPrice, quantity * unitPrice),
-                    new Ab(itemId + 10_000, name.replace("(4)", "(3)"), -quantity, left, -quantity * left)),
-                Bd.LIKELY, "Preview sample.", null);
-            sips.setActionKind(Au.DRINK);
+                    new Flow(itemId, name, quantity, unitPrice, quantity * unitPrice),
+                    new Flow(itemId + 10_000, name.replace("(4)", "(3)"), -quantity, left, -quantity * left)),
+                Confidence.LIKELY, "Preview sample.", null);
+            sips.setActionKind(ActionKind.DRINK);
             return sips;
         }
-        return new Ac(at, null, Ai.CONSUMPTION, Aj.GENERIC, "", "Vorkath",
-            true, Collections.singletonList(new Ab(itemId, name, quantity, unitPrice, value)),
-            Bd.LIKELY, "Preview sample.", null);
+        return new Transaction(at, TransactionType.CONSUMPTION, Context.GENERIC, "", "Vorkath",
+            true, Collections.singletonList(new Flow(itemId, name, quantity, unitPrice, value)),
+            Confidence.LIKELY, "Preview sample.", null);
     }
 
-    private static Ac review(long at, String name, int itemId, long quantity)
+    private static Transaction review(long at, String name, int itemId, long quantity)
     {
-        return new Ac(at, null, Ai.UNCERTAIN, Aj.GENERIC, "", "Vorkath",
-            true, Collections.singletonList(new Ab(itemId, name, quantity, 0, 0L)),
-            Bd.UNCERTAIN, "Preview sample: awaiting a decision.", null);
+        return new Transaction(at, TransactionType.UNCERTAIN, Context.GENERIC, "", "Vorkath",
+            true, Collections.singletonList(new Flow(itemId, name, quantity, 0, 0L)),
+            Confidence.UNCERTAIN, "Preview sample: awaiting a decision.", null);
     }
 
-    private static Ac pkDeath(long at)
+    private static Transaction pkDeath(long at)
     {
-        return new Ac(at, null, Ai.PK_DEATH_LOSS, Aj.PK_LOOT, "Death: Rival",
-            "Wilderness", true, Collections.singletonList(new Ab(1, "Dragon bones", -1, 3_200, -3_200L)),
-            Bd.LIKELY, "Preview sample.", null);
+        return new Transaction(at, TransactionType.PK_DEATH_LOSS, Context.PK_LOOT, "Death: Rival",
+            "Wilderness", true, Collections.singletonList(new Flow(1, "Dragon bones", -1, 3_200, -3_200L)),
+            Confidence.LIKELY, "Preview sample.", null);
     }
 
-    private static Am engine()
+    private static Engine engine()
     {
-        return new Am(deltas ->
+        return new Engine(deltas ->
         {
-            java.util.List<Ab> flows = new java.util.ArrayList<>();
-            deltas.forEach((id, quantity) -> flows.add(new Ab(id, "Item " + id, quantity, 50, quantity * 50)));
+            java.util.List<Flow> flows = new java.util.ArrayList<>();
+            deltas.forEach((id, quantity) -> flows.add(new Flow(id, "Item " + id, quantity, 50, quantity * 50)));
             return flows;
         }, new TransactionClassifier(), config());
     }

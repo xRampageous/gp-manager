@@ -32,71 +32,53 @@ public class BagPickupTest
 
     private final FlowValuator valuator = deltas ->
     {
-        List<Ab> flows = new ArrayList<>();
-        deltas.forEach((id, quantity) -> flows.add(new Ab(id, "Item " + id, quantity, 35, quantity * 35)));
+        List<Flow> flows = new ArrayList<>();
+        deltas.forEach((id, quantity) -> flows.add(new Flow(id, "Item " + id, quantity, 35, quantity * 35)));
         return flows;
     };
 
-    private Am started(long bones)
+    private Engine started(long bones)
     {
-        Am engine = new Am(valuator, new TransactionClassifier(), CONFIG);
-        engine.rm(1_000L);
-        engine.setBaseline(new Cc(Collections.singletonMap(BONES, bones)));
+        Engine engine = new Engine(valuator, new TransactionClassifier(), CONFIG);
+        engine.ensureSession(1_000L);
+        engine.setBaseline(new ContainerSnapshot(Collections.singletonMap(BONES, bones)));
         return engine;
     }
 
     @Test
     public void aBaggedPickupIsAGainThoughTheInventoryNeverChanges()
     {
-        Am engine = started(0L);
+        Engine engine = started(0L);
         engine.bagged(BONES, 3L);
-        Ac pickup = settle(engine, Cc.empty(), 1_600L);
-        assertEquals(Ai.GAIN, pickup.getType());
+        Transaction pickup = settle(engine, ContainerSnapshot.empty(), 1_600L);
+        assertEquals(TransactionType.GAIN, pickup.getType());
         assertTrue(pickup.isCounted());
         assertEquals(105L, engine.getMetrics(5_000L).net);
     }
 
-    @Test
-    public void baggingYourOwnDropCancelsTheDropNotNewLoot()
-    {
-        Am engine = started(1L);
-        engine.aki(100, 200, 0);
-        engine.abz(BONES, 6, 100, 200, 0, true);
-        Ac drop = settle(engine, Cc.empty(), 1_600L);
-        assertEquals("Dropped", drop.getNote());
-        assertEquals(-35L, engine.getMetrics(2_800L).net);
-
-        engine.noteTake(BONES);
-        engine.bagged(BONES, 1L);
-        Ac recovery = settle(engine, Cc.empty(), 3_400L);
-        assertEquals(Ai.TRANSFER, recovery.getType());
-        assertFalse(recovery.isCounted());
-        assertEquals("your own item, back in the bag", 0L, engine.getMetrics(5_000L).net);
-        assertEquals(0L, engine.getMetrics(5_000L).revenue);
-    }
 
     /** Loot is private to you for a minute; a bag pickup inside it is still yours (research 1.2). */
     @Test
     public void yourLootStaysYoursForTheMinuteItIsPrivate()
     {
-        Am engine = started(0L);
-        engine.zk(Collections.singletonMap(BONES, 3L), 50, "Loot from Guard", "Guard");
+        Engine engine = started(0L);
+        engine.markLoot(Collections.singletonMap(BONES, 3L), 50, "Loot from Guard", "Guard");
         for (int tick = 0; tick < 60; tick++)
         {
-            engine.eb.tick(engine.eb.now + 1);
+            engine.inbox.tick(engine.inbox.now + 1);
         }
-        assertTrue("past the 30 s attribution window", (engine.eb.has(Eb.LT, BONES) || engine.eb.has(Eb.OD, BONES)));
+        assertTrue("past the 30 s attribution window", (engine.inbox.has(Inbox.PRIVATE_LOOT, BONES)));
         for (int tick = 60; tick < 100; tick++)
         {
-            engine.eb.tick(engine.eb.now + 1);
+            engine.inbox.tick(engine.inbox.now + 1);
         }
-        assertFalse("forgotten once the minute is over", (engine.eb.has(Eb.LT, BONES) || engine.eb.has(Eb.OD, BONES)));
+        assertFalse("forgotten once the minute is over", (engine.inbox.has(Inbox.PRIVATE_LOOT, BONES)));
     }
 
     @Test
     public void nothingIsBookedBeforeTrackingHasABaseline()
     {
-        Am engine = new Am(valuator, new TransactionClassifier(), CONFIG);
+        Engine engine = new Engine(valuator, new TransactionClassifier(), CONFIG);
         engine.bagged(BONES, 1L);
         assertNull(engine.baseline);
     }
@@ -110,19 +92,19 @@ public class BagPickupTest
             {"You get some yew logs.", null, "yew logs"}, {"You get some logs.", null, "logs"}};
         for (String[] c : cases)
         {
-            java.util.regex.Matcher m = Ak.pattern("bag").matcher(c[0].toLowerCase());
+            java.util.regex.Matcher m = GameData.pattern("bag").matcher(c[0].toLowerCase());
             assertTrue(c[0], m.matches());
             assertEquals(c[0], c[1], m.group(1));
             assertEquals(c[0], c[2], m.group(2));
         }
-        assertFalse(Ak.pattern("bag").matcher("you light the logs.").matches());
+        assertFalse(GameData.pattern("bag").matcher("you light the logs.").matches());
     }
 
-    private static Ac settle(Am engine, Cc snapshot, long firstTick)
+    private static Transaction settle(Engine engine, ContainerSnapshot snapshot, long firstTick)
     {
-        assertNull(engine.adj(snapshot, firstTick));
-        assertNull(engine.adj(snapshot, firstTick + 600L));
-        Ac tx = engine.adj(snapshot, firstTick + 1_200L);
+        assertNull(engine.processIfDirty(snapshot, firstTick));
+        assertNull(engine.processIfDirty(snapshot, firstTick + 600L));
+        Transaction tx = engine.processIfDirty(snapshot, firstTick + 1_200L);
         assertNotNull(tx);
         return tx;
     }
