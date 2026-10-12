@@ -127,6 +127,21 @@ public class ChargeEstimateReconciliationTest
             engine.getActiveSession().getId(), "slot-a", "seas", ItemID.DEATHRUNE));
     }
 
+    @Test
+    public void aMeasuredCheckClearsItsWeaponsPendingEstimates()
+    {
+        ChargeEstimateJournal journal = new ChargeEstimateJournal();
+        journal.record("s1", "target", "tx1", 23962, 200L);
+        journal.record("s2", "target", "tx2", 20718, 20L);
+        assertEquals(1, journal.receipts("s1", "target", 23962).size());
+
+        journal.clearTarget("s1", "target");
+        assertTrue("the checked weapon's estimate receipts are gone",
+            journal.receipts("s1", "target", 23962).isEmpty());
+        assertEquals("another session stays untouched", 1,
+            journal.receipts("s2", "target", 20718).size());
+    }
+
     private static Engine engine()
     {
         return new Engine(deltas -> Collections.emptyList(),

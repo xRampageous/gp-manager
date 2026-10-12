@@ -900,7 +900,7 @@ public class GrindsPresentationTest
         long todayTimestamp = Math.max(now - 37 * 60_000L, startOfToday + 60_000L);
         GrindsData.Recent today = new GrindsData.Recent("Vorkath", "Vorkath", todayTimestamp,
             2_840_000L, 37 * 60_000L);
-        String context = GrindsPage.contextLine(today, now);
+        String context = GrindsPage.contextLine(today, now, java.time.ZoneId.systemDefault());
         assertTrue("day label leads the context: " + context, context.startsWith("Today"));
         assertTrue("duration is present: " + context, context.contains("37m"));
         assertFalse("no internal ids leak", context.contains("Vorkath"));
@@ -911,8 +911,8 @@ public class GrindsPresentationTest
 
         GrindsData.Recent yesterday = new GrindsData.Recent("Zulrah", "Zulrah",
             startOfToday - 3_600_000L, -412_000L, 96 * 60_000L);
-        assertTrue("yesterday reads naturally: " + GrindsPage.contextLine(yesterday, now),
-            GrindsPage.contextLine(yesterday, now).contains("Yesterday"));
+        assertTrue("yesterday reads naturally: " + GrindsPage.contextLine(yesterday, now, java.time.ZoneId.systemDefault()),
+            GrindsPage.contextLine(yesterday, now, java.time.ZoneId.systemDefault()).contains("Yesterday"));
     }
 
     @Test

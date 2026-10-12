@@ -112,28 +112,29 @@ class Semantics {
 
         public Row marketSettlement;
 
+        /** Shop trades: the other side of the trade, named and counted ("Bought Death rune ×50"). */
+        String tradedItems;
+
+        /** The same list alone ("Death rune ×50"), for a currency entry row's name. */
+        String tradedItemsShort;
+
         boolean gain() {
             return category == Category.GAIN;
         }
 
         /** The Corrected audit search; financial table search uses the projection group instead. */
         boolean matchesSearch(String needle) {
-            if (empty(needle)) return true;
-            String lower = needle.toLowerCase(ROOT);
-            for (String term :
-                    new String[] {
-                        itemName,
-                        verb,
-                        actionDisplayName,
-                        source,
-                        why,
-                        correctionLabel,
-                        transactionId,
-                        contributionId
-                    }) {
-                if (term.toLowerCase(ROOT).contains(lower)) return true;
-            }
-            return false;
+            return empty(needle)
+                    || Phrases.containsFolded(
+                            needle.toLowerCase(ROOT),
+                            itemName,
+                            verb,
+                            actionDisplayName,
+                            source,
+                            why,
+                            correctionLabel,
+                            transactionId,
+                            contributionId);
         }
     }
 
@@ -189,6 +190,17 @@ class Semantics {
 
         void search(String... terms) {
             Collections.addAll(searchTerms, terms);
+        }
+
+        /** A charge or dose row: charge use, a normalized dose pair, or a dose-suffixed spend. */
+        boolean chargeRow() {
+            if (chargeUse || normalizedConsume) return true;
+            if (ActionReader.trailingDose(primaryName) > 0) return true;
+            for (Receipt receipt : receipts) {
+                if (receipt.itemName != null && ActionReader.trailingDose(receipt.itemName) > 0)
+                    return true;
+            }
+            return false;
         }
 
         int units = 1;
@@ -464,6 +476,20 @@ class Semantics {
     }
 
     // ── unit construction ──────────────────────────────────────────────────────────────────────
+    /**
+     * A composite row's group: claim-spend, action and charge-cast units share the fixed tail (no
+     * normalised consume, no market lifecycle, no claim count). Field order mirrors the
+     * constructor's, so a transposition reads wrong at a glance.
+     */
+    static Group compositeGroup(String key, int itemId, Table table, String primaryName,
+            String contextLine, String actionLabel, boolean chargeUse, long at, long value,
+            boolean unpriced, long quantity, boolean neutral, boolean review, boolean corrected,
+            String transactionId, String contributionId) {
+        return new Group(key, itemId, table, primaryName, contextLine, actionLabel, "", chargeUse,
+                at, value, coverage(unpriced), quantity, false, true, neutral, false, review,
+                corrected, "", transactionId, contributionId, 0);
+    }
+
     static List<Group> transactionUnits(Transaction transaction, Predicate<Flow> td) {
         List<Flow> flows = transaction.getFlows();
         boolean neutral =
@@ -715,29 +741,10 @@ class Semantics {
         // A row named by a spell or an item shows its icon; any other shows its first item's.
         int icon = Spells.icon(primaryName);
         var unit =
-                new Group(
-                        key,
-                        icon != -1 ? icon : contributions.get(0).itemId,
-                        tableFor(category),
-                        primaryName,
-                        context,
-                        verb,
-                        "",
-                        false,
-                        at,
-                        value,
-                        coverage(unpriced),
-                        -1L,
-                        false,
-                        true,
-                        false,
-                        false,
-                        false,
-                        false,
-                        "",
-                        transaction.getId(),
-                        representative,
-                        0);
+                compositeGroup(
+                        key, icon != -1 ? icon : contributions.get(0).itemId, tableFor(category),
+                        primaryName, context, verb, false, at, value, unpriced, -1L, false, false,
+                        false, transaction.getId(), representative);
         for (Contribution contribution : contributions) {
             unit.receipts.add(receipt(transaction, contribution, null, null));
         }
@@ -868,29 +875,10 @@ class Semantics {
         String verb = verbOf(transaction);
         String key = "note:" + transaction.getId();
         var unit =
-                new Group(
-                        key,
-                        -1,
-                        tableFor(category),
-                        name,
-                        verb,
-                        verb,
-                        "",
-                        false,
-                        at,
-                        value,
-                        Coverage.COMPLETE,
-                        0L,
-                        false,
-                        true,
-                        neutral,
-                        false,
-                        review,
-                        corrected,
-                        "",
-                        transaction.getId(),
-                        transaction.getId() + ":composite",
-                        0);
+                compositeGroup(
+                        key, -1, tableFor(category), name, verb, verb, false, at, value, false, 0L,
+                        neutral, review, corrected, transaction.getId(),
+                        transaction.getId() + ":composite");
         unit.receipts.add(
                 new Receipt(
                         transaction.getId() + ":composite",
@@ -914,7 +902,9 @@ class Semantics {
                         source,
                         "",
                         "",
-                        null));
+                        null,
+                        "",
+                        ""));
         unit.search(name, verb, source, transaction.getId());
         return singletonList(unit);
     }
@@ -1005,6 +995,7 @@ class Semantics {
                                 || ReviewRules.needsOwnerDecision(transaction));
         boolean valueKnown = !neutral && !contribution.auditOnly;
         Category category = contribution.category;
+        String[] traded = tradedItemsParts(transaction, contribution);
         return new Receipt(
                 contribution.contributionId,
                 transaction.getId(),
@@ -1027,7 +1018,9 @@ class Semantics {
                 Contribution.sourceOf(transaction),
                 usedBy == null ? "" : usedBy,
                 chargeBasis(transaction, contribution),
-                marketSettlement);
+                marketSettlement,
+                traded == null ? "" : traded[0] + " " + traded[1],
+                traded == null ? "" : traded[1]);
     }
 
     static long semanticQuantity(Contribution contribution) {
@@ -1045,6 +1038,7 @@ class Semantics {
                 && transaction.getContext() == Context.PRODUCTION) {
             return msg("failed", "Failed");
         }
+        if (shopExchange(transaction)) return msg("verb-exchanged", "Exchanged");
         return msg(
                 "verb." + transaction.getType(), transaction.getNet() < 0L ? "Used" : "Received");
     }
@@ -1073,6 +1067,83 @@ class Semantics {
         return msg(
                 "why-type." + transaction.getType(),
                 transaction.isCounted() ? msg("counted-automatically") : "Not counted.");
+    }
+
+    /**
+     * The claimed shop click behind a trade's note ("buy"/"sell"), else empty. Player trades and
+     * the Grand Exchange keep their own vocabulary.
+     */
+    static String shopClick(Transaction transaction) {
+        if (transaction == null || transaction.getType() != TRADE) return "";
+        String note = Phrases.lower(transaction.getNote());
+        if (note.startsWith("buy")) return "buy";
+        if (note.startsWith("sell")) return "sell";
+        return "";
+    }
+
+    /** A shop trade paid in a currency other than coins (tokkul, spirit flakes, …). */
+    static boolean nonCoinShopCurrency(Transaction transaction) {
+        if (transaction == null) return false;
+        var cash = GameData.pattern("cash");
+        for (Flow flow : transaction.getFlows()) {
+            if (flow == null) continue;
+            if (CurrencyProxyCatalogue.isMapped(flow.itemId)) return true;
+            String name = Phrases.lower(flow.itemName);
+            if (!"coins".equals(name) && cash.matcher(name).matches()) return true;
+        }
+        return false;
+    }
+
+    /** A shop trade that reads "Exchanged": a claimed shop click paid in a non-coin currency. */
+    static boolean shopExchange(Transaction transaction) {
+        return !shopClick(transaction).isEmpty() && nonCoinShopCurrency(transaction);
+    }
+
+    /**
+     * For a shop trade entry: the other side of the trade, named and counted, from the claimed
+     * click ("buy"/"sell"). A tokkul spend entry reads "Bought Death rune ×50"; the rune's own
+     * entry reads "Paid Tokkul ×14,550". Returns {"Bought", "Death rune ×50"} or null.
+     */
+    static String[] tradedItemsParts(Transaction transaction, Contribution self) {
+        if (self == null) return null;
+        String click = shopClick(transaction);
+        if (click.isEmpty()) return null;
+        boolean buying = "buy".equals(click);
+        Map<Integer, String> names = new java.util.LinkedHashMap<>();
+        Map<Integer, Long> quantities = new java.util.LinkedHashMap<>();
+        boolean anyGain = false;
+        boolean anyCost = false;
+        for (Contribution item : Contribution.project(transaction)) {
+            if (item == null || item.contributionId.equals(self.contributionId)) continue;
+            long signed = item.normalizedConsume ? item.normalizedQuantity : item.quantityDelta;
+            if (signed == 0L) continue;
+            anyGain |= signed > 0L;
+            anyCost |= signed < 0L;
+            names.putIfAbsent(item.itemId, item.itemName);
+            quantities.merge(item.itemId, Math.abs(signed), Long::sum);
+        }
+        if (quantities.isEmpty()) return null;
+        var text = new StringBuilder();
+        for (var entry : quantities.entrySet()) {
+            if (text.length() > 0) text.append(" \u00b7 ");
+            text.append(names.get(entry.getKey()));
+            if (entry.getValue() > 1L) text.append(' ').append(Fmt.times(entry.getValue()));
+        }
+        String label =
+                buying
+                        ? anyGain && !anyCost
+                                ? msg("traded-bought", "Bought")
+                                : msg("traded-paid", "Paid")
+                        : anyGain && !anyCost
+                                ? msg("traded-sold-for", "Sold for")
+                                : msg("traded-sold", "Sold");
+        return new String[] {label, text.toString()};
+    }
+
+    /** A shop trade receipt's other side with its Bought/Paid/Sold word, or empty. */
+    static String tradedItems(Transaction transaction, Contribution self) {
+        String[] parts = tradedItemsParts(transaction, self);
+        return parts == null ? "" : parts[0] + " " + parts[1];
     }
 
     /**
@@ -1130,34 +1201,15 @@ class Semantics {
         int icon = transaction.castItemId;
         if (icon <= 0) {
             // The weapon hint is transient; a restart must still draw the weapon sprite,
-            // including estimate-only variants (the scythe has no Check mapping yet).
+            // including the scythe, whose Check may not have been read yet.
             var variant = ChargeCheck.variantForName(weapon);
             if (variant != null) icon = variant.itemIds[0];
         }
         var unit =
-                new Group(
-                        key,
-                        icon,
-                        tableFor(financialCategory(transaction, contributions.get(0))),
-                        weapon,
-                        context,
-                        verb,
-                        "",
-                        true,
-                        at,
-                        value,
-                        coverage(unpriced),
-                        1L,
-                        false,
-                        true,
-                        neutral,
-                        false,
-                        review,
-                        corrected,
-                        "",
-                        transaction.getId(),
-                        contributions.get(0).contributionId,
-                        0);
+                compositeGroup(
+                        key, icon, tableFor(financialCategory(transaction, contributions.get(0))),
+                        weapon, context, verb, true, at, value, unpriced, 1L, neutral, review,
+                        corrected, transaction.getId(), contributions.get(0).contributionId);
         for (Contribution contribution : contributions) {
             unit.receipts.add(receipt(transaction, contribution, null, null));
             unit.searchTerms.add(contribution.itemName);

@@ -437,10 +437,7 @@ class Engine {
     synchronized void setBaseline(ContainerSnapshot snapshot) {
         baseline = snapshot;
         baselinePriming = false;
-        primingSnapshot = null;
-        primingObservedTicks = 0;
-        primingStableTicks = 0;
-        clearPendingChange();
+        clearPriming();
     }
 
     synchronized void markDirty() {
@@ -518,17 +515,23 @@ class Engine {
         // Eat/Bury/Drink/Cast/etc. — clear any pending Drop intent for the same click window.
         inbox.drop(DROP_CLICK);
         int safeTicks = max(1, ticks);
-        if (consumeIntent() != null && itemId < 0 && consumeIntent().item >= 0) {
+        Observation prior = consumeIntent();
+        if (prior != null && itemId < 0 && prior.item >= 0) {
             // Chat/menu reinforcement without an id must not wipe a resolved item id,
             // flip a Destroy stamp to Used, or replace the resolved item's proven verb.
             // Exact spell text may refresh the label; a click that proves no name must not
             // erase the name already proven for this bounded interaction.
             inbox.refresh(CONSUME, safeTicks);
-            if (actionLabel != null) consumeIntent().label = actionLabel;
+            if (actionLabel != null) prior.label = actionLabel;
             return;
         }
         Observation e = inbox.put(CONSUME, itemId, 1L, safeTicks - 1, null);
-        e.held = armQuantity(itemId);
+        long held = armQuantity(itemId);
+        // Keep the window's high-water: a later click re-arms at the current count, but a bite
+        // that landed between the clicks must stay measurable against the stack's top (owner
+        // 2026-10-12: withdraw-all then an eat while the clicks kept coming).
+        if (prior != null && prior.item == itemId && prior.held > held) held = prior.held;
+        e.held = held;
         e.flag = destroy;
         e.action = actionKind;
         e.label = actionLabel;
@@ -559,12 +562,23 @@ class Engine {
      * stamp; never invents destroy from chat alone.
      */
     synchronized void extendConsume(int ticks) {
+        extendConsume(ticks, null);
+    }
+
+    /**
+     * Chat confirmation ("You eat the chicken.") carries the verb the line proves: a chat that
+     * arrives after the menu clicks lapse still names Ate/Drank instead of a bare "Used" (owner
+     * 2026-10-12). A verb the menu already proved is never replaced.
+     */
+    synchronized void extendConsume(int ticks, ActionKind actionKind) {
         int safeTicks = max(1, ticks);
         if (consumeIntent() != null) {
             inbox.refresh(CONSUME, safeTicks);
+            if (actionKind != null && consumeIntent().action == null)
+                consumeIntent().action = actionKind;
             return;
         }
-        noteConsume(-1, safeTicks, false);
+        noteConsume(-1, safeTicks, false, actionKind);
     }
 
     /** Player-initiated Drop action: the confirmed inventory removal books as Dropped. */
@@ -576,10 +590,13 @@ class Engine {
 
     /**
      * Set-up or Pick-up of a dwarf multicannon: its parts are yours wherever they stand (Nulodion
-     * replaces a lost one free), so moving them is neutral (owner 1.3.3).
+     * replaces a lost one free), so moving them is neutral (owner 1.3.3). The base-to-furnace
+     * assembly runs for up to ~12 ticks after the click and its auto-load follows right behind,
+     * so the custody must outlive them both (owner live 2026-10-13: 15 ticks expired right at the
+     * furnace's own settle and booked it as a loss).
      */
     synchronized void moveCannon() {
-        inbox.put(CANNON, -1, 1L, 15, null);
+        inbox.put(CANNON, -1, 1L, 40, null);
     }
 
     /** Fire or Load: the balls it takes (granite first) are remembered until it is picked up. */
@@ -592,8 +609,47 @@ class Engine {
                     ticks);
     }
 
+    /**
+     * Sailing's additional ball tiers: bronze, iron, mithril, adamant, rune and dragon. The plain
+     * steel tier is the classic id-2 ball and granite also serves ship cannons, so both already
+     * sit in {@link #cannonball}; the exact ids here add the chainshot and incendiary types, so a
+     * ship-cannon volley reads the same as a dwarf load (owner 1.3.4 ship sweep).
+     */
+    private static final Set<Integer> SAIL_CANNONBALLS =
+            Set.of(
+                    ItemID.BRONZE_CANNONBALL,
+                    ItemID.IRON_CANNONBALL,
+                    ItemID.MITHRIL_CANNONBALL,
+                    ItemID.ADAMANT_CANNONBALL,
+                    ItemID.RUNE_CANNONBALL,
+                    ItemID.DRAGON_CANNONBALL,
+                    ItemID.BRONZE_CHAINSHOT_CANNONBALL,
+                    ItemID.IRON_CHAINSHOT_CANNONBALL,
+                    ItemID.STEEL_CHAINSHOT_CANNONBALL,
+                    ItemID.MITHRIL_CHAINSHOT_CANNONBALL,
+                    ItemID.ADAMANT_CHAINSHOT_CANNONBALL,
+                    ItemID.RUNE_CHAINSHOT_CANNONBALL,
+                    ItemID.DRAGON_CHAINSHOT_CANNONBALL,
+                    ItemID.BRONZE_INCENDIARY_CANNONBALL,
+                    ItemID.IRON_INCENDIARY_CANNONBALL,
+                    ItemID.STEEL_INCENDIARY_CANNONBALL,
+                    ItemID.MITHRIL_INCENDIARY_CANNONBALL,
+                    ItemID.ADAMANT_INCENDIARY_CANNONBALL,
+                    ItemID.RUNE_INCENDIARY_CANNONBALL,
+                    ItemID.DRAGON_INCENDIARY_CANNONBALL);
+
     static boolean cannonball(int itemId) {
-        return itemId == ItemID.MCANNONBALL || itemId == ItemID.GRANITE_CANNONBALL;
+        return itemId == ItemID.MCANNONBALL
+                || itemId == ItemID.GRANITE_CANNONBALL
+                || SAIL_CANNONBALLS.contains(itemId);
+    }
+
+    /** The four dwarf multicannon parts, unnoted ids as placed (TWPART1..4). */
+    static boolean cannonPart(int itemId) {
+        return itemId == ItemID.TWPART1
+                || itemId == ItemID.TWPART2
+                || itemId == ItemID.TWPART3
+                || itemId == ItemID.TWPART4;
     }
 
     /**
@@ -1237,6 +1293,22 @@ class Engine {
         return selected
                 ? new LoadTarget(e.variant, e.id, left, candidates, e.at)
                 : new LoadTarget(null, null, flows == null ? emptyList() : flows, emptyList(), 0L);
+    }
+
+    /**
+     * A refused automatic use (the game answered "already at that location"): the click spent
+     * nothing, so the estimate it booked is removed through the announced automatic-evidence path
+     * (owner 1.3.4). Other pending estimates for the target are untouched.
+     */
+    synchronized void forfeitEstimate(String targetIdentity, String transactionId) {
+        if (activeSession == null || transactionId == null || transactionId.isEmpty()) return;
+        String target = nonBlank(targetIdentity, null);
+        if (target == null) return;
+        long now = SafeMath.now();
+        for (ChargeEstimateJournal.Receipt receipt :
+                chargeEstimateJournal.receiptsFor(activeSession.getId(), target)) {
+            if (transactionId.equals(receipt.transactionId)) forfeit(receipt, now);
+        }
     }
 
     /** Clear a pending charge-load intent when another action supersedes its evidence. */
@@ -2106,7 +2178,8 @@ class Engine {
      * Settles one stabilized inventory change. The stages run in order; each may book its own
      * receipt and removes the flows it owns: commit, death wipe, key tokens, held items (death
      * keys, wipe, charge loads), returns (loot, chest claims, death reclaim), neutral-zone restore,
-     * actions and transfers, GE custody, then classification and booking of what is left.
+     * a confirmed drop's own item, actions and transfers, GE custody, then classification and
+     * booking of what is left.
      */
     Transaction settle(
             ContainerSnapshot committed,
@@ -2114,6 +2187,26 @@ class Engine {
             java.util.function.Consumer<Transaction> additionalBooking) {
         Settle settle = commit(committed, now);
         if (settle == null) return null;
+        // Minigame-only items (a loaned loadout, table supplies) cannot legally exist outside
+        // their minigame: the grant and the exit strip vanish before any settle stage sees them, so
+        // they never book, reach Review or pollute the death-wipe whitelist (Coinflow
+        // MinigameQuarantine evidence, owner 2026-10-12). commit()'s swap filter runs earlier and
+        // cannot pair these ids; the drink normalization runs later, so a loaned dose sip can never
+        // be rewritten into real ids.
+        settle.flows.removeIf(flow -> flow != null && MinigameItems.isMinigameOnly(flow.itemId));
+        // An essence pouch's Empty/Fill carries custody of the essence it moves, never the runes a
+        // craft produces in the same stabilized window: the essence stays neutral and the residual
+        // classifies normally (owner 2026-10-13).
+        if ((settle.transfer || settle.hard)
+                && settle.note != null
+                && settle.note.contains("essence_pouch")) {
+            settle.flows.removeIf(
+                    flow ->
+                            flow != null
+                                    && flow.itemName != null
+                                    && Phrases.lower(flow.itemName).contains("essence"));
+            settle.clear();
+        }
         settleDeathWipe(settle);
         settleKeyTokens(settle);
         if (settle.flows.isEmpty()) return settle.keyAudit;
@@ -2166,7 +2259,11 @@ class Engine {
         if (settle.loot.matched
                 && !matchesExpectedLoot(settle.flows, settle.loot.matchedQuantities))
             settle.loot = LootMatch.NONE;
+        Transaction dropSlice = settleDropSlice(settle);
+        Transaction consumeSlice = settleConsumeSlice(settle);
         settleActions(settle);
+        if (dropSlice != null && settle.flows.isEmpty() && sources.isEmpty()) return dropSlice;
+        if (consumeSlice != null && settle.flows.isEmpty() && sources.isEmpty()) return consumeSlice;
         if (settle.consumed
                 && !settle.dropped
                 && !settle.destroy
@@ -2194,6 +2291,8 @@ class Engine {
                 if (row != result) additionalBooking.accept(row);
             }
             if (cast != null) additionalBooking.accept(cast);
+            if (dropSlice != null) additionalBooking.accept(dropSlice);
+            if (consumeSlice != null) additionalBooking.accept(consumeSlice);
         }
         return result;
     }
@@ -2227,6 +2326,90 @@ class Engine {
         slice.actionLabel = settle.actionLabel;
         settle.flows = new ArrayList<>(settle.flows);
         settle.flows.removeAll(losses);
+        return book(slice);
+    }
+
+    /**
+     * A confirmed drop owns its item in a mixed settle (owner 1.3.4): dropping plant pots while a
+     * calquat harvest lands must book the pot loss as its own Dropped row instead of turning the
+     * change into Review. The drop's losses move to their own row; every other flow must be a
+     * gain, and a second loss, a pickup back of the same item, an armed consume intent, bank
+     * evidence or a Market/PK context cancels the split, leaving the change to settle as before.
+     */
+    Transaction settleDropSlice(Settle settle) {
+        if (settle.hard || settle.soft() || settle.transfer) return null;
+        if (settle.context == Context.TRANSFER
+                || settle.context == MARKET
+                || settle.context == PK_DEATH
+                || settle.context == PK_LOOT) {
+            return null;
+        }
+        if (inbox.peek(DROP_CLICK) == null || consumeIntent() != null) return null;
+        int itemId = inbox.item(DROP_CLICK);
+        if (itemId <= 0) return null;
+        var losses = new ArrayList<Flow>();
+        boolean pickedBack = false;
+        for (Flow flow : settle.flows) {
+            if (flow == null) continue;
+            if (flow.itemId == itemId) {
+                if (flow.quantityDelta > 0L) pickedBack = true;
+                else if (flow.quantityDelta < 0L) losses.add(flow);
+            } else if (flow.quantityDelta <= 0L) {
+                // Any second loss (or a zero flow) makes the change ambiguous again.
+                return null;
+            }
+        }
+        if (losses.isEmpty() || pickedBack) return null;
+        var slice = new Settle(new Clue(), settle.committed, settle.now);
+        slice.context = settle.context;
+        slice.encounterId = settle.encounterId;
+        slice.activity = settle.activity;
+        slice.flows = losses;
+        settle.flows = new ArrayList<>(settle.flows);
+        settle.flows.removeAll(losses);
+        settleActions(slice);
+        return book(slice);
+    }
+
+    /**
+     * A named consume whose bite lands with a same-item top-up (a bank withdrawal or a pickup in
+     * one window): the bite moves to its own Supplies row and the top-up stays with the settle, so
+     * the stack's acquisition is never counted as the bite's revenue (owner 2026-10-12, review).
+     * Runs before settleActions so the remainder follows its own evidence — a hard bank batch
+     * stays a neutral transfer, a loot batch keeps its row.
+     */
+    Transaction settleConsumeSlice(Settle settle) {
+        Observation intent = consumeIntent();
+        if (intent == null || intent.item < 0 || intent.flag) return null;
+        if (settle.localDeath || settle.suppressActionEvidence) return null;
+        if (settle.context == PK_DEATH) return null;
+        int itemId = intent.item;
+        var bites = new ArrayList<Flow>();
+        boolean toppedUp = false;
+        for (Flow flow : settle.flows) {
+            if (flow == null || flow.itemId != itemId) continue;
+            if (flow.quantityDelta > 0L) toppedUp = true;
+            else if (flow.quantityDelta < 0L) bites.add(flow);
+        }
+        if (bites.isEmpty()) return null;
+        // A pure bite (nothing else in the change) books on its own whenever the intent proved
+        // it — including inside a live bank window, where the transfer context would otherwise
+        // swallow it. A bite mixed with other items only splits when a same-item top-up is there
+        // to keep; any other mixed window keeps its existing shape.
+        boolean pure = bites.size() == settle.flows.size();
+        if (!pure && !toppedUp) return null;
+        // The bite is a player action of its own, never part of the transfer or loot batch it
+        // landed with: a fresh generic slice books it as the counted Supplies row.
+        var slice = new Settle(new Clue(), settle.committed, settle.now);
+        slice.activity = settle.activity;
+        slice.actionIntent = intent.action;
+        slice.actionLabel = intent.label;
+        slice.consumed = true;
+        slice.flows = bites;
+        settle.flows = new ArrayList<>(settle.flows);
+        settle.flows.removeAll(bites);
+        // The bite owns the intent: take it so no later flow wears its verb or spell label.
+        inbox.take(CONSUME, intent.item, 1L, e -> true);
         return book(slice);
     }
 
@@ -2301,7 +2484,43 @@ class Engine {
                         : new ArrayList<>(valuationService.value(deltas, now));
         if (settle.context == GENERIC && !settle.transfer && !settle.hard)
             settle.flows = withoutSwaps(settle.flows);
+        // The split rewrites settle.flows only; nothing after commit() re-reads deltas, so the two
+        // structures may disagree by design (review 2026-10-12).
+        splitToppedUpConsume(settle, deltas, committed, now);
         return settle.flows.isEmpty() ? null : settle;
+    }
+
+    /**
+     * A named consume whose stack was topped up in the same window (a bank withdrawal then an
+     * immediate bite) nets positive and hides the bite. Split the stack's net gain into its gross
+     * acquisition and the shortfall since the intent was armed, so the named consume keeps its own
+     * cost flow and books Ate/Buried instead of vanishing into the transfer (owner 2026-10-12).
+     */
+    void splitToppedUpConsume(
+            Settle settle, Map<Integer, Long> deltas, ContainerSnapshot committed, long now) {
+        if (consumeIntent() == null || consumeIntent().item < 0 || consumeIntent().held < 0L) return;
+        int id = consumeIntent().item;
+        Long net = deltas.get(id);
+        if (net == null || net <= 0L) return;
+        long lost = consumeIntent().held - committed.quantityOf(id);
+        if (lost <= 0L || lost > net) return;
+        for (int index = 0; index < settle.flows.size(); index++) {
+            Flow flow = settle.flows.get(index);
+            if (flow == null || flow.itemId != id || flow.quantityDelta <= 0L) continue;
+            long gross = flow.quantityDelta + lost;
+            settle.flows.set(
+                    index,
+                    new Flow(
+                            id,
+                            flow.itemName,
+                            gross,
+                            flow.unitPrice,
+                            SafeMath.safeMultiply(gross, flow.unitPrice),
+                            flow.getPriceSource(),
+                            flow.priceCapturedAtEpochMillis));
+            break;
+        }
+        settle.flows.addAll(valuationService.value(Collections.singletonMap(id, -lost), now));
     }
 
     /** A measured death wipe: stacks held at death that left INV stay ownership-neutral. */
@@ -2411,7 +2630,10 @@ class Engine {
         Transaction loadReview = null;
         if (!load.ambiguousCandidates.isEmpty()) {
             settle.flows = new ArrayList<>(load.remaining);
-            loadReview = recordAmbiguousLoad(load, settle.now);
+            loadReview =
+                    load.variant != null && load.variant.isCommittedLoad()
+                            ? recordCommittedLoad(load, settle.now)
+                            : recordAmbiguousLoad(load, settle.now);
         }
         return first(settle.keyAudit, wipe, loadReview);
     }
@@ -2479,11 +2701,26 @@ class Engine {
             // source; preserve the accounting classification without a Decanted stamp.
             settle.suppressActionEvidence = true;
         }
-        settle.dropped =
-                inbox.peek(DROP_CLICK) != null
+        // A set-up's auto-load can settle together with the last part placed (the furnace), and
+        // the login priming can clear the click intent between the click and the load: with the
+        // parts custody active, ball losses are loads on their own. The clicked item must itself
+        // be lost for the click path, or a lone part settle would eat the ball's intent (owner
+        // live 2026-10-13).
+        boolean cannonLoad =
+                inbox.peek(CANNON) != null
                         && consumeIntent() == null
                         && onlyCosts(settle.flows)
-                        && !hasLoss(settle.flows, id -> id != inbox.item(DROP_CLICK));
+                        && hasLoss(settle.flows, Engine::cannonball)
+                        && !hasLoss(settle.flows, id -> !cannonball(id) && !cannonPart(id));
+        settle.dropped =
+                cannonLoad
+                        || (inbox.peek(DROP_CLICK) != null
+                                && consumeIntent() == null
+                                && onlyCosts(settle.flows)
+                                && hasLoss(settle.flows, id -> id == inbox.item(DROP_CLICK))
+                                && !hasLoss(
+                                        settle.flows,
+                                        id -> id != inbox.item(DROP_CLICK) && !cannonPart(id)));
         settle.consumed =
                 !settle.dropped && !settle.decant && matchesConsume(settle.flows, settle.hard);
         if (settle.consumed && consumeIntent() != null) {
@@ -2495,7 +2732,15 @@ class Engine {
             settle.consumedItemId = consumeIntent().item;
         }
         settle.droppedItemId =
-                settle.dropped && inbox.peek(DROP_CLICK) != null ? inbox.item(DROP_CLICK) : -1;
+                settle.dropped
+                        ? (inbox.peek(DROP_CLICK) != null
+                                ? inbox.item(DROP_CLICK)
+                                : settle.flows.stream()
+                                        .filter(flow -> flow != null && flow.isCost() && cannonball(flow.itemId))
+                                        .mapToInt(flow -> flow.itemId)
+                                        .findFirst()
+                                        .orElse(-1))
+                        : -1;
         if (!settle.consumed
                 && !settle.dropped
                 && !settle.hard
@@ -2646,9 +2891,16 @@ class Engine {
         TransactionType type = classifier.classify(settle.context, settle.flows);
         boolean plainUncertain =
                 !settle.asTransfer && !settle.hard && !settle.soft() && type == UNCERTAIN;
-        if (settle.dismantle) {
+        boolean braceletDismantle =
+                settle.dismantle
+                        && (inbox.item(DISMANTLE_CLICK) == ItemID.WILD_CAVE_BRACELET_UNCHARGED
+                                || inbox.item(DISMANTLE_CLICK) == ItemID.WILD_CAVE_BRACELET_CHARGED);
+        if (settle.dismantle && !braceletDismantle) {
             // Taking an item apart (Revert, Dismantle) keeps its worth in the parts: neutral, never
-            // Review (owner 1.2). What the parts do not give back is booked below.
+            // Review (owner 1.2). What the parts do not give back is booked below. The bracelet of
+            // ethereum is the exception: its 250-ether dismantle is worth more than the item, so
+            // the parts rule would bury the gain; it settles like the same change without the
+            // click (fail-closed Review, owner 2026-10-12).
             type = TransactionType.TRANSFER;
             for (Flow flow : settle.flows)
                 if (flow != null && flow.itemId == inbox.item(DISMANTLE_CLICK))
@@ -2682,9 +2934,11 @@ class Engine {
             // An opened claim (a coin pouch) is income too: its neutral claim leg is not a cost
             // (owner 2026-09-29).
             type = GAIN;
-        } else if (plainUncertain && settle.decant) {
+        } else if (plainUncertain && settle.decant && !braceletDismantle) {
             // Combining or decanting keeps every dose, so it is neutral like a bank move, never a
-            // Review row (owner 1.2); the doses keep their value until they are drunk.
+            // Review row (owner 1.2); the doses keep their value until they are drunk. The bracelet
+            // of ethereum's dismantle is not value-preserving, so it stays fail-closed Review
+            // (owner 2026-10-12).
             type = TransactionType.TRANSFER;
             settle.note = "Decanted";
         } else if (plainUncertain
@@ -2698,6 +2952,15 @@ class Engine {
             type = TRADE;
             settle.context = MARKET;
             settle.note = "Bought";
+        } else if (plainUncertain
+                && inbox.peek(DIALOGUE) != null
+                && ActionReader.all(
+                        settle.flows, 1, GameData.pattern("cash").asMatchPredicate())) {
+            // Owner 1.3.4: items for coins with a shop window open is a sale; the window raises
+            // the same conversation signal as a dialogue. Without it the change stays Review.
+            type = TRADE;
+            settle.context = MARKET;
+            settle.note = "Sold";
         }
         // A drop settle is always CONSUMPTION, so picking it back up can shrink it.
         if (settle.dropped && type != TransactionType.TRANSFER && type != TRADE) type = CONSUMPTION;
@@ -2769,6 +3032,17 @@ class Engine {
                 transaction.setActionLabel(settle.actionLabel);
             }
         }
+        if (type == CONSUMPTION
+                && !settle.destroy
+                && transaction.getActionKind() == null
+                && !settle.flows.isEmpty()
+                && settle.flows.stream()
+                        .allMatch(flow -> flow != null && flow.isCost() && cannonball(flow.itemId))) {
+            // The cannon's balls are supplies wherever they leave the pack: a Fire or Load, a
+            // ship-cannon shot from the pack, a manual drop, or the loss leg of a part-pickup
+            // (owner 1.3.4).
+            transaction.setActionKind(SUPPLIES);
+        }
         if (retainTransaction) {
             if (type != TransactionType.TRANSFER
                     && type != TRADE
@@ -2831,10 +3105,7 @@ class Engine {
                 && primingStableTicks >= requiredStableTicks) {
             baseline = current;
             baselinePriming = false;
-            primingSnapshot = null;
-            primingObservedTicks = 0;
-            primingStableTicks = 0;
-            clearPendingChange();
+            clearPriming();
             consumeContext();
         }
     }
@@ -3035,10 +3306,7 @@ class Engine {
         inbox.drop(LOAD_TARGET);
         baseline = null;
         baselinePriming = primeBaseline;
-        primingSnapshot = null;
-        primingObservedTicks = 0;
-        primingStableTicks = 0;
-        clearPendingChange();
+        clearPriming();
         clearSettledContext();
         resetHelpers();
         inbox.drop(PRIVATE_LOOT, LOOT_RESERVE, DISMANTLE_CLICK, CONSUME, DROP_CLICK, DROPPED);
@@ -3091,8 +3359,9 @@ class Engine {
     transient Map<String, Transaction> ground;
 
     /**
-     * An own drop or fired ammo stays on the ground, yours, for 3 minutes (300 ticks); balls in a
-     * cannon for as long as it can stand, 35 minutes.
+     * An own drop or fired ammo stays on the ground, yours, for 3 minutes (300 ticks); balls that
+     * went into any cannon for as long as it can stand, 35 minutes (dwarf part-pickups and ship
+     * volleys alike).
      */
     void rememberDrop(Transaction drop, Predicate<Flow> onGround) {
         if (ground != null) remember(drop);
@@ -3200,6 +3469,14 @@ class Engine {
         pendingSnapshot = null;
         pendingStableTicks = 0;
         inbox.drop(PENDING_CLAIM);
+    }
+
+    /** The priming window ends: its counters and any pending change reset together. */
+    void clearPriming() {
+        primingSnapshot = null;
+        primingObservedTicks = 0;
+        primingStableTicks = 0;
+        clearPendingChange();
     }
 
     boolean matchesConsume(List<Flow> flows, boolean hardTransferEvidence) {
@@ -3345,6 +3622,25 @@ class Engine {
                             ChargeCheck.unitsPerItem(partition.variant, flow.itemId)));
         }
         return transfer;
+    }
+
+    /**
+     * A load whose components can never be refunded (crystal armour and the crystal shield): the
+     * shards are committed to the piece, so they book as a counted Supplies spend now instead of a
+     * neutral transfer (owner 2026-10-12). A revert keeps the seeds and loses these charges; the
+     * piece keeps no Check baseline to reconcile.
+     */
+    Transaction recordCommittedLoad(LoadTarget partition, long now) {
+        if (partition == null || partition.ambiguousCandidates.isEmpty() || !live()) return null;
+        return bookCharge(
+                now,
+                msg("committed-load")
+                        + nonBlank(partition.variant.getDisplayName(), "Crystal charges"),
+                Confidence.CONFIRMED,
+                msg("committed-load-why") + partition.variant.getDisplayName() + ".",
+                partition.ambiguousCandidates,
+                partition.variant.action,
+                false);
     }
 
     Transaction advanceContext(long now) {
@@ -3679,5 +3975,51 @@ class Engine {
                 encounterId = empty(encounter) ? encounterId : encounter;
             }
         }
+    }
+}
+
+/** Source-backed quantities and their distinct source/encounter owners, in observation order. */
+@AllArgsConstructor
+class LootMatch {
+    static final LootMatch NONE =
+            new LootMatch(
+                    false,
+                    "",
+                    "General",
+                    Context.GENERIC,
+                    null,
+                    Collections.<Integer, Long>emptyMap(),
+                    Collections.emptyList());
+    boolean matched;
+    String note;
+    String activityName;
+    Context context;
+    String encounterId;
+    Map<Integer, Long> matchedQuantities;
+    List<LootMatch> sources;
+}
+
+@Singleton
+class TransactionClassifier {
+    TransactionType classify(Context context, List<Flow> flows) {
+        if (context == Context.TRANSFER) return TransactionType.TRANSFER;
+        boolean hasGain = false;
+        boolean hasCost = false;
+        for (Flow flow : flows) {
+            // Direction comes from quantity. An unavailable unit price produces a
+            // zero value, but it is still a real gain or cost that belongs in Review.
+            hasGain |= flow.isGain();
+            hasCost |= flow.isCost();
+        }
+        if (context == MARKET) return TRADE;
+        if (context == Context.PK_LOOT && hasGain) return TransactionType.PK_LOOT;
+        if (context == PK_DEATH && hasCost) return PK_DEATH_LOSS;
+        if (context == Context.LOOT && hasGain) return TransactionType.LOOT;
+        if (hasGain && hasCost) {
+            return context == PRODUCTION ? PROCESSING : UNCERTAIN;
+        }
+        if (hasGain) return GAIN;
+        if (hasCost) return CONSUMPTION;
+        return ADJUSTMENT;
     }
 }

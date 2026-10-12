@@ -151,30 +151,31 @@ class FlowFilters {
 
     /**
      * Removes same-variant charge-state swaps (full -> partial -> uncharged): one physical weapon
-     * changing item id is neither a gain nor a loss. Leftover flows keep their own rows.
+     * changing item id is neither a gain nor a loss. A 1:1 proxy pair (X and X(i)/(ei)/(ri)) is the
+     * same item changing state too, so an imbue never books a loss and a gain (owner 2026-10-12).
+     * Leftover flows keep their own rows.
      */
     static List<Flow> withoutSwaps(List<Flow> flows) {
         boolean[] dropped = new boolean[flows.size()];
         for (int i = 0; i < flows.size(); i++) {
             Flow cost = flows.get(i);
-            ChargeCheck.ChargedItem variant =
-                    cost == null || cost.quantityDelta >= 0L
-                            ? null
-                            : ChargeCheck.supportedForId(cost.itemId);
-            if (variant == null) continue;
+            if (cost == null || cost.quantityDelta >= 0L) continue;
+            ChargeCheck.ChargedItem variant = ChargeCheck.supportedForId(cost.itemId);
             for (int j = 0; j < flows.size(); j++) {
                 Flow gain = flows.get(j);
                 if (dropped[j]
                         || gain == null
                         || gain.quantityDelta <= 0L
                         || gain.itemId == cost.itemId
-                        || abs(gain.quantityDelta) != abs(cost.quantityDelta)
-                        || ChargeCheck.supportedForId(gain.itemId) != variant) {
+                        || abs(gain.quantityDelta) != abs(cost.quantityDelta)) {
                     continue;
                 }
-                dropped[i] = true;
-                dropped[j] = true;
-                break;
+                if (variant != null && ChargeCheck.supportedForId(gain.itemId) == variant
+                        || reducedBase(cost.itemId) == reducedBase(gain.itemId)) {
+                    dropped[i] = true;
+                    dropped[j] = true;
+                    break;
+                }
             }
         }
         var result = new ArrayList<Flow>();
@@ -182,6 +183,12 @@ class FlowFilters {
             if (!dropped[i]) result.add(flows.get(i));
         }
         return result;
+    }
+
+    /** The item's 1:1 proxy base (an imbued variant reduces to its plain item), else itself. */
+    static int reducedBase(int itemId) {
+        int[] proxy = CurrencyProxyCatalogue.proxyOf(itemId);
+        return proxy != null && proxy[1] == 1 ? proxy[0] : itemId;
     }
 
     static boolean hasLoss(List<Flow> flows) {

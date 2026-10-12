@@ -141,6 +141,12 @@ class ChargeIntake {
     boolean observeCheck(String message, long now) {
         ChargeCheck read = parse(message);
         if (read == null) return false;
+        if (read.variant.isCommittedLoad()) {
+            // A committed load books when its shards arrive; its Check has nothing to compare
+            // (owner 2026-10-12).
+            engine.resetChecks(read.variant);
+            return true;
+        }
         if (read.variant == ChargedItem.BLOWPIPE) blowpipeDart = read.dartItemId;
         ChargedItem clicked = checkIntent() == null ? null : checkIntent().variant;
         // A revenant Check says only "bow", "sceptre" or "chainmace": the clicked weapon names the
@@ -148,7 +154,14 @@ class ChargeIntake {
         if (clicked != null
                 && clicked.check != null
                 && clicked != read.variant
-                && clicked.check == read.variant.check) read.variant = clicked;
+                && clicked.check == read.variant.check)
+        {
+            // The line names only the family ("your tome"); the clicked item names the row, and
+            // the read's stock is rebuilt from that row's own recipe (the tomes use different
+            // pages; owner 2026-10-12).
+            read.componentCounts = restock(clicked, read.variant, read.componentCounts);
+            read.variant = clicked;
+        }
         String targetIdentity = resolveCheck(read, client.getTickCount());
         if (targetIdentity == null && read.variant == ChargedItem.BLOOD_FURY) {
             // The amulet's count arrives on its own, without a Check click: bind it to the
@@ -357,21 +370,37 @@ class ChargeIntake {
      * The eye's identity for lines that arrive with no Check click: the worn staff, else the pack.
      */
     String eyeIdentity() {
+        return heldIdentity(ChargedItem.EYE_OF_AYAK, EquipmentInventorySlot.WEAPON);
+    }
+
+    /**
+     * A teleport click that carries no item id (a Rub-interface destination button, or a worn
+     * pendant's own minimenu destination) resolves the pendant itself: the worn amulet first,
+     * then the pack (owner 1.3.4).
+     */
+    void bookAtesPendant(long now) {
+        String identity = heldIdentity(ChargedItem.ATES, EquipmentInventorySlot.AMULET);
+        if (identity != null)
+            bookAttackEstimate(
+                    ChargedItem.ATES, identityItemId(identity), identity, ActionKind.SUPPLIES, now);
+    }
+
+    /**
+     * The identity of a held item of this family: the one worn in that equipment slot first, then
+     * the first one in the pack; null when neither holds one.
+     */
+    String heldIdentity(ChargedItem variant, EquipmentInventorySlot wornSlot) {
         ItemContainer worn = container(InventoryID.WORN);
-        if (worn != null) {
-            Item weapon = worn.getItem(EquipmentInventorySlot.WEAPON.getSlotIdx());
-            if (weapon != null && supportedForId(weapon.getId()) == ChargedItem.EYE_OF_AYAK) {
-                return wornIdentity(ChargedItem.EYE_OF_AYAK, weapon.getId());
-            }
-        }
+        Item item = worn == null ? null : worn.getItem(wornSlot.getSlotIdx());
+        if (item != null && supportedForId(item.getId()) == variant)
+            return weaponIdentity(
+                    InterfaceID.Wornitems.UNIVERSE, wornSlot.getSlotIdx(), item.getId(), variant);
         ItemContainer inventory = container(InventoryID.INV);
         if (inventory == null) return null;
         for (int slot = 0; slot < inventory.size(); slot++) {
-            Item item = inventory.getItem(slot);
-            if (item != null && supportedForId(item.getId()) == ChargedItem.EYE_OF_AYAK) {
-                return weaponIdentity(
-                        InterfaceID.Inventory.ITEMS, slot, item.getId(), ChargedItem.EYE_OF_AYAK);
-            }
+            item = inventory.getItem(slot);
+            if (item != null && supportedForId(item.getId()) == variant)
+                return weaponIdentity(InterfaceID.Inventory.ITEMS, slot, item.getId(), variant);
         }
         return null;
     }
@@ -427,11 +456,25 @@ class ChargeIntake {
         if ("inspect".equals(option) && target.contains("old memorial"))
             engine.markChargeLoad(
                     ChargedItem.MEMOIRS, ItemID.LAWRUNE, "law rune", null, LOAD_TICKS);
+        if (isAtesDestination(event)) {
+            // A Rub-interface destination button carries no item id: the pendant itself, worn or
+            // in the pack, names the teleport (owner 1.3.4).
+            bookAtesPendant(SafeMath.now());
+            return;
+        }
         if (!isAtesLocation(option)) return;
         int itemId = weaponItemId(event);
         ChargedItem variant = supportedForId(itemId);
+        if (variant == null && target.contains("pendant of ates")) {
+            // A worn pendant's own minimenu destination can carry no item id either (owner 1.3.4
+            // live capture: "Nemus Retreat" arrived with param1 on the worn amulet and itemId
+            // -1); resolve the pendant itself rather than drop the click.
+            bookAtesPendant(SafeMath.now());
+            return;
+        }
         if (variant != ChargedItem.ATES && variant != ChargedItem.MEMOIRS) return;
         String identity = clickedIdentity(event, variant, itemId);
+        if (identity == null) identity = wornCheckIdentity(variant, itemId);
         if (identity != null)
             bookAttackEstimate(variant, itemId, identity, ActionKind.SUPPLIES, SafeMath.now());
     }
@@ -448,6 +491,17 @@ class ChargeIntake {
 
     /** The pendant's six teleport locations, normalized like menu options. */
     static final List<String> LOCATIONS = GameData.names("ates_locations");
+
+    /** The Rub interface's six destination buttons; a click there is a teleport (owner 1.3.4). */
+    static final Set<Integer> ATES_DESTINATIONS = GameData.byId("ates_destinations").keySet();
+
+    /** A Rub-interface destination click; the event carries the packed component id. */
+    static boolean isAtesDestination(MenuOptionClicked event) {
+        if (event == null) return false;
+        if (ATES_DESTINATIONS.contains(event.getParam1())) return true;
+        Widget widget = event.getWidget();
+        return widget != null && ATES_DESTINATIONS.contains(widget.getId());
+    }
 
     /**
      * A local cast or shot graphic books this use's pinned recipe as a LIKELY estimate; the next
@@ -567,7 +621,40 @@ class ChargeIntake {
         if (recipe == null || recipe.isEmpty()) return;
         Transaction receipt =
                 engine.bookEstimatedCharge(identity, variant.displayName, kind, recipe, now);
-        if (receipt != null) receipt.castItemId = weaponId;
+        if (receipt != null) {
+            receipt.castItemId = weaponId;
+            if (variant == ChargedItem.ATES) {
+                lastAtesIdentity = identity;
+                lastAtesTransactionId = receipt.getId();
+                lastAtesAt = now;
+            }
+        }
+    }
+
+    /** How long after a pendant click its refusal message still cancels the estimate. */
+    static final long REFUSAL_WINDOW_MILLIS = 3_000L;
+
+    /** The newest pendant click's estimate, so a refusal can remove exactly that row (1.3.4). */
+    String lastAtesIdentity;
+    String lastAtesTransactionId;
+    long lastAtesAt;
+
+    /**
+     * The game refused a pendant teleport ("you appear to already be at that location"), so the
+     * click consumed nothing: the estimate that click booked is removed through the announced
+     * automatic-evidence path (owner 1.3.4). Earlier pendant estimates are untouched.
+     */
+    void refusedTeleport(long now) {
+        String identity = lastAtesIdentity;
+        String transactionId = lastAtesTransactionId;
+        lastAtesIdentity = null;
+        lastAtesTransactionId = null;
+        if (identity == null
+                || transactionId == null
+                || now - lastAtesAt > REFUSAL_WINDOW_MILLIS) {
+            return;
+        }
+        engine.forfeitEstimate(identity, transactionId);
     }
 
     /** A family may cast with more than one local graphic (Sanguinesti's Justiciar variant). */
@@ -602,6 +689,25 @@ class ChargeIntake {
     }
 
     /**
+     * The worn-container identity of a clicked item, by the slot that actually holds it. A Check
+     * from the Worn Equipment tab arrives with param0 -1 (owner capture 2026-10-12), so the
+     * clicked location is unknown; the item's own worn slot is the identity the estimates use.
+     */
+    String wornCheckIdentity(ChargedItem variant, int weaponItemId) {
+        if (client == null || variant == null) return null;
+        ItemContainer worn = client.getItemContainer(InventoryID.WORN);
+        if (worn == null) return null;
+        for (EquipmentInventorySlot slot : EquipmentInventorySlot.values()) {
+            Item item = worn.getItem(slot.getSlotIdx());
+            if (item == null || supportedForId(item.getId()) != variant) continue;
+            if (weaponItemId > 0 && item.getId() != weaponItemId) continue;
+            return weaponIdentity(
+                    InterfaceID.Wornitems.UNIVERSE, slot.getSlotIdx(), item.getId(), variant);
+        }
+        return null;
+    }
+
+    /**
      * The eye's mode-aware per-cast recipe, keyed off its own charge line's wording (owner
      * 2026-09-30).
      */
@@ -632,7 +738,7 @@ class ChargeIntake {
      * none.
      */
     static long[] dartLoss(String capeName) {
-        String cape = capeName == null ? "" : capeName.toLowerCase(Locale.ROOT);
+        String cape = Phrases.lower(capeName);
         if (cape.contains("assembler") || cape.contains("dizana")) return new long[] {1L, 5L};
         if (cape.contains("accumulator")) return new long[] {7L, 25L};
         if (cape.contains("attractor")) return new long[] {2L, 5L};
@@ -740,6 +846,14 @@ class ChargeIntake {
             engine.resetChecks(itemVariant);
             return;
         }
+        if ("charge".equals(option) && itemVariant != null && !itemVariant.recipe.isEmpty()) {
+            // A right-click Charge prompt applies the weapon's own component from the pack
+            // (Tonalztics of Ralos: "You apply N charges…", OSRS Wiki transcript 2026-10-12).
+            int part = itemVariant.recipe.keySet().iterator().next();
+            engine.markChargeLoad(
+                    itemVariant, part, itemName(part), clickedIdentity(event, itemVariant, rawItemId), LOAD_TICKS);
+            return;
+        }
         if (("uncharge".equals(option) || "unload".equals(option) || "empty".equals(option))
                 && itemVariant != null) {
             // These actions can return loaded components. A later lower Check value
@@ -758,8 +872,14 @@ class ChargeIntake {
             }
             return;
         }
-        if (!"check".equals(option) || itemVariant == null || !itemVariant.implemented) return;
+        if (!"check".equals(option) || itemVariant == null || !itemVariant.implemented
+                || itemVariant.isCommittedLoad()) return;
         String targetIdentity = clickedIdentity(event, itemVariant, rawItemId);
+        if (targetIdentity == null) {
+            // A Check from the Worn Equipment tab carries no slot (param0 -1, owner capture
+            // 2026-10-12): the item's own worn slot names the baseline the estimates use.
+            targetIdentity = wornCheckIdentity(itemVariant, rawItemId);
+        }
         if (targetIdentity != null)
             startCheck(itemVariant, targetIdentity, client.getTickCount(), 2);
     }
@@ -835,6 +955,8 @@ class ChargeIntake {
     void armLoad(MenuOptionClicked event, String option) {
         // Answering the "How many charges?" prompt is part of the same load (owner 1.2).
         if (isDialogAnswer(event, option)) return;
+        // A right-click Charge prompt arms its load in armCheck (the Tonalztics of Ralos).
+        if ("charge".equals(option)) return;
         // On a widget-target click the clicked widget is the target; the item being used is the
         // client's selected widget. Either order loads: scales on the blowpipe, or the blowpipe on
         // them.
@@ -918,5 +1040,10 @@ class ChargeIntake {
         if (variant == null || weaponItemId <= 0 || slot < 0 || widgetId <= 0 || widgetGroup <= 0)
             return null;
         return widgetGroup + ":" + slot + ":" + weaponItemId + ":" + variant.name();
+    }
+
+    /** The item id inside a {@link #weaponIdentity} ("group:slot:item:variant"). */
+    static int identityItemId(String identity) {
+        return Integer.parseInt(identity.split(":")[2]);
     }
 }

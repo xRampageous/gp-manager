@@ -20,6 +20,7 @@ RAID_SHARED_BAG	@shared-raid	RAID_SHARED_BAG	@raid-shared
 STASH_UNIT	stash unit|stash 	STASH_UNIT	@stash-unit
 POH_COSTUME	@costume-room	POH_COSTUME	@poh-costume
 DEPOSIT_BOX	deposit box	DEPOSIT_BOX	@deposit-box-transfer
+GOTR_DEPOSIT_POOL	deposit-runes+deposit pool	GOTR_DEPOSIT_POOL	@deposit-pool
 IMP_BOX	imp-in-a-box	IMP_BOX	Sent to the bank by an imp-in-a-box
 CHUG_BARREL	chugging barrel	CHUG_BARREL	Put in the chugging barrel
 SCROLL_BOOK	master scroll book	SCROLL_BOOK	Master scroll book

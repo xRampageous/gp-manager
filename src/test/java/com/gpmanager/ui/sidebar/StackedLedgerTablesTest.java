@@ -42,7 +42,7 @@ public class StackedLedgerTablesTest
         List<String> labels = onEdt(() -> labels(page.body()));
         assertTrue(labels.stream().anyMatch(label -> label.startsWith("GAINS \u00b7")));
         assertTrue(labels.stream().anyMatch(label -> label.startsWith("LOSSES \u00b7")));
-        assertTrue(labels.stream().anyMatch(label -> label.startsWith("MARKET \u00b7")));
+        assertTrue(labels.stream().anyMatch(label -> label.startsWith("TRADE \u00b7")));
         // The scope Net stays on Live/HUD; the page bar is the scope toolbar only (owner 2026-10-01).
         assertFalse("no multi-line Total block remains", labels.contains("TOTAL"));
         assertFalse("no global All/Gains/Costs/Market/Review/Corrected tab strip",

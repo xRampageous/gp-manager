@@ -1,8 +1,13 @@
 package com.gpmanager;
 
+import java.lang.reflect.Proxy;
+import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.Collections;
+import java.util.List;
 import java.util.Map;
+import net.runelite.api.ActorSpotAnim;
+import net.runelite.api.Skill;
 import net.runelite.api.gameval.AnimationID;
 import net.runelite.api.gameval.ItemID;
 import net.runelite.api.gameval.InterfaceID;
@@ -11,12 +16,27 @@ import org.junit.Test;
 import static org.junit.Assert.assertArrayEquals;
 import static org.junit.Assert.assertEquals;
 import static org.junit.Assert.assertFalse;
+import static org.junit.Assert.assertNotNull;
 import static org.junit.Assert.assertNull;
 import static org.junit.Assert.assertTrue;
 
-/** Cast-graphic estimate evidence and charge-state swap neutrality. */
-public class ChargeCastEstimateTest
+/**
+ * What books a charge estimate and at what price: the pinned cast graphics, attack animations and
+ * spot anims, the eye's and blood fury's per-hit rules, dart loss by cape slot, recipes, kinds,
+ * fractional accrual and charge-state swap neutrality (owners 2026-09-29 and 1.1).
+ */
+public class ChargeEstimateTriggerTest
 {
+    private final List<Integer> casts = new ArrayList<>();
+    private final ChargeIntake intake = new ChargeIntake(null, null, null, null, null)
+    {
+        @Override
+        void onGraphic(int graphicId, long now)
+        {
+            casts.add(graphicId);
+        }
+    };
+
     @Test
     public void castGraphicsArePinnedPerFamilyAndIgnoreUnsupportedVariants()
     {
@@ -124,7 +144,7 @@ public class ChargeCastEstimateTest
     public void saeldorIsAShardFedBladeThatBillsOneChargePerAttack()
     {
         // One charge per attack, hit or miss; a shard feeds 100 charges and prices at a hundredth.
-        // The Check text is not pinned yet, so the blade is estimate-only for now.
+        // Its crystal-family Check now books measured shards (ChargeCheckToCheckContractTest).
         assertEquals(ActionKind.SUPPLIES, ChargeIntake.kindFor(ChargeCheck.ChargedItem.SAELDOR));
         assertTrue(ChargeIntake.isPinnedAttack(ChargeCheck.ChargedItem.SAELDOR, AnimationID.HUMAN_SWORD_SLASH));
         assertTrue(ChargeIntake.isPinnedAttack(ChargeCheck.ChargedItem.SAELDOR, AnimationID.HUMAN_SWORD_LUNGE));
@@ -190,6 +210,212 @@ public class ChargeCastEstimateTest
 
         Flow swamp = flow(ItemID.TOXIC_TOTS_CHARGED, "Trident of the Swamp", -1L, 3_000L);
         assertEquals(2, FlowFilters.withoutSwaps(Arrays.asList(swamp, partial)).size());
+    }
+
+    @Test
+    public void eyeChargeLineIsAParsedTearRead()
+    {
+        ChargeCheck eye = ChargeCheck.parse("The Eye of Ayak has been charged with demon tears. It currently has 1,996 charges.");
+        assertNotNull("the owner's live line must parse", eye);
+        assertEquals(ChargeCheck.ChargedItem.EYE_OF_AYAK, eye.variant);
+        assertTrue(eye.bookable);
+        assertEquals(Long.valueOf(1_996L), eye.componentCounts.get(ItemID.DEMON_TEAR));
+    }
+
+    @Test
+    public void eyeLoadsValidateForBothChargingModes()
+    {
+        assertTrue(ChargeCheck.isLoadComponent(ChargeCheck.ChargedItem.EYE_OF_AYAK, ItemID.DEMON_TEAR, "Demon tear"));
+        assertTrue(ChargeCheck.isLoadComponent(ChargeCheck.ChargedItem.EYE_OF_AYAK, ItemID.DEATHRUNE, "Death rune"));
+        assertTrue(ChargeCheck.isLoadComponent(ChargeCheck.ChargedItem.EYE_OF_AYAK, ItemID.CHAOSRUNE, "Chaos rune"));
+        assertFalse("an unrelated rune never validates as an eye load",
+            ChargeCheck.isLoadComponent(ChargeCheck.ChargedItem.EYE_OF_AYAK, ItemID.BLOODRUNE, "Blood rune"));
+    }
+
+    @Test
+    public void eyeRecipeFollowsItsOwnChargingMode()
+    {
+        assertEquals(Long.valueOf(1L), ChargeIntake.eyeRecipe(false).get(ItemID.DEMON_TEAR));
+        assertNull(ChargeIntake.eyeRecipe(false).get(ItemID.DEATHRUNE));
+        assertEquals(Long.valueOf(2L), ChargeIntake.eyeRecipe(true).get(ItemID.DEATHRUNE));
+        assertEquals(Long.valueOf(1L), ChargeIntake.eyeRecipe(true).get(ItemID.CHAOSRUNE));
+        assertNull("a rune-charged eye never estimates tears",
+            ChargeIntake.eyeRecipe(true).get(ItemID.DEMON_TEAR));
+    }
+
+    @Test
+    public void eyeRuneModeParsesAsRunesNotTears()
+    {
+        ChargeCheck runes = ChargeCheck.parse("The Eye of Ayak has been charged with runes. It currently has 98 charges.");
+        assertNotNull(runes);
+        assertEquals(ChargeCheck.ChargedItem.EYE_OF_AYAK, runes.variant);
+        assertEquals(Long.valueOf(196L), runes.componentCounts.get(ItemID.DEATHRUNE));
+        assertEquals(Long.valueOf(98L), runes.componentCounts.get(ItemID.CHAOSRUNE));
+        assertNull("a rune-charged eye never books demon tears",
+            runes.componentCounts.get(ItemID.DEMON_TEAR));
+    }
+
+    @Test
+    public void eyeIsAChargeMeasuredFamilyAtOneTearPerCharge()
+    {
+        assertTrue(ChargeCheck.ChargedItem.EYE_OF_AYAK.implemented);
+        assertEquals(1, ChargeCheck.unitsPerItem(ChargeCheck.ChargedItem.EYE_OF_AYAK, ItemID.DEMON_TEAR));
+    }
+
+    @Test
+    public void eyeCastsBookOneDemonTearLikeASpell()
+    {
+        assertEquals(ActionKind.CAST, ChargeIntake.kindFor(ChargeCheck.ChargedItem.EYE_OF_AYAK));
+        assertEquals(Long.valueOf(1L), ChargeIntake.recipeOf(ChargeCheck.ChargedItem.EYE_OF_AYAK).get(ItemID.DEMON_TEAR));
+        assertEquals(1, ChargeCheck.unitsPerItem(ChargeCheck.ChargedItem.EYE_OF_AYAK, ItemID.DEMON_TEAR));
+    }
+
+    @Test
+    public void magicXpPinsTheEyesOwnCastTrigger()
+    {
+        ChargeIntake intake = new ChargeIntake(null, null, null, null, null);
+        intake.eyeCandidateAnimation = 9276;
+        intake.eyeCandidateTick = 10;
+        intake.learnEyeCast(Skill.MAGIC, 11, 11_000L);
+        assertTrue(intake.eyeAnimations.contains(9276));
+        assertTrue("the proven candidate never leaks into a later cast", intake.eyeCandidateTick < 0);
+        intake.eyeCandidateGraphic = 7000;
+        intake.eyeCandidateTick = 20;
+        intake.learnEyeCast(Skill.MAGIC, 21, 21_000L);
+        assertTrue("the cast graphic is learned too, so a once-only animation cannot starve it",
+            intake.eyeGraphics.contains(7000));
+    }
+
+    @Test
+    public void combatXpStyleDecidesMeleeForEveryWeapon()
+    {
+        ChargeIntake intake = new ChargeIntake(null, null, null, null, null);
+        assertFalse(intake.furyMelee(10));
+        intake.learnEyeCast(Skill.ATTACK, 10, 10_000L);
+        assertTrue("melee XP confirms the stance", intake.furyMelee(12));
+        intake.learnEyeCast(Skill.RANGED, 20, 20_000L);
+        assertFalse("ranged XP denies melee", intake.furyMelee(21));
+        intake.learnEyeCast(Skill.DEFENCE, 30, 30_000L);
+        assertTrue("defensive melee counts too", intake.furyMelee(32));
+        intake.learnEyeCast(Skill.MAGIC, 40, 40_000L);
+        assertFalse("magic XP denies melee", intake.furyMelee(41));
+        intake.learnEyeCast(Skill.ATTACK, 100, 100_000L);
+        assertFalse("a stale stance expires", intake.furyMelee(200));
+    }
+
+    @Test
+    public void furyEstimatesOneTenThousandthOfAShardPerCountedHit()
+    {
+        // The hit estimate must price in hit units, so the Check delta reconciles on the same scale.
+        assertEquals(ActionKind.SUPPLIES, ChargeIntake.kindFor(ChargeCheck.ChargedItem.BLOOD_FURY));
+        assertEquals(Long.valueOf(1L), ChargeIntake.recipeOf(ChargeCheck.ChargedItem.BLOOD_FURY).get(ItemID.BLOOD_SHARD));
+        assertEquals(10_000, ChargeCheck.unitsPerItem(ChargeCheck.ChargedItem.BLOOD_FURY, ItemID.BLOOD_SHARD));
+    }
+
+    @Test
+    public void seasTridentEstimatesBookTenCoinsPerCast()
+    {
+        assertEquals(Long.valueOf(10L), ChargeIntake.recipeOf(ChargeCheck.ChargedItem.TRIDENT_SEAS).get(ItemID.COINS));
+        assertEquals(Long.valueOf(10L),
+            ChargeIntake.recipeOf(ChargeCheck.ChargedItem.TRIDENT_SEAS_ENHANCED).get(ItemID.COINS));
+    }
+
+    @Test
+    public void fractionalPricingCarriesTheWholeItemValueExactly()
+    {
+        ChargeIntake intake = new ChargeIntake(null, null, null, null, null);
+        // 100 units of a 101-gp item: the first 50 book 50, the next 50 book 51 — 101 in total.
+        assertEquals(50L, intake.carriedValue(ChargeCheck.ChargedItem.BLOOD_FURY, 1, 50L, 101, 100));
+        assertEquals(51L, intake.carriedValue(ChargeCheck.ChargedItem.BLOOD_FURY, 1, 50L, 101, 100));
+        ChargeIntake other = new ChargeIntake(null, null, null, null, null);
+        assertEquals("a fresh window books the whole item at once", 101L,
+            other.carriedValue(ChargeCheck.ChargedItem.BLOOD_FURY, 1, 100L, 101, 100));
+    }
+
+    @Test
+    public void eyeModeIsTrackedPerIdentity()
+    {
+        ChargeIntake intake = new ChargeIntake(null, null, null, null, null);
+        intake.eyeRunes.put("a", true);
+        assertTrue("the rune-charged staff reads runes", intake.eyeRune("a"));
+        assertFalse("another staff keeps the tear default", intake.eyeRune("b"));
+    }
+
+    @Test
+    public void aCastStillPlayingIsNotBookedAgainWhenAnotherAnimJoins()
+    {
+        intake.spotAnims(Arrays.asList(anim(1251, 100)), 0L);
+        intake.spotAnims(Arrays.asList(anim(1251, 100), anim(85, 130)), 0L);
+        assertEquals(Arrays.asList(1251, 85), casts);
+    }
+
+    @Test
+    public void theSameGraphicCastAgainIsANewAnim()
+    {
+        intake.spotAnims(Arrays.asList(anim(1251, 100)), 0L);
+        intake.spotAnims(Arrays.asList(anim(1251, 160)), 0L);
+        intake.spotAnims(Arrays.asList(), 0L);
+        intake.spotAnims(Arrays.asList(anim(1251, 220)), 0L);
+        assertEquals(Arrays.asList(1251, 1251, 1251), casts);
+    }
+
+    @Test
+    public void twoNewAnimsOnOneChangeAreEachOffered()
+    {
+        // Each keeps one booking per tick and graphic, and ignores graphics no weapon uses.
+        intake.spotAnims(Arrays.asList(anim(1251, 100), anim(1252, 100)), 0L);
+        assertEquals(Arrays.asList(1251, 1252), casts);
+    }
+
+    @Test
+    public void theCapeSlotSetsTheDartsEachShotSpends()
+    {
+        assertArrayEquals(new long[] {1L, 1L}, ChargeIntake.dartLoss(""));
+        assertArrayEquals(new long[] {1L, 1L}, ChargeIntake.dartLoss(null));
+        assertArrayEquals(new long[] {2L, 5L}, ChargeIntake.dartLoss("Ava's attractor"));
+        assertArrayEquals(new long[] {7L, 25L}, ChargeIntake.dartLoss("Ava's accumulator"));
+        assertArrayEquals(new long[] {1L, 5L}, ChargeIntake.dartLoss("Ava's assembler"));
+        assertArrayEquals(new long[] {1L, 5L}, ChargeIntake.dartLoss("Masori assembler max cape"));
+        assertArrayEquals(new long[] {1L, 5L}, ChargeIntake.dartLoss("Blessed dizana's quiver"));
+    }
+
+    @Test
+    public void anAssemblerBooksOneDartEveryFiveShots()
+    {
+        long carry = 0L;
+        long booked = 0L;
+        for (int shot = 0; shot < 25; shot++)
+        {
+            long[] step = ChargeIntake.accrue(carry, 1L, 5L);
+            booked += step[0];
+            carry = step[1];
+        }
+        assertEquals(5L, booked);
+        assertEquals(0L, carry);
+    }
+
+    @Test
+    public void aCheckOrLoadNamesTheDart()
+    {
+        ChargeIntake intake = new ChargeIntake(null, null, null, null, null);
+        intake.blowpipeDart = -1;
+        assertTrue("the dart table knows dragon darts", ChargeCheck.DARTS.containsValue(11230));
+    }
+
+    private static ActorSpotAnim anim(int id, int startCycle)
+    {
+        return (ActorSpotAnim) Proxy.newProxyInstance(ActorSpotAnim.class.getClassLoader(),
+            new Class<?>[] {ActorSpotAnim.class}, (proxy, method, args) ->
+            {
+                switch (method.getName())
+                {
+                    case "getId": return id;
+                    case "getStartCycle": return startCycle;
+                    default:
+                        if (method.getReturnType() == int.class) return 0;
+                        return null;
+                }
+            });
     }
 
     private static Flow flow(int itemId, String name, long quantity, long unitPrice)

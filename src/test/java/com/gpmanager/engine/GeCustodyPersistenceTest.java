@@ -81,7 +81,7 @@ public class GeCustodyPersistenceTest
 
         SavedState state = engine.savedState();
         assertEquals(SavedState.CURRENT_SCHEMA_VERSION, state.schemaVersion);
-        assertEquals(109, state.schemaVersion);
+        assertEquals(110, state.schemaVersion);
         assertEquals(1, state.getGeCustody().size());
         assertEquals(10L, state.getGeCustody().get(0).getCapturedQty());
 

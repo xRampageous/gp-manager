@@ -183,8 +183,8 @@ public class MarketActivityValueSemanticsTest
             created.apply(snapshot);
             return created;
         });
-        assertEquals("the Market cell shows the result versus basis", Fmt.signed(-1_200L),
-            HeroProbe.cell(page.hero, "MARKET"));
+        assertEquals("the Trade cell shows the result versus basis", Fmt.signed(-1_200L),
+            HeroProbe.cell(page.hero, "TRADE"));
     }
 
     @Test

@@ -39,6 +39,8 @@ public class NeutralStorageTableTest
         {"Costume room", "PoH costume room transfer"},
         {"poh costume", "PoH costume room transfer"},
         {"Bank deposit box", "Deposit box transfer"},
+        {"Deposit-runes Deposit Pool", "Deposit pool transfer"},
+        {"deposit pool", null},
         {"seed vault deposit box", "Seed vault transfer"},
         {"shared storage raid bag", "GIM shared storage transfer"},
         {"  ", null},

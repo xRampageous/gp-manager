@@ -40,6 +40,9 @@ class Valuation implements FlowValuator {
     GpManagerConfig config;
     @Getter volatile Economy economyState;
 
+    /** Karamja gloves 1-4 worn: sampled by the plugin, read when a proxy rate is chosen. */
+    volatile boolean karamjaGlovesWorn;
+
     @Inject
     Valuation(ItemManager itemManager, GpManagerConfig config) {
         // Accounting explicitly requests GP Manager's chosen RuneLite active market route (the
@@ -160,7 +163,7 @@ class Valuation implements FlowValuator {
         try {
             for (int id :
                     ItemVariationMapping.getVariations(ItemVariationMapping.map(flow.itemId))) {
-                Flow unit = valueOne(id, 1L, priceOverrides, now);
+                Flow unit = valueOne(id, 1L, priceOverrides, now, false);
                 String unitName = unit == null ? "" : unit.itemName;
                 if (unitName == null || !one.equals(Phrases.lower(unitName))) continue;
                 if (unit.getPriceSource() == MANUAL_OVERRIDE) return unit;
@@ -171,6 +174,78 @@ class Valuation implements FlowValuator {
             return null;
         }
         return geCandidate;
+    }
+
+    /**
+     * The per-dose price for a dose variant with no quote of its own (owner 1.3.4): the family's
+     * highest-dose quote scaled by this variant's dose, so a Burning amulet(4) is four fifths of
+     * the (5) and one teleport costs a fifth. A manual override anywhere in the family is
+     * authoritative; RuneLite's variation mapping names the family and anything malformed fails
+     * closed to null.
+     */
+    Flow doseFamilyQuote(int itemId, String itemName, Map<Integer, Integer> priceOverrides) {
+        int dose = ActionReader.trailingDose(itemName);
+        String base = ActionReader.doseBaseName(itemName);
+        if (dose <= 0 || base.isEmpty()) return null;
+        int anchorDose = 0;
+        int anchorPrice = 0;
+        boolean manual = false;
+        try {
+            for (int id : ItemVariationMapping.getVariations(ItemVariationMapping.map(itemId))) {
+                if (id == itemId) continue;
+                String otherName = compositionName(id);
+                int otherDose = ActionReader.trailingDose(otherName);
+                if (otherDose <= 0
+                        || !base.equalsIgnoreCase(ActionReader.doseBaseName(otherName))) {
+                    continue;
+                }
+                Integer override = priceOverrides.get(id);
+                if (override != null && override > 0) {
+                    if (!manual || otherDose > anchorDose) {
+                        manual = true;
+                        anchorDose = otherDose;
+                        anchorPrice = override;
+                    }
+                    continue;
+                }
+                if (manual || otherDose <= anchorDose) continue;
+                int quote;
+                try {
+                    quote = marketQuotes.priceOf(id, true);
+                } catch (RuntimeException ignored) {
+                    continue;
+                }
+                if (quote > 0) {
+                    anchorDose = otherDose;
+                    anchorPrice = quote;
+                }
+            }
+        } catch (RuntimeException ignored) {
+            return null;
+        }
+        if (anchorDose <= 0 || anchorPrice <= 0) return null;
+        long scaled = (long) anchorPrice * dose / anchorDose;
+        if (scaled <= 0L || scaled > Integer.MAX_VALUE) return null;
+        return new Flow(
+                itemId,
+                itemName,
+                1L,
+                (int) scaled,
+                scaled,
+                manual ? MANUAL_OVERRIDE : GRAND_EXCHANGE,
+                0L);
+    }
+
+    /** One variation family member's display name, "" when the definition is unavailable. */
+    String compositionName(int id) {
+        try {
+            ItemComposition composition = compositions.apply(id);
+            return composition == null || composition.getName() == null
+                    ? ""
+                    : composition.getName();
+        } catch (RuntimeException ignored) {
+            return "";
+        }
     }
 
     private boolean normalizePotionPair(
@@ -254,6 +329,11 @@ class Valuation implements FlowValuator {
         this.economyState = state == null ? Economy.UNKNOWN : state;
     }
 
+    /** Client-thread Karamja-gloves snapshot; picks the improved proxy rate while worn. */
+    void setKaramjaGlovesWorn(boolean worn) {
+        this.karamjaGlovesWorn = worn;
+    }
+
     /**
      * Every main-game world (members, PvP, high risk, LMS, PvP Arena, skill total...) shares the
      * Grand Exchange and keeps automatic quotes. Only the separate economies (Deadman, Leagues,
@@ -291,6 +371,15 @@ class Valuation implements FlowValuator {
             long quantityDelta,
             Map<Integer, Integer> priceOverrides,
             long priceCapturedAtEpochMillis) {
+        return valueOne(itemId, quantityDelta, priceOverrides, priceCapturedAtEpochMillis, true);
+    }
+
+    Flow valueOne(
+            int itemId,
+            long quantityDelta,
+            Map<Integer, Integer> priceOverrides,
+            long priceCapturedAtEpochMillis,
+            boolean doseFallback) {
         boolean deferredClaim = DeferredClaims.of(itemId);
         try {
             ItemComposition composition = null;
@@ -341,11 +430,46 @@ class Valuation implements FlowValuator {
                             ? CurrencyProxyCatalogue.proxyOf(itemId)
                             : null;
             if (proxy != null) {
+                // Some exchanges improve while Karamja gloves are worn; the proxy row may
+                // carry the improved units after a slash (tokkul: 300,000 or 260,000 per onyx).
+                int units = proxy[1];
+                if (karamjaGlovesWorn) {
+                    int glovesUnits = CurrencyProxyCatalogue.glovesUnitsOf(itemId);
+                    if (glovesUnits > 0) units = glovesUnits;
+                }
                 try {
-                    marketPrice = max(0, marketQuotes.priceOf(proxy[0], true) / proxy[1]);
+                    marketPrice = max(0, marketQuotes.priceOf(proxy[0], true) / units);
                 } catch (RuntimeException ignored) {
                     // No proxy quote: the flow stays unpriced for Review.
                 }
+            }
+            // RuneLite's ItemMapping carries no bracelet of ethereum entry (upstream omission,
+            // verified 2026-10-12): the charged bracelet prices from its uncharged form's live
+            // quote, the same relationship the revenant weapons already have.
+            if (marketPrice == 0
+                    && itemId == ItemID.WILD_CAVE_BRACELET_CHARGED
+                    && !manualOverride
+                    && economyState == Economy.NORMAL
+                    && !unsupportedMapping.test(itemId)) {
+                try {
+                    marketPrice = max(0, marketQuotes.priceOf(ItemID.WILD_CAVE_BRACELET_UNCHARGED, true));
+                } catch (RuntimeException ignored) {
+                    // No quote: the flow stays unpriced for Review.
+                }
+            }
+            // A partial dose RuneLite cannot quote (Burning amulet(4)) is priced from its family's
+            // highest-dose quote at the same rate per dose (owner 1.3.4, GP-Per-Hour's fractional
+            // model); a manual override anywhere in the family is authoritative.
+            Flow doseQuote = null;
+            if (marketPrice == 0
+                    && doseFallback
+                    && !manualOverride
+                    && !deferredClaim
+                    && faceValue == 0
+                    && economyState == Economy.NORMAL
+                    && !CurrencyProxyCatalogue.isMapped(itemId)
+                    && !unsupportedMapping.test(itemId)) {
+                doseQuote = doseFamilyQuote(itemId, name, priceOverrides);
             }
             int unitPrice;
             PriceSource priceSource;
@@ -369,6 +493,10 @@ class Valuation implements FlowValuator {
                 // a hypothetical high-alchemy liquidation is never converted into booked GP.
                 unitPrice = marketPrice;
                 priceSource = proxy == null ? GRAND_EXCHANGE : CURRENCY_PROXY;
+            } else if (doseQuote != null) {
+                // The derived price follows its family anchor's source so provenance stays honest.
+                unitPrice = doseQuote.unitPrice;
+                priceSource = doseQuote.getPriceSource();
             } else {
                 unitPrice = 0;
                 priceSource = UNPRICED;
@@ -433,5 +561,24 @@ class Valuation implements FlowValuator {
     /** The owner's manual price overrides by item id. */
     Map<Integer, Integer> priceOverrides() {
         return ItemRuleParser.parsePriceOverrides(config.manualPriceOverrides());
+    }
+}
+
+class ItemRuleParser {
+    static Map<Integer, Integer> parsePriceOverrides(String value) {
+        if (Phrases.blank(value)) return Collections.emptyMap();
+        var result = new HashMap<Integer, Integer>();
+        for (String token : value.split(",")) {
+            String[] parts = token.trim().split("=", 2);
+            if (parts.length != 2) continue;
+            try {
+                int itemId = Integer.parseInt(parts[0].trim());
+                int price = Integer.parseInt(parts[1].trim());
+                if (itemId >= 0 && price >= 0) result.put(itemId, price);
+            } catch (NumberFormatException ignored) {
+                // Invalid entries are ignored so a typo cannot break tracking.
+            }
+        }
+        return result;
     }
 }

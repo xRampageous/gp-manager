@@ -489,10 +489,6 @@ class GrindsPage implements Shell.Page {
 
     // ---- text ---------------------------------------------------------------------------------
     /** Date and duration context: Today/Yesterday/date plus Active Time, never internal ids. */
-    static String contextLine(Recent recent, long now) {
-        return contextLine(recent, now, ZoneId.systemDefault());
-    }
-
     static String contextLine(Recent recent, long now, ZoneId zone) {
         ZoneId z = zone == null ? ZoneId.systemDefault() : zone;
         return dayLabel(Instant.ofEpochMilli(recent.startedAt).atZone(z).toLocalDate(), now, z)

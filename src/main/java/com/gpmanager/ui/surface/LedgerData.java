@@ -524,13 +524,16 @@ class LedgerData {
 
     static Group findGroup(
             List<Group> groups, String groupId, String contributionId, String transactionId) {
+        // Most specific anchor first: a receipt's own contribution must win over the transaction
+        // it came from, or a shop drill lands on the wrong side of the trade (one rune's group).
         for (Group group : groups) {
-            if (group.reviewRequired) continue;
-            if (group.containsContribution(groupId)
-                    || group.containsContribution(contributionId)
-                    || group.containsTransaction(transactionId)) {
-                return group;
-            }
+            if (!group.reviewRequired && group.containsContribution(groupId)) return group;
+        }
+        for (Group group : groups) {
+            if (!group.reviewRequired && group.containsContribution(contributionId)) return group;
+        }
+        for (Group group : groups) {
+            if (!group.reviewRequired && group.containsTransaction(transactionId)) return group;
         }
         // Review-required groups are still openable from the audit list detail.
         for (Group group : groups) {
@@ -598,9 +601,9 @@ class LedgerData {
     static boolean matchesSearch(ReviewRow row, String query) {
         if (Phrases.blank(query)) return true;
         String needle = Phrases.lower(query);
-        if (row.why != null && row.why.toLowerCase(ROOT).contains(needle)) return true;
+        if (Phrases.containsFolded(needle, row.why)) return true;
         for (ReviewRow.Item item : row.items) {
-            if (item.name != null && item.name.toLowerCase(ROOT).contains(needle)) return true;
+            if (Phrases.containsFolded(needle, item.name)) return true;
         }
         return false;
     }

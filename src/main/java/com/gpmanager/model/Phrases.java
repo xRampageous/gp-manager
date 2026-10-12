@@ -58,6 +58,14 @@ class Phrases {
         return false;
     }
 
+    /** True when any non-null term contains the already lower-case needle. */
+    static boolean containsFolded(String lowerNeedle, String... terms) {
+        for (String term : terms) {
+            if (term != null && term.toLowerCase(Locale.ROOT).contains(lowerNeedle)) return true;
+        }
+        return false;
+    }
+
     static boolean containsAll(String text, String... words) {
         for (String word : words) {
             if (!text.contains(word)) return false;

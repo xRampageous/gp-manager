@@ -82,6 +82,11 @@ class LootPresentationFilterService {
         return listMatch(hiddenCsv, itemName, quantity, true) == NONE ? NONE : HIDDEN;
     }
 
+    /** The Recent charge pattern for a row: its dose family, wildcarded (Burning amulet*). */
+    static String chargePattern(String itemName) {
+        return ActionReader.doseBaseName(itemName) + "*";
+    }
+
     static int listMatch(String csv, String itemName, long quantity, boolean wildcard) {
         String name = Phrases.orEmpty(itemName);
         for (Rule rule : rules(csv)) {

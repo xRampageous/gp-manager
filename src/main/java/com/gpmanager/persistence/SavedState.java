@@ -14,12 +14,12 @@ import java.util.*;
  * The durable account state. Contains only facts needed after restart: owners and sessions and
  * minimal unresolved claims.
  *
- * <p>Schema {@value #CURRENT_SCHEMA_VERSION} is the 1.3.3 data schema. There is no upgrade path: an
+ * <p>Schema {@value #CURRENT_SCHEMA_VERSION} is the 1.3.4 data schema. There is no upgrade path: an
  * older save is set aside and the profile starts fresh; anything newer is preserved read-only.
  */
 class SavedState {
-    /** The 1.3.3 data schema. Nothing older is read: it starts fresh with no upgrade path. */
-    static final int CURRENT_SCHEMA_VERSION = 109;
+    /** The 1.3.4 data schema. Nothing older is read: it starts fresh with no upgrade path. */
+    static final int CURRENT_SCHEMA_VERSION = 110;
 
     @Setter int schemaVersion = CURRENT_SCHEMA_VERSION;
 

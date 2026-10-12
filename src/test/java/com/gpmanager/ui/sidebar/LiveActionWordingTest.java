@@ -110,14 +110,23 @@ public class LiveActionWordingTest
             new Flow(12934, "Zulrah's scales", -1L, 110, -110L));
         blowpipe.note = "Measured charge spend \u00b7 Toxic blowpipe";
         List<LiveSnapshot.Recent> blowpipeRows = recents(blowpipe);
-        assertEquals("owner 1.1: only the darts, as Supplies; the scales stay a charge", 1, blowpipeRows.size());
-        assertEquals("Dragon dart", blowpipeRows.get(0).name);
+        assertEquals("owner 1.3.4: the darts as Supplies and the scales as a charge row", 2,
+            blowpipeRows.size());
+        LiveSnapshot.Recent darts = blowpipeRows.stream().filter(row -> "Dragon dart".equals(row.name))
+            .findFirst().orElseThrow(AssertionError::new);
+        assertEquals(LedgerData.CostView.SUPPLIES, darts.ledgerCostView);
+        LiveSnapshot.Recent scales = blowpipeRows.stream().filter(row -> "Zulrah's scales".equals(row.name))
+            .findFirst().orElseThrow(AssertionError::new);
+        assertEquals(LedgerData.CostView.CHARGES, scales.ledgerCostView);
 
         Transaction trident = action(10L, ActionKind.CAST,
             rune("Death rune", 560, -1L, -100L), rune("Chaos rune", 562, -1L, -50L),
             rune("Soul rune", 566, -1L, -100L));
         trident.note = "Measured charge spend \u00b7 Trident of the swamp";
-        assertTrue("charge use stays out of Recent (owner 2026-09-29)", recents(trident).isEmpty());
+        List<LiveSnapshot.Recent> tridentRows = recents(trident);
+        assertFalse("charge use is listed now (owner 1.3.4)", tridentRows.isEmpty());
+        assertTrue("every trident row is a Ledger charge row",
+            tridentRows.stream().allMatch(row -> row.ledgerCostView == LedgerData.CostView.CHARGES));
     }
 
     private static List<LiveSnapshot.Recent> recents(Transaction transaction)

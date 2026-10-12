@@ -20,7 +20,7 @@ public class SessionRepositoryMigrationTest
         Files.createDirectories(current);
         Files.writeString(
             current.resolve("sessions.json"),
-            "{\"schemaVersion\":109,\"generalSession\":{\"name\":\"Legacy\",\"transactions\":[]},\"history\":[]}",
+            "{\"schemaVersion\":110,\"generalSession\":{\"name\":\"Legacy\",\"transactions\":[]},\"history\":[]}",
             StandardCharsets.UTF_8);
 
         SavedState state = new SessionRepository(new Gson(), FilepathTestSupport.root(current)).load();
@@ -38,7 +38,7 @@ public class SessionRepositoryMigrationTest
         Files.createDirectories(current);
         Files.writeString(
             current.resolve("sessions.json"),
-            "{\"schemaVersion\":109,\"generalSession\":{\"name\":\"Broken undo\",\"transactions\":[],\"undoHistory\":[null,{\"timestampEpochMillis\":5}]},\"history\":[]}",
+            "{\"schemaVersion\":110,\"generalSession\":{\"name\":\"Broken undo\",\"transactions\":[],\"undoHistory\":[null,{\"timestampEpochMillis\":5}]},\"history\":[]}",
             StandardCharsets.UTF_8);
 
         SavedState state = new SessionRepository(new Gson(), FilepathTestSupport.root(current)).load();

@@ -102,6 +102,9 @@ class LiveSnapshot {
          * under Offers.
          */
         boolean open;
+
+        /** A charge or dose spend row: the charge hide may be offered on it (owner 1.3.4). */
+        boolean chargeRow;
     }
 
     boolean hasSession;
@@ -388,8 +391,6 @@ class LiveSnapshot {
             Semantics.Result projection, Map<String, Row> marketRows, RecentFilter filter) {
         var rows = new ArrayList<Recent>();
         for (Group group : projection.groups) {
-            // Charges live in the Ledger only.
-            if (group.chargeUse) continue;
             Recent row =
                     toRecent(
                             group,
@@ -398,9 +399,15 @@ class LiveSnapshot {
                                     : marketRows.get(group.marketPresentationId));
             // A canceled offer that returned everything stays in the Ledger, not Recent (owner
             // 2026-09-28).
-            if (row == null
-                    || "canceled".equals(row.tag)
-                    || !row.open && filter != null && !filter.showRecent(row.name, row.quantity)) {
+            if (row == null || "canceled".equals(row.tag)) continue;
+            // A charge or dose spend also answers to the separate charge list; the item list still
+            // gates every row and a dose gain is never hidden with the spends (owner 1.3.4).
+            if (!row.open
+                    && filter != null
+                    && !filter.showRecent(
+                            row.name,
+                            row.quantity,
+                            group.table == Semantics.Table.COSTS_SUPPLIES && group.chargeRow())) {
                 continue;
             }
             rows.add(row);
@@ -511,7 +518,8 @@ class LiveSnapshot {
                 marketResult,
                 settlementValue,
                 marketSide,
-                marketRow != null && LedgerData.isPending(marketRow.lifecycle));
+                marketRow != null && LedgerData.isPending(marketRow.lifecycle),
+                group.chargeRow());
     }
 
     /**

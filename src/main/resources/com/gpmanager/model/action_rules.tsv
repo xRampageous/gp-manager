@@ -5,10 +5,13 @@ eat	^eat	EAT
 ~scatter	scatter	SCATTER
 offer	^offer	OFFER
 cast	^cast	CAST
+chat eat	^you eat	EAT
+chat drink	^you drink	DRINK
+chat offer	^you offer	OFFER
 supplies	%light-tend	
 vessel	^empty |=vial|=jug|=beer glass	
 rune	$ rune	
-claim	=coin pouch|%clue|=impling jar|$ impling jar|hunters' loot sack|port coin bag|port reward bag|=hallowed sack	
+claim	=coin pouch|%clue|=impling jar|$ impling jar|hunters' loot sack|port coin bag|port reward bag|=hallowed sack|=intricate pouch|=seed pack|bounty supply crate	
 ingredient	!^grimy 	
 food	%pizza-cake-pie	
 partial	%pizza-pie	

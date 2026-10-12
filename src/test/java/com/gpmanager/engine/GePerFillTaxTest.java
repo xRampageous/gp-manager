@@ -141,7 +141,7 @@ public class GePerFillTaxTest
         Fixture fixture = new Fixture(RUNE, 40L);
         fixture.sellInFills(0, new long[] {30L, 10L}, new long[] {4_200L, 1_290L}, T0 + 1_000L);
         SavedState state = fixture.engine.savedState();
-        assertEquals(109, state.schemaVersion);
+        assertEquals(110, state.schemaVersion);
         GeOffer saved = state.getGeCustody().get(0);
         assertTrue(saved.fillTaxExact);
         assertEquals(80L, saved.getFillTaxGp());

@@ -295,7 +295,7 @@ public class LedgerGroupReceiptNavigationTest
 
         assertEquals(netBefore, market.engine.getMetrics(market.now).net);
         assertEquals(revisionBefore, market.engine.getRevision());
-        assertEquals(109, SavedState.CURRENT_SCHEMA_VERSION);
+        assertEquals(110, SavedState.CURRENT_SCHEMA_VERSION);
         assertEquals("RuneLite market", PriceSource.GRAND_EXCHANGE.toString());
     }
 

@@ -8,6 +8,7 @@ import org.junit.Test;
 
 import static org.junit.Assert.assertEquals;
 import static org.junit.Assert.assertFalse;
+import static org.junit.Assert.assertNull;
 import static org.junit.Assert.assertTrue;
 
 public final class ChargeLoadTransferEvidenceTest
@@ -96,6 +97,7 @@ public final class ChargeLoadTransferEvidenceTest
             2));
         evidence.inbox.tick(evidence.inbox.now + 1);
         evidence.inbox.tick(evidence.inbox.now + 1);
+        assertNull("the stale load intent is gone", evidence.inbox.peek(Inbox.LOAD_TARGET));
     }
 
 }

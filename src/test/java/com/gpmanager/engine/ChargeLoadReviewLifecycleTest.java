@@ -440,6 +440,34 @@ public class ChargeLoadReviewLifecycleTest
     }
 
 
+    /** A refundless crystal load books its shards as Supplies the moment they arrive. */
+    @Test
+    public void committedCrystalLoadsBookTheirShardsAsSupplies()
+    {
+        for (ChargeCheck.ChargedItem piece : new ChargeCheck.ChargedItem[] {
+            ChargeCheck.ChargedItem.CRYSTAL_HELM, ChargeCheck.ChargedItem.CRYSTAL_BODY,
+            ChargeCheck.ChargedItem.CRYSTAL_LEGS, ChargeCheck.ChargedItem.CRYSTAL_SHIELD})
+        {
+            Engine engine = engine();
+            long start = 100_000L;
+            engine.ensureSession(start);
+            engine.setBaseline(snapshot(ItemID.PRIF_CRYSTAL_SHARD, 42L));
+
+            engine.markChargeLoad(piece, ItemID.PRIF_CRYSTAL_SHARD, "Crystal shard", TARGET, 8);
+            engine.markDirty();
+            Transaction load = settle(engine, snapshot(ItemID.PRIF_CRYSTAL_SHARD, 38L), start + 600L);
+
+            assertEquals(piece.name(), TransactionType.CONSUMPTION, load.autoType());
+            assertTrue(piece.name(), load.isCounted());
+            assertEquals(piece.name(), GameData.msg("committed-load") + piece.getDisplayName(),
+                load.getNote());
+            assertEquals(piece.name(), ActionKind.SUPPLIES, load.getActionKind());
+            assertEquals(piece.name(), -2_000L, load.getNet());
+            assertEquals(piece.name(), 2_000L, engine.getMetrics(start + 2_400L).costs);
+            assertEquals(piece.name(), -2_000L, engine.getMetrics(start + 2_400L).net);
+        }
+    }
+
     private static int countTransactions(Session session, TransactionType type)
     {
         int count = 0;

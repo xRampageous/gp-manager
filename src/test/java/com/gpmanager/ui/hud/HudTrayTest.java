@@ -74,6 +74,8 @@ public class HudTrayTest
         assertEquals("Dropped", tray.label());
         HudTray.Entry bones = tray.entries().get(0);
         assertEquals(HudTray.State.LOST, bones.state);
+        assertTrue("a lost row carries no tag: the Dropped headline and red value say it",
+            bones.state.tag.isEmpty());
         LiveContext hideCheap = new LiveContext(false, null, 1_000L, PvpState.NONE, "", false, "");
         assertFalse("below the minimum shown value, the dropped Bones stay hidden",
             hideCheap.flowVisible(HudBuilder.flowOf(bones)));
@@ -476,6 +478,25 @@ public class HudTrayTest
         assertEquals(1_927L, sale.entries().get(0).quantity);
         assertEquals(329_517L, sale.entries().get(0).value);
         assertEquals("Traded", sale.label());
+    }
+
+    /** Owner 2026-10-12: a non-coin currency shop trade is its own word; coins and trades stay Traded. */
+    @Test
+    public void aShopExchangeReadsExchanged()
+    {
+        HudTray tray = new HudTray();
+        tray.booked(Tx.of(1_000L, TransactionType.TRADE, Context.MARKET, "buy 50 Death rune", true,
+            java.util.List.of(
+                new Flow(560, "Death rune", 50L, 201, 10_050L),
+                new Flow(6529, "Tokkul", -14_550L, 9, -130_950L))), 1_000L, false);
+        assertEquals("Exchanged", tray.label());
+
+        HudTray coins = new HudTray();
+        coins.booked(Tx.of(2_000L, TransactionType.TRADE, Context.MARKET, "buy 1 Impling jar", true,
+            java.util.List.of(
+                new Flow(11260, "Impling jar", 1L, 290, 290L),
+                new Flow(995, "Coins", -290L, 1, -290L))), 2_000L, false);
+        assertEquals("a coin shop stays Traded", "Traded", coins.label());
     }
 
     private static boolean open(HudTray tray, long now)

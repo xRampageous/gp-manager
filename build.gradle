@@ -22,7 +22,7 @@ def pluginMainClass = devTools ? 'com.gpmanager.DevLauncher' : 'com.gpmanager.Gp
 
 group = 'com.gpmanager'
 // Plugin metadata and build version must agree; development identity is generated below.
-version = '1.3.3'
+version = '1.3.4'
 
 
 
@@ -592,9 +592,9 @@ tasks.register('configurationStabilityAudit') {
             }
         }
         def savedStateSource = file('src/main/java/com/gpmanager/persistence/SavedState.java').getText('UTF-8')
-        if (!savedStateSource.contains('CURRENT_SCHEMA_VERSION = 109')
+        if (!savedStateSource.contains('CURRENT_SCHEMA_VERSION = 110')
             || !savedStateSource.contains('return schemaVersion == CURRENT_SCHEMA_VERSION;')) {
-            throw new GradleException('data schema audit failed: the 1.3.3 SavedState schema 109 (reading only 109) is missing.')
+            throw new GradleException('data schema audit failed: the 1.3.4 SavedState schema 110 (reading only 110) is missing.')
         }
 
         println 'Configuration stability audit passed: current groups, retired pre-release keys, and the data schema.'
@@ -665,8 +665,8 @@ tasks.register('brandingCompatibilityAudit') {
             throw new GradleException('GP Manager Filepath compatibility check failed: production Filepath.Unchecked remains.')
         }
 
-        // 1.3.3 ships a fresh schema 109 with no upgrade path: older saves are set aside, never read.
-        if (!savedStateSource.contains('CURRENT_SCHEMA_VERSION = 109')
+        // 1.3.4 ships a fresh schema 110 with no upgrade path: older saves are set aside, never read.
+        if (!savedStateSource.contains('CURRENT_SCHEMA_VERSION = 110')
             || savedStateSource.contains('MIN_SUPPORTED_SCHEMA_VERSION')
             || file('src/main/java/com/gpmanager/engine/LegacyImport.java').exists()
             || file('src/main/java/com/gpmanager/persistence/LegacyAccountingPolicyV1.java').exists()) {

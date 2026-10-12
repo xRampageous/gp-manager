@@ -28,9 +28,18 @@ class Widgets {
      */
     static final java.util.List<String[]> STORES = GameData.rows("store_windows");
 
+    /** Shop windows whose own open UI turns a coin movement into a trade (owner 1.3.4). */
+    static final java.util.List<String[]> SHOPS = GameData.rows("shop_windows");
+
     static String store(Client client) {
         for (String[] row : STORES) if (visible(client, Integer.parseInt(row[0]))) return row[2];
         return null;
+    }
+
+    /** A shop window (classic or omni) visible: purchases and sales are traded, not Review. */
+    static boolean isShopOpen(Client client) {
+        for (String[] row : SHOPS) if (visible(client, Integer.parseInt(row[0]))) return true;
+        return false;
     }
 
     static boolean isGeOpen(Client client) {

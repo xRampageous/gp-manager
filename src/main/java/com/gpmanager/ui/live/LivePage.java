@@ -39,7 +39,7 @@ class LivePage implements Shell.Page {
 
         void editTarget();
 
-        default void hideRecent(String name) {}
+        default void hideRecent(String name, boolean charge) {}
 
         /** Opens the Start Grind sheet. */
         default void startGrind() {}
@@ -257,7 +257,15 @@ class LivePage implements Shell.Page {
         menu.add(new Table.Menu("Open in Ledger", () -> actions.openLedger(entry)));
         // A finished trade is one item too (owner 2026-10-08: a sold Fire rune had no Hide).
         if (!row.open && row.itemId > 0 && (!row.composite || row.market))
-            menu.add(new Table.Menu("Hide from recent", () -> actions.hideRecent(row.name)));
+            menu.add(new Table.Menu("Hide item from recent", () -> actions.hideRecent(row.name, false)));
+        // A charge or dose row can hide its whole family's spends from Recent without hiding the
+        // item; an ordinary supply (buried bones) offers only the item hide (owner 1.3.4).
+        if (!row.open
+                && row.itemId > 0
+                && row.chargeRow
+                && (row.ledgerCostView == CostView.SUPPLIES
+                        || row.ledgerCostView == CostView.CHARGES))
+            menu.add(new Table.Menu("Hide charge from recent", () -> actions.hideRecent(row.name, true)));
         // Ore a failed smelt lost sits beside the ore the bars used: say which is which.
         String name = msg("failed").equals(row.actionLabel) ? row.name + " (failed)" : row.name;
         return new Row(
@@ -319,7 +327,7 @@ class LivePage implements Shell.Page {
         if (snapshot.marketResult != 0L || snapshot.marketPending > 0) {
             money.add(
                     new Cell(
-                            "MARKET",
+                            "TRADE",
                             snapshot.marketResult == 0L ? "open" : signed(snapshot.marketResult),
                             MARKET,
                             msg("realized-market"),
@@ -543,7 +551,9 @@ class LivePage implements Shell.Page {
                 LedgerData.Scope.CURRENT_GRIND,
                 null,
                 null,
-                row.ledgerCostView == null ? CostView.ALL : row.ledgerCostView,
+                // The Ledger always opens its Losses view on All (owner live 2026-10-13); the
+                // row's own cost view still colours the tray and its menus.
+                LedgerData.CostView.ALL,
                 "",
                 row.receiptId,
                 row.contributionId,

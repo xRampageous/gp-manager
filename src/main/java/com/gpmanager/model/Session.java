@@ -747,3 +747,36 @@ class Session {
         return folded.size();
     }
 }
+
+/**
+ * AUTO sessions follow the detected activity; every session the engine opens (Overall and each
+ * Grind) is AUTO. GENERAL is the plain default of a bare {@code new Session}.
+ */
+enum SessionMode {
+    AUTO,
+    GENERAL
+}
+
+/** Persisted ownership of a paused session. NONE means the session is running. */
+enum PauseReason {
+    NONE,
+    MANUAL,
+    IDLE,
+    LIFECYCLE,
+    RECOVERY,
+    CUSTOM_SESSION
+}
+
+/** A transaction removed through the undo action, kept so the latest one can be restored. */
+class UndoRecord {
+    Transaction transaction;
+    boolean restored;
+
+    UndoRecord() {
+        // Gson
+    }
+
+    UndoRecord(Transaction transaction) {
+        this.transaction = transaction;
+    }
+}

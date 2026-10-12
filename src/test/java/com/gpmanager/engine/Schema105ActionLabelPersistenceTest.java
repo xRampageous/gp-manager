@@ -43,7 +43,7 @@ public class Schema105ActionLabelPersistenceTest
         session.addTransaction(labelled, 100);
         session.addTransaction(generic, 100);
         SavedState state = new SavedState(session, null, Collections.emptyList());
-        assertEquals(109, state.schemaVersion);
+        assertEquals(110, state.schemaVersion);
         String json = new Gson().toJson(state);
         assertTrue("the bounded label is a stable JSON field",
             json.contains("\"observedActionLabel\":\"Ice Burst\""));
@@ -127,7 +127,7 @@ public class Schema105ActionLabelPersistenceTest
     @Test
     public void onlyTheCurrentSchemaIsRead()
     {
-        assertEquals(109, SavedState.CURRENT_SCHEMA_VERSION);
+        assertEquals(110, SavedState.CURRENT_SCHEMA_VERSION);
         SavedState old = new SavedState();
         old.setSchemaVersion(107);
         assertFalse("an older schema is never read", old.isSupportedSchema());
@@ -136,7 +136,7 @@ public class Schema105ActionLabelPersistenceTest
         future.setSchemaVersion(SavedState.CURRENT_SCHEMA_VERSION + 1);
         assertTrue((future.schemaVersion > SavedState.CURRENT_SCHEMA_VERSION));
         assertFalse("a newer schema is refused/read-only", future.isSupportedSchema());
-        assertEquals("a restored profile saves as the current schema", 109,
+        assertEquals("a restored profile saves as the current schema", 110,
             engine().savedState().schemaVersion);
     }
 
@@ -201,7 +201,7 @@ public class Schema105ActionLabelPersistenceTest
         PersistenceProbe.save(repository, new SavedState(session, null, Collections.emptyList()));
 
         SavedState reloaded = new SessionRepository(new Gson(), FilepathTestSupport.root(directory)).load();
-        assertEquals(109, reloaded.schemaVersion);
+        assertEquals(110, reloaded.schemaVersion);
         Transaction restored = reloaded.getActiveSession().getTransactions().get(0);
         assertEquals(labelled.getId(), restored.getId());
         assertEquals(labelled.getFlows().size(), restored.getFlows().size());

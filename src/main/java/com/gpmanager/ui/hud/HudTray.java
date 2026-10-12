@@ -27,11 +27,13 @@ class HudTray {
 
     @RequiredArgsConstructor
     enum State {
+        // A tray row always reads icon, name ×count and value; the state stays internal
+        // (owner 2026-10-13: no "claimed"/"pending"/"recovered" words on loot rows).
         RECEIVED(""),
-        PENDING("pending"),
-        CLAIMED("claimed"),
-        LOST("lost"),
-        RECOVERED("recovered"),
+        PENDING(""),
+        CLAIMED(""),
+        LOST(""),
+        RECOVERED(""),
         TRADED("");
         final String tag;
     }
@@ -179,8 +181,7 @@ class HudTray {
             if (!gain && !market && !lost) continue;
             if (!any) {
                 // A drop or a GE or player trade joins the running trip; on an empty tray it reads
-                // "Dropped"
-                // or "Traded" (owners 2026-09-28, 2026-10-09).
+                // "Dropped", "Traded" (owners 2026-09-28, 2026-10-09) or "Exchanged" for a shop.
                 event(
                         now,
                         xy,
@@ -191,7 +192,9 @@ class HudTray {
                                         : lost ? "Lost" : verb(transaction, flow.itemName, now),
                         null);
                 if ((market || !dropped.isEmpty()) && entries.isEmpty())
-                    label = market ? "Traded" : dropped;
+                    label = market
+                            ? (Semantics.shopExchange(transaction) ? "Exchanged" : "Traded")
+                            : dropped;
                 any = true;
             }
             int id = flow.itemId;
@@ -502,7 +505,7 @@ class HudTray {
         // Runes, arrows, bolts, darts, javelins, throwing weapons and Zulrah's scales (d18
         // "routine").
         return GameData.pattern("routine")
-                .matcher(name == null ? "" : name.toLowerCase(ROOT))
+                .matcher(Phrases.lower(name))
                 .matches();
     }
 
@@ -555,7 +558,7 @@ class HudTray {
     }
 
     static String labelFor(String activity) {
-        String lower = activity == null ? "" : activity.toLowerCase(ROOT);
+        String lower = Phrases.lower(activity);
         for (String[] row : VERBS) {
             if (lower.contains(row[0])) return row[1];
         }

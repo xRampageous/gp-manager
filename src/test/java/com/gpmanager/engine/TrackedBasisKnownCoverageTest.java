@@ -295,7 +295,7 @@ public class TrackedBasisKnownCoverageTest
         assertEquals(60L, EngineProbe.reservedQty(h.engine, LOGS));
 
         SavedState state = h.engine.savedState();
-        assertEquals(109, state.schemaVersion);
+        assertEquals(110, state.schemaVersion);
         Engine restarted = engine(new int[] {100});
         restarted.restore(state, h.now);
         restarted.setBaseline(new ContainerSnapshot(with(h.inventory, LOGS, 0L)));

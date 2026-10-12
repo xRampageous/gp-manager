@@ -433,7 +433,7 @@ public class MarketValuationPolicyTest
     @Test
     public void schemaIs107AndNoWikiPriceSourceWasAdded()
     {
-        assertEquals(109, SavedState.CURRENT_SCHEMA_VERSION);
+        assertEquals(110, SavedState.CURRENT_SCHEMA_VERSION);
         for (PriceSource source : PriceSource.values())
         {
             assertFalse("no new active/wiki enum constant: " + source,

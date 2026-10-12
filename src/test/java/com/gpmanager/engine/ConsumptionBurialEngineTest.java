@@ -875,6 +875,133 @@ public class ConsumptionBurialEngineTest
         assertEquals(31L, engine.getMetrics(4_000L).costs);
     }
 
+    @Test
+    public void aBurialInsideTheWithdrawalWindowIsNotNettedAway()
+    {
+        // Live capture (owner 2026-10-12): withdraw-all, then a bite two ticks later with the
+        // bank just closed — the +26 and the −1 settled together, netted positive, and the bite
+        // vanished into the transfer. A later click re-arms the intent at the lower count, so the
+        // window's high-water must keep the stack's top for the split.
+        Engine engine = engine();
+        engine.ensureSession(1_000L);
+        engine.setBaseline(ContainerSnapshot.empty());
+        engine.bankOpened(6);
+        engine.markContext(Context.TRANSFER, 6, "Bank container transfer");
+        engine.markDirty();
+        assertNull(engine.processIfDirty(snapshot(526, 26L), 1_400L));
+        engine.bankClosed();
+        engine.noteConsume(526, 4, false, ActionKind.BURY);
+        assertNull(engine.processIfDirty(snapshot(526, 25L), 1_450L));
+        engine.noteConsume(526, 4, false, ActionKind.BURY);
+        assertNull(engine.processIfDirty(snapshot(526, 25L), 1_500L));
+
+        // The stable window commits one batch: +26 withdrawn, −1 bitten.
+        Transaction settled = engine.processIfDirty(snapshot(526, 25L), 1_600L);
+        if (settled == null) settled = engine.processIfDirty(snapshot(526, 25L), 1_700L);
+
+        assertNotNull(settled);
+        List<Transaction> rows = engine.getActiveSession().getTransactions();
+        Transaction burial = null;
+        Transaction transfer = null;
+        for (Transaction row : rows)
+        {
+            if (row.getType() == TransactionType.CONSUMPTION) burial = row;
+            if (row.getType() == TransactionType.TRANSFER) transfer = row;
+        }
+        assertNotNull("the bite must not vanish into the withdrawal: " + rows, burial);
+        assertTrue(burial.isCounted());
+        assertEquals("rows=" + rows, ActionKind.BURY, burial.getActionKind());
+        assertEquals(-31L, burial.getNet());
+        assertNotNull("the withdrawal keeps its own neutral row: " + rows, transfer);
+        assertFalse(transfer.isCounted());
+        assertEquals(26L, transfer.quantity(526, true));
+        Metrics metrics = engine.getMetrics(4_000L);
+        assertEquals("the bite is the only cost", 31L, metrics.costs);
+        assertEquals("the withdrawal is never revenue", 0L, metrics.revenue);
+        assertEquals(-31L, metrics.net);
+    }
+
+    @Test
+    public void aSingleChickenWithdrawnAndEatenQuicklyStillBooks()
+    {
+        // Live capture (owner 2026-10-12): withdraw one chicken, close the bank, eat it right
+        // away — the +1 and the −1 net to zero and the bite vanished into the bank window.
+        Engine engine = engine();
+        engine.ensureSession(1_000L);
+        engine.setBaseline(ContainerSnapshot.empty());
+        engine.bankOpened(6);
+        engine.markContext(Context.TRANSFER, 6, "Bank container transfer");
+        engine.markDirty();
+        assertNull(engine.processIfDirty(snapshot(526, 1L), 1_400L));
+        engine.bankClosed();
+        engine.noteConsume(526, 4, false, ActionKind.BURY);
+        assertNull(engine.processIfDirty(ContainerSnapshot.empty(), 1_450L));
+        assertNull(engine.processIfDirty(ContainerSnapshot.empty(), 1_500L));
+        Transaction settled = engine.processIfDirty(ContainerSnapshot.empty(), 1_600L);
+        if (settled == null) settled = engine.processIfDirty(ContainerSnapshot.empty(), 1_700L);
+
+        assertNotNull("the single bite must book", settled);
+        assertEquals(TransactionType.CONSUMPTION, settled.getType());
+        assertEquals(ActionKind.BURY, settled.getActionKind());
+        Metrics metrics = engine.getMetrics(4_000L);
+        assertEquals(31L, metrics.costs);
+        assertEquals(0L, metrics.revenue);
+        assertEquals(-31L, metrics.net);
+    }
+
+    @Test
+    public void aBiteInsideALootWindowKeepsBothRows()
+    {
+        // A looted stack settling with a bite must keep the loot as revenue and book the bite as
+        // its own Supplies cost, never one mixed row (review 2026-10-12).
+        Engine engine = engine();
+        engine.ensureSession(1_000L);
+        engine.setBaseline(ContainerSnapshot.empty());
+        engine.markLoot(Collections.singletonMap(526, 26L), 6, "Loot from Goblin", "Goblin");
+        engine.markDirty();
+        assertNull(engine.processIfDirty(snapshot(526, 26L), 1_400L));
+        engine.noteConsume(526, 4, false, ActionKind.BURY);
+        assertNull(engine.processIfDirty(snapshot(526, 25L), 1_450L));
+        engine.noteConsume(526, 4, false, ActionKind.BURY);
+        assertNull(engine.processIfDirty(snapshot(526, 25L), 1_500L));
+        Transaction settled = engine.processIfDirty(snapshot(526, 25L), 1_600L);
+        if (settled == null) settled = engine.processIfDirty(snapshot(526, 25L), 1_700L);
+        assertNotNull(settled);
+
+        List<Transaction> rows = engine.getActiveSession().getTransactions();
+        Transaction loot = null;
+        Transaction burial = null;
+        for (Transaction row : rows)
+        {
+            if (row.getType() == TransactionType.LOOT) loot = row;
+            if (row.getType() == TransactionType.CONSUMPTION) burial = row;
+        }
+        assertNotNull("the loot keeps its own row: " + rows, loot);
+        assertNotNull("the bite books its own row: " + rows, burial);
+        assertEquals("rows=" + rows, ActionKind.BURY, burial.getActionKind());
+        Metrics metrics = engine.getMetrics(4_000L);
+        assertEquals(26L * 31L, metrics.revenue);
+        assertEquals(31L, metrics.costs);
+        assertEquals(26L * 31L - 31L, metrics.net);
+    }
+
+    @Test
+    public void aChatConfirmationAfterTheClicksLapseKeepsItsVerb()
+    {
+        // Live capture (owner 2026-10-12): the Eat clicks stopped and the queued last bite
+        // matched a chat-armed intent, reading "Used"; the chat line itself proves Ate.
+        Engine engine = startedWithBones(1L);
+        engine.extendConsume(6, ActionKind.BURY);
+        engine.markDirty();
+
+        Transaction burial = settle(engine, ContainerSnapshot.empty(), 1_600L);
+
+        assertEquals(TransactionType.CONSUMPTION, burial.getType());
+        assertTrue(burial.isCounted());
+        assertEquals(ActionKind.BURY, burial.getActionKind());
+        assertEquals(31L, engine.getMetrics(4_000L).costs);
+    }
+
     private Engine startedWithBones(long quantity)
     {
         Engine engine = engine();

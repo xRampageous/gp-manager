@@ -90,7 +90,7 @@ class LedgerPage implements Shell.Page {
     IconTextField search = new IconTextField();
     Table gains = new Table("GAINS");
     Table costs = new Table("LOSSES");
-    Table market = new Table("MARKET");
+    Table market = new Table("TRADE");
     Table pending = new Table("PENDING");
     Table review = new Table("REVIEW");
 
@@ -264,7 +264,8 @@ class LedgerPage implements Shell.Page {
         long settledTotal = 0L;
         for (Group group : data.market.groups) {
             var row = data.marketRow(group.marketPresentationId);
-            if (MarketText.marketSettled(group, row)) {
+            if (!group.market || MarketText.marketSettled(group, row)) {
+                // A shop exchange is a MARKET group with no GE offer lifecycle: it is settled.
                 settled.add(group);
                 settledTotal += group.value;
                 // An offer canceled before anything filled moved no money: it leaves Pending.
@@ -272,7 +273,7 @@ class LedgerPage implements Shell.Page {
                 open.add(group);
             }
         }
-        fill(market, "MARKET", settled, settledTotal, data.market.incomplete, MARKET);
+        fill(market, "TRADE", settled, settledTotal, data.market.incomplete, MARKET);
         body.add(gains);
         body.add(costs);
         body.add(market);
@@ -680,6 +681,15 @@ class LedgerPage implements Shell.Page {
                     split |=
                             receipt.transactionId.equals(card.transactionId) && splittable(receipt);
                 }
+                // A shop exchange's currency entries are named by what they bought or sold
+                // (owner 2026-10-12): "Death rune ×5", not the tokkul that paid.
+                Receipt cardReceipt = LedgerData.firstReceipt(open.receipts, card.transactionId);
+                String rowName =
+                        several
+                                ? card.summaryText()
+                                : cardReceipt != null && !cardReceipt.tradedItemsShort.isEmpty()
+                                        ? cardReceipt.tradedItemsShort
+                                        : group.primaryName;
                 rows.add(
                         receiptRow(
                                 data,
@@ -687,7 +697,7 @@ class LedgerPage implements Shell.Page {
                                 card.transactionId,
                                 card.contributionId,
                                 chosen != null && chosen.transactionId.equals(card.transactionId),
-                                several ? card.summaryText() : group.primaryName,
+                                rowName,
                                 card.incomplete ? "?" : signed(card.value),
                                 card.incomplete ? DIM : sign(card.value),
                                 card.summaryText()
@@ -805,6 +815,7 @@ class LedgerPage implements Shell.Page {
         var facts = new KeyValue(null);
         if (trade == null) {
             panel.add(note(row.why, LABEL));
+            if (!row.tradedItems.isEmpty()) panel.add(note(row.tradedItems, LABEL));
             // Owner 2026-10-01 (F11): a Charges receipt discloses its captured unit price and
             // source.
             if (!row.priceBasis.isEmpty())

@@ -10,6 +10,7 @@ import lombok.*;
 
 import java.time.ZoneId;
 import java.util.*;
+import static com.gpmanager.GameData.msg;
 
 /**
  * Grinds read model: the current canonical Grind, the reusable My Grinds definitions with their
@@ -403,5 +404,77 @@ class GrindsData {
                 profileZone,
                 detail,
                 allTime(engine, now));
+    }
+}
+
+/**
+ * Shared Grind facts: one session's run metrics and the factual target wording the Grinds pages
+ * show. Nothing here books, prices, persists or feeds accounting.
+ */
+class GrindHistory {
+    /**
+     * One session's shared facts: the retained summary's metrics, else the session's own
+     * correction-aware totals, plus the full-session rate once established. Grinds, Grind history
+     * and the All time card all read sessions through this, so the pages cannot disagree.
+     */
+    static class Run {
+        Session session;
+        Metrics metrics;
+        Long gpPerHour;
+
+        /** Detached metrics supplied by the revision summary; fields keep their existing names. */
+        Run(Session session, Metrics metrics) {
+            this.session = session;
+            this.metrics = metrics;
+            gpPerHour =
+                    RateReadiness.isEstablished(metrics.elapsedMillis)
+                            ? Session.hourly(metrics.net, metrics.elapsedMillis)
+                            : null;
+        }
+
+        long net() {
+            return metrics.net;
+        }
+    }
+
+    /** Factual target wording; never "Failed". Shared with the Grinds detail. */
+    static String netOutcome(Long netTargetGp, long net, boolean closed) {
+        if (netTargetGp == null) return "No Net target";
+        if (net >= netTargetGp) return "Reached " + compact(netTargetGp) + " Net";
+        return closed
+                ? msg("ended-before") + signed(netTargetGp - net) + " remaining"
+                : msg("reached") + signed(netTargetGp - net) + " remaining";
+    }
+
+    /** Factual Active-Time target wording; never "Failed". Shared with the Grinds detail. */
+    static String timeOutcome(Long activeTimeTargetMillis, long activeMillis) {
+        if (activeTimeTargetMillis == null) return msg("active-time-target-2");
+        if (activeMillis >= activeTimeTargetMillis) return msg("time-target");
+        return duration(activeTimeTargetMillis - activeMillis) + msg("active-time-remaining");
+    }
+
+    /** Full-session rate: Net over canonical Active Time; zero Active Time has no rate. */
+}
+
+/**
+ * One presentation law for "is this GP/h trustworthy yet". A computed rate is only meaningful once
+ * the Grind has real Active Time behind it; before that the canonical number is a data-availability
+ * artifact, not a rate, and every surface must render the unavailable form ("—") instead of a
+ * fabricated 0/h.
+ *
+ * <p>The minimum window is the historical accepted value (the retired {@code RateAvailability} used
+ * the same 60 seconds); it is presentation-only and never affects accounting.
+ */
+class RateReadiness {
+    /** Minimum Active Time before a computed rate is presentation-trustworthy. */
+    static final long MIN_ACTIVE_MILLIS = 60_000L;
+
+    /**
+     * GP/h is Net over canonical Active Time; it is shown once that Active Time reaches the floor.
+     *
+     * @param activeMillis canonical Active Time of the Grind
+     */
+    static boolean isEstablished(long activeMillis) {
+        return activeMillis >= MIN_ACTIVE_MILLIS;
     }
 }

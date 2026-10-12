@@ -7,10 +7,13 @@ trident-check	^Your Trident of the (seas|swamp)( \(e\))? has (?:((?:\d{1,3}(?:,\
 blowpipe-check	^Darts: (.+?)\. Scales: ((?:\d{1,3}(?:,\d{3})+|\d+)) \((?:\d+(?:\.\d+)?)%\)\.$	2
 dart-count	^(.+?) x ((?:\d{1,3}(?:,\d{3})+|\d+))$	2
 essence-pouch	(small|medium|large|giant|colossal) pouch	0
-weapon-charges-check	^(?:Your )?(Holy sanguinesti staff|Sanguinesti staff|warped sceptre|Tumeken's shadow|echo venator bow|venator bow)(?: only)? has (?:((?:\d{1,3}(?:,\d{3})+|\d+)) charges?|(one) charge|(no) charges?)(?: (?:remaining|left))?\.$	2
+weapon-charges-check	^(?:Your )?(Holy sanguinesti staff|Sanguinesti staff|warped sceptre|Tumeken's shadow|echo venator bow|venator bow|tonalztics of ralos)(?: only)? has (?:((?:\d{1,3}(?:,\d{3})+|\d+)) charges?|(one) charge|(no) charges?)(?: (?:remaining|left))?\.$	2
 pendant-check	^The pendant has (?:((?:\d{1,3}(?:,\d{3})+|\d+)) charges?|(one) charge|(no) charges)\.$	2
-tome-check	^(?:Your tome has been charged with (?:Burnt|Searing) Pages\. It currently holds|Your tome currently holds) (?:([\d,]+)|(one)) charges?\.$	2
-crystal-check	^Your (crystal bow|crystal halberd|bow of Faerdhinen) has (?:([\d,]+)|(one)) charges? remaining\.$	2
+pendant-refused	^The pendant doesn.t respond as you appear to already be at that location\.$	2
+vyre-well-fill	^you fill the well with .*\.$	2
+tome-check	^(?:Your tome has been charged with (?:Burnt|Searing|Soaked|Soiled) Pages\. It currently holds|Your tome currently holds) (?:([\d,]+)|(one)) charges?\.$	2
+crystal-check	^Your (crystal bow|crystal halberd|bow of Faerdhinen|blade of saeldor) has (?:([\d,]+)|(one)) charges? remaining(?:, and \d{1,3}% progress towards corruption)?\.$	2
+scythe-check	^Your ((?:holy |sanguine |corrupted )?scythe(?: of vitur)?) has (?:((?:\d{1,3}(?:,\d{3})+|\d+)) charges?|(one) charge|(no) charges?)(?: (?:remaining|left))?\.$	2
 blood-fury-check	^Your Amulet of blood fury will work for ((\d{1,3}(?:,\d{3})+|\d+)) more hits?\.$	2
 eye-tears-check	^The Eye of Ayak has been charged with demon tears\. It currently has ((\d{1,3}(?:,\d{3})+|\d+)) charges?\.$	2
 eye-runes-check	^The Eye of Ayak has been charged with runes\. It currently has ((\d{1,3}(?:,\d{3})+|\d+)) charges?\.$	2
@@ -38,7 +41,7 @@ clue	^(?:clue scroll|scroll box|challenge scroll|reward casket|clue bottle|clue 
 
 death-fee	^Death charges you ([\d,]+) x Coins\..*$	2
 bank-payment	^Payment has been taken from your bank: ([\d,]+) (?:x Coins|coins)\.?$	2
-coffer-payment	^Payment has been taken from your coffer: ([\d,]+) x Coins\.?$	2
+coffer-payment	^Payment has been taken from your coffer: ([\d,]+) (?:x Coins|coins)\.?$	2
 revenant-check	^Your (?:bow|sceptre|chainmace) has (?:([\d,]+) charges?|(one) charge|no charges) left powering it\.$	2
 memoirs-check	^On the inside of the cover a message is displayed in dark ink\. It reads: (?:([\d,]+)|(one)) memor(?:ies|y) remains?\.$	2
 scales-check	^Scales: ((?:\d{1,3}(?:,\d{3})+|\d+))(?: \(\d+(?:\.\d+)?%\))?\.?$	2
@@ -53,3 +56,6 @@ reclaim	@claim-reclaim	0
 grave	grave.*	32
 dispenser	.*(agility dispenser|ticket dispenser).*	32
 cannon	cannon (?:base|stand|barrels|furnace)(?: \(or\))?	2
+# The Guardians of the Rift pool announces its deposit itself (owner 2026-10-13); chat is
+# normalized lowercase before matching.
+deposit-pool	^you deposit all of your runes into the pool\.$	0

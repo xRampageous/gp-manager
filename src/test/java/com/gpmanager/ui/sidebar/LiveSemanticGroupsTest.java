@@ -104,7 +104,7 @@ public class LiveSemanticGroupsTest
     }
 
     @Test
-    public void measuredResourceRowsLiveOnlyInTheLedgerChargesChip()
+    public void measuredResourceRowsShowInRecentAndStayInTheLedgerChargesChip()
     {
         Engine engine = session("Vorkath");
         engine.getActiveSession().addTransaction(gain(T0 + 500L, "Older gain", 999, 1L, 50, 50L), 2_000);
@@ -113,10 +113,13 @@ public class LiveSemanticGroupsTest
 
         LiveSnapshot snapshot = LiveSnapshot.capture(engine, T0 + 3_000L, LiveContext.NONE);
 
-        // Owner 2026-09-29: charge use never shows in Recent; it lives in the Ledger's Charges chip.
-        assertNull("scales stay out of Recent", rowNamed(snapshot.recent, "Zulrah's scales"));
+        // Owner 1.3.4: charge use shows in Recent like any row; the Ledger's Charges chip still
+        // holds it.
+        LiveSnapshot.Recent scales = rowNamed(snapshot.recent, "Zulrah's scales");
+        assertNotNull("the scales charge row is listed now", scales);
+        assertEquals(LedgerData.CostView.CHARGES, scales.ledgerCostView);
         assertNotNull("owner 1.1: darts are Supplies like arrows", rowNamed(snapshot.recent, "Dragon dart"));
-        assertEquals("the darts and the gain are in Recent", 2, snapshot.recent.size());
+        assertEquals("the darts, the scales and the gain are in Recent", 3, snapshot.recent.size());
         assertNotNull(rowNamed(snapshot.recent, "Older gain"));
 
         LedgerData ledger = LedgerData.capture(engine, T0 + 3_000L,

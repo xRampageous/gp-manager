@@ -409,8 +409,8 @@ class SidebarPanel extends PluginPanel {
         }
 
         @Override
-        public void hideRecent(String name) {
-            if (filter != null) filter.hideRecent(name);
+        public void hideRecent(String name, boolean charge) {
+            if (filter != null) filter.hideRecent(name, charge);
             refresh();
         }
 

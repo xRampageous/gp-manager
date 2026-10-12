@@ -11,9 +11,10 @@ import static org.junit.Assert.*;
 
 /**
  * Owner 2026-09-29: uncharging returns the loaded components. The refund is the player's own
- * charge investment coming back, so it books as an ownership-neutral transfer, never income.
+ * charge investment coming back, so it books as an ownership-neutral transfer, never income,
+ * however long the confirm takes.
  */
-public class ChargeUnloadNeutralTest
+public class ChargeUnloadTest
 {
     private static final long T0 = 1_700_000_000_000L;
 
@@ -109,6 +110,35 @@ public class ChargeUnloadNeutralTest
         assertNotNull(result);
         assertEquals("a slow confirm is still a transfer, not income", TransactionType.TRANSFER, result.getType());
         assertEquals(0L, engine.getMetrics(now).net);
+    }
+
+    @Test
+    public void onlyTheWeaponsOwnComponentsCountAsTheReturn()
+    {
+        assertTrue("blowpipe scales coming back are the return", ChargeIntake.returnLanded(ChargeCheck.ChargedItem.BLOWPIPE,
+            counts(ItemID.SNAKEBOSS_SCALE, 10L), counts(ItemID.SNAKEBOSS_SCALE, 2_010L), ChargeUnloadTest::name));
+        assertTrue("trident runes coming back are the return", ChargeIntake.returnLanded(ChargeCheck.ChargedItem.TRIDENT_SEAS,
+            Collections.emptyMap(), counts(ItemID.DEATHRUNE, 500L), ChargeUnloadTest::name));
+        assertFalse("loot that is not a load component never counts", ChargeIntake.returnLanded(ChargeCheck.ChargedItem.BLOWPIPE,
+            Collections.emptyMap(), counts(ItemID.BIG_BONES, 1L), ChargeUnloadTest::name));
+        assertFalse("an unchanged stack is not a return", ChargeIntake.returnLanded(ChargeCheck.ChargedItem.BLOWPIPE,
+            counts(ItemID.SNAKEBOSS_SCALE, 10L), counts(ItemID.SNAKEBOSS_SCALE, 10L), ChargeUnloadTest::name));
+    }
+
+    private static String name(int itemId)
+    {
+        switch (itemId)
+        {
+            case ItemID.SNAKEBOSS_SCALE: return "Zulrah's scales";
+            case ItemID.DEATHRUNE: return "Death rune";
+            case ItemID.BIG_BONES: return "Big bones";
+            default: return null;
+        }
+    }
+
+    private static Map<Integer, Long> counts(int itemId, long quantity)
+    {
+        return Collections.singletonMap(itemId, quantity);
     }
 
     /** A client whose tick and inventory the test drives. */

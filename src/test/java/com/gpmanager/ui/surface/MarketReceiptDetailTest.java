@@ -488,7 +488,7 @@ public class MarketReceiptDetailTest
     @Test
     public void schemaAndValuationPolicyRemainUntouched()
     {
-        assertEquals(109, SavedState.CURRENT_SCHEMA_VERSION);
+        assertEquals(110, SavedState.CURRENT_SCHEMA_VERSION);
         assertEquals("RuneLite market", PriceSource.GRAND_EXCHANGE.toString());
     }
 

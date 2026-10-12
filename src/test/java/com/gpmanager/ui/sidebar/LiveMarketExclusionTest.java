@@ -292,7 +292,7 @@ public class LiveMarketExclusionTest
 
         assertEquals(revisionBefore, market.engine.getRevision());
         assertEquals(netBefore, settlement.getNet());
-        assertEquals(109, SavedState.CURRENT_SCHEMA_VERSION);
+        assertEquals(110, SavedState.CURRENT_SCHEMA_VERSION);
     }
 
     // ── fixtures ───────────────────────────────────────────────────────────────────────────────

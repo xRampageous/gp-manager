@@ -1,0 +1,8 @@
+# The Pendant of Ates Rub interface's destination buttons; a click there is a teleport (owner 1.3.4).
+# component id <TAB> RuneLite gameval InterfaceID name
+57606172	PendantOfAtes.TELEPORT_AUBURN
+57606173	PendantOfAtes.TELEPORT_TWILIGHT
+57606174	PendantOfAtes.TELEPORT_DARKFROST
+57606175	PendantOfAtes.TELEPORT_RALOS
+57606176	PendantOfAtes.TELEPORT_ALDARIN
+57606177	PendantOfAtes.TELEPORT_TLATI

@@ -15,6 +15,7 @@ action.OFFER	Offered
 action.SCATTER	Scattered
 same-target-measured-check	A same-target measured Check confirmed these component quantities were loaded; unconfirmed quantities remain in Review.
 untradeable-chest	Untradeable chest key held as a non-counted claim token; contents are valued only after a settled INV gain.
+vyre-well	Vyre well
 detailed-entries	Detailed entries unavailable for older compacted history. Retained totals still reconcile.
 summary-detailed	Summary only · detailed entries were compacted; totals still reconcile.
 correct-to.COST	Count as Cost
@@ -55,7 +56,7 @@ future-runs	Future runs start with this Grind's targets. Finished runs keep the 
 logged-out	Logged out · tracking waits until you log back in
 settled-loot	Settled loot-key pickup retained as a non-counted audit row; key contents are valued only when they enter INV.
 primary-value	 · primary value is the observed settlement; Result is versus basis
-realized-market	Realized Market result versus basis · pending sales never count in Net
+realized-market	Realized trade result versus basis · pending trades never count in Net
 observed-settlement-result	 · observed settlement; Result unavailable because prior basis is unknown
 net-target	Net target (5m, 5000k, 5,000,000)
 items-restored	Items restored after leaving the neutral zone; ownership never changed.
@@ -108,6 +109,11 @@ why-type.PK_LOOT	Loot value from a player kill.
 why-type.PROCESSING	Production inputs and outputs during this Grind.
 why-type.TRADE	Settled through a trade.
 why-type.TRANSFER	Ownership-neutral move; nothing books.
+verb-exchanged	Exchanged
+traded-bought	Bought
+traded-sold-for	Sold for
+traded-paid	Paid
+traded-sold	Sold
 lifecycle-could-settled-exactly	 This lifecycle could not be settled exactly, so it 
 grand-exchange-lifecycle	Grand Exchange lifecycle could not be settled exactly (
 known-facts	); only known facts are recorded for review. No Market result is invented.
@@ -134,6 +140,8 @@ reset-primary-committed	Reset primary committed; obsolete backup invalidated aft
 reset-primary-committed-but	Reset primary committed but backup could not be aligned; obsolete backup removed
 primary-already	Primary already holds the new revision after a partial failure
 reset-did	Reset did not commit; previous disk state retained
+reset-refused	Factory reset was not applied: 
+reset-data-changed	data changed while the safety copy was prepared; retry.
 save-did	Save did not commit; previous disk state retained
 read-corrections-apply	Read-only · corrections apply to the current grind.
 observed-settlement-result-affects	 · observed settlement; only Result affects Net
@@ -265,6 +273,7 @@ deposit-box-transfer	Deposit box transfer
 grand-exchange-offer	Grand Exchange offer
 grand-exchange-collect	Grand Exchange collect
 deposit-box-transfer-2	Deposit box transfer
+deposit-pool	Deposit pool transfer
 bank-deposit	Bank/deposit transfer
 neutral-zone-instance-4	Neutral zone instance
 neutral-zone-instance-5	Neutral zone instance
@@ -291,6 +300,8 @@ failed	Failed
 failed-inputs	Failed: the inputs were used and nothing was produced.
 charge-unload	Charge unload
 charge-load	Charge load
+committed-load	Charge load · 
+committed-load-why	Charge components loaded into 
 after-death	 after a death; ownership never changed.
 amulet-blood	your amulet of blood fury will work for 
 eye-ayak-been	the eye of ayak has been charged with demon tears.
@@ -334,6 +345,7 @@ lms-coffer	LMS coffer transfer
 nmz-coffer	NMZ coffer transfer
 seed-vault	Seed vault transfer
 instance-fee	Instance fee (coffer)
+instance-fee-bank	Instance fee (bank)
 death-s	Death's fee (coffer or bank)
 pre-restore	Pre-restore backup failed: 
 unable-schedule-gp-manager-2	Unable to schedule GP Manager 

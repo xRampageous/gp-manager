@@ -94,19 +94,18 @@ class GrindsController implements GrindsPage.Actions {
             refresh();
             return;
         }
-        String startName = name;
-        String startGrindId = grindId;
+        startGrind(name, grindId, net, time);
+    }
+
+    /** Start a Grind through the switch guard, mutating the domain under it. */
+    void startGrind(String name, String grindId, Long net, Long time) {
         whenSwitchAllowed(
                 name,
                 () ->
                         mutate(
                                 () ->
                                         engine.startGrind(
-                                                startName,
-                                                startGrindId,
-                                                net,
-                                                time,
-                                                SafeMath.now())));
+                                                name, grindId, net, time, SafeMath.now())));
     }
 
     public void openTargets() {
@@ -360,17 +359,7 @@ class GrindsController implements GrindsPage.Actions {
                     Long timeTarget = GrindsData.applyTime(time, null);
                     String startGrindId = definition.getGrindId();
                     // One-off changes apply to this instance only; saved defaults stay untouched.
-                    whenSwitchAllowed(
-                            name,
-                            () ->
-                                    mutate(
-                                            () ->
-                                                    engine.startGrind(
-                                                            name,
-                                                            startGrindId,
-                                                            netTarget,
-                                                            timeTarget,
-                                                            SafeMath.now())));
+                    startGrind(name, startGrindId, netTarget, timeTarget);
                 });
     }
 
@@ -407,13 +396,7 @@ class GrindsController implements GrindsPage.Actions {
         String linkedGrindId = session.getGrindId();
         Long net = session.getProfitTargetGp();
         Long time = session.getActiveTimeTargetMillis();
-        whenSwitchAllowed(
-                name,
-                () ->
-                        mutate(
-                                () ->
-                                        engine.startGrind(
-                                                name, linkedGrindId, net, time, SafeMath.now())));
+        startGrind(name, linkedGrindId, net, time);
     }
 
     public void openDetail(String sessionId) {

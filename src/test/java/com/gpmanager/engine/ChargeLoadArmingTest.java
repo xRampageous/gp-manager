@@ -155,4 +155,40 @@ public class ChargeLoadArmingTest
         intake.onMenuOptionClicked(click(MenuAction.WALK, "walk here", null), "walk here", "");
         assertNull("walking away ends it, so later runes stay loot", (intake.engine.inbox.peek(Inbox.UNCHARGE) == null ? null : intake.engine.inbox.peek(Inbox.UNCHARGE).variant));
     }
+
+    @Test
+    public void aNotedRecoilLoadCanonicalisesToTheRingOfRecoil()
+    {
+        // The live menu carries the noted id (owner recording 2026-10-12); the intake
+        // canonicalises it before validation, so the load arms as the ring of recoil.
+        Engine engine = engine();
+        Widget ring = item(ItemID.ZENYTE_RING_ENCHANTED_RECOIL, 0);
+        ChargeIntake intake = new ChargeIntake(selecting(item(2551, 2)), canonicalising(),
+            new GpManagerConfig() {}, engine, null)
+        {
+            @Override
+            String itemName(int itemId)
+            {
+                return itemId == ItemID.RING_OF_RECOIL ? "Ring of recoil" : null;
+            }
+        };
+        intake.armLoad(click(MenuAction.WIDGET_TARGET_ON_WIDGET, "Use", ring), "");
+        assertEquals(ChargeCheck.ChargedItem.SUFFERING,
+            (engine.inbox.peek(Inbox.LOAD_TARGET) == null ? null : engine.inbox.peek(Inbox.LOAD_TARGET).variant));
+        assertEquals("the noted id canonicalises to the ring of recoil",
+            ItemID.RING_OF_RECOIL, engine.inbox.item(Inbox.LOAD_TARGET));
+    }
+
+    /** A lookup that canonicalises the noted recoil the way RuneLite's ItemManager does. */
+    private static ItemLookup canonicalising()
+    {
+        return new ItemLookup(null)
+        {
+            @Override
+            int canon(int id)
+            {
+                return id == 2551 ? ItemID.RING_OF_RECOIL : id;
+            }
+        };
+    }
 }

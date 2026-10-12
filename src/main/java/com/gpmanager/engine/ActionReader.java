@@ -323,9 +323,14 @@ class ActionReader {
         if (isVessel(gained)) return true;
         int lostDose = trailingDose(lost);
         int gainedDose = trailingDose(gained);
-        if (lostDose > 0 && gainedDose >= 0 && lostDose == gainedDose + 1) {
+        if (lostDose > 0) {
             String lostBase = doseBaseName(lost);
-            return !lostBase.isEmpty() && lostBase.equals(doseBaseName(gained));
+            if (!lostBase.isEmpty() && lostBase.equals(doseBaseName(gained))) {
+                // A suffix-less gain of the same base is the uncharged item: the last glory
+                // charge leaves the plain amulet, so the pair is still one dose step (owner
+                // 1.3.4). Any other suffix-less gain keeps failing closed.
+                return lostDose == (gainedDose < 0 ? 0 : gainedDose) + 1;
+            }
         }
         return rule("food", lost) && rule("partial", gained);
     }

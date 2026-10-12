@@ -302,18 +302,25 @@ public class ItemValuationServiceTest
         assertEquals(0L, flow.getPriceCapturedAtEpochMillis());
     }
 
-    @Test public void nonGpCurrencyWithoutOverrideStaysUnpriced()
+    @Test public void tokkulPricesFromTheOnyxExchangeAndGlovesImproveIt()
     {
-        // An exchange relationship (tokkul → onyx, stardust → coins) is not a supported
-        // observation and must never be converted into proxy GP.
+        // Owner 2026-10-12: a tokkul reads at the uncut onyx exchange (300,000 per onyx;
+        // 260,000 while Karamja gloves are worn). A currency with no fixed exchange
+        // (stardust → coins) still stays unpriced.
         Valuation service = new Valuation(new GpManagerConfig() { }, id -> null, id -> {
-            if (id == 6573) return 3_000_000;
+            if (id == ItemID.UNCUT_ONYX) return 3_000_000;
             return 0;
         });
         Flow tokkul = service.value(Collections.singletonMap(6529, 300L)).get(0);
-        assertEquals(PriceSource.UNPRICED, tokkul.getPriceSource());
-        assertEquals(0, tokkul.unitPrice);
-        assertEquals(0L, tokkul.valueDelta);
+        assertEquals(PriceSource.CURRENCY_PROXY, tokkul.getPriceSource());
+        assertEquals(10, tokkul.unitPrice);
+        assertEquals(3_000L, tokkul.valueDelta);
+
+        service.setKaramjaGlovesWorn(true);
+        Flow gloved = service.value(Collections.singletonMap(6529, 260L)).get(0);
+        assertEquals(PriceSource.CURRENCY_PROXY, gloved.getPriceSource());
+        assertEquals(11, gloved.unitPrice);
+        assertEquals(2_860L, gloved.valueDelta);
 
         Flow stardust = service.value(Collections.singletonMap(46678, 5L)).get(0);
         assertEquals(PriceSource.UNPRICED, stardust.getPriceSource());

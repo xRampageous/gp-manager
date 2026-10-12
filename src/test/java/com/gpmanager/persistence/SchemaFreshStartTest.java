@@ -12,7 +12,7 @@ import org.junit.rules.TemporaryFolder;
 
 import static org.junit.Assert.*;
 
-/** Schema 109: an older save is set aside and the profile starts fresh; a newer one is never touched. */
+/** Schema 110: an older save is set aside and the profile starts fresh; a newer one is never touched. */
 public class SchemaFreshStartTest
 {
     @Rule
@@ -66,6 +66,13 @@ public class SchemaFreshStartTest
     public void anOlderSaveIsSetAsideAndTheProfileStartsFresh() throws Exception
     {
         startsFresh(108);
+    }
+
+    @Test
+    public void theReleasedSaveIsSetAsideAndTheProfileStartsFresh() throws Exception
+    {
+        // The actual 1.3.3 (schema 109) → 1.3.4 (schema 110) transition.
+        startsFresh(109);
     }
 
     @Test

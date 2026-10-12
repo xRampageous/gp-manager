@@ -62,7 +62,7 @@ public class ObservedActionLabelTest
         assertEquals(netBefore, transaction.getNet());
         assertEquals(countedBefore, transaction.isCounted());
         assertEquals(typeBefore, transaction.getType());
-        assertEquals(109, SavedState.CURRENT_SCHEMA_VERSION);
+        assertEquals(110, SavedState.CURRENT_SCHEMA_VERSION);
 
         Gson gson = new Gson();
         String json = gson.toJson(transaction);

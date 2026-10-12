@@ -1,5 +1,59 @@
 # GP Manager changelog
 
+## 1.3.4 - 2026-10-13
+
+Your GP Manager history starts fresh with this update (saved Grind setups are cleared too); the old save is kept beside the new one as `sessions.schema109-….json`. The fixes below re-book charges, items and trades, and rows an earlier build already wrote cannot be corrected in place.
+
+**New**
+- Right-clicking a charge row in Recent offers "Hide charge from recent" beside "Hide item from recent": hiding the charge removes that item family's spends (a "Burning amulet*" pattern) while its gains stay listed; hiding the item removes every row of that name. Net and the Ledger are unchanged, and removing either setting in Loot display restores the rows.
+- Crystal armour and the crystal shield count their shards when you load them: using crystal shards on a piece books a Supplies spend at the shard's price, because a revert keeps only the seeds. A Check on a piece books nothing; the crystal weapons keep their per-use estimates and measured Checks.
+- The ring of suffering counts its recoils when you load them: rings of recoil (noted or unnoted) book a Supplies spend at the recoil's price as a Charge load, because a discharge never refunds them. A Check on the ring, the recoil settings toggle and the bank's Configure-Charges book nothing.
+- The Tonalztics of Ralos counts its sunfire splinters: charging it (the Charge prompt or splinters used on it) books nothing, and a Check books the splinters its throws used.
+- The tomes of water and earth count their pages: loading soaked or soiled pages books nothing, and a Check measures the casts from the tome you clicked.
+- The bracelet of ethereum counts its revenant ether: loading ether books a Supplies spend at the ether's price as a Charge load (an uncharge destroys the stored ether, so it never refunds). Alchemy books the bracelet at its uncharged form's price, and its 250-ether dismantle stays Review — its parts are worth more than the item.
+- Minigame loaner items never book: a loaned loadout or table supply from Castle Wars, Soul Wars, Barbarian Assault, Guardians of the Rift, the Nightmare Zone or the Tithe Farm is invisible on both the grant and the strip, while the persistent rewards (tickets, penance gear, tithe gear, and the Guardians of the Rift reward items) still count.
+- Guardians of the Rift books only what it should: the guardian essence, the guardian stones and the portal talismans never book on a grant, a use or a drop, so crafting at the altars books the runes alone; the intricate pouch is a claim — its pickup books nothing and opening it books its contents. The Emir's Arena staging-area rune pouch is invisible too.
+- Imbuing keeps an item's worth: swapping an item for its imbued form (or between imbue venues) never books a loss and a gain, and the imbued piece prices from its plain item — salve amulets, the Fremennik and Vet'ion rings, the granite ring, the ring of wealth and the magic shortbow (i).
+
+**Fixed**
+- Cannonballs count as Supplies on the Ledger for the dwarf multicannon and every ship cannon tier (bronze to dragon, chainshot and incendiary).
+- Dwarf cannon: the balls Set-up loads by itself, and the balls loaded by using one on the cannon, now come back through Empty exactly like Fire and Load do - the parts custody covers the whole set-up, so the furnace is never a loss, and a login right after a set-up no longer misbooks its auto-load; only the balls that actually fire count (owner live 2026-10-13).
+- Buying from a shop with its window open books "Bought" and selling books "Sold", as counted Market trades instead of Review; shops that pay in tokkul or other currencies still ask.
+- A drop with a harvest in the same moment books both: dropping empty plant pots while a calquat fruit is picked up shows the Dropped row plus the fruit, instead of one Review row.
+- A Pendant of Ates teleport books the frozen tear from a Rub-interface destination or a minimenu destination click, including one that carries no item id (a worn pendant's own option); no Check is needed first.
+- Charged jewellery RuneLite cannot price (a Burning amulet(4)) now counts one dose from the family's full price, so each teleport costs about a fifth of the amulet instead of the whole price or an unknown row.
+- The last charge of an amulet or ring that leaves a plain uncharged item (a glory(1) to Amulet of glory) books as the same one-dose Supplies step, instead of waiting in Review.
+- The HUD+ tray no longer writes "lost" after a dropped item's count; the red amount and the Dropped headline carry it.
+- A refused pendant teleport (the click-here-to-continue line, "you appear to already be at that location") removes the charge its click estimated - the line arrives as a message box, so it is matched before the chat-type gate now (owner live 2026-10-13).
+- The Ledger always opens its Losses view on All (owner live 2026-10-13).
+- A private boss instance paid from Death's coffer counts again (the game's line reads "12,500 Coins", not "12,500 x Coins"), along with its same-moment bank share.
+- A private instance paid only from the bank counts its fee too, instead of missing it when Death's coffer is empty.
+- A Check on a Scythe of Vitur (including the holy and sanguine forms) or a Blade of Saeldor now counts what it measured — the scythe's blood runes, the blade's crystal shards — instead of staying estimate-only.
+- A bite that lands while a bank withdrawal of the same item settles now books its own Supplies cost instead of being netted away by the transfer: withdraw-all food, eat one, keep playing — the eaten one counts.
+- A queued bite after the last Eat click keeps its verb: the chat confirmation ("You eat the chicken.") names Ate, so the row no longer reads Used.
+- A Check clicked from the Worn Equipment tab now works: the click adopts the item's own worn slot, so tab Checks on a scythe or another measured-Check item book their measured spend instead of being ignored.
+- A farming seed pack and the Bounty Hunter supply crate work like a herb box: worth nothing until you take from them, then each Take counts what came out with no Review.
+- Spirit flakes count at their soaked-page exchange and Molch pearls at Alry's golden-tench rate, so neither shows "?"; the hallowed marks, Castle Wars tickets and Soul Wars spoils are catalogued as known currencies.
+- Mastering Mixology counts cleanly: the herbs you refine book their cost once, the pastes, order potions and digweed never book, and the rewards you buy with resin count normally.
+- Tempoross's raw, cooked and crystallised harpoonfish never book: they are minigame-only ammunition, so grants, cooking and loading stay invisible.
+- The fish sack barrel, forestry basket and the gem pouch, satchel, tote and sack are utility containers now, so loot picked into them counts like any pickup.
+- Shipwreck salvage sorts cleanly: the raw salvage never books, so the sorted loot counts once when you sort it at a salvaging station.
+- Sailing port tasks count cleanly: courier cargo and bounty monster parts never book, so a delivery or bounty hand-in shows only the real reward; a sealed crate's charting drink never books either — the loot it grants still counts.
+- Sailing unlocks count cleanly too: lost schematics, their keys and lockbox directions never book, charging the sailors' amulet books only its law and water runes, and a full boat bottle never books — the empty bottle's use does.
+- Runes crafted at the Guardians of the Rift altars count when they are crafted: emptying an essence pouch just before a craft no longer hides them, so a round books the runes it made.
+- Depositing runes into the Guardians of the Rift deposit pool is a neutral bank move now, instead of a spent-runes row.
+- Guardians of the Rift rewards show in the HUD+ tray as loot; they no longer read as "claimed".
+- The Astral Contact spell (the Lunar NPC contact) shows the spell's icon.
+
+**Changed**
+- Plugin settings read in use order: Loot display runs filter, minimum, item icons, Hidden Recent items, Hidden Recent charges; Accounting puts PK and uncertainty before ironman and manual overrides; HUD+ lists what it shows before how it looks.
+- Recent now lists charge rows (a weapon's cast estimate, a Check's measured charges, a pendant's tears) like any other row; they were previously Ledger-only. "Hide charge from recent" hides them per weapon, the same as jewellery doses, and is offered only on charge or dose rows (an ordinary supply like buried bones offers just "Hide item from recent").
+- Tokkul now counts: it prices from the uncut onyx exchange, so TzHaar drops show their value and tokkul trades book both sides; wearing Karamja gloves uses their improved rate.
+- A shop trade paid in a currency other than coins (tokkul, spirit flakes, …) now reads "Exchanged" and names what it moved: buying runes with tokkul shows "Bought Death rune ×50" on the tokkul entry, and "Paid Tokkul ×14,550" on the rune's. Coin shops keep their own wording. It also sits under the Ledger's Trade section as a settled trade instead of waiting in Pending.
+- Recent's shop-exchange row opens the exchange's own entries (every buy in that row), not one rune's side of it, and each entry is named by what was bought ("Death rune ×5"); the Ledger section holding G.E. and shop trades reads TRADE.
+- HUD+ text size now defaults to Small; pick Normal or Large in settings if you want it bigger.
+- HUD+ tray rows read as the item icon, its name, ×count and value only; the old "claimed" and "pending" words are gone.
+
 ## 1.3.3 — 2026-10-11
 
 Your GP Manager history starts fresh with this update; the old save is kept beside the new one as `sessions.schema108-….json`.
@@ -151,7 +205,9 @@ Your GP Manager history starts fresh with this update; the old save is kept besi
   a crystal bow, runes into a sanguinesti staff or Tumeken's shadow, ether into a revenant weapon,
   tears into the Pendant of Ates, the scythe at the Vyre well) moves those items into charges, so
   it books nothing. A "How many charges?" prompt no longer cuts the charge short. The charges
-  count as used only when you attack.
+  count as used only when you attack. The Vyre well's own Fill box (vials of blood plus blood
+  runes) rides the same rule: filling it is refundable storage, and only the charges you use
+  book (owner live 2026-10-13).
 - **Kharedst's memoirs and the blood essence cost what they use.** Each memoirs (or Book of the
   Dead) teleport from the worn book spends one law, body, mind and soul rune, and checking the book
   measures what was really used. Charging it at the Old Memorial books nothing. Activating a blood

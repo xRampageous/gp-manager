@@ -21,7 +21,7 @@ Settings open from the wrench next to GP Manager in RuneLite's plugin list.
 
 ## What it counts
 
-- **Supplies** you use: food, potions, runes, ammo and weapon charges (blowpipe, tridents, Bryophyta's staff, the Eye of Ayak and more).
+- **Supplies** you use: food, potions, runes, ammo, cannonballs and weapon charges (blowpipe, tridents, the Toxic staff of the dead, Bryophyta's staff, the Eye of Ayak and more). Picking up what you dropped or fired cancels it out.
 - **Loot** once it reaches your inventory; keys, chests, caskets and clue rewards when you open them.
 - **Grand Exchange** trades at the real tax. Banking, storage and gear swaps are neutral moves, not gains or losses.
 - **Deaths**, reclaim fees and repair costs. Barrows gear wearing down is not a loss.
@@ -35,4 +35,4 @@ Everything stays on your computer, in one profile per account. The **⚙** menu 
 
 ## Feedback
 
-Found a bug or have an idea? Use **⚙ › Report a bug**, open an [issue](https://github.com/xRampageous/gp-manager/issues), or ask in [Discussions](https://github.com/xRampageous/gp-manager/discussions). A screenshot of the Ledger entry helps a lot.
+GP Manager is in beta, so I could use some help testing the flows I can't reach myself — the pinned [live-test checklist](https://github.com/xRampageous/gp-manager/issues/1) has them. Found a bug or have an idea? Use **⚙ › Report a bug**, open an [issue](https://github.com/xRampageous/gp-manager/issues), or ask in [Discussions](https://github.com/xRampageous/gp-manager/discussions). A screenshot of the Ledger entry helps a lot.

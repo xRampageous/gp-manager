@@ -1,6 +1,9 @@
 package com.gpmanager;
 
 import javax.inject.Singleton;
+import lombok.RequiredArgsConstructor;
+import net.runelite.api.*;
+import javax.inject.*;
 
 /**
  * Presentation-only character idle (Idle Notifier–shaped). Never pauses accounting or changes GP/hr
@@ -62,5 +65,36 @@ class CharacterIdleModel {
         idleCandidateSinceEpochMillis = 0L;
         lastSkillingXpEpochMillis = 0L;
         characterIdle = false;
+    }
+}
+
+/**
+ * Client-thread adapter for character idle (no animation, no target for the idle delay).
+ * Presentation-only: it never pauses the engine or touches GP/hr; session idle pause is the
+ * engine's own idle timeout.
+ */
+@Singleton
+@RequiredArgsConstructor(onConstructor_ = @Inject)
+class CharacterIdleTracker {
+    final Client client;
+    final CharacterIdleModel model;
+
+    void clear() {
+        model.clear();
+    }
+
+    /** Soft-busy across Make-X / process XP gaps. */
+    void noteSkillingXp() {
+        model.noteSkillingXp(SafeMath.now());
+    }
+
+    /**
+     * @return true once when the character newly becomes idle
+     */
+    boolean onGameTick() {
+        Player local = client.getLocalPlayer();
+        boolean animating = local != null && local.getAnimation() != -1;
+        boolean interacting = local != null && local.getInteracting() != null;
+        return model.tick(animating, interacting, SafeMath.now());
     }
 }

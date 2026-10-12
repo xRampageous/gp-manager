@@ -74,7 +74,7 @@ public class ChargeCatalogueTest
             ints(ItemID.VENATOR_BOW_ORNAMENT, ItemID.VENATOR_BOW_ORNAMENT_UNCHARGED));
         row(checked, ChargedItem.EYE_OF_AYAK, "Eye of Ayak", true, "EYE", ActionKind.CAST, 1, NONE, NONE,
             new Object[]{ItemID.DEMON_TEAR, 1L}, null, List.of(), ints(ItemID.EYE_OF_AYAK, ItemID.EYE_OF_AYAK_UNCHARGED));
-        row(checked, ChargedItem.SCYTHE, "Scythe of vitur", false, "NONE", ActionKind.SUPPLIES, 1, NONE, NONE,
+        row(checked, ChargedItem.SCYTHE, "Scythe of vitur", true, "NONE", ActionKind.SUPPLIES, 1, NONE, NONE,
             new Object[]{ItemID.BLOODRUNE, 2L}, new long[]{ItemID.VIAL_BLOOD, 1L, 100L}, List.of(),
             ints(ItemID.SCYTHE_OF_VITUR, ItemID.SCYTHE_OF_VITUR_UNCHARGED, ItemID.SCYTHE_OF_VITUR_OR,
                 ItemID.SCYTHE_OF_VITUR_UNCHARGED_OR, ItemID.SCYTHE_OF_VITUR_BL, ItemID.SCYTHE_OF_VITUR_UNCHARGED_BL));
@@ -94,7 +94,7 @@ public class ChargeCatalogueTest
         row(checked, ChargedItem.BOWFA, "Bow of Faerdhinen", true, "CRYSTAL", ActionKind.FIRE, 100,
             ints(SpotanimID.SP_ATTACK_ARROW_LAUNCH_FAERDHINEN), NONE, shard, null, List.of(),
             ints(ItemID.BOW_OF_FAERDHINEN, ItemID.BOW_OF_FAERDHINEN_INACTIVE));
-        row(checked, ChargedItem.SAELDOR, "Blade of Saeldor", false, "CRYSTAL", ActionKind.SUPPLIES, 100, NONE,
+        row(checked, ChargedItem.SAELDOR, "Blade of Saeldor", true, "CRYSTAL", ActionKind.SUPPLIES, 100, NONE,
             ints(AnimationID.HUMAN_SWORD_SLASH, AnimationID.HUMAN_SWORD_LUNGE), shard, null, List.of(),
             ints(ItemID.BLADE_OF_SAELDOR, ItemID.BLADE_OF_SAELDOR_INACTIVE));
         row(checked, ChargedItem.BLOOD_FURY, "Blood fury", true, "FURY", ActionKind.SUPPLIES, 10_000, NONE, NONE,
@@ -138,6 +138,55 @@ public class ChargeCatalogueTest
             new Object[]{ItemID.SNAKEBOSS_SCALE, 1L}, null, List.of("tanzanite helm", "magma helm"),
             ints(ItemID.SERPENTINE_HELM_CHARGED, ItemID.SERPENTINE_HELM, ItemID.SERPENTINE_HELM_CHARGED_CYAN,
                 ItemID.SERPENTINE_HELM_CYAN, ItemID.SERPENTINE_HELM_CHARGED_RED, ItemID.SERPENTINE_HELM_RED));
+        row(checked, ChargedItem.CRYSTAL_HELM, "Crystal helm", true, "CRYSTAL", ActionKind.SUPPLIES, 100, NONE, NONE,
+            shard, null, List.of(),
+            ints(ItemID.CRYSTAL_HELMET, ItemID.CRYSTAL_HELMET_INACTIVE, ItemID.CRYSTAL_HELMET_HEFIN,
+                ItemID.CRYSTAL_HELMET_INACTIVE_HEFIN, ItemID.CRYSTAL_HELMET_ITHELL, ItemID.CRYSTAL_HELMET_INACTIVE_ITHELL,
+                ItemID.CRYSTAL_HELMET_IORWERTH, ItemID.CRYSTAL_HELMET_INACTIVE_IORWERTH, ItemID.CRYSTAL_HELMET_TRAHAEARN,
+                ItemID.CRYSTAL_HELMET_INACTIVE_TRAHAEARN, ItemID.CRYSTAL_HELMET_CADARN, ItemID.CRYSTAL_HELMET_INACTIVE_CADARN,
+                ItemID.CRYSTAL_HELMET_CRWYS, ItemID.CRYSTAL_HELMET_INACTIVE_CRWYS, ItemID.CRYSTAL_HELMET_AMLODD,
+                ItemID.CRYSTAL_HELMET_INACTIVE_AMLODD));
+        row(checked, ChargedItem.CRYSTAL_BODY, "Crystal body", true, "CRYSTAL", ActionKind.SUPPLIES, 100, NONE, NONE,
+            shard, null, List.of(),
+            ints(ItemID.CRYSTAL_CHESTPLATE, ItemID.CRYSTAL_CHESTPLATE_INACTIVE, ItemID.CRYSTAL_CHESTPLATE_HEFIN,
+                ItemID.CRYSTAL_CHESTPLATE_INACTIVE_HEFIN, ItemID.CRYSTAL_CHESTPLATE_ITHELL,
+                ItemID.CRYSTAL_CHESTPLATE_INACTIVE_ITHELL, ItemID.CRYSTAL_CHESTPLATE_IORWERTH,
+                ItemID.CRYSTAL_CHESTPLATE_INACTIVE_IORWERTH, ItemID.CRYSTAL_CHESTPLATE_TRAHAEARN,
+                ItemID.CRYSTAL_CHESTPLATE_INACTIVE_TRAHAEARN, ItemID.CRYSTAL_CHESTPLATE_CADARN,
+                ItemID.CRYSTAL_CHESTPLATE_INACTIVE_CADARN, ItemID.CRYSTAL_CHESTPLATE_CRWYS,
+                ItemID.CRYSTAL_CHESTPLATE_INACTIVE_CRWYS, ItemID.CRYSTAL_CHESTPLATE_AMLODD,
+                ItemID.CRYSTAL_CHESTPLATE_INACTIVE_AMLODD));
+        row(checked, ChargedItem.CRYSTAL_LEGS, "Crystal legs", true, "CRYSTAL", ActionKind.SUPPLIES, 100, NONE, NONE,
+            shard, null, List.of(),
+            ints(ItemID.CRYSTAL_PLATELEGS, ItemID.CRYSTAL_PLATELEGS_INACTIVE, ItemID.CRYSTAL_PLATELEGS_HEFIN,
+                ItemID.CRYSTAL_PLATELEGS_INACTIVE_HEFIN, ItemID.CRYSTAL_PLATELEGS_ITHELL,
+                ItemID.CRYSTAL_PLATELEGS_INACTIVE_ITHELL, ItemID.CRYSTAL_PLATELEGS_IORWERTH,
+                ItemID.CRYSTAL_PLATELEGS_INACTIVE_IORWERTH, ItemID.CRYSTAL_PLATELEGS_TRAHAEARN,
+                ItemID.CRYSTAL_PLATELEGS_INACTIVE_TRAHAEARN, ItemID.CRYSTAL_PLATELEGS_CADARN,
+                ItemID.CRYSTAL_PLATELEGS_INACTIVE_CADARN, ItemID.CRYSTAL_PLATELEGS_CRWYS,
+                ItemID.CRYSTAL_PLATELEGS_INACTIVE_CRWYS, ItemID.CRYSTAL_PLATELEGS_AMLODD,
+                ItemID.CRYSTAL_PLATELEGS_INACTIVE_AMLODD));
+        row(checked, ChargedItem.CRYSTAL_SHIELD, "Crystal shield", true, "CRYSTAL", ActionKind.SUPPLIES, 100, NONE, NONE,
+            shard, null, List.of(),
+            ints(ItemID.CRYSTAL_SHIELD, ItemID.CRYSTAL_SHIELD_INACTIVE, ItemID.CRYSTAL_SHIELD_2500));
+        row(checked, ChargedItem.SUFFERING, "Ring of suffering", true, "SUFFERING", ActionKind.SUPPLIES, 40, NONE, NONE,
+            new Object[]{ItemID.RING_OF_RECOIL, 1L}, null, List.of(),
+            ints(ItemID.ZENYTE_RING_ENCHANTED, ItemID.ZENYTE_RING_ENCHANTED_RECOIL,
+                ItemID.NZONE_ZENYTE_RING_ENCHANTED, ItemID.NZONE_ZENYTE_RING_ENCHANTED_RECOIL,
+                ItemID.SW_ZENYTE_RING_ENCHANTED, ItemID.SW_ZENYTE_RING_ENCHANTED_RECOIL,
+                ItemID.PVPA_ZENYTE_RING_ENCHANTED, ItemID.PVPA_ZENYTE_RING_ENCHANTED_RECOIL));
+        row(checked, ChargedItem.TONALZTICS, "Tonalztics of Ralos", true, "CHARGES", ActionKind.FIRE, 1, NONE, NONE,
+            new Object[]{ItemID.SUNFIRESPLINTER, 1L}, null, List.of(),
+            ints(ItemID.TONALZTICS_OF_RALOS_UNCHARGED, ItemID.TONALZTICS_OF_RALOS_CHARGED));
+        row(checked, ChargedItem.TOME_OF_WATER, "Tome of Water", true, "TOME", ActionKind.CAST, 20, NONE, NONE,
+            new Object[]{ItemID.SOAKED_PAGE, 1L}, null, List.of(),
+            ints(ItemID.TOME_OF_WATER, ItemID.TOME_OF_WATER_UNCHARGED));
+        row(checked, ChargedItem.TOME_OF_EARTH, "Tome of Earth", true, "TOME", ActionKind.CAST, 20, NONE, NONE,
+            new Object[]{ItemID.SOILED_PAGE, 1L}, null, List.of(),
+            ints(ItemID.TOME_OF_EARTH, ItemID.TOME_OF_EARTH_UNCHARGED));
+        row(checked, ChargedItem.ETHEREUM, "Bracelet of ethereum", true, "ETHEREUM", ActionKind.SUPPLIES, 1, NONE, NONE,
+            new Object[]{ItemID.WILD_CAVE_SHARD, 1L}, null, List.of(),
+            ints(ItemID.WILD_CAVE_BRACELET_CHARGED, ItemID.WILD_CAVE_BRACELET_UNCHARGED));
         assertEquals("every family has exactly one checked row", Arrays.asList(ChargedItem.values()), checked);
     }
 
@@ -146,7 +195,9 @@ public class ChargeCatalogueTest
     {
         for (ChargedItem variant : ChargedItem.values())
         {
-            boolean special = variant == ChargedItem.BLOWPIPE || variant == ChargedItem.EYE_OF_AYAK || variant == ChargedItem.SCYTHE;
+            boolean special = variant == ChargedItem.BLOWPIPE
+                || variant == ChargedItem.EYE_OF_AYAK
+                || variant.isCommittedLoad();
             if (special)
             {
                 assertNull(variant.name(), variant.getCheck());
@@ -155,6 +206,22 @@ public class ChargeCatalogueTest
             {
                 assertNotNull(variant.name(), variant.getCheck());
             }
+        }
+    }
+
+    /** Only the refundless loads book at load (committed_loads.tsv): the crystal pieces' shards and the ring of suffering's recoils. */
+    @Test
+    public void committedLoadsAreExactlyTheRefundlessLoads()
+    {
+        for (ChargedItem variant : ChargedItem.values())
+        {
+            boolean expected = variant == ChargedItem.CRYSTAL_HELM
+                || variant == ChargedItem.CRYSTAL_BODY
+                || variant == ChargedItem.CRYSTAL_LEGS
+                || variant == ChargedItem.CRYSTAL_SHIELD
+                || variant == ChargedItem.SUFFERING
+                || variant == ChargedItem.ETHEREUM;
+            assertEquals(variant.name(), expected, variant.isCommittedLoad());
         }
     }
 

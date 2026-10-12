@@ -66,7 +66,7 @@ public interface GpManagerConfig extends Config {
             keyName = "showItemIcons",
             name = "Item icons",
             description = "Show item and spell icons on the tray, Live and Ledger",
-            position = 3,
+            position = 2,
             section = lootSection)
     default boolean showItemIcons() {
         return true;
@@ -76,9 +76,20 @@ public interface GpManagerConfig extends Config {
             keyName = "hiddenRecentItems",
             name = "Hidden Recent items",
             description = "Comma-separated names hidden from Recent. Net is unchanged",
-            position = 2,
+            position = 3,
             section = lootSection)
     default String hiddenRecentItems() {
+        return "";
+    }
+
+    @ConfigItem(
+            keyName = "hiddenRecentCharges",
+            name = "Hidden Recent charges",
+            description =
+                    "Comma-separated names whose charge spends are hidden from Recent; their other rows stay. Net and the Ledger are unchanged",
+            position = 4,
+            section = lootSection)
+    default String hiddenRecentCharges() {
         return "";
     }
 
@@ -119,7 +130,7 @@ public interface GpManagerConfig extends Config {
             keyName = "showHud",
             name = "Show HUD+",
             description = "Show the HUD+ overlay",
-            position = 2,
+            position = 0,
             section = hudLiveSection)
     default boolean showHud() {
         return true;
@@ -130,7 +141,7 @@ public interface GpManagerConfig extends Config {
             name = "Hide when not tracking",
             description =
                     "Hide HUD+ when nothing is tracking, and in Free play until something is booked",
-            position = 3,
+            position = 1,
             section = hudLiveSection)
     default boolean hudHideWhenIdle() {
         return true;
@@ -140,10 +151,10 @@ public interface GpManagerConfig extends Config {
             keyName = "hudTextSize",
             name = "Text size",
             description = "HUD+ text size",
-            position = 4,
+            position = 9,
             section = hudLiveSection)
     default TextSize hudTextSize() {
-        return TextSize.Normal;
+        return TextSize.Small;
     }
 
     @Range(min = 120, max = 320)
@@ -151,7 +162,7 @@ public interface GpManagerConfig extends Config {
             keyName = "hudMaxWidth",
             name = "Max width",
             description = "HUD+ fits its content up to this width; longer names end in …",
-            position = 5,
+            position = 10,
             section = hudLiveSection)
     default int hudMaxWidth() {
         return 260;
@@ -162,7 +173,7 @@ public interface GpManagerConfig extends Config {
             keyName = "hudOpacity",
             name = "Background opacity",
             description = "HUD+ background opacity, percent",
-            position = 6,
+            position = 11,
             section = hudLiveSection)
     default int hudOpacity() {
         return 75;
@@ -172,7 +183,7 @@ public interface GpManagerConfig extends Config {
             keyName = "hudTimer",
             name = "Timer",
             description = "Compact (39m52s) or full (0:39:52); counts tracked active time",
-            position = 7,
+            position = 2,
             section = hudLiveSection)
     default HudTimer hudTimer() {
         return HudTimer.Compact;
@@ -182,7 +193,7 @@ public interface GpManagerConfig extends Config {
             keyName = "hudTray",
             name = "Item tray",
             description = "Fold the tray after loot, or keep it open",
-            position = 8,
+            position = 3,
             section = hudLiveSection)
     default HudTray hudTray() {
         return HudTray.AUTO_FOLD;
@@ -193,7 +204,7 @@ public interface GpManagerConfig extends Config {
             keyName = "hudTraySeconds",
             name = "Tray stays open",
             description = "Seconds the tray stays open after loot",
-            position = 9,
+            position = 4,
             section = hudLiveSection)
     default int hudTraySeconds() {
         return 5;
@@ -204,7 +215,7 @@ public interface GpManagerConfig extends Config {
             keyName = "hudTrayRows",
             name = "Visible item rows",
             description = "Tray rows before \"+N more\"",
-            position = 10,
+            position = 5,
             section = hudLiveSection)
     default int hudTrayRows() {
         return 4;
@@ -214,7 +225,7 @@ public interface GpManagerConfig extends Config {
             keyName = "hudTrayKeeps",
             name = "Tray keeps rows for",
             description = "Keep this streak's items, or the whole session's",
-            position = 11,
+            position = 6,
             section = hudLiveSection)
     default HudTrayKeeps hudTrayKeeps() {
         return HudTrayKeeps.STREAK;
@@ -225,7 +236,7 @@ public interface GpManagerConfig extends Config {
             keyName = "streakEndSeconds",
             name = "Streak ends after",
             description = "Seconds after the last kill before the HUD tray streak ends.",
-            position = 14,
+            position = 7,
             section = hudLiveSection)
     default int streakEndSeconds() {
         return 60;
@@ -235,7 +246,7 @@ public interface GpManagerConfig extends Config {
             keyName = "reducedMotion",
             name = "Reduced motion",
             description = "Skip HUD+ tray entry animation; loot still shows.",
-            position = 13,
+            position = 8,
             section = hudLiveSection)
     default boolean reducedMotion() {
         return false;
@@ -315,7 +326,7 @@ public interface GpManagerConfig extends Config {
             keyName = "enablePkTracking",
             name = "PK accounting",
             description = "Passively group RuneLite player-loot and confirmed player-death events",
-            position = 3,
+            position = 2,
             section = accountingSection)
     default boolean enablePkTracking() {
         return true;
@@ -325,7 +336,7 @@ public interface GpManagerConfig extends Config {
             keyName = "countUncertainMixedChanges",
             name = "Count uncertain mixed changes",
             description = "Count simultaneous gains and costs without a confirmed context",
-            position = 2,
+            position = 3,
             section = accountingSection)
     default boolean countUncertainMixedChanges() {
         return false;
@@ -335,7 +346,7 @@ public interface GpManagerConfig extends Config {
             keyName = "manualPriceOverrides",
             name = "Manual price overrides",
             description = "Comma-separated itemId=gp pairs, for example 995=1,1234=250",
-            position = 4,
+            position = 5,
             section = accountingSection)
     default String manualPriceOverrides() {
         return "";
@@ -346,7 +357,7 @@ public interface GpManagerConfig extends Config {
             name = "Ironman: value at high alch",
             description =
                     "On an ironman account, value items at their high alchemy price (coins you can make) instead of the Grand Exchange",
-            position = 5,
+            position = 4,
             section = accountingSection)
     default boolean ironmanAlch() {
         return false;
@@ -367,7 +378,7 @@ public interface GpManagerConfig extends Config {
             keyName = "activityLabelSeconds",
             name = "Activity label timeout",
             description = "Seconds without an attack before the activity label clears",
-            position = 5,
+            position = 2,
             section = generalSection)
     default int activityLabelSeconds() {
         return 15;

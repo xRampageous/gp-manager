@@ -1,0 +1,9 @@
+# A shop's own open window turns a coins-for-items change into a purchase and an items-for-coins
+# change into a sale (owner 1.3.4). Classic shops and the modern omni shop (RuneLite 1.13.1).
+# component id <TAB> RuneLite gameval InterfaceID name
+19660800	Shopmain.UNIVERSE
+19660801	Shopmain.FRAME
+19726336	Shopside.ITEMS
+53673985	OmnishopMain.UNIVERSE
+53673991	OmnishopMain.FRAME
+52822016	OmnishopSide.ITEMS

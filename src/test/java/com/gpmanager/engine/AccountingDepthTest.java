@@ -57,13 +57,17 @@ public class AccountingDepthTest
         assertTrue(RewardChestCatalogue.isRewardChest("Corrupted Gauntlet"));
         assertTrue(RewardChestCatalogue.isRewardChest("Tempoross"));
         assertTrue(RewardChestCatalogue.isRewardChest("Wintertodt"));
-        assertTrue(RewardChestCatalogue.isRewardChest("Guardians of the Rift"));
+        // GOTR rewards arrive as received loot (no held window): they ride the tray as loot, not
+        // the claim path (owner 2026-10-13).
+        assertFalse(RewardChestCatalogue.isRewardChest("Guardians of the Rift"));
         assertFalse(RewardChestCatalogue.isRewardChest("Goblin"));
 
         assertEquals(GameData.msg("seed-vault"), NeutralTransfers.storage("Seed vault"));
         assertEquals(GameData.msg("tool-leprechaun"), NeutralTransfers.storage("Tool Leprechaun"));
         assertEquals(GameData.msg("motherlode-hopper"), NeutralTransfers.storage("Motherlode hopper"));
         assertEquals(GameData.msg("nmz-coffer"), NeutralTransfers.storage("NMZ coffer"));
+        assertEquals(GameData.msg("deposit-pool"),
+            NeutralTransfers.storage("Deposit-runes Deposit Pool"));
 
         assertTrue(RewardChestCatalogue.isRewardChest("Bird house"));
         assertTrue(RewardChestCatalogue.isRewardChest("Herbiboar"));
@@ -98,6 +102,14 @@ public class AccountingDepthTest
         assertEquals("huntsmans_kit", UtilityContainerCatalogue.familyFor("Huntsman's kit"));
         assertEquals("meat_pouch", UtilityContainerCatalogue.familyFor("Large meat pouch"));
         assertEquals("fur_pouch", UtilityContainerCatalogue.familyFor("Small fur pouch"));
+        // 2026 container families found by the gap pass (owner 2026-10-13): the gem
+        // pouch/satchel/tote/sack chain and the upgraded baskets.
+        assertEquals("gem_pouch", UtilityContainerCatalogue.familyFor("Gem pouch"));
+        assertEquals("gem_satchel", UtilityContainerCatalogue.familyFor("Gem satchel"));
+        assertEquals("gem_tote", UtilityContainerCatalogue.familyFor("Gem tote"));
+        assertEquals("gem_sack", UtilityContainerCatalogue.familyFor("Gem sack"));
+        assertEquals("forestry_basket", UtilityContainerCatalogue.familyFor("Forestry basket"));
+        assertEquals("fish_sack_barrel", UtilityContainerCatalogue.familyFor("Fish sack barrel"));
         // The rune pouch is normally tracked through its varbits; its custody options must stay
         // neutral regardless, so an untracked pouch cannot book revenue or cost.
         assertEquals("rune_pouch", UtilityContainerCatalogue.familyFor("Rune pouch"));

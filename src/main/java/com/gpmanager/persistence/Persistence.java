@@ -463,8 +463,7 @@ class Persistence {
             // before replacing data, with check/snapshot/mutation atomic and all file IO outside.
             if (!backupContent(engine.exportState()).equals(backupContent(protectedState)))
                 return new ResetOutcome(
-                        false,
-                        "Factory reset was not applied: data changed while the safety copy was prepared; retry.");
+                        false, msg("reset-refused") + msg("reset-data-changed"));
             before = snapshot();
             fence();
             engine.resetData(now);
@@ -478,7 +477,7 @@ class Persistence {
                             : "";
             // Owner 2026-10-01 (F25): the shared outcome names the operation that was refused.
             return new ResetOutcome(
-                    false, "Factory reset was not applied: " + why + outcome.message);
+                    false, msg("reset-refused") + why + outcome.message);
         }
         engine.beginPriming();
         return new ResetOutcome(true, msg("fresh-general"));
@@ -632,7 +631,7 @@ class Persistence {
     }
 
     /**
-     * Loads the bound scope. Any schema other than 1.0's is left exactly as it is and makes the
+     * Loads the bound scope. Any schema other than the current one is left exactly as it is and makes the
      * scope read-only; it is never rewritten.
      */
     SavedState loadScope(TrackingIdentity identity) {
@@ -734,5 +733,40 @@ class Persistence {
                 baseRevision,
                 header,
                 snapshotJson(header, quick && ++quickSaves % 10 != 0));
+    }
+}
+
+/**
+ * Outcome of ordinary and reset persistence attempts.
+ *
+ * <p>Successful saves stay quiet. Persistent failures expose a compact warning with details and a
+ * safe retry action in the panel.
+ */
+class SaveStatus {
+    enum State {
+        NEVER_SAVED,
+        OK,
+        FAILED,
+        CONFLICT
+    }
+
+    State state;
+    String detail;
+    boolean retryAvailable;
+    String recoveredFrom;
+
+    SaveStatus(State state, String detail, boolean retryAvailable, String recoveredFrom) {
+        this.state = state;
+        this.detail = Phrases.orEmpty(detail);
+        this.retryAvailable = retryAvailable;
+        this.recoveredFrom = Phrases.orEmpty(recoveredFrom);
+    }
+
+    static SaveStatus neverSaved() {
+        return new SaveStatus(State.NEVER_SAVED, "", false, "");
+    }
+
+    boolean isFailure() {
+        return state == State.FAILED || state == State.CONFLICT;
     }
 }

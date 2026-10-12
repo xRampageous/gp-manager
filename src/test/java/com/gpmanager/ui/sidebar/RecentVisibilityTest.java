@@ -23,7 +23,7 @@ public class RecentVisibilityTest
         RecentFilter filter = new RecentFilter()
         {
             public boolean isFlowIncluded(Flow flow) { return true; }
-            public boolean showRecent(String name, long quantity)
+            public boolean showRecent(String name, long quantity, boolean charge)
             {
                 return LootPresentationFilterService.listState("", config.hiddenRecentItems(), name, quantity)
                     != LootPresentationFilterService.HIDDEN;
@@ -37,13 +37,13 @@ public class RecentVisibilityTest
             public void togglePause() { }
             public void editTarget() { }
             public void openLedger(LedgerData.Entry entry) { }
-            public void hideRecent(String name)
+            public void hideRecent(String name, boolean charge)
             {
                 manager.setConfiguration(GpManagerConfig.GROUP, "hiddenRecentItems", Text.toCSV(List.of(name)));
             }
         }, id -> null);
         Table.Row row = page.rowOf(before.recent.get(0));
-        row.menu.stream().filter(menu -> "Hide from recent".equals(menu.label))
+        row.menu.stream().filter(menu -> "Hide item from recent".equals(menu.label))
             .findFirst().orElseThrow(AssertionError::new).action.run();
         LiveSnapshot hidden = LiveSnapshot.capture(engine, now + 1_200L, context);
         assertTrue(hidden.recent.isEmpty());
@@ -72,18 +72,148 @@ public class RecentVisibilityTest
             hides(page, recent(554, "Fire rune", true, true)));
         assertFalse("a spell's runes are no single item", hides(page, recent(554, "Fire Strike", false, false)));
         assertTrue(hides(page, new LiveSnapshot.Recent(385, "Shark", null, 900L, false, false, null, 1, "r", "c",
-            "", 1L, false, false, true, null, false, 0L, false, "", false)));
+            "", 1L, false, false, true, null, false, 0L, false, "", false, false)));
+    }
+
+    @Test
+    public void anOrdinarySupplyNeverOffersTheChargeHide()
+    {
+        // Owner live 2026-10-12: buried bones offered "Hide charge from recent"; it is a supply,
+        // not a charge.
+        Transaction bones = Tx.of(1_000L, TransactionType.CONSUMPTION, Context.GENERIC, "Buried", true,
+            List.of(new Flow(526, "Bones", -1L, 90, -90L)));
+        LiveContext context = new LiveContext(false, null, 0L, PvpState.NONE, "", false, "");
+        List<LiveSnapshot.Recent> rows = LiveProbe.recent(List.of(bones), context);
+        assertEquals(1, rows.size());
+        LivePage page = new LivePage(new LivePage.Actions()
+        {
+            public void togglePause() { }
+            public void editTarget() { }
+            public void openLedger(LedgerData.Entry entry) { }
+        }, id -> null);
+        assertTrue("a buried supply is still an item row", has(page, rows.get(0), "Hide item from recent"));
+        assertFalse("but it is not a charge",
+            has(page, rows.get(0), "Hide charge from recent"));
     }
 
     static LiveSnapshot.Recent recent(int itemId, String name, boolean market, boolean open)
     {
         return new LiveSnapshot.Recent(itemId, name, null, 1_000L, false, false, market ? "market" : null, 1, "r", "c",
-            "", 200L, true, market, true, null, false, 0L, market, market ? "Sold" : "", open);
+            "", 200L, true, market, true, null, false, 0L, market, market ? "Sold" : "", open, false);
     }
 
     static boolean hides(LivePage page, LiveSnapshot.Recent row)
     {
-        return page.rowOf(row).menu.stream().anyMatch(menu -> "Hide from recent".equals(menu.label));
+        return page.rowOf(row).menu.stream().anyMatch(menu -> "Hide item from recent".equals(menu.label));
+    }
+
+    @Test
+    public void aChargeSpendHidesItsWholeFamilyAndLeavesTheItemsOtherRows()
+    {
+        ConfigManager manager = IsolatedConfigManager.create(null);
+        GpManagerConfig config = manager.getConfig(GpManagerConfig.class);
+        Engine engine = PresentationLifecycleTest.engine();
+        long now = 1_700_000_000_000L;
+        engine.startCustom("Teleports", now);
+        engine.getActiveSession().addTransaction(Tx.of(now, TransactionType.CONSUMPTION, Context.GENERIC, "", true,
+            List.of(new Flow(21173, "Burning amulet(2)", -1L, 828, -828L),
+                new Flow(21175, "Burning amulet(1)", 1L, 414, 414L))), 2_000);
+        engine.getActiveSession().addTransaction(Tx.of(now + 1_000L, TransactionType.CONSUMPTION, Context.GENERIC, "", true,
+            List.of(new Flow(21171, "Burning amulet(3)", -1L, 1_242, -1_242L),
+                new Flow(21173, "Burning amulet(2)", 1L, 828, 828L))), 2_000);
+        engine.getActiveSession().addTransaction(Tx.of(now + 2_000L, TransactionType.GAIN, Context.GENERIC, "", true,
+            List.of(new Flow(21166, "Burning amulet(5)", 1L, 2_070, 2_070L))), 2_000);
+        RecentFilter filter = new RecentFilter()
+        {
+            public boolean isFlowIncluded(Flow flow) { return true; }
+            public boolean showRecent(String name, long quantity, boolean charge)
+            {
+                return LootPresentationFilterService.listState("", config.hiddenRecentItems(), name, quantity)
+                    != LootPresentationFilterService.HIDDEN
+                    && (!charge || LootPresentationFilterService.listState("", config.hiddenRecentCharges(),
+                        name, quantity) != LootPresentationFilterService.HIDDEN);
+            }
+            public String version() { return config.hiddenRecentItems() + "|" + config.hiddenRecentCharges(); }
+        };
+        LiveContext context = new LiveContext(false, filter, 0L, PvpState.NONE, "", false, "");
+        LiveSnapshot before = LiveSnapshot.capture(engine, now + 3_000L, context);
+        assertEquals("one merged charge row and one gain", 2, before.recent.size());
+        LiveSnapshot.Recent spend = before.recent.stream().filter(row -> row.value < 0L)
+            .findFirst().orElseThrow(AssertionError::new);
+        LiveSnapshot.Recent gain = before.recent.stream().filter(row -> row.value > 0L)
+            .findFirst().orElseThrow(AssertionError::new);
+        LivePage page = new LivePage(new LivePage.Actions()
+        {
+            public void togglePause() { }
+            public void editTarget() { }
+            public void openLedger(LedgerData.Entry entry) { }
+            public void hideRecent(String name, boolean charge)
+            {
+                manager.setConfiguration(GpManagerConfig.GROUP, "hiddenRecentCharges",
+                    Text.toCSV(List.of(LootPresentationFilterService.chargePattern(name))));
+            }
+        }, id -> null);
+        assertTrue("a charge row keeps both options",
+            has(page, spend, "Hide item from recent") && has(page, spend, "Hide charge from recent"));
+        assertFalse("a gain is not a charge", has(page, gain, "Hide charge from recent"));
+
+        page.rowOf(spend).menu.stream().filter(menu -> "Hide charge from recent".equals(menu.label))
+            .findFirst().orElseThrow(AssertionError::new).action.run();
+        assertEquals("Burning amulet*", manager.getConfig(GpManagerConfig.class).hiddenRecentCharges());
+        assertTrue("the item itself was not hidden",
+            manager.getConfig(GpManagerConfig.class).hiddenRecentItems().isEmpty());
+
+        LiveSnapshot after = LiveSnapshot.capture(engine, now + 3_600L, context);
+        assertTrue("every spend of the family is hidden",
+            after.recent.stream().noneMatch(row -> row.value < 0L));
+        assertEquals("the gain stays listed", 1,
+            after.recent.stream().filter(row -> row.value > 0L).count());
+        assertEquals(before.net, after.net);
+
+        manager.setConfiguration(GpManagerConfig.GROUP, "hiddenRecentCharges", "");
+        assertEquals("removing the preference restores the spends", 1,
+            LiveSnapshot.capture(engine, now + 4_200L, context).recent.stream()
+                .filter(row -> row.value < 0L).count());
+    }
+
+    @Test
+    public void aChargeRowIsListedNowAndHidesWithTheChargeList()
+    {
+        // Owner 1.3.4: charge rows are no longer hardcoded out of Recent; the Hidden Recent
+        // charges list hides them like any supply spend.
+        Transaction estimate = new Transaction(1_000L, TransactionType.CONSUMPTION, Context.GENERIC,
+            GameData.msg("estimated-charge") + "Trident of the Seas", "Vorkath", true,
+            List.of(new Flow(560, "Death rune", -1L, 100, -100L, PriceSource.GRAND_EXCHANGE)),
+            Confidence.LIKELY, "Estimated", null);
+        estimate.setActionKind(ActionKind.CAST);
+        LiveContext context = new LiveContext(false, null, 0L, PvpState.NONE, "", false, "");
+        List<LiveSnapshot.Recent> visible = LiveProbe.recent(List.of(estimate), context);
+        assertEquals("a charge cast is listed by default", 1, visible.size());
+        assertEquals("Trident of the Seas", visible.get(0).name);
+        assertEquals(LedgerData.CostView.CHARGES, visible.get(0).ledgerCostView);
+
+        RecentFilter hiding = new RecentFilter()
+        {
+            public boolean isFlowIncluded(Flow flow) { return true; }
+            public boolean showRecent(String name, long quantity, boolean charge) { return !charge; }
+        };
+        LiveContext hidden = new LiveContext(false, hiding, 0L, PvpState.NONE, "", false, "");
+        assertTrue("the charge list hides it like any charge",
+            LiveProbe.recent(List.of(estimate), hidden).isEmpty());
+
+        LivePage page = new LivePage(new LivePage.Actions()
+        {
+            public void togglePause() { }
+            public void editTarget() { }
+            public void openLedger(LedgerData.Entry entry) { }
+        }, id -> null);
+        assertTrue("the charge menu is offered on it",
+            has(page, visible.get(0), "Hide charge from recent"));
+    }
+
+    private static boolean has(LivePage page, LiveSnapshot.Recent row, String label)
+    {
+        return page.rowOf(row).menu.stream().anyMatch(menu -> label.equals(menu.label));
     }
 
     @Test

@@ -1,9 +1,10 @@
 # Untradeable non-GP currencies, unpriced unless a manual override supplies a price.
 # item id <TAB> RuneLite gameval ItemID name (or the item's name where no constant is used)
-# Proxy rows instead read: item id <TAB> proxy item id <TAB> units per proxy item <TAB> name.
+# Proxy rows instead read: item id <TAB> proxy item id <TAB> units per proxy item or base/with-gloves <TAB> name.
 # A shard is one hundred-and-fiftieth of an enhanced crystal teleport seed, the most
 # efficient seed exchange.
-6529	TZHAAR_TOKEN
+# A tokkul reads at the uncut onyx exchange: 300,000 tokkul per onyx, or 260,000 while Karamja gloves are worn.
+6529	6571	300000/260000	TZHAAR_TOKEN
 23866	GAUNTLET_CRYSTAL_SHARD
 23964	PRIF_CRYSTAL_SHARD_CRUSHED
 21649	Mermaid's tear
@@ -12,11 +13,28 @@
 12012	MOTHERLODE_NUGGET
 # A degrading Amulet of the damned is worth its full self until it turns to dust (OSRS Wiki).
 12853	12851	1	Amulet of the damned
-27285	Abyssal pearl
+26792	Abyssal pearl
 24714	HALLOWED_MARK_3
 12746	BH_EMBLEM
-26879	Guardian fragments
 23962	23959	150	PRIF_CRYSTAL_SHARD
+# Spirit flakes read at the retired sailor's exchange: 6,000 flakes buy a barrel or tackle box,
+# swapped for 25 soaked pages, so a page is 240 flakes (OSRS Wiki valuation).
+25588	25578	240	SPIRIT_FLAKES
+# Molch pearls read at Alry's exchange: a golden tench is worth 100 pearls.
+22820	22840	100	AERIAL_FISHING_PEARL
+22822	22840	100	MOLCH_PEARL_2
+22823	22840	100	MOLCH_PEARL_3
+22824	22840	100	MOLCH_PEARL_4
+22825	22840	100	MOLCH_PEARL_5
+# Known-currency guards with no fixed exchange: the hallowed mark counting variants, Castle Wars
+# tickets and Soul Wars spoils stay unpriced rather than mapping to a wrong item.
+24711	HALLOWED_MARK
+24713	HALLOWED_MARK_2
+24715	HALLOWED_MARK_4
+24716	HALLOWED_MARK_5
+24717	HALLOWED_MARK_25
+4067	CASTLEWARS_TICKET
+25342	SOUL_WARS_SPOILS
 # Imbuing keeps an item's worth: imbued black masks and slayer helmets (NMZ, Soul Wars, PvP Arena)
 # are worth the plain black mask, so an imbue is neutral (owner 2026-10-09).
 11774	8921	1	Black mask (10) (i)
@@ -55,3 +73,46 @@
 11865	8921	1	Slayer helmet (i)
 25177	8921	1	Slayer helmet (i)
 26674	8921	1	Slayer helmet (i)
+# Imbuing keeps an item's worth: every 1:1 row also makes an X to X(i)/(ei)/(ri) swap neutral, so
+#   an imbue never books a loss and a gain (owner 2026-10-12).
+12017	4081	1	Salve amulet (i)
+25250	4081	1	Salve amulet (i)
+26763	4081	1	Salve amulet (i)
+12018	4081	1	Salve amulet (ei)
+25278	4081	1	Salve amulet (ei)
+26782	4081	1	Salve amulet (ei)
+# The sailors' amulet never de-charges: its inert state swaps 1:1 for the charged one, so charging
+#   books only the law and water runes it takes and the amulet's own states stay unvalued
+#   (owner 1.3.4 review).
+32398	32399	1	Sailors' amulet (inert)
+11770	6731	1	Seers ring (i)
+11771	6733	1	Archers ring (i)
+11772	6735	1	Warriors ring (i)
+11773	6737	1	Berserker ring (i)
+25258	6731	1	Seers ring (i)
+25260	6733	1	Archers ring (i)
+25262	6735	1	Warriors ring (i)
+25264	6737	1	Berserker ring (i)
+26767	6731	1	Seers ring (i)
+26768	6733	1	Archers ring (i)
+26769	6735	1	Warriors ring (i)
+26770	6737	1	Berserker ring (i)
+13202	12601	1	Ring of the gods (i)
+12691	12603	1	Tyrannical ring (i)
+12692	12605	1	Treasonous ring (i)
+25252	12601	1	Ring of the gods (i)
+25254	12603	1	Tyrannical ring (i)
+25256	12605	1	Treasonous ring (i)
+26764	12601	1	Ring of the gods (i)
+26765	12603	1	Tyrannical ring (i)
+26766	12605	1	Treasonous ring (i)
+21752	21739	1	Granite ring (i)
+25193	21739	1	Granite ring (i)
+26685	21739	1	Granite ring (i)
+12785	2572	1	Ring of wealth (i)
+20786	11980	1	Ring of wealth (i5)
+20787	11982	1	Ring of wealth (i4)
+20788	11984	1	Ring of wealth (i3)
+20789	11986	1	Ring of wealth (i2)
+20790	11988	1	Ring of wealth (i1)
+12788	861	1	Magic shortbow (i)

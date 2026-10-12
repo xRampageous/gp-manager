@@ -44,3 +44,142 @@ Smoke Barrage	332
 Shadow Barrage	340
 Blood Barrage	336
 Ice Barrage	328
+# The Lunar contact spell: the game labels it Astral Contact now (owner 2026-10-13); the old
+# NPC Contact label stays aliased.
+Astral Contact	568
+NPC Contact	568
+# Every spellbook's spells, so a booked cast can always show its icon (owner 2026-10-13 gap-fill).
+# Standard utility, teleports and enchantments.
+Confuse	16
+Lvl-1 Enchant	18
+Weaken	20
+Bones to Bananas	22
+Curse	24
+Low Level Alchemy	25
+Varrock Teleport	27
+Lvl-2 Enchant	28
+Lumbridge Teleport	30
+Telekinetic Grab	31
+Falador Teleport	33
+Superheat Item	36
+Camelot Teleport	37
+Lvl-3 Enchant	39
+High Level Alchemy	41
+Charge Water Orb	42
+Lvl-4 Enchant	43
+Charge Earth Orb	45
+Charge Fire Orb	47
+Charge Air Orb	49
+Lvl-5 Enchant	50
+Ardougne Teleport	54
+Watchtower Teleport	55
+Vulnerability	56
+Enfeeble	57
+Stun	58
+Bind	319
+Snare	320
+Entangle	321
+Charge	322
+Trollheim Teleport	323
+Paddewwa Teleport	341
+Senntisten Teleport	342
+Kharyrll Teleport	343
+Lassar Teleport	344
+Dareeyak Teleport	345
+Carrallangar Teleport	346
+Annakarl Teleport	347
+Ghorrock Teleport	348
+Teleother Lumbridge	349
+Teleother Falador	350
+Teleother Camelot	351
+Tele Block	352
+Lvl-6 Enchant	353
+Bones to Peaches	354
+Teleport to House	355
+Teleport to Ape Atoll	357
+Enchant Crossbow Bolt	358
+Teleport to Bounty Target	359
+Teleport to Target	359
+Teleport to Kourend	360
+Lvl-7 Enchant	361
+Civitas illa Fortis Teleport	367
+# Lunar spellbook.
+Bake Pie	543
+Moonclan Teleport	544
+Waterbirth Teleport	545
+Barbarian Teleport	547
+Superglass Make	548
+Khazard Teleport	549
+String Jewellery	550
+Boost Potion Share	551
+Magic Imbue	552
+Fertile Soil	553
+Stat Restore Pot Share	554
+Fishing Guild Teleport	555
+Catherby Teleport	556
+Ice Plateau Teleport	557
+Energy Transfer	558
+Cure Other	559
+Heal Other	560
+Vengeance Other	561
+Cure Me	562
+Geomancy	563
+Vengeance	564
+Cure Group	565
+Heal Group	566
+Cure Plant	567
+Tele Group Moonclan	569
+Tele Group Waterbirth	570
+Tele Group Barbarian	571
+Tele Group Khazard	572
+Tele Group Fishing Guild	573
+Tele Group Catherby	574
+Tele Group Ice Plateau	575
+Stat Spy	576
+Monster Examine	577
+Humidify	578
+Hunter Kit	579
+Dream	580
+Plank Make	581
+Spellbook Swap	582
+Tan Leather	583
+Recharge Dragonstone	584
+Spin Flax	585
+Ourania Teleport	586
+# Arceuus spellbook.
+Basic Reanimation	1247
+Adept Reanimation	1248
+Expert Reanimation	1249
+Master Reanimation	1250
+Arceuus Library Teleport	1252
+Draynor Manor Teleport	1253
+Salve Graveyard Teleport	1254
+Mind Altar Teleport	1256
+Respawn Teleport	1257
+Fenkenstrain's Castle Teleport	1259
+West Ardougne Teleport	1260
+Harmony Island Teleport	1261
+Barrows Teleport	1262
+Ape Atoll Teleport	1263
+Cemetery Teleport	1264
+Resurrect Crops	1266
+Ghostly Grasp	1267
+Skeletal Grasp	1268
+Undead Grasp	1269
+Resurrect Lesser Ghost	1270
+Inferior Demonbane	1302
+Superior Demonbane	1303
+Dark Demonbane	1304
+Mark of Darkness	1305
+Ward of Arceuus	1306
+Lesser Corruption	1307
+Greater Corruption	1308
+Death Charge	1310
+Demonic Offering	1311
+Sinister Offering	1312
+Shadow Veil	1315
+Dark Lure	1316
+Vile Vigour	1317
+Degrime	1318
+Resurrect Superior Skeleton	2981
+Resurrect Greater Zombie	2984

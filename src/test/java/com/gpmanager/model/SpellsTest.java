@@ -35,6 +35,26 @@ public class SpellsTest
     }
 
     @Test
+    public void theContactSpellsUseTheNpcContactSprite()
+    {
+        // RuneLite 1.13.1 SpriteID.SPELL_NPC_CONTACT = 568; the game labels it Astral Contact now.
+        assertEquals(-568, Spells.icon("Astral Contact"));
+        assertEquals(-568, Spells.icon("NPC Contact"));
+    }
+
+    @Test
+    public void arceuusCombatSpellsNameFromTheirRunes()
+    {
+        // Owner 2026-10-13 gap-fill: these autocast with their runes alone (no click label).
+        assertEquals("Ghostly Grasp", Spells.spellFor(Arrays.asList(rune("Air rune", 4), rune("Chaos rune", 1))));
+        assertEquals("Inferior Demonbane", Spells.spellFor(Arrays.asList(rune("Fire rune", 3), rune("Chaos rune", 1))));
+        assertEquals("Superior Demonbane", Spells.spellFor(Arrays.asList(rune("Fire rune", 5), rune("Soul rune", 1))));
+        assertEquals("Dark Demonbane", Spells.spellFor(Arrays.asList(rune("Fire rune", 7), rune("Soul rune", 2))));
+        assertEquals("Undead Grasp", Spells.spellFor(Arrays.asList(rune("Fire rune", 12), rune("Blood rune", 1))));
+        assertEquals(-1304, Spells.icon("Dark Demonbane"));
+    }
+
+    @Test
     public void anAmbiguousOrForeignCostStaysACast()
     {
         // A water staff covers the water, and a smoke staff would make Smoke Barrage cost the same.

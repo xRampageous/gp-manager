@@ -3,6 +3,7 @@ package com.gpmanager;
 import lombok.*;
 
 import java.util.*;
+import net.runelite.api.gameval.ItemID;
 
 /**
  * Wiki-sourced key/chest pairs used for deferred-claim valuation and provenance. Chest names and
@@ -126,5 +127,41 @@ class KeyChestCatalogue {
         @Getter int keyItemId;
         @Getter String chestName;
         @Getter boolean tradeable;
+    }
+}
+
+/** Untradeable unopened claims held at zero: their contents become income only on receipt. */
+class DeferredClaims {
+    /** A key/chest claim or a pouch. */
+    static boolean of(int itemId) {
+        return KeyChestCatalogue.isDeferredKey(itemId) || pouch(itemId);
+    }
+
+    /** Coin pouches and the Guardians of the Rift intricate pouch: contents book when opened. */
+    static boolean pouch(int itemId) {
+        return itemId >= ItemID.PICKPOCKET_COIN_POUCH_CITIZEN
+                        && itemId <= ItemID.PICKPOCKET_COIN_POUCH_ELF
+                || itemId == ItemID.PICKPOCKET_COIN_POUCH_VYRE
+                || itemId == ItemID.PICKPOCKET_COIN_POUCH_VARLAMORE_WEALTHY
+                || itemId == ItemID.PICKPOCKET_COIN_POUCH_PIRATE
+                || itemId == ItemID.GOTR_INTRICATE_POUCH;
+    }
+}
+
+/**
+ * Reward-interface / chest adapters → Pending Rewards → Claimed once. Name matching for Loot
+ * Tracker EVENT + live reward UIs.
+ */
+class RewardChestCatalogue {
+    /** True when this LT/event name is a reward chest / raid / clue pool — not floor loot. */
+
+    /** Reward fragments share the same once-compiled matcher as other evidence tables. */
+    static final Map<String, Phrases.Clause[][]> RULES = GameData.rules("reward_chests");
+
+    static boolean isRewardChest(String raw) {
+        if (Phrases.blank(raw)) return false;
+        if (KeyChestCatalogue.entryForChest(raw) != null) return true;
+        String name = Phrases.lower(raw);
+        return RULES.values().stream().anyMatch(c -> Phrases.has(name, c));
     }
 }

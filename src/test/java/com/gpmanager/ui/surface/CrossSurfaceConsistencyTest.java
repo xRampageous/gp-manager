@@ -56,8 +56,8 @@ public class CrossSurfaceConsistencyTest
         });
         List<String> labels = labels(page.body());
         assertFalse("visible Revenue is gone", labels.contains("Revenue"));
-        assertEquals("the Market cell shows the realized result", Fmt.signed(snapshot.marketResult),
-            onEdt(() -> HeroProbe.cell(page.hero, "MARKET")));
+        assertEquals("the Trade cell shows the realized result", Fmt.signed(snapshot.marketResult),
+            onEdt(() -> HeroProbe.cell(page.hero, "TRADE")));
         assertEquals("ordinary Gains exclude the whole Market transaction",
             Fmt.signed(snapshot.gains), onEdt(() -> HeroProbe.cell(page.hero, "GAINS")));
         Accounting.MarketFold fold =
@@ -88,7 +88,7 @@ public class CrossSurfaceConsistencyTest
             created.apply(snapshot);
             return created;
         });
-        assertEquals("open", onEdt(() -> HeroProbe.cell(page.hero, "MARKET")));
+        assertEquals("open", onEdt(() -> HeroProbe.cell(page.hero, "TRADE")));
     }
 
     @Test

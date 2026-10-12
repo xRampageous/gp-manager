@@ -47,7 +47,7 @@ public class LedgerOverviewModesTest
         List<String> overview = onEdt(() -> labels(page.body()));
         assertTrue(overview.stream().anyMatch(label -> label.startsWith("GAINS \u00b7")));
         assertTrue(overview.stream().anyMatch(label -> label.startsWith("LOSSES \u00b7")));
-        assertTrue(overview.stream().anyMatch(label -> label.startsWith("MARKET \u00b7")));
+        assertTrue(overview.stream().anyMatch(label -> label.startsWith("TRADE \u00b7")));
         assertFalse(onEdt(() -> detailOpen(page)));
 
         String groupId = harness.data().gains.groups.get(0).semanticGroupId;
@@ -61,7 +61,7 @@ public class LedgerOverviewModesTest
         List<String> detail = onEdt(() -> labels(page.body()));
         assertFalse("overview tables are gone while a detail is open", detail.stream()
             .anyMatch(label -> label.startsWith("GAINS \u00b7") || label.startsWith("LOSSES \u00b7")
-                || label.startsWith("MARKET \u00b7")));
+                || label.startsWith("TRADE \u00b7")));
         assertTrue("the detail summary is rendered",
             detail.stream().anyMatch(label -> label.contains(groupName)));
 
@@ -207,8 +207,64 @@ public class LedgerOverviewModesTest
 
         List<String> labels = onEdt(() -> labels(page.body()));
         assertTrue("an empty table keeps its header",
-            labels.stream().anyMatch(label -> label.startsWith("MARKET \u00b7 0")));
+            labels.stream().anyMatch(label -> label.startsWith("TRADE \u00b7 0")));
         assertTrue(onEdt(() -> LedgerPageProbe.overviewRows(page, LedgerPageProbe.FinancialTable.MARKET)).isEmpty());
+    }
+
+    @Test
+    public void aShopExchangeSettlesIntoMarketNotPending() throws Exception
+    {
+        Engine engine = session();
+        Transaction trade = new Transaction(T0 + 1_000L, TransactionType.TRADE, Context.MARKET,
+            "buy 5 death rune", "Market", true, Arrays.asList(
+                new Flow(6529, "Tokkul", -1_942L, 10, -19_420L),
+                new Flow(560, "Death rune", 5L, 201, 1_005L)),
+            Confidence.CONFIRMED, "Trade inventory movement observed.", null);
+        engine.getActiveSession().addTransaction(trade, 2_000);
+        LedgerHarness harness = new LedgerHarness(engine, T0 + 50_000L, entry());
+        LedgerPage page = onEdt(() -> harness.attach(new LedgerPage(harness, id -> null)));
+
+        assertEquals("the shop spend is a settled MARKET row", 1,
+            (int) onEdt(() -> LedgerPageProbe.overviewRows(page, LedgerPageProbe.FinancialTable.MARKET)).size());
+        assertTrue("a shop exchange never waits in Pending",
+            onEdt(() -> TableRows.of(page.body(), "PENDING").isEmpty()));
+    }
+
+    @Test
+    public void theRecentTokkulRowOpensBothShopEntries() throws Exception
+    {
+        Engine engine = session();
+        engine.getActiveSession().addTransaction(
+            shopTrade(T0 + 1_000L, "buy 5 death rune", 560, 5L, 1_942L), 2_000);
+        engine.getActiveSession().addTransaction(
+            shopTrade(T0 + 2_000L, "buy 50 chaos rune", 562, 50L, 1_350L), 2_000);
+
+        LiveSnapshot snapshot = LiveSnapshot.capture(engine, T0 + 50_000L, LiveContext.NONE);
+        LiveSnapshot.Recent row = snapshot.recent.stream()
+            .filter(candidate -> "Tokkul".equals(candidate.name))
+            .findFirst().orElseThrow(AssertionError::new);
+        assertEquals("both shop spends coalesce into one Recent row", 2, row.receipts);
+
+        LedgerHarness harness = new LedgerHarness(engine, T0 + 50_000L, LivePage.entryFor(row));
+        LedgerPage page = onEdt(() -> harness.attach(new LedgerPage(harness, id -> null)));
+        LedgerData data = harness.data();
+        assertNotNull("the Recent row opens its group", data.detail);
+        assertEquals("the click lands on the tokkul side, not one rune",
+            "Tokkul", data.detail.group.primaryName);
+        assertEquals("the drill shows both entries", 2, data.detail.receipts.size());
+        List<String> entries =
+            onEdt(() -> TableRows.names(TableRows.tables(page.body(), "ENTRIES").get(0)));
+        assertTrue("entry rows name the bought runes: " + entries,
+            entries.contains("Death rune ×5") && entries.contains("Chaos rune ×50"));
+    }
+
+    private static Transaction shopTrade(long at, String note, int runeId, long runeQty, long tokkulQty)
+    {
+        return new Transaction(at, TransactionType.TRADE, Context.MARKET, note, "Market", true,
+            Arrays.asList(
+                new Flow(6529, "Tokkul", -tokkulQty, 10, -tokkulQty * 10L),
+                new Flow(runeId, runeId == 560 ? "Death rune" : "Chaos rune", runeQty, 201, runeQty * 201L)),
+            Confidence.CONFIRMED, "Trade inventory movement observed.", null);
     }
 
     @Test

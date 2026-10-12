@@ -38,6 +38,7 @@ public class DeathFeeMessagesTest
     public void instanceFeesFromTheCoffer()
     {
         assertEquals(25_000L, amount("coffer-payment", "Payment has been taken from your coffer: 25,000 x Coins."));
+        assertEquals(12_500L, amount("coffer-payment", "Payment has been taken from your coffer: 12,500 Coins."));
         assertFalse(GameData.pattern("coffer-payment").matcher("you have 25,000 x coins left in death's coffer.").matches());
     }
 }

@@ -28,6 +28,8 @@ public class ClueClaimTest
     private static final int MYSTERY = 30000;
     private static final int EMPTY_JAR = 11260;
     private static final int ECLECTIC = 11248;
+    private static final int POUCH = 26908;
+    private static final int WATER_RUNE = 555;
     private static final Map<Integer, String> NAMES = new HashMap<>();
 
     static
@@ -41,6 +43,8 @@ public class ClueClaimTest
         NAMES.put(MYSTERY, "Mystery scroll");
         NAMES.put(EMPTY_JAR, "Impling jar");
         NAMES.put(ECLECTIC, "Eclectic impling jar");
+        NAMES.put(POUCH, "Intricate pouch");
+        NAMES.put(WATER_RUNE, "Water rune");
     }
 
     private static final GpManagerConfig CONFIG = new GpManagerConfig()
@@ -54,7 +58,11 @@ public class ClueClaimTest
 
     private final Map<Integer, Long> inventory = new HashMap<>();
     private final Engine engine = new Engine(new Valuation(CONFIG, ClueClaimTest::composition,
-        id -> id == PLATEBODY ? 38_000 : id == ECLECTIC ? 20_000 : id == EMPTY_JAR ? 290 : 0), new TransactionClassifier(), CONFIG);
+        id -> id == PLATEBODY ? 38_000
+            : id == ECLECTIC ? 20_000
+            : id == EMPTY_JAR ? 290
+            : id == WATER_RUNE ? 5
+            : 0), new TransactionClassifier(), CONFIG);
     private long now = 1_000_000L;
 
     @Test
@@ -134,6 +142,22 @@ public class ClueClaimTest
         change(MYSTERY, 1L);
         Flow flow = engine.getActiveSession().getTransactions().get(0).getFlows().get(0);
         assertEquals(PriceSource.UNPRICED, flow.getPriceSource());
+    }
+
+    /** The GOTR reward pouch: held at zero until opened, then its contents book once. */
+    @Test
+    public void theIntricatePouchIsAClaimUntilOpened()
+    {
+        engine.startCustom("GotR", now);
+        engine.setBaseline(new ContainerSnapshot(new HashMap<>(inventory)));
+
+        change(POUCH, 1L);
+        assertEquals("the pouch is worth nothing yet", 0L, net());
+        assertEquals(0, reviews());
+
+        change(POUCH, -1L, WATER_RUNE, 106L);
+        assertEquals("opening it counts the runes once", 530L, net());
+        assertEquals(0, reviews());
     }
 
     private void change(Object... idsAndDeltas)

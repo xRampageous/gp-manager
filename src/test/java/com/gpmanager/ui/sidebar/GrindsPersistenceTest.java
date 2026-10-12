@@ -36,7 +36,7 @@ public class GrindsPersistenceTest
     @Test
     public void schemaIsAdditiveAndFutureVersionsStayReadOnly() throws Exception
     {
-        assertEquals(109, SavedState.CURRENT_SCHEMA_VERSION);
+        assertEquals(110, SavedState.CURRENT_SCHEMA_VERSION);
         SavedState old = new SavedState();
         old.setSchemaVersion(103);
         assertFalse("pre-1.0 states are never read", old.isSupportedSchema());

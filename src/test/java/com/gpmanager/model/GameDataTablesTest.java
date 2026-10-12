@@ -40,14 +40,33 @@ public class GameDataTablesTest
 
     static final Set<Integer> CURRENCY_PROXIES = new HashSet<>(Arrays.asList(
         ItemID.TZHAAR_TOKEN, ItemID.GAUNTLET_CRYSTAL_SHARD, ItemID.PRIF_CRYSTAL_SHARD_CRUSHED,
-        21649, ItemID.STAR_DUST, ItemID.MGUILD_MINERALS, ItemID.MOTHERLODE_NUGGET, 27285,
-        ItemID.HALLOWED_MARK_3, ItemID.BH_EMBLEM, 26879, ItemID.PRIF_CRYSTAL_SHARD,
+        21649, ItemID.STAR_DUST, ItemID.MGUILD_MINERALS, ItemID.MOTHERLODE_NUGGET, 26792,
+        ItemID.HALLOWED_MARK_3, ItemID.BH_EMBLEM, ItemID.PRIF_CRYSTAL_SHARD,
+        // 2026-10-13 currency pass: spirit flakes read at the soaked-page exchange, Molch pearls
+        // at the golden-tench one; hallowed mark variants, Castle Wars tickets and Soul Wars
+        // spoils are catalogue guards.
+        ItemID.SPIRIT_FLAKES, ItemID.AERIAL_FISHING_PEARL, ItemID.MOLCH_PEARL_2,
+        ItemID.MOLCH_PEARL_3, ItemID.MOLCH_PEARL_4, ItemID.MOLCH_PEARL_5,
+        ItemID.HALLOWED_MARK, ItemID.HALLOWED_MARK_2, ItemID.HALLOWED_MARK_4,
+        ItemID.HALLOWED_MARK_5, ItemID.HALLOWED_MARK_25, ItemID.CASTLEWARS_TICKET,
+        ItemID.SOUL_WARS_SPOILS,
         // 1.3.0: the degrading Amulet of the damned, imbued black masks and slayer helmets.
-        ItemID.DAMNED_AMULET_DEGRADED, ItemID.SLAYER_HELM_I, ItemID.SW_SLAYER_HELM_I, ItemID.PVPA_SLAYER_HELM_I));
+        ItemID.DAMNED_AMULET_DEGRADED, ItemID.SLAYER_HELM_I, ItemID.SW_SLAYER_HELM_I, ItemID.PVPA_SLAYER_HELM_I,
+        // 1.3.4 review: the sailors' amulet's inert and charged states are the same worth, and the
+        // 1:1 row pairs the inert-to-charged swap so only the charging runes book.
+        ItemID.SAILORS_AMULET_EMPTY));
     static {
         for (int id = 11774; id <= 11784; id++) CURRENCY_PROXIES.add(id);
         for (int id = 25266; id <= 25276; id++) CURRENCY_PROXIES.add(id);
         for (int id = 26771; id <= 26781; id++) CURRENCY_PROXIES.add(id);
+        // 2026-10-12: imbued variants worth their plain item; their 1:1 rows also pair the swaps.
+        for (int id : new int[] {12017, 12018, 25250, 25278, 26763, 26782,
+            11770, 11771, 11772, 11773, 25258, 25260, 25262, 25264, 26767, 26768, 26769, 26770,
+            13202, 12691, 12692, 25252, 25254, 25256, 26764, 26765, 26766,
+            21752, 25193, 26685, 12785, 20786, 20787, 20788, 20789, 20790, 12788})
+        {
+            CURRENCY_PROXIES.add(id);
+        }
     }
 
     static List<String> keyChests()
@@ -140,7 +159,7 @@ public class GameDataTablesTest
 
     static final List<String> REWARD_SOURCES = Arrays.asList(
         "chambers of xeric", "theatre of blood", "tombs of amascut", "barrows", "gauntlet", "tempoross",
-        "wintertodt", "guardians of the rift", "fishing trawler", "drift net", "colosseum", "lunar chest",
+        "wintertodt", "fishing trawler", "drift net", "colosseum", "lunar chest",
         "loot chest", "wilderness loot", "clue", "casket", "reward", "bounty hunter", "crates", "bird house",
         "birdhouse", "herbiboar", "giants' foundry", "giants foundry");
 
@@ -251,7 +270,7 @@ public class GameDataTablesTest
     public void itemNamesInTheTablesMatchRuneLiteIds() throws ReflectiveOperationException
     {
         int named = 0;
-        for (String table : new String[]{"tax_exempt", "currencies", "key_chests", "dismantle"})
+        for (String table : new String[]{"tax_exempt", "currencies", "key_chests", "dismantle", "minigame_items"})
         {
             for (String[] row : GameData.rows(table))
             {
@@ -264,7 +283,7 @@ public class GameDataTablesTest
                 }
             }
         }
-        assertEquals(50 + 9 + 35 + 8, named);
+        assertEquals(50 + 9 + 35 + 8 + 782, named);
     }
 
     /** Every msg key the plugin uses has its text, and text.tsv holds nothing the code no longer uses. */
@@ -337,15 +356,23 @@ public class GameDataTablesTest
     @Test
     public void actionAndItemRulesKeepEveryUsedKeyAndOrderedOutcome()
     {
-        assertEquals(Set.of("drink", "eat", "~bury", "~scatter", "offer", "cast", "supplies",
-            "vessel", "rune", "claim", "ingredient", "food", "partial"), ActionReader.RULES.keySet());
+        assertEquals(Set.of("drink", "eat", "~bury", "~scatter", "offer", "cast", "chat eat", "chat drink",
+            "chat offer", "supplies", "vessel", "rune", "claim", "ingredient", "food", "partial"),
+            ActionReader.RULES.keySet());
         List<String> loaded = new ArrayList<>();
         for (String[] row : GameData.rows("action_rules"))
         {
             assertEquals(3, row.length);
             if (!row[2].isEmpty()) loaded.add(row[0] + "|" + ActionKind.valueOf(row[2]).name());
         }
-        assertEquals(Arrays.asList("drink|DRINK", "eat|EAT", "~bury|BURY", "~scatter|SCATTER", "offer|OFFER", "cast|CAST"), loaded);
+        assertEquals(Arrays.asList("drink|DRINK", "eat|EAT", "~bury|BURY", "~scatter|SCATTER", "offer|OFFER",
+            "cast|CAST", "chat eat|EAT", "chat drink|DRINK", "chat offer|OFFER"), loaded);
+        // A chat confirmation names its own verb ("You eat the chicken."), so a bite that lands
+        // after the menu clicks lapse still books Ate, not a bare Used (owner 2026-10-12).
+        assertEquals(ActionKind.EAT, ActionReader.verbOf("You eat the chicken."));
+        assertEquals(ActionKind.DRINK, ActionReader.verbOf("You drink the prayer potion."));
+        assertEquals(ActionKind.BURY, ActionReader.verbOf("You bury the bones."));
+        assertEquals(ActionKind.OFFER, ActionReader.verbOf("You offer the bones."));
         assertEquals(GameData.msg("light-tend"), GameData.pattern("light-tend").pattern());
         assertEquals(GameData.msg("pizza-pie"), GameData.pattern("pizza-pie").pattern());
         assertEquals(".*(pizza|cake|pie).*", GameData.pattern("pizza-cake-pie").pattern());
@@ -354,7 +381,7 @@ public class GameDataTablesTest
     /** d26 contains phrases rather than gameval ids; d13 continues to validate region ids. */
     @Test public void neutralTransferTableRowsAllCompileWithPhrasesAndNotes() {
         List<String[]> rows = GameData.cachedRows("neutral_transfers");
-        assertEquals(24, rows.size());
+        assertEquals(25, rows.size());
         assertEquals(rows.stream().map(row -> row[0]).collect(java.util.stream.Collectors.toList()),
             new ArrayList<>(NeutralTransfers.RULES.keySet()));
         for (String[] row : rows) {

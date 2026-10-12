@@ -41,7 +41,7 @@ class UtilityContainerCatalogue {
      * Kind#EMPTY_TO_BANK} (ownership-neutral).
      */
     static Kind classify(String option, boolean depositBoxOpen) {
-        String normalized = Phrases.norm(option) == null ? "" : Phrases.norm(option);
+        String normalized = Phrases.lower(option);
         return "check".equals(normalized)
                 ? Kind.CALIBRATE_CHECK
                 : normalized.startsWith("empty")

@@ -19,6 +19,7 @@ import net.runelite.api.events.*;
 import net.runelite.api.gameval.*;
 import net.runelite.api.gameval.InterfaceID;
 import net.runelite.api.gameval.InventoryID;
+import net.runelite.api.gameval.ItemID;
 import net.runelite.api.widgets.*;
 import net.runelite.client.callback.ClientThread;
 import net.runelite.client.config.ConfigManager;
@@ -158,20 +159,36 @@ public class GpManagerPlugin extends Plugin {
                                     + "|"
                                     + lootPresentationFilter.fingerprint
                                     + "|"
-                                    + config.hiddenRecentItems();
+                                    + config.hiddenRecentItems()
+                                    + "|"
+                                    + config.hiddenRecentCharges();
                         }
 
-                        public boolean showRecent(String name, long quantity) {
+                        public boolean showRecent(String name, long quantity, boolean charge) {
+                            // A charge row answers to both lists; a match in either hides it.
+                            String hidden =
+                                    config.hiddenRecentItems()
+                                            + (charge ? "," + config.hiddenRecentCharges() : "");
                             return LootPresentationFilterService.listState(
-                                            "", config.hiddenRecentItems(), name, quantity)
+                                            "", hidden, name, quantity)
                                     != LootPresentationFilterService.HIDDEN;
                         }
 
-                        public void hideRecent(String name) {
-                            var names = new ArrayList<>(Text.fromCSV(config.hiddenRecentItems()));
-                            if (!names.contains(name)) names.add(name);
+                        public void hideRecent(String name, boolean charge) {
+                            String list =
+                                    charge
+                                            ? config.hiddenRecentCharges()
+                                            : config.hiddenRecentItems();
+                            String entry =
+                                    charge
+                                            ? LootPresentationFilterService.chargePattern(name)
+                                            : name;
+                            var names = new ArrayList<>(Text.fromCSV(list));
+                            if (!names.contains(entry)) names.add(entry);
                             configManager.setConfiguration(
-                                    GpManagerConfig.GROUP, "hiddenRecentItems", Text.toCSV(names));
+                                    GpManagerConfig.GROUP,
+                                    charge ? "hiddenRecentCharges" : "hiddenRecentItems",
+                                    Text.toCSV(names));
                         }
                     });
             activityPanel = panel;
@@ -339,6 +356,7 @@ public class GpManagerPlugin extends Plugin {
         clientThread.invokeLater(
                 () -> {
                     refreshEconomyState();
+                    refreshKaramjaGloves();
                     if (canIngest()) initLoggedIn();
                 });
         pulse();
@@ -375,6 +393,19 @@ public class GpManagerPlugin extends Plugin {
                         : Valuation.Economy.UNKNOWN);
     }
 
+    /** Karamja gloves 1-4 on the hands slot pick the improved tokkul rate. */
+    private static final Set<Integer> KARAMJA_GLOVES =
+            Set.of(ItemID.ATJUN_GLOVES_EASY, ItemID.ATJUN_GLOVES_MED,
+                    ItemID.ATJUN_GLOVES_HARD, ItemID.ATJUN_GLOVES_ELITE);
+
+    /** Client-thread gloves snapshot; called at login/start and on worn-equipment changes. */
+    void refreshKaramjaGloves() {
+        if (valuation == null) return;
+        ItemContainer worn = client == null ? null : client.getItemContainer(InventoryID.WORN);
+        Item gloves = worn == null ? null : worn.getItem(EquipmentInventorySlot.GLOVES.getSlotIdx());
+        valuation.setKaramjaGlovesWorn(gloves != null && KARAMJA_GLOVES.contains(gloves.getId()));
+    }
+
     @Subscribe
     public void onGameStateChanged(GameStateChanged event) {
         GameState previous = lastGameState;
@@ -383,6 +414,7 @@ public class GpManagerPlugin extends Plugin {
             loggedIn = true;
             // Login or world hop: re-read the economy identity from the client thread.
             refreshEconomyState();
+            refreshKaramjaGloves();
         } else if (event.getGameState() == LOGIN_SCREEN || event.getGameState() == HOPPING) {
             recentPlayerCombatTicks = 0;
             loggedIn = event.getGameState() == HOPPING;
@@ -439,6 +471,7 @@ public class GpManagerPlugin extends Plugin {
     public void onRuneScapeProfileChanged(RuneScapeProfileChanged event) {
         beginOwnerSwitch();
         refreshEconomyState();
+        refreshKaramjaGloves();
         persistence.syncIdentityAsync(config::persistHistory);
         pulse();
     }
@@ -558,6 +591,7 @@ public class GpManagerPlugin extends Plugin {
         if (!canIngest()) return;
         int containerId = event.getContainerId();
         boolean inventory = containerId == InventoryID.INV || containerId == InventoryID.WORN;
+        if (containerId == InventoryID.WORN) refreshKaramjaGloves();
         if (!inventory) markActivity();
         if (containerId == InventoryID.BANK) {
             engine.markContext(Context.TRANSFER, CORRELATION_TICKS, "Bank transfer");
@@ -689,14 +723,25 @@ public class GpManagerPlugin extends Plugin {
     @Subscribe
     public void onChatMessage(ChatMessage event) {
         if (!canIngest() || event == null) return;
+        String message = normalize(event.getMessage());
         // Uncharging Bryophyta's staff destroys its runes; its dialog says how many (recorded
         // 2026-10-09).
-        var emptied = GameData.pattern("bru").matcher(normalize(event.getMessage()));
+        var emptied = GameData.pattern("bru").matcher(message);
         if (emptied.matches())
             charges.emptied(ChargeCheck.parseCount(emptied.group(1)), SafeMath.now());
+        // A refused pendant teleport (already at that location) books no charge; its line arrives
+        // as a "click here to continue" box (MESBOX), so it is matched before the chat-type gate
+        // and the estimate its click made is removed through the announced path (owner live
+        // 2026-10-13).
+        if (GameData.pattern("pendant-refused").matcher(message).matches())
+            charges.refusedTeleport(SafeMath.now());
+        // The Vyre well is refundable storage for scythe charges (owner live 2026-10-13): filling
+        // it with vials and blood runes moves the player's own items, and the scythe's charge
+        // estimates book the use. Its line arrives as a message box too.
+        if (GameData.pattern("vyre-well-fill").matcher(message).matches())
+            zone(msg("vyre-well"));
         ChatMessageType type = event.getType();
         if (type != ChatMessageType.SPAM && type != ChatMessageType.GAMEMESSAGE) return;
-        String message = normalize(event.getMessage());
         // Each potion a chug drinks prints its own barrel line (Dude Where's My Stuff, GIM Hub).
         var chug = GameData.pattern("chug").matcher(message);
         if (chug.matches()) charges.chug(chug.group(1), SafeMath.now());
@@ -707,10 +752,21 @@ public class GpManagerPlugin extends Plugin {
         // Any unrelated chat between click and numeric response makes the target
         // association uncertain; the next Check must establish fresh intent.
         charges.clearCheck();
+        // The Guardians of the Rift pool's left-click deposit resolves a few ticks after the
+        // click, outside the menu's correlation window; its own line marks the custody
+        // (owner 2026-10-13).
+        if (GameData.pattern("deposit-pool").matcher(message).matches()) {
+            zone(msg("deposit-pool"));
+            return;
+        }
         // Fees paid from Death's Coffer or the bank never leave the inventory; the game's own lines
         // name them (research 1.2). "Death charges you" is the whole reclaim fee, so a bank share
         // inside it waits two ticks and is dropped once that line arrives. A private instance is
         // paid coffer first, then the bank for the rest in the same tick (Death Cost Tracker).
+        // Every instance line arrives as SPAM, while reclaim bank lines arrive as GAMEMESSAGE,
+        // so a lone SPAM bank line with an empty coffer is the bank-paid instance fee. A share
+        // settles the same tick as its coffer line, and the pinned later-tick bank line is never
+        // a fee, so this branch also requires no coffer line on this tick or the last one.
         var fee = GameData.pattern("death-fee").matcher(message);
         var bank = GameData.pattern("bank-payment").matcher(message);
         var coffer = GameData.pattern("coffer-payment").matcher(message);
@@ -730,6 +786,10 @@ public class GpManagerPlugin extends Plugin {
                                     "Reclaim fee (bank)")
                             .at =
                     client.getTickCount();
+        } else if (bank.matches() && type == ChatMessageType.SPAM
+                && client.getTickCount() - instancePaidTick > 1) {
+            engine.bookDeathFee(
+                    ChargeCheck.parseCount(bank.group(1)), msg("instance-fee-bank"), SafeMath.now());
         } else if (coffer.matches()) {
             instancePaidTick = client.getTickCount();
             engine.bookDeathFee(
@@ -769,7 +829,7 @@ public class GpManagerPlugin extends Plugin {
         if (!ActionSignals.isChatSpend(message)) return;
         // Live bury/drink often animate after the menu click; chat confirms the spend
         // and keeps open intent alive until inventory stabilizes (incl. coalesced picks).
-        engine.extendConsume(consumeTicks());
+        engine.extendConsume(consumeTicks(), ActionReader.verbOf(message));
         markActivity();
     }
 
@@ -810,10 +870,24 @@ public class GpManagerPlugin extends Plugin {
         if ("revert".equals(option) || "dismantle".equals(option))
             engine.dismantle(menuItemId(event));
         if (target.contains("multicannon") || target.startsWith("cannon ")) {
-            // A dwarf multicannon (OSRS Wiki): Fire or Load takes balls from the pack; Set-up and
-            // Pick-up move its parts.
+            // A dwarf multicannon (OSRS Wiki): Fire or Load takes balls from the pack, Set-up
+            // places its parts and auto-loads the balls it finds with them, and using a ball on
+            // it loads too. Every one of those ball moves is a load (owner 1.3.4 live: the
+            // set-up and use loads were unarmed, so their Empty returns booked as gains).
             if ("fire".equals(option) || option.startsWith("load")) engine.loadCannon(consumeTicks());
-            else if ("set-up".equals(option) || "pick-up".equals(option)) engine.moveCannon();
+            else if ("set-up".equals(option)) {
+                engine.moveCannon();
+                // The auto-load follows the ~12-tick assembly, so arm it for the same span as
+                // the parts custody (owner live 2026-10-13).
+                engine.loadCannon(40);
+            } else if ("pick-up".equals(option)) engine.moveCannon();
+            else if ("use".equals(option)) engine.loadCannon(consumeTicks());
+        }
+        if (target.contains("vyre well") && "empty".equals(option)) {
+            // The filled Vyre well refunds its vials of blood and blood runes through its Empty
+            // option; that return is the player's own storage coming back, never income
+            // (owner live 2026-10-13).
+            zone(msg("vyre-well"));
         }
         if (consumption) {
             int itemId = menuItemId(event);
@@ -1345,9 +1419,11 @@ public class GpManagerPlugin extends Plugin {
         if (tile != null) applyNeutralZone(regionId());
         servantTalk();
         charges.drank(SafeMath.now());
-        // An NPC conversation or its options on screen: a coins-for-items change is a purchase.
+        // An NPC conversation or its options on screen, or a shop window: a coins-for-items
+        // change is a purchase, an items-for-coins change a sale (owner 1.3.4).
         if (Widgets.visible(client, InterfaceID.ChatLeft.UNIVERSE)
-                || Widgets.visible(client, InterfaceID.Chatmenu.UNIVERSE)) {
+                || Widgets.visible(client, InterfaceID.Chatmenu.UNIVERSE)
+                || Widgets.isShopOpen(client)) {
             engine.inbox.put(DIALOGUE, 0, 1L, stableTicks(4), null);
         }
         boolean activeAnimation = localPlayer != null && localPlayer.getAnimation() != -1;

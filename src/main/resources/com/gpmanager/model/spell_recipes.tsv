@@ -41,3 +41,10 @@ Smoke Barrage	4:air 4:fire 2:blood 4:death
 Shadow Barrage	4:air 2:blood 4:death 3:soul
 Blood Barrage	4:blood 4:death 1:soul
 Ice Barrage	6:water 2:blood 4:death
+# Arceuus combat spells (owner 2026-10-13 gap-fill): fire costs as of the 22 May 2025 change.
+Ghostly Grasp	4:air 1:chaos
+Skeletal Grasp	8:earth 1:death
+Undead Grasp	12:fire 1:blood
+Inferior Demonbane	3:fire 1:chaos
+Superior Demonbane	5:fire 1:soul
+Dark Demonbane	7:fire 2:soul

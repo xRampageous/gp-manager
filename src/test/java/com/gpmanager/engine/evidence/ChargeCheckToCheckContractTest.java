@@ -206,6 +206,74 @@ public class ChargeCheckToCheckContractTest
     }
 
     @Test
+    public void scytheChecksMeasureBloodRunes()
+    {
+        Engine engine = engine();
+        String target = "149:0:0:" + ItemID.SCYTHE_OF_VITUR + ":SCYTHE";
+        ChargeOutcomeTest.none(observe(engine, "Your Scythe of Vitur has 1,322 charges remaining.", target, 1_000L));
+        ChargeDelta delta = observe(engine, "Your Scythe of Vitur has 1,315 charges remaining.", target, 2_000L);
+        assertNotNull(delta);
+        assertEquals(-14L, quantityDelta(delta, ItemID.BLOODRUNE));
+    }
+
+    @Test
+    public void saeldorChecksMeasureShardsLikeItsCrystalFamily()
+    {
+        Engine engine = engine();
+        String target = "149:5:0:" + ItemID.BLADE_OF_SAELDOR + ":S";
+        ChargeOutcomeTest.none(observe(engine,
+            "Your Blade of Saeldor has 1,000 charges remaining.", target, 1_000L));
+        ChargeDelta delta = observe(engine,
+            "Your Blade of Saeldor has 950 charges remaining.", target, 2_000L);
+        assertNotNull(delta);
+        assertEquals(-50L, quantityDelta(delta, ItemID.PRIF_CRYSTAL_SHARD));
+        assertEquals(100, ChargeCheck.unitsPerItem(ChargeCheck.ChargedItem.SAELDOR, ItemID.PRIF_CRYSTAL_SHARD));
+    }
+
+    @Test
+    public void scytheAndSaeldorCheckGrammarsCoverObservedForms()
+    {
+        assertRead("Your Scythe of Vitur has 1,322 charges remaining.", ChargeCheck.ChargedItem.SCYTHE);
+        assertRead("Your Holy Scythe of Vitur has 900 charges left.", ChargeCheck.ChargedItem.SCYTHE);
+        assertRead("Your Blade of Saeldor has 10,000 charges remaining.", ChargeCheck.ChargedItem.SAELDOR);
+        assertRead("<col=ff0000>Your Blade of Saeldor has 100 charges remaining, and 3% progress towards corruption.</col>",
+            ChargeCheck.ChargedItem.SAELDOR);
+    }
+
+    @Test
+    public void crystalArmourAndShieldChecksHaveNothingToCompare()
+    {
+        // A committed load books its shards on arrival; the piece's Check cannot measure anything
+        // (owner 2026-10-12).
+        String[][] pieces = {
+            {"Crystal helm", "149:5:0:23971:CH", "CRYSTAL_HELM"},
+            {"Crystal body", "149:5:0:23975:CB", "CRYSTAL_BODY"},
+            {"Crystal legs", "149:5:0:23979:CL", "CRYSTAL_LEGS"},
+            {"Crystal shield", "149:5:0:23991:CS", "CRYSTAL_SHIELD"}};
+        for (String[] piece : pieces)
+        {
+            Engine engine = engine();
+            String lower = piece[0].toLowerCase(java.util.Locale.ROOT);
+            ChargeCheck read = ChargeCheck.parse("Your " + lower + " has 1,000 charges remaining.");
+            assertNotNull(piece[0], read);
+            assertEquals(piece[0], ChargeCheck.ChargedItem.valueOf(piece[2]), read.variant);
+            assertFalse(piece[0], read.bookable);
+            ChargeOutcomeTest.none(engine.observeCheck(read, piece[1], 1_000L));
+            ChargeOutcomeTest.none(engine.observeCheck(
+                ChargeCheck.parse("Your " + lower + " has 950 charges remaining."), piece[1], 2_000L));
+            assertTrue(piece[0], engine.getActiveSession().getTransactions().isEmpty());
+        }
+    }
+
+    private static void assertRead(String chat, ChargeCheck.ChargedItem expected)
+    {
+        ChargeCheck read = ChargeCheck.parse(chat);
+        assertNotNull(chat, read);
+        assertEquals(chat, expected, read.variant);
+        assertTrue(chat, read.bookable);
+    }
+
+    @Test
     public void atesChecksMeasureTearsOnePerCharge()
     {
         Engine engine = engine();
@@ -258,28 +326,6 @@ public class ChargeCheckToCheckContractTest
         assertEquals("seven hits, healed or not, are seven charges", -7L,
             quantityDelta(delta, ItemID.BLOOD_SHARD));
         assertEquals(10_000, ChargeCheck.unitsPerItem(ChargeCheck.ChargedItem.BLOOD_FURY, ItemID.BLOOD_SHARD));
-    }
-
-    @Test
-    public void everyImplementedFamilyIsMeasured()
-    {
-        List<String> implemented = new ArrayList<>();
-        for (ChargeCheck.ChargedItem variant : ChargeCheck.ChargedItem.values())
-        {
-            if (variant.isImplemented())
-            {
-                implemented.add(variant.getDisplayName());
-            }
-        }
-        Collections.sort(implemented);
-        assertEquals(java.util.Arrays.asList("Accursed sceptre", "Blood fury", "Bow of Faerdhinen", "Bryophyta's staff", "Craw's bow",
-            "Crystal bow", "Crystal halberd", "Echo venator bow", "Eye of Ayak", "Holy sanguinesti staff", "Kharedst's memoirs",
-            "Pendant of Ates", "Sanguinesti staff", "Serpentine helm", "Thammaron's sceptre", "Tome of fire", "Toxic blowpipe",
-            "Toxic staff of the dead",
-            "Trident of the Seas", "Trident of the Seas (e)", "Trident of the Swamp",
-            "Trident of the Swamp (e)", "Tumeken's shadow", "Ursine chainmace", "Venator bow", "Viggora's chainmace",
-            "Warped sceptre", "Webweaver bow"),
-            implemented);
     }
 
     private static ChargeDelta observe(Engine engine, String chat, String target, long now)

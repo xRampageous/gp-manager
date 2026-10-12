@@ -64,12 +64,24 @@ class ChargeCheck {
         MEMOIRS,
         BRYOPHYTA,
         TOXIC_STAFF,
-        SERPENTINE_HELM;
+        SERPENTINE_HELM,
+        CRYSTAL_HELM,
+        CRYSTAL_BODY,
+        CRYSTAL_LEGS,
+        CRYSTAL_SHIELD,
+        SUFFERING,
+        TONALZTICS,
+        TOME_OF_WATER,
+        TOME_OF_EARTH,
+        ETHEREUM;
         String displayName;
         boolean implemented;
         String family;
         ActionKind action;
         int units;
+
+        /** A load's components can never be refunded: the load books as spend, not a transfer. */
+        boolean committedLoad;
 
         /** The Check line's pattern with its count group and its single-charge group (0: none). */
         Pattern check;
@@ -116,6 +128,9 @@ class ChargeCheck {
                 }
                 item.aliases = parts(row[11], ";");
                 item.itemIds = ids(row[12]);
+            }
+            for (String[] row : GameData.rows("committed_loads")) {
+                valueOf(row[0]).committedLoad = true;
             }
         }
 
@@ -206,7 +221,14 @@ class ChargeCheck {
     static ChargedItem surface(String lower) {
         if (lower.startsWith("darts:") && lower.contains("scales:")) return ChargedItem.BLOWPIPE;
         if (lower.startsWith("the pendant has ")) return ChargedItem.ATES;
-        if (lower.startsWith("your tome has been charged with ")) return ChargedItem.TOME_OF_FIRE;
+        if (lower.startsWith("your tome has been charged with "))
+        {
+            // The page names the tome; a bare "your tome" line stays fire and the clicked row
+            // redirects it (owner 2026-10-12).
+            if (lower.contains("soaked")) return ChargedItem.TOME_OF_WATER;
+            if (lower.contains("soiled")) return ChargedItem.TOME_OF_EARTH;
+            return ChargedItem.TOME_OF_FIRE;
+        }
         if (lower.startsWith(msg("amulet-blood"))) return ChargedItem.BLOOD_FURY;
         if (lower.startsWith(msg("eye-ayak-been"))
                 || lower.startsWith(msg("eye-ayak-been-charged"))) {
@@ -297,6 +319,17 @@ class ChargeCheck {
         return new ChargeCheck(variant, emptyMap(), -1, false);
     }
 
+    /** The same measured count expressed in another same-pattern variant's own recipe. */
+    static Map<Integer, Long> restock(
+            ChargedItem target, ChargedItem source, Map<Integer, Long> counts) {
+        if (counts.isEmpty() || source.recipe.isEmpty()) return counts;
+        long unit = source.recipe.values().iterator().next();
+        long count = counts.values().iterator().next() / unit;
+        var stock = new LinkedHashMap<Integer, Long>();
+        for (var part : target.recipe.entrySet()) stock.put(part.getKey(), count * part.getValue());
+        return stock;
+    }
+
     /**
      * A load component not in the item's own recipe: the blowpipe's darts, and the Eye of Ayak's
      * runes in rune mode (owner 2026-09-30). Everything else loads through its recipe.
@@ -325,4 +358,16 @@ class ChargeCheck {
         String cleaned = stripTags(value);
         return Phrases.empty(cleaned) ? null : cleaned.toLowerCase(ROOT).replaceAll("\\s+", " ");
     }
+}
+
+/** A load target's candidate losses; only a measured Check can reconcile their quantities. */
+@AllArgsConstructor
+class LoadTarget {
+    ChargeCheck.ChargedItem variant;
+    String targetIdentity;
+    List<Flow> remaining;
+    List<Flow> ambiguousCandidates;
+
+    /** When the load was clicked; 0 when there was no load. */
+    long clickedAt;
 }

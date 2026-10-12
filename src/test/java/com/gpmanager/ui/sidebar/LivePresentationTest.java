@@ -157,7 +157,7 @@ public class LivePresentationTest
         assertFalse("supplies show", onEdt(() -> HeroProbe.cell(page.hero, "SUPPLY")).isEmpty());
         assertFalse("losses show", onEdt(() -> HeroProbe.cell(page.hero, "LOSS")).isEmpty());
         assertEquals("no aggregate cell when the split is vouched for", "", onEdt(() -> HeroProbe.cell(page.hero, "COSTS")));
-        assertEquals("no Market cell without Market activity", "", onEdt(() -> HeroProbe.cell(page.hero, "MARKET")));
+        assertEquals("no Trade cell without Trade activity", "", onEdt(() -> HeroProbe.cell(page.hero, "TRADE")));
     }
 
     @Test
