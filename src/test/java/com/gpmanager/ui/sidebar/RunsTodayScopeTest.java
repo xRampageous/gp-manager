@@ -87,7 +87,7 @@ public class RunsTodayScopeTest
             return null;
         });
 
-        assertEquals("Runs today ▾", panel.ledger.scope.getText());
+        assertEquals("Runs today ⌄", panel.ledger.scope.getText());
         assertTrue("the tooltip names the membership",
             panel.ledger.scope.getToolTipText().contains("runs started today"));
         assertTrue("the note names the membership too",

@@ -1,0 +1,7 @@
+# The sailors' amulet teleport destinations, lowercased; a leading "the " is stripped by the
+#   matcher like the Ates pendant's own destinations (OSRS Wiki; the owner's captured clicks
+#   carry exactly these option names).
+pandemonium
+port roberts
+red rock
+deepfin point

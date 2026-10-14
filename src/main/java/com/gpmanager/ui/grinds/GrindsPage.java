@@ -81,7 +81,7 @@ class GrindsPage implements Shell.Page {
     JPanel detail = stack(PANEL, GAP);
     JPanel running = new JPanel(new BorderLayout(GAP, 0));
     JLabel runningName = label("", bold(), TEXT);
-    JLabel runningNet = label("", Kit.body(), TEXT);
+    JLabel runningNet = label("", numbers(11.5f), TEXT);
     Table mine = new Table("MY GRINDS");
     JPanel selectedPanel = stack(CARD, 0);
     Table recent = new Table("RECENT GRINDS");

@@ -45,7 +45,7 @@ public class HudInsightTest
         }
         builder.interaction("", false);
         String title = builder.update(grind(100_000L, null), f -> true, NOW).title;
-        assertEquals("a stale streak must not add its count", "Vorkath", title);
+        assertEquals("a stale streak shows nothing; the name stays on the sidebar", "", title);
     }
 
     @Test

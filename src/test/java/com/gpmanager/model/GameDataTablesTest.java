@@ -54,7 +54,11 @@ public class GameDataTablesTest
         ItemID.DAMNED_AMULET_DEGRADED, ItemID.SLAYER_HELM_I, ItemID.SW_SLAYER_HELM_I, ItemID.PVPA_SLAYER_HELM_I,
         // 1.3.4 review: the sailors' amulet's inert and charged states are the same worth, and the
         // 1:1 row pairs the inert-to-charged swap so only the charging runes book.
-        ItemID.SAILORS_AMULET_EMPTY));
+        ItemID.SAILORS_AMULET_EMPTY,
+        // 2026-10-14: the tool and staff upgrades pair their swaps (the infernal tools, echo boots
+        // and slayer's staff (e)); a crystal tool's revert is the dismantle rule instead.
+        ItemID.INFERNAL_AXE, ItemID.INFERNAL_PICKAXE, ItemID.INFERNAL_HARPOON,
+        ItemID.ECHO_BOOTS, ItemID.SLAYER_STAFF_ENCHANTED));
     static {
         for (int id = 11774; id <= 11784; id++) CURRENCY_PROXIES.add(id);
         for (int id = 25266; id <= 25276; id++) CURRENCY_PROXIES.add(id);

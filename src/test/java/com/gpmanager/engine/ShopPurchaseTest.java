@@ -26,8 +26,9 @@ public class ShopPurchaseTest
     private static final int PLATEBODY = 1127;
     private static final int TOKKUL = 6529;
     private static final int DEATH_RUNE = 560;
+    private static final int BOOK = 9003; // Security book: untradeable, no market price
     private static final Map<Integer, String> NAMES = Map.of(COINS, "Coins", JAR, "Impling jar",
-        PLATEBODY, "Rune platebody", TOKKUL, "Tokkul", DEATH_RUNE, "Death rune");
+        PLATEBODY, "Rune platebody", TOKKUL, "Tokkul", DEATH_RUNE, "Death rune", BOOK, "Security book");
     private static final Map<Integer, Integer> PRICES = Map.of(COINS, 1, JAR, 290, PLATEBODY, 38_000, TOKKUL, 9);
 
     private final Map<Integer, Long> inventory = new HashMap<>(Map.of(COINS, 100_000L, PLATEBODY, 5L, TOKKUL, 100_000L));
@@ -39,7 +40,8 @@ public class ShopPurchaseTest
             int unit = PRICES.getOrDefault(id, 0);
             flows.add(new Flow(id, NAMES.getOrDefault(id, "Item " + id), quantity, unit,
                 quantity * unit,
-                id == COINS ? PriceSource.FACE_VALUE : PriceSource.GRAND_EXCHANGE));
+                id == COINS ? PriceSource.FACE_VALUE
+                    : id == BOOK ? PriceSource.UNPRICED : PriceSource.GRAND_EXCHANGE));
         });
         return flows;
     }, new TransactionClassifier(), new GpManagerConfig()
@@ -51,6 +53,22 @@ public class ShopPurchaseTest
         }
     });
     private long now = 1_000_000L;
+
+    @Test
+    public void buyingAnUntradeableIsAPurchaseNotReview()
+    {
+        // A shop/dialogue purchase of an item with no market (untradeable) spends coins that
+        // can never be recovered: the purchase books the cost (Coinflow 1.7.1 calls this the
+        // unrealizable case; owner probe 2026-10-13).
+        start();
+        engine.inbox.put(Inbox.DIALOGUE, 0, 1L, 4, null);
+        Transaction bought = change(COINS, -2L, BOOK, 1L);
+        assertSame(TransactionType.TRADE, bought.getType());
+        assertEquals("Bought", bought.getNote());
+        assertTrue(bought.isCounted());
+        assertFalse("not Review", ReviewRules.needsOwnerDecision(bought));
+        assertEquals(-2L, engine.getMetrics(now + 1_000L).net);
+    }
 
     @Test
     public void coinsForAnItemWithAShopOpenIsAPurchase()

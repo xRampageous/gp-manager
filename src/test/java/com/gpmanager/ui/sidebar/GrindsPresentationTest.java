@@ -130,7 +130,7 @@ public class GrindsPresentationTest
         engine.getActiveSession().addTransaction(booked(now - 15L * 60_000L, "Dragon bones", 1, 2,
             100_000, 200_000L), 2_000);
         engine.getActiveSession().setProfitTargetGp(5_000_000L);
-        engine.getActiveSession().setActiveTimeTargetMillis(3L * 3_600_000L);
+        engine.getActiveSession().setActiveTimeTargetMillis(3L * 3_600_000L, now);
         String id = engine.getActiveSession().getId();
         SidebarPanel panel = onEdt(() -> new SidebarPanel(engine, PresentationLifecycleTest.config(), null));
         onEdt(() ->

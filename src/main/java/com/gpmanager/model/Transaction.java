@@ -250,7 +250,7 @@ class Transaction {
 
     /** Presentation-only audit-row note update; accounting fields are untouched. */
     String getActivityName() {
-        if (activityName != null && !activityName.trim().isEmpty()) return activityName.trim();
+        if (!blank(activityName)) return activityName.trim();
         String safeNote = getNote();
         String prefix = "Loot from ";
         return safeNote.startsWith(prefix) && safeNote.length() > prefix.length()
@@ -343,7 +343,7 @@ class Transaction {
     }
 
     String correctionReason() {
-        return correctionReason == null ? "" : correctionReason.trim();
+        return nonBlank(correctionReason, "");
     }
 
     String getEncounterId() {

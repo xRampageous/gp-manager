@@ -14,6 +14,7 @@ import static com.gpmanager.HudBuilderTest.grind;
 import static com.gpmanager.HudTrayTest.flow;
 import static com.gpmanager.HudTrayTest.receipt;
 import static org.junit.Assert.assertEquals;
+import static org.junit.Assert.assertFalse;
 import static org.junit.Assert.assertTrue;
 
 /** Auto width hugs content, stops at a ceiling, and shortens what does not fit. */
@@ -136,10 +137,13 @@ public class HudSizingTest
         }
     }
 
+    /**
+     * Owner live 2026-10-14: with the run's name off the HUD the rate rides the gem row, so the
+     * old money-row wrap trigger is gone; the ceiling is the invariant that remains.
+     */
     @Test
-    public void aNarrowHudWrapsMoneyInsteadOfDrawingItOverTheRate()
+    public void aNarrowHudNeverDrawsWiderThanItsCeiling()
     {
-        int wideHeight = 0;
         for (int ceiling : new int[] {320, 120})
         {
             GpManagerConfig config = new GpManagerConfig()
@@ -152,13 +156,43 @@ public class HudSizingTest
             HudBuilder builder = new HudBuilder(config, null);
             builder.tray().booked(receipt(NOW, TransactionType.LOOT,
                 flow(1, "Whip", 1L, 1_500_000)), NOW, false);
-            builder.update(grind(1_500_000L, 100_000_000L), f -> false, NOW + 10L);
+            builder.update(grind(123_400_000L, null), f -> false, NOW + 10L);
             HudOverlay overlay = new HudOverlay(builder, config);
             Dimension rendered = overlay.render(G);
-            assertTrue(rendered.width <= ceiling);
-            if (ceiling == 320) wideHeight = rendered.height;
-            else assertTrue("Net, target, change and rate need separate lines at 120 pixels",
-                rendered.height > wideHeight);
+            assertTrue("the HUD never draws wider than its ceiling", rendered.width <= ceiling);
+        }
+    }
+
+    /** Owner live 2026-10-14: the kill count survives even the narrowest HUD. */
+    @Test
+    public void theKillCountSurvivesNarrowCeilings()
+    {
+        for (int ceiling : new int[] {320, 100})
+        {
+            GpManagerConfig config = new GpManagerConfig()
+            {
+                @Override
+                public int hudMaxWidth() { return ceiling; }
+                @Override
+                public boolean reducedMotion() { return true; }
+            };
+            HudBuilder builder = new HudBuilder(config, null);
+            builder.update(grind(1_000L, null), f -> true, NOW - 1L);
+            builder.interaction("Goblin", true);
+            builder.tray().kill("Goblin", NOW - 1L, false);
+            builder.update(grind(1_000L, null), f -> true, NOW);
+            HudOverlay overlay = new HudOverlay(builder, config);
+            overlay.render(G);
+            if (ceiling == 320)
+            {
+                assertEquals("KC: 1", overlay.title);
+            }
+            else
+            {
+                assertTrue("the count survives narrow widths",
+                    overlay.title.equals("KC: 1") || overlay.title.equals("1"));
+                assertFalse("never an ellipsized count", overlay.title.contains("\u2026"));
+            }
         }
     }
 }

@@ -24,6 +24,8 @@ class HudFrame {
                     Color.WHITE,
                     "",
                     -1d,
+                    false,
+                    false,
                     "",
                     Color.WHITE,
                     0L,
@@ -68,11 +70,23 @@ class HudFrame {
     final String net;
     final Color netColor;
 
-    /** " / 100M" beside Net when a Net target is set, else empty. */
+    /**
+     * What the aim has counted, what is left of it, or a time target's countdown, drawn at the
+     * progress bar's end; empty with no target.
+     */
     final String target;
 
     /** Target bar fill 0..1, or -1 with no target. Never negative for a losing Net. */
     final double progress;
+
+    /** True in a time target's final warning seconds (owner live 2026-10-13). */
+    final boolean targetWarning;
+
+    /**
+     * True once the aim (or the time window) is reached: the bar's fill turns green then, whichever
+     * way the gauge counts (owner live 2026-10-14).
+     */
+    final boolean targetDone;
 
     /**
      * The newest booking's change beside Net ("+23") for a few seconds, whether or not the tray

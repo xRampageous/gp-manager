@@ -34,7 +34,9 @@ enum ActionKind {
     COOK,
     BURN,
     /** Settled supply loss whose specific action is not evidenced. */
-    SUPPLIES;
+    SUPPLIES,
+    /** A bank-paid fee (the boat recovery): one action row named by its own note. */
+    FEE;
 
     /** The constant's name, lowercased with hyphens: the wire name saved on every row. */
     String wireName = name().toLowerCase(Locale.ROOT).replace('_', '-');

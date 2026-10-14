@@ -47,23 +47,42 @@ public final class HudPreview
         engine.getActiveSession().setProfitTargetGp(5_000_000L);
 
         HudBuilder builder = new HudBuilder(config, HudPreview::icon);
-        HudOverlay overlay = new HudOverlay(builder, config);
         HudTray tray = builder.tray();
         builder.update(LiveSnapshot.capture(engine, now - 3_000L, null), f -> true, now - 3_000L);
-        add(engine, tray, now - 1_500L, flow(536, "Superior dragon bones", 2L, 12_000));
-        add(engine, tray, now - 1_000L, flow(11286, "Draconic visage", 1L, 10_400_000));
-        add(engine, tray, now - 500L, flow(1319, "Rune 2h sword", 1L, 37_000));
+        add(engine, tray, now - 1_500L, flow(22124, "Superior dragon bones", 2L, 21_920));
+        add(engine, tray, now - 1_000L, flow(11286, "Draconic visage", 1L, 3_425_000));
+        add(engine, tray, now - 500L, flow(1319, "Rune 2h sword", 1L, 37_900));
         builder.update(LiveSnapshot.capture(engine, now, null), f -> true, now);
+        canvas(out, "hud-grind.png", builder, config, 520, 260);
 
-        BufferedImage image = new BufferedImage(520, 260, BufferedImage.TYPE_INT_ARGB);
-        Graphics2D g = image.createGraphics();
-        g.setRenderingHint(RenderingHints.KEY_TEXT_ANTIALIASING, RenderingHints.VALUE_TEXT_ANTIALIAS_OFF);
-        g.setColor(new Color(62, 74, 44));
-        g.fillRect(0, 0, image.getWidth(), image.getHeight());
-        g.translate(8, 8);
-        overlay.render(g);
-        g.dispose();
-        ImageIO.write(image, "png", new File(out, "hud-grind.png"));
+        // The same loot with no target: no bar, no label (owner live 2026-10-13).
+        engine.getActiveSession().setProfitTargetGp(null);
+        builder.update(LiveSnapshot.capture(engine, now + 1L, null), f -> true, now + 1L);
+        canvas(out, "hud-loot.png", builder, config, 520, 260);
+
+        // A looted Theatre of Blood: KC: 15, the scythe and rune loot (owner live 2026-10-13).
+        Engine raid = new Engine(deltas ->
+        {
+            List<Flow> flows = new ArrayList<>();
+            deltas.forEach((id, quantity) -> flows.add(new Flow(id, "Item " + id, quantity, 50, quantity * 50)));
+            return flows;
+        }, new TransactionClassifier(), config);
+        raid.startCustom("Theatre of Blood", now - 2_100_000L);
+        HudBuilder raidBuilder = new HudBuilder(config, HudPreview::icon);
+        HudTray raidTray = raidBuilder.tray();
+        raidBuilder.update(LiveSnapshot.capture(raid, now - 1_200L, null), f -> true, now - 1_200L);
+        for (int i = 0; i < 15; i++)
+        {
+            raidTray.kill("Verzik Vitur", now - 1_000L + i, false);
+        }
+        // An update inside the streak records its base at the pre-chest net, so the heading can
+        // show the Net per kill.
+        raidBuilder.update(LiveSnapshot.capture(raid, now - 900L, null), f -> true, now - 900L);
+        raidBuilder.interaction("Verzik Vitur", true);
+        add(raid, raidTray, now - 300L, flow(22486, "Scythe of vitur", 1L, 1_219_300_000));
+        add(raid, raidTray, now - 200L, flow(565, "Blood rune", 56L, 339));
+        raidBuilder.update(LiveSnapshot.capture(raid, now, null), f -> true, now);
+        canvas(out, "hud-raid.png", raidBuilder, config, 520, 320);
 
         // Nothing new for a while: the tray folds and HUD+ rests at its narrow width.
         HudBuilder resting = new HudBuilder(config, HudPreview::icon);
@@ -76,6 +95,22 @@ public final class HudPreview
         new HudOverlay(resting, config).render(r);
         r.dispose();
         ImageIO.write(rest, "png", new File(out, "hud-rest.png"));
+
+        // A time target in its final seconds: the countdown warns (owner live 2026-10-13).
+        Engine timed = new Engine(deltas ->
+        {
+            List<Flow> flows = new ArrayList<>();
+            deltas.forEach((id, quantity) -> flows.add(new Flow(id, "Item " + id, quantity, 50, quantity * 50)));
+            return flows;
+        }, new TransactionClassifier(), config);
+        timed.startCustom("Vorkath", now - 61_000L);
+        timed.getActiveSession().addTransaction(receipt(now - 500L, TransactionType.LOOT,
+            flow(536, "Dragon bones", 2L, 3_930)), 2_000);
+        timed.getActiveSession().setActiveTimeTargetMillis(60_000L, now);
+        timed.getActiveSession().activeTimeTargetSetMillis = 9_000L;
+        HudBuilder timedBuilder = new HudBuilder(config, HudPreview::icon);
+        timedBuilder.update(LiveSnapshot.capture(timed, now, null), f -> true, now);
+        canvas(out, "hud-time-warning.png", timedBuilder, config, 520, 160);
     }
 
     private static void emptyAndFiltered(File out, long now) throws IOException
@@ -92,8 +127,8 @@ public final class HudPreview
         HudBuilder builder = new HudBuilder(config, HudPreview::icon);
         builder.update(LiveSnapshot.capture(engine, now, null), f -> true, now);
         shot(out, "hud-empty.png", builder, config);
-        builder.tray().booked(receipt(now, TransactionType.LOOT, flow(1, "Bones", 1L, 300)), now, false);
-        engine.getActiveSession().addTransaction(receipt(now, TransactionType.LOOT, flow(1, "Bones", 1L, 300)), 2_000);
+        builder.tray().booked(receipt(now, TransactionType.LOOT, flow(526, "Bones", 1L, 41)), now, false);
+        engine.getActiveSession().addTransaction(receipt(now, TransactionType.LOOT, flow(526, "Bones", 1L, 41)), 2_000);
         builder.update(LiveSnapshot.capture(engine, now + 10L, null), f -> false, now + 10L);
         shot(out, "hud-filtered.png", builder, config);
         shot(out, "hud-narrow.png", builder, new GpManagerConfig()
@@ -105,9 +140,23 @@ public final class HudPreview
         });
     }
 
-    private static void shot(File out, String name, HudBuilder builder, GpManagerConfig config) throws IOException
+    /** A full-size HUD+ canvas over the game-coloured backdrop. */
+    private static void canvas(File out, String name, HudBuilder builder, GpManagerConfig config, int width, int height)
+            throws IOException
     {
-        BufferedImage image = new BufferedImage(350, 240, BufferedImage.TYPE_INT_ARGB);
+        BufferedImage image = new BufferedImage(width, height, BufferedImage.TYPE_INT_ARGB);
+        Graphics2D g = image.createGraphics();
+        g.setRenderingHint(RenderingHints.KEY_TEXT_ANTIALIASING, RenderingHints.VALUE_TEXT_ANTIALIAS_OFF);
+        g.setColor(new Color(62, 74, 44));
+        g.fillRect(0, 0, width, height);
+        g.translate(8, 8);
+        new HudOverlay(builder, config).render(g);
+        g.dispose();
+        ImageIO.write(image, "png", new File(out, name));
+    }
+
+    private static void shot(File out, String name, HudBuilder builder, GpManagerConfig config) throws IOException
+    {        BufferedImage image = new BufferedImage(350, 240, BufferedImage.TYPE_INT_ARGB);
         Graphics2D g = image.createGraphics();
         g.setColor(new Color(62, 74, 44));
         g.fillRect(0, 0, image.getWidth(), image.getHeight());
@@ -127,6 +176,11 @@ public final class HudPreview
     /** A stand-in sprite: RuneLite's item images are 36 x 32. */
     private static BufferedImage icon(int itemId, int quantity)
     {
+        BufferedImage real = PreviewIcons.sprite(itemId);
+        if (real != null)
+        {
+            return real;
+        }
         BufferedImage image = new BufferedImage(36, 32, BufferedImage.TYPE_INT_ARGB);
         Graphics2D g = image.createGraphics();
         g.setColor(Color.getHSBColor((itemId % 97) / 97f, 0.5f, 0.8f));

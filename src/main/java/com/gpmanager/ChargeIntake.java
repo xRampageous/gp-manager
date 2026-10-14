@@ -110,11 +110,14 @@ class ChargeIntake {
         engine.inbox.drop(CHECK_LINK);
     }
 
-    /** Login/hop/profile change: transient baselines and load intents never survive. */
+    /**
+     * Login/hop: transient baselines and load intents never survive; the fractional carries do,
+     * so a vial of blood (or a tome page, or a blowpipe scale) still accrues toward its next
+     * whole unit across a relog (owner live 2026-10-13: the wipe made short sessions never book
+     * the vial).
+     */
     void resetTransient() {
         engine.inbox.drop(CHECK_LINK);
-        chargeCarry.clear();
-        valueCarry.clear();
         eyeGraphics.clear();
         eyeAnimations.clear();
         eyeCandidateGraphic = 0;
@@ -129,6 +132,13 @@ class ChargeIntake {
         lastAttackTick = -1;
         engine.resetChecks(null);
         engine.clearChargeLoad();
+    }
+
+    /** Profile change: nothing of the previous owner survives, the fractional carries included. */
+    void resetOwner() {
+        resetTransient();
+        chargeCarry.clear();
+        valueCarry.clear();
     }
 
     /**
@@ -386,6 +396,22 @@ class ChargeIntake {
     }
 
     /**
+     * A sailors' amulet teleport click spends one charge: the amulet itself, worn or in the pack,
+     * names the teleport (owner captures).
+     */
+    void bookSailorsAmulet(long now) {
+        String identity =
+                heldIdentity(ChargedItem.SAILORS_AMULET, EquipmentInventorySlot.AMULET);
+        if (identity != null)
+            bookAttackEstimate(
+                    ChargedItem.SAILORS_AMULET,
+                    identityItemId(identity),
+                    identity,
+                    ActionKind.SUPPLIES,
+                    now);
+    }
+
+    /**
      * The identity of a held item of this family: the one worn in that equipment slot first, then
      * the first one in the pack; null when neither holds one.
      */
@@ -462,6 +488,14 @@ class ChargeIntake {
             bookAtesPendant(SafeMath.now());
             return;
         }
+        if (isAmuletLocation(option) && isAmuletTeleport(event, target, option)) {
+            // A sailors' amulet teleport: the destination names the teleport whether the click
+            // sits on the worn amulet's own menu, its teleport dialog or the teleport interface
+            // (owner captures and live 2026-10-14). One charge leaves the amulet; the amulet
+            // itself names the row.
+            bookSailorsAmulet(SafeMath.now());
+            return;
+        }
         if (!isAtesLocation(option)) return;
         int itemId = weaponItemId(event);
         ChargedItem variant = supportedForId(itemId);
@@ -491,6 +525,37 @@ class ChargeIntake {
 
     /** The pendant's six teleport locations, normalized like menu options. */
     static final List<String> LOCATIONS = GameData.names("ates_locations");
+
+    /**
+     * The sailors' amulet's four destinations (a leading "the " strips like the pendant's own
+     * options); a click there is a teleport (OSRS Wiki, owner recording 2026-10-14).
+     */
+    static boolean isAmuletLocation(String option) {
+        String name = option == null ? "" : option.replace('\u2019', '\'');
+        if (name.startsWith("the ")) name = name.substring(4);
+        // The amulet's own teleport dialog lists each destination as a sentence.
+        while (name.endsWith(".")) name = name.substring(0, name.length() - 1).trim();
+        return AMULET_LOCATIONS.contains(name);
+    }
+
+    static final List<String> AMULET_LOCATIONS = GameData.names("amulet_locations");
+
+    /**
+     * A teleport click that names the amulet itself: an interface or worn-item widget carrying
+     * the amulet's item id, the worn amulet's own minimenu target, or the amulet's teleport
+     * dialog ("Where would you like to teleport to?", each option a sentence). A sentence-shaped
+     * option (a menu option never ends in a period) counts too. A destination-named option that
+     * names no amulet (a port travel menu) never books (owner 2026-10-14).
+     */
+    static boolean isAmuletTeleport(MenuOptionClicked event, String target, String option) {
+        if (supportedForId(weaponItemId(event)) == ChargedItem.SAILORS_AMULET) return true;
+        if (target != null && target.contains("sailors' amulet")) return true;
+        int dialogGroup = InterfaceID.Chatmenu.UNIVERSE >>> 16;
+        if (event != null && (event.getParam1() >>> 16) == dialogGroup) return true;
+        Widget widget = event == null ? null : event.getWidget();
+        if (widget != null && (widget.getId() >>> 16) == dialogGroup) return true;
+        return option != null && option.trim().endsWith(".");
+    }
 
     /** The Rub interface's six destination buttons; a click there is a teleport (owner 1.3.4). */
     static final Set<Integer> ATES_DESTINATIONS = GameData.byId("ates_destinations").keySet();
@@ -776,26 +841,33 @@ class ChargeIntake {
         return booked;
     }
 
+    /** Accrues one fractional component into the recipe (owner 1.4.0 size pass). */
+    void accrueInto(
+            ChargedItem variant,
+            int itemId,
+            long numerator,
+            long denominator,
+            Map<Integer, Long> recipe) {
+        String key = variant.name() + ":" + itemId;
+        long[] accrued = accrue(chargeCarry.getOrDefault(key, 0L), numerator, denominator);
+        chargeCarry.put(key, accrued[1]);
+        if (accrued[0] > 0L) recipe.put(itemId, accrued[0]);
+    }
+
     /** One cast's priced recipe, or null when a component lacks a supported valuation. */
     List<Flow> estimateRecipe(ChargedItem variant, String identity, long now) {
         var recipe = recipeOf(variant);
         if (variant == ChargedItem.EYE_OF_AYAK) recipe = eyeRecipe(eyeRune(identity));
         long[] fraction = fractionOf(variant);
         if (fraction != null) {
-            String key = variant.name() + ":" + fraction[0];
-            long[] accrued = accrue(chargeCarry.getOrDefault(key, 0L), fraction[1], fraction[2]);
-            chargeCarry.put(key, accrued[1]);
-            if (accrued[0] > 0L) recipe.put((int) fraction[0], accrued[0]);
+            accrueInto(variant, (int) fraction[0], fraction[1], fraction[2], recipe);
         }
         if (variant == ChargedItem.BLOWPIPE && blowpipeDart > 0) {
             // Owner 1.1: each shot spends its dart unless an Ava's device saves it; the expected
             // share
             // accrues like the scales, and a Check reconciles it.
             long[] loss = dartLoss(wornCapeName());
-            String key = "BLOWPIPE:" + blowpipeDart;
-            long[] darts = accrue(chargeCarry.getOrDefault(key, 0L), loss[0], loss[1]);
-            chargeCarry.put(key, darts[1]);
-            if (darts[0] > 0L) recipe.put(blowpipeDart, darts[0]);
+            accrueInto(variant, blowpipeDart, loss[0], loss[1], recipe);
         }
         var flows = new ArrayList<Flow>();
         for (Map.Entry<Integer, Long> entry : recipe.entrySet()) {

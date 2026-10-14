@@ -3,64 +3,17 @@ package com.gpmanager;
 import java.util.*;
 
 /**
- * The one activity label HUD+ and Live both show. It never names an NPC (owner 1.1: other plugins
- * do): a named Grind, else a raid, minigame or skilling activity, else "Combat" for fighting and
- * NPC loot. Generic placeholders never surface. Presentation only: it never books or values.
+ * Activity naming facts the engine still reads: combat XP never names an activity (the NPC's loot
+ * does), and the rules table stays the single source for that skill list. The activity display was
+ * retired (owner live 2026-10-13): the Live hero shows the run's own name and nothing else, so the
+ * presentation ladder that used to live here is gone. Presentation only: it never books or values.
  */
 class ActivityLabel {
-    /** Raids and minigames whose session name outranks a fresh target. */
-    static final List<String> CURATED = list("curated");
-
-    static final List<String> CURATED_SHORT = list("short");
-
     /** XP in these is fighting, not an activity of its own. */
     static final List<String> COMBAT = list("combat");
 
-    /** The status-line label: the named run, else a named activity, else Combat, else empty. */
-
-    /** A raid, minigame, skill, agility course or one of the named pursuits; never an NPC. */
-
-    /** True when the session activity is a raid or minigame that keeps its name over a target. */
-
-    /** Trim, and drop generic placeholders that are not activities. */
-
-    /** Label predicates share the compiled rule matcher; skill case matching remains unchanged. */
+    /** The compiled activity rules; the table remains the only source for these rows. */
     static final Map<String, Phrases.Clause[][]> RULES = GameData.rules("activity_rules");
-
-    static boolean isCurated(String raw) {
-        String name = Phrases.lower(raw);
-        return !name.isEmpty()
-                && (Phrases.has(name, RULES.get("short"))
-                        || Phrases.has(name, RULES.get("curated")));
-    }
-
-    static String specific(String raw) {
-        String name = raw == null ? "" : raw.trim();
-        return name.isEmpty() || Phrases.has(name, RULES.get("generic")) ? "" : name;
-    }
-
-    static boolean isActivity(String hint) {
-        if (isCurated(hint)
-                || AgilityCourses.BY_REGION.containsValue(hint)
-                || Phrases.has(hint, RULES.get("pursuit"))) return true;
-        for (net.runelite.api.Skill skill : net.runelite.api.Skill.values()) {
-            if (skill.getName().equalsIgnoreCase(hint)) return !COMBAT.contains(skill.getName());
-        }
-        return false;
-    }
-
-    static String label(
-            boolean fighting,
-            String activity,
-            String ownerLabel,
-            boolean hasSession,
-            boolean freePlay) {
-        if (hasSession && !freePlay) return Fmt.activity(ownerLabel);
-        String hint = specific(activity);
-        if (isActivity(hint)) return Fmt.activity(hint);
-        // What is left came from fighting: an NPC's loot names it, or combat XP.
-        return fighting || !hint.isEmpty() ? "Combat" : "";
-    }
 
     /** Original list fields retain their exact values; the table is their only source. */
     static List<String> list(String name) {

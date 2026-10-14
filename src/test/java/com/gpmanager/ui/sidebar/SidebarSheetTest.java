@@ -229,7 +229,7 @@ public class SidebarSheetTest
         GrindsController grinds = new GrindsController(panel);
         for (long target : new long[]{30L * 60_000L, 90L * 60_000L, 26L * 3_600_000L + 30L * 60_000L})
         {
-            engine.getActiveSession().setActiveTimeTargetMillis(target);
+            engine.getActiveSession().setActiveTimeTargetMillis(target, System.currentTimeMillis());
             onEdt(() ->
             {
                 grinds.openTargets();

@@ -403,6 +403,76 @@ class SidebarPanel extends PluginPanel {
             new GrindsController(SidebarPanel.this).openTargets();
         }
 
+        /** Owner live 2026-10-13/14: Again restarts the completed aim; a reached Net asks whether
+         * to keep the run (re-basing the aim) or start the same setup fresh. */
+        public void againTarget() {
+            long now = SafeMath.now();
+            String sessionId;
+            synchronized (engine) {
+                Session active = engine.getActiveSession();
+                if (active == null) return;
+                Long netTarget = active.getProfitTargetGp();
+                boolean netDone = netTarget != null && netTarget > 0L
+                        && active.profitTargetProgress(engine.getMetrics(now).net) >= netTarget;
+                if (!netDone) {
+                    // An ended timer re-arms in place, in any run.
+                    engine.restartTimeTarget(now);
+                    return;
+                }
+                if (!engine.isCustomActive()) return;
+                sessionId = active.getId();
+            }
+            // The sheet is Swing-only and runs on the EDT (the button handler), outside the engine
+            // monitor; its choices re-validate the pinned run before acting.
+            shell()
+                    .sheet(
+                            "Again",
+                            "Retain this run's net, or start the same setup fresh?",
+                            null,
+                            new Shell.Choice("Retain net", true, () -> mutate(() ->
+                            {
+                                long at = SafeMath.now();
+                                Session run = engine.getActiveSession();
+                                if (run == null || !sessionId.equals(run.getId())) return;
+                                Long aim = run.getProfitTargetGp();
+                                if (aim == null
+                                        || run.profitTargetProgress(engine.getMetrics(at).net) < aim) {
+                                    return;
+                                }
+                                engine.rebaseNetTarget(at);
+                            })),
+                            new Shell.Choice("Start fresh", false, () -> mutate(() ->
+                            {
+                                long at = SafeMath.now();
+                                Session run = engine.getActiveSession();
+                                if (run == null
+                                        || !sessionId.equals(run.getId())
+                                        || !engine.isCustomActive()) {
+                                    return;
+                                }
+                                String name = run.getName();
+                                String grindId = run.getGrindId();
+                                Long net = run.getProfitTargetGp();
+                                Long time = run.getActiveTimeTargetMillis();
+                                engine.finishCustom(at);
+                                engine.startGrind(name, grindId, net, time, at);
+                            })));
+        }
+
+        public void doneTarget() {
+            mutate(() -> engine.setTargets(null, null, SafeMath.now()));
+        }
+
+        /** Owner live 2026-10-14: the timer's own pause; the session pause stays the hero dot. */
+        public void toggleTimerPause() {
+            mutate(() -> engine.toggleTimeTargetPause(SafeMath.now()));
+        }
+
+        /** Owner live 2026-10-14: Reset re-bases a running Net aim without completing it. */
+        public void resetTarget() {
+            mutate(() -> engine.rebaseNetTarget(SafeMath.now()));
+        }
+
         @Override
         public boolean autoStartArmed() {
             return config.autoStartSession();

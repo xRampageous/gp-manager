@@ -13,6 +13,7 @@ import org.junit.Test;
 
 import static org.junit.Assert.assertEquals;
 import static org.junit.Assert.assertFalse;
+import static org.junit.Assert.assertNotEquals;
 import static org.junit.Assert.assertNotNull;
 import static org.junit.Assert.assertNull;
 import static org.junit.Assert.assertTrue;
@@ -185,7 +186,16 @@ public class LivePresentationTest
 
         LivePage with = pageWithSession(6_400L, 1_000_000L, false);
         assertTrue("the target is clearly labelled", anyContains(labels(with), "TARGET · 1.00M"));
-        assertTrue("progress reads Net over target", labels(with).contains(Fmt.signed(6_400L) + " / 1.00M"));
+        assertTrue("the Net pair rides the hero",
+            onEdt(() -> HeroProbe.netText(with.hero)).equals(Fmt.signed(6_400L) + "/1.00M"));
+        assertEquals("the pair is never duplicated on the card",
+            1, Collections.frequency(labels(with), Fmt.signed(6_400L) + "/1.00M"));
+
+        LivePage big = pageWithSession(11_600_000L, 1_000_000L, false);
+        assertEquals("a long pair uses the tight form",
+            Fmt.signed(11_600_000L) + "/1.00M", onEdt(() -> HeroProbe.netText(big.hero)));
+        assertTrue("the hero names the exact aim on hover",
+            onEdt(() -> with.hero.net.getToolTipText()).contains("of 1,000,000 gp"));
         assertTrue("clicking the card edits the target", with.target.getMouseListeners().length > 0);
 
         // Owner 2026-09-28: Free play can hold a target too.
@@ -217,7 +227,7 @@ public class LivePresentationTest
         engine.startCustom("Vorkath", now - 20L * 60_000L);
         engine.getActiveSession().addTransaction(booked(now - 15L * 60_000L, "Dragon bones", 1, 2,
             100_000, 200_000L), 2_000);
-        engine.getActiveSession().setActiveTimeTargetMillis(5L * 3_600_000L);
+        engine.getActiveSession().setActiveTimeTargetMillis(5L * 3_600_000L, System.currentTimeMillis());
         SidebarPanel panel = onEdt(() ->
         {
             SidebarPanel created = new SidebarPanel(engine, PresentationLifecycleTest.config(), null);
@@ -225,12 +235,390 @@ public class LivePresentationTest
             return created;
         });
         LivePage page = (LivePage) SidebarPanelProbe.livePage(panel);
-        assertTrue("the time target keeps its card",
-            anyContains(labels(page), "TARGET · " + Fmt.durationShort(5L * 3_600_000L)));
-        assertTrue("progress reads Active Time over target", labels(page).contains(
-            Fmt.durationShort(20L * 60_000L) + " / " + Fmt.durationShort(5L * 3_600_000L)));
+        assertTrue("the time target keeps its card", labels(page).contains(
+            "TARGET · " + Fmt.durationShort(5L * 3_600_000L)));
+        assertTrue("a fresh set starts its own count at zero", labels(page).contains(
+            Fmt.durationCount(0L) + " / " + Fmt.durationShort(5L * 3_600_000L) + " · 0%"));
+        assertEquals("a time target leaves the hero on the plain Net",
+            Fmt.signed(200_000L), onEdt(() -> HeroProbe.netText(page.hero)));
+        // Owner live 2026-10-13: the window counts from the set moment, not the run's start.
+        engine.getActiveSession().activeTimeTargetSetMillis =
+            engine.getActiveSession().getElapsedMillis(System.currentTimeMillis()) - 20L * 60_000L;
+        onEdt(() ->
+        {
+            SidebarPanelProbe.refresh(panel);
+            return null;
+        });
+        assertTrue("the window counts from when it was set", labels(page).contains(
+            Fmt.durationShort(20L * 60_000L) + " / " + Fmt.durationShort(5L * 3_600_000L)
+                + " · " + Fmt.percent(20L * 60_000L / (double) (5L * 3_600_000L))));
         assertTrue("the established rate projects Net at the target",
             anyContains(labels(page), "projected Net"));
+    }
+
+    /** Owner live 2026-10-13: both targets set keep the Net read and add the Active Time timer. */
+    @Test
+    public void bothTargetsShowTheNetReadAndActiveTimeTimer() throws Exception
+    {
+        Engine engine = PresentationLifecycleTest.engine();
+        long now = System.currentTimeMillis();
+        engine.startCustom("Vorkath", now - 20L * 60_000L);
+        engine.getActiveSession().addTransaction(
+            booked(now - 15L * 60_000L, "Dragon bones", 1, 1, 100_000, 100_000L), 2_000);
+        engine.setTargets(200_000L, 5L * 3_600_000L, System.currentTimeMillis());
+        // The fixtures show aims set at the run's start: baseline zero.
+        engine.getActiveSession().profitTargetSetNet = 0L;
+        // The Timer window is the run's last 20m: the count starts when the target is set.
+        engine.getActiveSession().activeTimeTargetSetMillis =
+            engine.getActiveSession().getElapsedMillis(System.currentTimeMillis()) - 20L * 60_000L;
+        SidebarPanel panel = onEdt(() ->
+        {
+            SidebarPanel created = new SidebarPanel(engine, PresentationLifecycleTest.config(), null);
+            SidebarPanelProbe.refresh(created);
+            return created;
+        });
+        LivePage page = (LivePage) SidebarPanelProbe.livePage(panel);
+        List<String> labels = labels(page);
+        assertTrue("the Net target keeps its header",
+            anyContains(labels, "TARGET · " + Fmt.compact(200_000L)));
+        assertEquals("the hero carries the live Net pair",
+            Fmt.signed(100_000L) + " / " + Fmt.compact(200_000L),
+            onEdt(() -> HeroProbe.netText(page.hero)));
+        assertEquals("the pair is never duplicated on the card",
+            1, Collections.frequency(labels, Fmt.signed(100_000L) + " / " + Fmt.compact(200_000L)));
+        assertTrue("the Active Time pair rides under it", labels.contains(
+            Fmt.durationShort(20L * 60_000L) + " / " + Fmt.durationShort(5L * 3_600_000L)
+                + " · " + Fmt.percent(20L * 60_000L / (double) (5L * 3_600_000L))));
+        assertTrue("the countdown carries the projection",
+            anyContains(labels, "left · ~") && anyContains(labels, "projected Net"));
+    }
+
+    /** A completed aim swaps the pace line for the Again / Done / Edit row (owner live 2026-10-13). */
+    @Test
+    public void bothTargetReachedStatesShowTheCompletedRow() throws Exception
+    {
+        // Net reached, time pending: the completed row replaces the countdown.
+        Engine reachedNet = PresentationLifecycleTest.engine();
+        long now = System.currentTimeMillis();
+        reachedNet.startCustom("Vorkath", now - 20L * 60_000L);
+        reachedNet.getActiveSession().addTransaction(
+            booked(now - 15L * 60_000L, "Dragon bones", 1, 1, 100_000, 100_000L), 2_000);
+        reachedNet.setTargets(10_000L, 5L * 3_600_000L, System.currentTimeMillis());
+        // The aim counts the run's net (baseline at zero), not from this mid-test save.
+        reachedNet.getActiveSession().profitTargetSetNet = 0L;
+        SidebarPanel netPanel = onEdt(() ->
+        {
+            SidebarPanel created = new SidebarPanel(reachedNet, PresentationLifecycleTest.config(), null);
+            SidebarPanelProbe.refresh(created);
+            return created;
+        });
+        LivePage netPage = (LivePage) SidebarPanelProbe.livePage(netPanel);
+        assertTrue("a reached Net offers the completed row",
+            anyContains(labels(netPage), "\u21BB") && anyContains(labels(netPage), "\u2713")
+                && anyContains(labels(netPage), "\u2026"));
+
+        // Time reached, net pending: the time line stays and the row appears too.
+        Engine reachedTime = PresentationLifecycleTest.engine();
+        reachedTime.startCustom("Vorkath", now - 10L * 60_000L);
+        reachedTime.getActiveSession().addTransaction(
+            booked(now - 5L * 60_000L, "Dragon bones", 1, 1, 100_000, 100_000L), 2_000);
+        reachedTime.setTargets(200_000L, 5L * 60_000L, System.currentTimeMillis());
+        // The window is the run's whole 10m, past the 5m target (the count starts at the run).
+        reachedTime.getActiveSession().activeTimeTargetSetMillis = 0L;
+        SidebarPanel timePanel = onEdt(() ->
+        {
+            SidebarPanel created = new SidebarPanel(reachedTime, PresentationLifecycleTest.config(), null);
+            SidebarPanelProbe.refresh(created);
+            return created;
+        });
+        LivePage timePage = (LivePage) SidebarPanelProbe.livePage(timePanel);
+        assertTrue("the window clamps at its aim",
+            anyContains(labels(timePage), "5m / 5m · 100%"));
+        assertTrue("a reached window offers the completed row too",
+            anyContains(labels(timePage), "\u21BB"));
+    }
+
+    /** Owner 2026-10-14: a reached aim keeps a short next-hour projection on the card. */
+    @Test
+    public void aReachedAimKeepsTheNextHourProjection() throws Exception
+    {
+        Engine engine = PresentationLifecycleTest.engine();
+        long now = System.currentTimeMillis();
+        engine.startCustom("Vorkath", now - 20L * 60_000L);
+        engine.getActiveSession().addTransaction(
+            booked(now - 15L * 60_000L, "Dragon bones", 1, 1, 100_000, 100_000L), 2_000);
+        engine.setTargets(10_000L, null, System.currentTimeMillis());
+        // The aim counts the run's net (baseline at zero), not from this mid-test save.
+        engine.getActiveSession().profitTargetSetNet = 0L;
+        SidebarPanel panel = onEdt(() ->
+        {
+            SidebarPanel created = new SidebarPanel(engine, PresentationLifecycleTest.config(), null);
+            SidebarPanelProbe.refresh(created);
+            return created;
+        });
+        LivePage page = (LivePage) SidebarPanelProbe.livePage(panel);
+        assertTrue("the header still says reached", anyContains(labels(page), "reached"));
+        assertTrue("a reached aim keeps the next-hour projection",
+            anyContains(labels(page), "in 1h"));
+
+        // An immature rate keeps the line blank rather than fabricating an hour.
+        Engine fresh = PresentationLifecycleTest.engine();
+        fresh.startCustom("Vorkath", System.currentTimeMillis() - 5_000L);
+        fresh.getActiveSession().addTransaction(
+            booked(System.currentTimeMillis() - 2_000L, "Dragon bones", 1, 1, 5_000, 5_000L),
+            2_000);
+        fresh.setTargets(1L, null, System.currentTimeMillis());
+        fresh.getActiveSession().profitTargetSetNet = 0L;
+        SidebarPanel freshPanel = onEdt(() ->
+        {
+            SidebarPanel created = new SidebarPanel(fresh, PresentationLifecycleTest.config(), null);
+            SidebarPanelProbe.refresh(created);
+            return created;
+        });
+        LivePage freshPage = (LivePage) SidebarPanelProbe.livePage(freshPanel);
+        assertFalse("no established rate, no projection",
+            anyContains(labels(freshPage), "in 1h"));
+    }
+
+    /** Owner live 2026-10-13: Again restarts the completed setup, Done clears the goal. */
+    @Test
+    public void completedRowRestartsOrClearsTheGoal() throws Exception
+    {
+        // Done clears both aims.
+        Engine engine = PresentationLifecycleTest.engine();
+        long now = System.currentTimeMillis();
+        engine.startCustom("Vorkath", now - 20L * 60_000L);
+        engine.getActiveSession().addTransaction(
+            booked(now - 15L * 60_000L, "Dragon bones", 1, 1, 100_000, 100_000L), 2_000);
+        engine.setTargets(200_000L, null, System.currentTimeMillis());
+        // The aim counts the run's net (baseline at zero), not from this mid-test save.
+        engine.getActiveSession().profitTargetSetNet = 0L;
+        SidebarPanel panel = onEdt(() ->
+        {
+            SidebarPanel created = new SidebarPanel(engine, PresentationLifecycleTest.config(), null);
+            SidebarPanelProbe.refresh(created);
+            return created;
+        });
+        LivePage page = (LivePage) SidebarPanelProbe.livePage(panel);
+        assertFalse("a pending aim shows no completed row", onEdt(() -> page.againButton.isVisible()));
+
+        engine.getActiveSession().addTransaction(
+            booked(now - 10L * 60_000L, "Zulrah's scales", 12934, 1, 150_000, 150_000L), 2_000);
+        onEdt(() ->
+        {
+            SidebarPanelProbe.refresh(panel);
+            return null;
+        });
+        assertTrue("a reached aim shows the completed row", onEdt(() -> page.againButton.isVisible()));
+        onEdt(() ->
+        {
+            page.doneButton.doClick();
+            return null;
+        });
+        assertNull("Done clears the Net aim", engine.getActiveSession().getProfitTargetGp());
+        assertNull("Done clears the timer too", engine.getActiveSession().getActiveTimeTargetMillis());
+
+        // Again on a reached Net asks: Retain net re-bases the aim in the same run, Start fresh
+        // re-runs the setup as a new instance (owner live 2026-10-14).
+        Engine again = PresentationLifecycleTest.engine();
+        long now2 = System.currentTimeMillis();
+        again.startCustom("Zulrah", now2 - 20L * 60_000L);
+        again.getActiveSession().addTransaction(
+            booked(now2 - 15L * 60_000L, "Zulrah's scales", 12934, 1, 50_000, 50_000L), 2_000);
+        again.setTargets(10_000L, null, now2);
+        again.getActiveSession().profitTargetSetNet = 0L;
+        String firstId = again.getActiveSession().getId();
+        SidebarPanel retainPanel = onEdt(() ->
+        {
+            SidebarPanel created = new SidebarPanel(again, PresentationLifecycleTest.config(), null);
+            SidebarPanelProbe.refresh(created);
+            return created;
+        });
+        LivePage retainPage = (LivePage) SidebarPanelProbe.livePage(retainPanel);
+        onEdt(() ->
+        {
+            retainPage.againButton.doClick();
+            return null;
+        });
+        assertEquals("the fork waits for the choice", firstId, again.getActiveSession().getId());
+        onEdt(() ->
+        {
+            ShellProbe.pressSheet(retainPanel.shell(), "Retain net");
+            return null;
+        });
+        assertEquals("Retain net keeps the run", firstId, again.getActiveSession().getId());
+        assertEquals("and re-bases the aim on the net so far", 50_000L,
+            again.getActiveSession().getProfitTargetSetNet());
+        assertEquals(Long.valueOf(10_000L), again.getActiveSession().getProfitTargetGp());
+
+        // Retain leaves a running timer exactly as it was, pause included (owner live 2026-10-14).
+        Engine bothRun = PresentationLifecycleTest.engine();
+        long now5 = System.currentTimeMillis();
+        bothRun.startCustom("Zulrah", now5 - 20L * 60_000L);
+        bothRun.getActiveSession().addTransaction(
+            booked(now5 - 15L * 60_000L, "Zulrah's scales", 12934, 1, 50_000, 50_000L), 2_000);
+        bothRun.setTargets(10_000L, 5L * 60_000L, now5);
+        bothRun.getActiveSession().profitTargetSetNet = 0L;
+        bothRun.getActiveSession().pauseTimeTarget(now5);
+        String bothId = bothRun.getActiveSession().getId();
+        SidebarPanel bothPanel = onEdt(() ->
+        {
+            SidebarPanel created = new SidebarPanel(bothRun, PresentationLifecycleTest.config(), null);
+            SidebarPanelProbe.refresh(created);
+            return created;
+        });
+        LivePage bothPage = (LivePage) SidebarPanelProbe.livePage(bothPanel);
+        onEdt(() ->
+        {
+            bothPage.againButton.doClick();
+            return null;
+        });
+        onEdt(() ->
+        {
+            ShellProbe.pressSheet(bothPanel.shell(), "Retain net");
+            return null;
+        });
+        assertEquals("the run stays", bothId, bothRun.getActiveSession().getId());
+        assertTrue("the timer stays paused", bothRun.getActiveSession().isTimeTargetPaused());
+        assertEquals("the aim re-bases", 50_000L,
+            bothRun.getActiveSession().getProfitTargetSetNet());
+        assertEquals("and the aim keeps its value", Long.valueOf(10_000L),
+            bothRun.getActiveSession().getProfitTargetGp());
+
+        // Reset re-bases a still-running Net aim in place without completing it (owner live
+        // 2026-10-14).
+        Engine reset = PresentationLifecycleTest.engine();
+        long now6 = System.currentTimeMillis();
+        reset.startCustom("Zulrah", now6 - 20L * 60_000L);
+        reset.getActiveSession().addTransaction(
+            booked(now6 - 15L * 60_000L, "Zulrah's scales", 12934, 1, 50_000, 50_000L), 2_000);
+        reset.setTargets(200_000L, null, now6);
+        reset.getActiveSession().profitTargetSetNet = 0L;
+        String resetId = reset.getActiveSession().getId();
+        SidebarPanel resetPanel = onEdt(() ->
+        {
+            SidebarPanel created = new SidebarPanel(reset, PresentationLifecycleTest.config(), null);
+            SidebarPanelProbe.refresh(created);
+            return created;
+        });
+        LivePage resetPage = (LivePage) SidebarPanelProbe.livePage(resetPanel);
+        assertTrue("a running aim offers Reset", onEdt(() -> resetPage.resetButton.isVisible()));
+        assertFalse("and not Again", onEdt(() -> resetPage.againButton.isVisible()));
+        onEdt(() ->
+        {
+            resetPage.resetButton.doClick();
+            return null;
+        });
+        assertEquals("Reset keeps the run", resetId, reset.getActiveSession().getId());
+        assertEquals("restarts the aim's count at the net so far", 0L,
+            reset.getActiveSession().profitTargetProgress(reset.getMetrics(now6).net));
+        assertEquals("the run's net stays", 50_000L, reset.getMetrics(now6).net);
+
+        // The other side of the fork starts the setup over as a fresh instance.
+        Engine fresh = PresentationLifecycleTest.engine();
+        long now4 = System.currentTimeMillis();
+        fresh.startCustom("Zulrah", now4 - 20L * 60_000L);
+        fresh.getActiveSession().addTransaction(
+            booked(now4 - 15L * 60_000L, "Zulrah's scales", 12934, 1, 50_000, 50_000L), 2_000);
+        fresh.setTargets(10_000L, null, now4);
+        fresh.getActiveSession().profitTargetSetNet = 0L;
+        String freshId = fresh.getActiveSession().getId();
+        SidebarPanel freshPanel = onEdt(() ->
+        {
+            SidebarPanel created = new SidebarPanel(fresh, PresentationLifecycleTest.config(), null);
+            SidebarPanelProbe.refresh(created);
+            return created;
+        });
+        LivePage freshPage = (LivePage) SidebarPanelProbe.livePage(freshPanel);
+        onEdt(() ->
+        {
+            freshPage.againButton.doClick();
+            return null;
+        });
+        onEdt(() ->
+        {
+            ShellProbe.pressSheet(freshPanel.shell(), "Start fresh");
+            return null;
+        });
+        assertNotEquals("Start fresh starts a new instance", freshId,
+            fresh.getActiveSession().getId());
+        assertEquals("the setup travels", "Zulrah", fresh.getActiveSession().getName());
+        assertEquals("the Net aim travels", Long.valueOf(10_000L),
+            fresh.getActiveSession().getProfitTargetGp());
+
+        // The timer's own pause (owner live 2026-10-14): a running timer offers Pause; pausing
+        // freezes the window and shows Done / Edit / Resume; the run itself keeps tracking.
+        Engine timed = PresentationLifecycleTest.engine();
+        long now3 = System.currentTimeMillis();
+        timed.startCustom("Vorkath", now3 - 5L * 60_000L);
+        timed.getActiveSession().setActiveTimeTargetMillis(5L * 60_000L, now3);
+        SidebarPanel third = onEdt(() ->
+        {
+            SidebarPanel created = new SidebarPanel(timed, PresentationLifecycleTest.config(), null);
+            SidebarPanelProbe.refresh(created);
+            return created;
+        });
+        LivePage thirdPage = (LivePage) SidebarPanelProbe.livePage(third);
+        assertTrue("a running timer offers its cluster",
+            onEdt(() -> thirdPage.targetTopActions.isVisible()));
+        assertFalse("with no bottom row while it runs",
+            onEdt(() -> thirdPage.targetActions.isVisible()));
+        assertEquals("with the pause icon", "||", onEdt(() -> thirdPage.pauseButton.getText()));
+        assertFalse("Done waits for the pause", onEdt(() -> thirdPage.doneButton.isVisible()));
+        onEdt(() ->
+        {
+            thirdPage.pauseButton.doClick();
+            return null;
+        });
+        assertTrue("the timer pauses", timed.getActiveSession().isTimeTargetPaused());
+        assertFalse("the run itself keeps tracking", timed.getActiveSession().paused);
+        onEdt(() ->
+        {
+            SidebarPanelProbe.refresh(third);
+            return null;
+        });
+        assertEquals("with the resume icon", "\u25B6", onEdt(() -> thirdPage.pauseButton.getText()));
+        assertTrue("Done shows while paused", onEdt(() -> thirdPage.doneButton.isVisible()));
+        assertTrue("and Edit", onEdt(() -> thirdPage.editButton.isVisible()));
+        assertFalse("but not Again", onEdt(() -> thirdPage.againButton.isVisible()));
+        onEdt(() ->
+        {
+            thirdPage.pauseButton.doClick();
+            return null;
+        });
+        assertFalse("Resume runs the timer again", timed.getActiveSession().isTimeTargetPaused());
+    }
+
+    /** Owner live 2026-10-14: a Net aim counts what the run earns after it is set. */
+    @Test
+    public void aNetAimCountsFromWhenItWasSet() throws Exception
+    {
+        Engine engine = PresentationLifecycleTest.engine();
+        long now = System.currentTimeMillis();
+        engine.startCustom("Vorkath", now - 20L * 60_000L);
+        engine.getActiveSession().addTransaction(
+            booked(now - 15L * 60_000L, "Dragon bones", 1, 1, 100_000, 100_000L), 2_000);
+        engine.setTargets(200_000L, null, System.currentTimeMillis());
+        SidebarPanel panel = onEdt(() ->
+        {
+            SidebarPanel created = new SidebarPanel(engine, PresentationLifecycleTest.config(), null);
+            SidebarPanelProbe.refresh(created);
+            return created;
+        });
+        LivePage page = (LivePage) SidebarPanelProbe.livePage(panel);
+        assertEquals("the aim starts at zero", "0 / " + Fmt.compact(200_000L),
+            onEdt(() -> HeroProbe.netText(page.hero)));
+
+        engine.getActiveSession().addTransaction(
+            booked(now - 10L * 60_000L, "Zulrah's scales", 12934, 1, 50_000, 50_000L), 2_000);
+        onEdt(() ->
+        {
+            SidebarPanelProbe.refresh(panel);
+            return null;
+        });
+        assertEquals("and counts what came after",
+            Fmt.signed(50_000L) + "/" + Fmt.compact(200_000L),
+            onEdt(() -> HeroProbe.netText(page.hero)));
     }
 
     /** Owner 2026-10-01 (F12): the Live hero names the rate window and the Active time policy. */
@@ -420,22 +808,23 @@ public class LivePresentationTest
     }
 
     @Test
-    public void liveShowsTheSameActivityLadderAsHudPlus() throws Exception
+    public void liveNamesTheRunAndFreePlayKeepsItsActivity() throws Exception
     {
         Engine engine = PresentationLifecycleTest.engine();
         long now = System.currentTimeMillis();
         engine.startCustom("Vorkath", now);
 
         LiveContext target = new LiveContext(false, null, 0L, PvpState.NONE, "Woodcutting", false, "Goblin");
-        assertEquals("the named run, never the target", "Vorkath",
+        assertEquals("the named run, never the activity", "Vorkath",
             LivePage.identityOf(LiveSnapshot.capture(engine, now + 1_000L, target)));
 
         Engine free = PresentationLifecycleTest.engine();
         free.ensureSession(now);
-        LiveContext fight = new LiveContext(false, null, 0L, PvpState.NONE, "Greater Nechryael", false, "Goblin");
-        assertEquals("Combat", LivePage.identityOf(LiveSnapshot.capture(free, now + 1_000L, fight)));
-        LiveContext placeholder = new LiveContext(false, null, 0L, PvpState.NONE, "NPC loot", false, "");
-        assertEquals("a fallback names nothing", "", LivePage.identityOf(LiveSnapshot.capture(free, now + 1_000L, placeholder)));
+        // Owner live 2026-10-14: free play shows the detected activity label ("Trade").
+        LiveContext trade = new LiveContext(false, null, 0L, PvpState.NONE, "Trade", false, "");
+        assertEquals("Trade", LivePage.identityOf(LiveSnapshot.capture(free, now + 1_000L, trade)));
+        LiveContext quiet = new LiveContext(false, null, 0L, PvpState.NONE, "", false, "");
+        assertEquals("", LivePage.identityOf(LiveSnapshot.capture(free, now + 1_000L, quiet)));
     }
 
     @Test

@@ -74,7 +74,7 @@ public class LedgerDetailDisclosureTest
         assertEquals("the linked receipt opens under the list", "EXACT", onEdt(() -> LedgerPageProbe.drill(page)));
         List<String> exactLabels = onEdt(() -> labels(page.body()));
         assertEquals("ids never show", 0, uuidLabels(exactLabels));
-        assertTrue("one Correct menu", exactLabels.stream().anyMatch(label -> label.startsWith("Correct ▾")));
+        assertTrue("one Correct menu", exactLabels.stream().anyMatch(label -> label.startsWith("Correct ⌄")));
         assertFalse("no technical or raw panels remain",
             exactLabels.stream().anyMatch(label -> label.startsWith("Technical details") || label.startsWith("Raw evidence")));
         assertEquals(Arrays.asList("Count as Revenue", "Count as Cost", "Mark as Transfer", "Exclude",

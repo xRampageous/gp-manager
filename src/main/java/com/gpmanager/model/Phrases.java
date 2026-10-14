@@ -66,13 +66,6 @@ class Phrases {
         return false;
     }
 
-    static boolean containsAll(String text, String... words) {
-        for (String word : words) {
-            if (!text.contains(word)) return false;
-        }
-        return true;
-    }
-
     /**
      * A compiled table clause: contains, =exact, ^prefix, $suffix, %pattern, ~case-insensitive
      * exact (Unicode equalsIgnoreCase), with optional !.

@@ -44,7 +44,7 @@ class Kit {
     /** Icon rows: every sprite is cropped and fitted into one ICON_BOX square (owner 1.1). */
     static final int ICON_ROW = 28;
 
-    static final int ICON_WIDTH = 28;
+    static final int ICON_WIDTH = 24;
     static final int ICON_BOX = 24;
     static final int HEADER = 22;
     static final int GAP = 6;
@@ -104,16 +104,36 @@ class Kit {
         return row;
     }
 
+    /** Text is Inter (GE Uncut direction); the bundled OFL files fall back to RuneLite's fonts. */
     static Font small() {
-        return FontManager.getRunescapeSmallFont();
+        return SMALL_TXT;
     }
 
     static Font body() {
-        return FontManager.getRunescapeFont();
+        return BODY_TXT;
     }
 
     static Font bold() {
-        return FontManager.getRunescapeBoldFont();
+        return BOLD_TXT;
+    }
+
+    private static final Font BODY_TXT =
+            loaded("/com/gpmanager/fonts/Inter-Regular.ttf", 12.5f, FontManager.getRunescapeFont());
+    private static final Font SMALL_TXT = BODY_TXT.deriveFont(11f);
+    private static final Font BOLD_TXT =
+            loaded(
+                    "/com/gpmanager/fonts/Inter-SemiBold.ttf",
+                    12.5f,
+                    FontManager.getRunescapeBoldFont());
+
+    /** A bundled resource face when the build ships it; else the RuneLite font. */
+    private static Font loaded(String resource, float size, Font fallback) {
+        try (java.io.InputStream in = Kit.class.getResourceAsStream(resource)) {
+            if (in != null) return Font.createFont(Font.TRUETYPE_FONT, in).deriveFont(size);
+        } catch (Exception unavailable) {
+            // A build without the font bundle keeps RuneLite's own fonts.
+        }
+        return fallback;
     }
 
     /**
@@ -218,47 +238,48 @@ class Kit {
      * Full-width children at their preferred heights, {@code gap} apart; hidden ones take no room.
      */
     static JPanel stack(Color background, int gap) {
-        var panel =
-                new JPanel(
-                        new LayoutManager() {
-                            public void addLayoutComponent(String name, Component comp) {}
-
-                            public void removeLayoutComponent(Component comp) {}
-
-                            public Dimension preferredLayoutSize(Container parent) {
-                                Insets in = parent.getInsets();
-                                int width = 0;
-                                int height = 0;
-                                for (Component child : parent.getComponents()) {
-                                    if (child.isVisible()) {
-                                        Dimension size = child.getPreferredSize();
-                                        width = Math.max(width, size.width);
-                                        height += (height == 0 ? 0 : gap) + size.height;
-                                    }
-                                }
-                                return new Dimension(
-                                        width + in.left + in.right, height + in.top + in.bottom);
-                            }
-
-                            public Dimension minimumLayoutSize(Container parent) {
-                                return preferredLayoutSize(parent);
-                            }
-
-                            public void layoutContainer(Container parent) {
-                                Insets in = parent.getInsets();
-                                int y = in.top;
-                                int width = parent.getWidth() - in.left - in.right;
-                                for (Component child : parent.getComponents()) {
-                                    if (child.isVisible()) {
-                                        int height = child.getPreferredSize().height;
-                                        child.setBounds(in.left, y, width, height);
-                                        y += height + gap;
-                                    }
-                                }
-                            }
-                        });
+        var panel = new JPanel(stackLayout(gap));
         panel.setBackground(background);
         return panel;
+    }
+
+    static LayoutManager stackLayout(int gap) {
+        return new LayoutManager() {
+            public void addLayoutComponent(String name, Component comp) {}
+
+            public void removeLayoutComponent(Component comp) {}
+
+            public Dimension preferredLayoutSize(Container parent) {
+                Insets in = parent.getInsets();
+                int width = 0;
+                int height = 0;
+                for (Component child : parent.getComponents()) {
+                    if (child.isVisible()) {
+                        Dimension size = child.getPreferredSize();
+                        width = Math.max(width, size.width);
+                        height += (height == 0 ? 0 : gap) + size.height;
+                    }
+                }
+                return new Dimension(width + in.left + in.right, height + in.top + in.bottom);
+            }
+
+            public Dimension minimumLayoutSize(Container parent) {
+                return preferredLayoutSize(parent);
+            }
+
+            public void layoutContainer(Container parent) {
+                Insets in = parent.getInsets();
+                int y = in.top;
+                int width = parent.getWidth() - in.left - in.right;
+                for (Component child : parent.getComponents()) {
+                    if (child.isVisible()) {
+                        int height = child.getPreferredSize().height;
+                        child.setBounds(in.left, y, width, height);
+                        y += height + gap;
+                    }
+                }
+            }
+        };
     }
 
     /** A dim note that wraps to the sidebar width. */
@@ -345,4 +366,16 @@ class Kit {
         g.dispose();
         return out;
     }
+
+    /** JetBrains Mono for every number; the resource falls back to the platform face. */
+    static Font numbers(float size) {
+        return NUMBERS.deriveFont(size);
+    }
+
+    private static final Font NUMBERS =
+            loaded(
+                    "/com/gpmanager/fonts/JetBrainsMono-Regular.ttf",
+                    12f,
+                    new Font(Font.MONOSPACED, Font.PLAIN, 12));
+
 }

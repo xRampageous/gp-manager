@@ -121,7 +121,7 @@ class LedgerPage implements Shell.Page {
     LedgerPage(Actions actions, Function<Integer, BufferedImage> sprites) {
         this.actions = actions;
         this.sprites = sprites == null ? id -> null : sprites;
-        scope = button("This Grind \u25be", false, () -> {});
+        scope = button("This Grind \u2304", false, () -> {});
         scope.addActionListener(e -> actions.openScopeMenu(scope));
         JButton find = button("Search", false, this::toggleSearch);
         find.setToolTipText("Search this scope");
@@ -216,7 +216,7 @@ class LedgerPage implements Shell.Page {
                 clearPending();
             }
         }
-        scope.setText(next.scopeName + " \u25be");
+        scope.setText(next.scopeName + " \u2304");
         // Owner 2026-10-01 (F03): Runs today is whole runs that started today, never calendar-day
         // money.
         scope.setToolTipText(
@@ -281,16 +281,17 @@ class LedgerPage implements Shell.Page {
             var rows = new ArrayList<Row>();
             for (Group group : open) rows.add(groupRow(group, DIM));
             for (LedgerData.PendingItem item : data.pendingItems) {
+                boolean valued = item.value > 0L;
                 rows.add(
                         new Row(
                                 "pending|" + item.name + "|" + item.itemId,
                                 icon(item.itemId),
                                 item.name,
                                 "×" + exact(item.quantity),
-                                "",
+                                valued ? signed(item.value) : "",
                                 DIM,
                                 item.tip,
-                                "",
+                                valued ? exactSigned(item.value) + " gp" : "",
                                 false,
                                 null,
                                 emptyList()));
@@ -341,7 +342,7 @@ class LedgerPage implements Shell.Page {
      * Owner 1.1: the Losses view is a dropdown beside the header (All, Supplies, Items, Charges).
      */
     JButton costPicker(CostView selected, int[] counts) {
-        var pick = new JButton(selected.label + " \u25be");
+        var pick = new JButton(selected.label + " \u2304");
         pick.setFont(small());
         pick.setForeground(selected == CostView.ALL ? LABEL : ACCENT);
         pick.setBorder(BorderFactory.createEmptyBorder());
@@ -867,7 +868,7 @@ class LedgerPage implements Shell.Page {
                                     }),
                             confirm));
         } else {
-            JButton correct = button("Correct ▾", false, () -> {});
+            JButton correct = button("Correct ⌄", false, () -> {});
             correct.getAccessibleContext().setAccessibleName(msg("correct-entry"));
             correct.addActionListener(e -> correctMenu(row).show(correct, 0, correct.getHeight()));
             panel.add(row(correct));
@@ -1021,7 +1022,7 @@ class LedgerPage implements Shell.Page {
         card.setBackground(CARD);
         pad(card, 5, GAP, 5, GAP);
         card.add(label(name, bold(), Color.WHITE), BorderLayout.CENTER);
-        card.add(label(value, bold(), tone.color), BorderLayout.EAST);
+        card.add(label(value, numbers(12.5f), tone.color), BorderLayout.EAST);
         card.add(label(sub, small(), LABEL), BorderLayout.SOUTH);
         return card;
     }

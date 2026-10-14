@@ -48,7 +48,7 @@ public class StackedLedgerTablesTest
         assertFalse("no global All/Gains/Costs/Market/Review/Corrected tab strip",
             onEdt(() -> containsNav(page.body())));
         // Owner 1.1: the Losses view is one dropdown beside its header.
-        assertTrue("the Losses picker reads its view: " + labels, labels.contains("All ▾"));
+        assertTrue("the Losses picker reads its view: " + labels, labels.contains("All ⌄"));
     }
 
     @Test

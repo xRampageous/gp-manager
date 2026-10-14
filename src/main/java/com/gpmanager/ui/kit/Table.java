@@ -77,10 +77,10 @@ class Table extends JPanel {
     JPanel header = new JPanel(new BorderLayout(GAP, 0));
     JLabel chevron = label("▾", small(), LABEL);
     JLabel title = label("", small(), LABEL);
-    JLabel total = label("", small(), LABEL);
+    JLabel total = label("", numbers(10.5f), LABEL);
     JButton previous = glyphButton("‹");
     JButton next = glyphButton("›");
-    JLabel pageLabel = label("", small(), LABEL);
+    JLabel pageLabel = label("", numbers(10f), LABEL);
 
     /** One row, centred on the title's line so "‹ 1/2 ›" sits level with it. */
     JPanel right = new JPanel(new GridBagLayout());
@@ -290,17 +290,9 @@ class Table extends JPanel {
                 body.add(Kit.emptyLine(emptyText));
             }
             int rowHeight = rowHeight();
-            // The quantity column is as wide as this page's widest quantity, so names keep the
-            // rest.
-            FontMetrics metrics = body.getFontMetrics(small());
-            int qtyWidth = 0;
-            for (Row row : visible) {
-                qtyWidth =
-                        max(
-                                qtyWidth,
-                                row.qty.isEmpty() ? 0 : min(70, metrics.stringWidth(row.qty) + 2));
-            }
-            for (Row row : visible) body.add(rowComponent(row, rowHeight, qtyWidth));
+            // The quantity column hugs each row's own text, so one wide "×2 doses" row no longer
+            // steals width from every name; right edges stay aligned against the value column.
+            for (Row row : visible) body.add(rowComponent(row, rowHeight));
             int height =
                     visible.isEmpty()
                             ? max(1, minRows) * ROW
@@ -326,10 +318,10 @@ class Table extends JPanel {
         right.revalidate();
     }
 
-    static JComponent rowComponent(Row row, int height, int qtyWidth) {
-        var line = new JPanel(new BorderLayout(GAP, 0));
+    static JComponent rowComponent(Row row, int height) {
+        var line = new JPanel(new BorderLayout(4, 0));
         line.setBackground(row.selected ? SELECTED : CARD);
-        pad(line, 0, height == ICON_ROW ? 2 : 6, 0, 6);
+        pad(line, 0, height == ICON_ROW ? 2 : 6, 0, 4);
         line.setMaximumSize(new Dimension(Integer.MAX_VALUE, height));
         line.setPreferredSize(new Dimension(0, height));
         if (height == ICON_ROW) {
@@ -339,12 +331,14 @@ class Table extends JPanel {
             icon.setPreferredSize(new Dimension(ICON_WIDTH, ICON_ROW));
             line.add(icon, BorderLayout.WEST);
         }
-        line.add(label(row.name, body(), TEXT), BorderLayout.CENTER);
-        var numbers = new JPanel(new BorderLayout(qtyWidth == 0 ? 0 : 4, 0));
+        line.add(label(row.name, body().deriveFont(11.5f), TEXT), BorderLayout.CENTER);
+        var numbers = new JPanel(new BorderLayout(row.qty.isEmpty() ? 0 : 4, 0));
         numbers.setOpaque(false);
-        if (qtyWidth > 0)
-            numbers.add(column(row.qty, small(), LABEL, qtyWidth, height), BorderLayout.WEST);
-        JLabel value = column(row.value, body(), row.tone.color, VALUE_WIDTH, height);
+        if (!row.qty.isEmpty()) {
+            int qty = min(70, line.getFontMetrics(numbers(10.5f)).stringWidth(row.qty) + 2);
+            numbers.add(column(row.qty, numbers(10.5f), LABEL, qty, height), BorderLayout.WEST);
+        }
+        JLabel value = column(row.value, numbers(10.5f), row.tone.color, VALUE_WIDTH, height);
         if (!row.exact.isEmpty()) value.setToolTipText(row.exact);
         numbers.add(value, BorderLayout.EAST);
         line.add(numbers, BorderLayout.EAST);

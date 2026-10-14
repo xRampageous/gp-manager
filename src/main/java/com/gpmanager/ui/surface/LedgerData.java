@@ -65,6 +65,9 @@ class LedgerData {
         String name;
         long quantity;
         String tip;
+
+        /** An observed open chest's exact worth; 0 when unseen, looted or unpriced. */
+        long value;
     }
 
     /** Compact audit subsections; never peer financial tabs. */
@@ -345,7 +348,7 @@ class LedgerData {
     /** Group counts for the Losses chips by {@link CostView} ordinal, whatever view is selected. */
     int[] costCounts;
 
-    /** Keys and reclaim waiting to settle; current scope only, counts and items, never GP. */
+    /** Keys and reclaim waiting to settle; current scope only, with an exact observed chest value. */
     List<PendingItem> pendingItems;
 
     static LedgerData capture(Engine engine, long now, Entry entry) {
@@ -466,12 +469,13 @@ class LedgerData {
                 detail,
                 markets,
                 new int[] {0, supplies.size(), lossAll.size(), charges.size()},
-                pendingItems(engine, e));
+                pendingItems(engine, e, now));
     }
 
-    static List<PendingItem> pendingItems(Engine engine, Entry e) {
+    static List<PendingItem> pendingItems(Engine engine, Entry e, long now) {
         var items = new ArrayList<PendingItem>();
         if (e.scope != Scope.CURRENT_GRIND || readOnly(e)) return items;
+        var valued = new HashSet<Integer>();
         for (SavedState.PendingClaim claim : engine.getPendingClaims()) {
             if (claim == null || !claim.isValid()) continue;
             KeyChestCatalogue.Entry chest = KeyChestCatalogue.entryForKey(claim.itemOrKeyId);
@@ -482,12 +486,14 @@ class LedgerData {
                                             && claim.itemOrKeyId <= ItemID.WILDY_LOOT_KEY4
                                     ? "Loot key"
                                     : "Key or chest";
+            // One chest per key type: stacked claims of it name the same worth once.
+            long value =
+                    valued.add(claim.itemOrKeyId)
+                            ? engine.pendingKeyValue(claim.itemOrKeyId, now)
+                            : 0L;
             items.add(
                     new PendingItem(
-                            claim.itemOrKeyId,
-                            name,
-                            claim.getQuantity(),
-                            name + msg("opened-books")));
+                            claim.itemOrKeyId, name, claim.getQuantity(), name + msg("opened-books"), value));
         }
         DeathReclaimStatus reclaim = engine.deathStatus();
         if (reclaim.awaiting) {
@@ -496,7 +502,8 @@ class LedgerData {
                             0,
                             "Death reclaim",
                             Math.max(1L, reclaim.outstandingItemCount),
-                            msg("items-waiting-reclaimed")));
+                            msg("items-waiting-reclaimed"),
+                            0L));
         }
         return items;
     }

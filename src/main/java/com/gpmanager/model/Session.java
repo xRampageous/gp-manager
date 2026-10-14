@@ -131,9 +131,18 @@ class Session {
     // Nullable by design: a target is owner-local presentation metadata, never
     // an accounting input or generated transaction.
     Long profitTargetGp;
+    // The session's Net when the target above was last set: the aim counts what has been earned
+    // since (owner live 2026-10-14). Null on older saves counts from the run's start.
+    Long profitTargetSetNet;
     // Signature targets: the actual Active-Time aim this Grind instance ran with, and the stable
     // My Grind lineage link it was started from. Both are metadata; neither books anything.
     Long activeTimeTargetMillis;
+    // The session's own Active Time when the target above was last set; null on older saves and
+    // fresh sessions, which keep counting from the run's start (owner live 2026-10-13).
+    Long activeTimeTargetSetMillis;
+    // The timer's own pause: the Active Time it was frozen at; null while it runs (owner live
+    // 2026-10-14). Distinct from a session pause — the run keeps tracking.
+    Long activeTimeTargetPauseMillis;
     String grindId;
 
     Session() {
@@ -196,8 +205,45 @@ class Session {
     }
 
     boolean setProfitTargetGp(Long value) {
-        if (value != null && value <= 0L) return false;
-        profitTargetGp = value;
+        return setProfitTargetGp(value, 0L);
+    }
+
+    /**
+     * Sets the Net aim and the run's Net at the set moment (owner live 2026-10-14): a changed
+     * value counts from now, as does the same value once the aim is already reached; an unchanged,
+     * unreached value keeps its count.
+     */
+    boolean setProfitTargetGp(Long value, long sessionNet) {
+        Long next = value == null || value <= 0L ? null : value;
+        if (Objects.equals(next, profitTargetGp)) {
+            if (next != null && sessionNet - getProfitTargetSetNet() >= next) {
+                profitTargetSetNet = sessionNet;
+                return true;
+            }
+            return false;
+        }
+        profitTargetGp = next;
+        profitTargetSetNet = next == null ? null : sessionNet;
+        return true;
+    }
+
+    /** The run's Net when the aim was set; 0 with none and on older saves. */
+    long getProfitTargetSetNet() {
+        return profitTargetSetNet == null || profitTargetSetNet < 0L ? 0L : profitTargetSetNet;
+    }
+
+    /** What the Net aim has counted so far; sessionNet is the run's total. */
+    long profitTargetProgress(long sessionNet) {
+        return sessionNet - getProfitTargetSetNet();
+    }
+
+    /**
+     * Re-bases the set Net aim's count on the given net, keeping its value (owner live
+     * 2026-10-14): Reset counts the aim from now whether or not it was reached.
+     */
+    boolean rebaseProfitTarget(long sessionNet) {
+        if (profitTargetGp == null) return false;
+        profitTargetSetNet = sessionNet;
         return true;
     }
 
@@ -208,10 +254,76 @@ class Session {
                 : null;
     }
 
-    boolean setActiveTimeTargetMillis(Long value) {
-        if (value != null && value <= 0L) return false;
-        activeTimeTargetMillis = value;
+    /**
+     * Sets the actual Active-Time target and restarts its count when the value changes (owner live
+     * 2026-10-13): a target counts from the moment it was set, not from the run's start. An
+     * unchanged value keeps the running count; a cleared one forgets it.
+     */
+    boolean setActiveTimeTargetMillis(Long value, long now) {
+        Long next = value == null || value <= 0L ? null : value;
+        if (Objects.equals(next, activeTimeTargetMillis)) {
+            // Re-saving the same aim keeps a running window; a completed one starts over
+            // (owner live 2026-10-13: Edit > Save after completion must begin again).
+            if (next != null && getElapsedMillis(now) - getActiveTimeTargetSetMillis() >= next) {
+                activeTimeTargetSetMillis = getElapsedMillis(now);
+                activeTimeTargetPauseMillis = null;
+                return true;
+            }
+            return false;
+        }
+        activeTimeTargetMillis = next;
+        activeTimeTargetSetMillis = next == null ? null : getElapsedMillis(now);
+        activeTimeTargetPauseMillis = null;
         return true;
+    }
+
+    /** The Active Time a set target counts from; 0 with none and on older saves. */
+    long getActiveTimeTargetSetMillis() {
+        return activeTimeTargetSetMillis == null || activeTimeTargetSetMillis < 0L
+                ? 0L
+                : activeTimeTargetSetMillis;
+    }
+
+    /** The window a set target has counted so far; frozen while the timer is paused. */
+    long getActiveTimeTargetWindowMillis(long elapsedMillis) {
+        long at =
+                activeTimeTargetPauseMillis != null
+                        ? activeTimeTargetPauseMillis
+                        : max(0L, elapsedMillis);
+        return max(0L, at - getActiveTimeTargetSetMillis());
+    }
+
+    /** True while the timer's own pause holds; the run keeps tracking (owner live 2026-10-14). */
+    boolean isTimeTargetPaused() {
+        return activeTimeTargetPauseMillis != null;
+    }
+
+    /** Freezes the timer's window where it stands; an ended window has nothing to stop. */
+    boolean pauseTimeTarget(long now) {
+        if (activeTimeTargetMillis == null || activeTimeTargetPauseMillis != null) return false;
+        if (getActiveTimeTargetWindowMillis(getElapsedMillis(now)) >= activeTimeTargetMillis) {
+            return false;
+        }
+        activeTimeTargetPauseMillis = getElapsedMillis(now);
+        return true;
+    }
+
+    /** Resumes a paused timer, keeping the window it had already counted. */
+    boolean resumeTimeTarget(long now) {
+        if (activeTimeTargetMillis == null || activeTimeTargetPauseMillis == null) return false;
+        activeTimeTargetSetMillis =
+                getActiveTimeTargetSetMillis()
+                        + max(0L, getElapsedMillis(now) - activeTimeTargetPauseMillis);
+        activeTimeTargetPauseMillis = null;
+        return true;
+    }
+
+    /** Restarts the set target's count from now without changing its value (owner live 2026-10-13). */
+    void rearmTimeTarget(long now) {
+        if (activeTimeTargetMillis != null) {
+            activeTimeTargetSetMillis = getElapsedMillis(now);
+            activeTimeTargetPauseMillis = null;
+        }
     }
 
     /** Stable My Grind lineage link; empty when this instance was never saved as a Grind. */

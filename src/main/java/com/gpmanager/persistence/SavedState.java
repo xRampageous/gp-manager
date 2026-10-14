@@ -177,7 +177,7 @@ class SavedState {
     }
 
     void setProfileTimeZoneId(String value) {
-        profileTimeZoneId = value == null ? "" : value.trim();
+        profileTimeZoneId = nonBlank(value, "");
     }
 
     List<PendingClaim> getPendingClaims() {

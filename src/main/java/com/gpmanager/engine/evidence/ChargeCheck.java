@@ -49,6 +49,7 @@ class ChargeCheck {
         EYE_OF_AYAK,
         SCYTHE,
         ATES,
+        SAILORS_AMULET,
         TOME_OF_FIRE,
         CRYSTAL_BOW,
         CRYSTAL_HALBERD,
@@ -73,7 +74,16 @@ class ChargeCheck {
         TONALZTICS,
         TOME_OF_WATER,
         TOME_OF_EARTH,
-        ETHEREUM;
+        ETHEREUM,
+        BONE_STAFF,
+        CRYSTAL_AXE,
+        CRYSTAL_PICKAXE,
+        CRYSTAL_HARPOON,
+        ECHO_BOOTS,
+        SLAYER_STAFF_E,
+        INFERNAL_AXE,
+        INFERNAL_PICKAXE,
+        INFERNAL_HARPOON;
         String displayName;
         boolean implemented;
         String family;
@@ -221,6 +231,11 @@ class ChargeCheck {
     static ChargedItem surface(String lower) {
         if (lower.startsWith("darts:") && lower.contains("scales:")) return ChargedItem.BLOWPIPE;
         if (lower.startsWith("the pendant has ")) return ChargedItem.ATES;
+        if (lower.startsWith("the amulet has ") || lower.startsWith("your amulet has ")) {
+            // The sailors' amulet's own Check wording ("...has 106 charges." or "...charges
+            // left."); the blood fury's hit-count line names itself below (owner 2026-10-14).
+            return ChargedItem.SAILORS_AMULET;
+        }
         if (lower.startsWith("your tome has been charged with "))
         {
             // The page names the tome; a bare "your tome" line stays fire and the clicked row

@@ -167,7 +167,7 @@ public class SemanticFinancialProjectionTest
     }
 
     @Test
-    public void estimatedScytheChargeKeepsItsIconWithoutTheTransientHint()
+    public void estimatedScytheChargeWearsTheSpentComponent()
     {
         Transaction estimate = estimatedCharge(T0 + 1_000L, "Scythe of vitur",
             new Flow(BLOOD, "Blood rune", -2L, 100, -200L, PriceSource.GRAND_EXCHANGE));
@@ -175,8 +175,43 @@ public class SemanticFinancialProjectionTest
         Semantics.Group charge = named(capture(estimate).groups, "Scythe of vitur");
         assertNotNull(charge);
         assertTrue("a scythe estimate is charge use", charge.chargeUse);
-        assertEquals("the weapon sprite must resolve after a restart",
-            ItemID.SCYTHE_OF_VITUR, charge.itemId);
+        assertEquals("a charge row wears what it spent (owner live 2026-10-13)",
+            BLOOD, charge.itemId);
+    }
+
+    @Test
+    public void aMultiComponentChargeWearsTheWeapon()
+    {
+        // Owner live 2026-10-14: the sailors' amulet's cast spends law and water runes; no single
+        // component is "what it spent", so the row wears the amulet itself.
+        Transaction estimate = estimatedCharge(T0 + 1_000L, "Sailors' amulet",
+            new Flow(ItemID.LAWRUNE, "Law rune", -1L, 100, -10L, PriceSource.GRAND_EXCHANGE),
+            new Flow(WATER, "Water rune", -10L, 4, -4L, PriceSource.GRAND_EXCHANGE));
+
+        Semantics.Group charge = named(capture(estimate).groups, "Sailors' amulet");
+        assertNotNull(charge);
+        assertTrue("an amulet teleport is charge use", charge.chargeUse);
+        assertEquals("a multi-component charge wears the weapon (owner live 2026-10-14)",
+            ItemID.SAILORS_AMULET, charge.itemId);
+    }
+
+    @Test
+    public void aPaidFeeIsOneRowNamedByItsNote()
+    {
+        // Owner live 2026-10-14: the boat recovery reads "Recovered Junior Jim", value only.
+        Transaction fee = new Transaction(T0 + 1_000L, TransactionType.CONSUMPTION, Context.GENERIC,
+            "Recovered Junior Jim", "General", true,
+            Collections.singletonList(new Flow(995, "Coins", -4_500L, 1, -4_500L, PriceSource.FACE_VALUE)),
+            Confidence.CONFIRMED, "Recovered Junior Jim", null);
+        fee.setActionKind(ActionKind.FEE);
+
+        Semantics.Group row = named(capture(fee).groups, "Recovered Junior Jim");
+        assertNotNull(row);
+        assertEquals("the coins flow supplies the icon", 995, row.itemId);
+        assertEquals("no quantity is stated", -1L, row.quantity);
+        assertEquals(-4_500L, row.value);
+        assertEquals(Semantics.Table.COSTS_SUPPLIES, row.table);
+        assertFalse("never a charge row", row.chargeUse);
     }
 
     @Test

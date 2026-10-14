@@ -167,6 +167,16 @@ class Engine {
     /** Key/chest claims (the one durable evidence exception, section H) and their live evidence. */
     KeyClaims claims = new KeyClaims();
 
+    /** One armed boat-recovery fee: the click read it; the bank line or the pack pays it. */
+    long boatRecoveryFee;
+
+    String boatRecoveryName = "";
+
+    long boatRecoveryArmedAt;
+
+    /** How long an armed recovery fee stays valid for its payment (owner live 2026-10-14). */
+    static final long RECOVERY_FEE_MILLIS = 120_000L;
+
     /** Chebyshev tiles — pickup must be near the recorded drop, not name-only. */
     @Inject
     Engine(Valuation valuationService, TransactionClassifier classifier, GpManagerConfig config) {
@@ -329,7 +339,8 @@ class Engine {
     /**
      * Create the durable General tracker from meaningful gameplay when automatic startup is
      * enabled, on a new install and after a factory reset alike. Never resumes Manual Pause; Idle
-     * and Recovery resume via {@link #resume}. Never starts tracking from login alone.
+     * and Recovery resume via {@link #resume}. Not from login alone, unless the plugin's
+     * Start-tracking-on-login option asks for it at the first login (owner live 2026-10-13).
      *
      * @return true when a new General session was created
      */
@@ -681,12 +692,11 @@ class Engine {
 
     /** Binds the identity and restores its state under the same engine lock. */
     synchronized void restoreProfile(String identityKey, SavedState state, long now) {
-        String next = identityKey == null ? "" : identityKey.trim();
+        String next = nonBlank(identityKey, "");
         SavedState detached = detach(state);
         String stateOwner = detached == null ? null : detached.ownerKey;
         if (!next.isEmpty()
-                && stateOwner != null
-                && !stateOwner.trim().isEmpty()
+                && !blank(stateOwner)
                 && !next.equals(stateOwner)) {
             throw new IllegalArgumentException(msg("savedstate-owner"));
         }
@@ -838,8 +848,7 @@ class Engine {
             // every non-bank transfer row.
             String note =
                     liveClue().context == Context.TRANSFER
-                                    && liveClue().note != null
-                                    && !liveClue().note.trim().isEmpty()
+                                    && !blank(liveClue().note)
                             ? liveClue().note
                             : "Bank transfer";
             applyPendingContext(Context.TRANSFER, note, emptyMap(), null);
@@ -1245,7 +1254,7 @@ class Engine {
      * estimates still pending were overestimates and are removed through the announced path.
      */
     synchronized void closeChargeWindow(String targetIdentity) {
-        if (activeSession == null || targetIdentity == null || targetIdentity.trim().isEmpty())
+        if (activeSession == null || blank(targetIdentity))
             return;
         String sessionId = activeSession.getId();
         long now = SafeMath.now();
@@ -1574,6 +1583,44 @@ class Engine {
         claims.observeKeyContents(keyItemId, contents);
     }
 
+    /** The exact price of one pending loot key's observed chest contents; 0 when unknown. */
+    synchronized long pendingKeyValue(int keyItemId, long now) {
+        return pricedContents(claims.observedContents(keyItemId), now);
+    }
+
+    /**
+     * The exact price across every pending key's observed chest, each key type once (one opening
+     * takes a chest's contents). 0 when no chest was observed or a part has no quote.
+     */
+    synchronized long pendingKeysValue(long now) {
+        long total = 0L;
+        var seen = new HashSet<Integer>();
+        for (SavedState.PendingClaim claim : claims.all()) {
+            if (claim == null || !claim.isValid() || !seen.add(claim.itemOrKeyId)) continue;
+            total =
+                    SafeMath.safeAdd(
+                            total, pricedContents(claims.observedContents(claim.itemOrKeyId), now));
+        }
+        return total;
+    }
+
+    /**
+     * A chest manifest priced exactly from its observed contents: every part needs a supported
+     * quote, or nothing shows (owner 2026-10-14). The game's own display rounds to a million.
+     */
+    private long pricedContents(Map<Integer, Long> contents, long now) {
+        if (contents == null || contents.isEmpty()) return 0L;
+        List<Flow> flows = valuationService.value(contents, now);
+        // A component the valuator silently drops (an empty vial) fails the manifest closed.
+        if (flows == null || flows.size() != contents.size()) return 0L;
+        long total = 0L;
+        for (Flow flow : flows) {
+            if (flow == null || flow.unitPrice <= 0) return 0L;
+            total = SafeMath.safeAdd(total, flow.valueDelta);
+        }
+        return total;
+    }
+
     /** A non-counted, ownership-neutral audit row: transfers, holds, restores and reclaims. */
     Transaction bookNeutral(
             long now,
@@ -1812,7 +1859,7 @@ class Engine {
             return null;
         }
         List<Flow> booked = componentLosses;
-        String target = targetIdentity == null ? "" : targetIdentity.trim();
+        String target = nonBlank(targetIdentity, "");
         if (!target.isEmpty()) {
             var excess = new ArrayList<Flow>();
             String sessionId = activeSession.getId();
@@ -1855,17 +1902,93 @@ class Engine {
 
     /** Book a death reclaim fee as a plain counted CONSUMPTION cost under "Death reclaim". */
     synchronized Transaction bookDeathFee(long feeGp, String why, long now) {
+        String label = why == null ? msg("grave-reclaim-fee-tiered") : why;
+        return bookFee(feeGp, label, "Death reclaim", now);
+    }
+
+    /**
+     * A bank-paid boat recovery fee as one named row: "Recovered Junior Jim" (owner live
+     * 2026-10-14; the action kind gives the row its own shape, value only).
+     */
+    synchronized Transaction bookBoatRecoveryFee(long feeGp, String boatName, long now) {
+        String activity =
+                activeSession == null
+                        ? "General"
+                        : nonBlank(activeSession.getActivityHint(), "General");
+        Transaction fee =
+                bookFee(feeGp, msg("boat-recovered") + nonBlank(boatName, "Boat"), activity, now);
+        if (fee != null) fee.setActionKind(ActionKind.FEE);
+        return fee;
+    }
+
+    /** Arms one boat-recovery fee from its Recover click (owner live 2026-10-14). */
+    synchronized void armBoatRecoveryFee(long fee, String boatName, long now) {
+        if (fee <= 0L) return;
+        boatRecoveryFee = fee;
+        boatRecoveryName = nonBlank(boatName, "Boat");
+        boatRecoveryArmedAt = now;
+    }
+
+    /** A confirm click refreshes the armed fee's window; a dialog never arms on its own. */
+    synchronized void refreshBoatRecoveryFee(long fee, long now) {
+        if (boatRecoveryFee <= 0L) return;
+        if (fee > 0L) boatRecoveryFee = fee;
+        boatRecoveryArmedAt = now;
+    }
+
+    /** The bank line's booking: the armed fee books once, if fresh (owner live 2026-10-14). */
+    synchronized Transaction bookArmedBoatRecovery(long now) {
+        long fee = boatRecoveryFee;
+        String name = boatRecoveryName;
+        return takeBoatRecoveryFee(now) > 0L ? bookBoatRecoveryFee(fee, name, now) : null;
+    }
+
+    /** The armed fee while fresh; one-shot. */
+    private long takeBoatRecoveryFee(long now) {
+        long fee = boatRecoveryFee;
+        boatRecoveryFee = 0L;
+        boatRecoveryName = "";
+        return fee > 0L && now - boatRecoveryArmedAt <= RECOVERY_FEE_MILLIS ? fee : 0L;
+    }
+
+    /**
+     * An armed boat recovery's pack payment: with coins in the pack the game prints nothing, so
+     * the settle's exact coins loss books the fee's named row and leaves the settle (owner live
+     * 2026-10-14).
+     */
+    Transaction settleBoatRecovery(Settle settle, long now) {
+        long fee = boatRecoveryFee;
+        if (fee <= 0L || now - boatRecoveryArmedAt > RECOVERY_FEE_MILLIS) return null;
+        Flow match = null;
+        for (Flow flow : settle.flows) {
+            if (flow != null
+                    && flow.isCost()
+                    && flow.itemId == ItemID.COINS
+                    && -flow.quantityDelta == fee) {
+                match = flow;
+                break;
+            }
+        }
+        if (match == null) return null;
+        var remaining = new ArrayList<Flow>(settle.flows);
+        remaining.remove(match);
+        settle.flows = remaining;
+        String name = boatRecoveryName;
+        return takeBoatRecoveryFee(now) > 0L ? bookBoatRecoveryFee(fee, name, now) : null;
+    }
+
+    /** A bank-paid fee as a plain counted CONSUMPTION cost under its own row name. */
+    private Transaction bookFee(long feeGp, String label, String activity, long now) {
         if (feeGp <= 0L || !live()) return null;
         var feeFlow =
                 new Flow(ItemID.COINS, "Coins", -feeGp, 1, -feeGp, PriceSource.FACE_VALUE, now);
-        String label = why == null ? msg("grave-reclaim-fee-tiered") : why;
         Transaction transaction =
                 bookTransaction(
                         now,
                         CONSUMPTION,
                         GENERIC,
                         label,
-                        "Death reclaim",
+                        activity,
                         true,
                         singletonList(feeFlow),
                         Confidence.CONFIRMED,
@@ -2635,7 +2758,8 @@ class Engine {
                             ? recordCommittedLoad(load, settle.now)
                             : recordAmbiguousLoad(load, settle.now);
         }
-        return first(settle.keyAudit, wipe, loadReview);
+        Transaction boatRecovery = settleBoatRecovery(settle, settle.now);
+        return first(settle.keyAudit, wipe, loadReview, boatRecovery);
     }
 
     /** Source-backed loot, key-chest claims and death reclaim returns. */
@@ -3720,7 +3844,7 @@ class Engine {
 
     synchronized SavedState savedState() {
         var state = new SavedState(generalSession, customSession, history);
-        if (profileIdentityKey != null && !profileIdentityKey.trim().isEmpty())
+        if (!blank(profileIdentityKey))
             state.setOwnerKey(profileIdentityKey);
         state.setProfileTimeZoneId(profileTimeZoneId);
         claims.writeTo(state);
@@ -3765,7 +3889,7 @@ class Engine {
             Long activeTimeMillis,
             boolean favorite,
             String linkSessionId) {
-        String cleanName = name == null ? "" : name.trim();
+        String cleanName = nonBlank(name, "");
         if (cleanName.isEmpty()) return null;
         var grind =
                 new SavedGrind(
@@ -3775,7 +3899,7 @@ class Engine {
                         activeTimeMillis,
                         favorite);
         savedGrinds.add(grind);
-        if (linkSessionId != null && !linkSessionId.isEmpty()) {
+        if (!empty(linkSessionId)) {
             Session linked =
                     activeSession != null && linkSessionId.equals(activeSession.getId())
                             ? activeSession
@@ -3794,7 +3918,7 @@ class Engine {
             boolean favorite) {
         SavedGrind grind = savedGrind(grindId);
         if (grind == null) return false;
-        String cleanName = name == null ? "" : name.trim();
+        String cleanName = nonBlank(name, "");
         if (!cleanName.isEmpty()) grind.setName(cleanName);
         grind.setNetTargetGp(netTargetGp);
         grind.setActiveTimeTargetMillis(activeTimeMillis);
@@ -3844,14 +3968,14 @@ class Engine {
      */
     synchronized boolean startGrind(
             String name, String grindId, Long netTargetGp, Long activeTimeTargetMillis, long now) {
-        String cleanName = name == null ? "" : name.trim();
+        String cleanName = nonBlank(name, "");
         if (cleanName.isEmpty() || customSession != null) return false;
         startCustom(cleanName, now);
         Session active = activeSession;
         if (active == null) return false;
-        if (grindId != null && !grindId.isEmpty()) active.setGrindId(grindId);
+        if (!empty(grindId)) active.setGrindId(grindId);
         active.setProfitTargetGp(netTargetGp);
-        active.setActiveTimeTargetMillis(activeTimeTargetMillis);
+        active.setActiveTimeTargetMillis(activeTimeTargetMillis, now);
         return true;
     }
 
@@ -3869,12 +3993,36 @@ class Engine {
     synchronized boolean setTargets(Long netTargetGp, Long activeTimeTargetMillis, long now) {
         if (activeSession == null) return false;
         activeSession.setProfitTargetGp(
-                netTargetGp == null || netTargetGp <= 0L ? null : netTargetGp);
+                netTargetGp == null || netTargetGp <= 0L ? null : netTargetGp,
+                getMetrics(now).net);
         activeSession.setActiveTimeTargetMillis(
                 activeTimeTargetMillis == null || activeTimeTargetMillis <= 0L
                         ? null
-                        : activeTimeTargetMillis);
+                        : activeTimeTargetMillis,
+                now);
         return true;
+    }
+
+    /** Restarts the running time target's window, keeping its value (owner live 2026-10-13). */
+    synchronized boolean restartTimeTarget(long now) {
+        if (activeSession == null || activeSession.getActiveTimeTargetMillis() == null) return false;
+        activeSession.rearmTimeTarget(now);
+        return true;
+    }
+
+    /**
+     * Re-bases a Net aim on the running session, keeping the run's net (owner live 2026-10-14):
+     * the aim counts from now without a new instance, reached or not.
+     */
+    synchronized boolean rebaseNetTarget(long now) {
+        if (activeSession == null) return false;
+        return activeSession.rebaseProfitTarget(getMetrics(now).net);
+    }
+
+    /** Toggles the timer's own pause; the run keeps tracking (owner live 2026-10-14). */
+    synchronized boolean toggleTimeTargetPause(long now) {
+        if (activeSession == null || activeSession.getActiveTimeTargetMillis() == null) return false;
+        return activeSession.pauseTimeTarget(now) || activeSession.resumeTimeTarget(now);
     }
 
     /** Every session the engine opens follows the detected activity (AUTO). */

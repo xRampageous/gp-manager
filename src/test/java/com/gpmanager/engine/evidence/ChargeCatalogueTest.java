@@ -81,6 +81,9 @@ public class ChargeCatalogueTest
         row(checked, ChargedItem.ATES, "Pendant of Ates", true, "ATES", ActionKind.CAST, 1, NONE, NONE,
             new Object[]{ItemID.FROZEN_TEAR, 1L}, null, List.of(),
             ints(ItemID.PENDANT_OF_ATES, ItemID.PENDANT_OF_ATES_EMPTY));
+        row(checked, ChargedItem.SAILORS_AMULET, "Sailors' amulet", true, "AMULET", ActionKind.CAST, 10, NONE, NONE,
+            new Object[]{ItemID.LAWRUNE, 1L, ItemID.WATERRUNE, 10L}, null, List.of(),
+            ints(ItemID.SAILORS_AMULET, ItemID.SAILORS_AMULET_EMPTY));
         row(checked, ChargedItem.TOME_OF_FIRE, "Tome of fire", true, "TOME", ActionKind.CAST, 20, NONE, NONE,
             new Object[]{ItemID.WINT_BURNT_PAGE, 1L}, null, List.of(),
             ints(ItemID.TOME_OF_FIRE, ItemID.TOME_OF_FIRE_UNCHARGED));
@@ -187,6 +190,31 @@ public class ChargeCatalogueTest
         row(checked, ChargedItem.ETHEREUM, "Bracelet of ethereum", true, "ETHEREUM", ActionKind.SUPPLIES, 1, NONE, NONE,
             new Object[]{ItemID.WILD_CAVE_SHARD, 1L}, null, List.of(),
             ints(ItemID.WILD_CAVE_BRACELET_CHARGED, ItemID.WILD_CAVE_BRACELET_UNCHARGED));
+        row(checked, ChargedItem.BONE_STAFF, "Bone staff", true, "CHARGES", ActionKind.CAST, 1, NONE, casts,
+            new Object[]{ItemID.CHAOSRUNE, 1L}, null, List.of(), ints(ItemID.RAT_BONE_STAFF));
+        row(checked, ChargedItem.CRYSTAL_AXE, "Crystal axe", true, "CRYSTAL", ActionKind.SUPPLIES, 100, NONE, NONE,
+            shard, null, List.of(),
+            ints(ItemID.CRYSTAL_AXE, ItemID.CRYSTAL_AXE_INACTIVE, ItemID.CRYSTAL_AXE_2H,
+                ItemID.CRYSTAL_AXE_2H_INACTIVE));
+        row(checked, ChargedItem.CRYSTAL_PICKAXE, "Crystal pickaxe", true, "CRYSTAL", ActionKind.SUPPLIES, 100, NONE, NONE,
+            shard, null, List.of(), ints(ItemID.CRYSTAL_PICKAXE, ItemID.CRYSTAL_PICKAXE_INACTIVE));
+        row(checked, ChargedItem.CRYSTAL_HARPOON, "Crystal harpoon", true, "CRYSTAL", ActionKind.SUPPLIES, 100, NONE, NONE,
+            shard, null, List.of(), ints(ItemID.CRYSTAL_HARPOON, ItemID.CRYSTAL_HARPOON_INACTIVE));
+        row(checked, ChargedItem.ECHO_BOOTS, "Echo boots", true, "ECHO", ActionKind.SUPPLIES, 6000, NONE, NONE,
+            new Object[]{ItemID.ECHO_CRYSTAL, 1L}, null, List.of(),
+            ints(ItemID.ECHO_BOOTS, ItemID.GUARDIAN_BOOTS));
+        row(checked, ChargedItem.SLAYER_STAFF_E, "Slayer's staff (e)", true, "SLAYER", ActionKind.SUPPLIES, 2500, NONE, NONE,
+            new Object[]{ItemID.SLAYER_ENCHANTMENT, 1L}, null, List.of(),
+            ints(ItemID.SLAYER_STAFF_ENCHANTED, ItemID.SLAYER_STAFF));
+        row(checked, ChargedItem.INFERNAL_AXE, "Infernal axe", true, "INFERNAL", ActionKind.SUPPLIES, 5000, NONE, NONE,
+            new Object[]{ItemID.SMOULDERING_STONE, 1L, ItemID.DRAGON_AXE, 1L}, null, List.of(),
+            ints(ItemID.INFERNAL_AXE, ItemID.INFERNAL_AXE_EMPTY));
+        row(checked, ChargedItem.INFERNAL_PICKAXE, "Infernal pickaxe", true, "INFERNAL", ActionKind.SUPPLIES, 5000, NONE, NONE,
+            new Object[]{ItemID.SMOULDERING_STONE, 1L, ItemID.DRAGON_PICKAXE, 1L}, null, List.of(),
+            ints(ItemID.INFERNAL_PICKAXE, ItemID.INFERNAL_PICKAXE_EMPTY));
+        row(checked, ChargedItem.INFERNAL_HARPOON, "Infernal harpoon", true, "INFERNAL", ActionKind.SUPPLIES, 5000, NONE, NONE,
+            new Object[]{ItemID.SMOULDERING_STONE, 1L, ItemID.DRAGON_HARPOON, 1L}, null, List.of(),
+            ints(ItemID.INFERNAL_HARPOON, ItemID.INFERNAL_HARPOON_EMPTY));
         assertEquals("every family has exactly one checked row", Arrays.asList(ChargedItem.values()), checked);
     }
 
@@ -220,7 +248,15 @@ public class ChargeCatalogueTest
                 || variant == ChargedItem.CRYSTAL_LEGS
                 || variant == ChargedItem.CRYSTAL_SHIELD
                 || variant == ChargedItem.SUFFERING
-                || variant == ChargedItem.ETHEREUM;
+                || variant == ChargedItem.ETHEREUM
+                || variant == ChargedItem.CRYSTAL_AXE
+                || variant == ChargedItem.CRYSTAL_PICKAXE
+                || variant == ChargedItem.CRYSTAL_HARPOON
+                || variant == ChargedItem.ECHO_BOOTS
+                || variant == ChargedItem.SLAYER_STAFF_E
+                || variant == ChargedItem.INFERNAL_AXE
+                || variant == ChargedItem.INFERNAL_PICKAXE
+                || variant == ChargedItem.INFERNAL_HARPOON;
             assertEquals(variant.name(), expected, variant.isCommittedLoad());
         }
     }

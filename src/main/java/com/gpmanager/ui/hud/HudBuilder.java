@@ -158,9 +158,46 @@ class HudBuilder {
                                         : snapshot.pvpPossible ? Gem.PVP : Gem.LIVE;
         String target = "";
         double progress = -1d;
+        boolean targetWarning = false;
+        boolean targetDone = false;
         if (snapshot.goal != null) {
-            target = " / " + snapshot.goal.label;
-            progress = snapshot.net <= 0L ? 0d : max(0d, min(1d, snapshot.goal.fraction));
+            // Owner live 2026-10-13: the target rides the progress bar's end, not the money row,
+            // so "/ 200k" never stretches HUD+ wide. A time target shows its live countdown
+            // there and warns in its final seconds.
+            if (snapshot.goal.time) {
+                long remaining = max(0L, snapshot.goal.target - snapshot.goal.current);
+                target = durationCount(remaining);
+                int warnSeconds = config.hudTargetWarningSeconds();
+                targetWarning =
+                        warnSeconds > 0
+                                && !snapshot.goal.timerPaused
+                                && remaining > 0L
+                                && remaining <= warnSeconds * 1000L;
+                targetDone = snapshot.goal.reached;
+                progress = max(0d, min(1d, snapshot.goal.fraction));
+            } else {
+                // The gauge and its bar-end label follow the owner's choice (owner live
+                // 2026-10-14): what the aim has counted ("100k" while the sidebar shows
+                // "100k / 200k"), or what is left with the bar draining from full. The countdown
+                // replaces the label only in the final seconds it warns for; a timer-paused
+                // countdown never warns while it is frozen.
+                long remaining = snapshot.goal.timeRemainingMillis;
+                int warnSeconds = config.hudTargetWarningSeconds();
+                // The label counts down what is left while the bar fills with the progress
+                // (owner live 2026-10-14).
+                target = compact(max(0L, snapshot.goal.target - snapshot.goal.current));
+                progress = snapshot.goal.current <= 0L
+                        ? 0d
+                        : max(0d, min(1d, snapshot.goal.fraction));
+                if (warnSeconds > 0
+                        && !snapshot.goal.timerPaused
+                        && remaining > 0L
+                        && remaining <= warnSeconds * 1000L) {
+                    target = durationCount(remaining);
+                    targetWarning = true;
+                }
+                targetDone = snapshot.goal.reached;
+            }
         }
         String rate =
                 !snapshot.hasSession
@@ -208,6 +245,8 @@ class HudBuilder {
                         booked ? tone(snapshot.net) : DIM.color,
                         target,
                         progress,
+                        targetWarning,
+                        targetDone,
                         trip != 0L ? signed(trip) : "",
                         tone(trip),
                         chipUntil,
@@ -226,14 +265,14 @@ class HudBuilder {
 
     /**
      * Owner 1.1: HUD+ stays clean. A running kill streak reads "KC: 12" (spawns and side targets
-     * aside, and only while the fight is fresh); otherwise a named Grind shows its name and Free
-     * play shows nothing. Activity names (Combat, Woodcutting) are for the sidebar.
+     * aside, and only while the fight is fresh); the run's name lives on the sidebar only (owner
+     * live 2026-10-14).
      */
     String title(LiveSnapshot snapshot, long now) {
         Map.Entry<String, Integer> streak = tray.streak(now);
         if (streak != null && snapshot.hasSession && !interaction.isEmpty())
             return "KC: " + streak.getValue();
-        return snapshot.hasSession && !snapshot.freePlay ? Fmt.activity(snapshot.ownerLabel) : "";
+        return "";
     }
 
     /**

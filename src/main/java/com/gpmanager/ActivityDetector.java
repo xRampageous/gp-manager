@@ -67,8 +67,7 @@ class ActivityDetector {
                 break;
             case LOOT:
                 String lootActivity = transaction.getActivityName();
-                if (lootActivity != null
-                        && !lootActivity.trim().isEmpty()
+                if (!blank(lootActivity)
                         && !GENERAL.equalsIgnoreCase(lootActivity.trim())) {
                     observe(lootActivity.trim(), true);
                 }

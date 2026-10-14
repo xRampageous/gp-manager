@@ -595,6 +595,40 @@ class Semantics {
                 return singletonList(unit);
             }
         }
+        // A bank-paid fee is one action row named by its own note ("Recovered Junior Jim"): the
+        // coins flow carries the value and the icon, and no quantity is stated (owner 2026-10-14).
+        if (transaction.getActionKind() == ActionKind.FEE && !visible.isEmpty()) {
+            long feeValue = 0L;
+            boolean feeUnpriced = false;
+            for (Contribution contribution : visible) {
+                feeUnpriced |= contribution.isUnpriced();
+                feeValue = safeAdd(feeValue, contribution.effectiveValue);
+            }
+            String feeName = transaction.getNote();
+            var unit =
+                    compositeGroup(
+                            "fee:" + feeName + ":" + coverageKey(feeUnpriced) + ":" + Long.signum(feeValue),
+                            visible.get(0).itemId,
+                            tableFor(financialCategory(transaction, visible.get(0))),
+                            feeName,
+                            "",
+                            "",
+                            false,
+                            at,
+                            feeValue,
+                            feeUnpriced,
+                            -1L,
+                            neutral,
+                            review,
+                            corrected,
+                            transaction.getId(),
+                            visible.get(0).contributionId);
+            for (Contribution contribution : visible) {
+                unit.receipts.add(receipt(transaction, contribution, null, null));
+            }
+            unit.search(feeName, source, transaction.getId());
+            return singletonList(unit);
+        }
         // An estimated charge use is one row named by the weapon.
         String note = transaction.getNote();
         String prefix = msg("estimated-charge");
@@ -765,7 +799,8 @@ class Semantics {
             long at) {
         Category category = financialCategory(transaction, contribution);
         boolean unpriced = contribution.isUnpriced();
-        // An unopened claim (a key or a coin pouch) is held at zero, never shown as a value.
+        // An unopened claim (a key or a coin pouch) is held at zero in Recent, never shown as a
+        // value there; the Ledger's Pending line shows an observed open chest's worth instead.
         int claimSign =
                 contribution.priceSource == PriceSource.DEFERRED_CLAIM
                         ? (int) Long.signum(contribution.quantityDelta)
@@ -1199,6 +1234,13 @@ class Semantics {
                         + ":"
                         + (corrected ? "corrected" : "auto");
         int icon = transaction.castItemId;
+        if (icon <= 0 && contributions.size() == 1) {
+            // Owner live 2026-10-13: a charge row wears what it actually spent (the vial, the
+            // rune), so a charged weapon never looks like a duplicate of its own loot row. A
+            // cast spending several component types has no single "what it spent": it wears the
+            // weapon (owner live 2026-10-14, the amulet's law rune read as a mismatch).
+            icon = contributions.get(0).itemId;
+        }
         if (icon <= 0) {
             // The weapon hint is transient; a restart must still draw the weapon sprite,
             // including the scythe, whose Check may not have been read yet.

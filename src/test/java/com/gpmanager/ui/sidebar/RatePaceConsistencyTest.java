@@ -105,12 +105,12 @@ public class RatePaceConsistencyTest
             GrindsData.pace(5_000_000L, null, 0L, true, 0L, 300_000L);
         assertTrue(zeroRate.present);
         assertTrue("an established rate always produces an answer", zeroRate.available);
-        assertEquals("Not on pace", zeroRate.line);
+        assertEquals("Not earning at this rate", zeroRate.line);
 
         GrindsData.Pace negativeRate =
             GrindsData.pace(5_000_000L, null, 0L, true, -200_000L, 300_000L);
         assertTrue(negativeRate.available);
-        assertEquals("Not on pace", negativeRate.line);
+        assertEquals("Not earning at this rate", negativeRate.line);
     }
 
     @Test
@@ -150,6 +150,11 @@ public class RatePaceConsistencyTest
         GrindsData.Pace reached =
             GrindsData.pace(1_000_000L, null, 2_000_000L, true, 0L, 300_000L);
         assertEquals("Target reached", reached.line);
+
+        // A reached aim's short retention line (owner 2026-10-14): the next hour at this rate.
+        assertEquals("~+11.9M in 1h", GrindsData.nextHour(11_600_000L, 300_000L));
+        assertEquals("a declining hour stays honest", "~+19.6M in 1h",
+            GrindsData.nextHour(20_000_000L, -400_000L));
 
         // Projection never writes accounting.
         Engine engine = PresentationLifecycleTest.engine();

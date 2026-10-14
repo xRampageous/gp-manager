@@ -48,7 +48,14 @@ class KeyValue extends JPanel {
         line.setMaximumSize(new Dimension(Integer.MAX_VALUE, ROW));
         // The key keeps its width; a value too long for the rest ends in "…" and hovers in full.
         line.add(label(key, small(), LABEL), BorderLayout.WEST);
-        JLabel shown = label(value, body(), (tone == null ? Kit.Tone.PLAIN : tone).color);
+        char first = value.isEmpty() ? ' ' : value.charAt(0);
+        boolean numeral =
+                Character.isDigit(first) || first == '\u2212' || first == '-' || first == '+';
+        JLabel shown =
+                label(
+                        value,
+                        numeral ? numbers(11.5f) : body(),
+                        (tone == null ? Kit.Tone.PLAIN : tone).color);
         shown.setHorizontalAlignment(JLabel.RIGHT);
         shown.setToolTipText(exact == null ? value : exact);
         line.add(shown, BorderLayout.CENTER);

@@ -116,7 +116,7 @@ class GrindsData {
             if (net >= netTargetGp) return new Pace(true, true, "Target reached", null);
             if (gpPerHour <= 0L) {
                 // The rate is established and genuinely non-positive: an ETA would be fabricated.
-                return new Pace(true, true, "Not on pace", null);
+                return new Pace(true, true, "Not earning at this rate", null);
             }
             long minutes = nonNeg(round((netTargetGp - net) * 60d / gpPerHour));
             return new Pace(true, true, "~" + durationMinutes(minutes) + " remaining", null);
@@ -153,6 +153,14 @@ class GrindsData {
         return round(nonNeg(target - net) * 3_600_000d / byMillis);
     }
 
+    /**
+     * A reached aim's short projection: where the next hour lands at the established rate; the
+     * rate itself lives on the hero, so the line stays one short phrase (owner 2026-10-14).
+     */
+    static String nextHour(long net, long gpPerHour) {
+        return "~" + signed(net + gpPerHour) + " in 1h";
+    }
+
     static String durationMinutes(long minutes) {
         return minutes < 90L ? minutes + "m" : (minutes / 60L) + "h " + (minutes % 60L) + "m";
     }
@@ -186,11 +194,15 @@ class GrindsData {
         String name;
         long startedAt;
         long net;
+        /** What the Net aim counted when this ran (the run's Net minus its set baseline). */
+        long targetProgress;
         long revenue;
         long supplies;
         long losses;
         boolean splitAvailable;
         long activeMillis;
+        /** The Active Time window the run's time target counts from (set moment to now/end). */
+        long targetWindowMillis;
         boolean rateEstablished;
         long gpPerHour;
         Long netTargetGp;
@@ -201,11 +213,11 @@ class GrindsData {
 
         /** Factual target outcome wording; never "Failed". */
         String netOutcome() {
-            return GrindHistory.netOutcome(netTargetGp, net, closed);
+            return GrindHistory.netOutcome(netTargetGp, targetProgress, closed);
         }
 
         String timeOutcome() {
-            return GrindHistory.timeOutcome(activeTimeTargetMillis, activeMillis);
+            return GrindHistory.timeOutcome(activeTimeTargetMillis, targetWindowMillis);
         }
     }
 
@@ -316,7 +328,18 @@ class GrindsData {
             activeSessionId = active.getId();
             activeGrindId = active.getGrindId();
         }
-        Pace pace = pace(netTarget, timeTarget, net, rateEstablished, rate, activeMillis);
+        // The Active Time target's own window counts from when it was set (owner live 2026-10-13);
+        // the displayed Active Time above stays the run's total.
+        long targetWindowMillis =
+                active == null ? 0L : active.getActiveTimeTargetWindowMillis(activeMillis);
+        Pace pace =
+                pace(
+                        netTarget,
+                        timeTarget,
+                        active == null ? net : active.profitTargetProgress(net),
+                        rateEstablished,
+                        rate,
+                        targetWindowMillis);
         var myGrinds = new ArrayList<MyGrind>();
         for (SavedState.SavedGrind definition : engine.getSavedGrinds(includeArchived)) {
             MoneySnapshot.Rollup rollup = summary.rollups.get(definition.getGrindId());
@@ -371,11 +394,13 @@ class GrindsData {
                                 selected.getName(),
                                 selected.startedAtEpochMillis,
                                 metrics.net,
+                                selected.profitTargetProgress(metrics.net),
                                 metrics.revenue,
                                 metrics.costSplitAvailable ? metrics.suppliesCosts : -1L,
                                 metrics.costSplitAvailable ? metrics.otherCosts : -1L,
                                 metrics.costSplitAvailable,
                                 metrics.elapsedMillis,
+                                selected.getActiveTimeTargetWindowMillis(metrics.elapsedMillis),
                                 RateReadiness.isEstablished(metrics.elapsedMillis),
                                 Session.hourly(metrics.net, metrics.elapsedMillis),
                                 selected.getProfitTargetGp(),

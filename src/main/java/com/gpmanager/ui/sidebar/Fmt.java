@@ -98,7 +98,6 @@ class Fmt {
         return EXACT.format(value);
     }
 
-    /** Rate without unit: {@code 248k}. Callers add {@code /h}. */
     /** Rates read like figures: {@code 248k}, or {@code −13.0k} when the hour is losing. */
     static String rate(long perHour) {
         return perHour < 0L ? "\u2212" + compact(perHour) : compact(perHour);
@@ -133,6 +132,11 @@ class Fmt {
     /** Duration without seconds for tight cells: {@code 30m}, {@code 7h 40m}, {@code 2d 3h}. */
     static String durationShort(long millis) {
         return duration(millis, false);
+    }
+
+    /** A counting timer value: {@code 12s} under a minute, then {@code 1m}, {@code 1h 02m}. */
+    static String durationCount(long millis) {
+        return nonNeg(millis) < 60_000L ? nonNeg(millis) / 1000L + "s" : durationShort(millis);
     }
 
     static String duration(long millis, boolean seconds) {

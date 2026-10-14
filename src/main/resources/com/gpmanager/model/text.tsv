@@ -9,6 +9,7 @@ action.DECANT	Decanted
 action.DEFERRED_CLAIM	Claim
 action.DRINK	Drank
 action.EAT	Ate
+action.FEE	Paid
 action.FIRE	Fired
 action.MIX	Mixed
 action.OFFER	Offered
@@ -69,7 +70,6 @@ review.COST	Count as cost
 review.GAIN	Count
 review.TRANSFER	Transfer
 removes-run	Removes this run from history. This cannot be undone; the saved Grind is unaffected.
-skulled-items	Skulled: all items are lost on death
 use-number	use a number like 5m, 5000k, 90m or 3h, or leave it blank
 active-time-target	Active Time target (90m, 3h 30m)
 proven-item	The proven per-item GE sell tax for this sale; it reduces Net as a market trade cost, and the sale's Result stays unavailable.
@@ -347,6 +347,7 @@ seed-vault	Seed vault transfer
 instance-fee	Instance fee (coffer)
 instance-fee-bank	Instance fee (bank)
 death-s	Death's fee (coffer or bank)
+boat-recovered	Recovered 
 pre-restore	Pre-restore backup failed: 
 unable-schedule-gp-manager-2	Unable to schedule GP Manager 
 unable-complete	Unable to complete GP Manager 
@@ -367,8 +368,8 @@ incomplete-value	 · incomplete value coverage
 market-result	 · Market result is not realized
 grand-exchange-offers	Grand Exchange offers still open: 
 loot-keys	Loot keys not yet opened: 
+loot-keys-worth	 — worth 
 items-need	 items need your decision
-protect-item	Protect Item prayer
 what-death	What a death here would lose: all but your 3 most valuable items (none skulled), +1 with Protect Item
 loot-other	Loot and other counted gains · 
 play-left	 of play left at this rate

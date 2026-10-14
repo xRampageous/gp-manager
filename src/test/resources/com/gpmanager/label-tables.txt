@@ -12,6 +12,7 @@ action CHARGE_LOAD_AMBIGUOUS = Charged
 action COOK = Cooked
 action BURN = Burned
 action SUPPLIES = Used
+action FEE = Paid
 correction null = Automatic
 correction AUTO = Automatic | Automatic
 correction REVENUE = Counted as Revenue | Count as Revenue

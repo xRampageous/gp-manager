@@ -189,6 +189,28 @@ public class ChargeEstimateTriggerTest
     }
 
     @Test
+    public void theFractionalCarrySurvivesReloginsAndClearsOnOwnerSwitch()
+    {
+        // Owner live 2026-10-13: the carry used to be wiped at every logout/hop, so a scythe
+        // vial never booked for players whose 100 hits spanned logins.
+        GpManagerConfig config = new GpManagerConfig() { };
+        Engine engine = new Engine(deltas -> new ArrayList<Flow>(), new TransactionClassifier(), config);
+        ChargeIntake intake = new ChargeIntake(null, null, config, engine, null);
+        String key = ChargeCheck.ChargedItem.SCYTHE.name() + ":" + ItemID.VIAL_BLOOD;
+        intake.chargeCarry.put(key, 99L);
+        intake.valueCarry.put(key, new long[] {123L});
+
+        intake.resetTransient();
+        assertEquals("a relog keeps the carry toward the next vial",
+            Long.valueOf(99L), intake.chargeCarry.get(key));
+        assertEquals(123L, intake.valueCarry.get(key)[0]);
+
+        intake.resetOwner();
+        assertNull("an owner switch clears it", intake.chargeCarry.get(key));
+        assertNull(intake.valueCarry.get(key));
+    }
+
+    @Test
     public void wornEstimateIdentityMatchesTheWornCheckIdentity()
     {
         int equipmentWidget = InterfaceID.Wornitems.UNIVERSE;

@@ -30,12 +30,20 @@ class Hero extends JPanel {
         String tip;
         Runnable open;
 
+        /** Relative box width in a strip row; 1 keeps the even grid every other strip uses. */
+        int weight = 1;
+
         Cell(String label, String value, Kit.Tone tone, String tip, Runnable open) {
             this.label = orEmpty(label);
             this.value = orEmpty(value);
             this.tone = tone == null ? Kit.Tone.PLAIN : tone;
             this.tip = orEmpty(tip);
             this.open = open;
+        }
+
+        Cell weight(int value) {
+            weight = value;
+            return this;
         }
     }
 
@@ -59,6 +67,8 @@ class Hero extends JPanel {
     Hero() {
         super(new BorderLayout());
         setBackground(CARD);
+        net.setFont(numbers(16f));
+        rate.setFont(numbers(12f));
         var status = new JPanel(new BorderLayout(4, 0));
         status.setOpaque(false);
         status.setPreferredSize(new Dimension(0, 28));
@@ -195,20 +205,40 @@ class Hero extends JPanel {
 
     /** One row of labelled cells, as the hero and the Grinds All time card show them. */
     static JPanel strip(List<Cell> cells) {
-        var row = new JPanel(new GridLayout(1, Math.max(1, cells.size()), 1, 0));
+        boolean weighted = false;
+        for (Cell cell : cells) weighted |= cell.weight != 1;
+        var row =
+                weighted
+                        ? new JPanel(new GridBagLayout())
+                        : new JPanel(new GridLayout(1, Math.max(1, cells.size()), 1, 0));
         row.setBackground(LINE);
         row.setBorder(BorderFactory.createMatteBorder(1, 0, 0, 0, LINE));
-        for (Cell cell : cells) {
-            var box = new JPanel(new BorderLayout());
-            box.setBackground(CARD);
-            pad(box, 2, 5, 3, 5);
-            box.add(label(cell.label, small(), LABEL), BorderLayout.NORTH);
-            box.add(label(cell.value, body(), cell.tone.color), BorderLayout.CENTER);
-            box.setToolTipText(cell.tip);
-            clickable(box, cell.open);
-            row.add(box);
+        for (int i = 0; i < cells.size(); i++) {
+            var box = box(cells.get(i));
+            if (weighted) {
+                var constraints = new GridBagConstraints();
+                constraints.gridx = i;
+                constraints.weightx = cells.get(i).weight;
+                constraints.fill = GridBagConstraints.BOTH;
+                constraints.insets = new Insets(0, i == 0 ? 0 : 1, 0, 0);
+                row.add(box, constraints);
+            } else {
+                row.add(box);
+            }
         }
         return row;
+    }
+
+    /** One strip cell: the label over its value, on the card tone. */
+    static JPanel box(Cell cell) {
+        var box = new JPanel(new BorderLayout());
+        box.setBackground(CARD);
+        pad(box, 2, 5, 3, 5);
+        box.add(label(cell.label, small(), LABEL), BorderLayout.NORTH);
+        box.add(label(cell.value, numbers(11f), cell.tone.color), BorderLayout.CENTER);
+        box.setToolTipText(cell.tip);
+        clickable(box, cell.open);
+        return box;
     }
 
     static void clickable(JComponent component, Runnable open) {

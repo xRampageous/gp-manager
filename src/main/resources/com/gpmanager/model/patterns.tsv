@@ -9,6 +9,10 @@ dart-count	^(.+?) x ((?:\d{1,3}(?:,\d{3})+|\d+))$	2
 essence-pouch	(small|medium|large|giant|colossal) pouch	0
 weapon-charges-check	^(?:Your )?(Holy sanguinesti staff|Sanguinesti staff|warped sceptre|Tumeken's shadow|echo venator bow|venator bow|tonalztics of ralos)(?: only)? has (?:((?:\d{1,3}(?:,\d{3})+|\d+)) charges?|(one) charge|(no) charges?)(?: (?:remaining|left))?\.$	2
 pendant-check	^The pendant has (?:((?:\d{1,3}(?:,\d{3})+|\d+)) charges?|(one) charge|(no) charges)\.$	2
+# The sailors' amulet Check, both wordings (tictac7x Charges plugin regex; the owner's check line): "The amulet has 106 charges." / "Your amulet has 105 charges left.".
+sailors-amulet-check	^(?:The|Your) amulet has (?:((?:\d{1,3}(?:,\d{3})+|\d+)) charges?|(one) charge|(no) charges?)(?: left)?\.$	2
+# The bone staff Check: wording unverified, broad on the tail; the name resolves it.
+bone-staff-check	^Your bone staff has (?:((?:\d{1,3}(?:,\d{3})+|\d+)) charges?|(one) charge|(no) charges?)(?: (?:remaining|left))?\.$	2
 pendant-refused	^The pendant doesn.t respond as you appear to already be at that location\.$	2
 vyre-well-fill	^you fill the well with .*\.$	2
 tome-check	^(?:Your tome has been charged with (?:Burnt|Searing|Soaked|Soiled) Pages\. It currently holds|Your tome currently holds) (?:([\d,]+)|(one)) charges?\.$	2
@@ -40,7 +44,9 @@ routine	.*(?: runes?| bolts| dart)|.*(?:arrow| bolts \(|javelin|throwing|zulrah'
 clue	^(?:clue scroll|scroll box|challenge scroll|reward casket|clue bottle|clue nest|clue geode) \((?:beginner|easy|medium|hard|elite|master)\)|puzzle box|light box|herb box$	2
 
 death-fee	^Death charges you ([\d,]+) x Coins\..*$	2
-bank-payment	^Payment has been taken from your bank: ([\d,]+) (?:x Coins|coins)\.?$	2
+bank-payment	^Payment has been taken from your bank: ([\d,]+) (?:x Coins|coins)\.?(?: \(\d+\))?$	2
+# The boat recovery's bank line carries no amount; its fee comes from the Recover click. A repeat count (" (2)") can follow (owner live 2026-10-14).
+bank-payment-amountless	^payment has been taken from your bank\.(?: \(\d+\))?$	2
 coffer-payment	^Payment has been taken from your coffer: ([\d,]+) (?:x Coins|coins)\.?$	2
 revenant-check	^Your (?:bow|sceptre|chainmace) has (?:([\d,]+) charges?|(one) charge|no charges) left powering it\.$	2
 memoirs-check	^On the inside of the cover a message is displayed in dark ink\. It reads: (?:([\d,]+)|(one)) memor(?:ies|y) remains?\.$	2

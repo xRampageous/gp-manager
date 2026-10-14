@@ -329,9 +329,13 @@ public class GpManagerPlugin extends Plugin {
     /** One client-thread initialization when this plugin enable becomes ready. */
     boolean boot;
 
+    /** Owner live 2026-10-13: the login-start option is offered once per client run. */
+    boolean firstLoginAutoStart;
+
     @Override
     protected void startUp() {
         boot = true;
+        firstLoginAutoStart = true;
         JsonCodec.bind(gson);
         boolean loggedInAtStart = client.getGameState() == LOGGED_IN;
         loggedIn = loggedInAtStart;
@@ -496,7 +500,7 @@ public class GpManagerPlugin extends Plugin {
         persistence.fence();
         recentPlayerCombatTicks = 0;
         beginGeOfferSeed();
-        charges.resetTransient();
+        charges.resetOwner();
         interactionContextTracker.clear();
     }
 
@@ -511,10 +515,17 @@ public class GpManagerPlugin extends Plugin {
             pulse();
             return;
         }
-        // Login restores identity and baseline. Resume LIFECYCLE only (hop/relog).
-        // Idle and Recovery stay until activity or explicit Resume. Manual / Stop stay held.
-        if (engine.getActiveSession() != null) engine.beginPriming();
         long now = SafeMath.now();
+        // Owner live 2026-10-13: an option pulls the automatic start (or the Idle/Recovery
+        // resume that gameplay would do) to the first login of this client run; Manual pause
+        // and Stop always hold.
+        boolean loginAutoStart =
+                firstLoginAutoStart && config.autoStartSession() && config.autoStartOnLogin();
+        firstLoginAutoStart = false;
+        if (loginAutoStart) engine.autoStart(now);
+        // Login restores identity and baseline. Resume LIFECYCLE only (hop/relog) without the
+        // option; with it Idle and Recovery come back at the first login too.
+        if (engine.getActiveSession() != null) engine.beginPriming();
         if (boot) {
             boot = false;
             // Seed current XP rather than swallowing the first real XP drop after enabling.
@@ -524,7 +535,11 @@ public class GpManagerPlugin extends Plugin {
                     lastSkillExperience.put(skill, client.getSkillExperience(skill));
             activity.clearProduction(now);
         }
-        engine.resume(now, LIFECYCLE);
+        if (loginAutoStart) {
+            engine.resume(now, LIFECYCLE, IDLE, RECOVERY);
+        } else {
+            engine.resume(now, LIFECYCLE);
+        }
         rebaseline();
         activity.syncSession();
         syncOwnerScope();
@@ -700,13 +715,13 @@ public class GpManagerPlugin extends Plugin {
 
     @Subscribe
     public void onGraphicChanged(GraphicChanged event) {
-        if (!canIngest() || event == null || event.getActor() != client.getLocalPlayer()) return;
+        if (skip(event) || event.getActor() != client.getLocalPlayer()) return;
         charges.spotAnims(event.getActor().getSpotAnims(), SafeMath.now());
     }
 
     @Subscribe
     public void onHitsplatApplied(HitsplatApplied event) {
-        if (!canIngest() || event == null || !(event.getActor() instanceof NPC)) return;
+        if (skip(event) || !(event.getActor() instanceof NPC)) return;
         Hitsplat hitsplat = event.getHitsplat();
         // isMine sees every target of one swing (owner 2026-09-29): a scythe sweep's second
         // and third hits land on NPCs the player never "interacts" with.
@@ -716,25 +731,26 @@ public class GpManagerPlugin extends Plugin {
 
     @Subscribe
     public void onAnimationChanged(AnimationChanged event) {
-        if (!canIngest() || event == null || event.getActor() != client.getLocalPlayer()) return;
+        if (skip(event) || event.getActor() != client.getLocalPlayer()) return;
         charges.onAnimation(event.getActor().getAnimation(), SafeMath.now());
     }
 
     @Subscribe
     public void onChatMessage(ChatMessage event) {
-        if (!canIngest() || event == null) return;
+        if (skip(event)) return;
         String message = normalize(event.getMessage());
+        long now = SafeMath.now();
         // Uncharging Bryophyta's staff destroys its runes; its dialog says how many (recorded
         // 2026-10-09).
         var emptied = GameData.pattern("bru").matcher(message);
         if (emptied.matches())
-            charges.emptied(ChargeCheck.parseCount(emptied.group(1)), SafeMath.now());
+            charges.emptied(ChargeCheck.parseCount(emptied.group(1)), now);
         // A refused pendant teleport (already at that location) books no charge; its line arrives
         // as a "click here to continue" box (MESBOX), so it is matched before the chat-type gate
         // and the estimate its click made is removed through the announced path (owner live
         // 2026-10-13).
         if (GameData.pattern("pendant-refused").matcher(message).matches())
-            charges.refusedTeleport(SafeMath.now());
+            charges.refusedTeleport(now);
         // The Vyre well is refundable storage for scythe charges (owner live 2026-10-13): filling
         // it with vials and blood runes moves the player's own items, and the scythe's charge
         // estimates book the use. Its line arrives as a message box too.
@@ -744,8 +760,8 @@ public class GpManagerPlugin extends Plugin {
         if (type != ChatMessageType.SPAM && type != ChatMessageType.GAMEMESSAGE) return;
         // Each potion a chug drinks prints its own barrel line (Dude Where's My Stuff, GIM Hub).
         var chug = GameData.pattern("chug").matcher(message);
-        if (chug.matches()) charges.chug(chug.group(1), SafeMath.now());
-        if (charges.observeCheck(message, SafeMath.now())) {
+        if (chug.matches()) charges.chug(chug.group(1), now);
+        if (charges.observeCheck(message, now)) {
             // Charge Check chat is an explicit measurement, never an activity or title signal.
             return;
         }
@@ -769,14 +785,15 @@ public class GpManagerPlugin extends Plugin {
         // a fee, so this branch also requires no coffer line on this tick or the last one.
         var fee = GameData.pattern("death-fee").matcher(message);
         var bank = GameData.pattern("bank-payment").matcher(message);
+        var bankBare = GameData.pattern("bank-payment-amountless").matcher(message);
         var coffer = GameData.pattern("coffer-payment").matcher(message);
         if (fee.matches()) {
             engine.inbox.drop(FEE);
             engine.bookDeathFee(
-                    ChargeCheck.parseCount(fee.group(1)), msg("death-s"), SafeMath.now());
+                    ChargeCheck.parseCount(fee.group(1)), msg("death-s"), now);
         } else if (bank.matches() && client.getTickCount() == instancePaidTick) {
             engine.bookDeathFee(
-                    ChargeCheck.parseCount(bank.group(1)), msg("instance-fee"), SafeMath.now());
+                    ChargeCheck.parseCount(bank.group(1)), msg("instance-fee"), now);
         } else if (bank.matches() && engine.deathReclaim.isAwaitingReclaim()) {
             engine.inbox.put(
                                     FEE,
@@ -789,11 +806,17 @@ public class GpManagerPlugin extends Plugin {
         } else if (bank.matches() && type == ChatMessageType.SPAM
                 && client.getTickCount() - instancePaidTick > 1) {
             engine.bookDeathFee(
-                    ChargeCheck.parseCount(bank.group(1)), msg("instance-fee-bank"), SafeMath.now());
+                    ChargeCheck.parseCount(bank.group(1)), msg("instance-fee-bank"), now);
         } else if (coffer.matches()) {
             instancePaidTick = client.getTickCount();
             engine.bookDeathFee(
-                    ChargeCheck.parseCount(coffer.group(1)), msg("instance-fee"), SafeMath.now());
+                    ChargeCheck.parseCount(coffer.group(1)), msg("instance-fee"), now);
+        } else if (bankBare.matches()) {
+            // The boat recovery's bank line carries no amount: the fee is what its Recover click
+            // read off the row (owner 2026-10-14). No fresh click, nothing books.
+            if (engine.bookArmedBoatRecovery(now) == null) {
+                log.info("GP Manager: amountless bank payment with no armed boat-recovery fee");
+            }
         }
         var caught = GameData.pattern("bag").matcher(message);
         if (caught.matches()
@@ -818,7 +841,7 @@ public class GpManagerPlugin extends Plugin {
         }
         if (message.contains("too impure")) {
             // A failed iron smelt gives no XP but is still part of the smelting run.
-            activity.continueProduction("Smelting", SafeMath.now());
+            activity.continueProduction("Smelting", now);
             return;
         }
         if (ActionSignals.isSpared(message)) {
@@ -835,7 +858,7 @@ public class GpManagerPlugin extends Plugin {
 
     @Subscribe
     public void onMenuOptionClicked(MenuOptionClicked event) {
-        if (!canIngest() || event == null || event.isConsumed()) return;
+        if (skip(event) || event.isConsumed()) return;
         String option = normalize(event.getMenuOption());
         if ("bank-all".equals(option)) bankAll(event.getParam1() >>> 16);
         boolean consumption = ActionSignals.isSpend(option);
@@ -849,12 +872,16 @@ public class GpManagerPlugin extends Plugin {
         markActivity();
         String target = normalize(event.getMenuTarget());
         String joined = option + " " + target;
+        int itemId = menuItemId(event);
+        int ttl = consumeTicks();
+        boolean ge = Widgets.isGeOpen(client);
         engine.observeChest(option, target);
+        noteBoatRecoveryClick(event, option, target);
         charges.onMenuOptionClicked(event, option, target);
         // A loss-only "Offer" click with the Grand Exchange open is a sell placement: the
         // inventory removal is GE evidence, not a prayer/altar spend. The proven GE UI context
         // disambiguates the shared "Offer" verb; a generic Offer elsewhere keeps its spend intent.
-        if (consumption && "offer".equals(option) && Widgets.isGeOpen(client)) {
+        if (consumption && "offer".equals(option) && ge) {
             trading(
                     CORRELATION_TICKS,
                     msg("grand-exchange-offer") + (target.isEmpty() ? "" : " " + target));
@@ -862,26 +889,26 @@ public class GpManagerPlugin extends Plugin {
         }
         // A Collect interaction with the open Grand Exchange is bounded collection evidence. It
         // never owns a movement by itself; it lets exact custody settlements correlate.
-        if (option.startsWith("collect") && Widgets.isGeOpen(client)) {
+        if (option.startsWith("collect") && ge) {
             engine.noteGeCollect(SafeMath.now());
             trading(CORRELATION_TICKS, msg("grand-exchange-collect"));
             return;
         }
         if ("revert".equals(option) || "dismantle".equals(option))
-            engine.dismantle(menuItemId(event));
+            engine.dismantle(itemId);
         if (target.contains("multicannon") || target.startsWith("cannon ")) {
             // A dwarf multicannon (OSRS Wiki): Fire or Load takes balls from the pack, Set-up
             // places its parts and auto-loads the balls it finds with them, and using a ball on
             // it loads too. Every one of those ball moves is a load (owner 1.3.4 live: the
             // set-up and use loads were unarmed, so their Empty returns booked as gains).
-            if ("fire".equals(option) || option.startsWith("load")) engine.loadCannon(consumeTicks());
+            if ("fire".equals(option) || option.startsWith("load")) engine.loadCannon(ttl);
             else if ("set-up".equals(option)) {
                 engine.moveCannon();
                 // The auto-load follows the ~12-tick assembly, so arm it for the same span as
                 // the parts custody (owner live 2026-10-13).
                 engine.loadCannon(40);
             } else if ("pick-up".equals(option)) engine.moveCannon();
-            else if ("use".equals(option)) engine.loadCannon(consumeTicks());
+            else if ("use".equals(option)) engine.loadCannon(ttl);
         }
         if (target.contains("vyre well") && "empty".equals(option)) {
             // The filled Vyre well refunds its vials of blood and blood runes through its Empty
@@ -890,21 +917,19 @@ public class GpManagerPlugin extends Plugin {
             zone(msg("vyre-well"));
         }
         if (consumption) {
-            int itemId = menuItemId(event);
             // Always note intent — even when item id is unresolved (open intent). Spend is
             // confirmed on stable inventory removal / dose leftover; the verb lets the settled
             // row say Drank/Ate/Buried honestly. Exact spell text is optional presentation
             // evidence and never changes matching, type, counted state or value.
             engine.noteConsume(
                     itemId,
-                    consumeTicks(),
+                    ttl,
                     false,
                     ActionReader.verbOf(option),
                     spellLabel(event, option));
         } else if ("drop".equals(option)) {
-            int itemId = menuItemId(event);
             // Match consume TTL so dump-then-settle does not miss power-train drops.
-            engine.noteDrop(itemId, consumeTicks());
+            engine.noteDrop(itemId, ttl);
         } else if ("take".equals(option)
                 && event.getMenuAction() != null
                 && event.getMenuAction().name().startsWith("GROUND_ITEM_")) {
@@ -917,15 +942,15 @@ public class GpManagerPlugin extends Plugin {
             e.held = snapshotFactory.capture(false, false).quantityOf(id);
         } else if ("destroy".equals(option)) {
             // Irreversible loss — consume-style intent, never recoverable own-drop.
-            engine.noteConsume(menuItemId(event), consumeTicks(), true);
+            engine.noteConsume(itemId, ttl, true);
         }
         // Use Tinderbox ↔ Logs (inventory Use): a spend intent for the fuel, same as Light.
         if (ActionSignals.lightsFire(option, target)) {
-            engine.noteConsume(menuItemId(event), consumeTicks(), false, ActionKind.SUPPLIES);
+            engine.noteConsume(itemId, ttl, false, ActionKind.SUPPLIES);
         }
         // Use bones/ashes ↔ altar (PoH / wildy): an offer spend intent; Prayer XP confirms it.
         if (ActionSignals.offersBones(option, target) || ActionSignals.isOffering(option, target)) {
-            engine.noteConsume(menuItemId(event), consumeTicks(), false, ActionKind.OFFER);
+            engine.noteConsume(itemId, ttl, false, ActionKind.OFFER);
         }
         // Agility dispensers (Wilderness course rewards, Brimhaven tickets): the claim keeps the
         // course title; the rewards book as ordinary inventory gains.
@@ -1030,7 +1055,7 @@ public class GpManagerPlugin extends Plugin {
         if (option.startsWith("buy") || option.startsWith("sell") || option.startsWith("collect")) {
             trading(
                     CORRELATION_TICKS,
-                    (Widgets.isGeOpen(client) ? "Grand Exchange " : "")
+                    (ge ? "Grand Exchange " : "")
                             + option
                             + (target.isEmpty() ? "" : " " + target));
             return;
@@ -1096,7 +1121,7 @@ public class GpManagerPlugin extends Plugin {
 
     @Subscribe
     public void onServerNpcLoot(ServerNpcLoot event) {
-        if (!canIngest() || event == null) return;
+        if (skip(event)) return;
         String npcName =
                 event.getComposition() == null ? "NPC loot" : event.getComposition().getName();
         if (blank(npcName)) npcName = "NPC loot";
@@ -1107,7 +1132,7 @@ public class GpManagerPlugin extends Plugin {
     public void onLootReceived(LootReceived event) {
         // Optional: only fires when Loot Tracker is enabled. Deduped against
         // NpcLootReceived / ServerNpcLoot for the same kill.
-        if (!canIngest() || event == null || event.getItems() == null) return;
+        if (skip(event) || event.getItems() == null) return;
         String name = nonBlank(event.getName(), "Reward");
         boolean pending =
                 event.getType() == LootRecordType.EVENT && RewardChestCatalogue.isRewardChest(name);
@@ -1617,6 +1642,52 @@ public class GpManagerPlugin extends Plugin {
         if (panel != null) panel.refresh();
     }
 
+    /**
+     * A Recover click reads the row's shown fee for the amountless bank line that follows; a
+     * recovery confirm dialog names the fee on its own and keeps the arm fresh through a slow
+     * decision; any other click is not a fee row (owner live 2026-10-14).
+     */
+    void noteBoatRecoveryClick(MenuOptionClicked event, String option, String target) {
+        if (event == null) return;
+        Widget clicked =
+                event.getWidget() != null
+                        ? event.getWidget()
+                        : client == null ? null : client.getWidget(event.getParam1());
+        if ("recover".equals(option)) {
+            long fee = Widgets.rowFee(clicked, target);
+            if (fee > 0L) {
+                engine.armBoatRecoveryFee(fee, titleCase(target), SafeMath.now());
+                return;
+            }
+            log.info(
+                    "GP Manager: no boat-recovery fee read (target={}, param1={}, chain={})",
+                    target,
+                    event.getParam1(),
+                    Widgets.describe(clicked));
+            return;
+        }
+        int dialogGroup = InterfaceID.Chatmenu.UNIVERSE >>> 16;
+        boolean dialogClick =
+                (event.getParam1() >>> 16) == dialogGroup
+                        || clicked != null && (clicked.getId() >>> 16) == dialogGroup;
+        // A recovery confirm's click refreshes the arm so a slow decision cannot expire it; a
+        // dialog never arms alone (an unrelated dialog's number must never book).
+        if (!dialogClick) return;
+        engine.refreshBoatRecoveryFee(Widgets.dialogFee(client), SafeMath.now());
+    }
+
+    /** "junior jim" reads as the game names it: "Junior Jim". */
+    static String titleCase(String name) {
+        var out = new StringBuilder();
+        for (String word : Phrases.orEmpty(name).trim().split("\\s+")) {
+            if (word.isEmpty()) continue;
+            if (out.length() > 0) out.append(' ');
+            out.append(Character.toUpperCase(word.charAt(0)));
+            if (word.length() > 1) out.append(word.substring(1));
+        }
+        return out.toString();
+    }
+
     boolean canIngest() {
         try {
             if (client == null || client.getGameState() != LOGGED_IN) return false;
@@ -1624,6 +1695,11 @@ public class GpManagerPlugin extends Plugin {
             return false;
         }
         return persistence.isTrackingReady();
+    }
+
+    /** The shared subscriber gate: live tracking and a real event (owner 1.4.0 size pass). */
+    boolean skip(Object event) {
+        return !canIngest() || event == null;
     }
 
     void markActivity() {

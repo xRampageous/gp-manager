@@ -100,7 +100,9 @@ public class ImbueSwapTest
     public void theSailorsAmuletStateSwapIsNeutral()
     {
         // Charging the sailors' amulet turns its inert state into the charged one; the pair is the
-        // same worth, so only the law and water runes the charge took book (owner 1.3.4 review).
+        // same worth. The armed use-on load books nothing (owner 2026-10-14: its charges measure
+        // through the amulet's Check); this no-intent settle is the fail-safe where the runes
+        // book rather than vanish.
         assertSwapped(ItemID.SAILORS_AMULET_EMPTY, ItemID.SAILORS_AMULET);
 
         Engine engine = settle(

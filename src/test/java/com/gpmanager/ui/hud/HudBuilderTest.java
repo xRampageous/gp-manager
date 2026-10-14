@@ -106,20 +106,133 @@ public class HudBuilderTest
     }
 
     @Test
-    public void aGrindShowsNetFirstWithItsTargetFoldedIn()
+    public void aGrindShowsNetWithItsTargetOnTheBar()
     {
         HudFrame s = new HudBuilder(config(true, 4), null).update(grind(6_400L, 100_000L), f -> true, NOW);
         assertTrue("a running Grind always shows", s.visible);
-        assertEquals("Vorkath", s.title);
+        assertEquals("the run's name lives on the sidebar only", "", s.title);
         assertEquals("+6.4k", s.net);
-        assertEquals(" / 100k", s.target);
-        assertEquals(0.064d, s.progress, 0.001d);
+        assertEquals("the gauge counts down: what is left", "93.6k", s.target);
+        assertEquals("while the bar fills with the progress", 0.064d, s.progress, 0.001d);
         assertEquals("a new run is calculating, never 0/h", "Calculating…", s.rate);
         assertEquals(HudFrame.Gem.LIVE, s.gem);
+
+        // A reached aim reads zero with a full bar and the done signal (owner live 2026-10-14).
+        Engine done = engine();
+        done.startCustom("Vorkath", NOW);
+        done.getActiveSession().addTransaction(receipt(NOW + 1_000L, TransactionType.LOOT,
+            flow(536, "Dragon bones", 1L, 300_000)), 2_000);
+        done.getActiveSession().setProfitTargetGp(200_000L);
+        HudFrame reached = new HudBuilder(config(true, 4), null)
+            .update(LiveSnapshot.capture(done, NOW + 2_000L, null), f -> true, NOW + 2_000L);
+        assertEquals("a reached aim reads zero left", "0", reached.target);
+        assertEquals("with a full bar", 1d, reached.progress, 0d);
+        assertTrue("and the bar's done signal", reached.targetDone);
+        assertFalse("a fresh aim is not done", s.targetDone);
+    }
+
+    /** Owner live 2026-10-13: the HUD shows a time target's countdown and warns in its last seconds. */
+    @Test
+    public void aTimeTargetCountsDownAndWarnsInItsFinalSeconds()
+    {
+        Engine engine = engine();
+        engine.startCustom("Vorkath", NOW - 60_000L);
+        engine.getActiveSession().setActiveTimeTargetMillis(2L * 60_000L, NOW);
+        engine.getActiveSession().activeTimeTargetSetMillis = 0L;
+        HudFrame mid = new HudBuilder(config(true, 4), null)
+            .update(LiveSnapshot.capture(engine, NOW + 1_000L, null), f -> true, NOW + 1_000L);
+        assertEquals("the label is the live countdown", "59s", mid.target);
+        assertFalse("no warning before the final seconds", mid.targetWarning);
+
+        engine.getActiveSession().setActiveTimeTargetMillis(60_000L, NOW + 1_000L);
+        engine.getActiveSession().activeTimeTargetSetMillis = 9_000L;
+        HudFrame late = new HudBuilder(config(true, 4), null)
+            .update(LiveSnapshot.capture(engine, NOW + 1_000L, null), f -> true, NOW + 1_000L);
+        assertEquals("seconds remain in the countdown", "8s", late.target);
+        assertTrue("the final seconds warn (default 10)", late.targetWarning);
+        assertEquals("the bar tracks the window, not the Net", 52d / 60d, late.progress, 0.01d);
+
+        GpManagerConfig noWarning = new GpManagerConfig()
+        {
+            @Override public boolean hudHideWhenIdle() { return true; }
+            @Override public int hudTrayRows() { return 4; }
+            @Override public int hudTargetWarningSeconds() { return 0; }
+            @Override public int stabilizationTicks() { return 1; }
+        };
+        HudFrame off = new HudBuilder(noWarning, null)
+            .update(LiveSnapshot.capture(engine, NOW + 1_000L, null), f -> true, NOW + 1_000L);
+        assertEquals("the countdown stays", "8s", off.target);
+        assertFalse("0 turns the warning off", off.targetWarning);
+
+        // Both targets: the Net label stays until the final seconds, then the countdown replaces
+        // it (owner live 2026-10-13).
+        Engine both = engine();
+        both.startCustom("Vorkath", NOW - 61_000L);
+        both.getActiveSession().setProfitTargetGp(200_000L);
+        both.getActiveSession().setActiveTimeTargetMillis(60_000L, NOW);
+        both.getActiveSession().activeTimeTargetSetMillis = 20_000L;
+        HudFrame running = new HudBuilder(config(true, 4), null)
+            .update(LiveSnapshot.capture(both, NOW, null), f -> true, NOW);
+        assertEquals("the both-run drains from its aim", "200k", running.target);
+        assertFalse("no warning outside the final seconds", running.targetWarning);
+
+        both.getActiveSession().activeTimeTargetSetMillis = 9_000L;
+        HudFrame flip = new HudBuilder(config(true, 4), null)
+            .update(LiveSnapshot.capture(both, NOW, null), f -> true, NOW);
+        assertEquals("the label flips to the countdown", "8s", flip.target);
+        assertTrue("the both-target run warns too", flip.targetWarning);
+
+        // A frozen countdown never warns (owner live 2026-10-14): a both-run returns to its Net
+        // label, a time-only run keeps its frozen seconds.
+        both.getActiveSession().pauseTimeTarget(NOW + 1_000L);
+        HudFrame frozen = new HudBuilder(config(true, 4), null)
+            .update(LiveSnapshot.capture(both, NOW + 1_000L, null), f -> true, NOW + 1_000L);
+        assertEquals("the frozen both-run keeps its drain value", "200k", frozen.target);
+        assertFalse("a frozen countdown never warns", frozen.targetWarning);
+
+        engine.getActiveSession().pauseTimeTarget(NOW + 1_000L);
+        HudFrame frozenOnly = new HudBuilder(config(true, 4), null)
+            .update(LiveSnapshot.capture(engine, NOW + 1_000L, null), f -> true, NOW + 1_000L);
+        assertEquals("the frozen time-only countdown keeps its value", "8s", frozenOnly.target);
+        assertFalse("and still never warns", frozenOnly.targetWarning);
+
+        // Zero warning seconds keep the Net gauge throughout on a both-run (owner live
+        // 2026-10-14: the countdown replacement follows the setting).
+        both.getActiveSession().resumeTimeTarget(NOW + 1_000L);
+        GpManagerConfig noWarn = new GpManagerConfig()
+        {
+            @Override public boolean hudHideWhenIdle() { return true; }
+            @Override public int hudTrayRows() { return 4; }
+            @Override public int hudTargetWarningSeconds() { return 0; }
+            @Override public int stabilizationTicks() { return 1; }
+        };
+        HudFrame silent = new HudBuilder(noWarn, null)
+            .update(LiveSnapshot.capture(both, NOW + 1_000L, null), f -> true, NOW + 1_000L);
+        assertEquals("no countdown without a warning window", "200k", silent.target);
+        assertFalse("and no warning", silent.targetWarning);
+
+        // The window follows the setting: 30s warns at 25s left, not at 34s (owner live 2026-10-14).
+        engine.getActiveSession().resumeTimeTarget(NOW + 1_000L);
+        GpManagerConfig wide = new GpManagerConfig()
+        {
+            @Override public boolean hudHideWhenIdle() { return true; }
+            @Override public int hudTrayRows() { return 4; }
+            @Override public int hudTargetWarningSeconds() { return 30; }
+            @Override public int stabilizationTicks() { return 1; }
+        };
+        engine.getActiveSession().activeTimeTargetSetMillis = 35_000L;
+        HudFrame wideQuiet = new HudBuilder(wide, null)
+            .update(LiveSnapshot.capture(engine, NOW + 1_000L, null), f -> true, NOW + 1_000L);
+        assertFalse("30s window does not warn at 34s left", wideQuiet.targetWarning);
+        engine.getActiveSession().activeTimeTargetSetMillis = 26_000L;
+        HudFrame wideWarn = new HudBuilder(wide, null)
+            .update(LiveSnapshot.capture(engine, NOW + 1_000L, null), f -> true, NOW + 1_000L);
+        assertTrue("but warns at 25s left", wideWarn.targetWarning);
+        assertEquals("25s", wideWarn.target);
     }
 
     @Test
-    public void aLosingNetIsRedWithAnEmptyBarNeverANegativePercent()
+    public void aLosingNetIsRedAndTheGaugeNeverGoesNegative()
     {
         Engine engine = engine();
         engine.startCustom("Zulrah", NOW);
@@ -129,7 +242,8 @@ public class HudBuilderTest
         HudFrame s = new HudBuilder(config(true, 4), null)
             .update(LiveSnapshot.capture(engine, NOW + 2_000L, null), f -> true, NOW);
         assertEquals(Kit.Tone.LOSS.color, s.netColor);
-        assertEquals(0d, s.progress, 0d);
+        assertEquals("the bar waits empty while nothing is earned", 0d, s.progress, 0d);
+        assertEquals("and reads everything still to earn", "1.00M", s.target);
     }
 
     @Test
@@ -235,13 +349,14 @@ public class HudBuilderTest
     }
 
     @Test
-    public void theHeaderNamesTheGrindAndNeverTheTarget()
+    public void theHeaderNeverNamesTheGrindOrTheTarget()
     {
         HudBuilder builder = new HudBuilder(config(true, 4), null);
         builder.interaction("Goblin", true);
-        assertEquals("Vorkath", builder.update(grind(1_000L, null), f -> true, NOW).title);
+        assertEquals("the run's name stays on the sidebar", "",
+            builder.update(grind(1_000L, null), f -> true, NOW).title);
         builder.interaction("", false);
-        assertEquals("Vorkath", builder.update(grind(1_000L, null), f -> true, NOW).title);
+        assertEquals("", builder.update(grind(1_000L, null), f -> true, NOW).title);
     }
 
     /** Owner 1.1: HUD+ stays clean; activity names such as Combat are for the sidebar. */

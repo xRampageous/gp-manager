@@ -238,7 +238,7 @@ class KeyClaims {
             Map<Integer, Long> keyLosses,
             Map<Integer, Long> positiveContents,
             String sourceBackedActivity) {
-        boolean sourced = sourceBackedActivity != null && !sourceBackedActivity.trim().isEmpty();
+        boolean sourced = !blank(sourceBackedActivity);
         Map<Integer, Long> losses = positiveEntries(keyLosses);
         if (empty(positiveContents)) {
             if (sourced) {
@@ -338,6 +338,14 @@ class KeyClaims {
                             evidence.contents.merge(itemId, quantity, SafeMath::safeAdd));
             evidence.ticks = CLAIM_EVIDENCE_TICKS;
         }
+    }
+
+    /** The last contents observed in one loot key's chest, or an empty map (read-only). */
+    Map<Integer, Long> observedContents(int keyItemId) {
+        int keyIndex = keyIndex(keyItemId);
+        Map<Integer, Long> contents =
+                keyIndex < 0 ? null : observedKeyContainerContents.get(keyIndex);
+        return contents == null ? emptyMap() : contents;
     }
 
     /**

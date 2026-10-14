@@ -2,6 +2,23 @@
 
 See what you actually make while you play. GP Manager tracks your gains, supplies, losses and Grand Exchange trades for every trip and keeps a full ledger of where your GP went. You just play.
 
+## Screenshots
+
+| Live | Raid loot | PvP |
+|:--:|:--:|:--:|
+| ![Live](docs/screenshots/live.png) | ![A looted Theatre of Blood](docs/screenshots/raid.png) | ![PvP](docs/screenshots/pvp.png) |
+| Net, GP/h and your latest drops, with a target if you set one | A looted raid — the scythe is one entry | Kills, the victim's loot key, and what one is worth |
+
+| Grinds | Loot key claim |
+|:--:|:--:|
+| ![Grinds](docs/screenshots/grinds.png) | ![A loot key's ledger entry](docs/screenshots/ledger-key.png) |
+| Named runs, targets, bests and All time | A key opens into one entry — the looted setup listed beneath it |
+
+| HUD+ at a target | HUD+ on a raid streak |
+|:--:|:--:|
+| ![HUD+ with a target](docs/screenshots/hud-grind.png) | ![HUD+ on a raid streak](docs/screenshots/hud-raid.png) |
+| Net, GP/h, a target bar and the streak's loot | KC, Net per kill and the drop that made it |
+
 ## Features
 
 - **Live** – your Net, GP/h, gains, supplies and losses as you play, plus your latest drops. Click the Net to set a GP or time target.

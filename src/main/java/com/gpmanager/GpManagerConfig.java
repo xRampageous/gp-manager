@@ -252,13 +252,34 @@ public interface GpManagerConfig extends Config {
         return false;
     }
 
+    @Range(min = 0, max = 300)
+    @ConfigItem(
+            keyName = "hudTargetWarningSeconds",
+            name = "Target countdown warning",
+            description = "Flash the HUD target countdown in its final seconds (solid with Reduced motion); 0 turns it off",
+            position = 12,
+            section = hudLiveSection)
+    default int hudTargetWarningSeconds() {
+        return 10;
+    }
+
     @ConfigItem(
             keyName = "autoStartSession",
             name = "Automatic tracking",
-            description = "Start Free play when gameplay is seen; logging in alone does not",
+            description = "Start Free play when gameplay is seen, or at the first login when Start tracking on login is on",
             position = 0,
             section = generalSection)
     default boolean autoStartSession() {
+        return true;
+    }
+
+    @ConfigItem(
+            keyName = "autoStartOnLogin",
+            name = "Start tracking on login",
+            description = "Start or resume tracking at the first login of a RuneLite session instead of waiting for the first action",
+            position = 1,
+            section = generalSection)
+    default boolean autoStartOnLogin() {
         return true;
     }
 
@@ -367,7 +388,7 @@ public interface GpManagerConfig extends Config {
             keyName = "autoActivityDetection",
             name = "Automatic activity detection",
             description = "Name the activity from what you do",
-            position = 1,
+            position = 2,
             section = generalSection)
     default boolean autoActivityDetection() {
         return true;
@@ -378,7 +399,7 @@ public interface GpManagerConfig extends Config {
             keyName = "activityLabelSeconds",
             name = "Activity label timeout",
             description = "Seconds without an attack before the activity label clears",
-            position = 2,
+            position = 3,
             section = generalSection)
     default int activityLabelSeconds() {
         return 15;

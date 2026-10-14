@@ -93,9 +93,12 @@ public class GrindsPersistenceTest
     {
         Engine engine = PresentationLifecycleTest.engine();
         long now = System.currentTimeMillis();
-        engine.startCustom("Vorkath", now);
+        engine.startCustom("Vorkath", now - 60_000L);
         engine.getActiveSession().setProfitTargetGp(5_000_000L);
-        engine.getActiveSession().setActiveTimeTargetMillis(3L * 3_600_000L);
+        engine.getActiveSession().setActiveTimeTargetMillis(3L * 3_600_000L, now);
+        long setAt = engine.getActiveSession().getActiveTimeTargetSetMillis();
+        engine.getActiveSession().pauseTimeTarget(now + 500L);
+        engine.getActiveSession().profitTargetSetNet = 12_345L;
         String sessionId = engine.getActiveSession().getId();
         SavedState.SavedGrind grind = engine.saveGrind("Vorkath", 5_000_000L, 3L * 3_600_000L, true, sessionId);
         assertNotNull(grind);
@@ -116,6 +119,12 @@ public class GrindsPersistenceTest
             restored.historySession(sessionId).getProfitTargetGp());
         assertEquals(Long.valueOf(3L * 3_600_000L),
             restored.historySession(sessionId).getActiveTimeTargetMillis());
+        assertEquals("the count baseline round-trips", setAt,
+            restored.historySession(sessionId).getActiveTimeTargetSetMillis());
+        assertTrue("the timer pause round-trips",
+            restored.historySession(sessionId).isTimeTargetPaused());
+        assertEquals("the Net baseline round-trips", 12_345L,
+            restored.historySession(sessionId).getProfitTargetSetNet());
     }
 
     @Test
@@ -151,8 +160,10 @@ public class GrindsPersistenceTest
         assertNull(engine.getActiveSession().getActiveTimeTargetMillis());
         engine.getActiveSession().setGrindId(null);
         assertEquals("", engine.getActiveSession().getGrindId());
-        engine.getActiveSession().setActiveTimeTargetMillis(null);
+        engine.getActiveSession().setActiveTimeTargetMillis(null, now);
         assertNull(engine.getActiveSession().getActiveTimeTargetMillis());
+        assertEquals("clearing forgets the count", 0L,
+            engine.getActiveSession().getActiveTimeTargetSetMillis());
     }
 
     @Test

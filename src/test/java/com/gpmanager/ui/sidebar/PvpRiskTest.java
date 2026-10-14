@@ -5,6 +5,7 @@ import java.util.List;
 import org.junit.Test;
 
 import static org.junit.Assert.assertEquals;
+import static org.junit.Assert.assertFalse;
 import static org.junit.Assert.assertTrue;
 
 /** Owner 1.1: HUD+ shows what a death in the Wilderness would lose. Nothing is booked. */
@@ -50,7 +51,7 @@ public class PvpRiskTest
         assertEquals("three darts kept, the cheap item lost", 497L * 1_200 + 100, PvpState.risk(darts, false, false));
     }
 
-    /** Owner 1.1: HUD+ stays short in the Wilderness; risk, skull and Protect live on Live. */
+    /** Owner 1.1: HUD+ stays short in the Wilderness; only Risk is shown (owner live 2026-10-13: no skull or Protect rows). */
     @Test
     public void riskLivesOnLiveAndHudPlusStaysClean() throws Exception
     {
@@ -72,6 +73,8 @@ public class PvpRiskTest
                 cells.add(cell.label + " " + cell.value);
             }
         }
-        assertTrue(cells.toString(), cells.containsAll(java.util.Arrays.asList("RISK 12.4M", "SKULL On", "PROTECT Off")));
+        assertTrue(cells.toString(), cells.contains("RISK 12.4M"));
+        assertFalse("skull and Protect are never shown (owner live 2026-10-13)",
+            cells.toString().contains("SKULL") || cells.toString().contains("PROTECT"));
     }
 }

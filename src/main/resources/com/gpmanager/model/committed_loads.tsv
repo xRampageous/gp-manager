@@ -1,13 +1,18 @@
-# Families whose load components can never be refunded: reverting a crystal armour piece or the
-#   crystal shield keeps the seeds but always loses the loaded charges, so crystal shards used on
-#   the piece book as a counted Supplies spend at load instead of a neutral charge transfer
-#   (owner 2026-10-12). The ring of suffering follows the same law (a discharge never refunds its
-#   stored rings of recoil), and so does the bracelet of ethereum (an uncharge destroys the stored
-#   ether) (OSRS Wiki, owner 2026-10-12). These families keep no Check comparison; a corrupted
-#   weapon is a different item id and stays untracked. Keyed by charged_items.tsv.
+# Families whose loads can never be refunded, so their components book as a counted Supplies spend
+#   at load instead of a neutral transfer and their Checks book nothing (owner 2026-10-12/14):
+#   crystal armour/shield/tools, the ring of suffering, the bracelet of ethereum, the echo boots,
+#   the slayer's staff (e) and the infernal tools. Keyed by charged_items.tsv.
 CRYSTAL_HELM
 CRYSTAL_BODY
 CRYSTAL_LEGS
 CRYSTAL_SHIELD
 SUFFERING
 ETHEREUM
+CRYSTAL_AXE
+CRYSTAL_PICKAXE
+CRYSTAL_HARPOON
+ECHO_BOOTS
+SLAYER_STAFF_E
+INFERNAL_AXE
+INFERNAL_PICKAXE
+INFERNAL_HARPOON

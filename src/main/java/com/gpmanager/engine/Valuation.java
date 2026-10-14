@@ -43,6 +43,15 @@ class Valuation implements FlowValuator {
     /** Karamja gloves 1-4 worn: sampled by the plugin, read when a proxy rate is chosen. */
     volatile boolean karamjaGlovesWorn;
 
+    /** A market quote floored at zero; an unavailable quote reads 0 (the flow stays unpriced). */
+    int quoteOrZero(int itemId) {
+        try {
+            return max(0, marketQuotes.priceOf(itemId, true));
+        } catch (RuntimeException ignored) {
+            return 0;
+        }
+    }
+
     @Inject
     Valuation(ItemManager itemManager, GpManagerConfig config) {
         // Accounting explicitly requests GP Manager's chosen RuneLite active market route (the
@@ -209,12 +218,7 @@ class Valuation implements FlowValuator {
                     continue;
                 }
                 if (manual || otherDose <= anchorDose) continue;
-                int quote;
-                try {
-                    quote = marketQuotes.priceOf(id, true);
-                } catch (RuntimeException ignored) {
-                    continue;
-                }
+                int quote = quoteOrZero(id);
                 if (quote > 0) {
                     anchorDose = otherDose;
                     anchorPrice = quote;
@@ -414,13 +418,9 @@ class Valuation implements FlowValuator {
                     && !CurrencyProxyCatalogue.isMapped(itemId)
                     && economyState == Economy.NORMAL
                     && !unsupportedMapping.test(itemId)) {
-                try {
-                    // GP Manager's single automatic market policy: the explicit active route,
-                    // gated by the current world/economy and the mapping guard above.
-                    marketPrice = max(0, marketQuotes.priceOf(itemId, true));
-                } catch (RuntimeException ignored) {
-                    // No quote: the flow stays unpriced for Review.
-                }
+                // GP Manager's single automatic market policy: the explicit active route,
+                // gated by the current world/economy and the mapping guard above.
+                marketPrice = quoteOrZero(itemId);
             }
             // A proxy row values the component from a market item and its fixed exchange rate.
             // The proxy's market item is priced only where market quotes are, never on unknown or
@@ -437,11 +437,8 @@ class Valuation implements FlowValuator {
                     int glovesUnits = CurrencyProxyCatalogue.glovesUnitsOf(itemId);
                     if (glovesUnits > 0) units = glovesUnits;
                 }
-                try {
-                    marketPrice = max(0, marketQuotes.priceOf(proxy[0], true) / units);
-                } catch (RuntimeException ignored) {
-                    // No proxy quote: the flow stays unpriced for Review.
-                }
+                // No proxy quote: the flow stays unpriced for Review.
+                marketPrice = quoteOrZero(proxy[0]) / units;
             }
             // RuneLite's ItemMapping carries no bracelet of ethereum entry (upstream omission,
             // verified 2026-10-12): the charged bracelet prices from its uncharged form's live
@@ -451,11 +448,8 @@ class Valuation implements FlowValuator {
                     && !manualOverride
                     && economyState == Economy.NORMAL
                     && !unsupportedMapping.test(itemId)) {
-                try {
-                    marketPrice = max(0, marketQuotes.priceOf(ItemID.WILD_CAVE_BRACELET_UNCHARGED, true));
-                } catch (RuntimeException ignored) {
-                    // No quote: the flow stays unpriced for Review.
-                }
+                // No quote: the flow stays unpriced for Review.
+                marketPrice = quoteOrZero(ItemID.WILD_CAVE_BRACELET_UNCHARGED);
             }
             // A partial dose RuneLite cannot quote (Burning amulet(4)) is priced from its family's
             // highest-dose quote at the same rate per dose (owner 1.3.4, GP-Per-Hour's fractional

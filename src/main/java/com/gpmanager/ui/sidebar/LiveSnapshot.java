@@ -50,6 +50,25 @@ class LiveSnapshot {
 
         /** True when this card tracks Active Time rather than Net (owner 2026-10-01, F10). */
         boolean time;
+
+        /**
+         * The tracked Active Time pair ({@code 1h 02m/2h 30m · 47%}) when the session has a time
+         * target; null with none. A Net card with both targets also shows it (owner live
+         * 2026-10-13).
+         */
+        String timeDetail;
+
+        /**
+         * Remaining Active Time on the time window while one is pending; -1 when none is set
+         * (owner live 2026-10-13, HUD warning for both-target runs).
+         */
+        long timeRemainingMillis;
+
+        /** True when a time window has reached its target, on any card (owner live 2026-10-13). */
+        boolean timeDone;
+
+        /** True while the timer's own pause holds (owner live 2026-10-14). */
+        boolean timerPaused;
     }
 
     /** One exact item contribution or an honestly labelled composite activity row. */
@@ -166,6 +185,9 @@ class LiveSnapshot {
     /** Loot keys and chests not opened yet; a count, never a GP guess. */
     int pendingKeys;
 
+    /** The exact price of the pending chests' observed contents; 0 until a chest is seen. */
+    long pendingKeyValue;
+
     /** Items waiting at a death reclaim; 0 when nothing is waiting. */
     long reclaimItems;
 
@@ -253,6 +275,7 @@ class LiveSnapshot {
                 pk.deaths,
                 engine.bestKill(),
                 engine.getPendingClaims().size(),
+                engine.pendingKeysValue(now),
                 engine.deathStatus().awaiting
                         ? max(1L, engine.deathStatus().outstandingItemCount)
                         : 0L,
@@ -274,14 +297,58 @@ class LiveSnapshot {
     static Goal goal(Session active, Metrics metrics, long elapsed) {
         if (active == null) return null;
         Long target = active.getProfitTargetGp();
+        Long timeTarget = active.getActiveTimeTargetMillis();
         if (target != null && target > 0L) {
-            long current = metrics.net;
+            long current = active.profitTargetProgress(metrics.net);
             double fraction = max(0d, min(1d, current / (double) target));
             boolean reached = current >= target;
             String eta = null;
-            if (!reached && elapsed >= 60_000L && metrics.profitPerHour > 0L) {
-                long minutes = round((target - current) * 60d / metrics.profitPerHour);
-                eta = minutes < 1L ? "<1m" : "~" + GrindsData.durationMinutes(minutes);
+            String timeDetail = null;
+            long timeRemaining = -1L;
+            boolean timeDone = false;
+            boolean timerPaused = false;
+            if (timeTarget != null && timeTarget > 0L) {
+                // Owner live 2026-10-13: with both targets set the hero keeps the live Net read
+                // and the card adds the tracked Active Time pair; the countdown replaces the
+                // Net-rate estimate.
+                long timeElapsed = active.getActiveTimeTargetWindowMillis(elapsed);
+                timeDetail = timeDetail(timeElapsed, timeTarget);
+                timeRemaining = max(0L, timeTarget - timeElapsed);
+                boolean timeReached = timeElapsed >= timeTarget;
+                timeDone = timeReached;
+                timerPaused = active.isTimeTargetPaused();
+                GrindsData.Pace pace =
+                        GrindsData.pace(
+                                null,
+                                timeTarget,
+                                current,
+                                RateReadiness.isEstablished(elapsed),
+                                metrics.profitPerHour,
+                                timeElapsed);
+                if (timeReached && reached) {
+                    // Owner 2026-10-14: both aims done keeps a short projection, not a blank line.
+                    eta =
+                            RateReadiness.isEstablished(elapsed)
+                                    ? GrindsData.nextHour(current, metrics.profitPerHour)
+                                    : null;
+                } else if (timeReached) {
+                    eta = pace == null || !pace.available ? null : pace.line;
+                } else if (pace != null && pace.available) {
+                    eta = durationCount(max(0L, timeTarget - timeElapsed)) + " left \u00b7 " + pace.line;
+                }
+            } else if (!reached && RateReadiness.isEstablished(elapsed)) {
+                if (metrics.profitPerHour > 0L) {
+                    long minutes = round((target - current) * 60d / metrics.profitPerHour);
+                    eta =
+                            (minutes < 1L ? "<1m" : "~" + GrindsData.durationMinutes(minutes))
+                                    + msg("play-left");
+                } else {
+                    // Owner live 2026-10-13: an established non-positive rate says so honestly.
+                    eta = "Not earning at this rate";
+                }
+            } else if (reached && RateReadiness.isEstablished(elapsed)) {
+                // Owner 2026-10-14: a reached Net aim keeps the short next-hour projection.
+                eta = GrindsData.nextHour(current, metrics.profitPerHour);
             }
             return new Goal(
                     target,
@@ -291,14 +358,18 @@ class LiveSnapshot {
                     reached ? "reached" : percent(fraction),
                     eta,
                     fraction,
-                    false);
+                    false,
+                    timeDetail,
+                    timeRemaining,
+                    timeDone,
+                    timerPaused);
         }
         // Owner 2026-10-01 (F10): a time-only target is still a target; the card tracks Active
         // Time.
-        Long timeTarget = active.getActiveTimeTargetMillis();
         if (timeTarget == null || timeTarget <= 0L) return null;
-        double timeFraction = max(0d, min(1d, elapsed / (double) timeTarget));
-        boolean timeReached = elapsed >= timeTarget;
+        long timeElapsed = active.getActiveTimeTargetWindowMillis(elapsed);
+        double timeFraction = max(0d, min(1d, timeElapsed / (double) timeTarget));
+        boolean timeReached = timeElapsed >= timeTarget;
         // The shared Pace answer for a time target: where the booked Net lands at the target time.
         GrindsData.Pace pace =
                 timeReached
@@ -307,18 +378,30 @@ class LiveSnapshot {
                                 null,
                                 timeTarget,
                                 metrics.net,
-                                true,
+                                RateReadiness.isEstablished(elapsed),
                                 metrics.profitPerHour,
-                                elapsed);
+                                timeElapsed);
         return new Goal(
                 timeTarget,
-                elapsed,
+                timeElapsed,
                 timeReached,
                 durationShort(timeTarget),
                 timeReached ? "reached" : percent(timeFraction),
                 pace == null || !pace.available ? null : pace.line,
                 timeFraction,
-                true);
+                true,
+                timeDetail(timeElapsed, timeTarget),
+                max(0L, timeTarget - timeElapsed),
+                timeReached,
+                active.isTimeTargetPaused());
+    }
+
+    /** "12s / 2m \u00b7 7%": the Active Time window pair a card shows for a time target. */
+    static String timeDetail(long elapsed, long timeTarget) {
+        // The pair never runs past its own aim: 2m/2m stays 2m/2m (owner live 2026-10-13).
+        long shown = min(elapsed, timeTarget);
+        double fraction = max(0d, min(1d, elapsed / (double) timeTarget));
+        return durationCount(shown) + " / " + durationShort(timeTarget) + " \u00b7 " + percent(fraction);
     }
 
     /** Visible ordinary Gains: canonical unfiltered revenue minus the counted Market fold. */

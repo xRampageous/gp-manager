@@ -33,6 +33,9 @@ class HudOverlay extends Overlay {
     static final Color CORAL = new Color(255, 127, 80);
     static final Color GOLD_ROW = new Color(255, 200, 40, 50);
     static final long FADE_IN_MILLIS = 350L;
+
+    /** Cadence of the final-seconds countdown blink (owner live 2026-10-13). */
+    static final long WARNING_BLINK_MILLIS = 500L;
     HudBuilder builder;
     GpManagerConfig config;
     TextSize fontSize;
@@ -170,8 +173,10 @@ class HudOverlay extends Overlay {
             text(g, body, frame.timer, PAD + 11, y + fh.getAscent(), LABEL);
             text(g, body, frame.rate, right - width(fb, frame.rate), y + fh.getAscent(), rateColor);
         } else {
-            text(g, bold, title, PAD + 11, y + fh.getAscent(), Color.WHITE);
-            text(g, body, frame.timer, right - width(fb, frame.timer), y + fh.getAscent(), LABEL);
+            // The timer keeps the left; the kill count owns the right, with the rate under it on
+            // the money row (owner live 2026-10-14) — the timer never jumps sides.
+            text(g, body, frame.timer, PAD + 11, y + fh.getAscent(), LABEL);
+            text(g, body, title, right - width(fb, title), y + fh.getAscent(), Color.WHITE);
         }
         if (compact) return;
         y += fh.getHeight() + 1;
@@ -179,7 +184,6 @@ class HudOverlay extends Overlay {
         float chip = !motion ? 1f : ease((frame.chipUntil - now) / (float) HudBuilder.FADE_MILLIS);
         int baseline = y + fg.getAscent();
         text(g, big, frame.net, PAD, baseline, frame.netColor);
-        text(g, body, frame.target, PAD + moneyX[1], baseline + moneyY[1], LABEL);
         fade(g, plain, chip);
         text(g, body, frame.trip, PAD + moneyX[2], baseline + moneyY[2], frame.tripColor);
         g.setComposite(plain);
@@ -193,11 +197,34 @@ class HudOverlay extends Overlay {
                     rateColor);
         y += moneyHeight;
         if (frame.progress >= 0d) {
+            // The target label rides the bar's end; the bar shortens to make room (owner live
+            // 2026-10-13: "/ 200k" on the money row stretched HUD+ wide).
+            int labelRoom = frame.target.isEmpty() ? 0 : 6 + width(fb, frame.target);
+            int barY = y + (labelRoom == 0 ? 0 : (fb.getHeight() - 3) / 2);
             g.setColor(LINE);
-            g.fillRect(PAD, y, width - PAD * 2, 3);
-            g.setColor(frame.progress >= 1d ? Tone.GAIN.color : ACCENT);
-            g.fillRect(PAD, y, (int) round((width - PAD * 2) * frame.progress), 3);
-            y += 5;
+            g.fillRect(PAD, barY, width - PAD * 2 - labelRoom, 3);
+            g.setColor(
+                    frame.targetDone
+                            ? Tone.GAIN.color
+                            : frame.targetWarning ? Tone.LOSS.color : ACCENT);
+            g.fillRect(PAD, barY, (int) round((width - PAD * 2 - labelRoom) * frame.progress), 3);
+            if (labelRoom > 0) {
+                // The final-seconds warning blinks unless reduced motion, then stays solid
+                // (owner live 2026-10-13).
+                Color targetColor = LABEL;
+                if (frame.targetWarning) {
+                    boolean dim = !config.reducedMotion() && (now / WARNING_BLINK_MILLIS) % 2L == 0L;
+                    targetColor = dim ? LABEL : Tone.LOSS.color;
+                }
+                text(
+                        g,
+                        body,
+                        frame.target,
+                        right - width(fb, frame.target),
+                        y + fb.getAscent(),
+                        targetColor);
+            }
+            y += labelRoom == 0 ? 5 : fb.getHeight();
         }
         if (!context.isEmpty()) {
             text(g, body, context, PAD, y + fb.getAscent(), frame.contextColor);
@@ -282,9 +309,10 @@ class HudOverlay extends Overlay {
                         : max(
                                 width(fb, frame.context),
                                 steady(fg, frame.net)
-                                        + steady(fb, frame.target)
                                         + (frame.trip.isEmpty() ? 0 : 6 + steady(fb, frame.trip))
                                         + (rateUp ? 0 : 8 + steady(fb, frame.rate)));
+        // The bar row needs room for its end label even when the money row is tiny.
+        content = max(content, frame.target.isEmpty() ? 0 : 6 + steady(fb, frame.target));
         // Owner 1.1: with item icons off a row is text-high and starts at the edge.
         boolean icons = config.showItemIcons();
         rowHeight = icons ? ICON : fb.getAscent() + fb.getDescent() + 2;
@@ -296,7 +324,7 @@ class HudOverlay extends Overlay {
         int width =
                 max(
                         MIN_WIDTH,
-                        min(ceiling, max(content, width(fh, frame.title) + header) + PAD * 2));
+                        min(ceiling, max(content, width(fb, frame.title) + header) + PAD * 2));
         if (!tray || frame.tripId != widthTrip) {
             widthTrip = frame.tripId;
             grownWidth = 0;
@@ -307,7 +335,12 @@ class HudOverlay extends Overlay {
         // A short status stays on one line only when both figures fit the selected ceiling.
         compact &= content <= inner;
         moneyHeight = moneyLayout(frame, fb, fg, inner);
-        title = fit(fh, frame.title, inner - header);
+        title = fit(fb, frame.title, inner - header);
+        if (!title.equals(frame.title) && frame.title.startsWith("KC: ")) {
+            // The count survives tight widths: the prefix goes before the ellipsis does
+            // (owner live 2026-10-14).
+            title = fit(fb, frame.title.substring(4), inner - header);
+        }
         context = fit(fb, frame.context, inner);
         names = new String[rows];
         crops = new Rectangle[rows];
@@ -331,7 +364,9 @@ class HudOverlay extends Overlay {
                                 ? 0
                                 : 1
                                         + moneyHeight
-                                        + (frame.progress >= 0d ? 5 : 0)
+                                        + (frame.progress >= 0d
+                                                ? (frame.target.isEmpty() ? 5 : fb.getHeight())
+                                                : 0)
                                         + (context.isEmpty() ? 0 : fb.getHeight()));
         trayHeight =
                 !tray
@@ -343,9 +378,9 @@ class HudOverlay extends Overlay {
         size = new Dimension(width, restHeight + trayHeight);
     }
 
-    /** Net leads; a target, new change or rate that cannot share its line wraps below it. */
+    /** Net leads; a new change or rate that cannot share its line wraps below it. */
     int moneyLayout(HudFrame frame, FontMetrics fb, FontMetrics fg, int inner) {
-        String[] values = {frame.net, frame.target, frame.trip, rateUp ? "" : frame.rate};
+        String[] values = {frame.net, "", frame.trip, rateUp ? "" : frame.rate};
         int x = steady(fg, frame.net);
         int y = 0;
         for (int i = 1; i < values.length; i++) {
