@@ -43,6 +43,32 @@ public class TableTest
         assertEquals(10, table.body.getComponentCount());
     }
 
+    @Test
+    public void aLongTitleEllipsizesInsteadOfWrappingOutOfTheHeader()
+    {
+        Table table = new Table("TRADE · 23 · long header title").setTotal("+168k", null).setRows(rows(3));
+        table.setSize(232, 200);
+        table.doLayout();
+        table.header.doLayout();
+        // A squeezed header (the pager joins the total): the title must not wrap below the line.
+        table.left.setSize(60, Kit.HEADER);
+        table.left.doLayout();
+        assertTrue("the title stays on the header's single line",
+            table.title.getY() + table.title.getHeight() <= Kit.HEADER);
+    }
+
+    @Test
+    public void aPickerNeverReplacesTheTitle()
+    {
+        Table table =
+            new Table("LOSSES · 11").setTotal("-33.3k", null).setRows(rows(3)).setPicker(new javax.swing.JButton("All"));
+        table.setSize(232, 200);
+        table.doLayout();
+        table.header.doLayout();
+        table.left.doLayout();
+        assertTrue("the picker sits beside the title, not on top of it", table.title.getWidth() > 0);
+    }
+
     private static void lastPage(Table table)
     {
         while (TableRows.page(table) < table.pages() - 1)

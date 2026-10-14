@@ -19,3 +19,7 @@ out/
 .env.*
 
 replays/
+
+# Python tooling caches
+__pycache__/
+*.pyc

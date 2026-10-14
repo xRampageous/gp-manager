@@ -440,6 +440,10 @@ class GrindsController implements GrindsPage.Actions {
                 item(
                         "Report a bug",
                         () -> net.runelite.client.util.LinkBrowser.browse(msg("bug-report"))));
+        menu.add(
+                item(
+                        "Changelog",
+                        () -> net.runelite.client.util.LinkBrowser.browse(msg("changelog"))));
         menu.addSeparator();
         menu.add(item(msg("factory-reset"), persistence != null, () -> factoryReset()));
         return menu;

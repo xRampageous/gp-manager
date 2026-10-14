@@ -74,6 +74,45 @@ public class LedgerOverviewModesTest
     }
 
     @Test
+    public void aRefreshKeepsTheOpenSearchFieldAttached() throws Exception
+    {
+        Engine engine = session();
+        engine.getActiveSession().addTransaction(gain(T0 + 1_000L, "Item", 2_000, 1L, 100, 100L), 2_000);
+        LedgerHarness harness = new LedgerHarness(engine, T0 + 50_000L, entry());
+        LedgerPage page = onEdt(() -> harness.attach(new LedgerPage(harness, id -> null)));
+        onEdt(() ->
+        {
+            page.toggleSearch();
+            return null;
+        });
+
+        List<Component> detached = new ArrayList<>();
+        onEdt(() ->
+        {
+            page.body().addContainerListener(new java.awt.event.ContainerAdapter()
+            {
+                @Override
+                public void componentRemoved(java.awt.event.ContainerEvent event)
+                {
+                    detached.add(event.getChild());
+                }
+            });
+            harness.searchChanged("i");
+            return null;
+        });
+        assertFalse("a typed character must not detach the search field (focus would drop)",
+            detached.contains(page.search));
+
+        onEdt(() ->
+        {
+            page.toggleSearch();
+            return null;
+        });
+        assertFalse("closing the search takes the field with it",
+            Arrays.asList(page.body().getComponents()).contains(page.search));
+    }
+
+    @Test
     public void backRestoresThePriorPageAndCostsFilter() throws Exception
     {
         Engine engine = session();
@@ -182,6 +221,17 @@ public class LedgerOverviewModesTest
             onEdt(() -> LedgerPageProbe.overviewRows(page, LedgerPageProbe.FinancialTable.MARKET)).isEmpty());
         assertEquals("every open sale waits in Pending", 4,
             (int) onEdt(() -> TableRows.of(page.body(), "PENDING").size()));
+    }
+
+    @Test
+    public void anOpenOfferNeverMarksTrade() throws Exception
+    {
+        MarketFixture market = new MarketFixture();
+        market.sell(0, MARKET_ITEMS[0], 10);
+        LedgerHarness harness = new LedgerHarness(market.engine, market.now + 1_000L, entry());
+        LedgerPage page = onEdt(() -> harness.attach(new LedgerPage(harness, id -> null)));
+        String title = onEdt(() -> TableRows.tables(page.body(), "TRADE").get(0).title.getText());
+        assertEquals("an uncollected sale never marks Trade: " + title, "TRADE · 0", title);
     }
 
     @Test

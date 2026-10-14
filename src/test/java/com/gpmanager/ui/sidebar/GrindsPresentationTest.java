@@ -883,7 +883,7 @@ public class GrindsPresentationTest
             }
         }
         assertEquals(java.util.Arrays.asList("Back up profile", "Copy data folder path", "Report a bug",
-            "Factory reset current profile…"), gear);
+            "Changelog", "Factory reset current profile…"), gear);
         assertTrue("no standalone Search page", java.util.Arrays.stream(ShellProbe.tabLabels(panel.shell()))
             .noneMatch(label -> label.equalsIgnoreCase("Search") || label.equalsIgnoreCase("Tools")));
         assertFalse("no open-folder affordance is described",

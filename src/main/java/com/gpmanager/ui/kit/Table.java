@@ -90,7 +90,7 @@ class Table extends JPanel {
     /** A small control beside the title, such as the Losses view picker (owner 1.1). */
     JComponent picker;
 
-    JPanel left = new JPanel(new FlowLayout(FlowLayout.LEFT, 4, 4));
+    JPanel left = new JPanel(new BorderLayout(4, 0));
     JComponent action;
     List<Row> rows = emptyList();
     List<Row> drawn = null;
@@ -115,8 +115,8 @@ class Table extends JPanel {
                         BorderFactory.createEmptyBorder(0, 6, 0, 2)));
         header.setPreferredSize(new Dimension(0, HEADER));
         left.setOpaque(false);
-        left.add(chevron);
-        left.add(this.title);
+        left.add(chevron, BorderLayout.WEST);
+        left.add(this.title, BorderLayout.CENTER);
         header.add(left, BorderLayout.CENTER);
         right.setOpaque(false);
         header.add(right, BorderLayout.EAST);
@@ -137,7 +137,7 @@ class Table extends JPanel {
     Table setPicker(JComponent component) {
         if (picker != null) left.remove(picker);
         picker = component;
-        if (component != null) left.add(component);
+        if (component != null) left.add(component, BorderLayout.EAST);
         left.revalidate();
         return this;
     }

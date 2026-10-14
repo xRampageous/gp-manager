@@ -99,9 +99,9 @@ class LivePage implements Shell.Page {
     /**
      * GE offers still on the exchange; shown only while there are some, then they move to Recent.
      */
-    Table offers = new Table("OFFERS");
+    Table offers = new Table("OFFERS").setFoldable(true);
 
-    Table recent = new Table("RECENT");
+    Table recent = new Table("RECENT").setFoldable(true);
 
     /** Pending counts as small icons: loot keys, GE offers, grave reclaim. */
     JPanel counts = new JPanel(new FlowLayout(FlowLayout.RIGHT, 4, 0));
@@ -272,8 +272,19 @@ class LivePage implements Shell.Page {
         applyTarget(snapshot);
         var rows = new ArrayList<Row>();
         var open = new ArrayList<Row>();
-        for (Recent row : snapshot.recent) (row.open ? open : rows).add(rowOf(row));
-        offers.setTitle("OFFERS · " + open.size()).setRows(open);
+        long openTotal = 0L;
+        long recentTotal = 0L;
+        for (Recent row : snapshot.recent)
+            if (row.open) {
+                open.add(rowOf(row));
+                openTotal += row.value;
+            } else {
+                rows.add(rowOf(row));
+                recentTotal += row.value;
+            }
+        offers.setTitle("OFFERS · " + open.size())
+                .setRows(open)
+                .setTotal(signed(openTotal), null);
         offers.setVisible(!open.isEmpty());
         // Owner 2026-10-01 (F13): the empty card says which event starts tracking, never a fake
         // start.
@@ -290,6 +301,7 @@ class LivePage implements Shell.Page {
             recent.setEmptyText(empty);
         }
         recent.countedTitle("RECENT", rows);
+        recent.setTotal(rows.isEmpty() ? "" : signed(recentTotal), sign(recentTotal));
     }
 
     void applyTarget(LiveSnapshot snapshot) {

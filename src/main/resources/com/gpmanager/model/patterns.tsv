@@ -45,8 +45,6 @@ clue	^(?:clue scroll|scroll box|challenge scroll|reward casket|clue bottle|clue 
 
 death-fee	^Death charges you ([\d,]+) x Coins\..*$	2
 bank-payment	^Payment has been taken from your bank: ([\d,]+) (?:x Coins|coins)\.?(?: \(\d+\))?$	2
-# The boat recovery's bank line carries no amount; its fee comes from the Recover click. A repeat count (" (2)") can follow (owner live 2026-10-14).
-bank-payment-amountless	^payment has been taken from your bank\.(?: \(\d+\))?$	2
 coffer-payment	^Payment has been taken from your coffer: ([\d,]+) (?:x Coins|coins)\.?$	2
 revenant-check	^Your (?:bow|sceptre|chainmace) has (?:([\d,]+) charges?|(one) charge|no charges) left powering it\.$	2
 memoirs-check	^On the inside of the cover a message is displayed in dark ink\. It reads: (?:([\d,]+)|(one)) memor(?:ies|y) remains?\.$	2

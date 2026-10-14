@@ -1,6 +1,6 @@
 # GP Manager changelog
 
-## 1.4.0 - 2026-10-15
+## 1.4.1 - 2026-10-15
 
 **New**
 - Start tracking on login: with Automatic tracking on, tracking starts or resumes at your first login of a RuneLite session instead of waiting for the first action. A manual pause or stop always holds.
@@ -8,12 +8,16 @@
 - Net aims count what the run earns after the aim is set, not the run's total.
 - One-row aim actions: pause, reset, again, done and edit ride the target card as icon buttons with tooltips. Again on a reached Net asks to keep the net or start fresh; an ended timer re-arms in place.
 - The sailors' amulet counts its charges: loading law and water runes is neutral, each teleport books one charge (a tenth of a law rune plus a water rune) as Supplies, and a Check measures the true count.
-- Boat recovery books from the bank: the Recover click reads the fee the window shows, and the bank payment books a "Recovered <boat>" cost. Paying from your pack books the same row.
 - Loot keys show their chest's worth: while a key chest is open, the Ledger and the Live key tooltip show the exact value of the loot inside (the game's own display rounds to the nearest million). Taking the loot settles it as usual.
 - Charge rows for crystal tools, infernal tools, echo boots and the slayer's staff (e): loading their components books one Supplies spend and Checks book nothing. The bone staff books each cast; its chaos runes refund on Uncharge.
+- The sidebar's gear menu offers a Changelog link that opens the changelog on GitHub.
+- Offers and Recent on the Live page fold away with a click on their chevrons; their headers show a summary (the open offers' worth, the recent rows' net).
 
 **Fixed**
 - Fractional charge carries (a scythe's vial of blood, a tome's page, a blowpipe's scale) survive a logout or hop instead of resetting.
+- Typing in the Ledger's search no longer drops focus after every character.
+- A table header keeps its title when the page arrows appear (a long title shortens instead of vanishing).
+- Sales with no tracked purchase carry no marker at all: the row shows as a plain trade (the coins received, like a buy shows its spend) and no profit is claimed — the same as how the big flip plugins treat unpaired sales. An open offer never marks Trade either.
 
 **Changed**
 - The sidebar uses Inter for labels and JetBrains Mono for numbers.

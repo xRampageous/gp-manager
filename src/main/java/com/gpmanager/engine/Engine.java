@@ -167,16 +167,6 @@ class Engine {
     /** Key/chest claims (the one durable evidence exception, section H) and their live evidence. */
     KeyClaims claims = new KeyClaims();
 
-    /** One armed boat-recovery fee: the click read it; the bank line or the pack pays it. */
-    long boatRecoveryFee;
-
-    String boatRecoveryName = "";
-
-    long boatRecoveryArmedAt;
-
-    /** How long an armed recovery fee stays valid for its payment (owner live 2026-10-14). */
-    static final long RECOVERY_FEE_MILLIS = 120_000L;
-
     /** Chebyshev tiles — pickup must be near the recorded drop, not name-only. */
     @Inject
     Engine(Valuation valuationService, TransactionClassifier classifier, GpManagerConfig config) {
@@ -1906,77 +1896,6 @@ class Engine {
         return bookFee(feeGp, label, "Death reclaim", now);
     }
 
-    /**
-     * A bank-paid boat recovery fee as one named row: "Recovered Junior Jim" (owner live
-     * 2026-10-14; the action kind gives the row its own shape, value only).
-     */
-    synchronized Transaction bookBoatRecoveryFee(long feeGp, String boatName, long now) {
-        String activity =
-                activeSession == null
-                        ? "General"
-                        : nonBlank(activeSession.getActivityHint(), "General");
-        Transaction fee =
-                bookFee(feeGp, msg("boat-recovered") + nonBlank(boatName, "Boat"), activity, now);
-        if (fee != null) fee.setActionKind(ActionKind.FEE);
-        return fee;
-    }
-
-    /** Arms one boat-recovery fee from its Recover click (owner live 2026-10-14). */
-    synchronized void armBoatRecoveryFee(long fee, String boatName, long now) {
-        if (fee <= 0L) return;
-        boatRecoveryFee = fee;
-        boatRecoveryName = nonBlank(boatName, "Boat");
-        boatRecoveryArmedAt = now;
-    }
-
-    /** A confirm click refreshes the armed fee's window; a dialog never arms on its own. */
-    synchronized void refreshBoatRecoveryFee(long fee, long now) {
-        if (boatRecoveryFee <= 0L) return;
-        if (fee > 0L) boatRecoveryFee = fee;
-        boatRecoveryArmedAt = now;
-    }
-
-    /** The bank line's booking: the armed fee books once, if fresh (owner live 2026-10-14). */
-    synchronized Transaction bookArmedBoatRecovery(long now) {
-        long fee = boatRecoveryFee;
-        String name = boatRecoveryName;
-        return takeBoatRecoveryFee(now) > 0L ? bookBoatRecoveryFee(fee, name, now) : null;
-    }
-
-    /** The armed fee while fresh; one-shot. */
-    private long takeBoatRecoveryFee(long now) {
-        long fee = boatRecoveryFee;
-        boatRecoveryFee = 0L;
-        boatRecoveryName = "";
-        return fee > 0L && now - boatRecoveryArmedAt <= RECOVERY_FEE_MILLIS ? fee : 0L;
-    }
-
-    /**
-     * An armed boat recovery's pack payment: with coins in the pack the game prints nothing, so
-     * the settle's exact coins loss books the fee's named row and leaves the settle (owner live
-     * 2026-10-14).
-     */
-    Transaction settleBoatRecovery(Settle settle, long now) {
-        long fee = boatRecoveryFee;
-        if (fee <= 0L || now - boatRecoveryArmedAt > RECOVERY_FEE_MILLIS) return null;
-        Flow match = null;
-        for (Flow flow : settle.flows) {
-            if (flow != null
-                    && flow.isCost()
-                    && flow.itemId == ItemID.COINS
-                    && -flow.quantityDelta == fee) {
-                match = flow;
-                break;
-            }
-        }
-        if (match == null) return null;
-        var remaining = new ArrayList<Flow>(settle.flows);
-        remaining.remove(match);
-        settle.flows = remaining;
-        String name = boatRecoveryName;
-        return takeBoatRecoveryFee(now) > 0L ? bookBoatRecoveryFee(fee, name, now) : null;
-    }
-
     /** A bank-paid fee as a plain counted CONSUMPTION cost under its own row name. */
     private Transaction bookFee(long feeGp, String label, String activity, long now) {
         if (feeGp <= 0L || !live()) return null;
@@ -2758,8 +2677,7 @@ class Engine {
                             ? recordCommittedLoad(load, settle.now)
                             : recordAmbiguousLoad(load, settle.now);
         }
-        Transaction boatRecovery = settleBoatRecovery(settle, settle.now);
-        return first(settle.keyAudit, wipe, loadReview, boatRecovery);
+        return first(settle.keyAudit, wipe, loadReview);
     }
 
     /** Source-backed loot, key-chest claims and death reclaim returns. */

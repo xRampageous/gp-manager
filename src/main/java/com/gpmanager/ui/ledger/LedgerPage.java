@@ -225,11 +225,12 @@ class LedgerPage implements Shell.Page {
             for (Table table : new Table[] {gains, costs, market, pending, review, corrected})
                 table.resetPage();
         }
-        body.removeAll();
         searchOpen = searchOpen || !next.entry.search.isEmpty();
+        for (var part : body.getComponents())
+            if (part != search || !searchOpen) body.remove(part);
         if (searchOpen) {
             if (!search.getText().equals(next.entry.search)) setSearchText(next.entry.search);
-            body.add(search);
+            if (search.getParent() != body) body.add(search, 0);
         }
         if (next.entry.scope == LedgerData.Scope.TODAY) {
             // Owner 2026-10-01 (F03): whole runs that started today, never calendar-day money.
@@ -250,14 +251,13 @@ class LedgerPage implements Shell.Page {
 
     // ── overview ─────────────────────────────────────────────────────────────────────────────
     void overview(LedgerData data) {
-        fill(gains, "GAINS", data.gains.groups, data.gains.total, data.gains.incomplete, Tone.GAIN);
+        fill(gains, "GAINS", data.gains.groups, data.gains.total, Tone.GAIN);
         costs.setPicker(costPicker(data.entry.costView, data.costCounts));
         fill(
                 costs,
                 "LOSSES",
                 data.costs.groups,
                 data.costs.total,
-                data.costs.incomplete,
                 data.entry.costView == CostView.LOSS ? LOSS : SUPPLY);
         var settled = new ArrayList<Group>();
         var open = new ArrayList<Group>();
@@ -273,7 +273,7 @@ class LedgerPage implements Shell.Page {
                 open.add(group);
             }
         }
-        fill(market, "TRADE", settled, settledTotal, data.market.incomplete, MARKET);
+        fill(market, "TRADE", settled, settledTotal, MARKET);
         body.add(gains);
         body.add(costs);
         body.add(market);
@@ -314,13 +314,7 @@ class LedgerPage implements Shell.Page {
         }
     }
 
-    void fill(
-            Table table,
-            String title,
-            List<Group> groups,
-            long total,
-            boolean incomplete,
-            Tone tone) {
+    void fill(Table table, String title, List<Group> groups, long total, Tone tone) {
         var rows = new ArrayList<Row>();
         for (Group group : groups) {
             // Under All, loss rows keep their own colour beside supplies.
@@ -331,11 +325,10 @@ class LedgerPage implements Shell.Page {
                                     ? LOSS
                                     : tone));
         }
-        table.setTitle(title + " · " + groups.size() + (incomplete ? " · incomplete" : ""))
+        table.setTitle(title + " · " + groups.size())
                 .setTotal(groups.isEmpty() || tone == DIM ? "" : signed(total), tone)
                 .setMinRows(rows.size() > ROWS ? ROWS : 0)
                 .setRows(rows);
-        table.setToolTipText(incomplete ? msg("some-rows") : null);
     }
 
     /**
@@ -565,7 +558,7 @@ class LedgerPage implements Shell.Page {
         detail.add(
                 title(
                         group.primaryName,
-                        group.incomplete() ? "Incomplete" : exactSigned(group.value) + " gp",
+                        group.incomplete() ? "—" : exactSigned(group.value) + " gp",
                         group.incomplete() ? DIM : sign(group.value),
                         (count == 0
                                         ? ""

@@ -785,7 +785,6 @@ public class GpManagerPlugin extends Plugin {
         // a fee, so this branch also requires no coffer line on this tick or the last one.
         var fee = GameData.pattern("death-fee").matcher(message);
         var bank = GameData.pattern("bank-payment").matcher(message);
-        var bankBare = GameData.pattern("bank-payment-amountless").matcher(message);
         var coffer = GameData.pattern("coffer-payment").matcher(message);
         if (fee.matches()) {
             engine.inbox.drop(FEE);
@@ -811,12 +810,6 @@ public class GpManagerPlugin extends Plugin {
             instancePaidTick = client.getTickCount();
             engine.bookDeathFee(
                     ChargeCheck.parseCount(coffer.group(1)), msg("instance-fee"), now);
-        } else if (bankBare.matches()) {
-            // The boat recovery's bank line carries no amount: the fee is what its Recover click
-            // read off the row (owner 2026-10-14). No fresh click, nothing books.
-            if (engine.bookArmedBoatRecovery(now) == null) {
-                log.info("GP Manager: amountless bank payment with no armed boat-recovery fee");
-            }
         }
         var caught = GameData.pattern("bag").matcher(message);
         if (caught.matches()
@@ -876,7 +869,6 @@ public class GpManagerPlugin extends Plugin {
         int ttl = consumeTicks();
         boolean ge = Widgets.isGeOpen(client);
         engine.observeChest(option, target);
-        noteBoatRecoveryClick(event, option, target);
         charges.onMenuOptionClicked(event, option, target);
         // A loss-only "Offer" click with the Grand Exchange open is a sell placement: the
         // inventory removal is GE evidence, not a prayer/altar spend. The proven GE UI context
@@ -1640,52 +1632,6 @@ public class GpManagerPlugin extends Plugin {
     void refreshPresentation() {
         SidebarPanel panel = activityPanel;
         if (panel != null) panel.refresh();
-    }
-
-    /**
-     * A Recover click reads the row's shown fee for the amountless bank line that follows; a
-     * recovery confirm dialog names the fee on its own and keeps the arm fresh through a slow
-     * decision; any other click is not a fee row (owner live 2026-10-14).
-     */
-    void noteBoatRecoveryClick(MenuOptionClicked event, String option, String target) {
-        if (event == null) return;
-        Widget clicked =
-                event.getWidget() != null
-                        ? event.getWidget()
-                        : client == null ? null : client.getWidget(event.getParam1());
-        if ("recover".equals(option)) {
-            long fee = Widgets.rowFee(clicked, target);
-            if (fee > 0L) {
-                engine.armBoatRecoveryFee(fee, titleCase(target), SafeMath.now());
-                return;
-            }
-            log.info(
-                    "GP Manager: no boat-recovery fee read (target={}, param1={}, chain={})",
-                    target,
-                    event.getParam1(),
-                    Widgets.describe(clicked));
-            return;
-        }
-        int dialogGroup = InterfaceID.Chatmenu.UNIVERSE >>> 16;
-        boolean dialogClick =
-                (event.getParam1() >>> 16) == dialogGroup
-                        || clicked != null && (clicked.getId() >>> 16) == dialogGroup;
-        // A recovery confirm's click refreshes the arm so a slow decision cannot expire it; a
-        // dialog never arms alone (an unrelated dialog's number must never book).
-        if (!dialogClick) return;
-        engine.refreshBoatRecoveryFee(Widgets.dialogFee(client), SafeMath.now());
-    }
-
-    /** "junior jim" reads as the game names it: "Junior Jim". */
-    static String titleCase(String name) {
-        var out = new StringBuilder();
-        for (String word : Phrases.orEmpty(name).trim().split("\\s+")) {
-            if (word.isEmpty()) continue;
-            if (out.length() > 0) out.append(' ');
-            out.append(Character.toUpperCase(word.charAt(0)));
-            if (word.length() > 1) out.append(word.substring(1));
-        }
-        return out.toString();
     }
 
     boolean canIngest() {

@@ -198,7 +198,7 @@ public class SemanticFinancialProjectionTest
     @Test
     public void aPaidFeeIsOneRowNamedByItsNote()
     {
-        // Owner live 2026-10-14: the boat recovery reads "Recovered Junior Jim", value only.
+        // Retired boat recovery, kept for save compat: a FEE row reads "Recovered Junior Jim", value only.
         Transaction fee = new Transaction(T0 + 1_000L, TransactionType.CONSUMPTION, Context.GENERIC,
             "Recovered Junior Jim", "General", true,
             Collections.singletonList(new Flow(995, "Coins", -4_500L, 1, -4_500L, PriceSource.FACE_VALUE)),

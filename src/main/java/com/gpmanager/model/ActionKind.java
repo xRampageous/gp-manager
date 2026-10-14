@@ -35,7 +35,7 @@ enum ActionKind {
     BURN,
     /** Settled supply loss whose specific action is not evidenced. */
     SUPPLIES,
-    /** A bank-paid fee (the boat recovery): one action row named by its own note. */
+    /** A bank-paid fee row (the retired boat recovery): one action row named by its own note. */
     FEE;
 
     /** The constant's name, lowercased with hyphens: the wire name saved on every row. */

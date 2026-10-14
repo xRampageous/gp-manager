@@ -41,6 +41,7 @@ barrows-gear	Barrows gear wore down a stage or was repaired: the same item, so n
 drunk-chugging	Drunk from the chugging barrel: one dose of each potion in it, as the game's own lines name them.
 game-counted	The game counted these charges out when you uncharged 
 bug-report	https://github.com/xRampageous/gp-manager/issues/new/choose
+changelog	https://github.com/xRampageous/gp-manager/blob/main/CHANGELOG.md
 servant-bank	Servant bank trip
 house-servant	A house servant fetched, banked or un-noted these items: moved, not gained or spent.
 gbank	 Collected to the bank after filling at several prices: it counts the highest tax it could have paid, so its result is never overstated.
@@ -184,7 +185,6 @@ gods-very	gods are very pleased with your offering
 offer-identity	offer identity replaced without evidence
 gp-manager-repository-initialized	GP Manager repository is not initialized
 unable-replace	Unable to replace GP Manager reset state
-some-rows	Some rows have incomplete value coverage
 account-identity-write	No account identity on the write intent
 unable-release	Unable to release GP Manager write lock
 ownership-neutral-move	Ownership-neutral move; nothing books.
@@ -313,7 +313,7 @@ runs-today	Runs today · Current run + runs started today; whole-run totals.
 tracked-active	Tracked active time; manual and login pauses are excluded
 tracking-waits	Tracking waits until you log back in
 kills-since	Kills since your last death · best 
-value-incomplete	 · value incomplete; no price known
+value-incomplete	 · no price known
 estimated-charge	Estimated charge use · 
 tax-counted	 · tax counted
 result-unavailable	 · result unavailable
@@ -347,7 +347,6 @@ seed-vault	Seed vault transfer
 instance-fee	Instance fee (coffer)
 instance-fee-bank	Instance fee (bank)
 death-s	Death's fee (coffer or bank)
-boat-recovered	Recovered 
 pre-restore	Pre-restore backup failed: 
 unable-schedule-gp-manager-2	Unable to schedule GP Manager 
 unable-complete	Unable to complete GP Manager 
@@ -364,7 +363,7 @@ confirm-correction	Confirm correction
 result-includes-manual-correction	 · Result includes a manual correction.
 if-counted-cost	If counted as a cost: Net 
 if-counted-gain	If counted as a gain: Net 
-incomplete-value	 · incomplete value coverage
+incomplete-value	 · not counted: no known value
 market-result	 · Market result is not realized
 grand-exchange-offers	Grand Exchange offers still open: 
 loot-keys	Loot keys not yet opened: 

@@ -183,7 +183,7 @@ public final class LedgerPageProbe
         for (LedgerData.Card card : LedgerData.cards(group))
         {
             texts.add(group.primaryName + "|" + card.summaryText() + "|"
-                + (card.incomplete ? "incomplete" : Fmt.exactSigned(card.value) + " gp"));
+                + (card.incomplete ? "—" : Fmt.exactSigned(card.value) + " gp"));
         }
         return texts;
     }
