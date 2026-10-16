@@ -1,5 +1,16 @@
 # GP Manager changelog
 
+## 1.5.1 - 2026-10-17
+
+**New**
+- Clicking the ACTIVE clock now restarts GP/h and the clock from that moment, in a Grind too; Net, Recent and the Ledger keep the whole run. It replaces Start fresh, so a factory reset is the only full reset.
+
+**Fixed**
+- A Grand Exchange buy paid from your bank no longer sends its change (the coins back when it fills below your price) to Review; earlier rows like this leave Review and Recent on login.
+- Wilderness Agility dispenser rewards that go straight into an open looting bag now count as loot.
+- Old items still showing "?" (half pies from before 1.5.0) take their price when you log in.
+- Risk sits beside the Grind button instead of taking a row of its own, and it now includes what your looting bag holds (always lost on a death).
+
 ## 1.5.0 - 2026-10-16
 
 **New**

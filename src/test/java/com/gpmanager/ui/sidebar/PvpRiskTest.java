@@ -66,14 +66,17 @@ public class PvpRiskTest
             LivePage.Actions.class.getClassLoader(), new Class<?>[] {LivePage.Actions.class},
             (proxy, method, args) -> method.getReturnType() == boolean.class ? false : null);
         java.util.List<String> cells = new java.util.ArrayList<>();
-        for (java.util.List<Hero.Cell> row : new LivePage(actions, id -> null).strips(s))
+        LivePage page = new LivePage(actions, id -> null);
+        for (java.util.List<Hero.Cell> row : page.strips(s))
         {
             for (Hero.Cell cell : row)
             {
                 cells.add(cell.label + " " + cell.value);
             }
         }
-        assertTrue(cells.toString(), cells.contains("RISK 12.4M"));
+        // Owner 1.5.1: risk sits beside the Review badge instead of a row of its own.
+        assertFalse("no Risk row: " + cells, cells.toString().contains("RISK"));
+        assertTrue(page.statusIcons(s).stream().anyMatch(cell -> "RISK 12.4M".equals(cell.value)));
         assertFalse("skull and Protect are never shown (owner live 2026-10-13)",
             cells.toString().contains("SKULL") || cells.toString().contains("PROTECT"));
     }

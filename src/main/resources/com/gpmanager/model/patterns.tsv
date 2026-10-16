@@ -33,6 +33,8 @@ barrows	((?:ahrim|dharok|guthan|karil|torag|verac)'s [^0-9]+?|amulet of the damn
 cash	coins|spirit flakes|molch pearl|abyssal pearls	0
 # Every Avernic defender variant (not the tradeable hilt): a death weighs it at its 600,000 repair cost.
 avernic	avernic defender(?! hilt).*	0
+# A Wilderness Agility dispenser award, every item it names (owner recording 2026-10-16).
+bag-reward	^you have been awarded (.+) from the agility dispenser\.$	2
 # A chug's line per potion (OSRS Wiki; Dude Where's My Stuff, GIM Hub): the one-dose potion it drank.
 chug	^You have (?:[\d,]+ doses? of|finished all doses of) (.+?)(?: left)? in your barrel\.$	2
 # Bryophyta's staff Check and load lines (owner recording 2026-10-09).

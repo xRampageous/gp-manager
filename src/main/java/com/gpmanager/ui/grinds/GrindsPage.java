@@ -525,24 +525,14 @@ class GrindsController implements GrindsPage.Actions {
                 });
     }
 
-    /** Soft reset from the Live clock; a running Grind is ended instead (owner 2026-10-16). */
-    public void startFresh() {
-        if (engine.isCustomActive()) {
-            shell.sheet(
-                    "End this Grind?",
-                    msg("end-for-fresh"),
-                    null,
-                    new Shell.Choice("End Grind", true, this::endGrind));
-        } else {
-            shell.sheet(
-                    "Start fresh?",
-                    msg("start-fresh"),
-                    null,
-                    new Shell.Choice(
-                            "Start fresh",
-                            true,
-                            () -> mutate(() -> engine.startFreshFreePlay(SafeMath.now()))));
-        }
+    /** The Live clock restarts GP/h and the clock, in a Grind too (owner 1.5.1). */
+    public void restartRate() {
+        shell.sheet(
+                "Restart GP/h?",
+                msg("restart-rate"),
+                null,
+                new Shell.Choice(
+                        "Restart", true, () -> mutate(() -> engine.restartRate(SafeMath.now()))));
     }
 
     /** A short getting-started guide; its words live in text.tsv (owner 2026-10-16). */

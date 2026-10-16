@@ -140,7 +140,7 @@ public final class SidebarPreview
         engine.getActiveSession().addTransaction(pkKill(now + 4_000L), 2_000);
         engine.getActiveSession().addTransaction(keyClaim(now + 6_000L), 2_000);
         engine.getActiveSession().addEncounter(false, now + 4_000L);
-        liveShot(out, "d-live-pvp-context.png", engine, new PvpState(true, true, true, 0L));
+        liveShot(out, "d-live-pvp-context.png", engine, new PvpState(true, true, true, 140_000L));
     }
 
     /** E. A looted raid: Theatre of Blood, a busy run and the scythe. */
@@ -642,8 +642,8 @@ public final class SidebarPreview
         Engine free = engine();
         free.ensureSession(SafeMath.now() - 60_000L);
         SidebarPanel fresh = panel(free, PvpState.NONE);
-        new GrindsController(fresh).startFresh();
-        paint(fresh, new File(out, "g-h-start-fresh.png"));
+        new GrindsController(fresh).restartRate();
+        paint(fresh, new File(out, "g-h-restart-rate.png"));
         SidebarPanel reset = panel(grindsFixture(), PvpState.NONE);
         new GrindsController(reset).factoryReset();
         paint(reset, new File(out, "g-i-factory-reset.png"));

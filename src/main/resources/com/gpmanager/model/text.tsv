@@ -63,7 +63,7 @@ saved-grinds	Grinds you start appear here
 entries-changed	Entries changed while the preview was open · check again
 items-waiting-reclaimed	Items waiting to be reclaimed after death · a reclaimed item stays neutral apart from the fee
 another-client-changed	another client changed this account after the flush; nothing was overwritten.
-resets-gp	Deletes this account's runs, Ledger, My Grinds and totals. A safety copy is saved first. Only want fresh numbers? Click the ACTIVE clock on Live.
+resets-gp	Deletes this account's runs, Ledger, My Grinds and totals. A safety copy is saved first. Only want a fresh GP/h? Click the ACTIVE clock on Live.
 review.COST	Count as cost
 review.GAIN	Count
 review.TRANSFER	Transfer
@@ -302,7 +302,7 @@ text-2	<html><font color='#6ee16e'>●</font>
 corrected	 · Corrected
 current-run	Current run + runs started today; whole-run totals
 runs-today	Runs today · Current run + runs started today; whole-run totals.
-tracked-active	Tracked active time; manual and login pauses are excluded. Click to start fresh.
+tracked-active	Tracked active time since the last restart; pauses are excluded. Click to restart GP/h.
 tracking-waits	Tracking waits until you log back in
 kills-since	Kills since your last death · best 
 value-incomplete	 · no price known
@@ -380,8 +380,9 @@ tentacle-used	Abyssal tentacle used up
 tentacle-whip	The tentacle ran out or was dissolved; its abyssal whip is gone and the kraken tentacle is left.
 cannon-parts	Cannon set up or picked up
 cannon-why	A dwarf multicannon's parts stay yours wherever it stands; Nulodion replaces a lost one free.
-start-fresh	Your run so far moves to Recent grinds. Nothing is deleted; Live starts again at zero.
-end-for-fresh	End this Grind first. It moves to Recent grinds.
-guide	Live: Net, GP/h and newest changes. Click the clock to start fresh. | Gains: loot and income. Costs: supplies, charges, deaths. Banking and trades are neutral. | Grinds: start one by name. It remembers its targets, best run and average GP/h. | Ledger: why each number changed. Check Review rows; Correct fixes any row. | HUD+: the in-game overlay. Set it up in plugin settings. | Values: GE price, else alch. — means worthless, ? means no price yet.
+restart-rate	GP/h and the clock start again from now. Net, Recent and the Ledger keep the whole run.
+guide	Live: Net, GP/h and newest changes. Click the clock to restart GP/h. | Gains: loot and income. Costs: supplies, charges, deaths. Banking and trades are neutral. | Grinds: start one by name. It remembers its targets, best run and average GP/h. | Ledger: why each number changed. Check Review rows; Correct fixes any row. | HUD+: the in-game overlay. Set it up in plugin settings. | Values: GE price, else alch. — means worthless, ? means no price yet.
 bf-coffer	Blast Furnace coffer
 free-play-kept	Free play is kept.
+bag-reward	Agility dispenser · looting bag
+bag-reward-why	The Agility dispenser paid this into your open looting bag; its chat line named it.

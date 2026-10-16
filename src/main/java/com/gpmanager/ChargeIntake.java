@@ -17,6 +17,19 @@ import net.runelite.api.widgets.Widget;
 import java.util.*;
 
 import javax.inject.*;
+import static com.gpmanager.GameData.msg;
+import static com.gpmanager.PriceSource.*;
+import static java.lang.Math.*;
+import static java.util.Collections.*;
+import static java.util.Locale.*;
+import java.util.regex.*;
+import lombok.*;
+import static com.gpmanager.FlowFilters.*;
+import static com.gpmanager.Phrases.*;
+import static com.gpmanager.SafeMath.nonNeg;
+import com.gpmanager.SavedState.PendingClaim;
+import java.util.function.IntPredicate;
+import net.runelite.api.gameval.*;
 
 /**
  * Client-thread intake for the exact Check-to-Check charge contract: a Check click binds a
@@ -1117,5 +1130,1457 @@ class ChargeIntake {
     /** The item id inside a {@link #weaponIdentity} ("group:slot:item:variant"). */
     static int identityItemId(String identity) {
         return Integer.parseInt(identity.split(":")[2]);
+    }
+}
+
+/**
+ * One explicit weapon Check response, expressed as its measured component stock. It does not infer
+ * depletion from combat events, menu intent, or probabilities.
+ */
+@AllArgsConstructor
+class ChargeCheck {
+    static final int SCALES = ItemID.SNAKEBOSS_SCALE;
+    static final Pattern BLOWPIPE_CHECK = GameData.pattern("blowpipe-check");
+    static final Pattern TYPED_DARTS = GameData.pattern("dart-count");
+    static final Pattern EYE_OF_AYAK_CHECK = GameData.pattern("eye-tears-check");
+    static final Pattern EYE_RUNE_CHECK = GameData.pattern("eye-runes-check");
+    static final Map<String, Integer> DARTS = new LinkedHashMap<>();
+
+    static {
+        for (String[] row : GameData.rows("darts")) DARTS.put(row[0], Integer.parseInt(row[1]));
+    }
+
+    /**
+     * Charged-item families; each one's data (names, ids, triggers, recipe, Check shape) is a d20
+     * row.
+     */
+    @Getter
+    enum ChargedItem {
+        TRIDENT_SEAS,
+        TRIDENT_SWAMP,
+        TRIDENT_SWAMP_ENHANCED,
+        TRIDENT_SEAS_ENHANCED,
+        BLOWPIPE,
+        SHADOW,
+        SANGUINESTI,
+        SANGUINESTI_HOLY,
+        WARPED,
+        VENATOR,
+        VENATOR_ECHO,
+        EYE_OF_AYAK,
+        SCYTHE,
+        ATES,
+        SAILORS_AMULET,
+        TOME_OF_FIRE,
+        CRYSTAL_BOW,
+        CRYSTAL_HALBERD,
+        BOWFA,
+        SAELDOR,
+        BLOOD_FURY,
+        CRAW,
+        WEBWEAVER,
+        VIGGORA,
+        URSINE,
+        THAMMARON,
+        ACCURSED,
+        MEMOIRS,
+        BRYOPHYTA,
+        TOXIC_STAFF,
+        SERPENTINE_HELM,
+        CRYSTAL_HELM,
+        CRYSTAL_BODY,
+        CRYSTAL_LEGS,
+        CRYSTAL_SHIELD,
+        SUFFERING,
+        TONALZTICS,
+        TOME_OF_WATER,
+        TOME_OF_EARTH,
+        ETHEREUM,
+        BONE_STAFF,
+        CRYSTAL_AXE,
+        CRYSTAL_PICKAXE,
+        CRYSTAL_HARPOON,
+        ECHO_BOOTS,
+        SLAYER_STAFF_E,
+        INFERNAL_AXE,
+        INFERNAL_PICKAXE,
+        INFERNAL_HARPOON;
+        String displayName;
+        boolean implemented;
+        String family;
+        ActionKind action;
+        int units;
+
+        /** A load's components can never be refunded: the load books as spend, not a transfer. */
+        boolean committedLoad;
+
+        /** The Check line's pattern with its count group and its single-charge group (0: none). */
+        Pattern check;
+
+        int countGroup, oneGroup;
+        int[] graphics, animations, itemIds;
+
+        /** Components one use spends; a Check's count of uses times this is its measured stock. */
+        Map<Integer, Long> recipe;
+
+        /** A fractional per-use part, [itemId, numerator, denominator], or null. */
+        long[] fraction;
+
+        List<String> aliases;
+
+        static {
+            for (String[] row : GameData.rows("charged_items")) {
+                ChargedItem item = valueOf(row[0]);
+                item.displayName = row[1];
+                item.implemented = Boolean.parseBoolean(row[2]);
+                item.family = row[3];
+                item.action = ActionKind.valueOf(row[4]);
+                item.units = Integer.parseInt(row[5]);
+                if (!"-".equals(row[6])) {
+                    String[] check = row[6].split(" ");
+                    item.check = GameData.pattern(check[0]);
+                    item.countGroup = Integer.parseInt(check[1]);
+                    item.oneGroup = Integer.parseInt(check[2]);
+                }
+                item.graphics = ids(row[7]);
+                item.animations = ids(row[8]);
+                var recipe = new LinkedHashMap<Integer, Long>();
+                for (String part : parts(row[9], " "))
+                    recipe.put(id(part), Long.parseLong(part.substring(0, part.indexOf('*'))));
+                item.recipe = unmodifiableMap(recipe);
+                if (!"-".equals(row[10])) {
+                    String[] fraction = row[10].split("[/*]");
+                    item.fraction =
+                            new long[] {
+                                id(row[10]),
+                                Long.parseLong(fraction[0]),
+                                Long.parseLong(fraction[1])
+                            };
+                }
+                item.aliases = parts(row[11], ";");
+                item.itemIds = ids(row[12]);
+            }
+            for (String[] row : GameData.rows("committed_loads")) {
+                valueOf(row[0]).committedLoad = true;
+            }
+        }
+
+        static List<String> parts(String cell, String separator) {
+            return "-".equals(cell) ? emptyList() : List.of(cell.split(separator));
+        }
+
+        /** The id in "qty*id=NAME" or "id=NAME". */
+        static int id(String part) {
+            return Integer.parseInt(part.substring(part.indexOf('*') + 1, part.indexOf('=')));
+        }
+
+        static int[] ids(String cell) {
+            return parts(cell, ",").stream().mapToInt(ChargedItem::id).toArray();
+        }
+    }
+
+    ChargedItem variant;
+    Map<Integer, Long> componentCounts;
+
+    /** Returns -1 when a Check explicitly reported no darts or had an unknown type. */
+    int dartItemId;
+
+    boolean bookable;
+
+    /**
+     * Parse a pinned Check-message shape. Returns {@code null} for unrelated chat. Recognized but
+     * unsupported/unknown variants return a non-bookable read so a tracker can clear an older
+     * baseline safely.
+     */
+    static ChargeCheck parse(String rawMessage) {
+        String message = stripTags(rawMessage);
+        ChargedItem surface = message == null ? null : surface(message.toLowerCase(ROOT));
+        if (surface == null) return null;
+        // A recognizably malformed Check surface resets the caller's old baseline
+        // rather than carrying stale evidence forward.
+        var components = new LinkedHashMap<Integer, Long>();
+        int dartId = -1;
+        try {
+            Matcher blowpipe = BLOWPIPE_CHECK.matcher(message);
+            if (blowpipe.matches()) {
+                components.put(SCALES, parseCount(blowpipe.group(2)));
+                String dartPart = blowpipe.group(1).trim();
+                Matcher darts = TYPED_DARTS.matcher(dartPart);
+                if (!"none".equalsIgnoreCase(dartPart)) {
+                    dartId =
+                            darts.matches()
+                                    ? DARTS.getOrDefault(normalizeItemName(darts.group(1)), -1)
+                                    : -1;
+                    if (dartId < 0) return unsupported(surface);
+                    components.put(dartId, parseCount(darts.group(2)));
+                }
+            } else if (surface == ChargedItem.EYE_OF_AYAK) {
+                Matcher eye = EYE_OF_AYAK_CHECK.matcher(message);
+                Matcher runes = EYE_RUNE_CHECK.matcher(message);
+                if (eye.matches()) {
+                    components.put(ItemID.DEMON_TEAR, parseCount(eye.group(1)));
+                } else if (runes.matches()) {
+                    long charges = parseCount(runes.group(1));
+                    components.put(ItemID.DEATHRUNE, Math.multiplyExact(charges, 2L));
+                    components.put(ItemID.CHAOSRUNE, charges);
+                }
+            } else if (surface.check != null) {
+                // Every other family's Check counts uses, so its stock is that count times one
+                // use's recipe.
+                Matcher read = surface.check.matcher(message);
+                if (read.matches()) {
+                    String counted = read.group(surface.countGroup);
+                    long count =
+                            counted != null
+                                    ? parseCount(counted)
+                                    : surface.oneGroup > 0 && read.group(surface.oneGroup) != null
+                                            ? 1L
+                                            : 0L;
+                    for (var part : surface.recipe.entrySet())
+                        components.put(part.getKey(), Math.multiplyExact(count, part.getValue()));
+                }
+            }
+            if (!components.isEmpty())
+                return new ChargeCheck(surface, unmodifiableMap(components), dartId, true);
+        } catch (NumberFormatException | ArithmeticException malformed) {
+            // The count is syntax-checked; this is a value outside the supported range.
+        }
+        return unsupported(surface);
+    }
+
+    /** The Check surface a lowercase chat line belongs to, whether or not it parses. */
+    static ChargedItem surface(String lower) {
+        if (lower.startsWith("darts:") && lower.contains("scales:")) return ChargedItem.BLOWPIPE;
+        if (lower.startsWith("the pendant has ")) return ChargedItem.ATES;
+        if (lower.startsWith("the amulet has ") || lower.startsWith("your amulet has ")) {
+            // The sailors' amulet's own Check wording ("...has 106 charges." or "...charges
+            // left."); the blood fury's hit-count line names itself below (owner 2026-10-14).
+            return ChargedItem.SAILORS_AMULET;
+        }
+        if (lower.startsWith("your tome has been charged with "))
+        {
+            // The page names the tome; a bare "your tome" line stays fire and the clicked row
+            // redirects it (owner 2026-10-12).
+            if (lower.contains("soaked")) return ChargedItem.TOME_OF_WATER;
+            if (lower.contains("soiled")) return ChargedItem.TOME_OF_EARTH;
+            return ChargedItem.TOME_OF_FIRE;
+        }
+        if (lower.startsWith(msg("amulet-blood"))) return ChargedItem.BLOOD_FURY;
+        if (lower.startsWith(msg("eye-ayak-been"))
+                || lower.startsWith(msg("eye-ayak-been-charged"))) {
+            return ChargedItem.EYE_OF_AYAK;
+        }
+        for (ChargedItem variant : ChargedItem.values()) {
+            if (variant == ChargedItem.BLOWPIPE) continue;
+            String name = variant.displayName.toLowerCase(ROOT);
+            if (lower.startsWith("your " + name + " has ")
+                    || lower.startsWith("your " + name + " only has ")
+                    || lower.startsWith(name + " has ")
+                    || lower.startsWith(name + " only has ")) {
+                return variant;
+            }
+        }
+        // A Check that names no weapon ("Your bow has…"): the first row sharing that wording.
+        for (ChargedItem variant : ChargedItem.values()) {
+            if (variant.check != null && variant.check.matcher(lower).matches()) return variant;
+        }
+        return null;
+    }
+
+    /** Resolve only exact supported menu-target names; menu evidence is identity only. */
+    static ChargedItem supportedForName(String itemName) {
+        String name = normalizeItemName(itemName);
+        if (name == null) return null;
+        for (ChargedItem variant : ChargedItem.values()) {
+            if (variant.implemented
+                    && (variant.displayName.toLowerCase(ROOT).equals(name)
+                            || variant.aliases.contains(name))) {
+                return variant;
+            }
+        }
+        return null;
+    }
+
+    /**
+     * Any catalogue variant by exact display name for presentation; estimate-only variants
+     * included.
+     */
+    static ChargedItem variantForName(String itemName) {
+        String name = normalizeItemName(itemName);
+        for (ChargedItem variant : ChargedItem.values()) {
+            if (variant.displayName.toLowerCase(ROOT).equals(name)) return variant;
+        }
+        return null;
+    }
+
+    /** Resolve charged and uncharged item ids so a Check receipt can be tied to its menu target. */
+    static ChargedItem supportedForId(int itemId) {
+        for (ChargedItem variant : ChargedItem.values()) {
+            for (int id : variant.itemIds) {
+                if (id == itemId) return variant;
+            }
+        }
+        return null;
+    }
+
+    /**
+     * Validate a candidate item-on-weapon load component. Both the canonical id and displayed name
+     * must agree, so unknown dart types fail closed.
+     */
+    static boolean isLoadComponent(ChargedItem variant, int itemId, String itemName) {
+        String expectedName =
+                variant == null || !variant.implemented ? null : expectedLoadName(variant, itemId);
+        String actualName = normalizeItemName(itemName);
+        // Owner 1.2: what an item's own charge is made of is loaded, never spent, for every item.
+        if (actualName != null
+                && variant != null
+                && (variant.recipe.containsKey(itemId)
+                        || variant.fraction != null && variant.fraction[0] == itemId)) return true;
+        return expectedName != null
+                && actualName != null
+                && (expectedName.equals(actualName)
+                        || actualName.equals(expectedName + "s") && !expectedName.endsWith("s"));
+    }
+
+    boolean hasDarts() {
+        return dartItemId >= 0;
+    }
+
+    /** Component units per priced item: a page feeds 20 charges, a shard 100. */
+    static int unitsPerItem(ChargedItem variant, int componentItemId) {
+        return variant.units;
+    }
+
+    static ChargeCheck unsupported(ChargedItem variant) {
+        return new ChargeCheck(variant, emptyMap(), -1, false);
+    }
+
+    /** The same measured count expressed in another same-pattern variant's own recipe. */
+    static Map<Integer, Long> restock(
+            ChargedItem target, ChargedItem source, Map<Integer, Long> counts) {
+        if (counts.isEmpty() || source.recipe.isEmpty()) return counts;
+        long unit = source.recipe.values().iterator().next();
+        long count = counts.values().iterator().next() / unit;
+        var stock = new LinkedHashMap<Integer, Long>();
+        for (var part : target.recipe.entrySet()) stock.put(part.getKey(), count * part.getValue());
+        return stock;
+    }
+
+    /**
+     * A load component not in the item's own recipe: the blowpipe's darts, and the Eye of Ayak's
+     * runes in rune mode (owner 2026-09-30). Everything else loads through its recipe.
+     */
+    static String expectedLoadName(ChargedItem variant, int itemId) {
+        if (variant == ChargedItem.BLOWPIPE) {
+            for (Map.Entry<String, Integer> dart : DARTS.entrySet()) {
+                if (dart.getValue() == itemId) return dart.getKey();
+            }
+        }
+        if (variant != ChargedItem.EYE_OF_AYAK) return null;
+        return itemId == ItemID.DEATHRUNE
+                ? "death rune"
+                : itemId == ItemID.CHAOSRUNE ? "chaos rune" : null;
+    }
+
+    static long parseCount(String raw) {
+        return Long.parseLong(raw.replace(",", ""));
+    }
+
+    static String stripTags(String value) {
+        return value == null ? null : value.replaceAll("<[^>]*>", "").trim();
+    }
+
+    static String normalizeItemName(String value) {
+        String cleaned = stripTags(value);
+        return Phrases.empty(cleaned) ? null : cleaned.toLowerCase(ROOT).replaceAll("\\s+", " ");
+    }
+}
+
+/** A load target's candidate losses; only a measured Check can reconcile their quantities. */
+@AllArgsConstructor
+class LoadTarget {
+    ChargeCheck.ChargedItem variant;
+    String targetIdentity;
+    List<Flow> remaining;
+    List<Flow> ambiguousCandidates;
+
+    /** When the load was clicked; 0 when there was no load. */
+    long clickedAt;
+}
+
+/**
+ * Transient ownership of automatic charge estimates. The canonical receipts remain in the owning
+ * {@link Session}; this index links one weapon (session and target identity) to those receipt ids
+ * until a compatible measured Check closes the window. Never persisted.
+ */
+class ChargeEstimateJournal {
+    static final int MAX_RECEIPTS = 512;
+
+    static final class Receipt {
+        final String key;
+        final String transactionId;
+        final int itemId;
+        long remainingQuantity;
+
+        Receipt(String key, String transactionId, int itemId, long quantity) {
+            this.key = key;
+            this.transactionId = transactionId;
+            this.itemId = itemId;
+            remainingQuantity = quantity;
+        }
+    }
+
+    /** Open receipts per weapon, oldest weapon first. */
+    final LinkedHashMap<String, List<Receipt>> entries = new LinkedHashMap<>();
+
+    /** Quantities evicted by the bound while their weapon's window is still open, per item. */
+    final Map<String, Map<Integer, Long>> evicted = new HashMap<>();
+
+    int receiptCount;
+
+    static String key(String sessionId, String targetIdentity) {
+        return Phrases.lower(sessionId) + "\n" + Phrases.lower(targetIdentity);
+    }
+
+    synchronized void clear() {
+        entries.clear();
+        evicted.clear();
+        receiptCount = 0;
+    }
+
+    synchronized void record(
+            String sessionId,
+            String targetIdentity,
+            String transactionId,
+            int itemId,
+            long quantity) {
+        if (Phrases.blank(sessionId)
+                || Phrases.blank(targetIdentity)
+                || Phrases.blank(transactionId)
+                || itemId <= 0
+                || quantity <= 0L) {
+            return;
+        }
+        String key = key(sessionId, targetIdentity);
+        entries.computeIfAbsent(key, ignored -> new ArrayList<>())
+                .add(new Receipt(key, transactionId, itemId, quantity));
+        receiptCount++;
+        while (receiptCount > MAX_RECEIPTS) {
+            Map.Entry<String, List<Receipt>> oldest = entries.entrySet().iterator().next();
+            Receipt gone = oldest.getValue().remove(0);
+            receiptCount--;
+            // The window is still open: remember the evicted quantity so the next measured
+            // delta is not booked on top of an estimate that is no longer tracked here.
+            evicted.computeIfAbsent(gone.key, ignored -> new HashMap<>())
+                    .merge(gone.itemId, gone.remainingQuantity, Long::sum);
+            if (oldest.getValue().isEmpty()) entries.remove(oldest.getKey());
+        }
+    }
+
+    /** Evicted quantity still inside this weapon's open window for one component. */
+    synchronized long evictedOverlap(String sessionId, String targetIdentity, int itemId) {
+        return evicted.getOrDefault(key(sessionId, targetIdentity), Map.of())
+                .getOrDefault(itemId, 0L);
+    }
+
+    /** Pending receipts for one component of one weapon. */
+    synchronized List<Receipt> receipts(String sessionId, String targetIdentity, int itemId) {
+        List<Receipt> result = new ArrayList<>();
+        for (Receipt receipt : receiptsFor(sessionId, targetIdentity))
+            if (receipt.itemId == itemId) result.add(receipt);
+        return result;
+    }
+
+    /** Every pending receipt for one weapon, whichever component it belongs to. */
+    synchronized List<Receipt> receiptsFor(String sessionId, String targetIdentity) {
+        return new ArrayList<>(entries.getOrDefault(key(sessionId, targetIdentity), List.of()));
+    }
+
+    synchronized void consume(Receipt receipt, long quantity) {
+        List<Receipt> values = receipt == null ? null : entries.get(receipt.key);
+        if (values == null || quantity <= 0L || !values.contains(receipt)) return;
+        receipt.remainingQuantity = Math.max(0L, receipt.remainingQuantity - quantity);
+        if (receipt.remainingQuantity == 0L) {
+            values.remove(receipt);
+            receiptCount--;
+        }
+        if (values.isEmpty()) entries.remove(receipt.key);
+    }
+
+    /** Forget every receipt, and all evicted overlap, for one weapon (its window closed). */
+    synchronized void clearTarget(String sessionId, String targetIdentity) {
+        String key = key(sessionId, targetIdentity);
+        List<Receipt> removed = entries.remove(key);
+        if (removed != null) receiptCount -= removed.size();
+        evicted.remove(key);
+    }
+}
+
+/** Measured negative component-count differences; valuation is applied by the caller. */
+@Getter
+class ChargeDelta {
+    ChargeCheck.ChargedItem variant;
+    List<ComponentDelta> componentDeltas;
+
+    /** Components the Check read at the same count as before: their estimates were overcounts. */
+    final Set<Integer> unchanged = new HashSet<>();
+
+    /** Explicit Check outcome; this enum is transient accounting evidence, never save data. */
+    enum CheckResult {
+        SEED,
+        SAME,
+        SPEND,
+        LOAD,
+        MISMATCH
+    }
+
+    CheckResult result;
+
+    ChargeDelta(ChargeCheck.ChargedItem variant, List<ComponentDelta> deltas, CheckResult result) {
+        this.variant = variant;
+        componentDeltas = deltas;
+        this.result = result;
+    }
+
+    /** A caller supplying measured losses explicitly constructs SPEND, as before. */
+    ChargeDelta(ChargeCheck.ChargedItem variant, List<ComponentDelta> deltas) {
+        this(variant, deltas, CheckResult.SPEND);
+    }
+
+    /** An outcome without a measured decrease carries no bookable component quantity. */
+    ChargeDelta(ChargeCheck.ChargedItem variant, CheckResult result) {
+        this(variant, Collections.emptyList(), result);
+    }
+
+    /** One component's measured decrease (always negative). */
+    @Getter
+    @AllArgsConstructor
+    static class ComponentDelta {
+        int itemId;
+        long quantityDelta;
+    }
+
+    /**
+     * The GP cost of these priced component losses when they exactly match every measured decrease;
+     * 0 otherwise. Missing, partial, extra, unsupported-priced or overflowing flows fail closed as
+     * a whole. Generic inventory losses can never authorize charge spend.
+     */
+    long exactCost(List<Flow> pricedLosses) {
+        if (result != CheckResult.SPEND
+                || variant == null
+                || !variant.implemented
+                || componentDeltas.isEmpty()
+                || pricedLosses == null
+                || pricedLosses.size() != componentDeltas.size()) {
+            return 0L;
+        }
+        var expected = new HashMap<Integer, Long>();
+        var actual = new HashMap<Integer, Long>();
+        long cost = 0L;
+        try {
+            for (ComponentDelta component : componentDeltas) {
+                if (component.itemId <= 0) return 0L;
+                expected.merge(component.itemId, component.quantityDelta, Math::addExact);
+            }
+            for (Flow flow : pricedLosses) {
+                boolean validPriceSource =
+                        (flow.itemId == ItemID.COINS
+                                        ? flow.unitPrice == 1 && flow.getPriceSource() == FACE_VALUE
+                                        : flow.getPriceSource() == GRAND_EXCHANGE
+                                                || flow.getPriceSource() == MANUAL_OVERRIDE);
+                if (!validPriceSource
+                        || flow.quantityDelta >= 0L
+                        || flow.itemId <= 0
+                        || flow.unitPrice <= 0
+                        || flow.valueDelta >= 0L
+                        || multiplyExact(flow.quantityDelta, (long) flow.unitPrice)
+                                != flow.valueDelta) {
+                    return 0L;
+                }
+                actual.merge(flow.itemId, flow.quantityDelta, Math::addExact);
+                cost = addExact(cost, negateExact(flow.valueDelta));
+            }
+        } catch (ArithmeticException ex) {
+            return 0L;
+        }
+        return expected.equals(actual) ? cost : 0L;
+    }
+}
+
+/**
+ * Compares explicit charge reads. One read establishes a baseline; only measured component
+ * decreases can produce a booking-ready delta.
+ */
+class MeasuredChargeReadTracker {
+    /**
+     * Bounded number of same-variant weapons tracked side by side (two blowpipes, a spare trident).
+     */
+    static final int MAX_TARGETS = 8;
+
+    /**
+     * One baseline per stable target identity, most recently read last: each weapon's last read,
+     * which its next Check is measured against.
+     */
+    LinkedHashMap<String, Baseline> baselines = new LinkedHashMap<>();
+
+    /** One weapon's last exact read and its local observation time. */
+    @Getter
+    @AllArgsConstructor
+    static class Baseline {
+        ChargeCheck read;
+        long atEpochMillis;
+
+        /**
+         * Component units loaded into the weapon since this read, which its next Check adds back.
+         */
+        final Map<Integer, Long> loaded = new HashMap<>();
+    }
+
+    /**
+     * A load into one weapon, clicked at {@code clickedAt}: its next Check counts it as loaded, not
+     * as unused. A load clicked before the last read is already in that read. A load whose weapon
+     * is unknown goes to the only weapon of that kind with a read, or else makes that kind's reads
+     * untrustworthy.
+     */
+    synchronized void noteLoad(
+            ChargeCheck.ChargedItem variant,
+            String targetIdentity,
+            long clickedAt,
+            int itemId,
+            long units) {
+        Baseline last =
+                targetIdentity == null ? only(variant) : baselines.get(targetIdentity.trim());
+        if (targetIdentity == null && last == null) {
+            resetVariant(variant);
+            return;
+        }
+        if (last == null || clickedAt < last.atEpochMillis || units <= 0L) return;
+        last.loaded.merge(itemId, units, SafeMath::safeAdd);
+    }
+
+    /** Observe one exact Check read and retain its local observation time. */
+    synchronized ChargeDelta observe(ChargeCheck read, String targetIdentity, long now) {
+        if (read == null) return new ChargeDelta(null, ChargeDelta.CheckResult.MISMATCH);
+        if (!read.bookable || Phrases.blank(targetIdentity)) {
+            reset();
+            return new ChargeDelta(read.variant, ChargeDelta.CheckResult.MISMATCH);
+        }
+        String safeIdentity = targetIdentity.trim();
+        // Each weapon keeps its own baseline: a Check of the other blowpipe is neither a
+        // decrease on this one nor a reason to forget what this one last read.
+        Baseline last = baselines.remove(safeIdentity);
+        baselines.put(safeIdentity, new Baseline(read, SafeMath.nonNeg(now)));
+        while (baselines.size() > MAX_TARGETS)
+            baselines.remove(baselines.keySet().iterator().next());
+        ChargeCheck previous = last == null ? null : last.read;
+        if (previous == null) return new ChargeDelta(read.variant, ChargeDelta.CheckResult.SEED);
+        if (previous.variant != read.variant)
+            return new ChargeDelta(read.variant, ChargeDelta.CheckResult.MISMATCH);
+        boolean blowpipe = read.variant == ChargeCheck.ChargedItem.BLOWPIPE;
+        // Dart type is an independent component identity. A type switch can return old darts
+        // and load new ones, so do not infer dart spend from the change; scale measurements
+        // remain valid across that switch.
+        boolean dartTypeSwitch =
+                blowpipe
+                        && read.hasDarts()
+                        && (!previous.hasDarts() || previous.dartItemId != read.dartItemId);
+        Map<Integer, Long> previousCounts = previous.componentCounts;
+        Map<Integer, Long> loaded = last.loaded;
+        var nextCounts = new LinkedHashMap<Integer, Long>(read.componentCounts);
+        if (blowpipe && previous.hasDarts() && !read.hasDarts())
+            nextCounts.put(previous.dartItemId, 0L);
+        var itemIds = new LinkedHashSet<Integer>(previousCounts.keySet());
+        itemIds.addAll(nextCounts.keySet());
+        var decreases = new ArrayList<ChargeDelta.ComponentDelta>();
+        var unchanged = new ArrayList<Integer>();
+        boolean same = true;
+        for (int itemId : itemIds) {
+            long before = previousCounts.getOrDefault(itemId, 0L);
+            // What was loaded since is not use: count it as if it had been there all along.
+            long after = nextCounts.getOrDefault(itemId, 0L) - loaded.getOrDefault(itemId, 0L);
+            same &= after == before;
+            if (after == before) unchanged.add(itemId);
+            if (after < before && (!dartTypeSwitch || itemId == ItemID.SNAKEBOSS_SCALE)) {
+                decreases.add(new ChargeDelta.ComponentDelta(itemId, after - before));
+            }
+        }
+        // Independent decreases still prove spend when a different component was loaded.
+        var delta =
+                new ChargeDelta(
+                        read.variant,
+                        decreases,
+                        !decreases.isEmpty()
+                                ? ChargeDelta.CheckResult.SPEND
+                                : same
+                                        ? ChargeDelta.CheckResult.SAME
+                                        : ChargeDelta.CheckResult.LOAD);
+        delta.unchanged.addAll(unchanged);
+        return delta;
+    }
+
+    synchronized void reset() {
+        baselines.clear();
+    }
+
+    /** The one baseline of this kind, or null when there are none or several. */
+    Baseline only(ChargeCheck.ChargedItem variant) {
+        Baseline found = null;
+        for (Baseline last : baselines.values()) {
+            if (last.read.variant != variant) continue;
+            if (found != null) return null;
+            found = last;
+        }
+        return found;
+    }
+
+    /**
+     * Forget one variant's baselines after a custody change: a new physical instance of the weapon
+     * entered the inventory, so a stored baseline can no longer be trusted to belong to the item
+     * now occupying the slot. The next Check seeds a fresh baseline.
+     */
+    synchronized void resetVariant(ChargeCheck.ChargedItem variant) {
+        if (variant == null) return;
+        baselines.values().removeIf(last -> last.read.variant == variant);
+    }
+}
+
+/**
+ * Key and chest claims. The account's unresolved claims are the only durable part: a claim opens
+ * when a key audit row is booked (the first key type keeps the row's id, more types derive {@code
+ * id#index}), shrinks as its chest contents settle or its keys are lost on death, and is removed at
+ * zero. Only a claim that reached zero writes its id onto the settling transaction as {@code
+ * sourceClaimId}, so a reload that sees both drops the stale claim without booking again, while a
+ * partly settled claim keeps its persisted remainder. Claims never expire on their own.
+ *
+ * <p>Everything else is short-lived evidence: an ordinary chest's object click (and a key loss seen
+ * while it is armed), the Wilderness loot-key chest container removals, and the local-death key
+ * snapshot. Chest contents never become durable provenance. Invoked only under the engine monitor.
+ */
+class KeyClaims {
+    static final int OPEN_WINDOW_TICKS = 4;
+    static final int DEATH_WINDOW_TICKS = 8;
+    static final int CLAIM_EVIDENCE_TICKS = 4;
+    static final int[] KEY_ITEM_IDS = {
+        ItemID.WILDY_LOOT_KEY0,
+        ItemID.WILDY_LOOT_KEY1,
+        ItemID.WILDY_LOOT_KEY2,
+        ItemID.WILDY_LOOT_KEY3,
+        ItemID.WILDY_LOOT_KEY4
+    };
+    static final int[] KEY_CONTAINER_IDS = {
+        InventoryID.DEADMAN_LOOT_INV0,
+        InventoryID.DEADMAN_LOOT_INV1,
+        InventoryID.DEADMAN_LOOT_INV2,
+        InventoryID.DEADMAN_LOOT_INV3,
+        InventoryID.DEADMAN_LOOT_INV4
+    };
+    static final String LOOT_KEY_NOTE = msg("loot-key");
+    List<PendingClaim> claims = new ArrayList<>();
+
+    /** The chest object click, armed for a few ticks. */
+    ChestOpen open;
+
+    /** A key loss seen while armed whose contents have not settled yet. */
+    ChestOpen used;
+
+    Map<Integer, Long> localDeathKeys;
+    int localDeathTicks;
+    boolean lootChestVisible;
+    Map<Integer, Map<Integer, Long>> observedKeyContainerContents = new HashMap<>();
+
+    /**
+     * Contents removed from each loot key's chest container, kept for a few ticks as claim
+     * evidence.
+     */
+    Map<Integer, Removed> removedByKey = new HashMap<>();
+
+    /** A chest opened with one key type: the key, how many were used and the chest's name. */
+    @AllArgsConstructor
+    static class ChestOpen {
+        int keyItemId;
+        long quantity;
+        String chestName;
+
+        @Getter(AccessLevel.NONE)
+        int ticks;
+    }
+
+    @AllArgsConstructor
+    static class Removed {
+        Map<Integer, Long> contents;
+        int ticks;
+    }
+
+    // -- Durable claims --
+    void clear() {
+        claims.clear();
+    }
+
+    /** Restores the persisted claims and drops any already settled by a retained transaction. */
+    void restore(SavedState state, List<Session> sessions) {
+        claims.clear();
+        var settled = new HashSet<String>();
+        for (Session session : sessions) {
+            for (Transaction transaction :
+                    session == null
+                            ? Collections.<Transaction>emptyList()
+                            : session.getTransactions()) {
+                if (transaction != null && !transaction.sourceClaimId().isEmpty()) {
+                    settled.add(transaction.sourceClaimId());
+                }
+            }
+        }
+        var seen = new HashSet<String>();
+        for (PendingClaim claim : state.getPendingClaims()) {
+            if (claim != null
+                    && claim.isValid()
+                    && seen.add(claim.getClaimId())
+                    && !settled.contains(claim.getClaimId())) {
+                claims.add(claim);
+            }
+        }
+        sort();
+    }
+
+    void adoptFrom(KeyClaims staged) {
+        claims.clear();
+        claims.addAll(staged.claims);
+    }
+
+    void writeTo(SavedState state) {
+        state.setPendingClaims(new ArrayList<>(claims));
+    }
+
+    List<PendingClaim> all() {
+        return unmodifiableList(claims);
+    }
+
+    /** Opens a claim keyed by the audit row's id; a second open with the same id is ignored. */
+    void open(String claimId, int keyItemId, long quantity, long now) {
+        if (empty(claimId) || keyItemId <= 0 || quantity <= 0L || indexOf(claimId) >= 0) return;
+        claims.add(new PendingClaim(claimId, keyItemId, quantity, now));
+        sort();
+    }
+
+    /**
+     * Applies a settlement or death loss of {@code quantity} keys to the oldest claims for the key.
+     * Returns the id of the last claim it touched when that claim closed; null otherwise.
+     */
+    String consume(int keyItemId, long quantity) {
+        String closed = null;
+        long remaining = nonNeg(quantity);
+        for (int index = 0; index < claims.size() && remaining > 0L; index++) {
+            PendingClaim claim = claims.get(index);
+            if (claim.itemOrKeyId != keyItemId) continue;
+            long applied = min(remaining, claim.getQuantity());
+            remaining -= applied;
+            closed = reduce(index, applied) ? claim.getClaimId() : null;
+            index -= closed == null ? 0 : 1;
+        }
+        return closed;
+    }
+
+    /** Settles one specific claim by {@code quantity}; returns its id when it closed. */
+    String settle(String claimId, long quantity) {
+        int index = indexOf(claimId);
+        boolean closed = index >= 0 && reduce(index, nonNeg(quantity));
+        sort();
+        return closed ? claimId : null;
+    }
+
+    /** Shrinks the claim at {@code index}; true when it reached zero and was removed. */
+    boolean reduce(int index, long quantity) {
+        PendingClaim claim = claims.get(index);
+        long left = claim.getQuantity() - quantity;
+        if (left > 0L) {
+            claims.set(
+                    index,
+                    new PendingClaim(
+                            claim.getClaimId(),
+                            claim.itemOrKeyId,
+                            left,
+                            claim.getCreatedAtEpochMillis()));
+            return false;
+        }
+        claims.remove(index);
+        return true;
+    }
+
+    int indexOf(String claimId) {
+        for (int index = 0; index < claims.size(); index++) {
+            if (claims.get(index).getClaimId().equals(claimId)) return index;
+        }
+        return -1;
+    }
+
+    /** Created-at then claim id: equal timestamps never reorder across save and reload. */
+    void sort() {
+        claims.sort(
+                Comparator.comparingLong(PendingClaim::getCreatedAtEpochMillis)
+                        .thenComparing(PendingClaim::getClaimId));
+    }
+
+    // -- Short-lived evidence --
+    /** All transient evidence goes; the durable claims stay. */
+    void clearEvidence() {
+        cancelChest();
+        localDeathKeys = null;
+        localDeathTicks = 0;
+        lootChestVisible = false;
+        observedKeyContainerContents.clear();
+        removedByKey.clear();
+    }
+
+    void tick() {
+        open = open == null || --open.ticks <= 0 ? null : open;
+        used = used == null || --used.ticks <= 0 ? null : used;
+        if (localDeathTicks > 0 && --localDeathTicks == 0) localDeathKeys = null;
+        removedByKey.values().removeIf(removed -> --removed.ticks <= 0);
+    }
+
+    /** Arms (or disarms) ordinary key-chest provenance from an actual chest object click. */
+    boolean chestClick(String option, String target) {
+        KeyChestCatalogue.Entry entry = KeyChestCatalogue.entryForMenu(option, target);
+        used = null;
+        open =
+                entry == null
+                        ? null
+                        : new ChestOpen(entry.keyItemId, 0L, entry.chestName, OPEN_WINDOW_TICKS);
+        return open != null;
+    }
+
+    void cancelChest() {
+        open = null;
+        used = null;
+    }
+
+    /**
+     * Correlate a settled key loss with settled positive inventory contents. A click alone is never
+     * a claim, and ambiguous keys with multiple chest types require the observed object name.
+     */
+    ChestOpen matchChest(
+            Map<Integer, Long> keyLosses,
+            Map<Integer, Long> positiveContents,
+            String sourceBackedActivity) {
+        boolean sourced = !blank(sourceBackedActivity);
+        Map<Integer, Long> losses = positiveEntries(keyLosses);
+        if (empty(positiveContents)) {
+            if (sourced) {
+                cancelChest();
+            } else if (open != null && losses.size() == 1 && losses.containsKey(open.keyItemId)) {
+                // The key left before its contents: remember the use for a few ticks.
+                used =
+                        new ChestOpen(
+                                open.keyItemId,
+                                losses.get(open.keyItemId),
+                                open.chestName,
+                                OPEN_WINDOW_TICKS);
+                open = null;
+            }
+            return null;
+        }
+        int keyId = -1;
+        long quantity = 0L;
+        String chestName = null;
+        if (!losses.isEmpty()) {
+            ChestOpen armed = open != null ? open : used;
+            Map.Entry<Integer, Long> loss = losses.entrySet().iterator().next();
+            if (losses.size() != 1 || armed != null && armed.keyItemId != loss.getKey()) {
+                cancelChest();
+                return null;
+            }
+            keyId = loss.getKey();
+            quantity = loss.getValue();
+            List<KeyChestCatalogue.Entry> entries = KeyChestCatalogue.entriesForKey(keyId);
+            chestName =
+                    open != null && open.keyItemId == keyId
+                            ? open.chestName
+                            : entries.size() == 1 ? entries.get(0).chestName : null;
+            used = null;
+        } else if (used != null) {
+            keyId = used.keyItemId;
+            quantity = used.quantity;
+            chestName = used.chestName;
+            used = null;
+        }
+        if (keyId < 0 || quantity <= 0L || chestName == null) {
+            // Do not let an uncorroborated gain leave an object click armed to
+            // relabel a later, unrelated key loss and contents change.
+            open = null;
+            return null;
+        }
+        KeyChestCatalogue.Entry sourceChest =
+                sourced ? KeyChestCatalogue.entryForChest(sourceBackedActivity) : null;
+        if (sourced
+                && (sourceChest == null || !chestName.equalsIgnoreCase(sourceChest.chestName))) {
+            cancelChest();
+            return null;
+        }
+        if (open != null
+                && open.keyItemId == keyId
+                && open.chestName != null
+                && !open.chestName.equalsIgnoreCase(chestName)) {
+            return null;
+        }
+        cancelChest();
+        return new ChestOpen(keyId, quantity, chestName, 0);
+    }
+
+    void beginLocalDeath(Map<Integer, Long> keyInventory) {
+        Map<Integer, Long> keys = keyQuantities(keyInventory);
+        localDeathKeys = keys.isEmpty() ? null : keys;
+        localDeathTicks = localDeathKeys == null ? 0 : DEATH_WINDOW_TICKS;
+    }
+
+    boolean awaitingDeathSettle() {
+        return localDeathKeys != null && localDeathTicks > 0;
+    }
+
+    void setLootChestVisible(boolean visible) {
+        if (lootChestVisible && !visible) {
+            // Reopening a key UI starts a fresh container-delta baseline. A
+            // short, already-observed claim delta may still settle afterward.
+            observedKeyContainerContents.clear();
+        }
+        lootChestVisible = visible;
+    }
+
+    /**
+     * Observe one loot key's server-owned contents while its interface is visible. Only removals
+     * from this container can correlate settled INV gains to a claim.
+     */
+    void observeKeyContents(int keyItemId, Map<Integer, Long> contents) {
+        int keyIndex = keyIndex(keyItemId);
+        if (!lootChestVisible || keyIndex < 0 || contents == null) return;
+        Map<Integer, Long> next = positiveEntries(contents);
+        Map<Integer, Long> removed = minus(observedKeyContainerContents.put(keyIndex, next), next);
+        if (!removed.isEmpty()) {
+            Removed evidence =
+                    removedByKey.computeIfAbsent(keyIndex, key -> new Removed(new HashMap<>(), 0));
+            removed.forEach(
+                    (itemId, quantity) ->
+                            evidence.contents.merge(itemId, quantity, SafeMath::safeAdd));
+            evidence.ticks = CLAIM_EVIDENCE_TICKS;
+        }
+    }
+
+    /** The last contents observed in one loot key's chest, or an empty map (read-only). */
+    Map<Integer, Long> observedContents(int keyItemId) {
+        int keyIndex = keyIndex(keyItemId);
+        Map<Integer, Long> contents =
+                keyIndex < 0 ? null : observedKeyContainerContents.get(keyIndex);
+        return contents == null ? emptyMap() : contents;
+    }
+
+    /**
+     * Settles the one single-key loot-key claim whose chest removal (seen within the evidence
+     * window) covers these settled gains. One matched manifest accounts for one physical key at
+     * most, so a stacked claim shrinks one unit at a time; exhausting the evidence supplies that
+     * unit even when the key-loss callback arrived separately. Returns the claim id when it closed.
+     * Descriptive: never alters the settling transaction's type, valuation or flows.
+     */
+    String settleLootKey(
+            Map<Integer, Long> settledPositiveFlows, Map<Integer, Long> settledKeyLosses) {
+        if (empty(settledPositiveFlows)) return null;
+        PendingClaim match = null;
+        int matchKeyIndex = -1;
+        for (Map.Entry<Integer, Removed> evidence : removedByKey.entrySet()) {
+            PendingClaim claim =
+                    covers(evidence.getValue().contents, settledPositiveFlows)
+                            ? uniquePending(keyItemId(evidence.getKey()))
+                            : null;
+            if (claim != null && claim.getQuantity() > 0L) {
+                if (match != null) return null;
+                match = claim;
+                matchKeyIndex = evidence.getKey();
+            }
+        }
+        if (match == null) return null;
+        long consumedKeys =
+                settledKeyLosses == null
+                        ? 0L
+                        : settledKeyLosses.getOrDefault(keyItemId(matchKeyIndex), 0L);
+        Removed evidence = removedByKey.get(matchKeyIndex);
+        evidence.contents = minus(evidence.contents, settledPositiveFlows);
+        evidence.ticks = CLAIM_EVIDENCE_TICKS;
+        if (evidence.contents.isEmpty()) removedByKey.remove(matchKeyIndex);
+        return settle(
+                match.getClaimId(),
+                evidence.contents.isEmpty() && consumedKeys <= 0L ? 1L : consumedKeys);
+    }
+
+    /** The one unresolved claim for this key item when exactly one exists; null otherwise. */
+    PendingClaim uniquePending(int keyItemId) {
+        PendingClaim match = null;
+        for (PendingClaim claim : claims) {
+            if (claim.itemOrKeyId != keyItemId) continue;
+            if (match != null) return null;
+            match = claim;
+        }
+        return match;
+    }
+
+    /**
+     * Closes pending loot-key claims only for key units that disappeared from INV in a local-death
+     * settlement, measured against the death snapshot.
+     */
+    void recordDeathLosses(List<Flow> settledFlows, Map<Integer, Long> currentKeyInventory) {
+        if (!awaitingDeathSettle()) return;
+        Map<Integer, Long> flowLosses = lossQuantities(settledFlows, KeyClaims::isLootKey);
+        Map<Integer, Long> gone = minus(localDeathKeys, keyQuantities(currentKeyInventory));
+        for (int keyItemId : KEY_ITEM_IDS) {
+            long pendingKeys = 0L;
+            for (PendingClaim claim : claims)
+                pendingKeys += claim.itemOrKeyId == keyItemId ? claim.getQuantity() : 0L;
+            long matchedLoss =
+                    min(
+                            pendingKeys,
+                            min(
+                                    gone.getOrDefault(keyItemId, 0L),
+                                    flowLosses.getOrDefault(keyItemId, 0L)));
+            if (matchedLoss > 0L) {
+                consume(keyItemId, matchedLoss);
+                // Inventory/equipment changes can stabilize in separate batches after a death.
+                // Keep the bounded snapshot until each confirmed key loss is consumed or the
+                // game-tick window expires; an unrelated first batch must not make a later
+                // key-loss flow look like an ordinary cost.
+                take(localDeathKeys, keyItemId, matchedLoss);
+            }
+        }
+        if (localDeathKeys.isEmpty()) {
+            localDeathKeys = null;
+            localDeathTicks = 0;
+        }
+    }
+
+    // -- Key identity --
+    static boolean isLootKey(int itemId) {
+        return keyIndex(itemId) >= 0;
+    }
+
+    static int keyIndex(int itemId) {
+        for (int index = 0; index < KEY_ITEM_IDS.length; index++) {
+            if (KEY_ITEM_IDS[index] == itemId) return index;
+        }
+        return -1;
+    }
+
+    static int keyItemId(int index) {
+        return index < 0 || index >= KEY_ITEM_IDS.length ? -1 : KEY_ITEM_IDS[index];
+    }
+
+    static int keyContainerId(int index) {
+        return index < 0 || index >= KEY_CONTAINER_IDS.length ? -1 : KEY_CONTAINER_IDS[index];
+    }
+
+    /**
+     * Positive item quantities in a container, skipping items {@code skip} rejects (nested crates).
+     */
+    static Map<Integer, Long> manifestFromContainer(ItemContainer container, IntPredicate skip) {
+        // Refuse an incomplete evidence policy rather than accidentally valuing a
+        // nested crate as if its unopened contents were already manifest items.
+        var manifest = new LinkedHashMap<Integer, Long>();
+        if (container == null || container.getItems() == null || skip == null) return emptyMap();
+        for (Item item : container.getItems()) {
+            if (item != null
+                    && item.getId() >= 0
+                    && item.getQuantity() > 0
+                    && !skip.test(item.getId())) {
+                manifest.merge(item.getId(), (long) item.getQuantity(), SafeMath::safeAdd);
+            }
+        }
+        return unmodifiableMap(manifest);
+    }
+
+    static Map<Integer, Long> keyQuantities(ItemContainer inventory) {
+        return manifestFromContainer(inventory, itemId -> !isLootKey(itemId));
+    }
+
+    static Map<Integer, Long> keyQuantities(Map<Integer, Long> quantities) {
+        Map<Integer, Long> keys = positiveEntries(quantities);
+        keys.keySet().removeIf(itemId -> !isLootKey(itemId));
+        return keys;
+    }
+}
+
+/**
+ * While a clue/casket/key path is active, digs / teleports / key spends attach as costs against
+ * that clue's Pending Rewards → Claimed batch. Unmatched supply spends stay normal Used.
+ */
+class ClueCostPairing {
+    String activeClueEncounterId;
+    String activeClueLabel;
+
+    synchronized void beginClue(String encounterId, String label) {
+        activeClueEncounterId = emptyToNull(encounterId);
+        activeClueLabel = emptyToNull(label);
+    }
+
+    synchronized void endClue() {
+        activeClueEncounterId = null;
+        activeClueLabel = null;
+    }
+
+    synchronized String activeEncounter() {
+        return activeClueEncounterId;
+    }
+
+    /**
+     * Classify a spend note while a clue path may be open. Dig / teleport / clue key → CLUE_COST;
+     * food / potions → UNRELATED_USED.
+     */
+    synchronized boolean isClueCost(String noteOrOption) {
+        String lower = Phrases.norm(noteOrOption);
+        return activeClueEncounterId != null && lower != null && looksLikeClueCost(lower);
+    }
+
+    static boolean looksLikeClueCost(String lowerNote) {
+        if (Phrases.empty(lowerNote)) return false;
+        return lowerNote.contains("dig")
+                || lowerNote.contains("teleport")
+                || lowerNote.contains("tele ")
+                || lowerNote.contains("clue")
+                || lowerNote.contains("casket")
+                || lowerNote.contains("spade")
+                || lowerNote.contains("key") && (Phrases.has(lowerNote, "clue", "chest"));
+    }
+
+    static boolean looksLikeClueActivity(String name) {
+        String lower = Phrases.norm(name);
+        return lower != null && (Phrases.has(lower, "clue", "casket", "treasure trail"));
+    }
+
+    synchronized String costNote() {
+        String label = activeClueLabel == null ? "clue" : activeClueLabel;
+        return "Clue cost paired to " + label;
+    }
+
+    synchronized void clear() {
+        endClue();
+    }
+
+    static String emptyToNull(String value) {
+        if (Phrases.blank(value)) return null;
+        return value.trim();
+    }
+}
+
+/**
+ * Wiki-sourced key/chest pairs used for deferred-claim valuation and provenance. Chest names and
+ * locations follow the OSRS Wiki pages for the <a
+ * href="https://oldschool.runescape.wiki/w/Crystal_chest">Crystal chest</a>, <a
+ * href="https://oldschool.runescape.wiki/w/Elf_crystal_chest">Elven Crystal Chest</a>, <a
+ * href="https://oldschool.runescape.wiki/w/Larran%27s_small_chest">Larran's small chest</a>, <a
+ * href="https://oldschool.runescape.wiki/w/Larran%27s_big_chest">Larran's big chest</a>, <a
+ * href="https://oldschool.runescape.wiki/w/Ogre_Coffin">Ogre coffin</a>, <a
+ * href="https://oldschool.runescape.wiki/w/Muddy_chest">Muddy chest</a>, <a
+ * href="https://oldschool.runescape.wiki/w/Sinister_chest">Sinister chest</a>, <a
+ * href="https://oldschool.runescape.wiki/w/Grubby_chest">Grubby chest</a>, <a
+ * href="https://oldschool.runescape.wiki/w/Brimstone_chest">Brimstone chest</a>, <a
+ * href="https://oldschool.runescape.wiki/w/Moons_rewards">Moon chest</a>, and <a
+ * href="https://oldschool.runescape.wiki/w/Category%3AShades_of_Mort%27ton_%28minigame%29">Shades
+ * of Mort'ton chest/key variants</a> (for example, <a
+ * href="https://oldschool.runescape.wiki/w/Steel_Chest_%28brown%29">Steel Chest (brown)</a>). Key
+ * names/tradeability follow the item pages for <a
+ * href="https://oldschool.runescape.wiki/w/Crystal_key">Crystal key</a>, <a
+ * href="https://oldschool.runescape.wiki/w/Enhanced_crystal_key">Enhanced crystal key</a>, <a
+ * href="https://oldschool.runescape.wiki/w/Larran%27s_key">Larran's key</a>, <a
+ * href="https://oldschool.runescape.wiki/w/Ogre_coffin_key">Ogre coffin key</a>, <a
+ * href="https://oldschool.runescape.wiki/w/Muddy_key">Muddy key</a>, <a
+ * href="https://oldschool.runescape.wiki/w/Sinister_key">Sinister key</a>, <a
+ * href="https://oldschool.runescape.wiki/w/Grubby_key">Grubby key</a>, <a
+ * href="https://oldschool.runescape.wiki/w/Brimstone_key">Brimstone key</a>, <a
+ * href="https://oldschool.runescape.wiki/w/Moon_key">Moon key</a>, and <a
+ * href="https://oldschool.runescape.wiki/w/Shade_key">Shade key variants</a> and the <a
+ * href="https://oldschool.runescape.wiki/w/Bronze_key_crimson">Bronze key crimson</a>, <a
+ * href="https://oldschool.runescape.wiki/w/Steel_key_brown">Steel key brown</a>, <a
+ * href="https://oldschool.runescape.wiki/w/Black_key_black">Black key black</a>, <a
+ * href="https://oldschool.runescape.wiki/w/Silver_key_red">Silver key red</a>, and <a
+ * href="https://oldschool.runescape.wiki/w/Gold_key_purple">Gold key purple</a> pages. Tradeable
+ * keys keep their market opportunity cost. Untradeable keys represent an unclaimed reward and are
+ * deliberately held at zero until contents enter inventory. The Wiki explicitly documents
+ * consumption for Crystal, Muddy, Sinister and Grubby keys (<a
+ * href="https://oldschool.runescape.wiki/w/Crystal_key">Crystal key</a>, <a
+ * href="https://oldschool.runescape.wiki/w/Muddy_chest">Muddy chest</a>, <a
+ * href="https://oldschool.runescape.wiki/w/Money_making_guide/Opening_sinister_chests">Sinister
+ * chest</a>, <a
+ * href="https://oldschool.runescape.wiki/w/Money_making_guide/Opening_grubby_chests">Grubby
+ * chest</a>). The Enhanced crystal, Larran, Ogre coffin, Brimstone, Moon and Shade pages describe
+ * using their keys but do not explicitly state that chest use consumes them. Every claim match
+ * therefore still requires a measured inventory key loss; a click only disambiguates a chest, and
+ * live acceptance must confirm consumption for those families.
+ */
+class KeyChestCatalogue {
+    static final List<Entry> ENTRIES = new ArrayList<>();
+
+    static {
+        for (String[] row : GameData.rows("key_chests")) {
+            ENTRIES.add(new Entry(Integer.parseInt(row[0]), row[1], Boolean.parseBoolean(row[2])));
+        }
+    }
+
+    /** Catalogue entries for a key item; Larran's key has both chest variants. */
+    static List<Entry> entriesForKey(int keyItemId) {
+        var entries = new ArrayList<Entry>();
+        for (Entry entry : ENTRIES) {
+            if (entry.keyItemId == keyItemId) entries.add(entry);
+        }
+        return entries;
+    }
+
+    /** First known chest association for an item, or {@code null} when not catalogued. */
+    static Entry entryForKey(int keyItemId) {
+        List<Entry> entries = entriesForKey(keyItemId);
+        return entries.isEmpty() ? null : entries.get(0);
+    }
+
+    /** Match an observed object target that contains one exact catalogue chest label. */
+    static Entry entryForChest(String target) {
+        if (Phrases.blank(target)) return null;
+        String normalizedTarget = normalize(target);
+        Entry best = null;
+        for (Entry entry : ENTRIES) {
+            String name = normalize(entry.chestName);
+            if (normalizedTarget.contains(name)
+                    && (best == null || name.length() > normalize(best.chestName).length())) {
+                best = entry;
+            }
+        }
+        return best;
+    }
+
+    /** Arm a short-lived chest label for measured key-loss disambiguation only. */
+    static Entry entryForMenu(String option, String target) {
+        String action = option == null ? "" : normalize(option);
+        if (!(action.equals("open")
+                || action.startsWith("open ")
+                || action.equals("unlock")
+                || action.startsWith("unlock ")
+                || action.equals("search")
+                || action.startsWith("search "))) {
+            return null;
+        }
+        return entryForChest(target);
+    }
+
+    static boolean isKey(int keyItemId) {
+        return entryForKey(keyItemId) != null;
+    }
+
+    /** Deferred claims have no held value and are excluded from high-alchemy fallback. */
+    static boolean isDeferredKey(int keyItemId) {
+        Entry entry = entryForKey(keyItemId);
+        return entry != null && !entry.tradeable;
+    }
+
+    static List<Entry> entries() {
+        return Collections.unmodifiableList(ENTRIES);
+    }
+
+    static String normalize(String value) {
+        return value.trim().replace('\u2019', '\'').toLowerCase(Locale.ROOT);
+    }
+
+    /** Immutable key-to-chest information for accounting and presentation. */
+    @AllArgsConstructor
+    static class Entry {
+        @Getter int keyItemId;
+        @Getter String chestName;
+        @Getter boolean tradeable;
+    }
+}
+
+/** Untradeable unopened claims held at zero: their contents become income only on receipt. */
+class DeferredClaims {
+    /** A key/chest claim or a pouch. */
+    static boolean of(int itemId) {
+        return KeyChestCatalogue.isDeferredKey(itemId) || pouch(itemId);
+    }
+
+    /** Coin pouches and the Guardians of the Rift intricate pouch: contents book when opened. */
+    static boolean pouch(int itemId) {
+        return itemId >= ItemID.PICKPOCKET_COIN_POUCH_CITIZEN
+                        && itemId <= ItemID.PICKPOCKET_COIN_POUCH_ELF
+                || itemId == ItemID.PICKPOCKET_COIN_POUCH_VYRE
+                || itemId == ItemID.PICKPOCKET_COIN_POUCH_VARLAMORE_WEALTHY
+                || itemId == ItemID.PICKPOCKET_COIN_POUCH_PIRATE
+                || itemId == ItemID.GOTR_INTRICATE_POUCH;
+    }
+}
+
+/**
+ * Reward-interface / chest adapters → Pending Rewards → Claimed once. Name matching for Loot
+ * Tracker EVENT + live reward UIs.
+ */
+class RewardChestCatalogue {
+    /** True when this LT/event name is a reward chest / raid / clue pool — not floor loot. */
+
+    /** Reward fragments share the same once-compiled matcher as other evidence tables. */
+    static final Map<String, Phrases.Clause[][]> RULES = GameData.rules("reward_chests");
+
+    static boolean isRewardChest(String raw) {
+        if (Phrases.blank(raw)) return false;
+        if (KeyChestCatalogue.entryForChest(raw) != null) return true;
+        String name = Phrases.lower(raw);
+        return RULES.values().stream().anyMatch(c -> Phrases.has(name, c));
+    }
+}
+
+/** Polls the real loot-key chest interface; menu and chat wording is never key source evidence. */
+@Singleton
+@RequiredArgsConstructor(onConstructor_ = @Inject)
+class LootKeyManifestReader {
+    final Client client;
+    final ItemLookup lookup;
+    final Engine engine;
+
+    void poll() {
+        if (client == null || engine == null) return;
+        boolean visible = Widgets.visible(client, InterfaceID.WildyLootChest.UNIVERSE);
+        engine.setChestVisible(visible);
+        if (!visible) return;
+        for (int index = 0; index < 5; index++) {
+            int keyItemId = KeyClaims.keyItemId(index);
+            ItemContainer keyContents = client.getItemContainer(KeyClaims.keyContainerId(index));
+            if (keyContents == null) continue;
+            Map<Integer, Long> rawManifest =
+                    KeyClaims.manifestFromContainer(keyContents, this::isNestedContainerItem);
+            var manifest = new HashMap<Integer, Long>();
+            for (Map.Entry<Integer, Long> item : rawManifest.entrySet()) {
+                int canonicalId = lookup == null ? item.getKey() : lookup.canon(item.getKey());
+                long quantity = item.getValue();
+                if (canonicalId <= 0 || quantity <= 0L) continue;
+                manifest.merge(canonicalId, quantity, LootKeyManifestReader::safeAddPositive);
+            }
+            // An open chest is evidence only; settled inventory gains carry the financial truth.
+            engine.observeKeyContainer(keyItemId, manifest);
+        }
+    }
+
+    boolean isNestedContainerItem(int itemId) {
+        String name = itemName(itemId);
+        return name == null || Phrases.has(name, "crate", "casket");
+    }
+
+    String itemName(int itemId) {
+        if (lookup == null) return null;
+        try {
+            ItemComposition composition = lookup.composition(itemId);
+            return composition == null
+                            || composition.getName() == null
+                            || composition.getName().trim().isEmpty()
+                    ? null
+                    : composition.getName().toLowerCase(Locale.ROOT);
+        } catch (RuntimeException unavailable) {
+            return null;
+        }
+    }
+
+    static long safeAddPositive(long left, long right) {
+        try {
+            return Math.addExact(left, right);
+        } catch (ArithmeticException overflow) {
+            return Long.MAX_VALUE;
+        }
     }
 }

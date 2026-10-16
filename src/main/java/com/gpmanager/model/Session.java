@@ -100,6 +100,9 @@ class Session {
 
     /** The run's Active Time when the Net aim was set; its pace counts from there (owner 2026-10-16). */
     Long profitTargetSetActiveMillis;
+
+    /** Net and Active Time at the last rate restart; Live's GP/h and clock count from there. */
+    long rateSetNet, rateSetMillis;
     // Signature targets: the actual Active-Time aim this Grind instance ran with, and the stable
     // My Grind lineage link it was started from. Both are metadata; neither books anything.
     Long activeTimeTargetMillis;
@@ -549,6 +552,14 @@ class Session {
         if (!drop.spends()) drop.applyCorrection(IGNORE, now, "Picked back up");
         changed(drop, AUTO, flowSnapshot);
         return taken;
+    }
+
+    /** Drops a neutral row the engine no longer keeps (old bank-paid GE change, owner 1.5.1). */
+    void drop(Transaction transaction) {
+        if (!transactions.remove(transaction)) return;
+        saveStamp++;
+        notifyChanged();
+        if (ownedValueObserver != null) ownedValueObserver.onRemoved(transaction);
     }
 
     Transaction undoTransaction() {

@@ -21,7 +21,7 @@ See what you actually make while you play. GP Manager tracks your gains, supplie
 
 ## Features
 
-- **Live** – your Net, GP/h, gains, supplies and losses as you play, plus your latest drops. Click the Net to set a GP or time target; click the ACTIVE clock to start fresh.
+- **Live** – your Net, GP/h, gains, supplies and losses as you play, plus your latest drops. Click the Net to set a GP or time target; click the ACTIVE clock to restart GP/h.
 - **Ledger** – every gain, loss, trade and death, with the reason it counted. Open any row to see the items behind it, and fix anything from one Correct menu. Anything it wasn't sure about waits in Review for you.
 - **Grinds** – start one by name (Vorkath, Zulrah, a skilling spot) and it's remembered with its targets, best run and average GP/h, so you can compare runs, including loot by the monster that dropped it. Between Grinds it tracks Free play on its own.
 - **All time** – your total Net and GP/h and your best Grinds.

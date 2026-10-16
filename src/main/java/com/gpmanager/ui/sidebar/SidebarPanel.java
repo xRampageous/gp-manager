@@ -505,8 +505,8 @@ class SidebarPanel extends PluginPanel {
         }
 
         @Override
-        public void startFresh() {
-            new GrindsController(SidebarPanel.this).startFresh();
+        public void restartRate() {
+            new GrindsController(SidebarPanel.this).restartRate();
         }
 
         @Override

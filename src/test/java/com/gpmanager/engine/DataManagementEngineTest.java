@@ -36,31 +36,55 @@ public class DataManagementEngineTest
         assertNull(engine.getGeneralSession());
     }
 
-    /** Owner 2026-10-16: the ACTIVE clock's soft reset keeps the run, never deletes it. */
-    @Test public void startFreshMovesFreePlayToHistoryAndStartsAtZero()
+    /** Owner 1.5.1: a neutral GE change row is only kept as an audit row, like a live custody move. */
+    @Test public void neutralChangeRowsLeaveWhenAuditRowsAreOff()
+    {
+        Engine engine = ReviewFixesTest.engine();
+        Transaction change = new Transaction(5L, TransactionType.TRANSFER, Context.MARKET,
+            GameData.msg("grand-exchange-custody"), "Market", false,
+            java.util.List.of(new Flow(995, "Coins", 430L, 1, 430L, PriceSource.FACE_VALUE)),
+            Confidence.CONFIRMED, GameData.msg("ownership-neutral-grand"), null);
+        engine.getActiveSession().addTransaction(change, 2_000);
+        engine.recheck(id -> 0);
+        assertTrue(engine.getActiveSession().getTransactions().isEmpty());
+    }
+
+    /** Owner 1.5.1: an old "?" item that now has a price (half a pie's share) takes it on login. */
+    @Test public void oldUnpricedRowsTakeTheirPriceOnLogin()
+    {
+        Engine engine = ReviewFixesTest.engine();
+        Transaction ate = new Transaction(5L, TransactionType.CONSUMPTION, Context.GENERIC, "", "General", true,
+            new java.util.ArrayList<>(java.util.List.of(new Flow(7220, "Half a summer pie", -1L, 0, 0L, PriceSource.UNPRICED))),
+            Confidence.LIKELY, "", null);
+        engine.getActiveSession().addTransaction(ate, 2_000);
+        engine.recheck(id -> 0);
+        Flow pie = engine.getActiveSession().getTransactions().get(0).getFlows().get(0);
+        assertNotSame(PriceSource.UNPRICED, pie.getPriceSource());
+        assertEquals(-100L, pie.valueDelta);
+    }
+
+    /** Owner 1.5.1: the ACTIVE clock restarts GP/h and the clock; Net, Recent and the Ledger stay. */
+    @Test public void restartingTheRateKeepsTheRun()
     {
         Engine engine = engine();
-        engine.ensureSession(1L);
-        Session before = engine.getGeneralSession();
-        before.addTransaction(new Transaction(5L, TransactionType.GAIN, Context.GENERIC, "", "General", true,
+        engine.ensureSession(0L);
+        Session run = engine.getGeneralSession();
+        run.addTransaction(new Transaction(5L, TransactionType.GAIN, Context.GENERIC, "", "General", true,
             java.util.List.of(new Flow(995, "Coins", 1_000L, 1, 1_000L, PriceSource.FACE_VALUE)),
             Confidence.LIKELY, "", null), 2_000);
-        before.pause(8L, PauseReason.MANUAL);
+        long hour = 3_600_000L;
+        engine.restartRate(hour);
+        run.addTransaction(new Transaction(hour + 5L, TransactionType.GAIN, Context.GENERIC, "", "General", true,
+            java.util.List.of(new Flow(995, "Coins", 500L, 1, 500L, PriceSource.FACE_VALUE)),
+            Confidence.LIKELY, "", null), 2_000);
 
-        assertTrue(engine.startFreshFreePlay(10L));
-        Session kept = engine.getHistory().get(0);
-        assertSame("the run is kept, not deleted", before, kept);
-        assertEquals("Free play", kept.getName());
-        assertTrue(kept.isClosed());
-        assertEquals(1, kept.getTransactions().size());
-        Session fresh = engine.getGeneralSession();
-        assertNotSame(before, fresh);
-        assertSame(fresh, engine.getActiveSession());
-        assertTrue("Live starts at zero", fresh.getTransactions().isEmpty());
-        assertSame("a manual pause holds", PauseReason.MANUAL, fresh.getPauseReason());
-
-        engine.startCustom("Vorkath", 20L);
-        assertFalse("a running Grind ends through End Grind instead", engine.startFreshFreePlay(30L));
+        LiveSnapshot live = LiveSnapshot.capture(engine, 2 * hour, null);
+        assertEquals("Net keeps the whole run", 1_500L, live.net);
+        assertEquals("the clock counts from the restart", hour, live.elapsedMillis);
+        assertEquals("GP/h is what came in since", 500L, live.gpPerHour);
+        assertSame("the same run, nothing moved to history", run, engine.getActiveSession());
+        assertTrue(engine.getHistory().isEmpty());
+        assertEquals(2, run.getTransactions().size());
     }
 
     /** Owner 2026-10-16 (after Coin Flow 1.9): only the Blast Furnace coffer's drain is a cost. */

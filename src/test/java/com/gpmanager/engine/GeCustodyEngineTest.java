@@ -526,6 +526,50 @@ public class GeCustodyEngineTest
         assertEquals(0L, h.net());
     }
 
+    /** Owner live 2026-10-16: a buy paid from the bank sent its change to Review. */
+    @Test
+    public void bankPaidBuyChangeIsNeutral()
+    {
+        Harness h = new Harness(48);
+        h.inventory = with(h.inventory, COINS, 0L);
+        h.engine.setBaseline(new ContainerSnapshot(h.inventory));
+        // The pack holds no coins, so the 500 reserve comes from the bank and is never seen.
+        h.offer(0, BUYING, LOGS, 10, 0, 50, 0);
+        h.offer(0, BOUGHT, LOGS, 10, 10, 50, 480);
+        h.settle(with(h.inventory, LOGS, 10L));
+        // Collecting the 20 change clears the slot and lands the coins in the pack.
+        h.offer(0, GrandExchangeOfferState.EMPTY, 0, 0, 0, 0, 0);
+        h.settle(with(h.inventory, COINS, 20L));
+        assertEquals("the change is the player's own coins coming back", 0, h.reviews().size());
+        assertEquals(0L, h.net());
+        assertEquals("only the purchase is counted", 1, h.counted().size());
+    }
+
+    /** Owner live 2026-10-16: change already sent to Review before 1.5.1 rebooks on login. */
+    @Test
+    public void oldBankPaidChangeRowsRebookOnLogin()
+    {
+        Harness h = new Harness(48);
+        h.inventory = with(h.inventory, COINS, 0L);
+        h.engine.setBaseline(new ContainerSnapshot(h.inventory));
+        h.offer(0, BUYING, LOGS, 10, 0, 50, 0);
+        h.offer(0, BOUGHT, LOGS, 10, 10, 50, 480);
+        h.settle(with(h.inventory, LOGS, 10L));
+        // The row the old build saved for the 20 change.
+        Transaction old = new Transaction(h.now, TransactionType.UNCERTAIN, Context.MARKET,
+            GameData.msg("grand-exchange-collect"), "Market", false,
+            Collections.singletonList(new Flow(COINS, "Coins", 20L, 1, 20L, PriceSource.FACE_VALUE)),
+            Confidence.UNCERTAIN, GameData.msg("grand-exchange-movement"), null);
+        h.engine.getActiveSession().addTransaction(old, 2_000);
+        h.engine.recheck(item -> 0);
+        assertEquals(TransactionType.TRANSFER, old.getType());
+        assertTrue("with audit rows on, the neutral change stays as one", h.transactions().contains(old));
+        assertEquals(0, h.reviews().size());
+        assertEquals(0L, h.net());
+        h.engine.recheck(item -> 0);
+        assertEquals(0, h.reviews().size());
+    }
+
     @Test
     public void buyRefundIsNeutral()
     {

@@ -238,6 +238,9 @@ class LiveSnapshot {
         boolean freePlay = active == null || !custom;
         String owner = active == null ? "Free play" : active.getName();
         long elapsed = metrics.elapsedMillis;
+        // The clock and GP/h count from the last rate restart; Net keeps the whole run (owner
+        // 1.5.1). A target's pace keeps the run's own time.
+        long since = active == null ? elapsed : max(0L, elapsed - active.rateSetMillis);
         MoneySnapshot.SessionFacts facts = active == null ? null : summary.fact(active);
         int reviewCount = facts == null ? 0 : facts.review;
         List<Transaction> transactions =
@@ -264,7 +267,7 @@ class LiveSnapshot {
                 active == null ? "" : active.getId(),
                 active != null,
                 owner,
-                elapsed,
+                since,
                 metrics.paused,
                 ctx.idle,
                 metrics.net,
@@ -273,8 +276,10 @@ class LiveSnapshot {
                 visibleSupplies(metrics, marketFold),
                 visibleCosts(metrics, marketFold),
                 metrics.costSplitAvailable,
-                RateReadiness.isEstablished(elapsed),
-                metrics.profitPerHour,
+                RateReadiness.isEstablished(since),
+                active == null || active.rateSetMillis == 0L
+                        ? metrics.profitPerHour
+                        : Session.hourly(metrics.net - active.rateSetNet, since),
                 goal(active, metrics, elapsed),
                 marketResult,
                 marketPending,

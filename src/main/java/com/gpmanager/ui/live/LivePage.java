@@ -51,7 +51,7 @@ class LivePage implements Shell.Page {
         default void resetTarget() {}
 
         /** The ACTIVE clock: start fresh (Free play) or end the Grind (owner 2026-10-16). */
-        default void startFresh() {}
+        default void restartRate() {}
 
         default void hideRecent(String name, boolean charge) {}
 
@@ -126,7 +126,7 @@ class LivePage implements Shell.Page {
         endGrind.setToolTipText("End this Grind");
         counts.setOpaque(false);
         hero.controls(counts, startGrind, endGrind);
-        Hero.clickable(hero.clock, () -> actions.startFresh());
+        Hero.clickable(hero.clock, () -> actions.restartRate());
         Hero.clickable(hero.name, actions::renameGrind);
         // Clicking the Net total sets or changes the target (owner 2026-09-28: no Target button).
         Hero.clickable(hero.net, actions::editTarget);
@@ -449,12 +449,12 @@ class LivePage implements Shell.Page {
                             ledger));
         }
         var rows = new ArrayList<List<Cell>>(singletonList(money));
-        // Owner live 2026-10-13: skull and protect states are not shown (immersion); one PvP row
-        // keeps Best kill, Streak and Risk.
-        if (snapshot.pvpPossible || snapshot.pvpSession) {
+        // Owner live 2026-10-13: skull and protect states are not shown (immersion); a PvP Grind
+        // keeps Best kill and Streak. Risk sits beside the Review badge (owner 1.5.1: alone it
+        // took a whole row).
+        if (snapshot.pvpSession) {
             var pvp = new ArrayList<Cell>();
-            if (snapshot.pvpSession) {
-                pvp.add(
+            pvp.add(
                         new Cell(
                                         "BEST KILL",
                                         snapshot.bestKill == 0L ? "—" : signed(snapshot.bestKill),
@@ -462,23 +462,14 @@ class LivePage implements Shell.Page {
                                         snapshot.kills + " kills · " + snapshot.deaths + " deaths",
                                         null)
                                 .weight(3));
-                pvp.add(
-                        new Cell(
-                                        "STREAK",
-                                        String.valueOf(snapshot.streak),
-                                        snapshot.streak > 0 ? GAIN : DIM,
-                                        msg("kills-since") + snapshot.bestStreak + " this Grind",
-                                        null)
-                                .weight(2));
-            }
             pvp.add(
                     new Cell(
-                                    "RISK",
-                                    snapshot.pvpPossible ? compact(snapshot.risk) : "—",
-                                    snapshot.risk > 0L ? LOSS : DIM,
-                                    msg("what-death"),
+                                    "STREAK",
+                                    String.valueOf(snapshot.streak),
+                                    snapshot.streak > 0 ? GAIN : DIM,
+                                    msg("kills-since") + snapshot.bestStreak + " this Grind",
                                     null)
-                            .weight(3));
+                            .weight(2));
             rows.add(pvp);
         }
         return rows;
@@ -486,6 +477,8 @@ class LivePage implements Shell.Page {
 
     List<Cell> statusIcons(LiveSnapshot snapshot) {
         var list = new ArrayList<Cell>();
+        if (snapshot.pvpPossible && snapshot.risk > 0L)
+            list.add(new Cell("", "RISK " + compact(snapshot.risk), LOSS, msg("what-death"), null));
         if (snapshot.reviewCount > 0) {
             list.add(
                     new Cell(

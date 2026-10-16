@@ -26,6 +26,12 @@ import java.util.function.Predicate;
 import javax.inject.*;
 import lombok.*;
 import net.runelite.api.gameval.ItemID;
+import static com.gpmanager.SafeMath.nonNeg;
+import java.util.Map.Entry;
+import java.util.function.*;
+import static java.util.Locale.*;
+import java.util.regex.*;
+import net.runelite.api.MenuAction;
 
 @Singleton
 class Engine {
@@ -245,6 +251,9 @@ class Engine {
         // Reclaim evidence is ephemeral and belongs to the identity being replaced;
         // never carry one account's lost-item whitelist into another account's rows.
         deathReclaim.reset();
+        // The looting bag's dispenser additions belong to the account that earned them.
+        bagAdded.clear();
+        bagReward.clear();
         // A restart of the same owner restores its persisted pending death/reclaim evidence.
         deathReclaim.restore(state == null ? null : state.pendingDeathReclaim);
         // Custody lifecycles are profile-scoped financial continuity state.
@@ -268,9 +277,33 @@ class Engine {
      */
     synchronized void recheck(java.util.function.IntUnaryOperator alchPrice) {
         boolean changed = false;
+        var drops = new ArrayList<Runnable>();
         for (Session session : uniqueSessions()) {
             for (Transaction row : session.getTransactions()) {
                 if (row.getCorrection() != Correction.AUTO || Contribution.isSplit(row)) continue;
+                if (row.getType() == UNCERTAIN
+                        && msg("grand-exchange-collect").equals(row.getNote())
+                        && row.getFlows().size() == 1
+                        && row.getFlows().get(0).itemId == ItemID.COINS
+                        && geCustody.claimOldChange(
+                                row.getFlows().get(0).valueDelta, row.timestampEpochMillis)) {
+                    // A bank-paid buy's change is the player's own coins coming back (owner 1.5.1).
+                    row.type = TransactionType.TRANSFER;
+                    row.counted = false;
+                    row.note = msg("grand-exchange-custody");
+                    row.confidence = Confidence.CONFIRMED;
+                    row.explanation = msg("ownership-neutral-grand");
+                    session.changed(row, Correction.AUTO, row.getFlows());
+                    changed = true;
+                }
+                // Neutral GE change stays only as an audit row, like a live custody move.
+                if (row.getType() == TransactionType.TRANSFER
+                        && msg("grand-exchange-custody").equals(row.getNote())
+                        && row.getFlows().size() == 1
+                        && row.getFlows().get(0).itemId == ItemID.COINS) {
+                    if (!config.keepTransferAuditRows()) drops.add(() -> session.drop(row));
+                    continue;
+                }
                 if (preCollectGate(row)) {
                     // Before the GE-collect gate (owner live 2026-10-16) a coin pickup within two
                     // hours of a sale went to Review as Grand Exchange; it books as one today.
@@ -286,10 +319,10 @@ class Engine {
                 boolean priced = false;
                 for (Flow flow : row.getFlows()) {
                     if (flow.getPriceSource() != PriceSource.UNPRICED) continue;
-                    // An item with no quote is now its alch value or worth nothing.
+                    // An item that had no price now has one: its alch value, worth nothing, or a share
+                    // of the whole (half a pie, owner 1.5.1).
                     for (Flow now : valuationService.value(Map.of(flow.itemId, flow.quantityDelta))) {
-                        if (now.getPriceSource() == PriceSource.NO_VALUE
-                                || now.getPriceSource() == PriceSource.HIGH_ALCHEMY) {
+                        if (now.getPriceSource() != PriceSource.UNPRICED) {
                             flow.unitPrice = now.unitPrice;
                             flow.valueDelta = now.valueDelta;
                             flow.priceSource = now.getPriceSource();
@@ -321,7 +354,8 @@ class Engine {
                 changed = true;
             }
         }
-        if (changed) bumpRevision();
+        drops.forEach(Runnable::run);
+        if (changed || !drops.isEmpty()) bumpRevision();
     }
 
     /**
@@ -389,6 +423,17 @@ class Engine {
         }
     }
 
+    /**
+     * The ACTIVE clock's restart: GP/h and the clock count from now, while Net, Recent and the Ledger
+     * keep the whole run; only a factory reset clears it (owner 1.5.1).
+     */
+    synchronized void restartRate(long now) {
+        if (activeSession == null) return;
+        activeSession.rateSetNet = getMetrics(now).net;
+        activeSession.rateSetMillis = activeSession.getElapsedMillis(now);
+        bumpRevision();
+    }
+
     synchronized void startCustom(String name, long now) {
         ensureSession(now);
         if (customSession != null) {
@@ -415,26 +460,6 @@ class Engine {
         if (generalSession != null && generalSession.getPauseReason() == CUSTOM_SESSION) {
             generalSession.resume(closeAt);
         }
-        resetTracking(true);
-        return true;
-    }
-
-    /**
-     * Soft reset (owner 2026-10-16): Free play's run so far moves to history, where Recent grinds
-     * and the all-time totals keep it, and a fresh Free play starts at zero. Nothing is deleted;
-     * a running Grind ends through End Grind instead.
-     */
-    synchronized boolean startFreshFreePlay(long now) {
-        if (customSession != null || generalSession == null) return false;
-        Session done = generalSession;
-        clearGeCollect();
-        done.rename("Free play");
-        done.close(max(done.startedAtEpochMillis, now));
-        history.add(0, done);
-        archive.trimHistory();
-        generalSession = activeSession = newSession(Session.DURABLE_OWNER_NAME, now, false);
-        // A manual pause holds across the fresh start.
-        if (done.getPauseReason() == MANUAL) generalSession.pause(now, MANUAL);
         resetTracking(true);
         return true;
     }
@@ -886,6 +911,9 @@ class Engine {
         // because agl/restoreProfile hold this engine's monitor.
         inbox.drop(DROP_CLICK);
         deathReclaim.reset();
+        // The looting bag's dispenser additions belong to the account that earned them.
+        bagAdded.clear();
+        bagReward.clear();
         clearGeCollect();
         resetTracking(false);
         history = nextHistory;
@@ -2044,6 +2072,51 @@ class Engine {
         return bookFee(feeGp, label, "Death reclaim", now);
     }
 
+    /** A dispenser award the chat named, waiting for its settle; empty when none. */
+    Map<Integer, Long> bagReward = new HashMap<>();
+
+    long bagRewardUntil;
+
+    /** Dispenser rewards booked into the looting bag since the client last showed its contents. */
+    Map<Integer, Long> bagAdded = new HashMap<>();
+
+    /**
+     * Wilderness Agility pays its dispenser into an open looting bag, which the client never shows
+     * (owner live 2026-10-16). The chat names the whole award, so what the next settle does not
+     * bring into the pack went into the bag and books as loot. The bag only ever empties into the
+     * bank, so nothing books twice.
+     */
+    synchronized void noteBagReward(Map<Integer, Long> awarded, long now) {
+        bagReward = new HashMap<>(awarded);
+        bagRewardUntil = now + 6_000L;
+    }
+
+    Transaction settleBagReward(List<Flow> flows, long now) {
+        if (bagReward.isEmpty()) return null;
+        var bag = new HashMap<>(bagReward);
+        bagReward.clear();
+        if (now > bagRewardUntil || !live()) return null;
+        for (Flow flow : flows)
+            if (flow.isGain()) bag.computeIfPresent(flow.itemId, (id, q) -> q - flow.quantityDelta);
+        bag.values().removeIf(quantity -> quantity <= 0L);
+        if (bag.isEmpty()) return null;
+        bag.forEach((id, quantity) -> bagAdded.merge(id, quantity, Long::sum));
+        Transaction loot =
+                bookTransaction(
+                        now,
+                        TransactionType.LOOT,
+                        LOOT,
+                        msg("bag-reward"),
+                        activeSession.getActivityHint(),
+                        true,
+                        valuationService.value(bag),
+                        Confidence.LIKELY,
+                        msg("bag-reward-why"),
+                        null);
+        add(loot, false);
+        return loot;
+    }
+
     /** The Blast Furnace coffer's drain while you work it (owner 2026-10-16, after Coin Flow 1.9). */
     synchronized Transaction bookCofferDrain(long gp, long now) {
         return bookFee(gp, msg("bf-coffer"), "Smithing", now);
@@ -2378,6 +2451,9 @@ class Engine {
             java.util.function.Consumer<Transaction> additionalBooking) {
         Settle settle = commit(committed, now);
         if (settle == null) return null;
+        // Published like any extra booking, so HUD+'s tray shows the bag's rewards too.
+        Transaction bag = settleBagReward(settle.flows, now);
+        if (bag != null && additionalBooking != null) additionalBooking.accept(bag);
         // Minigame-only items (a loaned loadout, table supplies) cannot legally exist outside
         // their minigame: the grant and the exit strip vanish before any settle stage sees them, so
         // they never book, reach Review or pollute the death-wipe whitelist (Coinflow
@@ -3963,6 +4039,9 @@ class Engine {
         clearGeCollect();
         // Destructive reset clears the pending death/reclaim physical evidence with it.
         deathReclaim.reset();
+        // The looting bag's dispenser additions belong to the account that earned them.
+        bagAdded.clear();
+        bagReward.clear();
         inbox.drop(DROP_CLICK);
         resetTracking(true);
         // A reset is a fresh start: resume by itself shortly, if the player does nothing first.
@@ -4548,5 +4627,1005 @@ class Observation {
 
     Observation source() {
         return data instanceof Observation ? ((Observation) data).source() : this;
+    }
+}
+
+/** Null-tolerant, allocation-light predicates and projections over settled item flows. */
+class FlowFilters {
+    static final IntPredicate ANY = itemId -> true;
+
+    /** Positive flows whose item matches. */
+    static List<Flow> gains(List<Flow> flows, IntPredicate item) {
+        var out = new ArrayList<Flow>();
+        if (flows != null) {
+            for (Flow flow : flows) {
+                if (flow.quantityDelta > 0L && item.test(flow.itemId))
+                    out.add(flow);
+            }
+        }
+        return out;
+    }
+
+    /** Flows minus those whose item matches (positive-only when {@code gainsOnly}). */
+    static List<Flow> without(List<Flow> flows, IntPredicate item, boolean gainsOnly) {
+        if (flows == null) return Collections.emptyList();
+        var out = new ArrayList<Flow>(flows.size());
+        for (Flow flow : flows) {
+            if (!item.test(flow.itemId) || (gainsOnly && flow.quantityDelta <= 0L))
+                out.add(flow);
+        }
+        return out;
+    }
+
+    /** Positive entries of {@code quantities} whose item does not match. */
+    static Map<Integer, Long> withoutItems(Map<Integer, Long> quantities, IntPredicate item) {
+        var out = new HashMap<Integer, Long>();
+        if (quantities != null) {
+            for (Entry<Integer, Long> e : quantities.entrySet()) {
+                if (e.getKey() != null
+                        && e.getValue() != null
+                        && e.getValue() > 0L
+                        && !item.test(e.getKey())) {
+                    out.put(e.getKey(), e.getValue());
+                }
+            }
+        }
+        return out.isEmpty() ? Collections.emptyMap() : out;
+    }
+
+    /** Positive entries only (fresh mutable map; merges duplicates). */
+    static Map<Integer, Long> positiveEntries(Map<Integer, Long> quantities) {
+        var out = new HashMap<Integer, Long>();
+        if (quantities != null) {
+            for (Entry<Integer, Long> e : quantities.entrySet()) {
+                if (e.getKey() != null && e.getValue() != null && e.getValue() > 0L) {
+                    out.merge(e.getKey(), e.getValue(), SafeMath::safeAdd);
+                }
+            }
+        }
+        return out;
+    }
+
+    /**
+     * The shared settle-later claim: offers each matching flow's magnitude to {@code claimer},
+     * which returns how much its lifecycle takes, leaves only the unclaimed rest in {@code flows}
+     * and returns the claimed parts.
+     */
+    static List<Flow> claim(
+            List<Flow> flows, Predicate<Flow> which, ToLongBiFunction<Flow, Long> claimer) {
+        var parts = new ArrayList<Flow>();
+        for (int index = 0; index < flows.size(); index++) {
+            Flow flow = flows.get(index);
+            if (flow.quantityDelta == Long.MIN_VALUE || !which.test(flow)) continue;
+            long taken = claimer.applyAsLong(flow, SafeMath.abs(flow.quantityDelta));
+            if (taken > 0L) parts.add(flow.part(taken));
+            Flow rest = flow.rest(taken);
+            if (rest == null) flows.remove(index--);
+            else flows.set(index, rest);
+        }
+        return parts;
+    }
+
+    /** Positive remainders of {@code a} minus {@code b}: what left between two observations. */
+    static Map<Integer, Long> minus(Map<Integer, Long> base, Map<Integer, Long> subtract) {
+        var out = new LinkedHashMap<Integer, Long>();
+        if (base != null) {
+            for (Entry<Integer, Long> e : base.entrySet()) {
+                Long less = subtract == null ? null : subtract.get(e.getKey());
+                long left =
+                        (e.getValue() == null ? 0L : e.getValue())
+                                - (less == null ? 0L : nonNeg(less));
+                if (e.getKey() != null && left > 0L) out.put(e.getKey(), left);
+            }
+        }
+        return out;
+    }
+
+    /** True when every wanted quantity fits inside {@code available}. */
+    static boolean covers(Map<Integer, Long> available, Map<Integer, Long> wanted) {
+        if (empty(wanted) || empty(available)) return false;
+        for (Entry<Integer, Long> e : wanted.entrySet()) {
+            if (e.getKey() == null
+                    || e.getValue() == null
+                    || e.getValue() <= 0L
+                    || available.getOrDefault(e.getKey(), 0L) < e.getValue()) {
+                return false;
+            }
+        }
+        return true;
+    }
+
+    /** Removes up to {@code max} of one item and returns the quantity taken. */
+    static long take(Map<Integer, Long> quantities, int itemId, long max) {
+        if (quantities == null || max <= 0L) return 0L;
+        long held = quantities.getOrDefault(itemId, 0L);
+        long taken = min(nonNeg(held), max);
+        if (held - taken <= 0L) quantities.remove(itemId);
+        else quantities.put(itemId, held - taken);
+        return taken;
+    }
+
+    /** Summed positive quantities per matching item. */
+    static Map<Integer, Long> gainQuantities(List<Flow> flows, IntPredicate item) {
+        return quantities(flows, item, true);
+    }
+
+    /** Summed magnitudes of negative deltas per matching item. */
+    static Map<Integer, Long> lossQuantities(List<Flow> flows, IntPredicate item) {
+        return quantities(flows, item, false);
+    }
+
+    static Map<Integer, Long> quantities(List<Flow> flows, IntPredicate item, boolean gains) {
+        var out = new HashMap<Integer, Long>();
+        if (flows != null) {
+            for (Flow flow : flows) {
+                if (!item.test(flow.itemId)) continue;
+                long delta = flow.quantityDelta;
+                if (gains ? delta > 0L : delta < 0L) {
+                    long magnitude = SafeMath.abs(delta);
+                    out.merge(flow.itemId, magnitude, SafeMath::safeAdd);
+                }
+            }
+        }
+        return out;
+    }
+
+    /**
+     * Removes same-variant charge-state swaps (full -> partial -> uncharged): one physical weapon
+     * changing item id is neither a gain nor a loss. A 1:1 proxy pair (X and X(i)/(ei)/(ri)) is the
+     * same item changing state too, so an imbue never books a loss and a gain (owner 2026-10-12).
+     * Leftover flows keep their own rows.
+     */
+    static List<Flow> withoutSwaps(List<Flow> flows) {
+        boolean[] dropped = new boolean[flows.size()];
+        for (int i = 0; i < flows.size(); i++) {
+            Flow cost = flows.get(i);
+            if (cost == null || cost.quantityDelta >= 0L) continue;
+            ChargeCheck.ChargedItem variant = ChargeCheck.supportedForId(cost.itemId);
+            for (int j = 0; j < flows.size(); j++) {
+                Flow gain = flows.get(j);
+                if (dropped[j]
+                        || gain == null
+                        || gain.quantityDelta <= 0L
+                        || gain.itemId == cost.itemId
+                        || abs(gain.quantityDelta) != abs(cost.quantityDelta)) {
+                    continue;
+                }
+                if (variant != null && ChargeCheck.supportedForId(gain.itemId) == variant
+                        || reducedBase(cost.itemId) == reducedBase(gain.itemId)) {
+                    dropped[i] = true;
+                    dropped[j] = true;
+                    break;
+                }
+            }
+        }
+        var result = new ArrayList<Flow>();
+        for (int i = 0; i < flows.size(); i++) {
+            if (!dropped[i]) result.add(flows.get(i));
+        }
+        return result;
+    }
+
+    /** The item's 1:1 proxy base (an imbued variant reduces to its plain item), else itself. */
+    static int reducedBase(int itemId) {
+        int[] proxy = CurrencyProxyCatalogue.proxyOf(itemId);
+        return proxy != null && proxy[1] == 1 ? proxy[0] : itemId;
+    }
+
+    static boolean hasLoss(List<Flow> flows) {
+        return hasLoss(flows, ANY);
+    }
+
+    static boolean hasLoss(List<Flow> flows, IntPredicate item) {
+        if (flows != null) {
+            for (Flow flow : flows) {
+                if (flow.quantityDelta < 0L && item.test(flow.itemId)) return true;
+            }
+        }
+        return false;
+    }
+
+    /** True when every non-null flow is on one side and at least one is non-zero. */
+    static boolean onlyGains(List<Flow> flows) {
+        return oneSided(flows, true);
+    }
+
+    static boolean onlyCosts(List<Flow> flows) {
+        return oneSided(flows, false);
+    }
+
+    static boolean oneSided(List<Flow> flows, boolean gains) {
+        if (empty(flows)) return false;
+        boolean saw = false;
+        for (Flow flow : flows) {
+            long delta = flow.quantityDelta;
+            if (gains ? delta < 0L : delta > 0L) return false;
+            saw |= delta != 0L;
+        }
+        return saw;
+    }
+}
+
+/**
+ * PvM death → reclaim lifecycle. A separate held-stack snapshot is intersected with measured
+ * negative inventory flows to establish which items actually left the player. Those exact
+ * quantities remain ownership-neutral until reclaimed or the gravestone timer expires.
+ *
+ * <p>Fees are never inferred here; the engine can book only an observed carried-coin loss. A timer
+ * expiry records an informational audit event and never creates an item loss.
+ *
+ * <p>Pure tick-counted state; the engine owns the single instance.
+ */
+class DeathReclaimLifecycle {
+    /** Ticks a gravestone retains items. */
+    static final int AWAIT_TICKS = 1_500; // 15 minutes
+
+    /** Keep a grave interaction armed through the usual open/confirm/claim sequence. */
+    static final int MIN_RECLAIM_ARM_TICKS = 200; // 2 minutes
+
+    /** Bound delayed death-wipe reconciliation so later ordinary losses cannot match it. */
+    static final int DEATH_WIPE_WINDOW_TICKS = 100; // 1 minute
+
+    @Getter(AccessLevel.PACKAGE)
+    boolean awaitingReclaim;
+
+    int deathWipeTicks;
+    int ageTicks;
+    int reclaimTicks;
+    BossRetrievalCatalogue.Service reclaimService;
+
+    /** Stacks held at death not yet matched to a measured loss; null when no wipe is pending. */
+    Map<Integer, Long> carriedAtDeath;
+
+    /** Measured grave contents still outstanding, with the names used by the expiry note. */
+    Map<Integer, Long> deathItems = new HashMap<>();
+
+    Map<Integer, String> names = new HashMap<>();
+
+    /** Local unsafe PvM death: the snapshot is ownership evidence, not presentation evidence. */
+    void onPvmDeath(Map<Integer, Long> heldItems) {
+        // A second death moves outstanding items to the new gravestone. Keep their
+        // quantities and restart the single gravestone timer with the new grave.
+        if (!awaitingReclaim) deathItems.clear();
+        awaitingReclaim = true;
+        // Missing canonical evidence is not permission to neutralize arbitrary losses.
+        Map<Integer, Long> held = positiveEntries(heldItems);
+        carriedAtDeath = held.isEmpty() ? null : held;
+        deathWipeTicks = carriedAtDeath == null ? 0 : DEATH_WIPE_WINDOW_TICKS;
+        ageTicks = 0;
+        reclaimTicks = 0;
+        reclaimService = null;
+        completeIfEmpty();
+    }
+
+    /** True while waiting for the measured death inventory/equipment removal. */
+    boolean wipePending() {
+        return awaitingReclaim && carriedAtDeath != null;
+    }
+
+    /** Stop the short death-wipe whitelist when stronger later evidence owns the loss. */
+    void cancelDeathWipe() {
+        carriedAtDeath = null;
+        deathWipeTicks = 0;
+        completeIfEmpty();
+    }
+
+    /** Consume death-time candidates whose later loss is explicitly action-attributed. */
+    void excludeActionLosses(Map<Integer, Long> actionLosses) {
+        if (carriedAtDeath == null || Phrases.empty(actionLosses)) return;
+        positiveEntries(actionLosses).forEach((itemId, lost) -> take(carriedAtDeath, itemId, lost));
+        endWipeIfSpent();
+    }
+
+    /**
+     * Intersect a settled negative-flow batch with the stacks held at death. The returned
+     * quantities identify the exact negative flow portions that may be labelled as the
+     * ownership-neutral death transfer.
+     */
+    Map<Integer, Long> onDeathItemsRemoved(List<Flow> flows) {
+        if (!wipePending()) return emptyMap();
+        var removed = new HashMap<Integer, Long>();
+        for (Flow flow : flows == null ? Collections.<Flow>emptyList() : flows) {
+            if (flow.quantityDelta >= 0L
+                    || flow.quantityDelta == Long.MIN_VALUE
+                    // A live retrieval interaction makes measured coin loss a possible
+                    // fee; do not consume it as a delayed death wipe.
+                    || flow.itemId == ItemID.COINS && isReclaimArmed()) {
+                continue;
+            }
+            long matched = take(carriedAtDeath, flow.itemId, -flow.quantityDelta);
+            if (matched <= 0L) continue;
+            removed.put(flow.itemId, matched);
+            // Coins can be part of the measured death wipe transfer, but they are
+            // never reclaim whitelist items: a later coin loss may be the observed fee.
+            if (flow.itemId != ItemID.COINS) {
+                deathItems.merge(flow.itemId, matched, SafeMath::safeAdd);
+                if (flow.itemName != null && !flow.itemName.trim().isEmpty())
+                    names.put(flow.itemId, flow.itemName.trim());
+            }
+        }
+        endWipeIfSpent();
+        return removed.isEmpty() ? emptyMap() : unmodifiableMap(removed);
+    }
+
+    /**
+     * Match a positive return against the still-outstanding measured death quantity. Returns zero
+     * when the item was not part of the actual settled death wipe.
+     */
+    long matchReturnedItem(int itemId, long quantity) {
+        long matched = take(deathItems, itemId, quantity);
+        if (matched > 0L && deathItems.isEmpty()) {
+            // All measured grave contents have returned. Remaining stacks from the
+            // death-time snapshot were kept and can no longer be a delayed wipe.
+            cancelDeathWipe();
+        }
+        return matched;
+    }
+
+    long outstandingItemCount() {
+        long count = 0L;
+        for (long quantity : deathItems.values()) count = SafeMath.safeAdd(count, quantity);
+        return count;
+    }
+
+    int ageTicks() {
+        return ageTicks;
+    }
+
+    /**
+     * Player interacted with a retrieval service. A fresh Grave / Gravestone click can always
+     * re-arm while this local death remains active.
+     *
+     * @return true only when a local PvM death is awaiting reclaim
+     */
+    boolean noteReclaimIntent(BossRetrievalCatalogue.Service service, int ticks) {
+        if (service == null || !awaitingReclaim && deathItems.isEmpty()) return false;
+        reclaimService = service;
+        reclaimTicks = Math.max(MIN_RECLAIM_ARM_TICKS, ticks);
+        return true;
+    }
+
+    boolean isReclaimArmed() {
+        return reclaimTicks > 0 && reclaimService != null;
+    }
+
+    /** One inventory/game tick; defers gravestone expiry while a snapshot is unsettled. */
+    String tick(boolean deferGravestoneExpiry) {
+        if (awaitingReclaim && ageTicks < Integer.MAX_VALUE) ageTicks++;
+        if (reclaimTicks > 0 && --reclaimTicks == 0) reclaimService = null;
+        if (deathWipeTicks > 0 && --deathWipeTicks == 0) cancelDeathWipe();
+        if (deferGravestoneExpiry || !awaitingReclaim || ageTicks < AWAIT_TICKS) return null;
+        String expired = deathItems.isEmpty() ? null : expiredItems();
+        // Expired grave items wait at Death's Office for good: still yours, so they stay
+        // outstanding
+        // and match only while a retrieval is armed (review 2026-10-09).
+        awaitingReclaim = false;
+        cancelDeathWipe();
+        return expired;
+    }
+
+    /** The expiry audit explanation: the outstanding items, sorted by name. */
+    String expiredItems() {
+        var labels = new ArrayList<String>();
+        deathItems.forEach(
+                (itemId, quantity) -> {
+                    String name = names.getOrDefault(itemId, "item #" + itemId);
+                    labels.add(
+                            quantity == 1L
+                                    ? name
+                                    : name + " ×" + String.format(Locale.ROOT, "%,d", quantity));
+                });
+        labels.sort(String.CASE_INSENSITIVE_ORDER);
+        return msg("gravestone-timer")
+                + outstandingItemCount()
+                + msg("item-s")
+                + String.join(", ", labels)
+                + msg("item-loss");
+    }
+
+    void reset() {
+        awaitingReclaim = false;
+        deathWipeTicks = 0;
+        ageTicks = 0;
+        reclaimTicks = 0;
+        reclaimService = null;
+        carriedAtDeath = null;
+        deathItems.clear();
+        names.clear();
+    }
+
+    /**
+     * Persistable physical continuity for restart, or null when no death awaits reclaim. Item
+     * identity and quantity only; the live reclaim interaction and presentation labels are
+     * deliberately not persisted.
+     */
+    PendingDeath snapshot() {
+        List<DeathItem> outstanding = items(deathItems);
+        List<DeathItem> held = items(carriedAtDeath);
+        return outstanding.isEmpty() && held.isEmpty()
+                ? null
+                : new PendingDeath(outstanding, held, deathWipeTicks, ageTicks);
+    }
+
+    static List<DeathItem> items(Map<Integer, Long> quantities) {
+        var items = new ArrayList<DeathItem>();
+        positiveEntries(quantities)
+                .forEach((itemId, quantity) -> items.add(new DeathItem(itemId, quantity)));
+        return items;
+    }
+
+    /**
+     * Restore persisted physical continuity after a restart. The reclaimed quantities are matched
+     * exactly as before; the delayed-wipe window resumes its remaining bounded ticks and the
+     * gravestone timer keeps its age. A live reclaim interaction is never restored.
+     */
+    void restore(PendingDeath pending) {
+        reset();
+        if (pending == null || pending.isEmpty()) return;
+        for (DeathItem item : pending.getOutstandingItems()) {
+            if (item.getQuantity() > 0L)
+                deathItems.merge(item.itemId, item.getQuantity(), SafeMath::safeAdd);
+        }
+        var held = new HashMap<Integer, Long>();
+        for (DeathItem item : pending.getHeldAtDeath()) {
+            held.merge(item.itemId, item.getQuantity(), SafeMath::safeAdd);
+        }
+        deathWipeTicks = Math.min(DEATH_WIPE_WINDOW_TICKS, pending.getWipeTicksRemaining());
+        carriedAtDeath = deathWipeTicks > 0 && !held.isEmpty() ? held : null;
+        deathWipeTicks = carriedAtDeath == null ? 0 : deathWipeTicks;
+        ageTicks = pending.getGravestoneAgeTicks();
+        awaitingReclaim = carriedAtDeath != null || !deathItems.isEmpty() && ageTicks < AWAIT_TICKS;
+    }
+
+    /** Adopt the physical continuity of a staged engine during an owner install. */
+    void adoptFrom(DeathReclaimLifecycle other) {
+        reset();
+        if (other == null) return;
+        awaitingReclaim = other.awaitingReclaim;
+        deathWipeTicks = other.deathWipeTicks;
+        ageTicks = other.ageTicks;
+        reclaimTicks = other.reclaimTicks;
+        reclaimService = other.reclaimService;
+        carriedAtDeath = other.carriedAtDeath == null ? null : new HashMap<>(other.carriedAtDeath);
+        deathItems.putAll(other.deathItems);
+        names.putAll(other.names);
+    }
+
+    void endWipeIfSpent() {
+        if (carriedAtDeath != null && carriedAtDeath.isEmpty()) cancelDeathWipe();
+        completeIfEmpty();
+    }
+
+    void completeIfEmpty() {
+        if (awaitingReclaim && carriedAtDeath == null && deathItems.isEmpty()) reset();
+    }
+}
+
+/**
+ * Read-only state for the local PvM death-reclaim indicator. The item count is the sum of measured
+ * outstanding stack quantities, and age is measured in active engine game ticks.
+ */
+class DeathReclaimStatus {
+    boolean awaiting;
+    boolean armed;
+    long outstandingItemCount;
+    long ageTicks;
+
+    DeathReclaimStatus(boolean awaiting, boolean armed, long outstandingItemCount, long ageTicks) {
+        this.awaiting = awaiting;
+        this.armed = awaiting && armed;
+        this.outstandingItemCount = nonNeg(outstandingItemCount);
+        this.ageTicks = nonNeg(ageTicks);
+    }
+}
+
+/**
+ * Item Retrieval Services and their published flat fees. Source: OSRS Wiki "Item Retrieval Service"
+ * (checked 2026-10-11). The fee here is an <em>expectation used for labelling</em>; the booked cost
+ * is always the coins actually observed leaving the inventory in the reclaim window. Fees paid from
+ * the bank or Death's Coffer are not observable and are never invented.
+ */
+class BossRetrievalCatalogue {
+    /** Marker for services whose fee depends on the run (ToA scales with raid level). */
+    static final long VARIABLE_FEE = -1L;
+
+    /** Marker for tiered / percentage fees (gravestone, Death's Office) — see DeathReclaimFees. */
+    static final long TIERED_FEE = -2L;
+
+    @AllArgsConstructor
+    static class Service {
+        String key;
+        String activity;
+        String interactable;
+        long expectedFee;
+        String note;
+
+        /**
+         * Target name shared with unrelated scenery (a bare "Chest", a gravestone): only evidence
+         * when a local PvM death is still awaiting reclaim.
+         */
+        boolean ambiguousTarget;
+
+        /** Ledger explanation for an observed coin payment at this service. */
+        String why(long observedCoins) {
+            var why =
+                    new StringBuilder(msg("item-retrieval"))
+                            .append(activity)
+                            .append(" (")
+                            .append(interactable)
+                            .append(")");
+            if (expectedFee > 0L) {
+                why.append(", published ").append(String.format(ROOT, "%,d", expectedFee));
+                if (observedCoins > 0L && observedCoins != expectedFee) {
+                    why.append(", observed ").append(String.format(ROOT, "%,d", observedCoins));
+                }
+            } else if (expectedFee == VARIABLE_FEE) {
+                why.append(", fee varies");
+            }
+            if (!note.isEmpty()) why.append(". ").append(note);
+            return why.toString();
+        }
+    }
+
+    static final Map<String, Service> BY_INTERACTABLE = new LinkedHashMap<>();
+
+    static {
+        for (String[] row : GameData.rows("retrieval_services")) {
+            BY_INTERACTABLE.put(
+                    row[2].toLowerCase(ROOT),
+                    new Service(
+                            row[0],
+                            row[1],
+                            row[2],
+                            Long.parseLong(row[3]),
+                            row[4],
+                            Boolean.parseBoolean(row[5])));
+        }
+    }
+
+    /**
+     * Service for a menu target (NPC or object name) when the option is a retrieval verb (see
+     * {@link #isRetrievalOption}). Ambiguous targets ("Chest", "Gravestone", "Death") are returned
+     * too; the engine only acts on them while a local PvM death awaits reclaim.
+     */
+
+    /** Menu verbs that open or complete a reclaim. */
+    /** Existing reclaim vocabulary and grave prefix compiled once from d18. */
+    static final java.util.regex.Pattern RECLAIM = GameData.pattern("reclaim");
+
+    static final java.util.regex.Pattern GRAVE = GameData.pattern("grave");
+
+    static Service serviceFor(String option, String target) {
+        if (target == null || option == null || !RECLAIM.matcher(Phrases.lower(option)).matches()) {
+            return null;
+        }
+        String lower = Phrases.lower(target);
+        if (lower.isEmpty()) return null;
+        Service exact = BY_INTERACTABLE.get(lower);
+        if (exact != null) return exact;
+        for (Map.Entry<String, Service> entry : BY_INTERACTABLE.entrySet()) {
+            if (!entry.getValue().ambiguousTarget && lower.contains(entry.getKey()))
+                return entry.getValue();
+        }
+        if (GRAVE.matcher(lower).matches()) return BY_INTERACTABLE.get("gravestone");
+        return null;
+    }
+}
+
+/**
+ * Derives the observed {@link ActionKind} for a settled inventory change from positive evidence
+ * only: a matched menu verb plus the settled flow shape. Never upgrades weak evidence into a
+ * confident verb — a dose leftover without a matched Drink click is {@link ActionKind#SUPPLIES},
+ * not {@link ActionKind#DRINK}.
+ *
+ * <p>Presentation evidence only. Accounting type, valuation and counted state are decided elsewhere
+ * and never read this class.
+ */
+class ActionReader {
+    static final Set<String> HERBLORE_INGREDIENTS = new HashSet<>(GameData.names("empty_vessels"));
+    static final Pattern HERBLORE_INGREDIENT_SUFFIX = GameData.pattern("herblore-ingredient");
+    static final Pattern DOSE_SUFFIX = GameData.pattern("dose-suffix");
+
+    /** Ammunition names; tips, heads and shafts are fletching supplies, not ammunition. */
+    static final Pattern AMMUNITION = GameData.pattern("ammunition");
+
+    static final Pattern FLETCHING_PART = GameData.pattern("fletching-part");
+
+    /** Menu verb prefixes (a leading "~" means "contains") and the action each evidences. */
+    static final Object[] VERBS =
+            GameData.rows("action_rules").stream()
+                    .filter(a -> !a[2].isEmpty())
+                    .flatMap(a -> java.util.stream.Stream.of(a[0], ActionKind.valueOf(a[2])))
+                    .toArray();
+
+    /**
+     * Final stamp for a booked change.
+     *
+     * @param matchedIntent the menu verb whose intent matched these flows, or null when the intent
+     *     was absent, stale or matched nothing
+     * @param flows settled flows of the transaction
+     * @param type booked accounting type (unchanged by this call)
+     * @param activityName booked activity name, used only to recognise Herblore production
+     */
+    static ActionKind resolve(
+            ActionKind matchedIntent, List<Flow> flows, TransactionType type, String activityName) {
+        if (Phrases.empty(flows)) return null;
+        // A decant shape can also appear in a bank transfer or trade. Only the
+        // otherwise-unclassified mixed inventory row is evidence of a player action.
+        if (type == UNCERTAIN && isDecant(flows)) return DECANT;
+        String activity = Phrases.lower(activityName);
+        if (type == PROCESSING
+                && activity.equals("herblore")
+                && all(flows, -1, ActionReader::isIngredient)
+                && all(flows, 1, name -> trailingDose(name) > 0)) {
+            return MIX;
+        }
+        if (type == PROCESSING && activity.equals("cooking") && isCooking(flows)) {
+            // Use the actual outcome: every output burnt → Burnt, otherwise Cooked.
+            return all(flows, 1, name -> name.startsWith("burnt")) ? BURN : COOK;
+        }
+        // Rune/ammo spends are only recognised on cost-shaped rows: a bank deposit or
+        // death loss of runes is a transfer/death, not casting.
+        boolean spendShaped = type == CONSUMPTION || type == PK_SUPPLY_COST;
+        boolean hasLoss = hasLoss(flows);
+        boolean hasGain = !gains(flows, ANY).isEmpty();
+        boolean lossOnly = hasLoss && !hasGain;
+        if (spendShaped && lossOnly && all(flows, 0, ActionReader::isRune)) return ActionKind.CAST;
+        if (spendShaped && lossOnly && all(flows, 0, ActionReader::isAmmo)) return FIRE;
+        boolean doseStep = isDoseStep(flows);
+        // Every loss must be one potion's doses (Drink) or one item (Eat/Bury/...): a coalesced
+        // shark or bones under the same click is not "Drank", so it falls back to Supplies.
+        boolean onePotion =
+                oneLossFamily(flows, name -> trailingDose(name) > 0 ? doseBaseName(name) : null);
+        boolean oneItem =
+                oneLossFamily(flows, name -> name.isEmpty() ? null : name)
+                        && all(flows, -1, name -> trailingDose(name) <= 0);
+        if (matchedIntent != null && hasLoss) {
+            switch (matchedIntent) {
+                case DRINK:
+                    return onePotion ? ActionKind.DRINK : ActionKind.SUPPLIES;
+                case EAT:
+                case BURY:
+                case SCATTER:
+                case OFFER:
+                    return oneItem ? matchedIntent : ActionKind.SUPPLIES;
+                case CAST:
+                    // A Cast proves its spell by what it spent: runes, or a broken tablet (the
+                    // spell in item form). An alch's coins or Bones to Peaches' fruit may come
+                    // back with them (owner live 2026-10-16); a bank or trade move never casts.
+                    return type != TransactionType.TRANSFER
+                                    && type != TRADE
+                                    && !all(
+                                            flows,
+                                            -1,
+                                            name -> !isRune(name) && Spells.named(name) == null)
+                            ? ActionKind.CAST
+                            : doseStep ? ActionKind.SUPPLIES : null;
+                case SUPPLIES:
+                    // This explicit intent currently comes from Light/Tend-to and the
+                    // Tinderbox→fuel pair. Require the matching loss to be actual fuel.
+                    return lossOnly && all(flows, 0, name -> name.matches(msg("logs-kindling")))
+                            ? ActionKind.SUPPLIES
+                            : null;
+                default:
+                    return matchedIntent;
+            }
+        }
+        // Consumption is known from the leftover shape; the verb is not.
+        return type == CONSUMPTION && doseStep ? ActionKind.SUPPLIES : null;
+    }
+
+    /**
+     * Doses of one potion redistributed with no dose lost: e.g. −(3) −(1) +(4), or −(4) +(2) +(2).
+     * Requires every flow to be a dosed form of the same base name.
+     */
+    static boolean isDecant(List<Flow> flows) {
+        if (flows == null || flows.size() < 2) return false;
+        String base = null;
+        long doseBalance = 0L;
+        boolean anyLoss = false;
+        boolean anyGain = false;
+        for (Flow flow : flows) {
+            if (flow.quantityDelta == 0L) continue;
+            String name = Phrases.lower(flow.itemName);
+            int dose = trailingDose(name);
+            // Combining doses frees a vessel; an emptied vial/jug gain is part of the shape.
+            if (dose <= 0 && flow.quantityDelta > 0L && isVessel(name)) continue;
+            String stem = doseBaseName(name);
+            if (dose <= 0 || stem.isEmpty() || base != null && !base.equals(stem)) return false;
+            base = stem;
+            doseBalance += (long) dose * flow.quantityDelta;
+            anyLoss |= flow.quantityDelta < 0L;
+            anyGain |= flow.quantityDelta > 0L;
+        }
+        return anyLoss && anyGain && doseBalance == 0L;
+    }
+
+    /** A dose/food step confirms a consume even when its menu intent has expired. */
+    static boolean isDoseStep(List<Flow> flows) {
+        return !partialUses(flows).isEmpty();
+    }
+
+    /** Exact matched loss/remainder pairs for a recognized dose or partial-food consume. */
+    static List<PartialUse> partialUses(List<Flow> flows) {
+        if (flows == null || flows.size() < 2) return Collections.emptyList();
+        var pairs = new ArrayList<PartialUse>();
+        for (int lossIndex = 0; lossIndex < flows.size(); lossIndex++) {
+            // A loss pairs only with the one remainder it could have become, and that remainder
+            // only with this loss.
+            List<Integer> gains = stepPartners(flows, flows.get(lossIndex), true);
+            if (gains.size() == 1
+                    && stepPartners(flows, flows.get(gains.get(0)), false).size() == 1) {
+                pairs.add(new PartialUse(lossIndex, gains.get(0)));
+            }
+        }
+        return Collections.unmodifiableList(pairs);
+    }
+
+    /**
+     * Indexes of the flows a loss could step to ({@code toGains}), or the losses a gain could come
+     * from.
+     */
+    static List<Integer> stepPartners(List<Flow> flows, Flow flow, boolean toGains) {
+        var partners = new ArrayList<Integer>();
+        Flow loss = toGains ? flow : null;
+        Flow gain = toGains ? null : flow;
+        if (flow == null
+                || (toGains
+                        ? flow.quantityDelta >= 0L || flow.quantityDelta == Long.MIN_VALUE
+                        : flow.quantityDelta <= 0L)) {
+            return partners;
+        }
+        for (int index = 0; index < flows.size(); index++) {
+            Flow other = flows.get(index);
+            Flow lost = toGains ? loss : other;
+            Flow gained = toGains ? other : gain;
+            if (lost != null
+                    && gained != null
+                    && lost.quantityDelta < 0L
+                    && lost.quantityDelta != Long.MIN_VALUE
+                    && gained.quantityDelta > 0L
+                    && -lost.quantityDelta == gained.quantityDelta
+                    && isConsumeStep(lost.itemName, gained.itemName)) {
+                partners.add(index);
+            }
+        }
+        return partners;
+    }
+
+    @AllArgsConstructor
+    static class PartialUse {
+        int lossIndex;
+        int remainderIndex;
+    }
+
+    static boolean addDoseLosses(Map<Integer, Long> target, List<Flow> flows) {
+        boolean matched = false;
+        for (Flow loss : flows) {
+            if (!stepPartners(flows, loss, true).isEmpty()) {
+                target.put(loss.itemId, -loss.quantityDelta);
+                matched = true;
+            }
+        }
+        return matched;
+    }
+
+    /**
+     * Potion base name without its dose suffix, for receipts: "Prayer potion(4)" → "Prayer potion".
+     */
+    static String doseBaseName(String itemName) {
+        return itemName == null ? "" : DOSE_SUFFIX.matcher(itemName.trim()).replaceFirst("").trim();
+    }
+
+    /** Dose count parsed from a trailing "(N)" suffix, or −1 when absent. */
+    static int trailingDose(String itemName) {
+        Matcher matcher = DOSE_SUFFIX.matcher(itemName == null ? "" : itemName.trim());
+        return matcher.find() ? Integer.parseInt(matcher.group(1)) : -1;
+    }
+
+    static boolean isAmmo(String itemName) {
+        String lower = Phrases.lower(itemName);
+        return AMMUNITION.matcher(lower).matches() && !FLETCHING_PART.matcher(lower).matches();
+    }
+
+    /**
+     * True when every loss has the same non-null family key (a matched click cannot name mixed
+     * costs); false when there is no loss.
+     */
+    static boolean oneLossFamily(List<Flow> flows, Function<String, String> family) {
+        String first = null;
+        for (Flow flow : flows) {
+            if (flow.quantityDelta >= 0L) continue;
+            String key = family.apply(Phrases.lower(flow.itemName));
+            if (key == null || first != null && !first.equals(key)) return false;
+            first = key;
+        }
+        return first != null;
+    }
+
+    /** A cooking row must pair raw food inputs with only their cooked/burnt products. */
+    static boolean isCooking(List<Flow> flows) {
+        var rawBases = new ArrayList<String>();
+        for (Flow flow : flows) {
+            if (flow.quantityDelta < 0L) {
+                String name = Phrases.lower(flow.itemName);
+                rawBases.add(
+                        name.startsWith("raw ") && name.length() > 4
+                                ? name.substring(4).trim()
+                                : name.startsWith("uncooked ") && name.length() > 9
+                                        ? name.substring(9).trim()
+                                        : null);
+            }
+        }
+        return !rawBases.isEmpty()
+                && !rawBases.contains(null)
+                && all(
+                        flows,
+                        1,
+                        output ->
+                                rawBases.stream()
+                                        .anyMatch(
+                                                raw ->
+                                                        output.equals(raw)
+                                                                || output.equals("cooked " + raw)
+                                                                || output.equals("burnt " + raw)));
+    }
+
+    /** True when every gained item is a burnt product ("Burnt shark", "Burnt pie"). */
+    /**
+     * True when at least one flow on the chosen side (1 gains, -1 losses, 0 both) exists and every
+     * such flow's lower-case name satisfies {@code predicate}.
+     */
+    static boolean all(List<Flow> flows, int side, Predicate<String> predicate) {
+        boolean any = false;
+        for (Flow flow : flows) {
+            long delta = flow.quantityDelta;
+            if (delta == 0L || side != 0 && Long.signum(delta) != side) continue;
+            if (!predicate.test(Phrases.lower(flow.itemName))) return false;
+            any = true;
+        }
+        return any;
+    }
+
+    /** Ordered intent and item-name rules, compiled beside the old implementation for parity. */
+    static final Map<String, Phrases.Clause[][]> RULES = GameData.rules("action_rules");
+
+    static boolean rule(String group, String text) {
+        return Phrases.has(text, RULES.get(group));
+    }
+
+    /** First matching verb wins, before the explicit fuel fallback. */
+    static ActionKind verbOf(String raw) {
+        String name = Phrases.lower(raw);
+        for (int index = 0; index < VERBS.length; index += 2) {
+            if (rule((String) VERBS[index], name)) return (ActionKind) VERBS[index + 1];
+        }
+        return rule("supplies", name) ? ActionKind.SUPPLIES : null;
+    }
+
+    /** Empty vessels use the already-normalized name, exactly as before. */
+    static boolean isVessel(String name) {
+        return rule("vessel", name);
+    }
+
+    /** Rune and unopened-claim names use the shared trimmed normalization. */
+    static boolean isRune(String name) {
+        return rule("rune", Phrases.lower(name));
+    }
+
+    static boolean isClaim(String name) {
+        return rule("claim", Phrases.lower(name));
+    }
+
+    /** Ingredient names retain their existing non-null precondition and named ingredient set. */
+    static boolean isIngredient(String name) {
+        return !name.isEmpty()
+                && rule("ingredient", name)
+                && (HERBLORE_INGREDIENTS.contains(name)
+                        || HERBLORE_INGREDIENT_SUFFIX.matcher(name).matches());
+    }
+
+    /** Dose arithmetic is unchanged; only food/vessel vocabulary is table-driven. */
+    static boolean isConsumeStep(String lostName, String gainedName) {
+        String lost = Phrases.lower(lostName);
+        String gained = Phrases.lower(gainedName);
+        if (lost.isEmpty() || gained.isEmpty()) return false;
+        if (isVessel(gained)) return true;
+        int lostDose = trailingDose(lost);
+        int gainedDose = trailingDose(gained);
+        if (lostDose > 0) {
+            String lostBase = doseBaseName(lost);
+            if (!lostBase.isEmpty() && lostBase.equals(doseBaseName(gained))) {
+                // A suffix-less gain of the same base is the uncharged item: the last glory
+                // charge leaves the plain amulet, so the pair is still one dose step (owner
+                // 1.3.4). Any other suffix-less gain keeps failing closed.
+                return lostDose == (gainedDose < 0 ? 0 : gainedDose) + 1;
+            }
+        }
+        return rule("food", lost) && rule("partial", gained);
+    }
+}
+
+/**
+ * Menu / chat vocabulary that turns a click into an accounting intent: explicit spend actions (eat,
+ * drink, bury, offer, light), transform/production options that arm PRODUCTION context, gather
+ * verbs that only name the activity, and the chat lines that confirm a spend after the click.
+ * Anything not listed here stays ambiguous and settles through Review, never a guess.
+ */
+class ActionSignals {
+    static final Map<String, String> TRANSFORM = GameData.byName("transform_skills");
+    static final Map<String, String> GATHER = GameData.byName("gather_skills");
+
+    /** Compiled menu/chat predicates; d7/d10 already contain transform and gather data. */
+    static final Map<String, Phrases.Clause[][]> RULES = GameData.rules("menu_rules");
+
+    /** Apply one compiled predicate group. */
+    static boolean rule(String group, String text) {
+        return Phrases.has(text, RULES.get(group));
+    }
+
+    /** Widget actions eligible for selected spell evidence. */
+    static boolean isWidgetAction(MenuAction action) {
+        return rule("widget", action == null ? null : action.name());
+    }
+
+    /** Raw consume verbs plus normalized explicit spends. */
+    static boolean isSpend(String option) {
+        return rule("spend.raw", option) || isSpendName(option);
+    }
+
+    /** Normalized light/offer/pray and burial/scatter verbs. */
+    static boolean isSpendName(String option) {
+        return rule("spend.norm", Phrases.lower(option));
+    }
+
+    /** Use tinderbox with fuel; target normalization preserves whitespace. */
+    static boolean lightsFire(String option, String target) {
+        return rule("use", Phrases.lower(option))
+                && rule("fuel", Phrases.lower(target, false))
+                && rule("fire", Phrases.lower(target, false));
+    }
+
+    /** Use bones/ashes on an altar. */
+    static boolean offersBones(String option, String target) {
+        return rule("use", Phrases.lower(option))
+                && rule("altar", Phrases.lower(target, false))
+                && rule("bones", Phrases.lower(target, false));
+    }
+
+    /** Positive Sinister Offering cast evidence. */
+    static boolean isOffering(String option, String target) {
+        return rule("cast", Phrases.lower(option))
+                && rule("offering", Phrases.lower(target, false));
+    }
+
+    /** Chaos Altar saved a bone; this cannot confirm spend. */
+    static boolean isSpared(String message) {
+        return rule("spared", Phrases.lower(message, false));
+    }
+
+    /** Inventory-spend chat, excluding a saved bone. */
+    static boolean isChatSpend(String message) {
+        return !isSpared(message) && rule("spend.chat", Phrases.lower(message, false));
+    }
+
+    /**
+     * Transform/production options (station or inventory) mapped to the skill whose XP confirms
+     * them.
+     */
+    static String transformSkill(String option) {
+        return TRANSFORM.getOrDefault(Phrases.lower(option), "");
+    }
+
+    /** Activity hint for object gather verbs; "General" when the verb is not a gather. */
+    static String gatherActivity(String option) {
+        return GATHER.getOrDefault(Phrases.orEmpty(option), "General");
+    }
+
+    /** Rake and plant still name the activity, but do not arm gather ownership evidence. */
+    static boolean namesActivityOnly(String option) {
+        return option != null
+                && !"General".equals(gatherActivity(option))
+                && !rule("gather.exclude", option);
     }
 }

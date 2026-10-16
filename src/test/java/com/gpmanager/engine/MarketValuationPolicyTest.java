@@ -176,7 +176,7 @@ public class MarketValuationPolicyTest
     @Test
     public void sourceCommentDescribesTheActiveRouteDecision()
     {
-        String source = read("src/main/java/com/gpmanager/engine/Valuation.java");
+        String source = read("src/main/java/com/gpmanager/model/GameData.java");
         assertTrue("the comment names GP Manager's own active market route",
             source.contains("active market route"));
         assertTrue("the comment states the user preference is ignored",

@@ -13,6 +13,8 @@ import static java.util.Collections.*;
 import java.util.*;
 import lombok.*;
 import lombok.AllArgsConstructor;
+import com.gpmanager.ActionReader.PartialUse;
+import java.util.List;
 
 /**
  * Canonical durable financial fact: stable id, timestamp, type/context, booked item flows, the
@@ -763,5 +765,586 @@ enum PriceSource {
 
     public String toString() {
         return label;
+    }
+}
+
+/**
+ * Bounded client-observed action text: durable presentation metadata since schema 105, never
+ * financial.
+ */
+@AllArgsConstructor
+class ActionLabel {
+    static final int MAX_LENGTH = 64;
+    String value;
+
+    /**
+     * Accept a name only from a Cast interaction whose associated widget belongs to the spellbook.
+     * The menu target is deliberately absent from this API: NPC/player/item names cannot become
+     * spell labels.
+     *
+     * <p>Used for both the direct spellbook click and the selected spell widget that RuneLite still
+     * exposes during the following widget-target interaction.
+     */
+    static ActionLabel fromSpellMenu(
+            String menuOption,
+            int widgetId,
+            int spellbookGroupId,
+            String widgetText,
+            String widgetName) {
+        String option = clean(menuOption);
+        if (!option.toLowerCase(java.util.Locale.ROOT).startsWith("cast")
+                || ((widgetId >>> 16) & 0xffff) != (spellbookGroupId & 0xffff)) {
+            return null;
+        }
+        String text = useful(clean(widgetText));
+        if (text != null) return new ActionLabel(text);
+        String name = useful(clean(widgetName));
+        if (name != null) return new ActionLabel(name);
+        // Some menu entries expose the exact action text directly, e.g. "Cast Ice Burst".
+        // Do not inspect menuTarget: it names the affected actor or item.
+        if (option.length() > 4 && option.regionMatches(true, 0, "Cast ", 0, 5)) {
+            String direct = useful(clean(option.substring(5)));
+            if (direct != null) return new ActionLabel(direct);
+        }
+        return null;
+    }
+
+    /** True when the widget id's interface group is the spellbook group. */
+    static ActionLabel of(String text) {
+        String normalized = useful(clean(text));
+        return normalized == null ? null : new ActionLabel(normalized);
+    }
+
+    String value() {
+        return value;
+    }
+
+    static String clean(String text) {
+        if (text == null) return "";
+        String withoutMarkup =
+                text.replaceAll("<[^>]*>", " ")
+                        .replaceAll("@[a-zA-Z0-9]{3,6}@", " ")
+                        .replace("&nbsp;", " ")
+                        .replace("&#160;", " ");
+        return withoutMarkup.replaceAll("\\s+", " ").trim();
+    }
+
+    static String useful(String text) {
+        if (text.isEmpty() || text.length() > MAX_LENGTH) return null;
+        if ("cast".equalsIgnoreCase(text)
+                || "autocast".equalsIgnoreCase(text)
+                || "cancel".equalsIgnoreCase(text)) return null;
+        for (int i = 0; i < text.length(); i++) {
+            char c = text.charAt(i);
+            if (!Character.isLetterOrDigit(c) && c != ' ' && c != '\'' && c != '-' && c != ',')
+                return null;
+        }
+        return text;
+    }
+
+    public String toString() {
+        return value;
+    }
+}
+
+/**
+ * Observed player action behind a settled inventory change. Presentation-only evidence: it names
+ * what the player did (drank, ate, decanted, cast) so HUD/receipts/Live/Ledger can use honest
+ * wording. It never changes {@link TransactionType}, valuation, counted state or session ownership.
+ *
+ * <p>Persisted on {@link Transaction} by wire name; absent on rows saved before B10 and on rows
+ * whose evidence never supported a specific verb. Unsupported evidence must not acquire a more
+ * confident verb — callers fall back to {@link #SUPPLIES} or a generic label rather than guessing.
+ */
+enum ActionKind {
+    /** Drink intent plus a settled dose/vial decrease. */
+    DRINK,
+    /** Eat intent plus settled food loss (partial foods use the observed portion). */
+    EAT,
+    /** Herblore production: ingredients in, potion out. Not every paired transform. */
+    MIX,
+    /** Dose-conserving redistribution (3+1 → 4). Never implies doses were drunk. */
+    DECANT,
+    BURY,
+    OFFER,
+    SCATTER,
+    /** Supported rune consumption. Spell name only when evidenced. Ledger detail only. */
+    CAST,
+    /** Supported ammunition consumption. Ledger detail only. */
+    FIRE,
+    /** Untradeable key audit rows are inspectable in Ledger only. */
+    DEFERRED_CLAIM,
+    /** Ambiguous charge-load settlements are explanatory Ledger notes only. */
+    CHARGE_LOAD_AMBIGUOUS,
+    COOK,
+    BURN,
+    /** Settled supply loss whose specific action is not evidenced. */
+    SUPPLIES,
+    /** A bank-paid fee row (the retired boat recovery): one action row named by its own note. */
+    FEE;
+
+    /** The constant's name, lowercased with hyphens: the wire name saved on every row. */
+    String wireName = name().toLowerCase(Locale.ROOT).replace('_', '-');
+
+    /** Stable persisted identifier. */
+    String wireName() {
+        return wireName;
+    }
+
+    static ActionKind fromWireName(String value) {
+        return Phrases.blank(value) ? null : BY_WIRE.get(Phrases.lower(value));
+    }
+
+    /** Wire and constant names, lowercased, read on every getActionKind() (a hot path). */
+    static final Map<String, ActionKind> BY_WIRE = new HashMap<>();
+
+    static {
+        for (ActionKind kind : values()) {
+            BY_WIRE.put(kind.wireName, kind);
+            BY_WIRE.put(kind.name().toLowerCase(Locale.ROOT), kind);
+        }
+    }
+}
+
+/**
+ * Combat spells by exact rune cost (spells.tsv). Autocasting never clicks a spell, so a Cast with
+ * no captured name reads as the one spell its runes pay for (owner 2026-09-28). A staff, tome or
+ * combination rune may cover elementals; when two spells could fit, it stays a plain Cast.
+ */
+class Spells {
+    /** Icons and recipes retain their original joined row shape for existing readers. */
+    static final Map<String, String> ICONS = GameData.byName("spells");
+
+    static final List<String[]> TABLE =
+            GameData.cachedRows("spell_recipes").stream()
+                    .map(a -> new String[] {a[0], ICONS.get(a[0]), a[1]})
+                    .collect(java.util.stream.Collectors.toList());
+    static final Map<String, String> COMBINATIONS = new HashMap<>();
+    static final String ELEMENTS = " air water earth fire ";
+
+    static {
+        for (String[] row : GameData.rows("combination_runes")) COMBINATIONS.put(row[0], row[1]);
+    }
+
+    /**
+     * The spell these rune costs pay for (a whole number of casts), or null. When staff-covered
+     * elementals let several fit, the one paid in full wins; if none or several are, it stays a
+     * Cast.
+     */
+
+    /**
+     * The spell's spellbook icon as a negated sprite id (the sidebar's sprite lookup reads it),
+     * else -1.
+     */
+    static final Map<String, String> BY_LOWER = new HashMap<>();
+
+    static {
+        for (String name : ICONS.keySet()) BY_LOWER.put(name.toLowerCase(Locale.ROOT), name);
+    }
+
+    /** The item ids a spell makes (an alch's coins, Bones to Peaches' fruit); empty for others. */
+    static Set<Integer> product(String name) {
+        for (String[] row : GameData.cachedRows("spells")) {
+            if (row[0].equals(name) && row.length > 2) {
+                var ids = new HashSet<Integer>();
+                for (String id : row[2].split(",")) ids.add(Integer.parseInt(id));
+                return ids;
+            }
+        }
+        return Collections.emptySet();
+    }
+
+    /** The spell a name spells out, ignoring case (a "Bones to peaches" tablet), else null. */
+    static String named(String name) {
+        return name == null ? null : BY_LOWER.get(name.toLowerCase(Locale.ROOT).trim());
+    }
+
+    static int icon(String name) {
+        // d19 holds a spell's sprite, or minus an item id for a row named by its item (the barrel).
+        String icon = ICONS.get(name);
+        return icon == null ? -1 : -Integer.parseInt(icon);
+    }
+
+    /** 0 when these costs cannot be this spell, 1 when they fit it, 2 when they pay it in full. */
+
+    /** Rune recipes are parsed once; fitting arithmetic and HashMap iteration stay unchanged. */
+    static final Map<String, Map<String, Long>> RECIPES = new LinkedHashMap<>();
+
+    static {
+        for (String[] row : GameData.cachedRows("spell_recipes")) {
+            var recipe = new HashMap<String, Long>();
+            for (String part : row[1].split(" ")) {
+                int colon = part.indexOf(':');
+                recipe.put(part.substring(colon + 1), Long.parseLong(part.substring(0, colon)));
+            }
+            RECIPES.put(row[0], Collections.unmodifiableMap(recipe));
+        }
+    }
+
+    static String spellFor(List<Flow> flows) {
+        String fitting = null;
+        String full = null;
+        int fits = 0;
+        int fulls = 0;
+        for (String[] spell : TABLE) {
+            int fit = fit(RECIPES.get(spell[0]), flows);
+            if (fit > 0) {
+                fits++;
+                fitting = spell[0];
+            }
+            if (fit > 1) {
+                fulls++;
+                full = spell[0];
+            }
+        }
+        return fits == 1 ? fitting : fulls == 1 ? full : null;
+    }
+
+    static int fit(Map<String, Long> recipe, List<Flow> flows) {
+        var paid = new HashMap<String, Long>();
+        for (Flow flow : flows) {
+            String name = flow.itemName.toLowerCase(Locale.ROOT);
+            if (!name.endsWith(" rune") || flow.quantityDelta >= 0L) return 0;
+            String rune = name.substring(0, name.length() - 5);
+            boolean used = false;
+            for (String element : COMBINATIONS.getOrDefault(rune, rune).split(" ")) {
+                // A combination rune pays only the elements this spell uses (steam is water for Ice
+                // Barrage).
+                if (recipe.containsKey(element) || !COMBINATIONS.containsKey(rune)) {
+                    paid.merge(element, -flow.quantityDelta, Long::sum);
+                    used = true;
+                }
+            }
+            if (!used) return 0;
+        }
+        long casts = 0L;
+        for (Map.Entry<String, Long> rune : recipe.entrySet()) {
+            if (!ELEMENTS.contains(" " + rune.getKey() + " ")) {
+                long got = paid.getOrDefault(rune.getKey(), 0L);
+                if (got == 0L
+                        || got % rune.getValue() != 0L
+                        || casts != 0L && got / rune.getValue() != casts) return 0;
+                casts = got / rune.getValue();
+            }
+        }
+        boolean full = true;
+        for (Map.Entry<String, Long> rune : recipe.entrySet()) {
+            long got = paid.getOrDefault(rune.getKey(), 0L);
+            // A rune the spell never uses, or more of an elemental than its casts need, is another
+            // spell.
+            if (got > casts * rune.getValue()) return 0;
+            full &= got == casts * rune.getValue();
+        }
+        return paid.keySet().stream().allMatch(recipe::containsKey) ? full ? 2 : 1 : 0;
+    }
+}
+
+/** Shared correction-aware projection for accounting read models and exports. */
+class Accounting {
+    static Amounts transaction(Transaction transaction) {
+        if (transaction == null) return Amounts.unavailable();
+        return transaction.memo(8, () -> amounts(transaction));
+    }
+
+    static Amounts amounts(Transaction transaction) {
+        if (transaction.getType() == TransactionType.TRANSFER
+                || transaction.getCorrection() == Correction.TRANSFER) {
+            return Amounts.transfer();
+        }
+        if (!transaction.isCounted()) return Amounts.excluded();
+        List<Flow> flows = transaction.getFlows();
+        if (Phrases.empty(flows)) {
+            return Amounts.included(transaction.getRevenue(), transaction.getCosts());
+        }
+        long gross = 0L;
+        boolean included = false;
+        for (Flow flow : flows) {
+            if (flow == null) continue;
+            included = true;
+            gross = safeAdd(gross, abs(flow.valueDelta));
+        }
+        if (!included) return Amounts.excluded();
+        switch (transaction.getCorrection()) {
+            case REVENUE:
+                return Amounts.included(gross, 0L);
+            case COST:
+                return Amounts.included(0L, gross);
+            case IGNORE:
+                return Amounts.excluded();
+            case TRANSFER:
+                return Amounts.transfer();
+            case AUTO:
+            default:
+                long[] steps = cachedSteps(transaction);
+                long step = 0L;
+                for (int i = 0; i < flows.size(); i++) {
+                    if (flows.get(i) != null && flows.get(i).valueDelta > 0L)
+                        step = safeAdd(step, steps[i]);
+                }
+                step = Math.min(step, Math.min(transaction.getRevenue(), transaction.getCosts()));
+                return Amounts.included(
+                        safeSubtract(transaction.getRevenue(), step),
+                        safeSubtract(transaction.getCosts(), step));
+        }
+    }
+
+    /**
+     * Owner 2026-09-28: a sip or bite steps an item down ((4) to (3), pie to half pie). The part
+     * left is no gain and the whole potion no cost; only the step is, as the Ledger pairs it. Per
+     * flow, the value both legs of each such pair give up (0 elsewhere, and always 0 under a
+     * correction).
+     */
+    static long[] cachedSteps(Transaction transaction) {
+        return transaction.memo(6, () -> steps(transaction));
+    }
+
+    static long[] steps(Transaction transaction) {
+        List<Flow> flows = transaction.getFlows();
+        long[] steps = new long[flows.size()];
+        for (PartialUse pair : consumePairs(transaction)) {
+            long left = flows.get(pair.remainderIndex).valueDelta;
+            if (left > 0L && safeAdd(flows.get(pair.lossIndex).valueDelta, left) <= 0L) {
+                steps[pair.lossIndex] = left;
+                steps[pair.remainderIndex] = left;
+            }
+        }
+        return steps;
+    }
+
+    /** One consume gate for accounting and item presentation; transfers/decants keep raw quotes. */
+    static List<PartialUse> consumePairs(Transaction transaction) {
+        List<Flow> flows = transaction.getFlows();
+        ActionKind action = transaction.getActionKind();
+        // Cheapest facts first: this runs for every flow of every receipt on each refresh (release
+        // pass).
+        if (!transaction.isCounted()
+                || transaction.getCorrection() != Correction.AUTO
+                || transaction.getType() != TransactionType.CONSUMPTION
+                        && transaction.getType() != TransactionType.PK_SUPPLY_COST
+                || action != null
+                        && action != ActionKind.DRINK
+                        && action != ActionKind.EAT
+                        && action != ActionKind.SUPPLIES
+                || ActionReader.isDecant(flows)) return java.util.Collections.emptyList();
+        var pairs = new java.util.ArrayList<PartialUse>();
+        for (PartialUse pair : ActionReader.partialUses(flows)) {
+            if (flows.get(pair.lossIndex).getPriceSource()
+                    == flows.get(pair.remainderIndex).getPriceSource()) pairs.add(pair);
+        }
+        return pairs;
+    }
+
+    /** Returns the additive accounting contribution of a single item-flow row. */
+    static Amounts flow(Transaction transaction, Flow flow) {
+        if (transaction == null || flow == null) return Amounts.unavailable();
+        if (transaction.getType() == TransactionType.TRANSFER
+                || transaction.getCorrection() == Correction.TRANSFER) {
+            return Amounts.transfer();
+        }
+        if (!transaction.isCounted() || transaction.getCorrection() == Correction.IGNORE) {
+            return Amounts.excluded();
+        }
+        long value = flow.valueDelta;
+        long autoRevenue = value > 0L ? value : 0L;
+        long autoCosts = value < 0L ? abs(value) : 0L;
+        switch (transaction.getCorrection()) {
+            case REVENUE:
+                return Amounts.included(abs(value), 0L);
+            case COST:
+                return Amounts.included(0L, abs(value));
+            case IGNORE:
+                return Amounts.excluded();
+            case TRANSFER:
+                return Amounts.transfer();
+            case AUTO:
+            default:
+                List<Flow> flows = transaction.getFlows();
+                long step = 0L;
+                for (int i = 0; i < flows.size(); i++) {
+                    if (flows.get(i) == flow) step = cachedSteps(transaction)[i];
+                }
+                return Amounts.included(
+                        safeSubtract(autoRevenue, value > 0L ? step : 0L),
+                        safeSubtract(autoCosts, value < 0L ? step : 0L));
+        }
+    }
+
+    /** Correction-aware supplies/other split shared by every retained money fold. */
+    static CostSplit costSplit(Transaction transaction) {
+        return transaction.memo(9, () -> split(transaction));
+    }
+
+    static CostSplit split(Transaction transaction) {
+        Amounts total = transaction(transaction);
+        if (!total.available) return new CostSplit(0L, 0L, false);
+        if (!total.included || total.costs <= 0L) return new CostSplit(0L, 0L, true);
+        if (transaction.getFlows().isEmpty()) return new CostSplit(0L, 0L, false);
+        long supplies = 0L;
+        long other = 0L;
+        for (Flow flow : transaction.getFlows()) {
+            if (flow == null) continue;
+            Amounts amounts = flow(transaction, flow);
+            if (!amounts.available) return new CostSplit(0L, 0L, false);
+            if (!amounts.included || amounts.costs <= 0L) continue;
+            switch (CostKind.of(transaction, flow)) {
+                case SUPPLIES:
+                    supplies = safeAdd(supplies, amounts.costs);
+                    break;
+                case LOSS:
+                case MARKET:
+                    other = safeAdd(other, amounts.costs);
+                    break;
+                default:
+                    return new CostSplit(0L, 0L, false);
+            }
+        }
+        return new CostSplit(supplies, other, safeAdd(supplies, other) == total.costs);
+    }
+
+    /**
+     * The correction-aware fold of the counted Market-context population. Market membership is the
+     * authoritative typed predicate {@code automaticType == TRADE}; corrections change effective
+     * amounts but never membership. Whole transactions are folded here so callers can remove their
+     * gross legs from ordinary categories without re-deriving economics.
+     */
+    static MarketFold marketFold(List<Transaction> transactions) {
+        long revenue = 0L;
+        long costs = 0L;
+        long supplies = 0L;
+        long other = 0L;
+        boolean splitAvailable = true;
+        int counted = 0;
+        if (transactions == null) return new MarketFold(0L, 0L, 0L, 0L, true, 0);
+        for (Transaction transaction : transactions) {
+            if (transaction == null || transaction.autoType() != TransactionType.TRADE) continue;
+            Amounts amounts = transaction(transaction);
+            if (!amounts.included) continue;
+            counted++;
+            revenue = safeAdd(revenue, amounts.revenue);
+            costs = safeAdd(costs, amounts.costs);
+            CostSplit split = costSplit(transaction);
+            if (!split.available) {
+                splitAvailable = false;
+                continue;
+            }
+            supplies = safeAdd(supplies, split.supplies);
+            other = safeAdd(other, split.other);
+        }
+        return new MarketFold(
+                revenue,
+                costs,
+                splitAvailable ? supplies : 0L,
+                splitAvailable ? other : 0L,
+                splitAvailable,
+                counted);
+    }
+
+    @AllArgsConstructor
+    static class MarketFold {
+        long revenue;
+        long costs;
+        long supplies;
+        long other;
+        boolean splitAvailable;
+
+        /** Counted Market-context transactions behind this fold. */
+        int transactions;
+
+        long getNet() {
+            return safeSubtract(revenue, costs);
+        }
+    }
+
+    @AllArgsConstructor
+    static class Amounts {
+        boolean available;
+        boolean included;
+        boolean transfer;
+        long revenue;
+        long costs;
+
+        static Amounts included(long revenue, long costs) {
+            return new Amounts(true, true, false, revenue, costs);
+        }
+
+        static Amounts excluded() {
+            return new Amounts(true, false, false, 0L, 0L);
+        }
+
+        static Amounts transfer() {
+            return new Amounts(true, false, true, 0L, 0L);
+        }
+
+        static Amounts unavailable() {
+            return new Amounts(false, false, false, 0L, 0L);
+        }
+
+        long getNet() {
+            return safeSubtract(revenue, costs);
+        }
+    }
+
+    @AllArgsConstructor
+    static class CostSplit {
+        long supplies;
+        long other;
+        boolean available;
+    }
+}
+
+/**
+ * Model-layer classification for one effective counted item cost.
+ *
+ * <p>The inputs intentionally match the Ledger's item contribution boundary: a transaction plus one
+ * flow. This keeps classification independent of Swing and allows every read model to apply the
+ * same rule after compaction.
+ *
+ * <p>The category is selected by typed canonical data only: the synthetic tax flow id, the
+ * transaction type and the observed action kind. Item names, activity labels, notes, explanations
+ * and owner correction reasons are presentation; renaming any of them can never change the booked
+ * category.
+ */
+enum CostKind {
+    NONE,
+    SUPPLIES,
+    LOSS,
+    /** Trade costs are market movement and remain inside the non-supplies total. */
+    MARKET;
+
+    /**
+     * Historical synthetic GE sell-tax flow id. New booking stopped in Band 3 C2; the constant
+     * stays so saved history keeps its typed loss category and the Ledger tax filter still reads.
+     */
+    static final int GE_TAX_ITEM_ID = -99502;
+
+    /**
+     * Classifies only an effective cost after counted/correction semantics. Non-cost, ignored,
+     * transfer, uncounted and deferred claim flows return {@link #NONE}.
+     */
+    static CostKind of(Transaction transaction, Flow flow) {
+        if (transaction == null
+                || flow == null
+                || transaction.getActionKind() == ActionKind.DEFERRED_CLAIM) {
+            return NONE;
+        }
+        Accounting.Amounts effective = Accounting.flow(transaction, flow);
+        if (!effective.available || !effective.included || effective.costs <= 0L) return NONE;
+        if (flow.itemId == GE_TAX_ITEM_ID || transaction.autoType() == PK_DEATH_LOSS) {
+            return LOSS;
+        }
+        if (transaction.autoType() == TRADE) return MARKET;
+        TransactionType type = transaction.autoType();
+        // Supplies are consumables the player used (eat / drink / cast / fire / charges /
+        // processing
+        // inputs), which the engine evidences with an action kind or a supply-shaped type. A plain
+        // "value decreased" consumption with no evidence is an item gone, i.e. a loss.
+        // A production run's input is a supply even when that action made nothing (a failed smelt).
+        if (type == PK_SUPPLY_COST
+                || type == PROCESSING
+                || transaction.getActionKind() != null
+                || transaction.getContext() == Context.PRODUCTION) {
+            return SUPPLIES;
+        }
+        return LOSS;
     }
 }

@@ -19,6 +19,14 @@ import java.nio.charset.StandardCharsets;
 import java.util.*;
 import java.util.function.Predicate;
 import lombok.*;
+import static com.gpmanager.Fmt.*;
+import static com.gpmanager.GeOffer.Side.*;
+import com.gpmanager.Semantics.*;
+import static com.gpmanager.MarketRows.Lifecycle.*;
+import static com.gpmanager.SafeMath.nonNeg;
+import com.gpmanager.Semantics.Table;
+import java.time.*;
+import net.runelite.api.gameval.ItemID;
 
 /**
  * The one derived, read-only semantic financial projection every presentation surface shares.
@@ -1942,5 +1950,1217 @@ class MoneySnapshot {
         }
         copy.flows = unmodifiableList(flows);
         return copy;
+    }
+}
+
+/**
+ * Derived, read-only Market settlement context over durable schema-104 custody lifecycles.
+ *
+ * <p>It never books GP, never owns corrections and never becomes a second financial authority. For
+ * a REALIZED lifecycle it explains the canonical settlement already booked; pending Execution Edge
+ * is exposed separately and is never folded into a realized total.
+ */
+class MarketRows {
+    /** Behavioural lifecycle state; several durable stages may map to one state. */
+    enum Lifecycle {
+        PENDING,
+        PARTIALLY_EXECUTED,
+        EXECUTED_UNSETTLED,
+        PARTIALLY_REALIZED,
+        REALIZED,
+        CANCELLED_RETURNED,
+        AMBIGUOUS,
+        UNAVAILABLE
+    }
+
+    /** Coverage of the realized quantity: proven prior tracked value, partial, or unknown. */
+    enum Coverage {
+        FULLY_KNOWN,
+        PARTIALLY_KNOWN,
+        FULLY_UNKNOWN
+    }
+
+    /** One immutable Market presentation row; no booking behaviour. */
+    @EqualsAndHashCode
+    static class Row {
+        String presentationId;
+        long timestampEpochMillis;
+        int itemId;
+        String itemName;
+        GeOffer.Side side;
+        long offeredQty;
+        long filledQty;
+
+        long settledQty;
+        long observedSettlementGp;
+        long settlementAdjustmentGp;
+
+        /**
+         * Observed gross-to-cash gap matching the per-item GE rule. It is the shared accepted-tax
+         * predicate: when the booked settlement is a counted unknown-basis sale, this exact tax is
+         * the booked Net contribution; otherwise it stays presentation evidence only.
+         */
+        long inferredGeTaxGp;
+
+        /** Actual after-tax Received per unit when exactly divisible; -1 when not provable. */
+        long receivedEachGp;
+
+        /**
+         * Realized execution/gross GP attributable to the collected quantity; 0 until collected.
+         */
+        /** Settlement/collection observation time; 0 when no exact settlement receipt resolves. */
+        long settlementAtEpochMillis;
+
+        long realizedResultGp;
+        boolean realizedResultCorrectionAware;
+
+        /**
+         * An explicit counted correction can supply a Result even when automatic basis is unknown.
+         */
+        boolean manualFinancialResult;
+
+        /**
+         * The lifecycle failed closed and was quarantined: its booked allocation was never observed
+         * as collected cash, so presentation must never show it as Received.
+         */
+        boolean collectionAmbiguous;
+
+        /**
+         * Booked contribution state: a fully-unknown sale whose counted AUTO settlement contributes
+         * exactly {@code -inferredGeTaxGp}. Derivation is from the booked transaction (counted +
+         * AUTO + effective net equals the shared accepted tax), never from coverage plus an
+         * inferred tax alone; a pre-change uncounted sale stays UNCOUNTED.
+         */
+        boolean knownCostOnly;
+
+        /**
+         * SELL: known-coverage quantity consumed by realized settlements; BUY: realized quantity.
+         */
+        /** SELL: known basis consumed; BUY: created known basis (the exact spend). */
+        long trackedBasisConsumedGp;
+
+        Coverage coverage;
+        Lifecycle lifecycle;
+        String settlementId;
+
+        /** The offer's earlier settlement ids, space-separated (a sale collected in parts). */
+        String earlierSettlements;
+
+        /**
+         * The session whose scope shows this row: the session holding its booked settlement,
+         * otherwise the listing (origin) session.
+         */
+        String scopeSessionId;
+
+        /** Display name of the listing session when the sale settled in another one; else empty. */
+        String listedDuring;
+
+        Row(
+                GeOffer record,
+                java.util.function.Function<String, Transaction> lookup,
+                Engine sessions) {
+            presentationId = record.offerId;
+            String originSessionId = record.originSessionId;
+            Session holder =
+                    sessions == null || record.settlementId.isEmpty()
+                            ? null
+                            : sessions.sessionHolding(record.settlementId);
+            scopeSessionId = holder == null ? originSessionId : holder.getId();
+            Session origin =
+                    holder == null
+                                    || originSessionId.isEmpty()
+                                    || originSessionId.equals(holder.getId())
+                            ? null
+                            : sessions.sessionById(originSessionId);
+            listedDuring = origin == null ? "" : origin.getName();
+            timestampEpochMillis = record.placedAtEpochMillis;
+            itemId = record.itemId;
+            itemName = record.itemName;
+            side = record.side;
+            offeredQty = record.offeredQty;
+            filledQty = record.filledQty;
+            boolean sell = record.side == GeOffer.Side.SELL;
+            long settled = record.settledQty;
+            settledQty = settled;
+            observedSettlementGp = record.settledCashGp;
+            settlementAdjustmentGp =
+                    sell && settled > 0L ? record.settledCashGp - record.settledExecutionGp : 0L;
+            // Actual after-tax settled unit value, only when the exact division is proven; -1
+            // means "not exactly derivable" and is never silently rounded for display.
+            long receivedCash = SafeMath.abs(record.settledCashGp);
+            // One shared accepted-tax predicate for booking and presentation: the per-fill tax
+            // when every fill was observed at its own price, else the uniform rule.
+            inferredGeTaxGp =
+                    sell
+                                    && record.fillTaxExact
+                                    && record.settledTaxGp > 0L
+                                    && record.settledExecutionGp - receivedCash
+                                            == record.settledTaxGp
+                            ? record.settledTaxGp
+                            : sell
+                                    ? GeTaxRule.acceptedTax(
+                                            record.itemId,
+                                            record.settledExecutionGp,
+                                            settled,
+                                            receivedCash)
+                                    : 0L;
+            receivedEachGp =
+                    sell && settled > 0L && receivedCash > 0L && receivedCash % settled == 0L
+                            ? receivedCash / settled
+                            : -1L;
+            Transaction settlement =
+                    lookup == null || record.settlementId.isEmpty()
+                            ? null
+                            : lookup.apply(record.settlementId);
+            settlementAtEpochMillis = settlement == null ? 0L : settlement.timestampEpochMillis;
+            if (settlement != null) {
+                // Correction-aware: consume the effective canonical truth of every booked
+                // settlement; an offer
+                // collected in parts has one per collect (owner 2026-10-09).
+                boolean missing = false;
+                for (String id :
+                        (record.settlementId + Phrases.orEmpty(record.earlierSettlements))
+                                .split(" ")) {
+                    Transaction part = id.isEmpty() ? null : lookup.apply(id);
+                    // An earlier receipt compacted away: fall back to the booked accumulator.
+                    missing |= part == null && !id.isEmpty();
+                    if (part == null) continue;
+                    realizedResultGp += Accounting.transaction(part).getNet();
+                    manualFinancialResult |=
+                            part.getCorrection() == REVENUE || part.getCorrection() == COST;
+                }
+                if (missing) realizedResultGp = record.realizedResultGp;
+                realizedResultCorrectionAware = !missing;
+            } else {
+                // The canonical receipt is no longer inspectable; the booked accumulator is
+                // exposed but explicitly marked as not correction-recomputed.
+                realizedResultGp = record.realizedResultGp;
+            }
+            long knownConsumed = sell ? Math.min(record.consumedTrackedQty, settled) : settled;
+            trackedBasisConsumedGp =
+                    settled <= 0L
+                            ? 0L
+                            : sell
+                                    ? record.consumedTrackedBasisGp
+                                    : SafeMath.abs(record.settledCashGp);
+            coverage =
+                    settled <= 0L
+                            ? Coverage.FULLY_UNKNOWN
+                            : settled - knownConsumed <= 0L
+                                    ? Coverage.FULLY_KNOWN
+                                    : knownConsumed <= 0L
+                                            ? Coverage.FULLY_UNKNOWN
+                                            : Coverage.PARTIALLY_KNOWN;
+            // KNOWN_COST_ONLY is a booked state, not merely coverage plus an inferred tax: a
+            // pre-change uncounted sale keeps UNCOUNTED even when its custody evidence still
+            // proves the historical tax, and a corrected sale is no longer automatic.
+            knownCostOnly =
+                    sell
+                            && settled > 0L
+                            && coverage == Coverage.FULLY_UNKNOWN
+                            && settlement != null
+                            && settlement.autoCounted()
+                            && settlement.getCorrection() == AUTO
+                            && inferredGeTaxGp > 0L
+                            && realizedResultGp == -inferredGeTaxGp;
+            lifecycle = lifecycleOf(record);
+            collectionAmbiguous = record.collectionAmbiguous;
+            settlementId = record.settlementId;
+            earlierSettlements = Phrases.orEmpty(record.earlierSettlements);
+        }
+
+        boolean isRealizedIncluded() {
+            return lifecycle == Lifecycle.REALIZED || lifecycle == Lifecycle.PARTIALLY_REALIZED;
+        }
+    }
+
+    /**
+     * Project the durable custody lifecycles. {@code settlementLookup} resolves a settlement id to
+     * its effective canonical transaction so corrections recompute the realized result; when it
+     * cannot resolve one, the row fails closed and flags the value as not correction-recomputed.
+     */
+    static List<Row> rows(
+            List<GeOffer> records,
+            java.util.function.Function<String, Transaction> settlementLookup,
+            Engine sessions) {
+        if (Phrases.empty(records)) return Collections.emptyList();
+        var rows = new ArrayList<Row>(records.size());
+        for (GeOffer record : records) {
+            if (record != null && !record.offerId.isEmpty())
+                rows.add(new Row(record, settlementLookup, sessions));
+        }
+        return Collections.unmodifiableList(rows);
+    }
+
+    /** Behavioural lifecycle for one durable record. Pending edge is never realized here. */
+    static Lifecycle lifecycleOf(GeOffer record) {
+        if (record == null) return Lifecycle.UNAVAILABLE;
+        if (record.isUnbased()) return Lifecycle.UNAVAILABLE;
+        if (record.confidence == GeOffer.CustodyConfidence.AMBIGUOUS
+                || record.quantityModified
+                || record.collectionAmbiguous) {
+            return Lifecycle.AMBIGUOUS;
+        }
+        if (record.filledQty <= 0L) {
+            if (record.isCancelled() || record.cleared) return Lifecycle.CANCELLED_RETURNED;
+            return Lifecycle.PENDING;
+        }
+        if (record.settledQty > 0L && record.settledQty < record.filledQty) {
+            return Lifecycle.PARTIALLY_REALIZED;
+        }
+        if (record.settledQty >= record.filledQty && record.settledQty > 0L)
+            return Lifecycle.REALIZED;
+        if (record.filledQty >= record.offeredQty) return Lifecycle.EXECUTED_UNSETTLED;
+        return Lifecycle.PARTIALLY_EXECUTED;
+    }
+}
+
+/**
+ * The Ledger's Market wording: one source for rows, receipts and the short GE facts, so the page
+ * and the read-model tests never drift apart.
+ */
+class MarketText {
+    /** True when a Market group has proven settled quantity and an observed settlement amount. */
+    static boolean marketSettled(Group group, Row market) {
+        return group.market
+                && market != null
+                && market.isRealizedIncluded()
+                && market.settledQty > 0L
+                && market.observedSettlementGp != 0L;
+    }
+
+    /** The Market row's primary signed value: observed settlement, else the canonical result. */
+    static long marketPrimary(LedgerData data, Group group) {
+        Row market = data.marketRow(group.marketPresentationId);
+        if (!marketSettled(group, market)) return group.value;
+        boolean sell = "SELL".equals(market.side.name());
+        return sell
+                ? Math.abs(market.observedSettlementGp)
+                : -Math.abs(market.observedSettlementGp);
+    }
+
+    /** The Market row's secondary line: explicit side + Result, or the lifecycle context. */
+    static String marketLead(LedgerData data, Group group) {
+        if (!group.market) return groupLead(group);
+        Row market = data.marketRow(group.marketPresentationId);
+        if (marketSettled(group, market)) {
+            return ("SELL".equals(market.side.name()) ? "Sold" : "Bought")
+                    + " \u00b7 Result "
+                    + (group.coverage == Semantics.Coverage.COMPLETE
+                            ? signed(group.value)
+                            : "\u2014");
+        }
+        if (group.coverage != Semantics.Coverage.COMPLETE) return group.contextLine;
+        return "Result " + signed(group.value);
+    }
+
+    static boolean receiptRealized(Receipt receipt) {
+        Row market = receipt.marketSettlement;
+        return market != null && market.isRealizedIncluded() && market.settledQty > 0L;
+    }
+
+    /** Signed observed settlement cash for the collected quantity (SELL positive, BUY negative). */
+    static long receiptPrimary(Receipt receipt) {
+        Row market = receipt.marketSettlement;
+        if (!receiptRealized(receipt)) return 0L;
+        return market.side == SELL
+                ? Math.abs(market.observedSettlementGp)
+                : -Math.abs(market.observedSettlementGp);
+    }
+
+    static String receiptTitle(Receipt receipt) {
+        Row market = receipt.marketSettlement;
+        if (receiptRealized(receipt) && market.settledQty > 1L) {
+            return receipt.itemName + "  " + times(market.settledQty);
+        }
+        return receipt.itemName;
+    }
+
+    /**
+     * Sold/Bought with the canonical Result as secondary information and a settlement-relative age.
+     */
+    static String receiptSub(Receipt receipt, long capturedAt) {
+        Row market = receipt.marketSettlement;
+        String sub;
+        if (receiptRealized(receipt)) {
+            boolean resultAvailable =
+                    market.realizedResultCorrectionAware
+                            && (market.side != SELL
+                                    || market.coverage != MarketRows.Coverage.FULLY_UNKNOWN
+                                    || market.manualFinancialResult);
+            String result =
+                    resultAvailable
+                            ? "Result " + exactSigned(market.realizedResultGp) + " gp"
+                            : "Result \u2014";
+            sub = (market.side == SELL ? "Sold" : "Bought") + " \u00b7 " + result;
+        } else {
+            sub = market == null ? receipt.verb : orderStateText(market);
+        }
+        return sub + " \u00b7 " + age(SafeMath.nonNeg(capturedAt - receipt.at));
+    }
+
+    /**
+     * One word for where an offer stands: Offering / Buying while it is up with nothing filled,
+     * Pending while part-filled, Sold / Bought once the exchange completes it, Canceled when
+     * returned.
+     */
+    static String stateWord(Row market) {
+        if (market == null) return "Pending";
+        boolean sell = market.side == SELL;
+        switch (market.lifecycle) {
+            case CANCELLED_RETURNED:
+                return "Canceled";
+            case AMBIGUOUS:
+                return "Review";
+            case EXECUTED_UNSETTLED:
+            case REALIZED:
+                return sell ? "Sold" : "Bought";
+            case PENDING:
+                return sell ? "Selling" : "Buying";
+            default:
+                return "Pending";
+        }
+    }
+
+    /**
+     * The exact human Market lines ("label|value") for one lifecycle row; the renderer and the
+     * read-model tests consume this one source. Coverage-aware: a sale whose prior tracked value is
+     * unknown shows liquidation cash with an unavailable Result, never a fake zero basis. Only a
+     * booked, uncorrected PROVEN tax earns a main GE tax row; exempt, unproven and pre-change sales
+     * and fully known results never show one.
+     */
+    static List<String> humanLines(Row market, boolean corrected) {
+        var lines = new ArrayList<String>();
+        String fillState = fillStateText(market);
+        if (!fillState.isEmpty()) lines.add(fillState);
+        if (!market.listedDuring.isEmpty()) {
+            // Cross-Grind: booked where it was collected; the listing session is named, never
+            // rewritten.
+            lines.add("Listed during|" + market.listedDuring);
+        }
+        boolean sell = market.side == SELL;
+        if (!market.isRealizedIncluded() || market.settledQty <= 0L) {
+            if (sell && market.collectionAmbiguous && market.settledQty > 0L) {
+                // D1: a quarantined settlement's cash was never observed; Received is never shown
+                // as if the player had actually collected it.
+                lines.add(msg("received-proven"));
+            }
+            return lines;
+        }
+        lines.add(
+                (sell ? "Received" : "Spent")
+                        + "|"
+                        + exact(Math.abs(market.observedSettlementGp))
+                        + " gp");
+        boolean unknown = sell && market.coverage == MarketRows.Coverage.FULLY_UNKNOWN;
+        if (sell) {
+            if (market.receivedEachGp > 0L) {
+                // The actual after-tax settled unit value; shown only when exactly divisible.
+                lines.add("Received each|" + exact(market.receivedEachGp) + " gp");
+            }
+            lines.add(
+                    msg("previously-counted")
+                            + (unknown ? "Unknown" : exact(market.trackedBasisConsumedGp) + " gp"));
+            lines.add(
+                    "Result|"
+                            + (unknown && !market.manualFinancialResult
+                                    ? "\u2014"
+                                    : market.realizedResultCorrectionAware
+                                            ? exactSigned(market.realizedResultGp)
+                                                    + " gp"
+                                                    + (market.coverage
+                                                                    == MarketRows.Coverage
+                                                                            .PARTIALLY_KNOWN
+                                                            ? " \u00b7 Partial"
+                                                            : "")
+                                                    + (corrected ? msg("corrected") : "")
+                                            : "\u2014"));
+            if (market.knownCostOnly) {
+                // Only the BOOKED state with an AUTO correction earns this row: the tax is a real
+                // market cost here. Uncounted/pre-change, corrected and fully known sales never
+                // show it (a full Result already has the tax inside Received).
+                lines.add("GE tax|" + exactSigned(-market.inferredGeTaxGp) + " gp");
+            }
+        } else {
+            lines.add("Tracked value|" + exact(market.trackedBasisConsumedGp) + " gp");
+            lines.add(
+                    "Result|"
+                            + (market.realizedResultCorrectionAware
+                                    ? exactSigned(market.realizedResultGp)
+                                            + " gp"
+                                            + (corrected ? msg("corrected") : "")
+                                    : "0 gp"));
+        }
+        if (market.settlementAdjustmentGp != 0L && market.inferredGeTaxGp <= 0L) {
+            // An unexplained gap is the receipt's own answer and must stay visible.
+            lines.add("Adjustment|" + exactSigned(market.settlementAdjustmentGp) + " gp");
+        }
+        return lines;
+    }
+
+    /** Compact fill/collected state; omitted when offered, filled and collected agree. */
+    static String fillStateText(Row market) {
+        long offered = market.offeredQty;
+        long filled = market.filledQty;
+        long collected = market.settledQty;
+        if (offered <= 0L || (filled == collected && collected == offered)) return "";
+        if (filled == collected) return "Filled " + exact(collected) + " / " + exact(offered);
+        return "Filled "
+                + exact(filled)
+                + " / "
+                + exact(offered)
+                + " \u00b7 collected "
+                + exact(collected);
+    }
+
+    /** Order-state wording that never mislabels placement time as settlement time. */
+    static String orderStateText(Row market) {
+        boolean sell = market.side == SELL;
+        String side = sell ? "Sell order" : "Buy order";
+        switch (market.lifecycle) {
+            case CANCELLED_RETURNED:
+                return msg("returned-canceled");
+            case AMBIGUOUS:
+                return "Needs review";
+            case UNAVAILABLE:
+                return "Unavailable";
+            case EXECUTED_UNSETTLED:
+                return (sell ? "Sold " : "Bought ")
+                        + exact(market.filledQty)
+                        + "/"
+                        + exact(market.offeredQty)
+                        + msg("awaiting-collection");
+            case PARTIALLY_EXECUTED:
+                return (sell ? "Part sold " : "Part bought ")
+                        + exact(market.filledQty)
+                        + "/"
+                        + exact(market.offeredQty)
+                        + " \u00b7 Pending";
+            default:
+                return stateWord(market);
+        }
+    }
+
+    static String orderWhy(Row market) {
+        switch (market.lifecycle) {
+            case CANCELLED_RETURNED:
+                return msg("canceled-returned");
+            case AMBIGUOUS:
+                return msg("lifecycle-could-settled");
+            case EXECUTED_UNSETTLED:
+                return msg("filled-quantity");
+            default:
+                return msg("collected-settlement");
+        }
+    }
+
+    static String groupLead(Group group) {
+        if (group.market) return group.contextLine;
+        if (!group.usedBy.isEmpty()) return "Used by " + group.usedBy;
+        return group.actionLabel;
+    }
+}
+
+/**
+ * The stacked-table Ledger read model: three independently paginated financial tables (Gains, Costs
+ * with a local Loss/Supplies selector, Market) built from the shared semantic projection, plus
+ * compact Review/Corrected audit lists and a reconciled Total block.
+ *
+ * <p>Search runs against COMPLETE semantic groups: a group that owns a matching underlying resource
+ * or receipt is kept whole, so a header total never becomes a partial child total. Correction
+ * targets are always exact canonical contribution receipts, never a group.
+ */
+@AllArgsConstructor
+class LedgerData {
+    @RequiredArgsConstructor
+    enum Scope {
+        CURRENT_GRIND("Current Grind"),
+        TODAY("Runs today"),
+        HISTORY("Recent Grind");
+        final String label;
+
+        public String toString() {
+            return label;
+        }
+    }
+
+    /**
+     * The Losses table's chips (owner 2026-09-28): LOSS is shown as Items; Charges are measured
+     * charge use.
+     */
+    @RequiredArgsConstructor
+    enum CostView {
+        ALL("All"),
+        SUPPLIES("Supplies"),
+        LOSS("Items"),
+        CHARGES("Charges");
+        final String label;
+
+        public String toString() {
+            return label;
+        }
+    }
+
+    /** A not-yet-settled count in Pending: an unopened loot key or chest, or a death reclaim. */
+    @AllArgsConstructor
+    static class PendingItem {
+        int itemId;
+        String name;
+        long quantity;
+        String tip;
+
+        /** An observed open chest's exact worth; 0 when unseen, looted or unpriced. */
+        long value;
+    }
+
+    /** Compact audit subsections; never peer financial tabs. */
+    @RequiredArgsConstructor
+    enum Audit {
+        REVIEW("Review"),
+        CORRECTED("Corrected");
+        final String label;
+
+        public String toString() {
+            return label;
+        }
+    }
+
+    /** Raw Market settlement row for a semantic group's presentation id, or null. */
+    Row marketRow(String presentationId) {
+        return presentationId == null || presentationId.isEmpty()
+                ? null
+                : marketRows.get(presentationId);
+    }
+
+    /** Presentation-only Ledger query state; it never enters SavedState. */
+    static class Entry {
+        Scope scope;
+        public String historySessionId;
+        public String historyName;
+        CostView costView;
+        String search;
+        public String highlightTransactionId;
+        public String highlightContributionId;
+        public String highlightGroupId;
+
+        /** Deep-link request to expand one audit subsection. */
+        public Audit focusAudit;
+
+        Entry(Scope scope, String historySessionId, String historyName) {
+            this(scope, historySessionId, historyName, CostView.ALL, "", null, null, null, null);
+        }
+
+        Entry(
+                Scope scope,
+                String historySessionId,
+                String historyName,
+                CostView costView,
+                String search,
+                String highlightTransactionId,
+                String highlightContributionId,
+                String highlightGroupId,
+                Audit focusAudit) {
+            this.scope = scope == null ? Scope.CURRENT_GRIND : scope;
+            this.historySessionId = historySessionId;
+            this.historyName = historyName;
+            this.costView = costView == null ? CostView.ALL : costView;
+            this.search = Phrases.orEmpty(search);
+            this.highlightTransactionId = highlightTransactionId;
+            this.highlightContributionId = highlightContributionId;
+            this.highlightGroupId = highlightGroupId;
+            this.focusAudit = focusAudit;
+        }
+
+        static Entry current() {
+            return new Entry(Scope.CURRENT_GRIND, null, null);
+        }
+
+        static Entry current(Audit audit, String transactionId) {
+            return new Entry(
+                    Scope.CURRENT_GRIND,
+                    null,
+                    null,
+                    CostView.ALL,
+                    "",
+                    transactionId,
+                    null,
+                    null,
+                    audit);
+        }
+
+        Entry withCostView(CostView next) {
+            return new Entry(
+                    scope, historySessionId, historyName, next, search, null, null, null, null);
+        }
+
+        Entry withSearch(String next) {
+            return new Entry(
+                    scope, historySessionId, historyName, costView, next, null, null, null, null);
+        }
+
+        Entry withScope(Scope next, String sessionId, String name) {
+            return new Entry(next, sessionId, name, costView, search, null, null, null, null);
+        }
+
+        /** Selection stores only stable identity. */
+        Entry withSelection(String transactionId, String contributionId, String groupId) {
+            return new Entry(
+                    scope,
+                    historySessionId,
+                    historyName,
+                    costView,
+                    search,
+                    transactionId,
+                    contributionId,
+                    groupId,
+                    focusAudit);
+        }
+    }
+
+    /** One table's full filtered set and its header facts; the page table pages it. */
+    @AllArgsConstructor
+    static class TableData {
+        List<Group> groups;
+        long total;
+        int entries;
+        int receipts;
+    }
+
+    /** Review audit: exact review rows with the full eligible bulk count. */
+    @AllArgsConstructor
+    static class ReviewData {
+        List<ReviewRow> rows;
+        int scopeCount;
+    }
+
+    /** The open detail: one semantic group, its exact receipts, and any selected exact receipt. */
+    @AllArgsConstructor
+    static class Detail {
+        Group group;
+        List<Receipt> receipts;
+        public Receipt exact;
+    }
+
+    /** One resource inside a receipt: "Chaos rune ×4" on its line. */
+    @AllArgsConstructor
+    static class ResourceSummary {
+        int itemId;
+        String itemName;
+        String usedBy;
+        long quantity;
+        long value;
+
+        /** Sum of only the known children; shown with explicit wording when incomplete. */
+        long knownSubtotal;
+
+        boolean incomplete;
+    }
+
+    /** One receipt row: exactly one canonical transaction inside the selected group. */
+    @AllArgsConstructor
+    static class Card {
+        String transactionId;
+        long at;
+        long value;
+        long knownSubtotal;
+        boolean incomplete;
+
+        /** Representative contribution id for selecting the receipt. */
+        String contributionId;
+
+        List<ResourceSummary> resources;
+
+        /** "Chaos rune ×4 · Death rune ×2" for the row's tooltip. */
+        String summaryText() {
+            var text = new StringBuilder();
+            for (ResourceSummary resource : resources) {
+                if (text.length() > 0) text.append(" \u00b7 ");
+                text.append(resource.itemName);
+                if (resource.quantity > 1L) text.append(' ').append(Fmt.times(resource.quantity));
+            }
+            return text.toString();
+        }
+    }
+
+    /** Additive facts shared by a receipt card and each resource inside it. */
+    @RequiredArgsConstructor
+    static class ReceiptTotal {
+        final Receipt head;
+        long quantity;
+        long value;
+        long known;
+        long at;
+        boolean incomplete;
+        String representative = "";
+
+        void add(Receipt receipt) {
+            quantity += receipt.quantity;
+            value += receipt.value;
+            at = Math.max(at, receipt.at);
+            incomplete |= receipt.unpriced;
+            if (!receipt.unpriced) known += receipt.value;
+            if (representative.isEmpty()) representative = receipt.contributionId;
+        }
+    }
+
+    static class ReceiptCard extends ReceiptTotal {
+        Map<String, ReceiptTotal> resources = new LinkedHashMap<>();
+
+        ReceiptCard(Receipt head) {
+            super(head);
+        }
+
+        void add(Receipt receipt) {
+            super.add(receipt);
+            resources
+                    .computeIfAbsent(
+                            receipt.itemId + "|" + receipt.usedBy,
+                            ignored -> new ReceiptTotal(receipt))
+                    .add(receipt);
+        }
+
+        Card card() {
+            var summaries = new ArrayList<ResourceSummary>();
+            for (ReceiptTotal resource : resources.values()) {
+                Receipt receipt = resource.head;
+                summaries.add(
+                        new ResourceSummary(
+                                receipt.itemId,
+                                receipt.itemName,
+                                receipt.usedBy,
+                                resource.quantity,
+                                resource.value,
+                                resource.known,
+                                resource.incomplete));
+            }
+            summaries.sort(
+                    Comparator.comparing(
+                                    (ResourceSummary summary) -> summary.itemName,
+                                    String.CASE_INSENSITIVE_ORDER)
+                            .thenComparingInt(summary -> summary.itemId));
+            return new Card(
+                    head.transactionId, at, value, known, incomplete, representative, summaries);
+        }
+    }
+
+    /** One pass builds each transaction card and its resources; newest cards first. */
+    static List<Card> cards(Group group) {
+        if (group == null) return emptyList();
+        var byTransaction = new LinkedHashMap<String, ReceiptCard>();
+        for (Receipt receipt : group.receipts) {
+            byTransaction
+                    .computeIfAbsent(receipt.transactionId, ignored -> new ReceiptCard(receipt))
+                    .add(receipt);
+        }
+        var cards = new ArrayList<Card>(byTransaction.size());
+        for (ReceiptCard card : byTransaction.values()) cards.add(card.card());
+        cards.sort(
+                Comparator.comparingLong((Card card) -> card.at)
+                        .reversed()
+                        .thenComparing(card -> card.transactionId));
+        return cards;
+    }
+
+    /** The query this data answers: scope, Costs view, search and the selected receipt. */
+    Entry entry;
+
+    String scopeName;
+    boolean readOnly;
+    boolean compacted;
+    boolean detailedHistoryAvailable;
+    long net;
+
+    /** Capture time for honest ages without leaking the engine. */
+    long capturedAt;
+
+    TableData gains;
+    TableData costs;
+    TableData market;
+    ReviewData review;
+    List<Receipt> corrected;
+    Summary total;
+    boolean reconciled;
+    public Detail detail;
+
+    /**
+     * Raw Market settlement rows by presentation id; presentation-only lookup for value semantics.
+     */
+    Map<String, Row> marketRows;
+
+    /** Group counts for the Losses chips by {@link CostView} ordinal, whatever view is selected. */
+    int[] costCounts;
+
+    /** Keys and reclaim waiting to settle; current scope only, with an exact observed chest value. */
+    List<PendingItem> pendingItems;
+
+    static LedgerData capture(Engine engine, long now, Entry entry) {
+        Entry e = entry == null ? Entry.current() : entry;
+        List<Session> sessions = sessionsFor(engine, e, now);
+        String scopeName = scopeName(engine, e);
+        MoneySnapshot summary = engine.summary();
+        MoneySnapshot.SessionScope scope = summary.scope(sessions);
+        Set<String> ids = scope.ids;
+        List<Transaction> transactions = scope.transactions;
+        boolean compacted = scope.cut;
+        long scopeNet = scope.net;
+        List<Row> marketRows = summary.marketRows;
+        Map<String, Row> markets = scope.markets;
+        Result result = scope.groups;
+        var tables = new EnumMap<Table, List<Group>>(Table.class);
+        for (Table table : Table.values()) tables.put(table, new ArrayList<>());
+        for (Group group : result.groups) {
+            if (!group.reviewRequired && group.matchesText(e.search))
+                tables.get(group.table).add(group);
+        }
+        List<Group> gainsAll = tables.get(Table.GAINS);
+        List<Group> suppliesAll = tables.get(Table.COSTS_SUPPLIES);
+        List<Group> lossAll = tables.get(Table.COSTS_LOSS);
+        List<Group> marketAll = tables.get(Table.MARKET);
+        var supplies = new ArrayList<Group>();
+        var charges = new ArrayList<Group>();
+        for (Group group : suppliesAll) (group.chargeUse ? charges : supplies).add(group);
+        var costsAll =
+                new ArrayList<Group>(
+                        e.costView == CostView.LOSS
+                                ? lossAll
+                                : e.costView == CostView.CHARGES ? charges : supplies);
+        if (e.costView == CostView.ALL) {
+            // All is every list together, newest first like every other table (owner 1.3.3).
+            costsAll.addAll(charges);
+            costsAll.addAll(lossAll);
+            costsAll.sort(
+                    Comparator.comparingLong((Group group) -> group.latestActivityAt)
+                            .reversed()
+                            .thenComparing(group -> group.semanticGroupId));
+        }
+        TableData gains = tableData(gainsAll, false);
+        TableData costs = tableData(costsAll, false);
+        TableData market = tableData(marketAll, true);
+        var financial = new ArrayList<Group>();
+        financial.addAll(gainsAll);
+        financial.addAll(suppliesAll);
+        financial.addAll(lossAll);
+        financial.addAll(marketAll);
+        Summary total = Semantics.summarize(financial);
+        // ── audit ────────────────────────────────────────────────────────────────────────────
+        var reviewRows = new ArrayList<ReviewRow>();
+        int reviewScopeCount = 0;
+        for (ReviewRow reviewRow : engine.getReviewRows(now)) {
+            if (reviewRow != null && ids.contains(reviewRow.sessionId)) {
+                reviewScopeCount++;
+                if (!readOnly(e) && matchesSearch(reviewRow, e.search)) reviewRows.add(reviewRow);
+            }
+        }
+        var review = new ReviewData(reviewRows, reviewScopeCount);
+        var correctedAll = new ArrayList<Receipt>();
+        for (Group group : result.groups) {
+            for (Receipt receipt : group.receipts) {
+                if ((receipt.corrected || receipt.split) && receipt.matchesSearch(e.search))
+                    correctedAll.add(receipt);
+            }
+        }
+        correctedAll.sort(
+                Comparator.comparingLong((Receipt receipt) -> receipt.at)
+                        .reversed()
+                        .thenComparing(receipt -> receipt.contributionId));
+        // ── selected detail ──────────────────────────────────────────────────────────────────
+        Detail detail = null;
+        String anchorContribution = e.highlightContributionId;
+        String anchorTransaction = e.highlightTransactionId;
+        String anchorGroup = e.highlightGroupId;
+        if (anchorGroup != null || anchorContribution != null || anchorTransaction != null) {
+            Group group =
+                    findGroup(result.groups, anchorGroup, anchorContribution, anchorTransaction);
+            if (group != null) {
+                List<Receipt> receipts = group.receipts;
+                Receipt exact = null;
+                if (anchorContribution != null) {
+                    for (Receipt receipt : receipts) {
+                        if (receipt.contributionId.equals(anchorContribution)) {
+                            exact = receipt;
+                            break;
+                        }
+                    }
+                }
+                if (exact == null && anchorTransaction != null) {
+                    exact = firstReceipt(receipts, anchorTransaction);
+                }
+                detail = new Detail(group, receipts, exact);
+            }
+        }
+        long net = scopeNet;
+        boolean detailedHistoryAvailable = !compacted || total.entries > 0;
+        boolean reconciled =
+                total.coverageComplete
+                        && safeAdd(safeAdd(total.gains, total.costs), total.market) == net;
+        return new LedgerData(
+                e,
+                scopeName,
+                readOnly(e),
+                compacted,
+                detailedHistoryAvailable,
+                net,
+                now,
+                gains,
+                costs,
+                market,
+                review,
+                correctedAll,
+                total,
+                reconciled,
+                detail,
+                markets,
+                new int[] {0, supplies.size(), lossAll.size(), charges.size()},
+                pendingItems(engine, e, now));
+    }
+
+    static List<PendingItem> pendingItems(Engine engine, Entry e, long now) {
+        var items = new ArrayList<PendingItem>();
+        if (e.scope != Scope.CURRENT_GRIND || readOnly(e)) return items;
+        var valued = new HashSet<Integer>();
+        for (SavedState.PendingClaim claim : engine.getPendingClaims()) {
+            if (claim == null || !claim.isValid()) continue;
+            KeyChestCatalogue.Entry chest = KeyChestCatalogue.entryForKey(claim.itemOrKeyId);
+            String name =
+                    chest != null
+                            ? chest.getChestName() + " key"
+                            : claim.itemOrKeyId >= ItemID.WILDY_LOOT_KEY0
+                                            && claim.itemOrKeyId <= ItemID.WILDY_LOOT_KEY4
+                                    ? "Loot key"
+                                    : "Key or chest";
+            // One chest per key type: stacked claims of it name the same worth once.
+            long value =
+                    valued.add(claim.itemOrKeyId)
+                            ? engine.pendingKeyValue(claim.itemOrKeyId, now)
+                            : 0L;
+            items.add(
+                    new PendingItem(
+                            claim.itemOrKeyId, name, claim.getQuantity(), name + msg("opened-books"), value));
+        }
+        DeathReclaimStatus reclaim = engine.deathStatus();
+        if (reclaim.awaiting) {
+            items.add(
+                    new PendingItem(
+                            0,
+                            "Death reclaim",
+                            Math.max(1L, reclaim.outstandingItemCount),
+                            msg("items-waiting-reclaimed"),
+                            0L));
+        }
+        return items;
+    }
+
+    /** Ordinary tables sum every group; Market's header includes only complete results. */
+    static TableData tableData(List<Group> groups, boolean market) {
+        long total = 0L;
+        var receipts = new LinkedHashSet<String>();
+        for (Group group : groups) {
+            if (!market || !group.incomplete()) total = safeAdd(total, group.value);
+            receipts.addAll(group.receiptIds);
+        }
+        return new TableData(groups, total, groups.size(), receipts.size());
+    }
+
+    /** True when a Market lifecycle is genuinely pending rather than already realized. */
+    static boolean isPending(Lifecycle lifecycle) {
+        return lifecycle == PENDING
+                || lifecycle == PARTIALLY_EXECUTED
+                || lifecycle == EXECUTED_UNSETTLED
+                || lifecycle == PARTIALLY_REALIZED;
+    }
+
+    static Group findGroup(
+            List<Group> groups, String groupId, String contributionId, String transactionId) {
+        // Most specific anchor first: a receipt's own contribution must win over the transaction
+        // it came from, or a shop drill lands on the wrong side of the trade (one rune's group).
+        for (Group group : groups) {
+            if (!group.reviewRequired && group.containsContribution(groupId)) return group;
+        }
+        for (Group group : groups) {
+            if (!group.reviewRequired && group.containsContribution(contributionId)) return group;
+        }
+        for (Group group : groups) {
+            if (!group.reviewRequired && group.containsTransaction(transactionId)) return group;
+        }
+        // Review-required groups are still openable from the audit list detail.
+        for (Group group : groups) {
+            if (group.containsContribution(contributionId)
+                    || group.containsTransaction(transactionId)) return group;
+        }
+        return null;
+    }
+
+    static Receipt firstReceipt(List<Receipt> receipts, String transactionId) {
+        Receipt found = null;
+        for (Receipt receipt : receipts) {
+            if (receipt.transactionId.equals(transactionId)
+                    && (found == null || receipt.at >= found.at)) {
+                found = receipt;
+            }
+        }
+        return found;
+    }
+
+    static List<Session> sessionsFor(Engine engine, Entry entry, long now) {
+        var sessions = new ArrayList<Session>();
+        if (entry.scope == Scope.HISTORY) {
+            Session historical =
+                    entry.historySessionId == null
+                            ? null
+                            : engine.historySession(entry.historySessionId);
+            if (historical != null) sessions.add(historical);
+            return sessions;
+        }
+        Session active = engine.getActiveSession();
+        if (active != null) sessions.add(active);
+        if (entry.scope == Scope.TODAY) {
+            ZoneId zone = engine.timeZone();
+            LocalDate today = Instant.ofEpochMilli(now).atZone(zone).toLocalDate();
+            for (Session historical : engine.getHistory()) {
+                if (historical == null
+                        || (active != null && historical.getId().equals(active.getId()))) continue;
+                LocalDate day =
+                        Instant.ofEpochMilli(historical.startedAtEpochMillis)
+                                .atZone(zone)
+                                .toLocalDate();
+                if (day.equals(today)) sessions.add(historical);
+            }
+        }
+        return sessions;
+    }
+
+    static String scopeName(Engine engine, Entry entry) {
+        if (entry.scope == Scope.HISTORY) {
+            if (entry.historyName != null && !entry.historyName.isEmpty()) return entry.historyName;
+            Session historical =
+                    entry.historySessionId == null
+                            ? null
+                            : engine.historySession(entry.historySessionId);
+            return historical == null ? "Recent Grind" : historical.getName();
+        }
+        return entry.scope == Scope.TODAY ? "Runs today" : "Current Grind";
+    }
+
+    static boolean readOnly(Entry entry) {
+        return entry.scope != Scope.CURRENT_GRIND;
+    }
+
+    static boolean matchesSearch(ReviewRow row, String query) {
+        if (Phrases.blank(query)) return true;
+        String needle = Phrases.lower(query);
+        if (Phrases.containsFolded(needle, row.why)) return true;
+        for (ReviewRow.Item item : row.items) {
+            if (Phrases.containsFolded(needle, item.name)) return true;
+        }
+        return false;
+    }
+
+    // ── correction support (unchanged semantics: exact canonical ids only) ─────────────────────
+    static class CorrectionPreview {
+        long currentNet;
+        long afterNet;
+        long change;
+        long revision;
+
+        CorrectionPreview(long currentNet, long afterNet, long revision) {
+            this.currentNet = currentNet;
+            this.afterNet = afterNet;
+            change = afterNet - currentNet;
+            this.revision = revision;
+        }
+
+        String note() {
+            return change == 0L ? msg("net-gp") : "Net changes by " + Fmt.signed(change) + " gp.";
+        }
+    }
+
+    /**
+     * Net if a split keeps {@code keep} of {@code itemId}: the split itself runs on a detached copy
+     * of the receipt, so the preview and the applied split cannot differ.
+     */
+    static CorrectionPreview splitPreview(
+            Engine engine, String transactionId, int itemId, long keep, long now) {
+        synchronized (engine) {
+            long currentNet = engine.getMetrics(now).net;
+            Session session = engine.getActiveSession();
+            Transaction transaction =
+                    session == null ? null : session.findTransaction(transactionId);
+            if (transaction == null)
+                return new CorrectionPreview(currentNet, currentNet, engine.getRevision());
+            var gson = JsonCodec.gson();
+            Transaction copy = gson.fromJson(gson.toJson(transaction), Transaction.class);
+            copy.takeQuantity(itemId, true, copy.quantity(itemId, true) - keep);
+            long before = transaction.isCounted() ? transaction.getNet() : 0L;
+            long after = copy.isCounted() ? copy.getNet() : 0L;
+            return new CorrectionPreview(
+                    currentNet, currentNet - before + after, engine.getRevision());
+        }
+    }
+
+    static CorrectionPreview preview(
+            Engine engine, String transactionId, Correction correction, long now) {
+        Session session = engine.getActiveSession();
+        long currentNet = engine.getMetrics(now).net;
+        if (session == null || transactionId == null || correction == null) {
+            return new CorrectionPreview(currentNet, currentNet, engine.getRevision());
+        }
+        Transaction transaction = session.findTransaction(transactionId);
+        if (transaction == null)
+            return new CorrectionPreview(currentNet, currentNet, engine.getRevision());
+        long before = transaction.isCounted() ? transaction.getNet() : 0L;
+        long after = transaction.netUnder(correction);
+        return new CorrectionPreview(currentNet, currentNet - before + after, engine.getRevision());
+    }
+}
+
+/** Detached, read-only summary of one transaction awaiting an owner decision. */
+class ReviewRow {
+    String transactionId;
+    String sessionId;
+    long timestampEpochMillis;
+    long ageMillis;
+    List<Item> items;
+    long value;
+    String why;
+    Set<Decision> validDecisions;
+
+    ReviewRow(
+            String transactionId,
+            String sessionId,
+            long timestampEpochMillis,
+            long ageMillis,
+            List<Item> items,
+            long value,
+            String why,
+            Set<Decision> validDecisions) {
+        this.transactionId = orEmpty(transactionId);
+        this.sessionId = orEmpty(sessionId);
+        this.timestampEpochMillis = nonNeg(timestampEpochMillis);
+        this.ageMillis = nonNeg(ageMillis);
+        this.items =
+                Collections.unmodifiableList(
+                        items == null ? new ArrayList<Item>() : new ArrayList<>(items));
+        this.value = value;
+        this.why = orEmpty(why);
+        EnumSet<Decision> copy =
+                validDecisions == null || validDecisions.isEmpty()
+                        ? EnumSet.noneOf(Decision.class)
+                        : EnumSet.copyOf(validDecisions);
+        this.validDecisions = Collections.unmodifiableSet(copy);
+    }
+
+    /** Detached item summary; value is the signed flow value for this item. */
+    static class Item {
+        int itemId;
+        String name;
+        long quantityDelta;
+        long valueDelta;
+
+        Item(int itemId, String name, long quantityDelta, long valueDelta) {
+            this.itemId = itemId;
+            this.name = orEmpty(name);
+            this.quantityDelta = quantityDelta;
+            this.valueDelta = valueDelta;
+        }
     }
 }
