@@ -72,8 +72,8 @@ public class AfkPauseTest
     }
 
     @Test
-    public void afkPauseIsOffByDefault()
+    public void afkPauseIsThreeMinutesByDefault()
     {
-        assertEquals(0, new GpManagerConfig() {}.afkPauseMinutes());
+        assertEquals(3, new GpManagerConfig() {}.afkPauseMinutes());
     }
 }

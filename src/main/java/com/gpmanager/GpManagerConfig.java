@@ -425,6 +425,7 @@ public interface GpManagerConfig extends Config {
             position = 4,
             section = generalSection)
     default int afkPauseMinutes() {
-        return 0;
+        // On by default (owner 1.5.1): only standing still pauses; skilling animates.
+        return 3;
     }
 }

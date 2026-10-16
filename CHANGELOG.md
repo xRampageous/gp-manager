@@ -4,6 +4,7 @@
 
 **New**
 - Clicking the ACTIVE clock now restarts GP/h and the clock from that moment, in a Grind too; Net, Recent and the Ledger keep the whole run. It replaces Start fresh, so a factory reset is the only full reset.
+- AFK pause is now on by default at 3 minutes: standing still that long pauses tracking so GP/h leaves AFK time out. Skilling still counts as play. Set it to 0 in the plugin settings to turn it off.
 
 **Fixed**
 - A Grand Exchange buy paid from your bank no longer sends its change (the coins back when it fills below your price) to Review; earlier rows like this leave Review and Recent on login.
