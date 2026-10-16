@@ -104,8 +104,9 @@ public class GeCustodyPersistenceTest
             GeCustodyLedger ledger = new GeCustodyLedger();
             GeOffer record = new GeOffer();
             record.setConfidence(held);
+            ledger.now = 5_000L;
             ledger.resume(record, new OfferSlots.Snapshot(0,
-                net.runelite.api.GrandExchangeOfferState.SELLING, 554, 10, 0, 100L, 0L), 5_000L);
+                net.runelite.api.GrandExchangeOfferState.SELLING, 554, 10, 0, 100L, 0L));
             assertEquals(held + " survives the login seed", held, record.getConfidence());
         }
     }
@@ -191,7 +192,7 @@ public class GeCustodyPersistenceTest
                 restored.noteGeOffer(cleared, "", tomorrow + 60_600L);
             }
             for (Transaction booking : restored.geCustody.maintenance(tomorrow + 70_000L,
-                restored.getActiveSession().getId()).countedBookings)
+                restored.getActiveSession().getId()))
             {
                 restored.getActiveSession().addTransaction(booking, 500, true);
             }
@@ -251,7 +252,7 @@ public class GeCustodyPersistenceTest
             settle(restored, inventory(COINS, 105_356L), tomorrow + 60_000L);
             noteGe(restored, live, 0, EMPTY, 0, 0, 0, 0, 0, tomorrow + 60_600L);
             for (Transaction booking : restored.geCustody.maintenance(tomorrow + 70_000L,
-                restored.getActiveSession().getId()).countedBookings)
+                restored.getActiveSession().getId()))
             {
                 restored.getActiveSession().addTransaction(booking, 500, true);
             }
@@ -309,7 +310,7 @@ public class GeCustodyPersistenceTest
                 }
             }
             for (Transaction booking : engine.geCustody.maintenance(now + 20L * 60_000L,
-                engine.getActiveSession().getId()).countedBookings)
+                engine.getActiveSession().getId()))
             {
                 engine.getActiveSession().addTransaction(booking, 500, true);
             }
@@ -718,7 +719,7 @@ false, engine.geCustody.records().get(0).hasFrozenBasis());
         // The unique exact attribution books at the window end when no contradicting slot evidence
         // arrived; the terminal SOLD states are still unobserved.
         for (Transaction booking : engine.geCustody.maintenance(now + 33_500L,
-            engine.getActiveSession().getId()).countedBookings)
+            engine.getActiveSession().getId()))
         {
             engine.getActiveSession().addTransaction(booking, 500, true);
         }
@@ -783,7 +784,7 @@ false, engine.geCustody.records().get(0).hasFrozenBasis());
             noteGe(engine, ledger, slot, EMPTY, 0, 0, 0, 0, 0, now + 20_600L + slot * 100L);
         }
         for (Transaction booking : engine.geCustody.maintenance(now + 23_000L,
-            engine.getActiveSession().getId()).countedBookings)
+            engine.getActiveSession().getId()))
         {
             engine.getActiveSession().addTransaction(booking, 500, true);
         }

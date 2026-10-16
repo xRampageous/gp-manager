@@ -1,16 +1,15 @@
 package com.gpmanager;
 
 import static com.gpmanager.GameData.msg;
-
+import static com.gpmanager.PriceSource.*;
+import static java.lang.Math.*;
 import static java.util.Collections.*;
 import static java.util.Locale.*;
 
-import lombok.*;
-
-import net.runelite.api.gameval.ItemID;
-
 import java.util.*;
 import java.util.regex.*;
+import lombok.*;
+import net.runelite.api.gameval.ItemID;
 
 /**
  * One explicit weapon Check response, expressed as its measured component stock. It does not infer
@@ -385,4 +384,340 @@ class LoadTarget {
 
     /** When the load was clicked; 0 when there was no load. */
     long clickedAt;
+}
+
+/**
+ * Transient ownership of automatic charge estimates. The canonical receipts remain in the owning
+ * {@link Session}; this index links one weapon (session and target identity) to those receipt ids
+ * until a compatible measured Check closes the window. Never persisted.
+ */
+class ChargeEstimateJournal {
+    static final int MAX_RECEIPTS = 512;
+
+    static final class Receipt {
+        final String key;
+        final String transactionId;
+        final int itemId;
+        long remainingQuantity;
+
+        Receipt(String key, String transactionId, int itemId, long quantity) {
+            this.key = key;
+            this.transactionId = transactionId;
+            this.itemId = itemId;
+            remainingQuantity = quantity;
+        }
+    }
+
+    /** Open receipts per weapon, oldest weapon first. */
+    final LinkedHashMap<String, List<Receipt>> entries = new LinkedHashMap<>();
+
+    /** Quantities evicted by the bound while their weapon's window is still open, per item. */
+    final Map<String, Map<Integer, Long>> evicted = new HashMap<>();
+
+    int receiptCount;
+
+    static String key(String sessionId, String targetIdentity) {
+        return Phrases.lower(sessionId) + "\n" + Phrases.lower(targetIdentity);
+    }
+
+    synchronized void clear() {
+        entries.clear();
+        evicted.clear();
+        receiptCount = 0;
+    }
+
+    synchronized void record(
+            String sessionId,
+            String targetIdentity,
+            String transactionId,
+            int itemId,
+            long quantity) {
+        if (Phrases.blank(sessionId)
+                || Phrases.blank(targetIdentity)
+                || Phrases.blank(transactionId)
+                || itemId <= 0
+                || quantity <= 0L) {
+            return;
+        }
+        String key = key(sessionId, targetIdentity);
+        entries.computeIfAbsent(key, ignored -> new ArrayList<>())
+                .add(new Receipt(key, transactionId, itemId, quantity));
+        receiptCount++;
+        while (receiptCount > MAX_RECEIPTS) {
+            Map.Entry<String, List<Receipt>> oldest = entries.entrySet().iterator().next();
+            Receipt gone = oldest.getValue().remove(0);
+            receiptCount--;
+            // The window is still open: remember the evicted quantity so the next measured
+            // delta is not booked on top of an estimate that is no longer tracked here.
+            evicted.computeIfAbsent(gone.key, ignored -> new HashMap<>())
+                    .merge(gone.itemId, gone.remainingQuantity, Long::sum);
+            if (oldest.getValue().isEmpty()) entries.remove(oldest.getKey());
+        }
+    }
+
+    /** Evicted quantity still inside this weapon's open window for one component. */
+    synchronized long evictedOverlap(String sessionId, String targetIdentity, int itemId) {
+        return evicted.getOrDefault(key(sessionId, targetIdentity), Map.of())
+                .getOrDefault(itemId, 0L);
+    }
+
+    /** Pending receipts for one component of one weapon. */
+    synchronized List<Receipt> receipts(String sessionId, String targetIdentity, int itemId) {
+        List<Receipt> result = new ArrayList<>();
+        for (Receipt receipt : receiptsFor(sessionId, targetIdentity))
+            if (receipt.itemId == itemId) result.add(receipt);
+        return result;
+    }
+
+    /** Every pending receipt for one weapon, whichever component it belongs to. */
+    synchronized List<Receipt> receiptsFor(String sessionId, String targetIdentity) {
+        return new ArrayList<>(entries.getOrDefault(key(sessionId, targetIdentity), List.of()));
+    }
+
+    synchronized void consume(Receipt receipt, long quantity) {
+        List<Receipt> values = receipt == null ? null : entries.get(receipt.key);
+        if (values == null || quantity <= 0L || !values.contains(receipt)) return;
+        receipt.remainingQuantity = Math.max(0L, receipt.remainingQuantity - quantity);
+        if (receipt.remainingQuantity == 0L) {
+            values.remove(receipt);
+            receiptCount--;
+        }
+        if (values.isEmpty()) entries.remove(receipt.key);
+    }
+
+    /** Forget every receipt, and all evicted overlap, for one weapon (its window closed). */
+    synchronized void clearTarget(String sessionId, String targetIdentity) {
+        String key = key(sessionId, targetIdentity);
+        List<Receipt> removed = entries.remove(key);
+        if (removed != null) receiptCount -= removed.size();
+        evicted.remove(key);
+    }
+}
+
+/** Measured negative component-count differences; valuation is applied by the caller. */
+@Getter
+class ChargeDelta {
+    ChargeCheck.ChargedItem variant;
+    List<ComponentDelta> componentDeltas;
+
+    /** Components the Check read at the same count as before: their estimates were overcounts. */
+    final Set<Integer> unchanged = new HashSet<>();
+
+    /** Explicit Check outcome; this enum is transient accounting evidence, never save data. */
+    enum CheckResult {
+        SEED,
+        SAME,
+        SPEND,
+        LOAD,
+        MISMATCH
+    }
+
+    CheckResult result;
+
+    ChargeDelta(ChargeCheck.ChargedItem variant, List<ComponentDelta> deltas, CheckResult result) {
+        this.variant = variant;
+        componentDeltas = deltas;
+        this.result = result;
+    }
+
+    /** A caller supplying measured losses explicitly constructs SPEND, as before. */
+    ChargeDelta(ChargeCheck.ChargedItem variant, List<ComponentDelta> deltas) {
+        this(variant, deltas, CheckResult.SPEND);
+    }
+
+    /** An outcome without a measured decrease carries no bookable component quantity. */
+    ChargeDelta(ChargeCheck.ChargedItem variant, CheckResult result) {
+        this(variant, Collections.emptyList(), result);
+    }
+
+    /** One component's measured decrease (always negative). */
+    @Getter
+    @AllArgsConstructor
+    static class ComponentDelta {
+        int itemId;
+        long quantityDelta;
+    }
+
+    /**
+     * The GP cost of these priced component losses when they exactly match every measured decrease;
+     * 0 otherwise. Missing, partial, extra, unsupported-priced or overflowing flows fail closed as
+     * a whole. Generic inventory losses can never authorize charge spend.
+     */
+    long exactCost(List<Flow> pricedLosses) {
+        if (result != CheckResult.SPEND
+                || variant == null
+                || !variant.implemented
+                || componentDeltas.isEmpty()
+                || pricedLosses == null
+                || pricedLosses.size() != componentDeltas.size()) {
+            return 0L;
+        }
+        var expected = new HashMap<Integer, Long>();
+        var actual = new HashMap<Integer, Long>();
+        long cost = 0L;
+        try {
+            for (ComponentDelta component : componentDeltas) {
+                if (component.itemId <= 0) return 0L;
+                expected.merge(component.itemId, component.quantityDelta, Math::addExact);
+            }
+            for (Flow flow : pricedLosses) {
+                boolean validPriceSource =
+                        (flow.itemId == ItemID.COINS
+                                        ? flow.unitPrice == 1 && flow.getPriceSource() == FACE_VALUE
+                                        : flow.getPriceSource() == GRAND_EXCHANGE
+                                                || flow.getPriceSource() == MANUAL_OVERRIDE);
+                if (!validPriceSource
+                        || flow.quantityDelta >= 0L
+                        || flow.itemId <= 0
+                        || flow.unitPrice <= 0
+                        || flow.valueDelta >= 0L
+                        || multiplyExact(flow.quantityDelta, (long) flow.unitPrice)
+                                != flow.valueDelta) {
+                    return 0L;
+                }
+                actual.merge(flow.itemId, flow.quantityDelta, Math::addExact);
+                cost = addExact(cost, negateExact(flow.valueDelta));
+            }
+        } catch (ArithmeticException ex) {
+            return 0L;
+        }
+        return expected.equals(actual) ? cost : 0L;
+    }
+}
+
+/**
+ * Compares explicit charge reads. One read establishes a baseline; only measured component
+ * decreases can produce a booking-ready delta.
+ */
+class MeasuredChargeReadTracker {
+    /**
+     * Bounded number of same-variant weapons tracked side by side (two blowpipes, a spare trident).
+     */
+    static final int MAX_TARGETS = 8;
+
+    /**
+     * One baseline per stable target identity, most recently read last: each weapon's last read,
+     * which its next Check is measured against.
+     */
+    LinkedHashMap<String, Baseline> baselines = new LinkedHashMap<>();
+
+    /** One weapon's last exact read and its local observation time. */
+    @Getter
+    @AllArgsConstructor
+    static class Baseline {
+        ChargeCheck read;
+        long atEpochMillis;
+
+        /**
+         * Component units loaded into the weapon since this read, which its next Check adds back.
+         */
+        final Map<Integer, Long> loaded = new HashMap<>();
+    }
+
+    /**
+     * A load into one weapon, clicked at {@code clickedAt}: its next Check counts it as loaded, not
+     * as unused. A load clicked before the last read is already in that read. A load whose weapon
+     * is unknown goes to the only weapon of that kind with a read, or else makes that kind's reads
+     * untrustworthy.
+     */
+    synchronized void noteLoad(
+            ChargeCheck.ChargedItem variant,
+            String targetIdentity,
+            long clickedAt,
+            int itemId,
+            long units) {
+        Baseline last =
+                targetIdentity == null ? only(variant) : baselines.get(targetIdentity.trim());
+        if (targetIdentity == null && last == null) {
+            resetVariant(variant);
+            return;
+        }
+        if (last == null || clickedAt < last.atEpochMillis || units <= 0L) return;
+        last.loaded.merge(itemId, units, SafeMath::safeAdd);
+    }
+
+    /** Observe one exact Check read and retain its local observation time. */
+    synchronized ChargeDelta observe(ChargeCheck read, String targetIdentity, long now) {
+        if (read == null) return new ChargeDelta(null, ChargeDelta.CheckResult.MISMATCH);
+        if (!read.bookable || Phrases.blank(targetIdentity)) {
+            reset();
+            return new ChargeDelta(read.variant, ChargeDelta.CheckResult.MISMATCH);
+        }
+        String safeIdentity = targetIdentity.trim();
+        // Each weapon keeps its own baseline: a Check of the other blowpipe is neither a
+        // decrease on this one nor a reason to forget what this one last read.
+        Baseline last = baselines.remove(safeIdentity);
+        baselines.put(safeIdentity, new Baseline(read, SafeMath.nonNeg(now)));
+        while (baselines.size() > MAX_TARGETS)
+            baselines.remove(baselines.keySet().iterator().next());
+        ChargeCheck previous = last == null ? null : last.read;
+        if (previous == null) return new ChargeDelta(read.variant, ChargeDelta.CheckResult.SEED);
+        if (previous.variant != read.variant)
+            return new ChargeDelta(read.variant, ChargeDelta.CheckResult.MISMATCH);
+        boolean blowpipe = read.variant == ChargeCheck.ChargedItem.BLOWPIPE;
+        // Dart type is an independent component identity. A type switch can return old darts
+        // and load new ones, so do not infer dart spend from the change; scale measurements
+        // remain valid across that switch.
+        boolean dartTypeSwitch =
+                blowpipe
+                        && read.hasDarts()
+                        && (!previous.hasDarts() || previous.dartItemId != read.dartItemId);
+        Map<Integer, Long> previousCounts = previous.componentCounts;
+        Map<Integer, Long> loaded = last.loaded;
+        var nextCounts = new LinkedHashMap<Integer, Long>(read.componentCounts);
+        if (blowpipe && previous.hasDarts() && !read.hasDarts())
+            nextCounts.put(previous.dartItemId, 0L);
+        var itemIds = new LinkedHashSet<Integer>(previousCounts.keySet());
+        itemIds.addAll(nextCounts.keySet());
+        var decreases = new ArrayList<ChargeDelta.ComponentDelta>();
+        var unchanged = new ArrayList<Integer>();
+        boolean same = true;
+        for (int itemId : itemIds) {
+            long before = previousCounts.getOrDefault(itemId, 0L);
+            // What was loaded since is not use: count it as if it had been there all along.
+            long after = nextCounts.getOrDefault(itemId, 0L) - loaded.getOrDefault(itemId, 0L);
+            same &= after == before;
+            if (after == before) unchanged.add(itemId);
+            if (after < before && (!dartTypeSwitch || itemId == ItemID.SNAKEBOSS_SCALE)) {
+                decreases.add(new ChargeDelta.ComponentDelta(itemId, after - before));
+            }
+        }
+        // Independent decreases still prove spend when a different component was loaded.
+        var delta =
+                new ChargeDelta(
+                        read.variant,
+                        decreases,
+                        !decreases.isEmpty()
+                                ? ChargeDelta.CheckResult.SPEND
+                                : same
+                                        ? ChargeDelta.CheckResult.SAME
+                                        : ChargeDelta.CheckResult.LOAD);
+        delta.unchanged.addAll(unchanged);
+        return delta;
+    }
+
+    synchronized void reset() {
+        baselines.clear();
+    }
+
+    /** The one baseline of this kind, or null when there are none or several. */
+    Baseline only(ChargeCheck.ChargedItem variant) {
+        Baseline found = null;
+        for (Baseline last : baselines.values()) {
+            if (last.read.variant != variant) continue;
+            if (found != null) return null;
+            found = last;
+        }
+        return found;
+    }
+
+    /**
+     * Forget one variant's baselines after a custody change: a new physical instance of the weapon
+     * entered the inventory, so a stored baseline can no longer be trusted to belong to the item
+     * now occupying the slot. The next Check seeds a fresh baseline.
+     */
+    synchronized void resetVariant(ChargeCheck.ChargedItem variant) {
+        if (variant == null) return;
+        baselines.values().removeIf(last -> last.read.variant == variant);
+    }
 }

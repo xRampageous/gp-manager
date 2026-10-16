@@ -70,12 +70,14 @@ public class ClueClaimTest
     {
         for (String name : new String[] {"Clue scroll (beginner)", "Clue scroll (master)", "Scroll box (elite)",
             "Reward casket (medium)", "Clue bottle (easy)", "Clue nest (hard)", "Clue geode (elite)",
-            "Challenge scroll (hard)", "Puzzle box", "Light box"})
+            "Challenge scroll (hard)", "Puzzle box", "Light box",
+            // Renamed with their tier in 2014 (OSRS Wiki); trail step items, worth nothing (owner 2026-10-16).
+            "Puzzle box (hard)", "Puzzle box (master)", "Key (medium)", "Key (elite)"})
         {
             assertTrue(name, GameData.pattern("clue").matcher(name).matches());
         }
         for (String name : new String[] {"Casket", "Clue scroll", "Scroll box (hard) extra", "Bird nest",
-            "Clue hunter garb", "Mystery box"})
+            "Clue hunter garb", "Mystery box", "Key", "Puzzle box (easy)", "Loop half of key"})
         {
             assertFalse(name, GameData.pattern("clue").matcher(name).matches());
         }
@@ -134,14 +136,15 @@ public class ClueClaimTest
         assertEquals(0, reviews());
     }
 
+    /** An untradeable that is no clue is worth its alch value (owner 2026-10-16), never a claim. */
     @Test
-    public void anUntradeableThatIsNoClueKeepsItsUnknownPrice()
+    public void anUntradeableThatIsNoClueIsWorthItsAlchPrice()
     {
         engine.startCustom("Clues", now);
         engine.setBaseline(new ContainerSnapshot(new HashMap<>(inventory)));
         change(MYSTERY, 1L);
         Flow flow = engine.getActiveSession().getTransactions().get(0).getFlows().get(0);
-        assertEquals(PriceSource.UNPRICED, flow.getPriceSource());
+        assertEquals(PriceSource.HIGH_ALCHEMY, flow.getPriceSource());
     }
 
     /** The GOTR reward pouch: held at zero until opened, then its contents book once. */
@@ -196,6 +199,7 @@ public class ClueClaimTest
         return (ItemComposition) Proxy.newProxyInstance(ItemComposition.class.getClassLoader(),
             new Class<?>[] {ItemComposition.class}, (proxy, method, args) -> {
                 if ("getName".equals(method.getName())) return name;
+                if ("getHaPrice".equals(method.getName())) return id == MYSTERY ? 50 : 0;
                 Class<?> type = method.getReturnType();
                 if (type == boolean.class) return false;
                 if (type == int.class) return 0;

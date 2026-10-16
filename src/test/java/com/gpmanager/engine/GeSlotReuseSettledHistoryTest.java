@@ -209,7 +209,7 @@ public class GeSlotReuseSettledHistoryTest
         void maintenance(long at)
         {
             for (Transaction booking : engine.geCustody.maintenance(at,
-                engine.getActiveSession().getId()).countedBookings)
+                engine.getActiveSession().getId()))
             {
                 engine.getActiveSession().addTransaction(booking, 500, true);
             }

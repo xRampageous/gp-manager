@@ -41,7 +41,7 @@ bry	^(?:The staff currently has|Your Bryophyta's staff now has) (?:([\d,]+) char
 bru	^You remove ([\d,]+) charges? from your staff, leaving it empty\.$	2
 # Routine supplies a tray never lists as lost: runes, ammo and charge scales (lowercase names).
 routine	.*(?: runes?| bolts| dart)|.*(?:arrow| bolts \(|javelin|throwing|zulrah's scales).*	0
-clue	^(?:clue scroll|scroll box|challenge scroll|reward casket|clue bottle|clue nest|clue geode) \((?:beginner|easy|medium|hard|elite|master)\)|puzzle box|light box|herb box$	2
+clue	^(?:clue scroll|scroll box|challenge scroll|reward casket|clue bottle|clue nest|clue geode) \((?:beginner|easy|medium|hard|elite|master)\)|puzzle box(?: \((?:hard|elite|master)\))?|key \((?:medium|elite)\)|light box|herb box$	2
 
 death-fee	^Death charges you ([\d,]+) x Coins\..*$	2
 bank-payment	^Payment has been taken from your bank: ([\d,]+) (?:x Coins|coins)\.?(?: \(\d+\))?$	2

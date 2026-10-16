@@ -13,8 +13,9 @@ import static org.junit.Assert.assertTrue;
 /** Forms and confirmations open inside the sidebar (SIDEBAR_SPEC.md §4), never as popups. */
 public class SidebarSheetTest
 {
+    /** Owner 1.5.0: one Start sheet; a new name becomes a Grind, a known one starts in a click. */
     @Test
-    public void addGrindSavesAndStartGrindStartsSavedAndNew() throws Exception
+    public void startGrindSavesNewNamesAndStartsKnownOnes() throws Exception
     {
         Engine engine = PresentationLifecycleTest.engine();
         SidebarPanel panel = onEdt(() -> new SidebarPanel(engine, PresentationLifecycleTest.config(), null));
@@ -22,32 +23,31 @@ public class SidebarSheetTest
         GrindsController grinds = new GrindsController(panel);
         onEdt(() ->
         {
-            grinds.addGrind();
-            return null;
-        });
-        assertEquals("Add Grind", ShellProbe.sheetTitle(shell));
-        onEdt(() ->
-        {
+            grinds.newGrind();
             ShellProbe.typeSheet(shell, "   ");
-            ShellProbe.pressSheet(shell, "OK");
+            ShellProbe.pressSheet(shell, "Start");
             return null;
         });
-        assertEquals("the sheet closes", "", ShellProbe.sheetTitle(shell));
-        assertTrue("a blank name saves nothing", engine.getSavedGrinds(true).isEmpty());
+        assertTrue("a blank name starts nothing", engine.getSavedGrinds(true).isEmpty());
+        assertFalse(engine.isCustomActive());
 
         onEdt(() ->
         {
-            grinds.addGrind();
+            grinds.newGrind();
             ShellProbe.typeSheet(shell, "  Vorkath ");
-            ShellProbe.pressSheet(shell, "OK");
+            ShellProbe.pressSheet(shell, "Start");
             return null;
         });
+        assertTrue(engine.isCustomActive());
         assertEquals(1, engine.getSavedGrinds(true).size());
         SavedState.SavedGrind saved = engine.getSavedGrinds(true).get(0);
         assertEquals("the name is trimmed", "Vorkath", saved.getName());
-        assertFalse("Add keeps it for later", engine.isCustomActive());
+        assertEquals("the run is that Grind", saved.getGrindId(), engine.getActiveSession().getGrindId());
+        assertEquals("starting shows it on Live", Shell.LIVE, onEdt(shell::currentPage));
+        engine.finishCustom(System.currentTimeMillis());
 
-        // Owner 2026-09-28: the same sheet lists saved Grinds, one click each.
+        // What Free play is doing now is offered first.
+        engine.setDetectedActivity("Vorkath", System.currentTimeMillis());
         onEdt(() ->
         {
             grinds.newGrind();
@@ -56,7 +56,7 @@ public class SidebarSheetTest
         assertEquals("Start Grind", ShellProbe.sheetTitle(shell));
         onEdt(() ->
         {
-            ShellProbe.pressSheet(shell, "Vorkath");
+            ShellProbe.pressSheet(shell, "Vorkath \u00b7 now");
             return null;
         });
         assertTrue(engine.isCustomActive());
@@ -76,7 +76,7 @@ public class SidebarSheetTest
             return null;
         });
         assertEquals("Zulrah", engine.getActiveSession().getName());
-        assertEquals("Start runs a new name once, unsaved", 1, engine.getSavedGrinds(true).size());
+        assertEquals("Zulrah is remembered too", 2, engine.getSavedGrinds(true).size());
     }
 
     @Test

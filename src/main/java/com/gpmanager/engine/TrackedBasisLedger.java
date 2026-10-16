@@ -3,16 +3,14 @@ package com.gpmanager;
 import static com.gpmanager.Correction.*;
 import static com.gpmanager.PriceSource.*;
 import static com.gpmanager.SafeMath.*;
-
+import static com.gpmanager.SafeMath.nonNeg;
 import static java.lang.Math.*;
 
-import lombok.*;
-
-import net.runelite.api.gameval.ItemID;
-
+import java.math.BigInteger;
 import java.util.*;
 import java.util.Map.Entry;
-import static com.gpmanager.SafeMath.nonNeg;
+import lombok.*;
+import net.runelite.api.gameval.ItemID;
 
 /**
  * Schema-106 pooled known-basis coverage memory.
@@ -31,16 +29,12 @@ import static com.gpmanager.SafeMath.nonNeg;
  * known coverage has been realized or depleted, so canonical Net and tracked basis can never
  * disagree about what was previously counted.
  */
-class TrackedBasisLedger implements Session.ValueObserver {
+class TrackedBasisLedger {
     /** Exact known-coverage share a proven SELL placement captured from the available pool. */
     @AllArgsConstructor
     static class Reservation {
         long trackedQty;
         long basisGp;
-
-        boolean isEmpty() {
-            return trackedQty <= 0L && basisGp <= 0L;
-        }
     }
 
     Map<Integer, BasisPool> pools = new LinkedHashMap<>();
@@ -55,7 +49,7 @@ class TrackedBasisLedger implements Session.ValueObserver {
      * coverage for proven permanent non-custody ownership sinks. Custody-owned settlements already
      * consumed their reservation, so their item legs never deplete again.
      */
-    public synchronized void onAdded(Transaction transaction, boolean custodyOwned) {
+    synchronized void onAdded(Transaction transaction, boolean custodyOwned) {
         if (transaction == null || transaction.timestampEpochMillis < basisEpochMillis) {
             // Pre-epoch stock is UNKNOWN coverage by migration law; nothing is inferred here.
             return;
@@ -67,7 +61,7 @@ class TrackedBasisLedger implements Session.ValueObserver {
     }
 
     /** Validate restoring a previously removed transaction; false blocks the restore. */
-    public synchronized boolean canAdd(Transaction transaction) {
+    synchronized boolean canAdd(Transaction transaction) {
         if (transaction == null) return false;
         if (transaction.timestampEpochMillis >= basisEpochMillis
                 && !sinkQuantities(transaction).isEmpty()) {
@@ -77,7 +71,7 @@ class TrackedBasisLedger implements Session.ValueObserver {
     }
 
     /** Validate removing a retained transaction (undo); false blocks the canonical removal. */
-    public synchronized boolean canRemove(Transaction transaction) {
+    synchronized boolean canRemove(Transaction transaction) {
         if (transaction == null || transaction.timestampEpochMillis < basisEpochMillis) return true;
         if (!sinkQuantities(transaction).isEmpty()) {
             return false;
@@ -98,13 +92,12 @@ class TrackedBasisLedger implements Session.ValueObserver {
         return true;
     }
 
-    @Override
-    public synchronized void onUsedUp(Transaction transaction) {
+    synchronized void onUsedUp(Transaction transaction) {
         depleteSinks(transaction);
     }
 
     /** Reverse a previously removed transaction's exact known coverage. */
-    public synchronized void onRemoved(Transaction transaction) {
+    synchronized void onRemoved(Transaction transaction) {
         if (transaction == null || transaction.timestampEpochMillis < basisEpochMillis) return;
         contribution(transaction)
                 .forEach((itemId, delta) -> applyDelta(itemId, -delta[0], -delta[1]));
@@ -114,7 +107,7 @@ class TrackedBasisLedger implements Session.ValueObserver {
      * Validate a pending correction/split/undo before any canonical mutation. False means the
      * mutation must be rejected as-is: the item's known coverage is reserved or already realized.
      */
-    public synchronized boolean canChange(
+    synchronized boolean canChange(
             Transaction transaction,
             Correction previousCorrection,
             List<Flow> previousFlows,
@@ -137,7 +130,7 @@ class TrackedBasisLedger implements Session.ValueObserver {
     }
 
     /** Apply the exact effective delta after a permitted correction/split/undo. */
-    public synchronized void onChanged(
+    synchronized void onChanged(
             Transaction transaction, Correction previousCorrection, List<Flow> previousFlows) {
         if (transaction == null) return;
         Map<Integer, Long> beforeSinks =
@@ -158,55 +151,51 @@ class TrackedBasisLedger implements Session.ValueObserver {
      * Reserve the tracked-first known-coverage share for a quantity entering proven SELL custody.
      */
     synchronized Reservation reserve(int itemId, long quantity, long now) {
-        int id = itemId;
         long requested = nonNeg(quantity);
-        BasisPool pool = pools.get(id);
-        long availableQty = pool == null ? 0L : pool.getAvailableQty();
-        long availableBasis = pool == null ? 0L : pool.getAvailableBasisGp();
+        BasisPool pool = pools.get(itemId);
+        long availableQty = pool == null ? 0L : pool.availableQty;
+        long availableBasis = pool == null ? 0L : pool.availableBasisGp;
         long consumeQty = min(requested, availableQty);
         long basis = BasisMath.shareOf(availableQty, availableBasis, consumeQty);
         if (consumeQty <= 0L && basis <= 0L) return new Reservation(0L, 0L);
-        pool = pool(id);
-        pool.setAvailableQty(availableQty - consumeQty);
-        pool.setAvailableBasisGp(availableBasis - basis);
+        pool = pool(itemId);
+        pool.availableQty = nonNeg(availableQty - consumeQty);
+        pool.availableBasisGp = nonNeg(availableBasis - basis);
         return new Reservation(consumeQty, basis);
     }
 
     /** A sale realized units of this item: fence retroactive corrections before {@code now}. */
     synchronized void fenceRealized(int itemId, long now) {
         BasisPool pool = pool(itemId);
-        pool.setRealizationFenceEpochMillis(max(pool.getRealizationFenceEpochMillis(), now));
+        pool.realizationFenceEpochMillis = max(pool.realizationFenceEpochMillis, now);
     }
 
     /** Return an unconsumed reservation share to the available pool (cancel/return). */
     synchronized void release(int itemId, long quantity, long basisGp) {
-        int id = itemId;
         long releaseQty = nonNeg(quantity);
         long releaseBasis = nonNeg(basisGp);
         if (releaseQty <= 0L && releaseBasis <= 0L) return;
-        BasisPool pool = pool(id);
-        pool.setAvailableQty(pool.getAvailableQty() + releaseQty);
-        pool.setAvailableBasisGp(pool.getAvailableBasisGp() + releaseBasis);
+        BasisPool pool = pool(itemId);
+        pool.availableQty = nonNeg(pool.availableQty + releaseQty);
+        pool.availableBasisGp = nonNeg(pool.availableBasisGp + releaseBasis);
     }
 
     /** Deplete known coverage for a proven permanent ownership sink; returns basis consumed. */
     synchronized long deplete(int itemId, long quantity, long now) {
-        int id = itemId;
         long requested = nonNeg(quantity);
-        BasisPool pool = pools.get(id);
+        BasisPool pool = pools.get(itemId);
         if (requested <= 0L) return 0L;
         if (pool == null) {
             // Even a sink with no known coverage leaves a realization fence: units left ownership,
             // so later retroactive coverage for them can never be re-added.
-            pool(id).setRealizationFenceEpochMillis(now);
+            pool(itemId).realizationFenceEpochMillis = nonNeg(now);
             return 0L;
         }
-        long consumeQty = min(requested, pool.getAvailableQty());
-        long basis =
-                BasisMath.shareOf(pool.getAvailableQty(), pool.getAvailableBasisGp(), consumeQty);
-        pool.setAvailableQty(pool.getAvailableQty() - consumeQty);
-        pool.setAvailableBasisGp(pool.getAvailableBasisGp() - basis);
-        pool.setRealizationFenceEpochMillis(max(pool.getRealizationFenceEpochMillis(), now));
+        long consumeQty = min(requested, pool.availableQty);
+        long basis = BasisMath.shareOf(pool.availableQty, pool.availableBasisGp, consumeQty);
+        pool.availableQty = nonNeg(pool.availableQty - consumeQty);
+        pool.availableBasisGp = nonNeg(pool.availableBasisGp - basis);
+        pool.realizationFenceEpochMillis = max(pool.realizationFenceEpochMillis, now);
         return basis;
     }
 
@@ -226,18 +215,17 @@ class TrackedBasisLedger implements Session.ValueObserver {
         out.basisEpochMillis = nonNeg(basisEpochMillis > 0L ? basisEpochMillis : 1L);
         var list = new ArrayList<BasisPool>();
         for (BasisPool pool : pools.values()) {
-            if (pool == null) continue;
-            if (pool.getAvailableQty() <= 0L
-                    && pool.getAvailableBasisGp() <= 0L
-                    && pool.getRealizationFenceEpochMillis() <= 0L
-                    && pool.getLatestAcquisitionEpochMillis() <= 0L) {
+            if (pool.availableQty <= 0L
+                    && pool.availableBasisGp <= 0L
+                    && pool.realizationFenceEpochMillis <= 0L
+                    && pool.latestAcquisitionEpochMillis <= 0L) {
                 continue;
             }
             var copy = new BasisPool(pool.itemId);
-            copy.setAvailableQty(pool.getAvailableQty());
-            copy.setAvailableBasisGp(pool.getAvailableBasisGp());
-            copy.setRealizationFenceEpochMillis(pool.getRealizationFenceEpochMillis());
-            copy.setLatestAcquisitionEpochMillis(pool.getLatestAcquisitionEpochMillis());
+            copy.availableQty = pool.availableQty;
+            copy.availableBasisGp = pool.availableBasisGp;
+            copy.realizationFenceEpochMillis = pool.realizationFenceEpochMillis;
+            copy.latestAcquisitionEpochMillis = pool.latestAcquisitionEpochMillis;
             list.add(copy);
         }
         list.removeIf(value -> value == null || value.itemId <= 0);
@@ -257,6 +245,11 @@ class TrackedBasisLedger implements Session.ValueObserver {
             basisEpochMillis = saved.getBasisEpochMillis();
             for (BasisPool pool : saved.pools()) {
                 if (pool == null || pool.itemId <= 0) continue;
+                // A save is clamped once here, so the pool's fields are read directly.
+                pool.availableQty = nonNeg(pool.availableQty);
+                pool.availableBasisGp = nonNeg(pool.availableBasisGp);
+                pool.realizationFenceEpochMillis = nonNeg(pool.realizationFenceEpochMillis);
+                pool.latestAcquisitionEpochMillis = nonNeg(pool.latestAcquisitionEpochMillis);
                 pools.put(pool.itemId, pool);
             }
         } else {
@@ -294,8 +287,8 @@ class TrackedBasisLedger implements Session.ValueObserver {
             applyDelta(entry.getKey(), entry.getValue()[0], entry.getValue()[1]);
             if (entry.getValue()[0] > 0L) {
                 BasisPool pool = pool(entry.getKey());
-                pool.setLatestAcquisitionEpochMillis(
-                        max(pool.getLatestAcquisitionEpochMillis(), timestamp));
+                pool.latestAcquisitionEpochMillis =
+                        max(pool.latestAcquisitionEpochMillis, timestamp);
             }
         }
     }
@@ -315,9 +308,9 @@ class TrackedBasisLedger implements Session.ValueObserver {
             if (!canApply(itemId, 0L, 0L, transactionTimestamp)) return false;
             BasisPool pool = pools.get(itemId);
             if (pool != null
-                    && pool.getAvailableQty() > 0L
-                    && (pool.getLatestAcquisitionEpochMillis() <= 0L
-                            || pool.getLatestAcquisitionEpochMillis() > transactionTimestamp)) {
+                    && pool.availableQty > 0L
+                    && (pool.latestAcquisitionEpochMillis <= 0L
+                            || pool.latestAcquisitionEpochMillis > transactionTimestamp)) {
                 return false;
             }
         }
@@ -338,7 +331,7 @@ class TrackedBasisLedger implements Session.ValueObserver {
             return quantities;
         }
         for (Flow flow : flows) {
-            if (flow == null || flow.quantityDelta >= 0L || isCurrency(flow.itemId)) continue;
+            if (flow.quantityDelta >= 0L || isCurrency(flow.itemId)) continue;
             long quantity =
                     flow.quantityDelta == Long.MIN_VALUE ? Long.MAX_VALUE : -flow.quantityDelta;
             int itemId = flow.itemId;
@@ -350,22 +343,21 @@ class TrackedBasisLedger implements Session.ValueObserver {
     void applyDelta(int itemId, long deltaQty, long deltaBasisGp) {
         if (deltaQty == 0L && deltaBasisGp == 0L) return;
         BasisPool pool = pool(itemId);
-        pool.setAvailableQty(pool.getAvailableQty() + deltaQty);
-        pool.setAvailableBasisGp(pool.getAvailableBasisGp() + deltaBasisGp);
+        pool.availableQty = nonNeg(pool.availableQty + deltaQty);
+        pool.availableBasisGp = nonNeg(pool.availableBasisGp + deltaBasisGp);
     }
 
     boolean canApply(int itemId, long deltaQty, long deltaBasisGp, long transactionTimestamp) {
         if (transactionTimestamp < basisEpochMillis) return false;
-        int id = itemId;
-        Long reservationTime = openReservationLookup.apply(id);
+        Long reservationTime = openReservationLookup.apply(itemId);
         if (reservationTime != null
                 && reservationTime > 0L
                 && reservationTime >= transactionTimestamp) return false;
-        BasisPool pool = pools.get(id);
-        long fence = pool == null ? 0L : pool.getRealizationFenceEpochMillis();
+        BasisPool pool = pools.get(itemId);
+        long fence = pool == null ? 0L : pool.realizationFenceEpochMillis;
         if (fence > 0L && fence >= transactionTimestamp) return false;
-        long availableQty = pool == null ? 0L : pool.getAvailableQty();
-        long availableBasis = pool == null ? 0L : pool.getAvailableBasisGp();
+        long availableQty = pool == null ? 0L : pool.availableQty;
+        long availableBasis = pool == null ? 0L : pool.availableBasisGp;
         if (availableQty + deltaQty < 0L || availableBasis + deltaBasisGp < 0L) return false;
         return true;
     }
@@ -389,12 +381,7 @@ class TrackedBasisLedger implements Session.ValueObserver {
     }
 
     Map<Integer, long[]> contribution(Transaction transaction) {
-        if (transaction == null) return new LinkedHashMap<>();
-        return contribution(
-                transaction.autoType(),
-                transaction.isCounted(),
-                transaction.getCorrection(),
-                transaction.getFlows());
+        return contribution(transaction, transaction.getCorrection(), transaction.getFlows());
     }
 
     /** The contribution the transaction would have under {@code correction} with {@code flows}. */
@@ -409,27 +396,16 @@ class TrackedBasisLedger implements Session.ValueObserver {
                         flows);
     }
 
-    /**
-     * A drop or a shot still on the ground is not a use yet: picking it up shrinks the row. It
-     * depletes the pool when its pickup window closes ({@link Engine#settleGround}).
-     */
-    static boolean pickable(Transaction transaction) {
-        return transaction.isOnGround();
-    }
-
     /** The row's sinks as it is booked now. */
     Map<Integer, Long> sinkQuantities(Transaction transaction) {
-        if (pickable(transaction)) return new LinkedHashMap<>();
-        return sinkQuantities(
-                transaction.autoType(),
-                transaction.isCounted(),
-                transaction.getCorrection(),
-                transaction.getFlows());
+        return sinkQuantities(transaction, transaction.getCorrection(), transaction.getFlows());
     }
 
     Map<Integer, Long> sinkQuantities(
             Transaction transaction, Correction correction, List<Flow> flows) {
-        if (pickable(transaction)) return new LinkedHashMap<>();
+        // A drop or a shot still on the ground is not a use yet: picking it up shrinks the row. It
+        // depletes the pool when its pickup window closes (Engine#settleGround).
+        if (transaction.isOnGround()) return new LinkedHashMap<>();
         return sinkQuantities(
                 transaction.autoType(),
                 effectiveCounted(transaction.autoCounted(), correction),
@@ -463,7 +439,7 @@ class TrackedBasisLedger implements Session.ValueObserver {
             return out;
         }
         for (Flow flow : flows) {
-            if (flow == null || flow.quantityDelta <= 0L || isCurrency(flow.itemId)) continue;
+            if (flow.quantityDelta <= 0L || isCurrency(flow.itemId)) continue;
             PriceSource source = flow.getPriceSource();
             if (source == null
                     || source == UNPRICED
@@ -502,5 +478,74 @@ class TrackedBasisState {
     List<BasisPool> pools() {
         if (pools == null) pools = new ArrayList<>();
         return pools;
+    }
+}
+
+/**
+ * One canonical item's pooled tracked-basis state (schema 106).
+ *
+ * <p>It is supporting ownership state, never a financial authority: canonical counted transactions
+ * stay the only financial truth. {@code available*} is the free pooled quantity/value that a new
+ * SELL reservation or permanent sink may consume (a reserved share is held by its open SELL custody
+ * record, not here); {@code realizationFenceEpochMillis} records the latest time pooled basis was
+ * realized or permanently depleted, which fences retroactive acquisition corrections for this item.
+ * No FIFO lots, no portfolio history, no mark-to-market.
+ */
+class BasisPool {
+    int itemId;
+    long availableQty;
+    long availableBasisGp;
+    long realizationFenceEpochMillis;
+
+    /** Latest proven known-coverage acquisition; fences retroactive counted removals. */
+    long latestAcquisitionEpochMillis;
+
+    BasisPool() {}
+
+    BasisPool(int itemId) {
+        this.itemId = itemId;
+    }
+}
+
+/**
+ * Integer-only pooled basis math shared by the known-basis ledger and the read model.
+ *
+ * <p>Every allocation is floor-based and the remainder stays with the other side, so parts always
+ * sum to the whole: no invented GP, no decimals, no drift. All multiplication is long-safe.
+ */
+class BasisMath {
+    /**
+     * Floor-share of a pooled quantity/basis pair; consuming everything takes the exact remainder.
+     */
+    static long shareOf(long totalQty, long totalBasisGp, long consumeQty) {
+        long qty = nonNeg(totalQty);
+        long basis = nonNeg(totalBasisGp);
+        long consume = nonNeg(consumeQty);
+        if (qty <= 0L || basis <= 0L || consume <= 0L) return 0L;
+        if (consume >= qty) return basis;
+        return multiplyDivide(basis, consume, qty);
+    }
+
+    /**
+     * Known-coverage share of an observed settlement: the known portion takes the floor share and
+     * the unknown remainder receives the integer difference, so both always sum to the settlement.
+     */
+    static long knownProceedsOf(long totalSettlementGp, long realizedQty, long knownQty) {
+        long total = nonNeg(totalSettlementGp);
+        long realized = nonNeg(realizedQty);
+        long known = nonNeg(min(knownQty, realized));
+        if (realized <= 0L || known <= 0L) return 0L;
+        if (known >= realized) return total;
+        return multiplyDivide(total, known, realized);
+    }
+
+    /** Long-safe floor(value × numerator / denominator) for non-negative inputs. */
+    static long multiplyDivide(long value, long numerator, long denominator) {
+        if (denominator <= 0L || numerator <= 0L || value <= 0L) return 0L;
+        if (numerator >= denominator) return value;
+        BigInteger product = BigInteger.valueOf(value).multiply(BigInteger.valueOf(numerator));
+        BigInteger share = product.divide(BigInteger.valueOf(denominator));
+        // b < c, so the share is below a and fits a long.
+        return share.longValue();
     }
 }

@@ -4,7 +4,6 @@ import static com.gpmanager.Fmt.*;
 import static com.gpmanager.Kit.*;
 import static com.gpmanager.Kit.Tone.*;
 import static com.gpmanager.SafeMath.*;
-
 import static java.lang.Math.*;
 import static java.util.Collections.*;
 import static java.util.Locale.*;
@@ -12,13 +11,11 @@ import static java.util.Locale.*;
 import com.gpmanager.HudFrame.*;
 import com.gpmanager.HudTray.*;
 import com.gpmanager.Kit.Tone;
-
-import lombok.RequiredArgsConstructor;
-
 import java.awt.Color;
 import java.awt.image.BufferedImage;
 import java.util.*;
 import java.util.function.Predicate;
+import lombok.RequiredArgsConstructor;
 
 /**
  * Builds one {@link HudFrame} per game tick from the same Live snapshot the sidebar paints, plus
@@ -104,6 +101,9 @@ class HudBuilder {
     /**
      * @param visible the display loot filter; hidden rows stay unnamed, and only their count shows
      */
+    /** The panel's display filter, for highlighted names; null highlights nothing. */
+    RecentFilter filter;
+
     HudFrame update(LiveSnapshot snapshot, Predicate<Flow> visible, long now) {
         String owner = snapshot.sessionId;
         if (!owner.equals(sessionOwner)) {
@@ -161,43 +161,23 @@ class HudBuilder {
         boolean targetWarning = false;
         boolean targetDone = false;
         if (snapshot.goal != null) {
+            LiveSnapshot.Goal goal = snapshot.goal;
             // Owner live 2026-10-13: the target rides the progress bar's end, not the money row,
             // so "/ 200k" never stretches HUD+ wide. A time target shows its live countdown
-            // there and warns in its final seconds.
-            if (snapshot.goal.time) {
-                long remaining = max(0L, snapshot.goal.target - snapshot.goal.current);
-                target = durationCount(remaining);
-                int warnSeconds = config.hudTargetWarningSeconds();
-                targetWarning =
-                        warnSeconds > 0
-                                && !snapshot.goal.timerPaused
-                                && remaining > 0L
-                                && remaining <= warnSeconds * 1000L;
-                targetDone = snapshot.goal.reached;
-                progress = max(0d, min(1d, snapshot.goal.fraction));
-            } else {
-                // The gauge and its bar-end label follow the owner's choice (owner live
-                // 2026-10-14): what the aim has counted ("100k" while the sidebar shows
-                // "100k / 200k"), or what is left with the bar draining from full. The countdown
-                // replaces the label only in the final seconds it warns for; a timer-paused
-                // countdown never warns while it is frozen.
-                long remaining = snapshot.goal.timeRemainingMillis;
-                int warnSeconds = config.hudTargetWarningSeconds();
-                // The label counts down what is left while the bar fills with the progress
-                // (owner live 2026-10-14).
-                target = compact(max(0L, snapshot.goal.target - snapshot.goal.current));
-                progress = snapshot.goal.current <= 0L
-                        ? 0d
-                        : max(0d, min(1d, snapshot.goal.fraction));
-                if (warnSeconds > 0
-                        && !snapshot.goal.timerPaused
-                        && remaining > 0L
-                        && remaining <= warnSeconds * 1000L) {
-                    target = durationCount(remaining);
-                    targetWarning = true;
-                }
-                targetDone = snapshot.goal.reached;
-            }
+            // there and warns in its final seconds. A Net aim's label counts down what is left
+            // while the bar fills (owner live 2026-10-14); its own timer's countdown replaces the
+            // label only in the final seconds it warns for, and a paused timer never warns.
+            long left = max(0L, goal.target - goal.current);
+            long remaining = goal.time ? left : goal.timeRemainingMillis;
+            int warnSeconds = config.hudTargetWarningSeconds();
+            targetWarning =
+                    warnSeconds > 0
+                            && !goal.timerPaused
+                            && remaining > 0L
+                            && remaining <= warnSeconds * 1000L;
+            target = goal.time || targetWarning ? durationCount(remaining) : compact(left);
+            progress = !goal.time && goal.current <= 0L ? 0d : max(0d, min(1d, goal.fraction));
+            targetDone = goal.reached;
         }
         String rate =
                 !snapshot.hasSession
@@ -315,19 +295,21 @@ class HudBuilder {
         // "(u)" is the game's own short form for uncharged, as in "Craw's bow (u)" (owner 1.2).
         return new Row(
                 icon(entry),
-                entry.name.replace(" (uncharged)", " (u)") + " " + times(entry.quantity),
+                entry.name.replace(" (uncharged)", " (u)")
+                        + (entry.itemId == 995 ? "" : " " + times(entry.quantity)),
                 entry.state.tag,
                 value(entry),
                 color(entry),
                 entry.gold,
-                entry.born);
+                entry.born,
+                filter == null ? null : filter.highlight(entry.name, entry.quantity));
     }
 
     static String value(Entry entry) {
         // A clue drop is worth nothing until its casket opens: no value, never "?" (owner
         // 2026-10-09).
         return entry.value == 0L && entry.unitPrice == 0L
-                ? GameData.pattern("clue").matcher(entry.name).matches() ? "" : "?"
+                ? entry.worthless || GameData.pattern("clue").matcher(entry.name).matches() ? "" : "?"
                 : counted(entry) || entry.state == State.TRADED
                         ? signed(entry.value)
                         : compact(entry.value);
@@ -382,4 +364,123 @@ class HudBuilder {
     static Color tone(long value) {
         return Tone.sign(value).color;
     }
+}
+
+/**
+ * Everything HUD+ paints, built once per game tick by {@link HudBuilder}. Strings are already
+ * formatted and colours already chosen, so painting only reads fields.
+ */
+@RequiredArgsConstructor
+class HudFrame {
+    static final HudFrame HIDDEN =
+            new HudFrame(
+                    false,
+                    Gem.OFF,
+                    "",
+                    "",
+                    "",
+                    Color.WHITE,
+                    "",
+                    -1d,
+                    false,
+                    false,
+                    "",
+                    Color.WHITE,
+                    0L,
+                    "",
+                    "",
+                    Color.WHITE,
+                    "",
+                    emptyList(),
+                    "",
+                    0,
+                    0L,
+                    0L,
+                    0L);
+
+    /** Tracking state dot: live, paused, away, not tracking, PvP. */
+    enum Gem {
+        LIVE,
+        PAUSED,
+        AWAY,
+        OFF,
+        PVP
+    }
+
+    /** One tray row: sprite, "Copper ore ×1", value and its colour; gold for a big drop. */
+    @RequiredArgsConstructor
+    static class Row {
+        final BufferedImage icon;
+        final String name;
+        final String tag;
+        final String value;
+        final Color color;
+        final boolean gold;
+
+        /** When the row first appeared, for its fade-in. */
+        final long born;
+
+        /** Ground Items' highlight colour for the name; null draws it white. */
+        final Color highlight;
+    }
+
+    final boolean visible;
+    final Gem gem;
+    final String title;
+    final String timer;
+    final String net;
+    final Color netColor;
+
+    /**
+     * What the aim has counted, what is left of it, or a time target's countdown, drawn at the
+     * progress bar's end; empty with no target.
+     */
+    final String target;
+
+    /** Target bar fill 0..1, or -1 with no target. Never negative for a losing Net. */
+    final double progress;
+
+    /** True in a time target's final warning seconds (owner live 2026-10-13). */
+    final boolean targetWarning;
+
+    /**
+     * True once the aim (or the time window) is reached: the bar's fill turns green then, whichever
+     * way the gauge counts (owner live 2026-10-14).
+     */
+    final boolean targetDone;
+
+    /**
+     * The newest booking's change beside Net ("+23") for a few seconds, whether or not the tray
+     * shows.
+     */
+    final String trip;
+
+    final Color tripColor;
+
+    /** When the chip is gone; it fades out just before. */
+    final long chipUntil;
+
+    /** "1.93M/h", "Calculating…" or "—". */
+    final String rate;
+
+    final String context;
+    final Color contextColor;
+
+    final String trayLabel;
+    final List<Row> rows;
+
+    /** "+3 more" past the visible rows, else empty. */
+    final String more;
+
+    /** Changes when a new trip starts; the tray width only grows within one trip. */
+    final int tripId;
+
+    /** When the tray began to fold; it slides shut over the next moment. 0 when always open. */
+    final long foldAt;
+
+    /** When the tray opened; it slides open over the next moment. */
+    final long openedAt;
+
+    /** The builder's clock when this snapshot was made; HUD+ animates on it. */
+    final long builtAt;
 }

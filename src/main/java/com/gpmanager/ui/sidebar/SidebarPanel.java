@@ -4,17 +4,18 @@ import static com.gpmanager.GameData.msg;
 import static com.gpmanager.Kit.*;
 
 import com.gpmanager.LedgerData.Entry;
-
-import net.runelite.client.game.ItemManager;
-import net.runelite.client.ui.PluginPanel;
-import net.runelite.client.util.AsyncBufferedImage;
-
 import java.awt.BorderLayout;
 import java.awt.image.BufferedImage;
+import java.io.*;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.function.*;
-
+import javax.imageio.ImageIO;
 import javax.swing.*;
+import net.runelite.client.game.ItemManager;
+import net.runelite.client.ui.*;
+import net.runelite.client.ui.PluginPanel;
+import net.runelite.client.util.AsyncBufferedImage;
+import org.slf4j.*;
 
 /**
  * The GP Manager sidebar as a RuneLite PluginPanel: owns the GP Surface shell and the Live page,
@@ -264,7 +265,10 @@ class SidebarPanel extends PluginPanel {
                 grindData = GrindsData.capture(engine, now, grindsShowArchived, grindsDetailId);
             }
         }
-        if (hud != null) hud.update(snapshot, context::flowVisible, now);
+        if (hud != null) {
+            hud.filter = context.filter;
+            hud.update(snapshot, context::flowVisible, now);
+        }
         if (!showing) return;
         pageForced = false;
         lastSnapshot = snapshot;
@@ -501,6 +505,11 @@ class SidebarPanel extends PluginPanel {
         }
 
         @Override
+        public void startFresh() {
+            new GrindsController(SidebarPanel.this).startFresh();
+        }
+
+        @Override
         public void startGrind() {
             new GrindsController(SidebarPanel.this).newGrind();
         }
@@ -526,5 +535,75 @@ class SidebarPanel extends PluginPanel {
                     if (persistence != null && config.persistHistory()) persistence.scheduleSave();
                     refresh();
                 });
+    }
+}
+
+/**
+ * Owns the one GP Manager NavigationButton; install is idempotent, so disable/enable cannot
+ * duplicate it, and uninstall always removes exactly what install added.
+ *
+ * <p>Sidebar navigation and overlay registration have separate lifecycles. The icon loader never
+ * returns null, so a missing image cannot silently remove the navigation button.
+ */
+class NavButton {
+    static final Logger log = LoggerFactory.getLogger(NavButton.class);
+
+    interface NavigationHost {
+        void add(NavigationButton button);
+
+        void remove(NavigationButton button);
+    }
+
+    NavigationButton button;
+
+    /** The runtime sidebar icon; never null so the required button cannot vanish silently. */
+    static BufferedImage loadIcon() {
+        try (InputStream stream = NavButton.class.getResourceAsStream(msg("profit-manager"))) {
+            BufferedImage image = stream == null ? null : ImageIO.read(stream);
+            if (image != null) return image;
+            log.warn(msg("gp-manager-icon"));
+        } catch (IOException ex) {
+            log.warn(msg("gp-manager-icon-resource"), ex);
+        }
+        return new BufferedImage(16, 16, BufferedImage.TYPE_INT_ARGB);
+    }
+
+    static NavigationHost toolbarHost(ClientToolbar toolbar) {
+        if (toolbar == null) return null;
+        return new NavigationHost() {
+            public void add(NavigationButton navigationButton) {
+                toolbar.addNavigation(navigationButton);
+            }
+
+            public void remove(NavigationButton navigationButton) {
+                toolbar.removeNavigation(navigationButton);
+            }
+        };
+    }
+
+    /**
+     * @return true when this call installed the button (host, panel and icon present).
+     */
+    synchronized boolean install(NavigationHost navigation, PluginPanel panel, BufferedImage icon) {
+        if (button != null || navigation == null || panel == null || icon == null) return false;
+        NavigationButton next =
+                NavigationButton.builder()
+                        .tooltip("GP Manager")
+                        .icon(icon)
+                        .priority(5)
+                        .panel(panel)
+                        .build();
+        navigation.add(next);
+        button = next;
+        return true;
+    }
+
+    synchronized void uninstall(NavigationHost navigation) {
+        if (button != null && navigation != null) navigation.remove(button);
+        button = null;
+    }
+
+    synchronized NavigationButton button() {
+        return button;
     }
 }

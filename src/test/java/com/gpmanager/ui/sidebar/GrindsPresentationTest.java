@@ -19,6 +19,7 @@ import org.junit.rules.TemporaryFolder;
 
 import static org.junit.Assert.assertEquals;
 import static org.junit.Assert.assertFalse;
+import static org.junit.Assert.assertNotEquals;
 import static org.junit.Assert.assertNotNull;
 import static org.junit.Assert.assertNull;
 import static org.junit.Assert.assertTrue;
@@ -200,9 +201,9 @@ public class GrindsPresentationTest
     {
         Engine engine = PresentationLifecycleTest.engine();
         long now = System.currentTimeMillis();
-        SavedState.SavedGrind alpha = engine.saveGrind("Alpha", 1_000_000L, null, false, null);
-        SavedState.SavedGrind beta = engine.saveGrind("Beta", null, null, false, null);
-        SavedState.SavedGrind gamma = engine.saveGrind("Gamma", null, null, true, null);
+        SavedState.SavedGrind alpha = engine.saveGrind("Alpha", 1_000_000L, null, false);
+        SavedState.SavedGrind beta = engine.saveGrind("Beta", null, null, false);
+        SavedState.SavedGrind gamma = engine.saveGrind("Gamma", null, null, true);
         assertNotNull(alpha);
         assertNotNull(beta);
         assertNotNull(gamma);
@@ -213,35 +214,14 @@ public class GrindsPresentationTest
     }
 
     @Test
-    public void saveThisGrindLinksOnlyTheNamedInstance() throws Exception
-    {
-        Engine engine = PresentationLifecycleTest.engine();
-        long now = System.currentTimeMillis();
-        engine.startCustom("Vorkath", now);
-        engine.getActiveSession().addTransaction(booked(now + 1_000L, "Dragon bones", 1, 1, 3_200, 3_200), 2_000);
-        String firstId = engine.getActiveSession().getId();
-        engine.finishCustom(now + 2_000L);
-        engine.startCustom("Vorkath", now + 3_000L);
-        engine.getActiveSession().addTransaction(booked(now + 4_000L, "Dragon bones", 1, 1, 3_200, 3_200), 2_000);
-        String secondId = engine.getActiveSession().getId();
-
-        SavedState.SavedGrind saved = engine.saveGrind("Vorkath", 5_000_000L, 3L * 3_600_000L, false, secondId);
-        assertNotNull(saved);
-        assertEquals("only the named instance joins the lineage", 1,
-            engine.linkedSessions(saved.getGrindId()).size());
-        assertEquals(secondId, engine.linkedSessions(saved.getGrindId()).get(0).getId());
-        assertFalse("the other same-name instance stays unlinked",
-            engine.historySession(firstId).isLinked());
-    }
-
-    @Test
     public void renameKeepsStableLineage() throws Exception
     {
         Engine engine = PresentationLifecycleTest.engine();
         long now = System.currentTimeMillis();
         engine.startCustom("Zulrah", now);
         String sessionId = engine.getActiveSession().getId();
-        SavedState.SavedGrind saved = engine.saveGrind("Zulrah", null, null, false, sessionId);
+        SavedState.SavedGrind saved = engine.saveGrind("Zulrah", null, null, false);
+        engine.getActiveSession().setGrindId(saved.getGrindId());
         assertNotNull(saved);
         engine.updateSavedGrind(saved.getGrindId(), "Zulrah Bowfa", null, null, false);
         assertEquals("the id never changes with the name", saved.getGrindId(),
@@ -257,7 +237,8 @@ public class GrindsPresentationTest
         engine.startCustom("Vorkath", now);
         engine.getActiveSession().setProfitTargetGp(5_000_000L);
         String sessionId = engine.getActiveSession().getId();
-        SavedState.SavedGrind saved = engine.saveGrind("Vorkath", 5_000_000L, null, false, sessionId);
+        SavedState.SavedGrind saved = engine.saveGrind("Vorkath", 5_000_000L, null, false);
+        engine.getActiveSession().setGrindId(saved.getGrindId());
         engine.finishCustom(now + 1_000L);
 
         engine.updateSavedGrind(saved.getGrindId(), "Vorkath", 10_000_000L, null, false);
@@ -266,135 +247,98 @@ public class GrindsPresentationTest
             engine.historySession(sessionId).getProfitTargetGp());
     }
 
-    /** Owner 2026-10-01 (F20): save and update read the viewed run, never the active one. */
+    /** Owner 1.5.0: one Grind, one setup; the targets a run starts with become the Grind's. */
     @Test
-    public void historicalSaveUsesTheViewedRunNotTheActiveOne() throws Exception
+    public void startingWithTargetsSetsTheGrindsTargets() throws Exception
     {
         Engine engine = PresentationLifecycleTest.engine();
-        long now = System.currentTimeMillis();
-        engine.startCustom("Historical", now);
-        engine.getActiveSession().setProfitTargetGp(5_000_000L);
-        String historicalId = engine.getActiveSession().getId();
-        engine.finishCustom(now + 1_000L);
-
-        engine.startCustom("Active", now + 2_000L);
-        engine.getActiveSession().setProfitTargetGp(9_000_000L);
-
-        SidebarPanel panel = onEdt(() -> new SidebarPanel(engine, PresentationLifecycleTest.config(), null));
-        GrindsController controller = new GrindsController(panel);
-        onEdt(() ->
-        {
-            controller.saveThisGrind(historicalId);
-            ShellProbe.typeSheet(panel.shell(), "Saved historical");
-            ShellProbe.pressSheet(panel.shell(), "OK");
-            return null;
-        });
-
-        SavedState.SavedGrind saved = engine.getSavedGrinds(false).stream()
-            .filter(g -> "Saved historical".equals(g.getName())).findFirst().orElse(null);
-        assertNotNull("the viewed run saves", saved);
-        assertEquals("targets come from the viewed run, not the active one", Long.valueOf(5_000_000L),
-            saved.getNetTargetGp());
-        assertEquals("the viewed run joins the lineage", historicalId,
-            engine.linkedSessions(saved.getGrindId()).get(0).getId());
-    }
-
-    @Test
-    public void historicalSaveWorksWhenOnlyFreePlayIsActive() throws Exception
-    {
-        Engine engine = PresentationLifecycleTest.engine();
-        long now = System.currentTimeMillis();
-        engine.startCustom("Gone", now);
-        engine.getActiveSession().setProfitTargetGp(4_000_000L);
-        String historicalId = engine.getActiveSession().getId();
-        engine.finishCustom(now + 1_000L);
-
-        SidebarPanel panel = onEdt(() -> new SidebarPanel(engine, PresentationLifecycleTest.config(), null));
-        GrindsController controller = new GrindsController(panel);
-        onEdt(() ->
-        {
-            controller.saveThisGrind(historicalId);
-            ShellProbe.typeSheet(panel.shell(), "Gone saved");
-            ShellProbe.pressSheet(panel.shell(), "OK");
-            return null;
-        });
-
-        SavedState.SavedGrind saved = engine.getSavedGrinds(false).stream()
-            .filter(g -> "Gone saved".equals(g.getName())).findFirst().orElse(null);
-        assertNotNull("a viewed run saves even with no named run active", saved);
-        assertEquals(Long.valueOf(4_000_000L), saved.getNetTargetGp());
-    }
-
-    @Test
-    public void historicalUpdateTakesTheViewedRunTargets() throws Exception
-    {
-        Engine engine = PresentationLifecycleTest.engine();
-        long now = System.currentTimeMillis();
-        engine.startCustom("Historical", now);
-        engine.getActiveSession().setProfitTargetGp(5_000_000L);
-        String historicalId = engine.getActiveSession().getId();
-        SavedState.SavedGrind saved = engine.saveGrind("Historical", 5_000_000L, null, false, historicalId);
-        engine.finishCustom(now + 1_000L);
-
-        engine.startCustom("Active", now + 2_000L);
-        engine.getActiveSession().setProfitTargetGp(9_000_000L);
-
-        SidebarPanel panel = onEdt(() -> new SidebarPanel(engine, PresentationLifecycleTest.config(), null));
-        GrindsController controller = new GrindsController(panel);
-        onEdt(() ->
-        {
-            controller.updateSavedGrind(saved.getGrindId(), historicalId);
-            ShellProbe.pressSheet(panel.shell(), "Update");
-            return null;
-        });
-
-        assertEquals("defaults come from the viewed run", Long.valueOf(5_000_000L),
-            engine.savedGrind(saved.getGrindId()).getNetTargetGp());
-        assertEquals("the active run's aim is untouched", Long.valueOf(9_000_000L),
-            engine.getActiveSession().getProfitTargetGp());
-    }
-
-    @Test
-    public void aRunDeletedWhileThePromptIsOpenSavesNothing() throws Exception
-    {
-        Engine engine = PresentationLifecycleTest.engine();
-        long now = System.currentTimeMillis();
-        engine.startCustom("Doomed", now);
-        String doomedId = engine.getActiveSession().getId();
-        engine.finishCustom(now + 1_000L);
-
-        engine.startCustom("Active", now + 2_000L);
-
-        SidebarPanel panel = onEdt(() -> new SidebarPanel(engine, PresentationLifecycleTest.config(), null));
-        GrindsController controller = new GrindsController(panel);
-        onEdt(() ->
-        {
-            controller.saveThisGrind(doomedId);
-            return null;
-        });
-        assertTrue(engine.deleteHistory(doomedId));
-        int before = engine.getSavedGrinds(false).size();
-        onEdt(() ->
-        {
-            ShellProbe.typeSheet(panel.shell(), "Too late");
-            ShellProbe.pressSheet(panel.shell(), "OK");
-            return null;
-        });
-        assertEquals("nothing saves once the viewed run is gone", before,
-            engine.getSavedGrinds(false).size());
-    }
-
-    @Test
-    public void startWithChangesDoesNotRewriteSavedDefaults() throws Exception
-    {
-        Engine engine = PresentationLifecycleTest.engine();
-        SavedState.SavedGrind saved = engine.saveGrind("Vorkath", 5_000_000L, null, false, null);
+        SavedState.SavedGrind saved = engine.saveGrind("Vorkath", 5_000_000L, null, false);
         long now = System.currentTimeMillis();
         assertTrue(engine.startGrind("Vorkath", saved.getGrindId(), 9_000_000L, 2L * 3_600_000L, now));
-        assertEquals("the instance gets the one-off aim", Long.valueOf(9_000_000L),
+        assertEquals("the run gets the aim", Long.valueOf(9_000_000L),
             engine.getActiveSession().getProfitTargetGp());
-        assertEquals("saved defaults are untouched", Long.valueOf(5_000_000L),
+        assertEquals("and so does its Grind", Long.valueOf(9_000_000L),
             engine.savedGrind(saved.getGrindId()).getNetTargetGp());
+        assertEquals(Long.valueOf(2L * 3_600_000L),
+            engine.savedGrind(saved.getGrindId()).getActiveTimeTargetMillis());
+    }
+
+    /** Owner 1.5.0: every Grind is remembered; a name already known is reused, not copied. */
+    @Test
+    public void everyStartedGrindIsRemembered() throws Exception
+    {
+        Engine engine = PresentationLifecycleTest.engine();
+        long now = System.currentTimeMillis();
+        assertTrue(engine.startGrind("Muspah", null, null, null, now));
+        assertEquals(1, engine.getSavedGrinds(true).size());
+        SavedState.SavedGrind made = engine.getSavedGrinds(true).get(0);
+        assertEquals("the run links to it", made.getGrindId(), engine.getActiveSession().getGrindId());
+        engine.finishCustom(now + 1_000L);
+
+        engine.archiveGrind(made.getGrindId(), true);
+        assertTrue(engine.startGrind("muspah", null, 1_000_000L, null, now + 2_000L));
+        assertEquals("the same name, any case, reuses it", 1, engine.getSavedGrinds(true).size());
+        assertEquals(made.getGrindId(), engine.getActiveSession().getGrindId());
+        assertEquals("the run keeps the Grind's own name", "Muspah", engine.getActiveSession().getName());
+        assertFalse("starting it brings it back from the archive", made.archived);
+        engine.finishCustom(now + 3_000L);
+
+        engine.deleteSavedGrind(made.getGrindId());
+        assertTrue("a run whose Grind was deleted starts a new one",
+            engine.startGrind("Muspah", made.getGrindId(), null, null, now + 4_000L));
+        assertEquals(1, engine.getSavedGrinds(true).size());
+        assertNotEquals(made.getGrindId(), engine.getActiveSession().getGrindId());
+    }
+
+    /** Owner 1.5.0: the Targets sheet changes the Grind too; Done clears the run's aim only. */
+    @Test
+    public void targetsFollowTheGrindButDoneStaysWithTheRun() throws Exception
+    {
+        Engine engine = PresentationLifecycleTest.engine();
+        long now = System.currentTimeMillis();
+        engine.startGrind("Zulrah", null, null, null, now);
+        String grindId = engine.getActiveSession().getGrindId();
+        assertTrue(engine.saveTargets(2_000_000L, 3_600_000L, now + 1_000L));
+        assertEquals(Long.valueOf(2_000_000L), engine.savedGrind(grindId).getNetTargetGp());
+        assertEquals(Long.valueOf(3_600_000L), engine.savedGrind(grindId).getActiveTimeTargetMillis());
+        engine.setTargets(null, null, now + 2_000L);
+        assertNull("Done clears the run", engine.getActiveSession().getProfitTargetGp());
+        assertEquals("but the next run starts with the target", Long.valueOf(2_000_000L),
+            engine.savedGrind(grindId).getNetTargetGp());
+
+        engine.updateSavedGrind(grindId, "Zulrah", 2_000_000L, 3_600_000L, true);
+        assertNull("a favourite or an unchanged target never re-arms the run",
+            engine.getActiveSession().getProfitTargetGp());
+        engine.updateSavedGrind(grindId, "Zulrah bowfa", 4_000_000L, 3_600_000L, true);
+        assertEquals("an edited target reaches the running run", Long.valueOf(4_000_000L),
+            engine.getActiveSession().getProfitTargetGp());
+        assertEquals("and so does the name", "Zulrah bowfa", engine.getActiveSession().getName());
+
+        engine.saveTargets(5_000_000L, null, now + 3_000L);
+        engine.finishCustom(now + 4_000L);
+        assertEquals("Free play targets never touch a Grind", Long.valueOf(5_000_000L),
+            engine.savedGrind(grindId).getNetTargetGp());
+        engine.saveTargets(9_000_000L, null, now + 5_000L);
+        assertEquals(Long.valueOf(5_000_000L), engine.savedGrind(grindId).getNetTargetGp());
+    }
+
+    /** Owner 1.5.0: a Grind's row compares by its average GP/h over finished runs. */
+    @Test
+    public void myGrindsShowTheAverageRateOfFinishedRuns() throws Exception
+    {
+        Engine engine = PresentationLifecycleTest.engine();
+        long now = System.currentTimeMillis() - 10L * 3_600_000L;
+        engine.startGrind("Vorkath", null, null, null, now);
+        engine.getActiveSession().addTransaction(booked(now + 1_000L, "Dragon bones", 536, 1, 1_000_000, 1_000_000L), 2_000);
+        engine.finishCustom(now + 3_600_000L);
+        engine.startGrind("Vorkath", null, null, null, now + 4_000_000L);
+        engine.getActiveSession().addTransaction(booked(now + 4_001_000L, "Dragon bones", 536, 1, 2_000_000, 2_000_000L), 2_000);
+        engine.finishCustom(now + 4_000_000L + 3_600_000L);
+
+        GrindsData.MyGrind row = GrindsData.capture(engine, System.currentTimeMillis(), false, null).myGrinds.get(0);
+        assertTrue(row.hasRate);
+        assertEquals("3m over two hours", 1_500_000L, row.rate);
+        assertEquals(2, row.linkedCount);
     }
 
     @Test
@@ -405,8 +349,8 @@ public class GrindsPresentationTest
         engine.startCustom("Vorkath", now);
         engine.getActiveSession().addTransaction(booked(now + 1_000L, "Dragon bones", 1, 5, 3_200, 16_000), 2_000);
         engine.getActiveSession().setProfitTargetGp(5_000_000L);
-        SavedState.SavedGrind saved = engine.saveGrind("Vorkath", 5_000_000L, null, false,
-            engine.getActiveSession().getId());
+        SavedState.SavedGrind saved = engine.saveGrind("Vorkath", 5_000_000L, null, false);
+        engine.getActiveSession().setGrindId(saved.getGrindId());
         engine.finishCustom(now + 2_000L);
 
         assertTrue(engine.startGrind("Vorkath", saved.getGrindId(), 5_000_000L, null, now + 3_000L));
@@ -424,7 +368,8 @@ public class GrindsPresentationTest
         long now = System.currentTimeMillis();
         engine.startCustom("Vorkath", now);
         String sessionId = engine.getActiveSession().getId();
-        SavedState.SavedGrind saved = engine.saveGrind("Vorkath", null, null, false, sessionId);
+        SavedState.SavedGrind saved = engine.saveGrind("Vorkath", null, null, false);
+        engine.getActiveSession().setGrindId(saved.getGrindId());
         engine.finishCustom(now + 1_000L);
 
         assertTrue(engine.archiveGrind(saved.getGrindId(), true));
@@ -456,7 +401,7 @@ public class GrindsPresentationTest
         long now = System.currentTimeMillis();
         engine.startCustom("Vorkath", now);
         engine.getActiveSession().addTransaction(booked(now + 1_000L, "Dragon bones", 1, 1, 3_200, 3_200), 2_000);
-        engine.saveGrind("Vorkath", 5_000_000L, null, false, engine.getActiveSession().getId());
+        engine.getActiveSession().setGrindId(engine.saveGrind("Vorkath", 5_000_000L, null, false).getGrindId());
         engine.resetData(now + 2_000L);
         assertEquals("accounting reset clears history", 0, engine.getHistory().size());
         assertEquals("reusable setup metadata survives a data reset", 1, engine.getSavedGrinds(false).size());
@@ -470,7 +415,7 @@ public class GrindsPresentationTest
         engine.startCustom("Vorkath", now);
         engine.getActiveSession().addTransaction(booked(now + 1_000L, "Dragon bones", 1, 1, 3_200, 3_200), 2_000);
         engine.getActiveSession().setProfitTargetGp(5_000_000L);
-        engine.saveGrind("Zulrah", null, null, true, null);
+        engine.saveGrind("Zulrah", null, null, true);
 
         SidebarPanel panel = onEdt(() -> new SidebarPanel(engine, PresentationLifecycleTest.config(), null));
         onEdt(() ->
@@ -484,9 +429,9 @@ public class GrindsPresentationTest
         assertTrue(anyContains(labels, "MY GRINDS"));
         assertTrue(anyContains(labels, "RECENT GRINDS"));
         assertTrue("saved Grinds render", anyContains(labels, "Zulrah"));
-        // Release pass 2026-09-28: one Start Grind, one Add Grind, and a saved Grind starts from its menu.
+        // Owner 1.5.0: one Start Grind (no Add Grind); a saved Grind starts from its row.
         List<String> buttons = onEdt(() -> buttonTexts(panel));
-        assertTrue(buttons.toString(), buttons.contains("Start Grind") && buttons.contains("+ Add Grind"));
+        assertTrue(buttons.toString(), buttons.contains("Start Grind") && !buttons.contains("+ Add Grind"));
         assertFalse("no per-Grind Start button", buttons.stream().anyMatch(text -> text.startsWith("Start Zulrah")));
         GrindsData.MyGrind zulrah = panel.grinds.data.myGrinds.stream()
             .filter(grind -> "Zulrah".equals(grind.definition.getName())).findFirst().orElseThrow();
@@ -500,7 +445,7 @@ public class GrindsPresentationTest
     public void theSelectedSavedGrindOffersStartBesideItsMenu() throws Exception
     {
         Engine engine = PresentationLifecycleTest.engine();
-        SavedState.SavedGrind saved = engine.saveGrind("Zulrah", null, null, true, null);
+        SavedState.SavedGrind saved = engine.saveGrind("Zulrah", null, null, true);
         SidebarPanel panel = onEdt(() -> new SidebarPanel(engine, PresentationLifecycleTest.config(), null));
         onEdt(() ->
         {
@@ -518,28 +463,22 @@ public class GrindsPresentationTest
             saved.getGrindId(), engine.getActiveSession().getGrindId());
     }
 
-    /** Owner 2026-10-01 (F21): the saved-Grind editor exposes the existing Favorite flag. */
+    /** Owner 1.5.0: Favourite is one menu pick; Edit keeps it as it was. */
     @Test
-    public void savedGrindEditorTogglesFavoriteAndSortsItFirst() throws Exception
+    public void favouriteTogglesFromTheMenuAndSortsFirst() throws Exception
     {
         Engine engine = PresentationLifecycleTest.engine();
-        SavedState.SavedGrind plain = engine.saveGrind("Zulrah", null, null, false, null);
-        assertNotNull(engine.saveGrind("Vorkath", null, null, false, null));
+        SavedState.SavedGrind plain = engine.saveGrind("Zulrah", null, null, false);
+        assertNotNull(engine.saveGrind("Vorkath", null, null, false));
         SidebarPanel panel = onEdt(() -> new SidebarPanel(engine, PresentationLifecycleTest.config(), null));
         GrindsController controller = new GrindsController(panel);
 
         onEdt(() ->
         {
-            controller.editSavedGrind(plain.getGrindId());
-            javax.swing.JCheckBox box = ShellProbe.sheetCheckbox(panel.shell(), "Favorite");
-            assertNotNull("the editor offers a Favorite control", box);
-            assertFalse("it starts from the saved definition", box.isSelected());
-            box.doClick();
-            ShellProbe.pressSheet(panel.shell(), "Save");
+            controller.favoriteSavedGrind(plain.getGrindId(), true);
             return null;
         });
-        assertTrue("the toggle writes the existing field",
-            engine.savedGrind(plain.getGrindId()).favorite);
+        assertTrue(engine.savedGrind(plain.getGrindId()).favorite);
         assertEquals("a favorite sorts first", plain.getGrindId(),
             GrindsData.capture(engine, System.currentTimeMillis(), false, null)
                 .myGrinds.get(0).definition.getGrindId());
@@ -547,33 +486,12 @@ public class GrindsPresentationTest
         onEdt(() ->
         {
             controller.editSavedGrind(plain.getGrindId());
-            javax.swing.JCheckBox box = ShellProbe.sheetCheckbox(panel.shell(), "Favorite");
-            assertTrue("reopening shows the saved value", box.isSelected());
-            box.doClick();
+            ShellProbe.typeSheet(panel.shell(), "Zulrah bowfa");
             ShellProbe.pressSheet(panel.shell(), "Save");
             return null;
         });
-        assertFalse("toggling off round-trips too", engine.savedGrind(plain.getGrindId()).favorite);
-    }
-
-    /** Owner 2026-10-01 (F21): a one-off "Start with changes" never edits the saved Favorite. */
-    @Test
-    public void startWithChangesNeverTouchesTheSavedFavorite() throws Exception
-    {
-        Engine engine = PresentationLifecycleTest.engine();
-        SavedState.SavedGrind saved = engine.saveGrind("Zulrah", null, null, true, null);
-        SidebarPanel panel = onEdt(() -> new SidebarPanel(engine, PresentationLifecycleTest.config(), null));
-        GrindsController controller = new GrindsController(panel);
-        onEdt(() ->
-        {
-            controller.startWithChanges(saved.getGrindId());
-            assertNull("the one-off form has no Favorite control",
-                ShellProbe.sheetCheckbox(panel.shell(), "Favorite"));
-            ShellProbe.pressSheet(panel.shell(), "Start");
-            return null;
-        });
-        assertTrue("the saved definition keeps its flag",
-            engine.savedGrind(saved.getGrindId()).favorite);
+        assertEquals("Zulrah bowfa", engine.savedGrind(plain.getGrindId()).getName());
+        assertTrue("Edit keeps the favourite", engine.savedGrind(plain.getGrindId()).favorite);
     }
 
     /** Owner 2026-10-01 (F22): the Start sheet pager appears only when rows exceed five. */
@@ -594,7 +512,7 @@ public class GrindsPresentationTest
         });
 
         Engine single = PresentationLifecycleTest.engine();
-        assertNotNull(single.saveGrind("Only", null, null, false, null));
+        assertNotNull(single.saveGrind("Only", null, null, false));
         SidebarPanel singlePanel = onEdt(() -> new SidebarPanel(single, PresentationLifecycleTest.config(), null));
         onEdt(() ->
         {
@@ -614,7 +532,7 @@ public class GrindsPresentationTest
         Engine engine = PresentationLifecycleTest.engine();
         for (int i = 1; i <= 6; i++)
         {
-            assertNotNull(engine.saveGrind("Plan " + i, null, null, false, null));
+            assertNotNull(engine.saveGrind("Plan " + i, null, null, false));
         }
         SidebarPanel panel = onEdt(() -> new SidebarPanel(engine, PresentationLifecycleTest.config(), null));
         GrindsController controller = new GrindsController(panel);
@@ -644,7 +562,7 @@ public class GrindsPresentationTest
         Engine engine = PresentationLifecycleTest.engine();
         for (int i = 1; i <= 100; i++)
         {
-            assertNotNull(engine.saveGrind("Plan " + i, null, null, false, null));
+            assertNotNull(engine.saveGrind("Plan " + i, null, null, false));
         }
         SidebarPanel panel = onEdt(() -> new SidebarPanel(engine, PresentationLifecycleTest.config(), null));
         GrindsController controller = new GrindsController(panel);
@@ -798,7 +716,7 @@ public class GrindsPresentationTest
             onEdt(() -> bandShape(panel.grinds.pageBar())));
         List<String> headerButtons = onEdt(() -> buttonTexts(panel.grinds.pageBar()));
         assertTrue("the Grinds header carries the controls: " + headerButtons,
-            headerButtons.contains("Start Grind") && headerButtons.contains("+ Add Grind")
+            headerButtons.contains("Start Grind") && !headerButtons.contains("+ Add Grind")
                 && headerButtons.contains("\u00b7\u00b7\u00b7"));
         assertFalse("the controls left the scrolling body",
             onEdt(() -> buttonTexts(panel.grinds.body())).contains("Start Grind"));
@@ -882,7 +800,7 @@ public class GrindsPresentationTest
                 gear.add(((javax.swing.JMenuItem) item).getText());
             }
         }
-        assertEquals(java.util.Arrays.asList("Back up profile", "Copy data folder path", "Report a bug",
+        assertEquals(java.util.Arrays.asList("Getting started", "Back up profile", "Copy data folder path", "Report a bug",
             "Changelog", "Factory reset current profile…"), gear);
         assertTrue("no standalone Search page", java.util.Arrays.stream(ShellProbe.tabLabels(panel.shell()))
             .noneMatch(label -> label.equalsIgnoreCase("Search") || label.equalsIgnoreCase("Tools")));

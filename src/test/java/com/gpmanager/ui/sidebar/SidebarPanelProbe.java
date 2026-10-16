@@ -79,12 +79,6 @@ public final class SidebarPanelProbe
         p.refresh();
     }
 
-    public static JPanel startWithChangesForm(SidebarPanel p, String grindId)
-    {
-        SavedState.SavedGrind definition = p.engine.savedGrind(grindId);
-        return definition == null ? null : new GrindsController(p).startWithChangesForm(definition);
-    }
-
     public static JPopupMenu dataMenu(SidebarPanel p)
     {
         return new GrindsController(p).dataMenu();

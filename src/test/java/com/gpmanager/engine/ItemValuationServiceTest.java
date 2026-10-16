@@ -367,16 +367,19 @@ public class ItemValuationServiceTest
         assertEquals(14, flow.valueDelta);
     }
 
-    @Test public void highAlchemyMetadataNeverBooksValue()
+    @Test public void anItemWithOnlyAnAlchValueIsWorthItsAlchPrice()
     {
-        // HA is metadata, not alchemy evidence or liquidation truth: the item stays unpriced
-        // and nothing about the alchemy price books money on its own.
+        // Owner 2026-10-16: an item no market can quote (untradeable here) is worth its alch value
+        // for every account; with a GE price as well, a normal account keeps the GE price.
         Valuation service = new Valuation(new GpManagerConfig() { },
             id -> composition("Unpriced hat", 48_000), id -> 0);
         Flow flow = service.value(Collections.singletonMap(1942, 1L)).get(0);
-        assertEquals(PriceSource.UNPRICED, flow.getPriceSource());
-        assertEquals(0, flow.unitPrice);
-        assertEquals(0L, flow.valueDelta);
+        assertEquals(PriceSource.HIGH_ALCHEMY, flow.getPriceSource());
+        assertEquals(48_000, flow.unitPrice);
+        assertEquals(48_000L, flow.valueDelta);
+        Valuation quoted = new Valuation(new GpManagerConfig() { },
+            id -> composition("Unpriced hat", 48_000), id -> id == 1942 ? 50_000 : 0);
+        assertEquals(PriceSource.GRAND_EXCHANGE, quoted.value(Collections.singletonMap(1942, 1L)).get(0).getPriceSource());
     }
 
     @Test public void identityMappingNeverManufacturesCrossItemValue()

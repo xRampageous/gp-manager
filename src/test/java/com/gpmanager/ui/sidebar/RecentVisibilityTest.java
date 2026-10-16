@@ -72,7 +72,7 @@ public class RecentVisibilityTest
             hides(page, recent(554, "Fire rune", true, true)));
         assertFalse("a spell's runes are no single item", hides(page, recent(554, "Fire Strike", false, false)));
         assertTrue(hides(page, new LiveSnapshot.Recent(385, "Shark", null, 900L, false, false, null, 1, "r", "c",
-            "", 1L, false, false, true, null, false, 0L, false, "", false, false)));
+            "", 1L, false, false, true, null, false, 0L, false, "", false, false, null)));
     }
 
     @Test
@@ -99,7 +99,7 @@ public class RecentVisibilityTest
     static LiveSnapshot.Recent recent(int itemId, String name, boolean market, boolean open)
     {
         return new LiveSnapshot.Recent(itemId, name, null, 1_000L, false, false, market ? "market" : null, 1, "r", "c",
-            "", 200L, true, market, true, null, false, 0L, market, market ? "Sold" : "", open, false);
+            "", 200L, true, market, true, null, false, 0L, market, market ? "Sold" : "", open, false, null);
     }
 
     static boolean hides(LivePage page, LiveSnapshot.Recent row)

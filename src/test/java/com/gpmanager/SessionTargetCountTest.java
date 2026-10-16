@@ -69,22 +69,37 @@ public class SessionTargetCountTest
     public void aNetAimCountsFromTheMomentItIsSet()
     {
         Session session = new Session("Vorkath", T0);
-        assertTrue(session.setProfitTargetGp(200_000L, 10_000_000L));
+        assertTrue(session.setProfitTargetGp(200_000L, 10_000_000L, 0L));
         assertEquals("a set aim starts at zero", 0L, session.profitTargetProgress(10_000_000L));
 
         assertFalse("re-saving while working keeps the count",
-            session.setProfitTargetGp(200_000L, 10_100_000L));
+            session.setProfitTargetGp(200_000L, 10_100_000L, 0L));
         assertEquals(100_000L, session.profitTargetProgress(10_100_000L));
 
-        assertTrue(session.setProfitTargetGp(300_000L, 10_150_000L));
+        assertTrue(session.setProfitTargetGp(300_000L, 10_150_000L, 0L));
         assertEquals("a changed aim counts from its own set", 0L,
             session.profitTargetProgress(10_150_000L));
 
         assertTrue("re-saving a reached aim begins again",
-            session.setProfitTargetGp(300_000L, 10_500_000L));
+            session.setProfitTargetGp(300_000L, 10_500_000L, 0L));
         assertEquals(0L, session.profitTargetProgress(10_500_000L));
 
-        assertTrue(session.setProfitTargetGp(null, 10_500_000L));
+        assertTrue(session.setProfitTargetGp(null, 10_500_000L, 0L));
         assertEquals("clearing forgets the baseline", 0L, session.getProfitTargetSetNet());
+    }
+
+    /** Owner 2026-10-16: an aim set after an hour of free play paces from its own start. */
+    @Test
+    public void aNetAimPacesFromWhenItWasSet()
+    {
+        Session session = new Session("General", 0L);
+        long hour = 3_600_000L;
+        assertTrue(session.setProfitTargetGp(200_000L, 0L, hour));
+        long elapsed = hour + 10L * 60_000L;
+        LiveSnapshot.Goal goal = LiveSnapshot.goal(session,
+            new Metrics("General", false, elapsed, 100_000L, 0L, 100_000L, 85_714L), elapsed);
+        assertEquals("100k in 10 minutes is 600k/h: 10 more minutes, not the run's 1h 10m",
+            "~10m" + GameData.msg("play-left"), goal.eta);
+        assertEquals("the aim's own clock", 10L * 60_000L, session.profitTargetActiveMillis(elapsed));
     }
 }

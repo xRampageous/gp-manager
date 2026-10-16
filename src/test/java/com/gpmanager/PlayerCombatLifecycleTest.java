@@ -65,7 +65,8 @@ public class PlayerCombatLifecycleTest
         GpManagerPlugin plugin = plugin();
         plugin.engine.ensureSession(1_000L);
         plugin.engine.noteGeCollect(1_100L);
-        plugin.engine.geCustody.holdCash(100L, 1_200L);
+        plugin.engine.geCustody.now = 1_200L;
+        plugin.engine.geCustody.holdCash(100L);
         Session previous = plugin.engine.getActiveSession();
         plugin.beginOwnerSwitch();
         assertNull(plugin.engine.inbox.peek(Inbox.GE_COLLECT));

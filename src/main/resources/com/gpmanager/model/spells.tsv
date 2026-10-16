@@ -1,6 +1,7 @@
 # Combat spell names and icons (RuneLite SpriteID); exact recipes live only in d27.
 # Autocasting never clicks a spell, so a Cast with no captured name reads as the one spell here its runes pay for.
 # Rows named by an item show it: minus its item id (owner 2026-10-09).
+# A third column lists the item ids a spell makes (coins, fruit): its own product, never a pickup.
 Chugging barrel	-30000
 Wind Strike	15
 Water Strike	17
@@ -53,9 +54,9 @@ NPC Contact	568
 Confuse	16
 Lvl-1 Enchant	18
 Weaken	20
-Bones to Bananas	22
+Bones to Bananas	22	1963
 Curse	24
-Low Level Alchemy	25
+Low Level Alchemy	25	995
 Varrock Teleport	27
 Lvl-2 Enchant	28
 Lumbridge Teleport	30
@@ -64,7 +65,7 @@ Falador Teleport	33
 Superheat Item	36
 Camelot Teleport	37
 Lvl-3 Enchant	39
-High Level Alchemy	41
+High Level Alchemy	41	995
 Charge Water Orb	42
 Lvl-4 Enchant	43
 Charge Earth Orb	45
@@ -94,7 +95,7 @@ Teleother Falador	350
 Teleother Camelot	351
 Tele Block	352
 Lvl-6 Enchant	353
-Bones to Peaches	354
+Bones to Peaches	354	6883
 Teleport to House	355
 Teleport to Ape Atoll	357
 Enchant Crossbow Bolt	358

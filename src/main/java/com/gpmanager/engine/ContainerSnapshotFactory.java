@@ -1,16 +1,19 @@
 package com.gpmanager;
 
-import lombok.RequiredArgsConstructor;
+import static com.gpmanager.GameData.msg;
 
+import java.util.*;
+import java.util.Map;
+import java.util.Set;
+import java.util.regex.Pattern;
+import javax.inject.*;
+import lombok.*;
+import lombok.Getter;
+import lombok.RequiredArgsConstructor;
 import net.runelite.api.*;
 import net.runelite.api.gameval.*;
 import net.runelite.api.gameval.InventoryID;
 import net.runelite.api.gameval.ItemID;
-
-import java.util.*;
-
-import javax.inject.*;
-import lombok.*;
 
 @Singleton
 @RequiredArgsConstructor(onConstructor_ = @Inject)
@@ -161,5 +164,194 @@ class ContainerSnapshot {
     /** Quantity of one item id in this snapshot (0 when absent). */
     long quantityOf(int itemId) {
         return quantities.getOrDefault(itemId, 0L);
+    }
+}
+
+/**
+ * Special bags/sacks/barrels/kits/pouches. Store/retrieve is ownership-neutral ({@link Kind});
+ * contents valuation follows snapshots — never invent gain/loss.
+ */
+class UtilityContainerCatalogue {
+    enum Kind {
+        STORE,
+        WITHDRAW,
+        EMPTY_TO_BANK,
+        EMPTY_TO_INVENTORY,
+        CALIBRATE_CHECK
+    }
+
+    /** Special container names, most specific first: the first one a name contains wins. */
+    static final List<String> NAMES = GameData.names("utility_containers");
+
+    static final Pattern ESSENCE_POUCH = GameData.pattern("essence-pouch");
+
+    /**
+     * The container family used in the custody note ({@code herb_sack}), or null for other items.
+     */
+    static String familyFor(String itemName) {
+        String lower = Phrases.norm(itemName);
+        if (lower != null && ESSENCE_POUCH.matcher(lower).find()) return "essence_pouch";
+        for (String name : NAMES) {
+            if (lower != null && lower.contains(name))
+                return name.replace("'", "").replace(' ', '_').replace('-', '_');
+        }
+        return null;
+    }
+
+    /**
+     * Classify a menu option on a known container. Deposit-box Empty → bank is {@link
+     * Kind#EMPTY_TO_BANK} (ownership-neutral).
+     */
+    static Kind classify(String option, boolean depositBoxOpen) {
+        String normalized = Phrases.lower(option);
+        return "check".equals(normalized)
+                ? Kind.CALIBRATE_CHECK
+                : normalized.startsWith("empty")
+                        ? depositBoxOpen ? Kind.EMPTY_TO_BANK : Kind.EMPTY_TO_INVENTORY
+                        : normalized.startsWith("withdraw") || normalized.startsWith("remove")
+                                ? Kind.WITHDRAW
+                                : Kind.STORE;
+    }
+
+    /** True when evidence must stay ownership-neutral (never invent Net). */
+    static boolean isNeutral(Kind kind) {
+        return kind != null && kind != Kind.CALIBRATE_CHECK;
+    }
+
+    /**
+     * True when the menu option is a container custody action this catalogue can classify.
+     * Store/withdraw/empty/fill are reversible custody movement, never revenue or cost.
+     */
+    static boolean isCustodyOption(String option) {
+        String normalized = Phrases.norm(option);
+        return normalized != null
+                && (normalized.matches(msg("fill-check"))
+                        || normalized.startsWith("empty")
+                        || normalized.startsWith("withdraw")
+                        || normalized.startsWith("remove"));
+    }
+}
+
+/**
+ * Region-based ownership-neutral zones. Some instances store the whole inventory and equipment on
+ * entry and restore it on exit without any menu click at the exit — The Gauntlet is the canonical
+ * case (GP Per Hour issues #7/#8: all gear booked as a loss on entry and a gain on exit). While the
+ * player is inside such a region every settled delta is an ownership-neutral transfer; leaving
+ * opens one more window so the restore settles as a transfer too. Reward chests are claimed in the
+ * lobby, outside the zone, so real loot still counts.
+ *
+ * <p>Pure state machine over region ids; the plugin feeds it one region per tick.
+ */
+@Getter
+class NeutralZoneTracker {
+    enum Signal {
+        /** Not in a neutral zone and nothing to close. */
+        NONE,
+        /** First tick inside a neutral zone. */
+        ENTERED,
+        /** Inside a neutral zone: keep the transfer window open this tick. */
+        INSIDE,
+        /** Just left a neutral zone: open one closing window for the gear restore. */
+        LEFT
+    }
+
+    boolean inside;
+
+    /** Feed the current region id (0 or negative when unknown). */
+    Signal onRegion(int regionId) {
+        boolean now = MinigameRegionHints.isNeutralZoneRegion(regionId);
+        if (now) {
+            boolean entered = !inside;
+            inside = true;
+            return entered ? Signal.ENTERED : Signal.INSIDE;
+        }
+        if (inside && regionId > 0) {
+            inside = false;
+            return Signal.LEFT;
+        }
+        // Unknown region (loading screens) keeps the previous state without signalling.
+        return Signal.NONE;
+    }
+
+    void reset() {
+        inside = false;
+    }
+}
+
+/**
+ * Minigame-only items: ids that cannot legally exist outside their minigame (a loaned loadout,
+ * table supplies), so their grant and exit strip are both non-economic. Persistent rewards stay
+ * tracked. Coinflow MinigameQuarantine evidence, Muse review, owner 2026-10-12.
+ */
+class MinigameItems {
+    static final Set<Integer> IDS = GameData.byId("minigame_items").keySet();
+
+    /** True for an item id that only exists inside its minigame. */
+    static boolean isMinigameOnly(int itemId) {
+        return IDS.contains(itemId);
+    }
+}
+
+/**
+ * Conservative region hints for LMS and Gauntlet instances when menu text is sparse. Live producers
+ * pass {@link net.runelite.api.coords.WorldPoint#getRegionID()}.
+ */
+class MinigameRegionHints {
+    /**
+     * Region id to kind: "lms" for Last Man Standing instances (not exhaustive; menu and chat stay
+     * primary) and "neutral" for instances that store the player's gear on entry and restore it on
+     * exit with no exit click (The Gauntlet and the Corrupted Gauntlet; see minigame-regions.tsv).
+     */
+    static final Map<Integer, String> KINDS = GameData.byId("minigame_regions");
+
+    /** True inside an instance whose inventory changes are never profit or loss. */
+    static boolean isNeutralZoneRegion(int regionId) {
+        return "neutral".equals(KINDS.get(regionId));
+    }
+
+    /** The PvP tutorial arena: lent gear and supplies, taken back on the way out. */
+    static boolean isPvpTutorial(int regionId) {
+        return "arena".equals(KINDS.get(regionId));
+    }
+
+    static boolean isLmsRegion(int regionId) {
+        return "lms".equals(KINDS.get(regionId));
+    }
+}
+
+/**
+ * Ownership-neutral moves, treated like a bank TRANSFER: world and coin storages (seed vault, tool
+ * leprechaun, coffers, STASH units...) and minigame moves (LMS loadouts, raid bags, GIM shared
+ * storage). Never invent profit or loss on deposit, withdraw, enter or exit, and never book a full
+ * inventory as Lost or loot on an LMS enter or exit.
+ *
+ * <p>The rows live in neutral_transfers.tsv and are checked in file order, so the first match wins:
+ * minigame rows have "m" keys, and the ".lms" rows apply only inside an LMS region.
+ */
+class NeutralTransfers {
+    static final java.util.Map<String, Phrases.Clause[][]> RULES =
+            GameData.rules("neutral_transfers");
+
+    /** The transfer note of the first storage row matching this menu text, or null. */
+    static String storage(String raw) {
+        return match(Phrases.norm(raw), false, -1);
+    }
+
+    static String minigame(String raw) {
+        return minigame(raw, -1);
+    }
+
+    /** The transfer note of the first minigame row matching this menu text, or null. */
+    static String minigame(String raw, int regionId) {
+        return match(Phrases.lower(raw), true, regionId);
+    }
+
+    private static String match(String name, boolean minigame, int regionId) {
+        boolean lms = regionId >= 0 && MinigameRegionHints.isLmsRegion(regionId);
+        for (String[] row : GameData.cachedRows("neutral_transfers")) {
+            if (row[0].startsWith("m") != minigame || row[0].endsWith(".lms") && !lms) continue;
+            if (Phrases.has(name, RULES.get(row[0]))) return GameData.text(row[3]);
+        }
+        return null;
     }
 }

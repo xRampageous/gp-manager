@@ -1,16 +1,18 @@
 package com.gpmanager;
 
 import static com.gpmanager.ActionKind.*;
+import static com.gpmanager.Correction.*;
 import static com.gpmanager.GameData.msg;
 import static com.gpmanager.Phrases.*;
+import static com.gpmanager.PriceSource.*;
 import static com.gpmanager.SafeMath.*;
 import static com.gpmanager.TransactionType.*;
-
+import static java.lang.Math.min;
 import static java.util.Collections.*;
 
 import java.util.*;
 import lombok.*;
-import static java.lang.Math.min;
+import lombok.AllArgsConstructor;
 
 /**
  * Canonical durable financial fact: stable id, timestamp, type/context, booked item flows, the
@@ -80,7 +82,7 @@ class Transaction {
             Confidence confidence,
             String explanation,
             String encounterId) {
-        this.id = UUID.randomUUID().toString();
+        id = UUID.randomUUID().toString();
         this.timestampEpochMillis = timestampEpochMillis;
         this.type = type;
         this.context = context;
@@ -90,8 +92,8 @@ class Transaction {
         this.flows = flows == null ? new ArrayList<>() : new ArrayList<>(flows);
         this.confidence = confidence == null ? Confidence.UNCERTAIN : confidence;
         this.explanation = orEmpty(explanation);
-        this.correction = Correction.AUTO;
-        this.correctionReason = "";
+        correction = Correction.AUTO;
+        correctionReason = "";
         this.encounterId = encounterId;
         recalculate();
     }
@@ -99,7 +101,6 @@ class Transaction {
     void recalculate() {
         revenue = 0L;
         costs = 0L;
-        if (flows == null) flows = new ArrayList<>();
         for (Flow flow : flows) {
             if (flow.valueDelta > 0) revenue = safeAdd(revenue, flow.valueDelta);
             else if (flow.valueDelta < 0) costs = safeAdd(costs, abs(flow.valueDelta));
@@ -124,9 +125,9 @@ class Transaction {
         if (gains) reverse(ordered);
         var next = new ArrayList<Flow>();
         for (Flow flow : ordered) {
-            long magnitude = flow == null ? 0L : abs(flow.quantityDelta);
+            long magnitude = abs(flow.quantityDelta);
             long take =
-                    flow != null && flow.itemId == itemId && (gains ? flow.isGain() : flow.isCost())
+                    flow.itemId == itemId && (gains ? flow.isGain() : flow.isCost())
                             ? Math.min(nonNeg(amount), magnitude)
                             : 0L;
             amount -= take;
@@ -155,7 +156,7 @@ class Transaction {
     /** True while any flow still spends an item; a blowpipe shot keeps its scales after a dart. */
     boolean spends() {
         for (Flow flow : getFlows()) {
-            if (flow != null && flow.isCost()) return true;
+            if (flow.isCost()) return true;
         }
         return false;
     }
@@ -193,8 +194,8 @@ class Transaction {
     /** Total gained ({@code gains}) or lost quantity of one item across the remaining flows. */
     long quantity(int itemId, boolean gains) {
         long total = 0L;
-        for (Flow flow : flows == null ? Collections.<Flow>emptyList() : flows) {
-            if (flow != null && flow.itemId == itemId && (gains ? flow.isGain() : flow.isCost())) {
+        for (Flow flow : flows) {
+            if (flow.itemId == itemId && (gains ? flow.isGain() : flow.isCost())) {
                 total = safeAdd(total, abs(flow.quantityDelta));
             }
         }
@@ -271,8 +272,13 @@ class Transaction {
     }
 
     List<Flow> getFlows() {
-        if (flows == null) flows = new ArrayList<>();
         return unmodifiableList(flows);
+    }
+
+    /** A loaded row is cleaned once (no missing or null flows), so readers never re-check. */
+    void sanitize() {
+        if (flows == null) flows = new ArrayList<>();
+        flows.removeIf(java.util.Objects::isNull);
     }
 
     long autoNet() {
@@ -369,7 +375,7 @@ class Transaction {
 
     /** Presentation-only stamp; never alters type, valuation, counted state or ownership. */
     void setActionKind(ActionKind kind) {
-        this.actionKind = kind == null ? null : kind.wireName();
+        actionKind = kind == null ? null : kind.wireName();
     }
 
     /** Exact action text captured from a trusted client widget, or null for generic/legacy rows. */
@@ -523,5 +529,239 @@ class ItemSplits {
                                 text.toLowerCase(java.util.Locale.ROOT),
                                 "split keep",
                                 "split share"));
+    }
+}
+
+enum Correction {
+    AUTO,
+    REVENUE,
+    COST,
+    TRANSFER,
+    IGNORE
+}
+
+enum Confidence {
+    CONFIRMED,
+    LIKELY,
+    UNCERTAIN
+}
+
+/** A deliberate correction choice for an unresolved transaction. */
+@AllArgsConstructor
+enum Decision {
+    GAIN(REVENUE),
+    COST(Correction.COST),
+    TRANSFER(Correction.TRANSFER),
+    IGNORE(Correction.IGNORE);
+    Correction correction;
+
+    Correction toCorrection() {
+        return correction;
+    }
+}
+
+/** Shared accounting predicate for receipts that still need an owner decision. */
+class ReviewRules {
+    /**
+     * Only unresolved automatic classifier decisions belong in the decision inbox. Ledger may
+     * separately surface unknown pricing or provenance as review hints.
+     */
+    static boolean needsOwnerDecision(Transaction transaction) {
+        return transaction != null
+                && transaction.getCorrection() == Correction.AUTO
+                && transaction.getConfidence() == Confidence.UNCERTAIN;
+    }
+}
+
+/** One undoable owner decision: the before/after state of every row it changed. */
+class CorrectionRecord {
+    String reason;
+    List<Change> changes;
+
+    /** Set once the decision has been undone; an undone record is skipped by later undos. */
+    boolean undone;
+
+    CorrectionRecord() {
+        // Gson
+    }
+
+    CorrectionRecord(String reason, List<Change> changes) {
+        this.reason = Transaction.normalizeReason(reason);
+        this.changes = new ArrayList<>(changes);
+    }
+
+    String getReason() {
+        return Transaction.normalizeReason(reason);
+    }
+
+    boolean isUndone() {
+        return undone;
+    }
+
+    /** The rows this decision changed. */
+    List<Change> getChanges() {
+        return changes == null ? emptyList() : unmodifiableList(changes);
+    }
+
+    /** True when any change in this record targets one of the given transaction ids. */
+    boolean touchesAny(Set<String> transactionIds) {
+        for (Change change : getChanges()) {
+            if (transactionIds.contains(change.getTransactionId())) return true;
+        }
+        return false;
+    }
+
+    /**
+     * One row's before/after state. The flow and explanation snapshots are set when the decision
+     * changed the row's flows (split, own-drop recovery); flows are immutable, so they are shared.
+     */
+    @NoArgsConstructor
+    @AllArgsConstructor
+    static class Change {
+        String transactionId;
+        Correction previousCorrection;
+        Correction newCorrection;
+        List<Flow> flowSnapshot;
+        String explanationSnapshot;
+
+        String getTransactionId() {
+            return orEmpty(transactionId);
+        }
+
+        Correction getPreviousCorrection() {
+            return previousCorrection == null ? Correction.AUTO : previousCorrection;
+        }
+
+        List<Flow> getFlowSnapshot() {
+            return flowSnapshot == null
+                    ? Collections.<Flow>emptyList()
+                    : unmodifiableList(flowSnapshot);
+        }
+
+        boolean hasFlowSnapshot() {
+            return flowSnapshot != null;
+        }
+    }
+}
+
+@EqualsAndHashCode(exclude = "priceCapturedAtEpochMillis")
+class Flow {
+    int itemId;
+    String itemName;
+    long quantityDelta;
+    int unitPrice;
+    long valueDelta;
+    PriceSource priceSource;
+
+    /** Epoch-millis when the selected non-zero unit price was observed; zero when unavailable. */
+    long priceCapturedAtEpochMillis;
+
+    Flow() {
+        // Gson
+    }
+
+    Flow(int itemId, String itemName, long quantityDelta, int unitPrice, long valueDelta) {
+        this(itemId, itemName, quantityDelta, unitPrice, valueDelta, UNKNOWN);
+    }
+
+    Flow(
+            int itemId,
+            String itemName,
+            long quantityDelta,
+            int unitPrice,
+            long valueDelta,
+            PriceSource priceSource) {
+        this(itemId, itemName, quantityDelta, unitPrice, valueDelta, priceSource, 0L);
+    }
+
+    Flow(
+            int itemId,
+            String itemName,
+            long quantityDelta,
+            int unitPrice,
+            long valueDelta,
+            PriceSource priceSource,
+            long priceCapturedAtEpochMillis) {
+        this.itemId = itemId;
+        this.itemName = itemName;
+        this.quantityDelta = quantityDelta;
+        this.unitPrice = unitPrice;
+        this.valueDelta = valueDelta;
+        this.priceSource = priceSource == null ? UNKNOWN : priceSource;
+        this.priceCapturedAtEpochMillis = priceCapturedAtEpochMillis;
+    }
+
+    PriceSource getPriceSource() {
+        return priceSource == null ? UNKNOWN : priceSource;
+    }
+
+    long getPriceCapturedAtEpochMillis() {
+        return SafeMath.nonNeg(priceCapturedAtEpochMillis);
+    }
+
+    /** {@code magnitude} units of this flow, signed like it, valued at {@code unit} each. */
+    Flow part(long magnitude, long unit, PriceSource source) {
+        long sign = quantityDelta < 0L ? -1L : 1L;
+        return new Flow(
+                itemId,
+                itemName,
+                sign * magnitude,
+                SafeMath.toInt(unit),
+                sign * SafeMath.safeMultiply(magnitude, unit),
+                source,
+                getPriceCapturedAtEpochMillis());
+    }
+
+    Flow part(long magnitude) {
+        return part(magnitude, unitPrice, getPriceSource());
+    }
+
+    /**
+     * What remains once {@code claimed} units leave at the unit price; null when nothing remains.
+     */
+    Flow rest(long claimed) {
+        long left = SafeMath.abs(quantityDelta) - claimed;
+        return claimed <= 0L
+                ? this
+                : left <= 0L
+                        ? null
+                        : new Flow(
+                                itemId,
+                                itemName,
+                                quantityDelta < 0L ? -left : left,
+                                unitPrice,
+                                valueDelta - part(claimed).valueDelta,
+                                priceSource,
+                                priceCapturedAtEpochMillis);
+    }
+
+    boolean isGain() {
+        return quantityDelta > 0;
+    }
+
+    boolean isCost() {
+        return quantityDelta < 0;
+    }
+}
+
+/** Provenance of the unit price used for an item flow. */
+@AllArgsConstructor
+enum PriceSource {
+    MANUAL_OVERRIDE("manual"),
+    /** A catalogue proxy price: a market item's quote divided by its fixed exchange rate. */
+    CURRENCY_PROXY("currency proxy"),
+    GRAND_EXCHANGE("RuneLite market"),
+    FACE_VALUE("face value"),
+    /** High-alchemy value, for an ironman who chose to value items at their alch price. */
+    HIGH_ALCHEMY("high alchemy"),
+    DEFERRED_CLAIM("Claim on open"),
+    /** Untradeable with no alch value: a known zero, never shown as an unknown price. */
+    NO_VALUE("no value"),
+    UNPRICED("unpriced"),
+    UNKNOWN("unknown");
+    String label;
+
+    public String toString() {
+        return label;
     }
 }

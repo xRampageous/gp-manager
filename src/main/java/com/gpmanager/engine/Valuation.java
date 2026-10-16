@@ -1,19 +1,21 @@
 package com.gpmanager;
 
 import static com.gpmanager.PriceSource.*;
-
 import static java.lang.Math.*;
 
+import java.util.*;
+import java.util.HashMap;
+import java.util.Map;
+import java.util.Set;
+import java.util.function.*;
+import javax.inject.*;
 import lombok.Getter;
-
 import net.runelite.api.*;
+import net.runelite.api.ItemComposition;
 import net.runelite.api.gameval.ItemID;
 import net.runelite.client.game.*;
-
-import java.util.*;
-import java.util.function.*;
-
-import javax.inject.*;
+import net.runelite.client.game.ItemManager;
+import net.runelite.http.api.item.ItemPrice;
 
 @Singleton
 class Valuation implements FlowValuator {
@@ -33,6 +35,8 @@ class Valuation implements FlowValuator {
     interface MarketQuote {
         int priceOf(int itemId, boolean active);
     }
+
+    static final Map<String, String> PARTS = GameData.byName("partial_food");
 
     IntFunction<ItemComposition> compositions;
     MarketQuote marketQuotes;
@@ -330,12 +334,12 @@ class Valuation implements FlowValuator {
      * quotes closed; manual override and face-value policy still apply.
      */
     void setEconomyState(Economy state) {
-        this.economyState = state == null ? Economy.UNKNOWN : state;
+        economyState = state == null ? Economy.UNKNOWN : state;
     }
 
     /** Client-thread Karamja-gloves snapshot; picks the improved proxy rate while worn. */
     void setKaramjaGlovesWorn(boolean worn) {
-        this.karamjaGlovesWorn = worn;
+        karamjaGlovesWorn = worn;
     }
 
     /**
@@ -465,6 +469,20 @@ class Valuation implements FlowValuator {
                     && !unsupportedMapping.test(itemId)) {
                 doseQuote = doseFamilyQuote(itemId, name, priceOverrides);
             }
+            // Half a pie, a pizza half or a cake slice is its share of the whole one's quote
+            // (owner live 2026-10-16: Half a summer pie read "?").
+            String part = PARTS.get(String.valueOf(itemId));
+            if (marketPrice == 0
+                    && part != null
+                    && !manualOverride
+                    && economyState == Economy.NORMAL) {
+                String[] share = part.split(" ");
+                marketPrice =
+                        (int)
+                                ((long) quoteOrZero(Integer.parseInt(share[0]))
+                                        * Integer.parseInt(share[1])
+                                        / Integer.parseInt(share[2]));
+            }
             int unitPrice;
             PriceSource priceSource;
             if (deferredClaim) {
@@ -483,14 +501,26 @@ class Valuation implements FlowValuator {
                 priceSource = HIGH_ALCHEMY;
             } else if (marketPrice > 0) {
                 // The item's own market quote is a supported observation. Non-GP currencies
-                // and untradeables without a quote stay unpriced; an exchange relationship or
-                // a hypothetical high-alchemy liquidation is never converted into booked GP.
+                // without a quote stay unpriced; an exchange relationship is never converted into
+                // booked GP.
                 unitPrice = marketPrice;
                 priceSource = proxy == null ? GRAND_EXCHANGE : CURRENCY_PROXY;
             } else if (doseQuote != null) {
                 // The derived price follows its family anchor's source so provenance stays honest.
                 unitPrice = doseQuote.unitPrice;
                 priceSource = doseQuote.getPriceSource();
+            } else if (composition != null
+                    && !CurrencyProxyCatalogue.isMapped(itemId)
+                    && !unsupportedMapping.test(itemId)
+                    && (!composition.isTradeable()
+                            || economyState == Economy.NORMAL
+                                    && quoteOrZero(ItemID.NATURERUNE) > 0)) {
+                // No market quote (untradeable, or tradeable once prices have loaded): its alch
+                // value for every account (a crystal shard), else worth nothing (a Progress hat),
+                // a known zero rather than a missing price (owner 2026-10-16). With both, the GE
+                // price above wins unless an ironman chose alch values.
+                unitPrice = max(0, composition.getHaPrice());
+                priceSource = unitPrice > 0 ? HIGH_ALCHEMY : NO_VALUE;
             } else {
                 unitPrice = 0;
                 priceSource = UNPRICED;
@@ -574,5 +604,113 @@ class ItemRuleParser {
             }
         }
         return result;
+    }
+}
+
+@FunctionalInterface
+interface FlowValuator {
+    List<Flow> value(Map<Integer, Long> quantityDeltas);
+
+    /**
+     * Values flows using the caller's evidence-capture time. Existing valuators remain
+     * source-compatible and may ignore the timestamp until they support price provenance.
+     */
+    default List<Flow> value(Map<Integer, Long> quantityDeltas, long priceCapturedAtEpochMillis) {
+        return value(quantityDeltas);
+    }
+
+    /**
+     * Applies an action-aware normalization after the engine has confirmed a consumption. Synthetic
+     * valuators keep their observed flows unchanged; the canonical valuator may normalize only the
+     * explicitly evidenced action and must preserve all source provenance.
+     *
+     * <p>Callers must invoke this after action settlement and before custody or booking. The
+     * timestamp is the same observation timestamp used to value the committed inventory delta. A
+     * {@code null} result means the confirmed action had an unsupported or conflicting price basis;
+     * callers must keep the original captured flows and route the receipt to Review.
+     */
+    default List<Flow> normalizeConsumedFlows(
+            List<Flow> flows, ActionKind actionKind, long priceCapturedAtEpochMillis) {
+        return flows;
+    }
+
+    /**
+     * Whether the current world/economy permits ordinary automatic market quotes. Synthetic test
+     * valuators default to the deterministic NORMAL fixture; the canonical {@link Valuation}
+     * overrides this with its observed economy snapshot.
+     */
+    default boolean automaticMarketQuotesAvailable() {
+        return true;
+    }
+}
+
+/**
+ * The item lookups accounting needs, in one place: the canonical id, the composition, the active
+ * market quote and a name search. Production answers from RuneLite's ItemManager; the rework's
+ * replay answers from a recording (docs/REWORK_PLAN.md), so a session books the same both ways.
+ */
+@Singleton
+class ItemLookup {
+    ItemManager manager;
+
+    @Inject
+    ItemLookup(ItemManager manager) {
+        this.manager = manager;
+    }
+
+    int canon(int id) {
+        return manager == null ? id : manager.canonicalize(id);
+    }
+
+    ItemComposition composition(int id) {
+        return manager == null ? null : manager.getItemComposition(id);
+    }
+
+    List<ItemPrice> find(String name) {
+        return manager == null ? Collections.emptyList() : manager.search(name);
+    }
+}
+
+/**
+ * Untradeable non-GP currencies. They are unpriced unless a manual override supplies a price or a
+ * proxy row prices them from a market item and its fixed exchange rate: RuneLite's price helper
+ * would otherwise value some of them through an item mapping. A proxy's units cell may read
+ * base/with-gloves when Karamja gloves improve that exchange.
+ */
+class CurrencyProxyCatalogue {
+    static final Set<Integer> CURRENCIES = GameData.byId("currencies").keySet();
+
+    /** Proxy rows: item id to {market item id, units per proxy item}. */
+    static final Map<Integer, int[]> PROXIES = new HashMap<>();
+
+    /** Proxy rows whose exchange improves with Karamja gloves worn: item id to gloves units. */
+    static final Map<Integer, Integer> GLOVES_UNITS = new HashMap<>();
+
+    static {
+        for (String[] row : GameData.rows("currencies")) {
+            if (row.length > 2) {
+                String[] units = row[2].split("/");
+                PROXIES.put(
+                        Integer.parseInt(row[0]),
+                        new int[] {Integer.parseInt(row[1]), Integer.parseInt(units[0])});
+                if (units.length > 1) {
+                    GLOVES_UNITS.put(Integer.parseInt(row[0]), Integer.parseInt(units[1]));
+                }
+            }
+        }
+    }
+
+    static boolean isMapped(int itemId) {
+        return CURRENCIES.contains(itemId);
+    }
+
+    /** The proxy price source for this item, or null. */
+    static int[] proxyOf(int itemId) {
+        return PROXIES.get(itemId);
+    }
+
+    /** The gloves-worn units for this proxy row, or 0 when its rate does not change. */
+    static int glovesUnitsOf(int itemId) {
+        return GLOVES_UNITS.getOrDefault(itemId, 0);
     }
 }

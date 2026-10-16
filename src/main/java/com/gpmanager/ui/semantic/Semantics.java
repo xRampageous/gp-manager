@@ -1,22 +1,24 @@
 package com.gpmanager;
 
+import static com.gpmanager.ActionKind.*;
 import static com.gpmanager.Correction.*;
 import static com.gpmanager.GameData.msg;
 import static com.gpmanager.Phrases.*;
+import static com.gpmanager.PriceSource.*;
 import static com.gpmanager.SafeMath.*;
 import static com.gpmanager.TransactionType.*;
-
+import static java.lang.Math.*;
 import static java.util.Collections.*;
 import static java.util.Locale.*;
 
+import com.gpmanager.Accounting.Amounts;
 import com.gpmanager.Contribution.Category;
 import com.gpmanager.MarketRows.*;
-
-import lombok.*;
-
+import com.gpmanager.MarketRows.Row;
 import java.nio.charset.StandardCharsets;
 import java.util.*;
 import java.util.function.Predicate;
+import lombok.*;
 
 /**
  * The one derived, read-only semantic financial projection every presentation surface shares.
@@ -232,7 +234,7 @@ class Semantics {
                 String representativeContributionId,
                 int claim) {
             if (GROUP_IDS.size() > 50_000) GROUP_IDS.clear();
-            this.semanticGroupId =
+            semanticGroupId =
                     GROUP_IDS.computeIfAbsent(
                             mergeKey,
                             key ->
@@ -246,7 +248,7 @@ class Semantics {
             this.actionLabel = actionLabel;
             this.usedBy = usedBy;
             this.chargeUse = chargeUse;
-            this.latestActivityAt = at;
+            latestActivityAt = at;
             this.value = value;
             this.coverage = coverage;
             this.quantity = quantity;
@@ -257,7 +259,7 @@ class Semantics {
             this.reviewRequired = reviewRequired;
             this.corrected = corrected;
             this.marketPresentationId = marketPresentationId;
-            this.representativeTransactionId = transactionId;
+            representativeTransactionId = transactionId;
             this.representativeContributionId = representativeContributionId;
             this.claim = claim;
             receiptIds.add(transactionId.isEmpty() ? representativeContributionId : transactionId);
@@ -730,12 +732,25 @@ class Semantics {
             return false;
         }
         if (contributions.size() < 2) return false;
+        // A named spell with a product (an alch's coins, Bones to Peaches' fruit) is one row by
+        // its spell; a gain it does not make (a pickup) keeps the rows apart (owner live
+        // 2026-10-16). Any other action keeps one shared cost category.
+        Set<Integer> made =
+                transaction.getActionKind() == ActionKind.CAST
+                        ? Spells.product(transaction.spellName())
+                        : emptySet();
+        boolean product = !made.isEmpty();
         Category category = financialCategory(transaction, contributions.get(0));
-        if (category != Category.SUPPLY && category != Category.LOSS) {
+        if (!product && category != Category.SUPPLY && category != Category.LOSS) {
             return false;
         }
         for (Contribution contribution : contributions) {
-            if (financialCategory(transaction, contribution) != category
+            Category each = financialCategory(transaction, contribution);
+            if ((product
+                            ? contribution.quantityDelta > 0L
+                                    ? !made.contains(contribution.itemId)
+                                    : each != Category.SUPPLY && each != Category.LOSS
+                            : each != category)
                     || !contribution.counted
                     || contribution.auditOnly) {
                 return false;
@@ -748,11 +763,15 @@ class Semantics {
             Transaction transaction, List<Contribution> contributions, String source, long at) {
         Category category = financialCategory(transaction, contributions.get(0));
         boolean unpriced = false;
+        boolean mixed = false;
         long value = 0L;
         for (Contribution contribution : contributions) {
             unpriced |= contribution.isUnpriced();
+            mixed |= financialCategory(transaction, contribution) != category;
             value = safeAdd(value, contribution.effectiveValue);
         }
+        // A spell with a product sits by its net: an alch that made coins is a gain.
+        if (mixed) category = value > 0L ? Category.GAIN : Category.SUPPLY;
         String exactName = transaction.spellName();
         String verb = verbOf(transaction);
         String primaryName = exactName.isEmpty() ? verb : exactName;
@@ -1060,7 +1079,7 @@ class Semantics {
 
     static long semanticQuantity(Contribution contribution) {
         if (contribution.normalizedConsume) return contribution.normalizedQuantity;
-        return abs(contribution.quantityDelta);
+        return SafeMath.abs(contribution.quantityDelta);
     }
 
     /** Display verb for a transaction: action kind first, then split/type direction. */
@@ -1088,6 +1107,9 @@ class Semantics {
             return msg("why-correction." + transaction.getCorrection());
         if (neutral) return msg("ownership-neutral-move");
         if (unpriced) return msg("price-known");
+        if (!transaction.getFlows().isEmpty()
+                && transaction.getFlows().stream().allMatch(flow -> flow.getPriceSource() == PriceSource.NO_VALUE))
+            return msg("no-value");
         String note = transaction.getNote();
         // Owner 2026-10-01 (F11): a Charges receipt names its retained confidence.
         if (note.startsWith(msg("estimated-charge"))) {
@@ -1121,7 +1143,6 @@ class Semantics {
         if (transaction == null) return false;
         var cash = GameData.pattern("cash");
         for (Flow flow : transaction.getFlows()) {
-            if (flow == null) continue;
             if (CurrencyProxyCatalogue.isMapped(flow.itemId)) return true;
             String name = Phrases.lower(flow.itemName);
             if (!"coins".equals(name) && cash.matcher(name).matches()) return true;
@@ -1291,7 +1312,7 @@ class Semantics {
         long gcd = 0L;
         boolean normalisable = true;
         for (Contribution contribution : contributions) {
-            long quantity = abs(contribution.quantityDelta);
+            long quantity = SafeMath.abs(contribution.quantityDelta);
             if (quantity <= 0L) {
                 normalisable = false;
                 break;
@@ -1304,7 +1325,7 @@ class Semantics {
                         .thenComparing((itemData -> itemData.contributionId)));
         var parts = new ArrayList<String>(sorted.size());
         for (Contribution contribution : sorted) {
-            long quantity = abs(contribution.quantityDelta);
+            long quantity = SafeMath.abs(contribution.quantityDelta);
             long ratio = normalisable && gcd > 0L ? quantity / gcd : quantity;
             parts.add(
                     contribution.itemId
@@ -1402,5 +1423,524 @@ class Semantics {
             default:
                 return msg("detail-unavailable");
         }
+    }
+}
+
+/**
+ * One correction-aware, read-only financial contribution derived from a retained Flow. The parent
+ * transaction remains the only correction identity and accounting authority.
+ */
+class Contribution {
+    enum Category {
+        GAIN,
+        SUPPLY,
+        LOSS,
+        MARKET,
+        AUDIT
+    }
+
+    String contributionId;
+    long timestampEpochMillis;
+    int flowOrdinal;
+    int itemId;
+    String itemName;
+    long quantityDelta;
+
+    /** Raw automatic Flow value, retained for audit and correction comparison. */
+    long valueDelta;
+
+    /** Effective, correction-aware additive value used by financial presentation. */
+    long effectiveValue;
+
+    PriceSource priceSource;
+    boolean counted;
+    Category category;
+
+    /** Transient exact action label captured from trusted client evidence; display/search only. */
+    String actionDisplayName;
+
+    boolean needsReview;
+    boolean corrected;
+    boolean split;
+    boolean auditOnly;
+    boolean normalizedConsume;
+    long normalizedQuantity;
+    List<Flow> rawFlows;
+
+    Contribution(
+            Transaction transaction,
+            int flowOrdinal,
+            int itemId,
+            String itemName,
+            long quantityDelta,
+            long valueDelta,
+            long effectiveValue,
+            PriceSource priceSource,
+            Category category,
+            boolean needsReview,
+            boolean auditOnly,
+            boolean normalizedConsume,
+            long normalizedQuantity,
+            List<Flow> rawFlows) {
+        contributionId =
+                transaction.getId()
+                        + (normalizedConsume ? ":consume:" + flowOrdinal : ":flow:" + flowOrdinal);
+        this.timestampEpochMillis = transaction.timestampEpochMillis;
+        this.flowOrdinal = flowOrdinal;
+        this.itemId = itemId;
+        this.itemName = nonBlank(itemName, "Unknown item");
+        this.quantityDelta = quantityDelta;
+        this.valueDelta = valueDelta;
+        this.effectiveValue = effectiveValue;
+        this.priceSource = priceSource == null ? UNKNOWN : priceSource;
+        counted = transaction.isCounted();
+        this.category = category == null ? Category.AUDIT : category;
+        actionDisplayName = transaction.spellName();
+        this.needsReview = needsReview;
+        corrected = transaction.getCorrection() != null && transaction.getCorrection() != AUTO;
+        split = isSplit(transaction);
+        this.auditOnly = auditOnly;
+        this.normalizedConsume = normalizedConsume;
+        this.normalizedQuantity = normalizedQuantity;
+        this.rawFlows = unmodifiableList(new ArrayList<>(rawFlows));
+    }
+
+    static Contribution from(Transaction transaction, Flow flow) {
+        return from(transaction, flow, 0);
+    }
+
+    static Contribution from(Transaction transaction, Flow flow, int ordinal) {
+        if (transaction == null || flow == null) return null;
+        Amounts amounts = Accounting.flow(transaction, flow);
+        long effective = amounts.included ? amounts.getNet() : 0L;
+        Category category = category(transaction, flow, amounts);
+        return new Contribution(
+                transaction,
+                ordinal,
+                flow.itemId,
+                flow.itemName,
+                flow.quantityDelta,
+                flow.valueDelta,
+                effective,
+                flow.getPriceSource(),
+                category,
+                reviewState(transaction, flow),
+                !amounts.included,
+                false,
+                SafeMath.abs(flow.quantityDelta),
+                singletonList(flow));
+    }
+
+    /**
+     * Project one receipt into exact per-flow rows, coalescing only proven full→partial consume
+     * pairs. Raw flows are retained on normalized rows for detail and audit.
+     */
+    static List<Contribution> project(Transaction transaction) {
+        return transaction == null ? emptyList() : transaction.memo(10, () -> build(transaction));
+    }
+
+    static List<Contribution> build(Transaction transaction) {
+        List<Flow> flows = transaction.getFlows();
+        if (empty(flows)) return emptyList();
+        var result = new ArrayList<Contribution>();
+        var consumed = new HashSet<Integer>();
+        for (ActionReader.PartialUse pair : Accounting.consumePairs(transaction)) {
+            Flow loss = flows.get(pair.lossIndex);
+            Flow remainder = flows.get(pair.remainderIndex);
+            Amounts lossAmounts = Accounting.flow(transaction, loss);
+            Amounts remainderAmounts = Accounting.flow(transaction, remainder);
+            long effective = SafeMath.safeAdd(lossAmounts.getNet(), remainderAmounts.getNet());
+            if (!lossAmounts.included || !remainderAmounts.included || effective > 0L) continue;
+            int ordinal = min(pair.lossIndex, pair.remainderIndex);
+            result.add(
+                    new Contribution(
+                            transaction,
+                            ordinal,
+                            loss.itemId,
+                            normalizedName(loss.itemName),
+                            -min(
+                                    SafeMath.abs(loss.quantityDelta),
+                                    SafeMath.abs(remainder.quantityDelta)),
+                            SafeMath.safeAdd(loss.valueDelta, remainder.valueDelta),
+                            effective,
+                            loss.getPriceSource(),
+                            Category.SUPPLY,
+                            reviewState(transaction, loss),
+                            false,
+                            true,
+                            min(
+                                    SafeMath.abs(loss.quantityDelta),
+                                    SafeMath.abs(remainder.quantityDelta)),
+                            List.of(loss, remainder)));
+            consumed.add(pair.lossIndex);
+            consumed.add(pair.remainderIndex);
+        }
+        for (int i = 0; i < flows.size(); i++) {
+            if (consumed.contains(i)) continue;
+            Flow flow = flows.get(i);
+            Amounts amounts = Accounting.flow(transaction, flow);
+            // The last dose drunk, its vial smashed, is one more dose of the same potion.
+            if (transaction.getActionKind() == DRINK
+                    && transaction.getCorrection() == AUTO
+                    && amounts.included
+                    && (transaction.getType() == TransactionType.CONSUMPTION
+                            || transaction.getType() == TransactionType.PK_SUPPLY_COST)
+                    && flow.quantityDelta < 0L
+                    && ActionReader.trailingDose(flow.itemName) == 1) {
+                long doses = SafeMath.abs(flow.quantityDelta);
+                result.add(
+                        new Contribution(
+                                transaction,
+                                i,
+                                flow.itemId,
+                                normalizedName(flow.itemName),
+                                -doses,
+                                flow.valueDelta,
+                                amounts.getNet(),
+                                flow.getPriceSource(),
+                                Category.SUPPLY,
+                                reviewState(transaction, flow),
+                                false,
+                                true,
+                                doses,
+                                List.of(flow)));
+                continue;
+            }
+            Contribution contribution = from(transaction, flow, i);
+            if (contribution != null) result.add(contribution);
+        }
+        result.sort(
+                Comparator.comparingInt((Contribution itemData) -> itemData.flowOrdinal)
+                        .thenComparing((itemData -> itemData.contributionId)));
+        return unmodifiableList(result);
+    }
+
+    static String normalizedName(String name) {
+        if (name == null) return "Unknown item";
+        String doseBase = ActionReader.doseBaseName(name);
+        if (!doseBase.equals(name.trim())) return doseBase;
+        String lower = Phrases.lower(name);
+        if (has(lower, "pizza", "cake", "pie")) {
+            for (String prefix : new String[] {"whole ", "full ", "half ", "1/2 "})
+                if (lower.startsWith(prefix)) return name.trim().substring(prefix.length()).trim();
+        }
+        return name.trim();
+    }
+
+    static Category category(Transaction transaction, Flow flow, Amounts amounts) {
+        if (!amounts.available || amounts.transfer || !amounts.included) return Category.AUDIT;
+        if (amounts.revenue > 0L) return Category.GAIN;
+        if (amounts.costs <= 0L) return Category.AUDIT;
+        switch (CostKind.of(transaction, flow)) {
+            case SUPPLIES:
+                return Category.SUPPLY;
+            case MARKET:
+                return Category.MARKET;
+            case LOSS:
+                return Category.LOSS;
+            default:
+                return Category.LOSS;
+        }
+    }
+
+    /** A shared-loot split share, told by the split marker on the reason or explanation. */
+    static boolean isSplit(Transaction transaction) {
+        return ItemSplits.isSplitReason(transaction.correctionReason())
+                || ItemSplits.isSplitReason(transaction.getExplanation());
+    }
+
+    /** The receipt's activity as a display source; the default "General" reads as no source. */
+    static String sourceOf(Transaction transaction) {
+        String activity = transaction.getActivityName();
+        return empty(activity) || "General".equalsIgnoreCase(activity) ? "" : activity;
+    }
+
+    /** Category of a flow-less note receipt: its own included Net decides the direction. */
+    static Category noteCategory(Transaction transaction, Amounts amounts, boolean neutral) {
+        if (neutral || !amounts.included) return Category.AUDIT;
+        if (amounts.getNet() > 0L) return Category.GAIN;
+        return transaction.autoType() == TransactionType.TRADE ? Category.MARKET : Category.LOSS;
+    }
+
+    static boolean reviewState(Transaction transaction, Flow flow) {
+        boolean unpriced =
+                flow.unitPrice <= 0
+                        && (flow.getPriceSource() == UNKNOWN || flow.getPriceSource() == UNPRICED);
+        boolean uncertain =
+                transaction.getCorrection() == AUTO
+                        && transaction.getConfidence() == Confidence.UNCERTAIN;
+        String blob =
+                (orEmpty(transaction.getExplanation())
+                                + " "
+                                + orEmpty(transaction.correctionReason()))
+                        .toLowerCase(Locale.ROOT);
+        return uncertain
+                || unpriced
+                || blob.contains("calibrat")
+                || blob.contains("uncertain")
+                        && (has(blob, "plank", "sack", "pouch", "bag", "container"))
+                || blob.contains("charge") && blob.contains("warn");
+    }
+
+    boolean isUnpriced() {
+        return itemUnitPriceUnavailable() && (priceSource == UNKNOWN || priceSource == UNPRICED);
+    }
+
+    boolean itemUnitPriceUnavailable() {
+        for (Flow flow : rawFlows) {
+            if (flow != null && flow.unitPrice > 0) return false;
+        }
+        return true;
+    }
+}
+
+/**
+ * One owned, unfiltered financial snapshot. Session save stamps cover close/history changes that do
+ * not advance Engine.revision. Clock, pause and activity are overlays, never cached money. A
+ * changed Market presentation reuses the same financial facts rather than refolding receipts.
+ */
+class MoneySnapshot {
+    final List<Object> key;
+    final List<Row> marketRows;
+    final Map<Session, SessionFacts> facts;
+    final Map<String, Rollup> rollups;
+
+    /** Derived scopes memoize only from the captured facts; they cannot read mutable receipts. */
+    final Map<List<Session>, SessionScope> scopes = new HashMap<>();
+
+    static MoneySnapshot of(Engine engine) {
+        List<Session> sessions = engine.uniqueSessions();
+        var keyParts = new ArrayList<Object>();
+        keyParts.add(engine.getRevision());
+        keyParts.add(engine.getActiveSession());
+        keyParts.add(engine.getHistory());
+        for (Session session : sessions) {
+            keyParts.add(session);
+            keyParts.add(session == null ? 0L : session.saveStamp);
+            keyParts.add(session == null ? "" : session.getGrindId());
+        }
+        for (SavedState.SavedGrind grind : engine.getSavedGrinds(true))
+            keyParts.add(grind.getGrindId());
+        List<Row> rows = engine.marketRows();
+        MoneySnapshot cached = engine.snapshot;
+        if (cached != null && cached.key.equals(keyParts) && cached.marketRows.equals(rows))
+            return cached;
+        return engine.snapshot = new MoneySnapshot(engine, sessions, keyParts, rows, cached);
+    }
+
+    MoneySnapshot(
+            Engine engine,
+            List<Session> sessions,
+            List<Object> keyParts,
+            List<Row> rows,
+            MoneySnapshot previous) {
+        key = unmodifiableList(keyParts);
+        marketRows = unmodifiableList(new ArrayList<>(rows));
+        if (previous != null && previous.key.equals(key)) {
+            facts = previous.facts;
+            rollups = previous.rollups;
+            return;
+        }
+        var built = new IdentityHashMap<Session, SessionFacts>();
+        for (Session session : sessions)
+            if (session != null && !built.containsKey(session)) {
+                SessionFacts reused = previous == null ? null : previous.facts.get(session);
+                built.put(
+                        session,
+                        session.isClosed() && reused != null && reused.stamp == session.saveStamp
+                                ? reused
+                                : new SessionFacts(session));
+            }
+        facts = unmodifiableMap(built);
+        var byGrind = new HashMap<String, Rollup>();
+        for (SavedState.SavedGrind grind : engine.getSavedGrinds(true))
+            byGrind.put(grind.getGrindId(), new Rollup(engine.completedLinked(grind.getGrindId())));
+        rollups = unmodifiableMap(byGrind);
+    }
+
+    /** Canonical metrics keep the exact live clock and Session's saturating rate formula. */
+    Metrics metrics(Session session, long now) {
+        return session == null ? Metrics.none() : fact(session).metrics(session, now);
+    }
+
+    SessionFacts fact(Session session) {
+        return Objects.requireNonNull(facts.get(session), "Session outside captured scope");
+    }
+
+    /** One session's shared facts, read from its retained history copy when it has one. */
+    GrindHistory.Run run(Engine engine, Session session, long now) {
+        Session retained = engine.historySession(session.getId());
+        return new GrindHistory.Run(session, metrics(retained != null ? retained : session, now));
+    }
+
+    SessionScope scope(List<Session> sessions) {
+        List<Session> scopeKey = unmodifiableList(new ArrayList<>(sessions));
+        return scopes.computeIfAbsent(scopeKey, SessionScope::new);
+    }
+
+    /**
+     * Visibility derives another presentation from frozen receipts; hero folds remain unfiltered.
+     */
+    Semantics.Result view(SessionScope scope, Predicate<Flow> visible) {
+        return visible == null
+                ? scope.groups
+                : Semantics.capture(scope.transactions, marketRows, scope.ids, visible);
+    }
+
+    /** Canonical per-session money and independently ordered Ledger deltas. */
+    static class SessionFacts {
+        /** Closed facts reuse the existing save stamp; a correction invalidates them. */
+        final long stamp;
+
+        final Metrics money;
+        final List<Transaction> transactions;
+        final List<Long> deltas;
+        final boolean cut;
+        final int review;
+        final Accounting.MarketFold market;
+
+        SessionFacts(Session session) {
+            stamp = session.saveStamp;
+            money = session.metrics(0L);
+            Session.CompactedContribution compacted = session.compactedContribution();
+            cut = compacted.rows > 0L || compacted.revenue != 0L || compacted.costs != 0L;
+            var copies = new ArrayList<Transaction>();
+            var deltaList = new ArrayList<Long>();
+            deltaList.add(compacted.getNet());
+            int reviews = 0;
+            for (Transaction transaction : session.getTransactions()) {
+                if (transaction == null) continue;
+                Transaction copied = copy(transaction);
+                copies.add(copied);
+                Accounting.Amounts amounts = Accounting.transaction(copied);
+                if (amounts.included) deltaList.add(amounts.getNet());
+                if (ReviewRules.needsOwnerDecision(copied)) reviews++;
+            }
+            transactions = unmodifiableList(copies);
+            deltas = unmodifiableList(deltaList);
+            review = reviews;
+            market = Accounting.marketFold(transactions);
+        }
+
+        Metrics metrics(Session session, long now) {
+            long elapsed = session.getElapsedMillis(now);
+            return new Metrics(
+                    session.getActivityHint(),
+                    session.paused,
+                    elapsed,
+                    money.revenue,
+                    money.costs,
+                    money.net,
+                    Session.hourly(money.net, elapsed),
+                    money.suppliesCosts,
+                    money.otherCosts,
+                    money.costSplitAvailable);
+        }
+    }
+
+    /** The last/best rollup is over completed lineage members, in the original order. */
+    class Rollup {
+        final int count;
+        final boolean has;
+        final long last, at, best;
+
+        /** Every finished run's Net and Active Time, for the Grind's average GP/h. */
+        long total, millis;
+
+        Rollup(List<Session> sessions) {
+            Session latest = null;
+            long bestNet = Long.MIN_VALUE, lastNet = 0L;
+            for (Session session : sessions) {
+                long net = runMoney(session);
+                total += net;
+                millis += session.getElapsedMillis(0L);
+                if (latest == null || session.startedAtEpochMillis > latest.startedAtEpochMillis) {
+                    latest = session;
+                    lastNet = net;
+                }
+                bestNet = Math.max(bestNet, net);
+            }
+            count = sessions.size();
+            has = latest != null;
+            last = lastNet;
+            at = has ? latest.startedAtEpochMillis : 0L;
+            best = bestNet == Long.MIN_VALUE ? 0L : bestNet;
+        }
+
+        long runMoney(Session session) {
+            return fact(session).money.net;
+        }
+    }
+
+    /** Scope construction preserves saturation order, compaction, Market ownership and groups. */
+    class SessionScope {
+        final Set<String> ids;
+        final List<Transaction> transactions;
+        final Map<String, Row> markets;
+        final long net;
+        final boolean cut;
+        final Semantics.Result groups;
+
+        SessionScope(List<Session> sessions) {
+            var idSet = new LinkedHashSet<String>();
+            var all = new ArrayList<Transaction>();
+            long total = 0L;
+            boolean anyCut = false;
+            for (Session session : sessions) {
+                if (session == null) continue;
+                SessionFacts sessionFacts = fact(session);
+                idSet.add(session.getId());
+                all.addAll(sessionFacts.transactions);
+                anyCut |= sessionFacts.cut;
+                for (long delta : sessionFacts.deltas) total = safeAdd(total, delta);
+            }
+            ids = unmodifiableSet(idSet);
+            transactions = unmodifiableList(all);
+            net = total;
+            cut = anyCut;
+            var byPresentation = new HashMap<String, Row>();
+            for (Row row : marketRows)
+                if (row != null && ids.contains(row.scopeSessionId))
+                    byPresentation.put(row.presentationId, row);
+            markets = unmodifiableMap(byPresentation);
+            groups = Semantics.capture(transactions, marketRows, ids, null);
+        }
+    }
+
+    /** Own the receipt and its flows: later corrections cannot mutate this financial revision. */
+    static Transaction copy(Transaction source) {
+        Transaction copy = new Transaction();
+        copy.id = source.id;
+        copy.timestampEpochMillis = source.timestampEpochMillis;
+        copy.type = source.type;
+        copy.context = source.context;
+        copy.note = source.note;
+        copy.activityName = source.activityName;
+        copy.counted = source.counted;
+        copy.revenue = source.revenue;
+        copy.costs = source.costs;
+        copy.confidence = source.confidence;
+        copy.explanation = source.explanation;
+        copy.correction = source.correction;
+        copy.correctionReason = source.correctionReason;
+        copy.encounterId = source.encounterId;
+        copy.sourceClaimId = source.sourceClaimId;
+        copy.actionKind = source.actionKind;
+        copy.observedActionLabel = source.observedActionLabel;
+        copy.castItemId = source.castItemId;
+        var flows = new ArrayList<Flow>();
+        for (Flow flow : source.getFlows()) {
+            flows.add(
+                    new Flow(
+                            flow.itemId,
+                            flow.itemName,
+                            flow.quantityDelta,
+                            flow.unitPrice,
+                            flow.valueDelta,
+                            flow.priceSource,
+                            flow.priceCapturedAtEpochMillis));
+        }
+        copy.flows = unmodifiableList(flows);
+        return copy;
     }
 }

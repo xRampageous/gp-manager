@@ -310,7 +310,7 @@ public class MarketValuationPolicyTest
         MarketRows.Row row = market.engine.marketRows().get(0);
         assertEquals("reference frozen at the placement quote", 60L, MarketFacts.basisValueGp(MarketFacts.record(market.engine, row)));
         assertEquals(70L, row.observedSettlementGp);
-        assertEquals("a later quote never reprices the frozen reference", 6L, row.basisUnitPrice);
+        assertEquals("a later quote never reprices the frozen reference", 6L, MarketFacts.record(market.engine, row).basisUnitPrice);
         assertEquals("pre-existing stock is UNKNOWN coverage, never zero",
             MarketRows.Coverage.FULLY_UNKNOWN, row.coverage);
         assertEquals("unknown liquidation never becomes automatic Net", 0L,

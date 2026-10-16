@@ -16,12 +16,12 @@ public final class EngineProbe
 
     public static long availableQty(Engine engine, int itemId) {
         BasisPool pool = pool(engine, itemId);
-        return pool == null ? 0L : pool.getAvailableQty();
+        return pool == null ? 0L : pool.availableQty;
     }
 
     public static long availableBasisGp(Engine engine, int itemId) {
         BasisPool pool = pool(engine, itemId);
-        return pool == null ? 0L : pool.getAvailableBasisGp();
+        return pool == null ? 0L : pool.availableBasisGp;
     }
 
     /** Known coverage held out by the item's open SELL custody records. */

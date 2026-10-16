@@ -1,13 +1,11 @@
 package com.gpmanager;
 
 import static com.gpmanager.TransactionType.*;
-
 import static java.lang.Math.*;
 import static java.util.Locale.*;
 
-import lombok.RequiredArgsConstructor;
-
 import java.util.*;
+import lombok.RequiredArgsConstructor;
 
 /**
  * The HUD+ item tray: what the current streak received, claimed, lost or traded. A streak is one
@@ -54,6 +52,9 @@ class HudTray {
          * The last time this entry grew; the tray opens and folds by its visible entries' times.
          */
         long touched;
+
+        /** Untradeable with no alch value: the tray shows no value, never "?". */
+        boolean worthless;
     }
 
     Map<String, Entry> entries = new LinkedHashMap<>();
@@ -139,7 +140,6 @@ class HudTray {
             long net = 0L;
             long count = 0L;
             for (Flow flow : transaction.getFlows()) {
-                if (flow == null) continue;
                 net += flow.valueDelta;
                 if (flow.isCost() && flow.itemId == container.itemId) count -= flow.quantityDelta;
                 if (flow.isGain() && flow.valueDelta >= big) {
@@ -169,11 +169,11 @@ class HudTray {
         long coins = 0L;
         int items = 0;
         for (Flow flow : transaction.getFlows()) {
-            if (flow != null && flow.itemId == 995) coins += flow.valueDelta;
-            else if (flow != null) items++;
+            if (flow.itemId == 995) coins += flow.valueDelta;
+            else items++;
         }
         for (Flow flow : transaction.getFlows()) {
-            if (flow == null || flow.quantityDelta == 0L || market && flow.itemId == 995) continue;
+            if (flow.quantityDelta == 0L || market && flow.itemId == 995) continue;
             boolean gain = flow.quantityDelta > 0L;
             // Routine rune/ammo/charge use never rides the tray, but a pickup is a drop
             // like any other (owner 2026-09-29).
@@ -229,6 +229,7 @@ class HudTray {
                                     : items == 1 && coins != 0L ? abs(coins) : abs(flow.valueDelta),
                             now,
                             born);
+            entry.worthless |= flow.getPriceSource() == PriceSource.NO_VALUE;
             delta += state == State.TRADED ? 0L : flow.valueDelta;
             if (gain && state != State.TRADED && flow.valueDelta >= big) {
                 entry.gold = true;
@@ -441,17 +442,18 @@ class HudTray {
 
     void merge(Collection<Entry> rows) {
         for (Entry row : rows) {
-            add(
-                                    row.itemId,
-                                    row.name,
-                                    row.state,
-                                    row.unitPrice,
-                                    row.quantity,
-                                    row.value,
-                                    0L,
-                                    row.born)
-                            .gold |=
-                    row.gold;
+            Entry entry =
+                    add(
+                            row.itemId,
+                            row.name,
+                            row.state,
+                            row.unitPrice,
+                            row.quantity,
+                            row.value,
+                            0L,
+                            row.born);
+            entry.gold |= row.gold;
+            entry.worthless |= row.worthless;
         }
     }
 

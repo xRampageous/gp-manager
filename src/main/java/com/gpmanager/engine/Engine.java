@@ -11,27 +11,21 @@ import static com.gpmanager.PauseReason.*;
 import static com.gpmanager.Phrases.*;
 import static com.gpmanager.TransactionType.*;
 import static com.gpmanager.TransactionType.TRANSFER;
-
 import static java.lang.Math.*;
 import static java.util.Collections.*;
 
 import com.google.gson.Gson;
 import com.gpmanager.BossRetrievalCatalogue.Service;
 import com.gpmanager.ChargeCheck.ChargedItem;
-import com.gpmanager.MarketRows.SessionLookup;
 import com.gpmanager.ReviewRow.Item;
 import com.gpmanager.SavedState.*;
-
-import lombok.*;
-
-import net.runelite.api.gameval.ItemID;
-
 import java.time.ZoneId;
 import java.util.*;
 import java.util.UUID;
 import java.util.function.Predicate;
-
 import javax.inject.*;
+import lombok.*;
+import net.runelite.api.gameval.ItemID;
 
 @Singleton
 class Engine {
@@ -231,7 +225,10 @@ class Engine {
             customSession = state.customSession;
             if (generalSession != null) generalSession.grind = false;
             if (customSession != null) customSession.grind = true;
-            for (Session session : uniqueSessions()) attachListeners(session);
+            for (Session session : uniqueSessions()) {
+                session.sanitize();
+                attachListeners(session);
+            }
             activeSession =
                     customSession != null && !customSession.isClosed()
                             ? customSession
@@ -260,6 +257,123 @@ class Engine {
             claims.restore(state, uniqueSessions());
             archive.compactAfterRestore(now);
         }
+    }
+
+    /**
+     * Brings retained automatic rows booked before 1.5.0's rules up to them (owner live
+     * 2026-10-16): an unpriced item takes its alch value or reads as worthless; tablet breaks, alchs and Bones to Peaches read
+     * as their spell, and a tablet left in Review books like a fresh one; coins picked up near a GE
+     * sale leave Review (owner 2026-10-16). Owner decisions and
+     * corrections are never touched, and a second pass changes nothing.
+     */
+    synchronized void recheck(java.util.function.IntUnaryOperator alchPrice) {
+        boolean changed = false;
+        for (Session session : uniqueSessions()) {
+            for (Transaction row : session.getTransactions()) {
+                if (row.getCorrection() != Correction.AUTO || Contribution.isSplit(row)) continue;
+                if (preCollectGate(row)) {
+                    // Before the GE-collect gate (owner live 2026-10-16) a coin pickup within two
+                    // hours of a sale went to Review as Grand Exchange; it books as one today.
+                    row.type = classifier.classify(row.context, row.flows);
+                    row.counted = row.type != TransactionType.TRANSFER;
+                    row.note = "";
+                    row.confidence = confidenceFor(row.context, row.type);
+                    row.explanation = explanationFor(row.context, row.type, row.counted);
+                    session.changed(row, Correction.AUTO, row.getFlows());
+                    changed = true;
+                    continue;
+                }
+                boolean priced = false;
+                for (Flow flow : row.getFlows()) {
+                    if (flow.getPriceSource() != PriceSource.UNPRICED) continue;
+                    // An item with no quote is now its alch value or worth nothing.
+                    for (Flow now : valuationService.value(Map.of(flow.itemId, flow.quantityDelta))) {
+                        if (now.getPriceSource() == PriceSource.NO_VALUE
+                                || now.getPriceSource() == PriceSource.HIGH_ALCHEMY) {
+                            flow.unitPrice = now.unitPrice;
+                            flow.valueDelta = now.valueDelta;
+                            flow.priceSource = now.getPriceSource();
+                            priced = true;
+                        }
+                    }
+                }
+                if (priced) {
+                    // A new list, so the row's derived views are rebuilt.
+                    row.flows = new ArrayList<>(row.flows);
+                    row.recalculate();
+                    changed = true;
+                }
+                String spell =
+                        row.getActionKind() != null
+                                        || row.getType() != CONSUMPTION && row.getType() != UNCERTAIN
+                                        || has(row.getNote(), "Dropped", "Destroyed")
+                                ? null
+                                : spellOf(row, alchPrice);
+                if (spell == null) continue;
+                if (ReviewRules.needsOwnerDecision(row)) {
+                    row.type = CONSUMPTION;
+                    row.counted = true;
+                    row.confidence = confidenceFor(row.context, CONSUMPTION);
+                    row.explanation = explanationFor(row.context, CONSUMPTION, true);
+                }
+                row.setActionKind(CAST);
+                row.setActionLabel(ActionLabel.of(spell));
+                changed = true;
+            }
+        }
+        if (changed) bumpRevision();
+    }
+
+    /**
+     * A Review row the old rule booked for a sale seen in the last two hours: coins gained with no
+     * Collect click, which today's rule books as a pickup. A real collect is always MARKET.
+     */
+    static boolean preCollectGate(Transaction row) {
+        if (row.getType() != UNCERTAIN
+                || row.getContext() == MARKET
+                || !"Grand Exchange".equals(row.getNote())
+                || !msg("grand-exchange-movement").equals(row.getExplanation())
+                || row.getFlows().isEmpty()) return false;
+        for (Flow flow : row.getFlows()) if (flow.itemId != ItemID.COINS || !flow.isGain()) return false;
+        return true;
+    }
+
+    /**
+     * The spell an unlabelled row's shape proves: a broken tablet; Bones to Peaches or Bananas
+     * (runes and bones for fruit); an alch (runes and one item for coins, High when the coins are
+     * its alch price).
+     */
+    static String spellOf(Transaction row, java.util.function.IntUnaryOperator alchPrice) {
+        String tablet = null;
+        boolean nature = false;
+        Flow item = null;
+        int items = 0;
+        long coins = 0L;
+        String gain = "";
+        var gains = new HashSet<Integer>();
+        for (Flow flow : row.getFlows()) {
+            if (flow.isGain()) gains.add(flow.itemId);
+            String name = lower(flow.itemName);
+            if (flow.isCost()) {
+                if (Spells.named(name) != null) tablet = Spells.named(name);
+                else if (ActionReader.isRune(name)) nature |= flow.itemId == ItemID.NATURERUNE;
+                else {
+                    item = flow;
+                    items++;
+                }
+            } else if (flow.itemId == ItemID.COINS) coins += flow.quantityDelta;
+            else gain = gain.isEmpty() || gain.equals(name) ? name : "?";
+        }
+        if (tablet != null)
+            return Spells.product(tablet).containsAll(gains) ? tablet : null;
+        if (!nature) return null;
+        if (gain.equals("peach") || gain.equals("banana"))
+            return gain.equals("peach") ? "Bones to Peaches" : "Bones to Bananas";
+        return items != 1 || coins <= 0L || !gain.isEmpty()
+                ? null
+                : coins == -item.quantityDelta * alchPrice.applyAsInt(item.itemId)
+                        ? "High Level Alchemy"
+                        : "Low Level Alchemy";
     }
 
     synchronized void ensureSession(long now) {
@@ -305,6 +419,26 @@ class Engine {
         return true;
     }
 
+    /**
+     * Soft reset (owner 2026-10-16): Free play's run so far moves to history, where Recent grinds
+     * and the all-time totals keep it, and a fresh Free play starts at zero. Nothing is deleted;
+     * a running Grind ends through End Grind instead.
+     */
+    synchronized boolean startFreshFreePlay(long now) {
+        if (customSession != null || generalSession == null) return false;
+        Session done = generalSession;
+        clearGeCollect();
+        done.rename("Free play");
+        done.close(max(done.startedAtEpochMillis, now));
+        history.add(0, done);
+        archive.trimHistory();
+        generalSession = activeSession = newSession(Session.DURABLE_OWNER_NAME, now, false);
+        // A manual pause holds across the fresh start.
+        if (done.getPauseReason() == MANUAL) generalSession.pause(now, MANUAL);
+        resetTracking(true);
+        return true;
+    }
+
     synchronized boolean isCustomActive() {
         return customSession != null && activeSession == customSession && !customSession.isClosed();
     }
@@ -314,10 +448,26 @@ class Engine {
         resetTracking(false);
     }
 
+    /**
+     * True on a separate-economy world (Leagues, Deadman, beta, tournament, speedrunning, no-save):
+     * tracking pauses there and neither starts nor resumes until it is left (owner 1.5.0).
+     */
+    boolean separateWorld;
+
+    /** Holds the world pause; any existing pause, Manual included, is left as it is. */
+    synchronized void pauseForWorld(long now) {
+        separateWorld = true;
+        if (live()) {
+            activeSession.pause(now, WORLD);
+            resetTracking(false);
+        }
+    }
+
     /** Resumes an automatic pause of one of these reasons; Manual Pause always needs the owner. */
     synchronized boolean resume(long now, PauseReason... reasons) {
         if (activeSession != null
                 && activeSession.paused
+                && !separateWorld
                 && Arrays.asList(reasons).contains(activeSession.getPauseReason())) {
             activeSession.resume(now);
             arm(now);
@@ -335,7 +485,7 @@ class Engine {
      * @return true when a new General session was created
      */
     synchronized boolean autoStart(long now) {
-        if (!config.autoStartSession()) return false;
+        if (!config.autoStartSession() || separateWorld) return false;
         if (customSession != null && !customSession.isClosed()) return false;
         if (generalSession != null && !generalSession.isClosed()) return false;
         ensureSession(now);
@@ -347,6 +497,14 @@ class Engine {
     void arm(long now) {
         resetTracking(true);
         calibratingUntil = now + CALIBRATING_MILLIS;
+    }
+
+    /** AFK pause: only a running session pauses, from now, so the timeout itself still counts. */
+    synchronized void pauseIdle(long now) {
+        if (live()) {
+            activeSession.pause(now, IDLE);
+            resetTracking(false);
+        }
     }
 
     synchronized boolean isIdlePaused() {
@@ -448,6 +606,7 @@ class Engine {
         // Animation lag: refresh consume/drop TTLs when the inventory finally moves so
         // bury/drink intents survive until stabilization rather than expiring idle.
         inbox.refresh(CONSUME, 4);
+        inbox.refresh(SPENT_CONSUME, 4);
         inbox.refresh(DROP_CLICK, max(4, config.stabilizationTicks() + 2));
         capturePendingContext();
         if (bankOpen() && (dirty || pendingSnapshot != null)) {
@@ -526,8 +685,23 @@ class Engine {
             if (actionLabel != null) prior.label = actionLabel;
             return;
         }
+        if (prior != null
+                && itemId >= 0
+                && prior.item >= 0
+                && prior.item != itemId
+                && pendingSnapshot != null
+                && baseline != null
+                && pendingSnapshot.quantityOf(prior.item) < baseline.quantityOf(prior.item)) {
+            // The earlier click's item already left the pack and its change has not settled: it
+            // keeps its own evidence while the new click arms (owner live 2026-10-16: an Eat two
+            // ticks after a Break left the tablet in Review).
+            inbox.drop(SPENT_CONSUME);
+            prior.kind = SPENT_CONSUME;
+        }
         Observation e = inbox.put(CONSUME, itemId, 1L, safeTicks - 1, null);
-        long held = armQuantity(itemId);
+        // Prefer the pending (dirty) snapshot so a mid-window pickup is visible before the settle.
+        ContainerSnapshot live = pendingSnapshot != null ? pendingSnapshot : baseline;
+        long held = itemId < 0 || live == null ? -1L : live.quantityOf(itemId);
         // Keep the window's high-water: a later click re-arms at the current count, but a bite
         // that landed between the clicks must stay measurable against the stack's top (owner
         // 2026-10-12: withdraw-all then an eat while the clicks kept coming).
@@ -544,17 +718,7 @@ class Engine {
      * lifecycle paths also reset pending consume evidence through {@link #resetTracking(boolean)}.
      */
     synchronized void clearActionEvidence() {
-        inbox.drop(CONSUME);
-    }
-
-    /**
-     * Invent qty for a named consume arm. Prefer the pending (dirty) snapshot so a mid-window
-     * pickup is visible before bury/drink settles.
-     */
-    long armQuantity(int itemId) {
-        if (itemId < 0) return -1L;
-        ContainerSnapshot live = pendingSnapshot != null ? pendingSnapshot : baseline;
-        return live == null ? -1L : live.quantityOf(itemId);
+        inbox.drop(CONSUME, SPENT_CONSUME);
     }
 
     /**
@@ -683,7 +847,8 @@ class Engine {
     /** Binds the identity and restores its state under the same engine lock. */
     synchronized void restoreProfile(String identityKey, SavedState state, long now) {
         String next = nonBlank(identityKey, "");
-        SavedState detached = detach(state);
+        Gson gson = JsonCodec.gson();
+        SavedState detached = state == null ? null : gson.fromJson(gson.toJson(state), SavedState.class);
         String stateOwner = detached == null ? null : detached.ownerKey;
         if (!next.isEmpty()
                 && !blank(stateOwner)
@@ -702,26 +867,12 @@ class Engine {
     }
 
     Engine prepareProfile(String identityKey, SavedState state, long now) {
-        Engine staged = newStaged();
+        // An isolated engine sharing this one's valuation, classifier and config.
+        var staged = new Engine(valuationService, classifier, config);
+        staged.setContributionEligibility(contributionEligibility);
         staged.profileIdentityKey = identityKey;
         staged.restore(state, now);
         return staged;
-    }
-
-    /**
-     * An isolated engine sharing this engine's valuation/classifier/config; used to stage restores
-     * and migrations.
-     */
-    Engine newStaged() {
-        var staged = new Engine(valuationService, classifier, config);
-        staged.setContributionEligibility(contributionEligibility);
-        return staged;
-    }
-
-    static SavedState detach(SavedState state) {
-        if (state == null) return null;
-        Gson gson = JsonCodec.gson();
-        return gson.fromJson(gson.toJson(state), SavedState.class);
     }
 
     void installProfile(Engine staged, String identityKey) {
@@ -760,7 +911,7 @@ class Engine {
         supersedeDeathMarker(newContext, note);
         if (newContext == Context.TRANSFER) {
             // Stale Eat/Bury intents must not reclassify bank deposits as Used/lost.
-            inbox.drop(CONSUME, DROP_CLICK);
+            inbox.drop(CONSUME, SPENT_CONSUME, DROP_CLICK);
             noteHardTransfer(max(1, ticks));
         }
         setContext(newContext, ticks, note, emptyMap(), null);
@@ -781,7 +932,7 @@ class Engine {
         boolean newlyOpened = !bankOpen();
         inbox.ttl(BANK_UI, Integer.MAX_VALUE);
         if (newlyOpened) {
-            inbox.drop(CONSUME, DROP_CLICK);
+            inbox.drop(CONSUME, SPENT_CONSUME, DROP_CLICK);
         }
         inbox.ttl(SOFT_TRANSFER, max(inbox.left(SOFT_TRANSFER), max(1, ticks)));
         setContext(Context.TRANSFER, ticks, "Bank transfer", emptyMap(), null);
@@ -958,7 +1109,7 @@ class Engine {
     synchronized void markUnknownDeath() {
         claims.cancelChest();
         deathReclaim.reset();
-        inbox.drop(CONSUME, DROP_CLICK);
+        inbox.drop(CONSUME, SPENT_CONSUME, DROP_CLICK);
         clearHardTransfer();
         inbox.drop(SOFT_TRANSFER);
         inbox.drop(BANK_UI);
@@ -1044,7 +1195,7 @@ class Engine {
                 && feeEvidence
                 && (!hasOtherLoss || !returned.isEmpty())) {
             String why = service == null ? msg("death-reclaim-fee") : service.why(coinsPaid);
-            flows.removeIf(flow -> flow != null && flow.itemId == ItemID.COINS && flow.isCost());
+            flows.removeIf(flow -> flow.itemId == ItemID.COINS && flow.isCost());
             return bookDeathFee(coinsPaid, why, now);
         }
         return recovered;
@@ -1282,12 +1433,11 @@ class Engine {
         var left = new ArrayList<Flow>();
         boolean selected = false;
         for (Flow flow : e == null || flows == null ? Collections.<Flow>emptyList() : flows) {
-            if (flow != null
-                    && flow.isCost()
+            if (flow.isCost()
                     && ChargeCheck.isLoadComponent(e.variant, flow.itemId, flow.itemName)) {
                 candidates.add(flow);
                 selected |= flow.itemId == e.item;
-            } else if (flow != null) left.add(flow);
+            } else left.add(flow);
         }
         return selected
                 ? new LoadTarget(e.variant, e.id, left, candidates, e.at)
@@ -1426,7 +1576,7 @@ class Engine {
     boolean takenApart(List<Flow> flows) {
         boolean out = false, in = false;
         for (Flow flow : flows) {
-            if (flow == null || inbox.item(DISMANTLE_CLICK) <= 0) continue;
+            if (inbox.item(DISMANTLE_CLICK) <= 0) continue;
             if (flow.itemId == inbox.item(DISMANTLE_CLICK) && flow.quantityDelta < 0L) out = true;
             else if (flow.quantityDelta > 0L) in = true;
         }
@@ -1486,26 +1636,26 @@ class Engine {
 
     /** Derived, read-only Market settlement context over the durable custody lifecycles. */
     synchronized List<MarketRows.Row> marketRows() {
-        return MarketRows.rows(geCustody.records(), this::transactionById, marketSessions);
+        return MarketRows.rows(geCustody.records(), this::transactionById, this);
     }
 
-    /** Market rows follow the session that holds their booked settlement (cross-Grind sales). */
-    SessionLookup marketSessions =
-            new SessionLookup() {
-                public Session holding(String transactionId) {
-                    for (Session session : uniqueSessions()) {
-                        if (findTransaction(session, transactionId) != null) return session;
-                    }
-                    return null;
-                }
+    /**
+     * The session holding this booked transaction, or null when none is retained: Market rows
+     * follow the session that holds their settlement (cross-Grind sales).
+     */
+    Session sessionHolding(String transactionId) {
+        for (Session session : uniqueSessions()) {
+            if (findTransaction(session, transactionId) != null) return session;
+        }
+        return null;
+    }
 
-                public Session byId(String sessionId) {
-                    for (Session session : uniqueSessions()) {
-                        if (session != null && session.getId().equals(sessionId)) return session;
-                    }
-                    return null;
-                }
-            };
+    Session sessionById(String sessionId) {
+        for (Session session : uniqueSessions()) {
+            if (session != null && session.getId().equals(sessionId)) return session;
+        }
+        return null;
+    }
 
     /**
      * Canonical item identity for GE custody/execution correlation, using the same noted/variation
@@ -1542,9 +1692,7 @@ class Engine {
     /** Release held cash to its current owner's Review before dropping transient evidence. */
     synchronized void clearGeCollect() {
         inbox.drop(GE_COLLECT);
-        var outcomes = new ArrayList<Transaction>();
-        geCustody.releasePendingSettlement(geCustody.pendingSettlementAtEpochMillis, outcomes);
-        outcomes.forEach(this::bookCustody);
+        geCustody.releaseHeldCollect().forEach(this::bookCustody);
     }
 
     /** Canonical custody outcomes (review handoffs and retried settlements) are booked once. */
@@ -1605,7 +1753,7 @@ class Engine {
         if (flows == null || flows.size() != contents.size()) return 0L;
         long total = 0L;
         for (Flow flow : flows) {
-            if (flow == null || flow.unitPrice <= 0) return 0L;
+            if (flow.unitPrice <= 0) return 0L;
             total = SafeMath.safeAdd(total, flow.valueDelta);
         }
         return total;
@@ -1652,7 +1800,7 @@ class Engine {
     /** Books the custody settlements that came due; true when any did. */
     boolean maintainCustody(long now) {
         List<Transaction> bookings =
-                geCustody.maintenance(now, activeSession.getId()).countedBookings;
+                geCustody.maintenance(now, activeSession.getId());
         bookings.forEach(booking -> add(booking, true));
         return !bookings.isEmpty();
     }
@@ -1770,7 +1918,7 @@ class Engine {
                         true);
         String sessionId = activeSession.getId();
         for (Flow flow : transaction.getFlows()) {
-            if (flow != null && flow.isCost() && flow.unitPrice > 0) {
+            if (flow.isCost() && flow.unitPrice > 0) {
                 chargeEstimateJournal.record(
                         sessionId,
                         target,
@@ -1894,6 +2042,11 @@ class Engine {
     synchronized Transaction bookDeathFee(long feeGp, String why, long now) {
         String label = why == null ? msg("grave-reclaim-fee-tiered") : why;
         return bookFee(feeGp, label, "Death reclaim", now);
+    }
+
+    /** The Blast Furnace coffer's drain while you work it (owner 2026-10-16, after Coin Flow 1.9). */
+    synchronized Transaction bookCofferDrain(long gp, long now) {
+        return bookFee(gp, msg("bf-coffer"), "Smithing", now);
     }
 
     /** A bank-paid fee as a plain counted CONSUMPTION cost under its own row name. */
@@ -2020,12 +2173,8 @@ class Engine {
 
     static ReviewRow reviewRow(Session session, Transaction transaction, long now) {
         var items = new ArrayList<Item>();
-        for (Flow flow : transaction.getFlows()) {
-            if (flow != null) {
-                items.add(
-                        new Item(flow.itemId, flow.itemName, flow.quantityDelta, flow.valueDelta));
-            }
-        }
+        for (Flow flow : transaction.getFlows())
+            items.add(new Item(flow.itemId, flow.itemName, flow.quantityDelta, flow.valueDelta));
         if (items.isEmpty())
             items.add(new Item(-1, transaction.getNote(), 0L, transaction.autoNet()));
         String why = transaction.getExplanation();
@@ -2131,7 +2280,7 @@ class Engine {
                 if (captureNeutralZoneEntry) neutralZoneEntryBaseline = current;
                 baselinePriming = false;
                 clearPendingChange();
-                inbox.drop(CONSUME);
+                inbox.drop(CONSUME, SPENT_CONSUME);
                 inbox.drop(DROP_CLICK);
                 clearHardTransfer();
                 return advanceContext(now);
@@ -2235,7 +2384,7 @@ class Engine {
         // MinigameQuarantine evidence, owner 2026-10-12). commit()'s swap filter runs earlier and
         // cannot pair these ids; the drink normalization runs later, so a loaned dose sip can never
         // be rewritten into real ids.
-        settle.flows.removeIf(flow -> flow != null && MinigameItems.isMinigameOnly(flow.itemId));
+        settle.flows.removeIf(flow -> MinigameItems.isMinigameOnly(flow.itemId));
         // An essence pouch's Empty/Fill carries custody of the essence it moves, never the runes a
         // craft produces in the same stabilized window: the essence stays neutral and the residual
         // classifies normally (owner 2026-10-13).
@@ -2244,8 +2393,7 @@ class Engine {
                 && settle.note.contains("essence_pouch")) {
             settle.flows.removeIf(
                     flow ->
-                            flow != null
-                                    && flow.itemName != null
+                            flow.itemName != null
                                     && Phrases.lower(flow.itemName).contains("essence"));
             settle.clear();
         }
@@ -2259,7 +2407,10 @@ class Engine {
                         .allMatch(
                                 flow ->
                                         flow.valueDelta == 0L
-                                                && flow.getPriceSource() != PriceSource.UNPRICED)
+                                                && flow.getPriceSource() != PriceSource.UNPRICED
+                                                // A worthless item still moved: it books at 0
+                                                // with a dash, never vanishes (owner 2026-10-16).
+                                                && flow.getPriceSource() != PriceSource.NO_VALUE)
                 // Owner 2026-10-09: a clue scroll, scroll box or casket picked up is worth nothing
                 // yet but is a
                 // drop, so it books and HUD+ shows it; opening, stepping or moving them still books
@@ -2321,6 +2472,7 @@ class Engine {
             if (normalized != null) settle.flows = normalized;
         }
         Transaction cast = settleCast(settle);
+        if (cast == null) cast = settleSpell(settle);
         Transaction result;
         if (!sources.isEmpty() && settle.flows.isEmpty()) {
             result = sources.get(sources.size() - 1);
@@ -2372,6 +2524,33 @@ class Engine {
     }
 
     /**
+     * A spell with a product keeps only its own legs; a pickup that settled with it books on its
+     * own (owner live 2026-10-16: 39 rune darts rode a Bones to Peaches tablet).
+     */
+    Transaction settleSpell(Settle settle) {
+        Set<Integer> product =
+                settle.consumed && settle.actionLabel != null
+                        ? Spells.product(Spells.named(settle.actionLabel.value()))
+                        : emptySet();
+        var legs = new ArrayList<Flow>();
+        for (Flow flow : settle.flows)
+            if (flow.isCost() || product.contains(flow.itemId)) legs.add(flow);
+        if (product.isEmpty() || legs.size() == settle.flows.size()) return null;
+        var slice = new Settle(new Clue(), settle.committed, settle.now);
+        slice.flows = legs;
+        slice.activity = settle.activity;
+        slice.actionIntent = settle.actionIntent;
+        slice.actionLabel = settle.actionLabel;
+        slice.consumed = true;
+        settle.flows = new ArrayList<>(settle.flows);
+        settle.flows.removeAll(legs);
+        settle.consumed = false;
+        settle.actionIntent = null;
+        settle.actionLabel = null;
+        return book(slice);
+    }
+
+    /**
      * A confirmed drop owns its item in a mixed settle (owner 1.3.4): dropping plant pots while a
      * calquat harvest lands must book the pot loss as its own Dropped row instead of turning the
      * change into Review. The drop's losses move to their own row; every other flow must be a
@@ -2392,7 +2571,6 @@ class Engine {
         var losses = new ArrayList<Flow>();
         boolean pickedBack = false;
         for (Flow flow : settle.flows) {
-            if (flow == null) continue;
             if (flow.itemId == itemId) {
                 if (flow.quantityDelta > 0L) pickedBack = true;
                 else if (flow.quantityDelta < 0L) losses.add(flow);
@@ -2429,7 +2607,7 @@ class Engine {
         var bites = new ArrayList<Flow>();
         boolean toppedUp = false;
         for (Flow flow : settle.flows) {
-            if (flow == null || flow.itemId != itemId) continue;
+            if (flow.itemId != itemId) continue;
             if (flow.quantityDelta > 0L) toppedUp = true;
             else if (flow.quantityDelta < 0L) bites.add(flow);
         }
@@ -2548,7 +2726,7 @@ class Engine {
         if (lost <= 0L || lost > net) return;
         for (int index = 0; index < settle.flows.size(); index++) {
             Flow flow = settle.flows.get(index);
-            if (flow == null || flow.itemId != id || flow.quantityDelta <= 0L) continue;
+            if (flow.itemId != id || flow.quantityDelta <= 0L) continue;
             long gross = flow.quantityDelta + lost;
             settle.flows.set(
                     index,
@@ -2662,7 +2840,7 @@ class Engine {
         // loss in a mixed claim settle has no source identity, so it never reduces the
         // manifest key quantity on that evidence alone.
         settle.flows.removeIf(
-                flow -> flow != null && flow.isCost() && KeyClaims.isLootKey(flow.itemId));
+                flow -> flow.isCost() && KeyClaims.isLootKey(flow.itemId));
         // Do not let this narrow menu intent compete with stronger bank/trade/
         // transfer evidence or the loot-key lifecycle. A stale load click expires
         // once a stronger ownership context is already active.
@@ -2732,8 +2910,31 @@ class Engine {
                 : null;
     }
 
-    /** A confirmed consume or drop owns its losses; transfer evidence and loot name the rest. */
+    /**
+     * A displaced earlier spend whose item this change lost leads the settle; the newer click
+     * waits for its own change (owner live 2026-10-16).
+     */
     void settleActions(Settle settle) {
+        Observation spent = inbox.peek(SPENT_CONSUME);
+        Observation newer = consumeIntent();
+        boolean lead =
+                spent != null
+                        && hasLoss(settle.flows, id -> id == spent.item)
+                        && (newer == null || !hasLoss(settle.flows, id -> id == newer.item));
+        if (lead) {
+            spent.kind = CONSUME;
+            if (newer != null) newer.kind = SPENT_CONSUME;
+        }
+        settleOwnActions(settle);
+        if (lead && newer != null) {
+            Observation left = consumeIntent();
+            if (left != null) left.kind = SPENT_CONSUME;
+            newer.kind = CONSUME;
+        }
+    }
+
+    /** A confirmed consume or drop owns its losses; transfer evidence and loot name the rest. */
+    void settleOwnActions(Settle settle) {
         settle.destroy = consumeIntent() != null && consumeIntent().flag;
         // Match Drop before consume wipe — consumeMatched used to null dropIntent first.
         settle.dismantle = !settle.hard && !settle.soft() && takenApart(settle.flows);
@@ -2765,20 +2966,29 @@ class Engine {
                                         id -> id != inbox.item(DROP_CLICK) && !cannonPart(id)));
         settle.consumed =
                 !settle.dropped && !settle.decant && matchesConsume(settle.flows, settle.hard);
-        if (settle.consumed && consumeIntent() != null) {
+        Observation intent = consumeIntent();
+        if (settle.consumed && intent != null) {
             // Only a verb whose intent actually matched these flows may name the action; a stale
-            // or unmatched click never upgrades the wording. Flow-level custody must never steal
-            // a quantity a named consume/drop intent owns, so its item is captured here.
-            settle.actionIntent = consumeIntent().action;
-            settle.actionLabel = consumeIntent().label;
-            settle.consumedItemId = consumeIntent().item;
+            // or unmatched click never upgrades the wording, and a named click names only a change
+            // that moved its own item (owner 2026-10-16 sweep: a key used with an Eat armed read
+            // "Ate"). Flow-level custody must never steal a quantity a named consume/drop intent
+            // owns, so its item is captured here.
+            boolean own =
+                    intent.item < 0
+                            || intent.action == DRINK
+                                    && ActionReader.all(
+                                            settle.flows, 0, n -> ActionReader.trailingDose(n) > 0)
+                            || settle.flows.stream().anyMatch(f -> f.itemId == intent.item);
+            settle.actionIntent = own ? intent.action : null;
+            settle.actionLabel = own ? intent.label : null;
+            settle.consumedItemId = intent.item;
         }
         settle.droppedItemId =
                 settle.dropped
                         ? (inbox.peek(DROP_CLICK) != null
                                 ? inbox.item(DROP_CLICK)
                                 : settle.flows.stream()
-                                        .filter(flow -> flow != null && flow.isCost() && cannonball(flow.itemId))
+                                        .filter(flow -> flow.isCost() && cannonball(flow.itemId))
                                         .mapToInt(flow -> flow.itemId)
                                         .findFirst()
                                         .orElse(-1))
@@ -2915,6 +3125,10 @@ class Engine {
                         && settle.context != MARKET
                         && settle.context != Context.TRANSFER
                         && !settle.hard
+                        // Proceeds reach the pack only through a Collect: without one a gain is a
+                        // pickup or loot, never an uncollected sale (owner live 2026-10-16:
+                        // ground coins went to Review as Grand Exchange).
+                        && (hasLoss(settle.flows) || inbox.at(GE_COLLECT) >= settle.now)
                         && geCustody.explains(settle.flows, settle.now);
         if (geExplained) settle.note = "Grand Exchange";
         if (geExplained || settle.context == MARKET) {
@@ -2945,7 +3159,7 @@ class Engine {
             // click (fail-closed Review, owner 2026-10-12).
             type = TransactionType.TRANSFER;
             for (Flow flow : settle.flows)
-                if (flow != null && flow.itemId == inbox.item(DISMANTLE_CLICK))
+                if (flow.itemId == inbox.item(DISMANTLE_CLICK))
                     settle.note = "Dismantled " + flow.itemName;
         } else if (settle.consumed && type != TransactionType.TRANSFER && type != TRADE) {
             // Dose leftovers / empty vials are mixed inventory deltas; confirmed
@@ -3079,7 +3293,7 @@ class Engine {
                 && transaction.getActionKind() == null
                 && !settle.flows.isEmpty()
                 && settle.flows.stream()
-                        .allMatch(flow -> flow != null && flow.isCost() && cannonball(flow.itemId))) {
+                        .allMatch(flow -> flow.isCost() && cannonball(flow.itemId))) {
             // The cannon's balls are supplies wherever they leave the pack: a Fire or Load, a
             // ship-cannon shot from the pack, a manual drop, or the loss leg of a part-pickup
             // (owner 1.3.4).
@@ -3275,8 +3489,7 @@ class Engine {
     Transaction recordClaimAudits(List<Flow> keyFlows, long now) {
         Transaction last = null;
         for (Flow flow : keyFlows) {
-            if (flow == null
-                    || flow.quantityDelta <= 0L
+            if (flow.quantityDelta <= 0L
                     || !KeyChestCatalogue.isDeferredKey(flow.itemId)) {
                 continue;
             }
@@ -3301,8 +3514,7 @@ class Engine {
     /** Only catalogued key losses and non-key gains: the shape of a chest open. */
     static boolean onlyGainsOrKeyCosts(List<Flow> flows) {
         for (Flow flow : flows == null ? Collections.<Flow>emptyList() : flows) {
-            if (flow != null
-                    && flow.quantityDelta != 0L
+            if (flow.quantityDelta != 0L
                     && flow.isCost() != KeyChestCatalogue.isKey(flow.itemId)) {
                 return false;
             }
@@ -3351,7 +3563,8 @@ class Engine {
         clearPriming();
         clearSettledContext();
         resetHelpers();
-        inbox.drop(PRIVATE_LOOT, LOOT_RESERVE, DISMANTLE_CLICK, CONSUME, DROP_CLICK, DROPPED);
+        inbox.drop(
+                PRIVATE_LOOT, LOOT_RESERVE, DISMANTLE_CLICK, CONSUME, SPENT_CONSUME, DROP_CLICK, DROPPED);
     }
 
     static boolean groundDart(Flow flow) {
@@ -3408,7 +3621,7 @@ class Engine {
     void rememberDrop(Transaction drop, Predicate<Flow> onGround) {
         if (ground != null) remember(drop);
         for (Flow flow : drop.getFlows()) {
-            if (flow != null && onGround.test(flow))
+            if (onGround.test(flow))
                 inbox.add(
                                         DROPPED,
                                         flow.itemId,
@@ -3796,17 +4009,9 @@ class Engine {
         return null;
     }
 
-    /**
-     * Creates a reusable My Grind from reusable setup only. When {@code linkSessionId} names a
-     * canonical session (active or retained), that one instance is linked as the first member of
-     * the lineage; other same-name instances are never swept in.
-     */
+    /** Creates a reusable My Grind from reusable setup only; runs link to it as they start. */
     synchronized SavedGrind saveGrind(
-            String name,
-            Long netTargetGp,
-            Long activeTimeMillis,
-            boolean favorite,
-            String linkSessionId) {
+            String name, Long netTargetGp, Long activeTimeMillis, boolean favorite) {
         String cleanName = nonBlank(name, "");
         if (cleanName.isEmpty()) return null;
         var grind =
@@ -3817,17 +4022,13 @@ class Engine {
                         activeTimeMillis,
                         favorite);
         savedGrinds.add(grind);
-        if (!empty(linkSessionId)) {
-            Session linked =
-                    activeSession != null && linkSessionId.equals(activeSession.getId())
-                            ? activeSession
-                            : archive.historySession(linkSessionId);
-            if (linked != null) linked.setGrindId(grind.getGrindId());
-        }
         return grind;
     }
 
-    /** Updates future reusable defaults; historical instances keep the snapshots they ran with. */
+    /**
+     * Edits a My Grind. Finished runs keep the targets they ran with; a running run of this Grind
+     * takes the new name and any changed target at once (owner 1.5.0: one Grind, one setup).
+     */
     synchronized boolean updateSavedGrind(
             String grindId,
             String name,
@@ -3837,11 +4038,28 @@ class Engine {
         SavedGrind grind = savedGrind(grindId);
         if (grind == null) return false;
         String cleanName = nonBlank(name, "");
+        // Only a changed target reaches the run: a rename or a favourite never re-arms its aim.
+        boolean retarget =
+                !Objects.equals(netTargetGp, grind.netTargetGp)
+                        || !Objects.equals(activeTimeMillis, grind.activeTimeTargetMillis);
         if (!cleanName.isEmpty()) grind.setName(cleanName);
         grind.setNetTargetGp(netTargetGp);
         grind.setActiveTimeTargetMillis(activeTimeMillis);
         grind.setFavorite(favorite);
+        Session run = customSession;
+        if (run != null && grindId.equals(run.getGrindId())) {
+            if (!cleanName.isEmpty()) renameActive(cleanName);
+            if (retarget) setTargets(netTargetGp, activeTimeMillis, SafeMath.now());
+        }
         return true;
+    }
+
+    /** The My Grind with this name, ignoring case; null when there is none. */
+    synchronized SavedGrind grindNamed(String name) {
+        for (SavedGrind grind : savedGrinds) {
+            if (grind.getName().equalsIgnoreCase(nonBlank(name, "").trim())) return grind;
+        }
+        return null;
     }
 
     synchronized boolean archiveGrind(String grindId, boolean archived) {
@@ -3881,17 +4099,24 @@ class Engine {
     }
 
     /**
-     * Starts one fresh canonical Grind. Reusable setup travels as metadata and target snapshots; no
-     * financial state, loot, active time or correction state is copied.
+     * Starts one fresh canonical Grind. Every Grind is remembered (owner 1.5.0): the run links to
+     * its My Grind, found by id, else by name, else created, and the targets it starts with become
+     * that Grind's targets. No financial state, loot, active time or correction state is copied.
      */
     synchronized boolean startGrind(
             String name, String grindId, Long netTargetGp, Long activeTimeTargetMillis, long now) {
         String cleanName = nonBlank(name, "");
         if (cleanName.isEmpty() || customSession != null) return false;
-        startCustom(cleanName, now);
+        SavedGrind grind = savedGrind(grindId);
+        if (grind == null) grind = grindNamed(cleanName);
+        if (grind == null) grind = saveGrind(cleanName, null, null, false);
+        grind.setArchived(false);
+        grind.setNetTargetGp(netTargetGp);
+        grind.setActiveTimeTargetMillis(activeTimeTargetMillis);
+        startCustom(grind.getName(), now);
         Session active = activeSession;
         if (active == null) return false;
-        if (!empty(grindId)) active.setGrindId(grindId);
+        active.setGrindId(grind.getGrindId());
         active.setProfitTargetGp(netTargetGp);
         active.setActiveTimeTargetMillis(activeTimeTargetMillis, now);
         return true;
@@ -3912,12 +4137,27 @@ class Engine {
         if (activeSession == null) return false;
         activeSession.setProfitTargetGp(
                 netTargetGp == null || netTargetGp <= 0L ? null : netTargetGp,
-                getMetrics(now).net);
+                getMetrics(now).net,
+                activeSession.getElapsedMillis(now));
         activeSession.setActiveTimeTargetMillis(
                 activeTimeTargetMillis == null || activeTimeTargetMillis <= 0L
                         ? null
                         : activeTimeTargetMillis,
                 now);
+        return true;
+    }
+
+    /**
+     * The Targets sheet's save: the run's targets change and, during a Grind, so do that Grind's,
+     * so the next run starts with them (owner 1.5.0). Done clears the run's aim only.
+     */
+    synchronized boolean saveTargets(Long netTargetGp, Long activeTimeTargetMillis, long now) {
+        if (!setTargets(netTargetGp, activeTimeTargetMillis, now)) return false;
+        SavedGrind grind = customSession == null ? null : savedGrind(customSession.getGrindId());
+        if (grind != null) {
+            grind.setNetTargetGp(activeSession.getProfitTargetGp());
+            grind.setActiveTimeTargetMillis(activeSession.getActiveTimeTargetMillis());
+        }
         return true;
     }
 
@@ -3934,7 +4174,8 @@ class Engine {
      */
     synchronized boolean rebaseNetTarget(long now) {
         if (activeSession == null) return false;
-        return activeSession.rebaseProfitTarget(getMetrics(now).net);
+        return activeSession.rebaseProfitTarget(
+                getMetrics(now).net, activeSession.getElapsedMillis(now));
     }
 
     /** Toggles the timer's own pause; the run keeps tracking (owner live 2026-10-14). */
@@ -4087,5 +4328,225 @@ class TransactionClassifier {
         if (hasGain) return GAIN;
         if (hasCost) return CONSUMPTION;
         return ADJUSTMENT;
+    }
+}
+
+/** Pending evidence inbox. FE fee, CH chest, TK ground click, BG bag gain, KT kit snapshot. */
+/** DI dismantle click, GE collect interaction, TA fired-ammo pickup intent. */
+/** DO drop click, DROPPED an own drop still on the ground, FA recoverable fired-ammo loss. */
+/** CN a consume command, including its named inventory baseline and presentation hints. */
+/** SC an earlier consume whose item already left the pack, displaced by a newer click. */
+/** LT private loot (at bounds attribution); LP/RD quantities reserved by an own-pile despawn. */
+/**
+ * CL load target, CK exact Check link, RV uncharge return; command quantities never prove money.
+ */
+/** CX/CP live/stabilizing claims, CT attribution clock, SF/HF soft/hard transfer, BO bank UI. */
+class Inbox {
+    static final int FEE = 1,
+            CHEST = 2,
+            GROUND_CLICK = 3,
+            BAG_GAIN = 4,
+            KIT_SNAPSHOT = 5,
+            DISMANTLE_CLICK = 6,
+            GE_COLLECT = 7,
+            DROP_CLICK = 9,
+            DROPPED = 10,
+            CONSUME = 12,
+            PRIVATE_LOOT = 13,
+            LOOT_RESERVE = 14,
+            LOAD_TARGET = 16,
+            CHECK_LINK = 17,
+            UNCHARGE = 18,
+            LIVE_CLAIM = 19,
+            PENDING_CLAIM = 20,
+            CLOCK = 21,
+            SOFT_TRANSFER = 22,
+            HARD_TRANSFER = 23,
+            BANK_UI = 24,
+            SERVANT = 25,
+            SAWMILL = 26,
+            DIALOGUE = 27,
+            PIPE_PICKUP = 28,
+            CANNON = 29,
+            SPENT_CONSUME = 30;
+    volatile long owner;
+
+    /** Legacy lifecycle ephemera clear here; their durable state keeps its tested lifecycle. */
+    Runnable reset = () -> {};
+
+    int now;
+
+    /** Proved context stays latched while its measured snapshot stabilizes, as in 1.2. */
+    boolean hold;
+
+    List<Observation> open = new ArrayList<>();
+
+    synchronized Observation add(int kind, int item, long qty, int ticks, String note) {
+        var e = new Observation();
+        e.kind = kind;
+        e.owner = owner;
+        e.item = item;
+        e.qty = qty;
+        e.until = (int) Math.min(Integer.MAX_VALUE, (long) now + ticks);
+        e.note = note;
+        open.add(e);
+        return e;
+    }
+
+    /** Replace a single observation, such as the latest click or chat confirmation. */
+    synchronized Observation put(int kind, int item, long qty, int ticks, String note) {
+        drop(kind);
+        return add(kind, item, qty, ticks, note);
+    }
+
+    int item(int kind) {
+        Observation e = peek(kind);
+        return e == null ? -1 : e.item;
+    }
+
+    long at(int kind) {
+        Observation e = peek(kind);
+        return e == null ? 0L : e.at;
+    }
+
+    boolean has(int kind, int item) {
+        return peek(kind, e -> e.item == item) != null;
+    }
+
+    Engine.Clue clue(int kind) {
+        Observation e = peek(kind);
+        if (e == null) {
+            e = add(kind, -1, 1L, Integer.MAX_VALUE, null);
+            e.data = new Engine.Clue();
+        }
+        return (Engine.Clue) e.data;
+    }
+
+    int left(int kind) {
+        Observation e = peek(kind);
+        return e == null ? 0 : e.until - now + 1;
+    }
+
+    void ttl(int kind, int ticks) {
+        if (ticks <= 0) drop(kind);
+        else put(kind, -1, 1L, ticks - 1, null);
+    }
+
+    synchronized Observation peek(int kind, Predicate<Observation> match) {
+        for (Observation e : open) if (e.kind == kind && live(e) && match.test(e)) return e;
+        return null;
+    }
+
+    Observation peek(int kind) {
+        return peek(kind, e -> true);
+    }
+
+    /** Consume no more than the still-open proof, even when a caller retains a stale record. */
+    synchronized long take(int kind, int item, long qty, Predicate<Observation> match) {
+        long left = Math.max(0L, qty);
+        for (Observation e : open) {
+            if (e.kind != kind || e.item != item || !live(e) || !match.test(e)) continue;
+            long used = Math.min(left, e.qty);
+            e.qty -= used;
+            left -= used;
+            if (left == 0L) break;
+        }
+        open.removeIf(e -> !live(e));
+        return Math.max(0L, qty) - left;
+    }
+
+    boolean live(Observation e) {
+        return e.owner == owner && e.qty > 0L && now <= e.until;
+    }
+
+    /**
+     * Reserve proven private quantity for the bag, retaining its original source for settlement.
+     */
+    synchronized long reserve(int kind, int item, long qty, int into) {
+        long left = Math.max(0L, qty);
+        for (Observation e : all(kind)) {
+            if (e.item != item) continue;
+            int index = open.indexOf(e);
+            long used = take(kind, item, left, v -> v == e);
+            if (used > 0L) {
+                Observation part = add(into, item, used, e.until - now, e.note);
+                part.data = e;
+                open.remove(part);
+                open.add(Math.min(index, open.size()), part);
+            }
+            left -= used;
+            if (left == 0L) break;
+        }
+        return Math.max(0L, qty) - left;
+    }
+
+    synchronized List<Observation> all(int kind) {
+        var found = new ArrayList<Observation>();
+        for (Observation e : open) if (e.kind == kind && live(e)) found.add(e);
+        return found;
+    }
+
+    void refresh(int kind, int ticks) {
+        Observation e = peek(kind);
+        if (e != null) e.until = Math.max(e.until, now + Math.max(1, ticks) - 1);
+    }
+
+    synchronized void drop(int... kinds) {
+        for (int kind : kinds) open.removeIf(e -> e.kind == kind);
+    }
+
+    synchronized void tick(int tick) {
+        if (hold)
+            for (Observation e : open)
+                if (e.kind >= CLOCK && e.kind <= HARD_TRANSFER && e.until < Integer.MAX_VALUE)
+                    e.until += tick - now;
+        now = tick;
+        open.removeIf(e -> !live(e));
+    }
+
+    /**
+     * Sole account boundary; called with Persistence's existing request generation, including A ->
+     * B -> A.
+     */
+    void owner(long token) {
+        synchronized (this) {
+            owner = token;
+            open.clear();
+        }
+        // Never take the engine monitor while holding the inbox monitor.
+        reset.run();
+    }
+}
+
+/** One owner-scoped observation. Quantity is spent once; until is an inclusive inbox tick. */
+class Observation {
+    int kind, item, x, y, until;
+    long owner, qty;
+
+    /** Source tick/time and inventory quantity at the observation. */
+    long at, held;
+
+    /** Receipt or physical target identity, independent of the human source label. */
+    String id;
+
+    String note;
+
+    /** Typed source snapshot (kit contents); never persisted. */
+    Object data;
+
+    /** Consume command metadata: Destroy, verb, trusted spell label. */
+    boolean flag;
+
+    ActionKind action;
+    ActionLabel label;
+
+    /** Loot source context and activity; id is its encounter. */
+    ChargeCheck.ChargedItem variant;
+
+    Context context;
+    String name;
+
+    Observation source() {
+        return data instanceof Observation ? ((Observation) data).source() : this;
     }
 }

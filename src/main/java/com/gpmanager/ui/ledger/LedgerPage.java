@@ -397,14 +397,16 @@ class LedgerPage implements Shell.Page {
             shown = DIM;
             tip = group.primaryName + msg("incomplete-value");
         } else {
-            value = signed(group.value);
+            value = worth(group.value);
         }
         String qty =
                 group.claim < 0
                         ? "\u2212" + Math.max(1L, group.quantity)
                         : !group.failedOf().isEmpty()
                                 ? group.failedOf()
-                                : group.quantity > 1L && (!group.actionGroup() || group.chargeUse)
+                                : group.quantity > 1L
+                                                && group.itemId != 995
+                                                && (!group.actionGroup() || group.chargeUse)
                                         ? times(group.quantity)
                                         : "";
         if (group.failed > 0L) tip = group.primaryName + " · " + group.failedTip();
@@ -437,8 +439,8 @@ class LedgerPage implements Shell.Page {
                 receipt.contributionId,
                 icon(receipt.itemId),
                 receipt.itemName,
-                receipt.quantity > 1L ? times(receipt.quantity) : "",
-                receipt.unpriced ? "?" : signed(receipt.value),
+                receipt.quantity > 1L && receipt.itemId != 995 ? times(receipt.quantity) : "",
+                receipt.unpriced ? "?" : worth(receipt.value),
                 receipt.unpriced ? DIM : of(receipt.category),
                 receipt.itemName + " · " + receipt.correctionLabel + " · " + receipt.why,
                 receipt.unpriced ? "" : exactSigned(receipt.value) + " gp",
@@ -622,8 +624,8 @@ class LedgerPage implements Shell.Page {
                             "item|" + item.itemId + "|" + item.itemName,
                             icon(item.itemId),
                             item.itemName,
-                            times(item.quantity),
-                            item.incomplete ? "?" : signed(item.value),
+                            item.itemId == 995 ? "" : times(item.quantity),
+                            item.incomplete ? "?" : worth(item.value),
                             item.incomplete ? DIM : sign(item.value),
                             "",
                             item.incomplete ? "" : exactSigned(item.value) + " gp",
@@ -780,32 +782,24 @@ class LedgerPage implements Shell.Page {
                         && !row.split;
         // The selected row above already names the receipt and its value: say what happened, and
         // when.
-        panel.add(
-                note(
-                        realized
-                                ? (trade.side == GeOffer.Side.SELL ? "Sold" : "Bought")
-                                        + " · "
-                                        + age(
-                                                nonNeg(
-                                                        data.capturedAt
-                                                                - (trade.settlementAtEpochMillis
-                                                                                > 0L
-                                                                        ? trade.settlementAtEpochMillis
-                                                                        : row.at)))
-                                : trade != null
-                                        ? MarketText.orderStateText(trade)
-                                                + " · "
-                                                + age(
-                                                        nonNeg(
-                                                                data.capturedAt
-                                                                        - trade.timestampEpochMillis))
-                                        : row.verb
-                                                + (row.actionDisplayName.isEmpty()
-                                                        ? ""
-                                                        : " · " + row.actionDisplayName)
-                                                + " · "
-                                                + age(nonNeg(data.capturedAt - row.at)),
-                        TEXT));
+        long at =
+                trade == null
+                        ? row.at
+                        : !realized
+                                ? trade.timestampEpochMillis
+                                : trade.settlementAtEpochMillis > 0L
+                                        ? trade.settlementAtEpochMillis
+                                        : row.at;
+        String what =
+                realized
+                        ? trade.side == GeOffer.Side.SELL ? "Sold" : "Bought"
+                        : trade != null
+                                ? MarketText.orderStateText(trade)
+                                : row.verb
+                                        + (row.actionDisplayName.isEmpty()
+                                                ? ""
+                                                : " · " + row.actionDisplayName);
+        panel.add(note(what + " · " + age(nonNeg(data.capturedAt - at)), TEXT));
         var facts = new KeyValue(null);
         if (trade == null) {
             panel.add(note(row.why, LABEL));

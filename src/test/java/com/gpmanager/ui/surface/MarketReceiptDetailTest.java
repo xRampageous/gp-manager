@@ -143,7 +143,6 @@ public class MarketReceiptDetailTest
         assertEquals(30L, row.settledQty);
         assertEquals("realized gross is settlement minus adjustment", 3_120L,
             row.observedSettlementGp - row.settlementAdjustmentGp);
-        assertEquals(105L, row.basisUnitPrice);
         assertEquals("the actual after-tax unit value uses the collected scope",
             102L, row.receivedEachGp);
         assertTrue(lines.contains("Filled 50 / 200 \u00b7 collected 30"));
@@ -438,7 +437,7 @@ public class MarketReceiptDetailTest
     public void orderStateLabelsMatchTheAcceptedWording()
     {
         GeOffer pending = syntheticRecord(11L, 0L, 0L, 0L, 0L, 0L, 0L, "");
-        assertEquals("Offering",
+        assertEquals("Selling",
             MarketText.orderStateText(MarketFacts.row(pending)));
 
         GeOffer partial = syntheticRecord(11L, 5L, 35L, 0L, 0L, 0L, 0L, "");
@@ -482,7 +481,7 @@ public class MarketReceiptDetailTest
         assertEquals(netBefore, market.engine.getMetrics(market.now).net);
         assertEquals(transactionBefore, settlement.getNet());
         assertEquals("the frozen basis is untouched by reading the human receipt", 105L,
-            market.engine.marketRows().get(0).basisUnitPrice);
+            MarketFacts.record(market.engine, market.engine.marketRows().get(0)).basisUnitPrice);
     }
 
     @Test

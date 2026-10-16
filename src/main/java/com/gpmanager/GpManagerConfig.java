@@ -73,10 +73,21 @@ public interface GpManagerConfig extends Config {
     }
 
     @ConfigItem(
+            keyName = "alwaysShowItems",
+            name = "Always show items",
+            description =
+                    "Comma-separated names always shown on the tray and Live, even when Ground Items hides them or they are under the minimum value. Hidden Recent items still wins",
+            position = 3,
+            section = lootSection)
+    default String alwaysShowItems() {
+        return "";
+    }
+
+    @ConfigItem(
             keyName = "hiddenRecentItems",
             name = "Hidden Recent items",
             description = "Comma-separated names hidden from Recent. Net is unchanged",
-            position = 3,
+            position = 4,
             section = lootSection)
     default String hiddenRecentItems() {
         return "";
@@ -87,7 +98,7 @@ public interface GpManagerConfig extends Config {
             name = "Hidden Recent charges",
             description =
                     "Comma-separated names whose charge spends are hidden from Recent; their other rows stay. Net and the Ledger are unchanged",
-            position = 4,
+            position = 5,
             section = lootSection)
     default String hiddenRecentCharges() {
         return "";
@@ -403,5 +414,17 @@ public interface GpManagerConfig extends Config {
             section = generalSection)
     default int activityLabelSeconds() {
         return 15;
+    }
+
+    @Units(Units.MINUTES)
+    @Range(max = 60)
+    @ConfigItem(
+            keyName = "afkPauseMinutes",
+            name = "AFK pause",
+            description = "Pause tracking after this long without playing, so GP/hr leaves AFK time out (0 = off)",
+            position = 4,
+            section = generalSection)
+    default int afkPauseMinutes() {
+        return 0;
     }
 }

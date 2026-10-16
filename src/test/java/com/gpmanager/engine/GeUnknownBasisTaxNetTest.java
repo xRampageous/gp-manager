@@ -207,7 +207,8 @@ public class GeUnknownBasisTaxNetTest
             assertEquals("the correction REPLACES the automatic tax (never stacks)",
                 expectedAfter, market.net());
             MarketRows.Row corrected = market.row(VIAL);
-            assertTrue(corrected.correctionApplied);
+            assertNotEquals(Correction.AUTO,
+                market.engine.transactionById(corrected.settlementId).getCorrection());
             assertFalse("a corrected sale is no longer KNOWN_COST_ONLY",
                 corrected.knownCostOnly);
             assertEquals(expectedAfter, corrected.realizedResultGp);
@@ -262,7 +263,7 @@ public class GeUnknownBasisTaxNetTest
         Market market = new Market();
         market.prices.put(RUNE, 100L);
         // The per-item rule says 200, but the observed gap is 300.
-        market.sellUnknown(0, RUNE, 100L, 100, 10_000, 9_700);
+        market.sellUnknown(0, RUNE, 100L, 100, 10_000, 9_700, true);
 
         MarketRows.Row row = market.row(RUNE);
         assertEquals("the rule mismatch is not accepted", 0L, row.inferredGeTaxGp);
@@ -472,17 +473,25 @@ public class GeUnknownBasisTaxNetTest
         /** Place a SELL offer for pre-existing (unknown-coverage) stock and collect its cash. */
         void sellUnknown(int slot, int item, long qty, long listedPrice, long gross, long received)
         {
+            sellUnknown(slot, item, qty, listedPrice, gross, received, false);
+        }
+
+        /** {@code collect}: the coins arrive after a Collect click, as they do in the game. */
+        void sellUnknown(int slot, int item, long qty, long listedPrice, long gross, long received,
+            boolean collect)
+        {
             inventory.put(item, qty);
             engine.setBaseline(new ContainerSnapshot(inventory));
             offer(slot, SELLING, item, (int) qty, 0, (int) listedPrice, 0);
             inventory.put(item, 0L);
             settle();
             offer(slot, SOLD, item, (int) qty, (int) qty, (int) listedPrice, (int) gross);
+            if (collect) engine.noteGeCollect(now);
             inventory.put(COINS, inventory.getOrDefault(COINS, 0L) + received);
             settle();
         }
 
-        private void offer(int slot, GrandExchangeOfferState state, int item, int total, int traded,
+        void offer(int slot, GrandExchangeOfferState state, int item, int total, int traded,
             int price, int spent)
         {
             now += 5_000L;
@@ -495,7 +504,7 @@ public class GeUnknownBasisTaxNetTest
             }
         }
 
-        private void settle()
+        void settle()
         {
             now += 5_000L;
             engine.markDirty();

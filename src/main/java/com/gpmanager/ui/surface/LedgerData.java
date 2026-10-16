@@ -2,21 +2,19 @@ package com.gpmanager;
 
 import static com.gpmanager.GameData.msg;
 import static com.gpmanager.MarketRows.Lifecycle.*;
+import static com.gpmanager.Phrases.*;
 import static com.gpmanager.SafeMath.*;
-
+import static com.gpmanager.SafeMath.nonNeg;
 import static java.util.Collections.*;
 import static java.util.Locale.*;
 
 import com.gpmanager.MarketRows.*;
 import com.gpmanager.Semantics.*;
 import com.gpmanager.Semantics.Table;
-
-import lombok.*;
-
-import net.runelite.api.gameval.ItemID;
-
 import java.time.*;
 import java.util.*;
+import lombok.*;
+import net.runelite.api.gameval.ItemID;
 
 /**
  * The stacked-table Ledger read model: three independently paginated financial tables (Gains, Costs
@@ -181,7 +179,6 @@ class LedgerData {
         long total;
         int entries;
         int receipts;
-        boolean incomplete;
     }
 
     /** Review audit: exact review rows with the full eligible bulk count. */
@@ -511,14 +508,12 @@ class LedgerData {
     /** Ordinary tables sum every group; Market's header includes only complete results. */
     static TableData tableData(List<Group> groups, boolean market) {
         long total = 0L;
-        boolean incomplete = false;
         var receipts = new LinkedHashSet<String>();
         for (Group group : groups) {
-            incomplete |= group.incomplete();
             if (!market || !group.incomplete()) total = safeAdd(total, group.value);
             receipts.addAll(group.receiptIds);
         }
-        return new TableData(groups, total, groups.size(), receipts.size(), incomplete);
+        return new TableData(groups, total, groups.size(), receipts.size());
     }
 
     /** True when a Market lifecycle is genuinely pending rather than already realized. */
@@ -625,7 +620,7 @@ class LedgerData {
         CorrectionPreview(long currentNet, long afterNet, long revision) {
             this.currentNet = currentNet;
             this.afterNet = afterNet;
-            this.change = afterNet - currentNet;
+            change = afterNet - currentNet;
             this.revision = revision;
         }
 
@@ -670,5 +665,57 @@ class LedgerData {
         long before = transaction.isCounted() ? transaction.getNet() : 0L;
         long after = transaction.netUnder(correction);
         return new CorrectionPreview(currentNet, currentNet - before + after, engine.getRevision());
+    }
+}
+
+/** Detached, read-only summary of one transaction awaiting an owner decision. */
+class ReviewRow {
+    String transactionId;
+    String sessionId;
+    long timestampEpochMillis;
+    long ageMillis;
+    List<Item> items;
+    long value;
+    String why;
+    Set<Decision> validDecisions;
+
+    ReviewRow(
+            String transactionId,
+            String sessionId,
+            long timestampEpochMillis,
+            long ageMillis,
+            List<Item> items,
+            long value,
+            String why,
+            Set<Decision> validDecisions) {
+        this.transactionId = orEmpty(transactionId);
+        this.sessionId = orEmpty(sessionId);
+        this.timestampEpochMillis = nonNeg(timestampEpochMillis);
+        this.ageMillis = nonNeg(ageMillis);
+        this.items =
+                Collections.unmodifiableList(
+                        items == null ? new ArrayList<Item>() : new ArrayList<>(items));
+        this.value = value;
+        this.why = orEmpty(why);
+        EnumSet<Decision> copy =
+                validDecisions == null || validDecisions.isEmpty()
+                        ? EnumSet.noneOf(Decision.class)
+                        : EnumSet.copyOf(validDecisions);
+        this.validDecisions = Collections.unmodifiableSet(copy);
+    }
+
+    /** Detached item summary; value is the signed flow value for this item. */
+    static class Item {
+        int itemId;
+        String name;
+        long quantityDelta;
+        long valueDelta;
+
+        Item(int itemId, String name, long quantityDelta, long valueDelta) {
+            this.itemId = itemId;
+            this.name = orEmpty(name);
+            this.quantityDelta = quantityDelta;
+            this.valueDelta = valueDelta;
+        }
     }
 }

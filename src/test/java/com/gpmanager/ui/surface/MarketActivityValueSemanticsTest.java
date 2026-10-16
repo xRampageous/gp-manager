@@ -99,6 +99,28 @@ public class MarketActivityValueSemanticsTest
         assertTrue(meta.contains("Bought") && meta.contains("Result " + Fmt.signed(0L)));
     }
 
+    /** Owner live 2026-10-15: a GE buy left the RECENT header at -3.22M; it moves Net by 0. */
+    @Test
+    public void recentTotalCountsTheMarketResultNeverTheCash()
+    {
+        Market buy = new Market(Collections.singletonMap(DEATH, 186));
+        buy.buy(0, DEATH, 200L, 180, 200L);
+        LiveSnapshot.Recent bought = marketRow(LiveSnapshot.capture(buy.engine, buy.now + 1_000L, null));
+        assertEquals("the row still shows the spend", -36_000L, bought.value);
+        assertEquals("but a buy adds nothing to the Recent total", 0L, bought.net());
+
+        Market sell = new Market(Collections.singletonMap(DEATH, 186));
+        sell.gain(DEATH, 200L, 37_200L, sell.now - 60_000L);
+        sell.sell(0, DEATH, 200L, 180);
+        assertEquals("a sale adds its Result",
+            -1_200L, marketRow(LiveSnapshot.capture(sell.engine, sell.now + 1_000L, null)).net());
+
+        Market unknown = new Market(Collections.singletonMap(DEATH, 12));
+        unknown.sell(0, DEATH, 15L, 12);
+        assertEquals("an unproven Result adds nothing",
+            0L, marketRow(LiveSnapshot.capture(unknown.engine, unknown.now + 1_000L, null)).net());
+    }
+
     @Test
     public void pendingOrderHasNoRealizedPrimarySettlement()
     {

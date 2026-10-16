@@ -181,7 +181,7 @@ public class GameDataTablesTest
     {
         for (int id = -1; id < MAX_ID; id++)
         {
-            assertEquals("item " + id, GE_TAX_EXEMPT.contains(id), GeTaxRule.isExempt(id));
+            assertEquals("item " + id, GE_TAX_EXEMPT.contains(id), GeTaxRule.EXEMPT_IDS.contains(id));
         }
     }
 
@@ -360,7 +360,7 @@ public class GameDataTablesTest
     @Test
     public void actionAndItemRulesKeepEveryUsedKeyAndOrderedOutcome()
     {
-        assertEquals(Set.of("drink", "eat", "~bury", "~scatter", "offer", "cast", "chat eat", "chat drink",
+        assertEquals(Set.of("drink", "eat", "~bury", "~scatter", "offer", "cast", "break", "chat eat", "chat drink",
             "chat offer", "supplies", "vessel", "rune", "claim", "ingredient", "food", "partial"),
             ActionReader.RULES.keySet());
         List<String> loaded = new ArrayList<>();
@@ -370,7 +370,7 @@ public class GameDataTablesTest
             if (!row[2].isEmpty()) loaded.add(row[0] + "|" + ActionKind.valueOf(row[2]).name());
         }
         assertEquals(Arrays.asList("drink|DRINK", "eat|EAT", "~bury|BURY", "~scatter|SCATTER", "offer|OFFER",
-            "cast|CAST", "chat eat|EAT", "chat drink|DRINK", "chat offer|OFFER"), loaded);
+            "cast|CAST", "break|CAST", "chat eat|EAT", "chat drink|DRINK", "chat offer|OFFER"), loaded);
         // A chat confirmation names its own verb ("You eat the chicken."), so a bite that lands
         // after the menu clicks lapse still books Ate, not a bare Used (owner 2026-10-12).
         assertEquals(ActionKind.EAT, ActionReader.verbOf("You eat the chicken."));

@@ -170,7 +170,8 @@ public class StackedLedgerTablesTest
 
         LedgerData data = capture(engine, T0 + 2_000L, LedgerData.Entry.current());
         assertEquals("the unpriced supply belongs to Costs/Supplies", 1, data.costs.entries);
-        assertTrue(data.costs.incomplete);
+        assertTrue("the unpriced supply stays incomplete at the group level",
+                data.costs.groups.get(0).incomplete());
         assertEquals(0L, data.total.costs);
         assertEquals("an unpriced supply is not a review decision", 0, data.review.scopeCount);
     }

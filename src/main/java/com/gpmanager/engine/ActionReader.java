@@ -5,11 +5,11 @@ import static com.gpmanager.FlowFilters.*;
 import static com.gpmanager.GameData.msg;
 import static com.gpmanager.TransactionType.*;
 
-import lombok.*;
-
 import java.util.*;
 import java.util.function.*;
 import java.util.regex.*;
+import lombok.*;
+import net.runelite.api.MenuAction;
 
 /**
  * Derives the observed {@link ActionKind} for a settled inventory change from positive evidence
@@ -89,8 +89,17 @@ class ActionReader {
                 case OFFER:
                     return oneItem ? matchedIntent : ActionKind.SUPPLIES;
                 case CAST:
-                    // A Cast click without a rune-only loss is not evidence runes were used.
-                    return doseStep ? ActionKind.SUPPLIES : null;
+                    // A Cast proves its spell by what it spent: runes, or a broken tablet (the
+                    // spell in item form). An alch's coins or Bones to Peaches' fruit may come
+                    // back with them (owner live 2026-10-16); a bank or trade move never casts.
+                    return type != TransactionType.TRANSFER
+                                    && type != TRADE
+                                    && !all(
+                                            flows,
+                                            -1,
+                                            name -> !isRune(name) && Spells.named(name) == null)
+                            ? ActionKind.CAST
+                            : doseStep ? ActionKind.SUPPLIES : null;
                 case SUPPLIES:
                     // This explicit intent currently comes from Light/Tend-to and the
                     // Tinderbox→fuel pair. Require the matching loss to be actual fuel.
@@ -116,7 +125,7 @@ class ActionReader {
         boolean anyLoss = false;
         boolean anyGain = false;
         for (Flow flow : flows) {
-            if (flow == null || flow.quantityDelta == 0L) continue;
+            if (flow.quantityDelta == 0L) continue;
             String name = Phrases.lower(flow.itemName);
             int dose = trailingDose(name);
             // Combining doses frees a vessel; an emptied vial/jug gain is part of the shape.
@@ -225,7 +234,7 @@ class ActionReader {
     static boolean oneLossFamily(List<Flow> flows, Function<String, String> family) {
         String first = null;
         for (Flow flow : flows) {
-            if (flow == null || flow.quantityDelta >= 0L) continue;
+            if (flow.quantityDelta >= 0L) continue;
             String key = family.apply(Phrases.lower(flow.itemName));
             if (key == null || first != null && !first.equals(key)) return false;
             first = key;
@@ -237,7 +246,7 @@ class ActionReader {
     static boolean isCooking(List<Flow> flows) {
         var rawBases = new ArrayList<String>();
         for (Flow flow : flows) {
-            if (flow != null && flow.quantityDelta < 0L) {
+            if (flow.quantityDelta < 0L) {
                 String name = Phrases.lower(flow.itemName);
                 rawBases.add(
                         name.startsWith("raw ") && name.length() > 4
@@ -269,7 +278,7 @@ class ActionReader {
     static boolean all(List<Flow> flows, int side, Predicate<String> predicate) {
         boolean any = false;
         for (Flow flow : flows) {
-            long delta = flow == null ? 0L : flow.quantityDelta;
+            long delta = flow.quantityDelta;
             if (delta == 0L || side != 0 && Long.signum(delta) != side) continue;
             if (!predicate.test(Phrases.lower(flow.itemName))) return false;
             any = true;
@@ -333,5 +342,89 @@ class ActionReader {
             }
         }
         return rule("food", lost) && rule("partial", gained);
+    }
+}
+
+/**
+ * Menu / chat vocabulary that turns a click into an accounting intent: explicit spend actions (eat,
+ * drink, bury, offer, light), transform/production options that arm PRODUCTION context, gather
+ * verbs that only name the activity, and the chat lines that confirm a spend after the click.
+ * Anything not listed here stays ambiguous and settles through Review, never a guess.
+ */
+class ActionSignals {
+    static final Map<String, String> TRANSFORM = GameData.byName("transform_skills");
+    static final Map<String, String> GATHER = GameData.byName("gather_skills");
+
+    /** Compiled menu/chat predicates; d7/d10 already contain transform and gather data. */
+    static final Map<String, Phrases.Clause[][]> RULES = GameData.rules("menu_rules");
+
+    /** Apply one compiled predicate group. */
+    static boolean rule(String group, String text) {
+        return Phrases.has(text, RULES.get(group));
+    }
+
+    /** Widget actions eligible for selected spell evidence. */
+    static boolean isWidgetAction(MenuAction action) {
+        return rule("widget", action == null ? null : action.name());
+    }
+
+    /** Raw consume verbs plus normalized explicit spends. */
+    static boolean isSpend(String option) {
+        return rule("spend.raw", option) || isSpendName(option);
+    }
+
+    /** Normalized light/offer/pray and burial/scatter verbs. */
+    static boolean isSpendName(String option) {
+        return rule("spend.norm", Phrases.lower(option));
+    }
+
+    /** Use tinderbox with fuel; target normalization preserves whitespace. */
+    static boolean lightsFire(String option, String target) {
+        return rule("use", Phrases.lower(option))
+                && rule("fuel", Phrases.lower(target, false))
+                && rule("fire", Phrases.lower(target, false));
+    }
+
+    /** Use bones/ashes on an altar. */
+    static boolean offersBones(String option, String target) {
+        return rule("use", Phrases.lower(option))
+                && rule("altar", Phrases.lower(target, false))
+                && rule("bones", Phrases.lower(target, false));
+    }
+
+    /** Positive Sinister Offering cast evidence. */
+    static boolean isOffering(String option, String target) {
+        return rule("cast", Phrases.lower(option))
+                && rule("offering", Phrases.lower(target, false));
+    }
+
+    /** Chaos Altar saved a bone; this cannot confirm spend. */
+    static boolean isSpared(String message) {
+        return rule("spared", Phrases.lower(message, false));
+    }
+
+    /** Inventory-spend chat, excluding a saved bone. */
+    static boolean isChatSpend(String message) {
+        return !isSpared(message) && rule("spend.chat", Phrases.lower(message, false));
+    }
+
+    /**
+     * Transform/production options (station or inventory) mapped to the skill whose XP confirms
+     * them.
+     */
+    static String transformSkill(String option) {
+        return TRANSFORM.getOrDefault(Phrases.lower(option), "");
+    }
+
+    /** Activity hint for object gather verbs; "General" when the verb is not a gather. */
+    static String gatherActivity(String option) {
+        return GATHER.getOrDefault(Phrases.orEmpty(option), "General");
+    }
+
+    /** Rake and plant still name the activity, but do not arm gather ownership evidence. */
+    static boolean namesActivityOnly(String option) {
+        return option != null
+                && !"General".equals(gatherActivity(option))
+                && !rule("gather.exclude", option);
     }
 }

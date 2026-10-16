@@ -53,26 +53,22 @@ grand-exchange-sale-settled-proven	Grand Exchange sale settled: only the proven 
 grand-exchange-movement	Grand Exchange movement not claimable by a custody lifecycle; recorded for review without booking profit, cost or basis.
 hides-my	Hides it from My Grinds; its history is untouched.
 removes-my	Removes it from My Grinds. Its run history is kept.
-saved-defaults	Saved defaults for future runs. Blank clears a target.
-future-runs	Future runs start with this Grind's targets. Finished runs keep the targets they ran with.
 logged-out	Logged out · tracking waits until you log back in
 settled-loot	Settled loot-key pickup retained as a non-counted audit row; key contents are valued only when they enter INV.
 primary-value	 · primary value is the observed settlement; Result is versus basis
 realized-market	Realized trade result versus basis · pending trades never count in Net
 observed-settlement-result	 · observed settlement; Result unavailable because prior basis is unknown
-net-target	Net target (5m, 5000k, 5,000,000)
 items-restored	Items restored after leaving the neutral zone; ownership never changed.
-saved-grinds	No saved Grinds yet · save one from a running Grind
+saved-grinds	Grinds you start appear here
 entries-changed	Entries changed while the preview was open · check again
 items-waiting-reclaimed	Items waiting to be reclaimed after death · a reclaimed item stays neutral apart from the fee
 another-client-changed	another client changed this account after the flush; nothing was overwritten.
-resets-gp	Resets GP Manager data for this RuneScape profile only. A safety copy is saved first; other accounts and RuneLite settings are untouched.
+resets-gp	Deletes this account's runs, Ledger, My Grinds and totals. A safety copy is saved first. Only want fresh numbers? Click the ACTIVE clock on Live.
 review.COST	Count as cost
 review.GAIN	Count
 review.TRANSFER	Transfer
 removes-run	Removes this run from history. This cannot be undone; the saved Grind is unaffected.
-use-number	use a number like 5m, 5000k, 90m or 3h, or leave it blank
-active-time-target	Active Time target (90m, 3h 30m)
+use-number	use a number like 5m, 5000k, 90m or 3h, or pick Clear
 proven-item	The proven per-item GE sell tax for this sale; it reduces Net as a market trade cost, and the sale's Result stays unavailable.
 gp-manager-did	GP Manager did not observe enough prior accounting for these units to determine profit. The received cash is liquidation; only a proven GE tax (and any correction) affects Net.
 received-cash	Received is cash from selling owned items; the GE tax row and the Result affect Net.
@@ -81,6 +77,7 @@ result-includes-units	Result includes only units whose previously counted value 
 spent-cash	Spent is cash used to acquire owned items; only Result affects Net.
 proven-ge	 A proven GE tax is still counted as a market trade cost.
 price-known	No price known · not in Net until priced.
+no-value	Worth nothing · untradeable, with no alch value.
 verb.ADJUSTMENT	Adjusted
 verb.CONSUMPTION	Used
 verb.PK_DEATH_LOSS	Lost
@@ -156,8 +153,6 @@ canceled-returned	Canceled; the returned principal is ownership-neutral.
 food-potions	Food, potions, runes, ammo and charges · 
 deaths-tax	Deaths, tax, fees and drops · 
 items-waiting-reclaimed-after	Items waiting to be reclaimed after death: 
-pick-saved	Pick a saved Grind, or name a new one.
-run-saved	For this run only; the saved Grind is unchanged.
 gp-manager-icon	GP Manager icon resource missing or unreadable; using a placeholder sidebar icon
 gp-manager-icon-resource	GP Manager icon resource failed to load; using a placeholder sidebar icon
 jsoncodec-bind	JsonCodec.bind(gson) must run at plugin start-up before any JSON work
@@ -204,12 +199,10 @@ gp-manager-background	GP Manager background save crashed
 version-modify	); this version will not modify it
 recovered-gp	Recovered GP Manager state from {}
 gravestone-retrieval	a gravestone or retrieval service
-supply-loss-split	Supply and loss split unavailable
 tracking-paused-click	Tracking paused · click to resume
 review-row	No review row matches the search
 ground-items	Ground Items config unavailable
 unable-save	Unable to save GP Manager state
-text	<html><div style='width:190px'>
 nothing-corrected	Nothing corrected in this scope
 fill-check	fill|check|open|view|use|store
 offer-changed	offer changed while unobserved
@@ -290,10 +283,9 @@ undo-latest-correction-2	Undo latest correction
 waiting-activity	Waiting for activity
 awaiting-decision	Awaiting your decision.
 guardians-rift	guardians of the rift
-blank-clears	Blank clears a target.
 copy-data	Copy data folder path
 data-folder	Data folder path copied
-fresh-profile	fresh profile committed
+fresh-profile	Everything for this account starts fresh. The safety copy is in GP Manager's backups folder.
 active-time-target-2	No Active Time target
 net-gp	Net GP will not change.
 failed	Failed
@@ -310,7 +302,7 @@ text-2	<html><font color='#6ee16e'>●</font>
 corrected	 · Corrected
 current-run	Current run + runs started today; whole-run totals
 runs-today	Runs today · Current run + runs started today; whole-run totals.
-tracked-active	Tracked active time; manual and login pauses are excluded
+tracked-active	Tracked active time; manual and login pauses are excluded. Click to start fresh.
 tracking-waits	Tracking waits until you log back in
 kills-since	Kills since your last death · best 
 value-incomplete	 · no price known
@@ -323,8 +315,6 @@ measured-exact	Measured from the exact charge Check difference.
 gp	 gp each · 
 sold-collect	Sold · collect
 bought-collect	Bought · collect
-view-recap	 · View recap
-future-defaults	 · future defaults only
 factory-reset	Factory reset current profile…
 recent-grind	Recent Grind · 
 split-needs	split needs one item with at least two units
@@ -355,7 +345,6 @@ advance-disk	 does not advance disk revision
 disk-state	Disk state uses unsupported data schema 
 empty-session	Empty session state
 gp-h	GP/h over active time
-start-changes	Start with changes…
 previously-counted	Previously counted|
 received-proven	Received|not proven
 correction-applied	That correction was not applied
@@ -391,3 +380,8 @@ tentacle-used	Abyssal tentacle used up
 tentacle-whip	The tentacle ran out or was dissolved; its abyssal whip is gone and the kraken tentacle is left.
 cannon-parts	Cannon set up or picked up
 cannon-why	A dwarf multicannon's parts stay yours wherever it stands; Nulodion replaces a lost one free.
+start-fresh	Your run so far moves to Recent grinds. Nothing is deleted; Live starts again at zero.
+end-for-fresh	End this Grind first. It moves to Recent grinds.
+guide	Live: Net, GP/h and newest changes. Click the clock to start fresh. | Gains: loot and income. Costs: supplies, charges, deaths. Banking and trades are neutral. | Grinds: start one by name. It remembers its targets, best run and average GP/h. | Ledger: why each number changed. Check Review rows; Correct fixes any row. | HUD+: the in-game overlay. Set it up in plugin settings. | Values: GE price, else alch. — means worthless, ? means no price yet.
+bf-coffer	Blast Furnace coffer
+free-play-kept	Free play is kept.

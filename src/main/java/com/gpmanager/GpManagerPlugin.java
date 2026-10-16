@@ -36,6 +36,7 @@ import net.runelite.http.api.loottracker.LootRecordType;
 import org.slf4j.*;
 
 import java.io.IOException;
+import java.awt.Color;
 import java.util.*;
 
 import javax.inject.Inject;
@@ -88,6 +89,9 @@ public class GpManagerPlugin extends Plugin {
      */
     @Inject Valuation valuation;
 
+    /** The profile whose old rows were last rechecked; null before the first ready tick. */
+    String rechecked;
+
     @Inject LootKeyManifestReader lootKeys;
     @Inject OfferSlots geOfferLedger;
     @Inject PvpContextReader pvp;
@@ -135,6 +139,7 @@ public class GpManagerPlugin extends Plugin {
         try {
             var panel = new SidebarPanel(engine, config, itemManager, repository, persistence);
             panel.spriteManager = spriteManager;
+            GrindsController.bondPrice = () -> bondGp;
             panel.mutationOwner = clientThread::invoke;
             panel.bindPvp(() -> currentPvp);
             panel.bindLoggedIn(() -> loggedIn);
@@ -154,10 +159,26 @@ public class GpManagerPlugin extends Plugin {
                                     flow, config.lootPresentationFilter());
                         }
 
+                        public boolean alwaysShows(Flow flow) {
+                            return LootPresentationFilterService.listState(
+                                            config.alwaysShowItems(),
+                                            "",
+                                            flow.itemName,
+                                            Math.abs(flow.quantityDelta))
+                                    == LootPresentationFilterService.HIGHLIGHTED;
+                        }
+
+                        public Color highlight(String name, long quantity) {
+                            return lootPresentationFilter.highlight(
+                                    name, quantity, config.lootPresentationFilter());
+                        }
+
                         public String version() {
                             return config.lootPresentationFilter()
                                     + "|"
                                     + lootPresentationFilter.fingerprint
+                                    + "|"
+                                    + config.alwaysShowItems()
                                     + "|"
                                     + config.hiddenRecentItems()
                                     + "|"
@@ -179,8 +200,10 @@ public class GpManagerPlugin extends Plugin {
                                     charge
                                             ? config.hiddenRecentCharges()
                                             : config.hiddenRecentItems();
+                            // Hiding one dose hides the whole potion (owner 2026-10-16, after
+                            // Coin Flow 1.9): "Prayer potion*" covers (1) to (4).
                             String entry =
-                                    charge
+                                    charge || ActionReader.trailingDose(name) > 0
                                             ? LootPresentationFilterService.chargePattern(name)
                                             : name;
                             var names = new ArrayList<>(Text.fromCSV(list));
@@ -320,6 +343,40 @@ public class GpManagerPlugin extends Plugin {
     NeutralZoneTracker neutralZoneTracker = new NeutralZoneTracker();
     int geOfferSeedTicks;
 
+    /** The Blast Furnace coffer's last balance (-1 until read), the tick it changed and unbooked drain. */
+    int cofferGp = -1;
+
+    int cofferTick;
+    long cofferDrain;
+
+    /**
+     * The Blast Furnace coffer drains 72,000 coins an hour, 12 a tick, while you work it (OSRS
+     * Wiki). Deposits and withdrawals stay neutral: a drop counts as drain only when it is no more
+     * than 12 gp a tick since the last change; anything faster is a withdrawal. Drain books in 1,200 gp batches and
+     * on logout (owner 2026-10-16, after Coin Flow 1.9).
+     */
+    void coffer(int gp) {
+        int tick = client.getTickCount();
+        cofferDrain += cofferDrain(cofferGp, gp, tick - cofferTick);
+        cofferGp = gp;
+        cofferTick = tick;
+        if (cofferDrain >= 1_200L) flushCoffer();
+    }
+
+    /**
+     * The drain in one coffer change: a drop the coffer could drain in the ticks elapsed (plus one);
+     * a bigger drop is a withdrawal, and its few coins of drain are left out.
+     */
+    static long cofferDrain(int before, int after, int ticks) {
+        long drop = before < 0 ? 0L : before - after;
+        return drop > 0L && drop <= 12L * (max(1, ticks) + 1) ? drop : 0L;
+    }
+
+    void flushCoffer() {
+        if (cofferDrain > 0L) engine.bookCofferDrain(cofferDrain, SafeMath.now());
+        cofferDrain = 0L;
+    }
+
     /** The tick a private instance was paid from the coffer; its bank share comes that tick. */
     int instancePaidTick = -1;
 
@@ -397,6 +454,20 @@ public class GpManagerPlugin extends Plugin {
                         : Valuation.Economy.UNKNOWN);
     }
 
+    /** One bond's price, read on the client thread for the target form's preset (owner 1.5.0). */
+    volatile long bondGp;
+
+    /** True on separate-economy worlds, where tracking pauses entirely (owner 1.5.0). */
+    boolean onUnsupportedWorld() {
+        return client != null
+                && Valuation.economyFor(client.getWorldType()) == Valuation.Economy.UNSUPPORTED_SPECIAL;
+    }
+
+    /** Reading the exchange or a trade window is not idle (owner 1.5.0). */
+    boolean windowHoldsActivity() {
+        return Widgets.isGeOpen(client) || Widgets.visible(client, InterfaceID.Trademain.TITLE);
+    }
+
     /** Karamja gloves 1-4 on the hands slot pick the improved tokkul rate. */
     private static final Set<Integer> KARAMJA_GLOVES =
             Set.of(ItemID.ATJUN_GLOVES_EASY, ItemID.ATJUN_GLOVES_MED,
@@ -420,6 +491,8 @@ public class GpManagerPlugin extends Plugin {
             refreshEconomyState();
             refreshKaramjaGloves();
         } else if (event.getGameState() == LOGIN_SCREEN || event.getGameState() == HOPPING) {
+            flushCoffer();
+            cofferGp = -1;
             recentPlayerCombatTicks = 0;
             loggedIn = event.getGameState() == HOPPING;
             // No world identity: automatic market quotes fail closed until the next login.
@@ -698,6 +771,10 @@ public class GpManagerPlugin extends Plugin {
 
     @Subscribe
     public void onVarbitChanged(VarbitChanged event) {
+        if (event != null && event.getVarbitId() == VarbitID.BLAST_FURNACE_COFFER) {
+            coffer(event.getValue());
+            return;
+        }
         // Rune pouch contents live in varbits, not an item container. A change there is
         // an inventory change for accounting: casting from the pouch is a cost, filling
         // it from the inventory nets to zero.
@@ -862,7 +939,7 @@ public class GpManagerPlugin extends Plugin {
             markGameplayActivity(true);
         }
         interactionContextTracker.onMenuOptionClicked(event);
-        markActivity();
+        if (worldAction(event.getMenuAction(), event.isItemOp())) markActivity();
         String target = normalize(event.getMenuTarget());
         String joined = option + " " + target;
         int itemId = menuItemId(event);
@@ -918,7 +995,9 @@ public class GpManagerPlugin extends Plugin {
                     ttl,
                     false,
                     ActionReader.verbOf(option),
-                    spellLabel(event, option));
+                    "break".equals(option)
+                            ? ActionLabel.of(Spells.named(target))
+                            : spellLabel(event, option));
         } else if ("drop".equals(option)) {
             // Match consume TTL so dump-then-settle does not miss power-train drops.
             engine.noteDrop(itemId, ttl);
@@ -1413,6 +1492,32 @@ public class GpManagerPlugin extends Plugin {
             return;
         }
         if (persistence.consumeReady()) initLoggedIn();
+        if (!engine.profileIdentityKey.equals(rechecked)
+                && engine.valuationService.value(Map.of(ItemID.NATURERUNE, 1L)).stream()
+                        .anyMatch(flow -> flow.valueDelta > 0)) {
+            // Each loaded profile's old rows take today's rules once, after prices load, so an item
+            // with no quote is told apart from one not loaded yet; item definitions are read here,
+            // on the client thread (owner live 2026-10-16).
+            rechecked = engine.profileIdentityKey;
+            engine.recheck(
+                    id -> {
+                        ItemComposition item = client.getItemDefinition(id);
+                        return item == null ? 0 : item.getHaPrice();
+                    });
+        }
+        bondGp = engine.valuationService.value(Map.of(ItemID.OSRS_BOND, 1L)).stream().mapToLong(f -> f.valueDelta).sum();
+        // Separate-economy worlds pause tracking entirely so their time and loot never dilute the
+        // main session; leaving resumes like a relog and re-baselines (owner 1.5.0).
+        if (onUnsupportedWorld()) {
+            boolean entering = !engine.separateWorld;
+            engine.pauseForWorld(SafeMath.now());
+            if (entering) pulse();
+            return;
+        }
+        if (engine.separateWorld) {
+            engine.separateWorld = false;
+            if (engine.resume(SafeMath.now(), WORLD)) rebaseline();
+        }
         // Any ironman account type (iron, ultimate, hardcore, group) reads 1-6 (OSRS Wiki, RuneLite
         // gameval).
         valuation.alch =
@@ -1445,7 +1550,13 @@ public class GpManagerPlugin extends Plugin {
         }
         boolean activeAnimation = localPlayer != null && localPlayer.getAnimation() != -1;
         boolean activeInteraction = localPlayer != null && localPlayer.getInteracting() != null;
+        // Moving is not AFK: it holds off and lifts AFK pause, but never starts tracking (owner 1.5.0).
+        boolean moved = tile != null && lastTile != null && !tile.equals(lastTile);
+        lastTile = tile;
+        int afk = config.afkPauseMinutes() * 100;
         if (activeAnimation || activeInteraction) markGameplayActivity();
+        else if (moved) markActivity();
+        else idleTick(afk);
         interactionContextTracker.onGameTick();
         if (bankOpen) {
             engine.bankOpened(max(CORRELATION_TICKS, stableTicks(2)));
@@ -1459,9 +1570,11 @@ public class GpManagerPlugin extends Plugin {
             bankClearedInteractionThisOpen = false;
             engine.bankClosed();
         }
-        // Character idle drops a leftover NPC hint so leaving idle does not revive the last kill.
+        // Character idle drops a leftover NPC hint so leaving idle does not revive the last kill;
+        // reading the exchange or a trade window is not idle (owner 1.5.0).
         if (characterIdleTracker.onGameTick()
                 && config.autoActivityDetection()
+                && !windowHoldsActivity()
                 && !"General".equalsIgnoreCase(activity.detectedActivity)) {
             activity.resetToGeneral(true);
         }
@@ -1648,7 +1761,23 @@ public class GpManagerPlugin extends Plugin {
         return !canIngest() || event == null;
     }
 
+    /** Ticks without gameplay or movement, for AFK pause (100 ticks a minute). */
+    int idleTicks;
+
+    WorldPoint lastTile;
+
+    /**
+     * One still tick toward AFK pause. Past the limit, a run that is no longer AFK-paused was
+     * resumed from the status dot, so the AFK clock starts over instead of pausing again at once.
+     */
+    void idleTick(int afk) {
+        if (afk <= 0 || ++idleTicks < afk) return;
+        if (idleTicks > afk && !engine.isIdlePaused()) idleTicks = 0;
+        else engine.pauseIdle(SafeMath.now());
+    }
+
     void markActivity() {
+        idleTicks = 0;
         if (!canIngest()) return;
         long now = SafeMath.now();
         // Inventory/bank context alone resumes a saved Idle pause but never Manual/Stop and
@@ -1656,11 +1785,27 @@ public class GpManagerPlugin extends Plugin {
         if (engine.resume(now, IDLE)) rebaseline();
     }
 
+    /**
+     * A click in the game world (walk, NPC, object, ground item, player, use or cast on one) or on
+     * an item lifts AFK pause; side tabs and panels such as Friends or Skills do not (owner 1.5.0).
+     */
+    static boolean worldAction(MenuAction action, boolean itemOp) {
+        String name = action == null ? "" : action.name();
+        return itemOp
+                || action == MenuAction.WALK
+                || name.startsWith("NPC_")
+                || name.startsWith("GAME_OBJECT_")
+                || name.startsWith("GROUND_ITEM_")
+                || name.startsWith("PLAYER_")
+                || name.startsWith("WIDGET_TARGET_ON_");
+    }
+
     void markGameplayActivity() {
         markGameplayActivity(false);
     }
 
     void markGameplayActivity(boolean beforeItemChange) {
+        idleTicks = 0;
         if (!canIngest()) return;
         long now = SafeMath.now();
         if (engine.autoStart(now)) {

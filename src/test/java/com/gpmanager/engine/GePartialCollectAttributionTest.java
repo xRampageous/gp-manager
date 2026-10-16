@@ -402,6 +402,44 @@ public class GePartialCollectAttributionTest
         assertEquals(1, owner.unattributedCoinRows());
     }
 
+    /**
+     * Owner live 2026-10-16 (recording 20261015-234131): coins picked up off the ground at
+     * Zilyana within two hours of a finished sale went to Review as "Grand Exchange". Proceeds
+     * reach the pack only through a Collect, so without one the coins are a pickup, whether the
+     * sale was already collected or is still waiting in its slot.
+     */
+    @Test
+    public void groundCoinsNearAFinishedSaleAreAPickupNotItsProceeds()
+    {
+        Owner collected = new Owner();
+        long t = T0 + 10_000L;
+        collected.placeAndSell(3, SHARK, 10L, 9_780L, t);
+        collected.clearSlot(3, SHARK, t + 20_000L + 600L);
+        collected.collect(9_590L, t + 20_000L, true);
+        assertEquals(MarketRows.Lifecycle.REALIZED, collected.row(SHARK).lifecycle);
+        assertPickup(collected, 19_911L, t + 16 * 60_000L);
+
+        Owner waiting = new Owner();
+        waiting.placeAndSell(3, SHARK, 10L, 9_780L, t);
+        assertPickup(waiting, 19_949L, t + 20 * 60_000L);
+        assertEquals("the sale still waits for its own Collect", 0L, waiting.row(SHARK).settledQty);
+        waiting.clearSlot(3, SHARK, t + 30 * 60_000L + 600L);
+        waiting.collect(9_590L, t + 30 * 60_000L, true);
+        assertEquals(9_590L, waiting.row(SHARK).observedSettlementGp);
+    }
+
+    private static void assertPickup(Owner owner, long coins, long at)
+    {
+        owner.collect(coins, at, false);
+        List<Transaction> rows = owner.engine.getActiveSession().getTransactions();
+        Transaction pickup = rows.get(rows.size() - 1);
+        assertEquals(TransactionType.GAIN, pickup.getType());
+        assertTrue("the pickup counts", pickup.isCounted());
+        assertEquals("", pickup.getNote());
+        assertFalse("no Review", ReviewRules.needsOwnerDecision(pickup));
+        assertEquals(coins, pickup.getFlows().get(0).quantityDelta);
+    }
+
     @Test
     public void partialFillCollectFromAnActiveSellIsUnchanged()
     {
@@ -690,7 +728,7 @@ public class GePartialCollectAttributionTest
         void maintenance(long at)
         {
             for (Transaction booking : engine.geCustody.maintenance(at,
-                engine.getActiveSession().getId()).countedBookings)
+                engine.getActiveSession().getId()))
             {
                 engine.getActiveSession().addTransaction(booking, 500, true);
             }
@@ -750,7 +788,7 @@ public class GePartialCollectAttributionTest
         {
             for (MarketRows.Row row : engine.marketRows())
             {
-                if (row.slot == slot && row.itemId == itemId)
+                if (MarketFacts.record(engine, row).slot == slot && row.itemId == itemId)
                 {
                     return row;
                 }

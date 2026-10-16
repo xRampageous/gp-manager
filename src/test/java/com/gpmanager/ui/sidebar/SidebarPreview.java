@@ -84,6 +84,7 @@ public final class SidebarPreview
         grindsDetail(out);
         grindsStartWithChanges(out);
         grindsDataMenu(out);
+        sheets(out);
         r31FreshLive(out);
         r31GrindsNoTargets(out);
         r31GrindsTargetCalculating(out);
@@ -197,6 +198,7 @@ public final class SidebarPreview
         engine.setTargets(200_000L, 150L * 60_000L, SafeMath.now());
         // The fixture's aim counts the run's net: baseline zero.
         engine.getActiveSession().profitTargetSetNet = 0L;
+        engine.getActiveSession().profitTargetSetActiveMillis = 0L;
         // The fixture shows the timer set at the run's start (62m in), not a fresh zero.
         engine.getActiveSession().activeTimeTargetSetMillis =
                 engine.getActiveSession().getElapsedMillis(SafeMath.now()) - 62L * 60_000L;
@@ -317,6 +319,8 @@ public final class SidebarPreview
         SidebarPanel panel = panel(engine, PvpState.NONE);
         panel.shell().show(Shell.GRINDS);
         paint(panel, new File(out, "r31-c-grinds-target-calculating.png"));
+        panel.shell().show(Shell.LIVE);
+        paint(panel, new File(out, "r31-d-live-net-running.png"));
     }
 
     // ---- R4 Insights / recap fixtures ---------------------------------------------------------
@@ -380,7 +384,7 @@ public final class SidebarPreview
         }
         if (definition == null)
         {
-            definition = engine.saveGrind(name, null, null, false, null);
+            definition = engine.saveGrind(name, null, null, false);
         }
         engine.startGrind(name, definition.getGrindId(), null, null, startedAt);
         engine.getActiveSession().addTransaction(booked(startedAt + 1_000L, "Dragon bones", 536, 1,
@@ -498,7 +502,7 @@ public final class SidebarPreview
         }
         if (definition == null)
         {
-            definition = engine.saveGrind(name, null, null, false, null);
+            definition = engine.saveGrind(name, null, null, false);
         }
         engine.startGrind(name, definition.getGrindId(), null, null, start);
         engine.getActiveSession().addTransaction(booked(start + 1_000L, "Dragon bones", 536, 1,
@@ -561,6 +565,7 @@ public final class SidebarPreview
         Engine engine = grindsFixture();
         SidebarPanel panel = panel(engine, PvpState.NONE);
         panel.shell().show(Shell.GRINDS);
+        panel.grinds.select(engine.getSavedGrinds(false).get(0).grindId);
         paint(panel, new File(out, "g-b-my-grinds.png"));
     }
 
@@ -600,16 +605,19 @@ public final class SidebarPreview
         paint(panel, new File(out, "g-d-grind-detail.png"));
     }
 
+    /** The one Start sheet: what Free play is doing now first, then a new name with targets. */
     private static void grindsStartWithChanges(File out) throws IOException
     {
-        Engine engine = grindsFixture();
-        String grindId = engine.getSavedGrinds(false).get(0).getGrindId();
-        SidebarPanel panel = panel(engine, PvpState.NONE);
-        panel.shell().show(Shell.GRINDS);
-        javax.swing.JPanel form = SidebarPanelProbe.startWithChangesForm(panel, grindId);
-        SidebarPanelProbe.disposeFrame(panel);
-        form.setSize(220, Math.max(120, form.getPreferredSize().height));
-        paintComponent(form, new File(out, "g-e-start-with-changes.png"));
+        for (String doing : new String[] {"Vorkath", "Muspah"})
+        {
+            Engine engine = grindsFixture();
+            engine.finishCustom(SafeMath.now());
+            engine.setDetectedActivity(doing, SafeMath.now());
+            SidebarPanel panel = panel(engine, PvpState.NONE);
+            panel.shell().show(Shell.GRINDS);
+            new GrindsController(panel).newGrind();
+            paint(panel, new File(out, "g-e-start-grind-" + doing.toLowerCase() + ".png"));
+        }
     }
 
     private static void grindsDataMenu(File out) throws IOException
@@ -625,6 +633,29 @@ public final class SidebarPreview
         paintComponent(menu, new File(out, "g-f-data-recovery-menu.png"));
     }
 
+    /** The Getting started and Start fresh sheets at sidebar width (owner 2026-10-16). */
+    private static void sheets(File out) throws IOException
+    {
+        SidebarPanel guide = panel(grindsFixture(), PvpState.NONE);
+        new GrindsController(guide).guide();
+        paint(guide, new File(out, "g-g-getting-started.png"));
+        Engine free = engine();
+        free.ensureSession(SafeMath.now() - 60_000L);
+        SidebarPanel fresh = panel(free, PvpState.NONE);
+        new GrindsController(fresh).startFresh();
+        paint(fresh, new File(out, "g-h-start-fresh.png"));
+        SidebarPanel reset = panel(grindsFixture(), PvpState.NONE);
+        new GrindsController(reset).factoryReset();
+        paint(reset, new File(out, "g-i-factory-reset.png"));
+        SidebarPanel targets = panel(grindsFixture(), PvpState.NONE);
+        new GrindsController(targets).openTargets();
+        paint(targets, new File(out, "g-j-targets.png"));
+        Engine saved = grindsFixture();
+        SidebarPanel edit = panel(saved, PvpState.NONE);
+        new GrindsController(edit).editSavedGrind(saved.getSavedGrinds(false).get(0).grindId);
+        paint(edit, new File(out, "g-k-edit-grind.png"));
+    }
+
     private static Engine grindsFixture()
     {
         Engine engine = engine();
@@ -635,12 +666,12 @@ public final class SidebarPreview
         engine.getActiveSession().addTransaction(consumed(now + 3_000L, "Prayer potion(4)", 2434, -2, 9_800, -19_600L), 2_000);
         engine.getActiveSession().setProfitTargetGp(5_000_000L);
         engine.getActiveSession().setActiveTimeTargetMillis(3L * 3_600_000L, SafeMath.now());
-        engine.saveGrind("Vorkath", 5_000_000L, 3L * 3_600_000L, true, engine.getActiveSession().getId());
-        engine.finishCustom(now + 10_000L);
+        engine.getActiveSession().setGrindId(engine.saveGrind("Vorkath", 5_000_000L, 3L * 3_600_000L, true).getGrindId());
+        engine.finishCustom(now + 3_600_000L);
 
         engine.startCustom("Zulrah", SafeMath.now() - 60_000L);
         engine.getActiveSession().addTransaction(booked(SafeMath.now() - 50_000L, "Magic logs", 1513, 5, 699, 3_495), 2_000);
-        engine.saveGrind("Zulrah", 2_000_000L, null, false, engine.getActiveSession().getId());
+        engine.getActiveSession().setGrindId(engine.saveGrind("Zulrah", 2_000_000L, null, false).getGrindId());
         engine.getActiveSession().setProfitTargetGp(5_000_000L);
         engine.getActiveSession().setActiveTimeTargetMillis(3L * 3_600_000L, SafeMath.now());
         return engine;

@@ -54,14 +54,17 @@ public final class LedgerPageProbe
         }
     }
 
-    /** The one effective Net contribution of a booked settlement, as the old proof worded it. */
-    public static String netContributionText(MarketRows.Row market)
+    /**
+     * The one effective Net contribution of a booked settlement, as the old proof worded it;
+     * {@code corrected} is the receipt's own correction state, as the Ledger passes it.
+     */
+    public static String netContributionText(MarketRows.Row market, boolean corrected)
     {
         if (!market.realizedResultCorrectionAware)
         {
             return "0 · not counted";
         }
-        if (market.correctionApplied)
+        if (corrected)
         {
             return Fmt.exactSigned(market.realizedResultGp) + " gp · corrected";
         }

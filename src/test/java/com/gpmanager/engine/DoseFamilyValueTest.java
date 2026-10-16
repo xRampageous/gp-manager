@@ -101,7 +101,8 @@ public class DoseFamilyValueTest
             new Class<?>[] {ItemComposition.class}, (proxy, method, args) ->
             {
                 if ("getName".equals(method.getName())) return name;
-                if (method.getReturnType() == boolean.class) return false;
+                // Potions and amulets trade on the Grand Exchange.
+                if (method.getReturnType() == boolean.class) return "isTradeable".equals(method.getName());
                 if (method.getReturnType() == int.class) return 0;
                 if (method.getReturnType() == long.class) return 0L;
                 return null;

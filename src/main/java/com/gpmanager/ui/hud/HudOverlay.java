@@ -1,17 +1,14 @@
 package com.gpmanager;
 
 import static com.gpmanager.Kit.*;
-
 import static java.lang.Math.*;
 
 import com.gpmanager.GpManagerConfig.TextSize;
 import com.gpmanager.HudFrame.Row;
 import com.gpmanager.Kit.Tone;
-
+import java.awt.*;
 import net.runelite.client.ui.FontManager;
 import net.runelite.client.ui.overlay.*;
-
-import java.awt.*;
 
 /**
  * HUD+ (Pulse role, Trip layout): gem, title and timer; Net first with the target folded in, the
@@ -73,7 +70,7 @@ class HudOverlay extends Overlay {
     String title = "";
     String context = "";
     String[] names = {};
-    Rectangle[] crops = {};
+    java.awt.image.BufferedImage[] sprites = {};
 
     HudOverlay(HudBuilder builder, GpManagerConfig config) {
         this.builder = builder;
@@ -169,15 +166,11 @@ class HudOverlay extends Overlay {
         g.setColor(gemColor(frame.gem, motion, now));
         g.fillOval(PAD, y + fh.getHeight() / 2 - 3, 7, 7);
         Color rateColor = frame.rate.endsWith("/h") ? Color.WHITE : LABEL;
-        if (rateUp) {
-            text(g, body, frame.timer, PAD + 11, y + fh.getAscent(), LABEL);
-            text(g, body, frame.rate, right - width(fb, frame.rate), y + fh.getAscent(), rateColor);
-        } else {
-            // The timer keeps the left; the kill count owns the right, with the rate under it on
-            // the money row (owner live 2026-10-14) — the timer never jumps sides.
-            text(g, body, frame.timer, PAD + 11, y + fh.getAscent(), LABEL);
-            text(g, body, title, right - width(fb, title), y + fh.getAscent(), Color.WHITE);
-        }
+        // The timer keeps the left; the kill count owns the right, with the rate under it on the
+        // money row (owner live 2026-10-14) — the timer never jumps sides.
+        String head = rateUp ? frame.rate : title;
+        text(g, body, frame.timer, PAD + 11, y + fh.getAscent(), LABEL);
+        text(g, body, head, right - width(fb, head), y + fh.getAscent(), rateUp ? rateColor : Color.WHITE);
         if (compact) return;
         y += fh.getHeight() + 1;
         // The chip keeps its own few seconds and fades on its own, whatever the tray is doing.
@@ -244,35 +237,11 @@ class HudOverlay extends Overlay {
                 g.setColor(GOLD_ROW);
                 g.fillRect(0, y, width, rowHeight);
             }
-            if (row.icon != null && crops[i] != null) {
-                Rectangle crop = crops[i];
-                // Sprites shrink smoothly to fit and are never blown up: a small sprite stays
-                // crisp.
-                double scale = min(1d, ICON / (double) max(crop.width, crop.height));
-                g.setRenderingHint(
-                        RenderingHints.KEY_INTERPOLATION,
-                        scale < 1d
-                                ? RenderingHints.VALUE_INTERPOLATION_BILINEAR
-                                : RenderingHints.VALUE_INTERPOLATION_NEAREST_NEIGHBOR);
-                int w = (int) round(crop.width * scale);
-                int h = (int) round(crop.height * scale);
-                int dx = PAD + (ICON - w) / 2;
-                int dy = y + (ICON - h) / 2;
-                g.drawImage(
-                        row.icon,
-                        dx,
-                        dy,
-                        dx + w,
-                        dy + h,
-                        crop.x,
-                        crop.y,
-                        crop.x + crop.width,
-                        crop.y + crop.height,
-                        null);
-            }
+            // Sprites are fitted once per snapshot: shrunk smoothly, never blown up, centred.
+            if (sprites[i] != null) g.drawImage(sprites[i], PAD, y, null);
             int textY = y + (rowHeight + fb.getAscent()) / 2 - 1;
             int valueX = right - width(fb, row.value);
-            text(g, body, names[i], PAD + indent, textY, Color.WHITE);
+            text(g, body, names[i], PAD + indent, textY, row.highlight == null ? Color.WHITE : row.highlight);
             text(g, body, row.value, valueX, textY, row.color);
             text(g, body, row.tag, valueX - 4 - width(fb, row.tag), textY, LABEL);
             y += rowHeight;
@@ -343,7 +312,7 @@ class HudOverlay extends Overlay {
         }
         context = fit(fb, frame.context, inner);
         names = new String[rows];
-        crops = new Rectangle[rows];
+        sprites = new java.awt.image.BufferedImage[rows];
         for (int i = 0; i < rows; i++) {
             Row row = frame.rows.get(i);
             // Owner 1.2: a long name shortens before its count, so the "×2" always shows.
@@ -355,7 +324,7 @@ class HudOverlay extends Overlay {
                                     row.name.substring(0, row.name.length() - count.length()),
                                     inner - indent - 8 - right(fb, row) - width(fb, count))
                             + count;
-            crops[i] = row.icon == null ? null : Kit.visible(row.icon);
+            sprites[i] = row.icon == null ? null : fitIcon(row.icon, ICON);
         }
         restHeight =
                 PAD * 2

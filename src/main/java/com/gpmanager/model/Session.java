@@ -6,17 +6,17 @@ import static com.gpmanager.GameData.msg;
 import static com.gpmanager.PauseReason.*;
 import static com.gpmanager.Phrases.*;
 import static com.gpmanager.SafeMath.*;
-
+import static com.gpmanager.SafeMath.safeAdd;
 import static java.lang.Math.*;
 import static java.util.Collections.*;
 
 import com.gpmanager.Accounting.Amounts;
 import com.gpmanager.CorrectionRecord.Change;
-
-import lombok.*;
-
+import java.time.*;
+import java.time.temporal.ChronoUnit;
 import java.util.*;
 import java.util.function.Predicate;
+import lombok.*;
 
 class Session {
     /** The always-on General tracker is shown as "Overall". */
@@ -38,53 +38,17 @@ class Session {
     transient long saveStamp;
 
     /** Runtime-only pooled known-basis observer; the engine wires the tracked-basis ledger. */
-    transient ValueObserver ownedValueObserver;
-
-    /**
-     * Canonical owned-value observer used by the schema-106 pooled known-basis ledger. Change
-     * validation happens BEFORE any canonical mutation: a false answer must leave the transaction
-     * exactly as it was. It never books GP itself.
-     */
-    interface ValueObserver {
-        /** Validate a pending effective change; false blocks the mutation before it happens. */
-        boolean canChange(
-                Transaction transaction,
-                Correction previousCorrection,
-                List<Flow> previousFlows,
-                Correction nextCorrection,
-                List<Flow> nextFlows);
-
-        /** Apply the exact effective delta after a permitted change. */
-        void onChanged(
-                Transaction transaction, Correction previousCorrection, List<Flow> previousFlows);
-
-        /** Validate restoring a previously removed transaction; false blocks the restore. */
-        boolean canAdd(Transaction transaction);
-
-        /** Validate removing a retained transaction (undo); false blocks the removal. */
-        boolean canRemove(Transaction transaction);
-
-        /** Book a newly added canonical transaction's known coverage/sink depletion. */
-        void onAdded(Transaction transaction, boolean custodyOwned);
-
-        /** Reverse a removed transaction's known coverage. */
-        void onRemoved(Transaction transaction);
-
-        /** A row that was on the ground is used up: what is left on it leaves the record. */
-        void onUsedUp(Transaction transaction);
-    }
+    transient TrackedBasisLedger ownedValueObserver;
 
     /** A drop or shot nobody picked up is used up, off the ground and off the paid-price record. */
     void usedUp(Transaction row) {
         row.setOnGround(false);
-        ValueObserver observer = ownedValueObserver;
-        if (observer != null) observer.onUsedUp(row);
+        if (ownedValueObserver != null) ownedValueObserver.onUsedUp(row);
         notifyChanged();
     }
 
     void notifyOwnedValue(Transaction transaction, boolean custodyOwned) {
-        ValueObserver observer = ownedValueObserver;
-        if (observer != null) observer.onAdded(transaction, custodyOwned);
+        if (ownedValueObserver != null) ownedValueObserver.onAdded(transaction, custodyOwned);
     }
 
     boolean canChangeOwnedValue(
@@ -93,17 +57,16 @@ class Session {
             List<Flow> previousFlows,
             Correction nextCorrection,
             List<Flow> nextFlows) {
-        ValueObserver observer = ownedValueObserver;
-        return observer == null
-                || observer.canChange(
+        return ownedValueObserver == null
+                || ownedValueObserver.canChange(
                         transaction, previousCorrection, previousFlows, nextCorrection, nextFlows);
     }
 
     /** Announces a changed row: totals, PvP and the owned-value observer follow it. */
     void changed(Transaction transaction, Correction previousCorrection, List<Flow> previousFlows) {
         transactionChanged(transaction);
-        ValueObserver observer = ownedValueObserver;
-        if (observer != null) observer.onChanged(transaction, previousCorrection, previousFlows);
+        if (ownedValueObserver != null)
+            ownedValueObserver.onChanged(transaction, previousCorrection, previousFlows);
     }
 
     void log(long now, String reason, Change... changes) {
@@ -134,6 +97,9 @@ class Session {
     // The session's Net when the target above was last set: the aim counts what has been earned
     // since (owner live 2026-10-14). Null on older saves counts from the run's start.
     Long profitTargetSetNet;
+
+    /** The run's Active Time when the Net aim was set; its pace counts from there (owner 2026-10-16). */
+    Long profitTargetSetActiveMillis;
     // Signature targets: the actual Active-Time aim this Grind instance ran with, and the stable
     // My Grind lineage link it was started from. Both are metadata; neither books anything.
     Long activeTimeTargetMillis;
@@ -154,13 +120,13 @@ class Session {
     }
 
     Session(String name, long startedAtEpochMillis, SessionMode mode) {
-        this.id = UUID.randomUUID().toString();
+        id = UUID.randomUUID().toString();
         this.name = normalizeName(name);
         this.mode = mode == null ? SessionMode.GENERAL : mode;
-        this.activityHint = "General";
+        activityHint = "General";
         this.startedAtEpochMillis = startedAtEpochMillis;
-        this.transactionLimit = 2_000;
-        this.retainedCostSplitComplete = true;
+        transactionLimit = 2_000;
+        retainedCostSplitComplete = true;
     }
 
     void addTransaction(Transaction transaction, int maxTransactions) {
@@ -205,25 +171,23 @@ class Session {
     }
 
     boolean setProfitTargetGp(Long value) {
-        return setProfitTargetGp(value, 0L);
+        return setProfitTargetGp(value, 0L, 0L);
     }
 
     /**
-     * Sets the Net aim and the run's Net at the set moment (owner live 2026-10-14): a changed
-     * value counts from now, as does the same value once the aim is already reached; an unchanged,
+     * Sets the Net aim and the run's Net at the set moment (owner live 2026-10-14): a changed value
+     * counts from now, as does the same value once the aim is already reached; an unchanged,
      * unreached value keeps its count.
      */
-    boolean setProfitTargetGp(Long value, long sessionNet) {
+    boolean setProfitTargetGp(Long value, long sessionNet, long activeMillis) {
         Long next = value == null || value <= 0L ? null : value;
         if (Objects.equals(next, profitTargetGp)) {
-            if (next != null && sessionNet - getProfitTargetSetNet() >= next) {
-                profitTargetSetNet = sessionNet;
-                return true;
-            }
-            return false;
+            return next != null
+                    && sessionNet - getProfitTargetSetNet() >= next
+                    && rebaseProfitTarget(sessionNet, activeMillis);
         }
         profitTargetGp = next;
-        profitTargetSetNet = next == null ? null : sessionNet;
+        rebaseProfitTarget(sessionNet, activeMillis);
         return true;
     }
 
@@ -238,13 +202,18 @@ class Session {
     }
 
     /**
-     * Re-bases the set Net aim's count on the given net, keeping its value (owner live
-     * 2026-10-14): Reset counts the aim from now whether or not it was reached.
+     * Re-bases the set Net aim's count on the given net, keeping its value (owner live 2026-10-14):
+     * Reset counts the aim from now whether or not it was reached.
      */
-    boolean rebaseProfitTarget(long sessionNet) {
-        if (profitTargetGp == null) return false;
-        profitTargetSetNet = sessionNet;
-        return true;
+    boolean rebaseProfitTarget(long sessionNet, long activeMillis) {
+        profitTargetSetNet = profitTargetGp == null ? null : sessionNet;
+        profitTargetSetActiveMillis = profitTargetGp == null ? null : activeMillis;
+        return profitTargetGp != null;
+    }
+
+    /** Active Time the Net aim has run for; the whole run on older saves. */
+    long profitTargetActiveMillis(long elapsedMillis) {
+        return nonNeg(elapsedMillis - (profitTargetSetActiveMillis == null ? 0L : profitTargetSetActiveMillis));
     }
 
     /** The actual Active-Time target this instance ran with; null when none was set. */
@@ -318,7 +287,9 @@ class Session {
         return true;
     }
 
-    /** Restarts the set target's count from now without changing its value (owner live 2026-10-13). */
+    /**
+     * Restarts the set target's count from now without changing its value (owner live 2026-10-13).
+     */
     void rearmTimeTarget(long now) {
         if (activeTimeTargetMillis != null) {
             activeTimeTargetSetMillis = getElapsedMillis(now);
@@ -556,7 +527,7 @@ class Session {
         if (transaction == null) return false;
         boolean sawTarget = false;
         for (Flow flow : transaction.getFlows()) {
-            if (flow == null || flow.quantityDelta == 0L) continue;
+            if (flow.quantityDelta == 0L) continue;
             if (flow.itemId != itemId) return false;
             if (flow.quantityDelta > 0L) sawTarget = true;
         }
@@ -583,14 +554,13 @@ class Session {
     Transaction undoTransaction() {
         if (transactions.isEmpty()) return null;
         Transaction removed = transactions.get(transactions.size() - 1);
-        ValueObserver observer = ownedValueObserver;
-        if (observer != null && !observer.canRemove(removed)) {
+        if (ownedValueObserver != null && !ownedValueObserver.canRemove(removed)) {
             // Known coverage was already reserved/realized downstream; leave it untouched.
             return null;
         }
         transactions.remove(transactions.size() - 1);
         notifyChanged();
-        if (observer != null) observer.onRemoved(removed);
+        if (ownedValueObserver != null) ownedValueObserver.onRemoved(removed);
         undoHistory.add(new UndoRecord(removed));
         int overflow = undoHistory.size() - MAX_UNDO_HISTORY;
         if (overflow > 0) undoHistory.subList(0, overflow).clear();
@@ -602,8 +572,7 @@ class Session {
             UndoRecord record = undoHistory.get(index);
             if (record == null || record.restored || record.transaction == null) continue;
             Transaction restored = record.transaction;
-            ValueObserver observer = ownedValueObserver;
-            if (observer != null && !observer.canAdd(restored)) {
+            if (ownedValueObserver != null && !ownedValueObserver.canAdd(restored)) {
                 // Restoring would re-add known coverage after a later realization; refuse it.
                 return null;
             }
@@ -820,6 +789,13 @@ class Session {
         return profitTargetGp != null && profitTargetGp > 0L ? profitTargetGp : null;
     }
 
+    /** A loaded session is cleaned once: no null rows or flows reach any reader. */
+    void sanitize() {
+        if (transactions == null) transactions = new ArrayList<>();
+        transactions.removeIf(java.util.Objects::isNull);
+        for (Transaction transaction : transactions) transaction.sanitize();
+    }
+
     List<Transaction> getTransactions() {
         return unmodifiableList(transactions);
     }
@@ -876,7 +852,8 @@ enum PauseReason {
     IDLE,
     LIFECYCLE,
     RECOVERY,
-    CUSTOM_SESSION
+    CUSTOM_SESSION,
+    WORLD
 }
 
 /** A transaction removed through the undo action, kept so the latest one can be restored. */
@@ -890,5 +867,194 @@ class UndoRecord {
 
     UndoRecord(Transaction transaction) {
         this.transaction = transaction;
+    }
+}
+
+/** Only the canonical money, active clock and rate facts consumed by presentation and export. */
+class Metrics {
+    String activityHint;
+    boolean paused;
+    long elapsedMillis;
+    long revenue;
+    long costs;
+    long net;
+    long profitPerHour;
+    long suppliesCosts;
+    long otherCosts;
+    boolean costSplitAvailable;
+
+    static Metrics none() {
+        return new Metrics("General", false, 0L, 0L, 0L, 0L, 0L);
+    }
+
+    Metrics(
+            String activityHint,
+            boolean paused,
+            long elapsedMillis,
+            long revenue,
+            long costs,
+            long net,
+            long profitPerHour) {
+        this(
+                activityHint,
+                paused,
+                elapsedMillis,
+                revenue,
+                costs,
+                net,
+                profitPerHour,
+                0L,
+                0L,
+                false);
+    }
+
+    Metrics(
+            String activityHint,
+            boolean paused,
+            long elapsedMillis,
+            long revenue,
+            long costs,
+            long net,
+            long profitPerHour,
+            long suppliesCosts,
+            long otherCosts,
+            boolean costSplitAvailable) {
+        this.activityHint = activityHint;
+        this.paused = paused;
+        this.elapsedMillis = elapsedMillis;
+        this.revenue = revenue;
+        this.costs = costs;
+        this.net = net;
+        this.profitPerHour = profitPerHour;
+        this.suppliesCosts = suppliesCosts;
+        this.otherCosts = otherCosts;
+        this.costSplitAvailable = costSplitAvailable && safeAdd(suppliesCosts, otherCosts) == costs;
+    }
+}
+
+/**
+ * Closed-session history management and receipt retention: UTC-day compaction sweeps, retention
+ * status, profile size/data-health facts and the history session reads/edits. The history list
+ * itself stays on the engine because owner lifecycle appends to it. Invoked only under the {@link
+ * Engine} monitor.
+ */
+@RequiredArgsConstructor
+class SessionArchive {
+    /** UTC day of the last receipt-retention sweep; null before the first one this run. */
+    LocalDate lastSweepDay;
+
+    final Engine engine;
+
+    void clear() {
+        lastSweepDay = null;
+    }
+
+    /** Post-restore compaction with the configured window; it counts as today's sweep. */
+    void compactAfterRestore(long now) {
+        compactOlderThan(retentionDays(), now);
+        lastSweepDay = utcDay(now);
+    }
+
+    void adoptFrom(SessionArchive staged) {
+        lastSweepDay = staged.lastSweepDay;
+    }
+
+    /** The configured receipt retention in days; 0 keeps receipts forever. */
+    int retentionDays() {
+        Retention period = engine.config.receiptRetentionDays();
+        return period == null ? Retention.DAYS_90.days : period.days;
+    }
+
+    static LocalDate utcDay(long now) {
+        return Instant.ofEpochMilli(now).atZone(ZoneOffset.UTC).toLocalDate();
+    }
+
+    void trimHistory() {
+        int maxHistory = Math.max(1, engine.config.maxHistorySessions());
+        if (engine.history.size() > maxHistory) {
+            engine.history.subList(maxHistory, engine.history.size()).clear();
+            engine.bumpRevision();
+        }
+    }
+
+    /**
+     * Compacts closed sessions strictly older than {@code days}; a zero window means forever and
+     * performs no compaction. The session metadata and all retained accounting aggregates remain
+     * available.
+     *
+     * @return receipt rows compacted
+     */
+    int compactOlderThan(int days, long now) {
+        if (days <= 0) return 0;
+        long cutoff;
+        try {
+            cutoff = Instant.ofEpochMilli(now).minus(days, ChronoUnit.DAYS).toEpochMilli();
+        } catch (RuntimeException ex) {
+            cutoff = Long.MIN_VALUE;
+        }
+        // Rows still needed individually: an unresolved claim's audit row and the settlement that
+        // carries a claim id keep their detail until the claim resolves (section L).
+        Set<String> pendingClaimIds = engine.pendingClaimIds();
+        Predicate<Transaction> keep =
+                transaction ->
+                        isPendingClaimRow(transaction, pendingClaimIds)
+                                || (!transaction.sourceClaimId().isEmpty()
+                                        && pendingClaimIds.contains(transaction.sourceClaimId()));
+        int compactedReceipts = 0;
+        for (Session session : engine.uniqueSessions()) {
+            if (session == null || session.getTransactions().isEmpty()) continue;
+            compactedReceipts =
+                    SafeMath.safeAddCount(compactedReceipts, session.compactBefore(cutoff, keep));
+        }
+        if (compactedReceipts > 0) engine.bumpRevision();
+        return compactedReceipts;
+    }
+
+    /**
+     * A multi-key audit row owns claims named {@code auditId#n}; retain its base row while any
+     * derived claim remains unresolved so provenance survives receipt compaction.
+     */
+    static boolean isPendingClaimRow(Transaction transaction, Set<String> pendingClaimIds) {
+        if (transaction == null || empty(pendingClaimIds)) return false;
+        String transactionId = transaction.getId();
+        if (pendingClaimIds.contains(transactionId)) return true;
+        String derivedPrefix = transactionId + "#";
+        for (String claimId : pendingClaimIds) {
+            if (claimId != null && claimId.startsWith(derivedPrefix)) return true;
+        }
+        return false;
+    }
+
+    /**
+     * The game tick's daily sweep: the first tick of each later UTC day compacts once. The first
+     * tick of a run only marks the day, since a restore already swept.
+     */
+    int maintainRetention(long now) {
+        LocalDate today = utcDay(now);
+        if (lastSweepDay != null && !today.isAfter(lastSweepDay)) return 0;
+        boolean first = lastSweepDay == null;
+        lastSweepDay = today;
+        return first ? 0 : compactOlderThan(retentionDays(), now);
+    }
+
+    Session historySession(String sessionId) {
+        if (empty(sessionId)) return null;
+        for (Session session : engine.history) {
+            if (sessionId.equals(session.getId())) return session;
+        }
+        return null;
+    }
+
+    Metrics historyMetrics(String sessionId, long now) {
+        Session session = historySession(sessionId);
+        return session == null ? null : session.metrics(now);
+    }
+
+    boolean deleteHistory(String sessionId) {
+        Session session = historySession(sessionId);
+        if (session == null) return false;
+        engine.history.remove(session);
+        engine.bumpRevision();
+        return true;
     }
 }

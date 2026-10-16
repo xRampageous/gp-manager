@@ -1,5 +1,33 @@
 # GP Manager changelog
 
+## 1.5.0 - 2026-10-16
+
+**New**
+- Simpler Grinds: one Start Grind sheet lists your Grinds (what you're doing now first) or takes a new name with targets. Every Grind you start is remembered, and the targets you change carry over to its next run. My Grinds shows each one's average GP/h, and starting a Grind opens Live.
+- A shorter Targets form with one-click picks (5m, one bond, 20m to 1b; 30m to 6h; Clear). A running Net target has a ✓ Done button.
+- Start fresh: click the ACTIVE clock on Live to move Free play's run so far into Recent grinds and start again at zero. Nothing is deleted.
+- A short "Getting started" guide in the ⚙ menu, and a factory reset that says plainly what it deletes.
+- AFK pause (off by default): after the chosen minutes without playing, tracking pauses so GP/h leaves AFK time out. Playing or moving resumes it; opening tabs like Friends or Skills does not.
+- Leagues, Deadman, beta, tournament and other separate worlds pause tracking, so they never skew your regular GP/h.
+- Blast Furnace: the coffer's drain counts as a cost; deposits and withdrawals stay neutral.
+- Hiding one dose of a potion from Recent hides all its doses.
+- An "Always show items" setting keeps the items you list on the tray and Live even when Ground Items hides them or they are under the minimum value, and drops on Ground Items' highlighted list show in its highlight colour.
+- Your history updates itself on login: worthless items show "—", old tablet breaks and alchs show as their spell, and coins picked up near a Grand Exchange sale leave Review. Rows you corrected are never changed.
+
+**Fixed**
+- High Level Alchemy (including "Really cast?") and broken magic tablets show as their spell, one row at its net; something picked up in the same moment books as its own pickup.
+- Items with no Grand Exchange price use their alch value on every account, or show "—" when they have neither; items with both keep the GE price unless an ironman turns on alch values.
+- Half pies, half pizzas and cake slices are priced as their share of the whole one.
+- Puzzle boxes and clue keys count as clue items worth nothing until the trail pays out.
+- Coins picked up while a finished sale waits to be collected no longer go to Review as "Grand Exchange".
+- The Live RECENT total counts a Grand Exchange trade by its Result, so a purchase no longer pulls it down by what you paid.
+- A click no longer names an action it had no part in, and a quick second click no longer steals the first one's label.
+- A Net target's "play left at this rate" counts only the time since you set it.
+- Coin rows show only their value, without a quantity.
+- A pending sell offer reads "Selling" instead of a clipped "Offering".
+- Reading the Grand Exchange or a trade window no longer counts as idle, so Free play keeps its activity name.
+- After resizing the client, the Ledger scrolls straight away.
+
 ## 1.4.1 - 2026-10-15
 
 **New**

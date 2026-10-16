@@ -19,7 +19,7 @@ public class GrindsPersistenceTest
         JsonCodec.bind(new com.google.gson.Gson());
         Engine source = PresentationLifecycleTest.engine();
         long now = System.currentTimeMillis();
-        SavedState.SavedGrind grind = source.saveGrind("Vorkath", 5_000_000L, null, true, null);
+        SavedState.SavedGrind grind = source.saveGrind("Vorkath", 5_000_000L, null, true);
         assertNotNull(grind);
         SavedState alice = source.savedState();
 
@@ -77,7 +77,7 @@ public class GrindsPersistenceTest
         engine.getActiveSession().addTransaction(booked(now + 1_000L, "Dragon bones", 1, 1, 3_200, 3_200), 2_000);
         engine.finishCustom(now + 2_000L);
         SavedState state = engine.savedState();
-        SavedState.SavedGrind grind = engine.saveGrind("Vorkath", null, null, false, null);
+        SavedState.SavedGrind grind = engine.saveGrind("Vorkath", null, null, false);
         assertNotNull(grind);
         state.setSavedGrinds(engine.getSavedGrinds(true));
 
@@ -100,7 +100,8 @@ public class GrindsPersistenceTest
         engine.getActiveSession().pauseTimeTarget(now + 500L);
         engine.getActiveSession().profitTargetSetNet = 12_345L;
         String sessionId = engine.getActiveSession().getId();
-        SavedState.SavedGrind grind = engine.saveGrind("Vorkath", 5_000_000L, 3L * 3_600_000L, true, sessionId);
+        SavedState.SavedGrind grind = engine.saveGrind("Vorkath", 5_000_000L, 3L * 3_600_000L, true);
+        engine.getActiveSession().setGrindId(grind.getGrindId());
         assertNotNull(grind);
         engine.finishCustom(now + 1_000L);
         SavedState state = engine.savedState();
@@ -132,7 +133,7 @@ public class GrindsPersistenceTest
     {
         Engine engine = PresentationLifecycleTest.engine();
         SavedState profileA = engine.savedState();
-        engine.saveGrind("Vorkath", 5_000_000L, null, false, null);
+        engine.saveGrind("Vorkath", 5_000_000L, null, false);
         profileA = engine.savedState();
 
         SavedState profileB = new SavedState();

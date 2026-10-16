@@ -18,7 +18,7 @@ class FlowFilters {
         var out = new ArrayList<Flow>();
         if (flows != null) {
             for (Flow flow : flows) {
-                if (flow != null && flow.quantityDelta > 0L && item.test(flow.itemId))
+                if (flow.quantityDelta > 0L && item.test(flow.itemId))
                     out.add(flow);
             }
         }
@@ -30,7 +30,7 @@ class FlowFilters {
         if (flows == null) return Collections.emptyList();
         var out = new ArrayList<Flow>(flows.size());
         for (Flow flow : flows) {
-            if (flow == null || !item.test(flow.itemId) || (gainsOnly && flow.quantityDelta <= 0L))
+            if (!item.test(flow.itemId) || (gainsOnly && flow.quantityDelta <= 0L))
                 out.add(flow);
         }
         return out;
@@ -75,7 +75,7 @@ class FlowFilters {
         var parts = new ArrayList<Flow>();
         for (int index = 0; index < flows.size(); index++) {
             Flow flow = flows.get(index);
-            if (flow == null || flow.quantityDelta == Long.MIN_VALUE || !which.test(flow)) continue;
+            if (flow.quantityDelta == Long.MIN_VALUE || !which.test(flow)) continue;
             long taken = claimer.applyAsLong(flow, SafeMath.abs(flow.quantityDelta));
             if (taken > 0L) parts.add(flow.part(taken));
             Flow rest = flow.rest(taken);
@@ -138,7 +138,7 @@ class FlowFilters {
         var out = new HashMap<Integer, Long>();
         if (flows != null) {
             for (Flow flow : flows) {
-                if (flow == null || !item.test(flow.itemId)) continue;
+                if (!item.test(flow.itemId)) continue;
                 long delta = flow.quantityDelta;
                 if (gains ? delta > 0L : delta < 0L) {
                     long magnitude = SafeMath.abs(delta);
@@ -198,7 +198,7 @@ class FlowFilters {
     static boolean hasLoss(List<Flow> flows, IntPredicate item) {
         if (flows != null) {
             for (Flow flow : flows) {
-                if (flow != null && flow.quantityDelta < 0L && item.test(flow.itemId)) return true;
+                if (flow.quantityDelta < 0L && item.test(flow.itemId)) return true;
             }
         }
         return false;
@@ -217,7 +217,7 @@ class FlowFilters {
         if (empty(flows)) return false;
         boolean saw = false;
         for (Flow flow : flows) {
-            long delta = flow == null ? (gains ? -1L : 1L) : flow.quantityDelta;
+            long delta = flow.quantityDelta;
             if (gains ? delta < 0L : delta > 0L) return false;
             saw |= delta != 0L;
         }

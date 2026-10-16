@@ -5,6 +5,7 @@ eat	^eat	EAT
 ~scatter	scatter	SCATTER
 offer	^offer	OFFER
 cast	^cast	CAST
+break	=break	CAST
 chat eat	^you eat	EAT
 chat drink	^you drink	DRINK
 chat offer	^you offer	OFFER

@@ -58,7 +58,7 @@ public class UnknownBasisTaxReceiptTest
         assertFalse("no unexplained adjustment is invented for a proven tax",
             lines.stream().anyMatch(line -> line.startsWith("Adjustment")));
         assertEquals(Fmt.exactSigned(-676L) + " gp \u00b7 GE tax",
-            LedgerPageProbe.netContributionText(row));
+            LedgerPageProbe.netContributionText(row, false));
 
         LedgerData data = captureWithGroup(market, groupIdOf(market));
         Semantics.Receipt receipt = receiptOfItem(data, VIAL);
@@ -121,7 +121,7 @@ public class UnknownBasisTaxReceiptTest
         List<String> exemptLines = MarketText.humanLines(exempt.row(CHICKEN), false);
         assertFalse(exemptLines.stream().anyMatch(line -> line.startsWith("GE tax")));
         assertEquals("0 \u00b7 not counted",
-            LedgerPageProbe.netContributionText(exempt.row(CHICKEN)));
+            LedgerPageProbe.netContributionText(exempt.row(CHICKEN), false));
 
         Market known = new Market();
         known.prices.put(RUNE, 420L);
@@ -131,7 +131,7 @@ public class UnknownBasisTaxReceiptTest
         assertTrue("a full result keeps its Result row", knownLines.contains("Result|+356 gp"));
         assertFalse("the tax is already inside Received for a full result",
             knownLines.stream().anyMatch(line -> line.startsWith("GE tax")));
-        assertEquals("+356 gp \u00b7 Result", LedgerPageProbe.netContributionText(known.row(RUNE)));
+        assertEquals("+356 gp \u00b7 Result", LedgerPageProbe.netContributionText(known.row(RUNE), false));
     }
 
     @Test
@@ -149,14 +149,14 @@ public class UnknownBasisTaxReceiptTest
         assertFalse("the GE tax row disappears while corrected",
             correctedLines.stream().anyMatch(line -> line.startsWith("GE tax")));
         assertEquals(Fmt.exactSigned(0L) + " gp \u00b7 corrected",
-            LedgerPageProbe.netContributionText(corrected));
+            LedgerPageProbe.netContributionText(corrected, true));
 
         assertTrue(market.engine.undoCorrection(market.now + 6_000L));
         MarketRows.Row undone = market.row(VIAL);
         assertTrue(MarketText.humanLines(undone, false)
             .contains("GE tax|" + Fmt.exactSigned(-676L) + " gp"));
         assertEquals(Fmt.exactSigned(-676L) + " gp \u00b7 GE tax",
-            LedgerPageProbe.netContributionText(undone));
+            LedgerPageProbe.netContributionText(undone, false));
     }
 
     @Test
@@ -199,7 +199,7 @@ public class UnknownBasisTaxReceiptTest
         assertFalse("no main-receipt GE tax row as if that cost were booked",
             lines.stream().anyMatch(line -> line.startsWith("GE tax")));
         assertTrue(lines.contains("Result|\u2014"));
-        assertEquals("0 \u00b7 not counted", LedgerPageProbe.netContributionText(row));
+        assertEquals("0 \u00b7 not counted", LedgerPageProbe.netContributionText(row, false));
 
         Semantics.Result projection = Semantics.capture(
             Collections.singletonList(settlement), Collections.singletonList(row), "session-a", null);

@@ -268,6 +268,7 @@ public class LivePresentationTest
         engine.setTargets(200_000L, 5L * 3_600_000L, System.currentTimeMillis());
         // The fixtures show aims set at the run's start: baseline zero.
         engine.getActiveSession().profitTargetSetNet = 0L;
+        engine.getActiveSession().profitTargetSetActiveMillis = 0L;
         // The Timer window is the run's last 20m: the count starts when the target is set.
         engine.getActiveSession().activeTimeTargetSetMillis =
             engine.getActiveSession().getElapsedMillis(System.currentTimeMillis()) - 20L * 60_000L;
@@ -306,6 +307,7 @@ public class LivePresentationTest
         reachedNet.setTargets(10_000L, 5L * 3_600_000L, System.currentTimeMillis());
         // The aim counts the run's net (baseline at zero), not from this mid-test save.
         reachedNet.getActiveSession().profitTargetSetNet = 0L;
+        reachedNet.getActiveSession().profitTargetSetActiveMillis = 0L;
         SidebarPanel netPanel = onEdt(() ->
         {
             SidebarPanel created = new SidebarPanel(reachedNet, PresentationLifecycleTest.config(), null);
@@ -350,6 +352,7 @@ public class LivePresentationTest
         engine.setTargets(10_000L, null, System.currentTimeMillis());
         // The aim counts the run's net (baseline at zero), not from this mid-test save.
         engine.getActiveSession().profitTargetSetNet = 0L;
+        engine.getActiveSession().profitTargetSetActiveMillis = 0L;
         SidebarPanel panel = onEdt(() ->
         {
             SidebarPanel created = new SidebarPanel(engine, PresentationLifecycleTest.config(), null);
@@ -369,6 +372,7 @@ public class LivePresentationTest
             2_000);
         fresh.setTargets(1L, null, System.currentTimeMillis());
         fresh.getActiveSession().profitTargetSetNet = 0L;
+        fresh.getActiveSession().profitTargetSetActiveMillis = 0L;
         SidebarPanel freshPanel = onEdt(() ->
         {
             SidebarPanel created = new SidebarPanel(fresh, PresentationLifecycleTest.config(), null);
@@ -393,6 +397,7 @@ public class LivePresentationTest
         engine.setTargets(200_000L, null, System.currentTimeMillis());
         // The aim counts the run's net (baseline at zero), not from this mid-test save.
         engine.getActiveSession().profitTargetSetNet = 0L;
+        engine.getActiveSession().profitTargetSetActiveMillis = 0L;
         SidebarPanel panel = onEdt(() ->
         {
             SidebarPanel created = new SidebarPanel(engine, PresentationLifecycleTest.config(), null);
@@ -427,6 +432,7 @@ public class LivePresentationTest
             booked(now2 - 15L * 60_000L, "Zulrah's scales", 12934, 1, 50_000, 50_000L), 2_000);
         again.setTargets(10_000L, null, now2);
         again.getActiveSession().profitTargetSetNet = 0L;
+        again.getActiveSession().profitTargetSetActiveMillis = 0L;
         String firstId = again.getActiveSession().getId();
         SidebarPanel retainPanel = onEdt(() ->
         {
@@ -459,6 +465,7 @@ public class LivePresentationTest
             booked(now5 - 15L * 60_000L, "Zulrah's scales", 12934, 1, 50_000, 50_000L), 2_000);
         bothRun.setTargets(10_000L, 5L * 60_000L, now5);
         bothRun.getActiveSession().profitTargetSetNet = 0L;
+        bothRun.getActiveSession().profitTargetSetActiveMillis = 0L;
         bothRun.getActiveSession().pauseTimeTarget(now5);
         String bothId = bothRun.getActiveSession().getId();
         SidebarPanel bothPanel = onEdt(() ->
@@ -494,6 +501,7 @@ public class LivePresentationTest
             booked(now6 - 15L * 60_000L, "Zulrah's scales", 12934, 1, 50_000, 50_000L), 2_000);
         reset.setTargets(200_000L, null, now6);
         reset.getActiveSession().profitTargetSetNet = 0L;
+        reset.getActiveSession().profitTargetSetActiveMillis = 0L;
         String resetId = reset.getActiveSession().getId();
         SidebarPanel resetPanel = onEdt(() ->
         {
@@ -504,6 +512,8 @@ public class LivePresentationTest
         LivePage resetPage = (LivePage) SidebarPanelProbe.livePage(resetPanel);
         assertTrue("a running aim offers Reset", onEdt(() -> resetPage.resetButton.isVisible()));
         assertFalse("and not Again", onEdt(() -> resetPage.againButton.isVisible()));
+        assertTrue("and Done, since a Net-only aim has no timer to pause",
+            onEdt(() -> resetPage.doneButton.isVisible()));
         onEdt(() ->
         {
             resetPage.resetButton.doClick();
@@ -522,6 +532,7 @@ public class LivePresentationTest
             booked(now4 - 15L * 60_000L, "Zulrah's scales", 12934, 1, 50_000, 50_000L), 2_000);
         fresh.setTargets(10_000L, null, now4);
         fresh.getActiveSession().profitTargetSetNet = 0L;
+        fresh.getActiveSession().profitTargetSetActiveMillis = 0L;
         String freshId = fresh.getActiveSession().getId();
         SidebarPanel freshPanel = onEdt(() ->
         {

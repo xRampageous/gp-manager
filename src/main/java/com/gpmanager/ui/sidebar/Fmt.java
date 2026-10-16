@@ -70,6 +70,11 @@ class Fmt {
         return (value > 0L ? "+" : "−") + compact(value);
     }
 
+    /** An item row's worth: a dash when it is worth nothing (owner live 2026-10-16). */
+    static String worth(long value) {
+        return value == 0L ? "—" : signed(value);
+    }
+
     /**
      * Unsigned compact with fixed precision so columns line up: {@code 812} · {@code 1.2k} · {@code
      * 36.0k} · {@code 248k} · {@code 1.76M} · {@code 12.4M} · {@code 212M} · {@code 1.02B}.
@@ -151,11 +156,20 @@ class Fmt {
     }
 
     /**
-     * A target time in the form the Targets field reads back exactly: {@code 30m}, {@code 26h 30m}.
+     * A target time in the form the Targets field reads back exactly: {@code 30m}, {@code 3h},
+     * {@code 26h 30m}.
      */
     static String targetTime(long millis) {
         long minutes = nonNeg(millis) / 60_000L;
-        return minutes >= 60L ? minutes / 60L + "h " + minutes % 60L + "m" : minutes + "m";
+        if (minutes < 60L) return minutes + "m";
+        return minutes / 60L + "h" + (minutes % 60L > 0L ? " " + minutes % 60L + "m" : "");
+    }
+
+    /** A Net target the field reads back exactly: {@code 5m}, {@code 9.12m}, {@code 750k}. */
+    static String targetNet(long gp) {
+        if (gp >= 1_000_000L && gp % 10_000L == 0L)
+            return java.math.BigDecimal.valueOf(gp, 6).stripTrailingZeros().toPlainString() + "m";
+        return gp < 1_000_000L && gp % 1_000L == 0L ? gp / 1_000L + "k" : exact(gp);
     }
 
     /** {@code ×27} quantity marker. */

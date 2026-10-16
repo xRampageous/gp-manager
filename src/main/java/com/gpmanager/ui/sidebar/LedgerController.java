@@ -134,7 +134,7 @@ class LedgerController implements LedgerPage.Actions {
         String itemName = "";
         if (transaction != null) {
             for (Flow flow : transaction.getFlows()) {
-                if (flow == null || flow.quantityDelta <= 0L) continue;
+                if (flow.quantityDelta <= 0L) continue;
                 if (itemId == -1) {
                     itemId = flow.itemId;
                     itemName = flow.itemName;
@@ -237,7 +237,7 @@ class LedgerController implements LedgerPage.Actions {
         int found = -1;
         long sum = 0L;
         for (Flow flow : transaction.getFlows()) {
-            if (flow == null || flow.quantityDelta <= 0L) continue;
+            if (flow.quantityDelta <= 0L) continue;
             if (found == -1) found = flow.itemId;
             else if (found != flow.itemId) return false;
             sum += flow.quantityDelta;

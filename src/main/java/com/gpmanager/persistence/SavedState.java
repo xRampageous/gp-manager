@@ -151,7 +151,7 @@ class SavedState {
     }
 
     SavedState(Session generalSession, Session customSession, List<Session> history) {
-        this.savedAtEpochMillis = SafeMath.now();
+        savedAtEpochMillis = SafeMath.now();
         this.generalSession = generalSession;
         this.customSession = customSession;
         this.history = new ArrayList<>(history == null ? new ArrayList<>() : history);

@@ -101,7 +101,7 @@ public class GrindRecapTest
     private static String runGrind(Engine engine, String name, long start, long end, long gainValue,
         long costValue, Long netTarget, Long timeTarget)
     {
-        SavedState.SavedGrind definition = engine.saveGrind(name, netTarget, timeTarget, false, null);
+        SavedState.SavedGrind definition = engine.saveGrind(name, netTarget, timeTarget, false);
         String grindId = definition.getGrindId();
         engine.startGrind(name, grindId, netTarget, timeTarget, start);
         if (gainValue != 0L)

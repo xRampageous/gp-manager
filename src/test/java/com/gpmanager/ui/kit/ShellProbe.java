@@ -115,21 +115,24 @@ public final class ShellProbe
     /** Types into the sheet's text field. */
     public static void typeSheet(Shell shell, String text)
     {
-        for (java.awt.Component row : shell.sheet.getComponents())
+        javax.swing.JTextField field = firstField(shell.sheet);
+        if (field == null) throw new IllegalArgumentException("no sheet field");
+        field.setText(text);
+    }
+
+    /** The first text field in tree order, however deep its row nests it. */
+    private static javax.swing.JTextField firstField(java.awt.Container parent)
+    {
+        for (java.awt.Component c : parent.getComponents())
         {
-            if (row instanceof JPanel)
+            if (c instanceof javax.swing.JTextField) return (javax.swing.JTextField) c;
+            if (c instanceof java.awt.Container)
             {
-                for (java.awt.Component c : ((JPanel) row).getComponents())
-                {
-                    if (c instanceof javax.swing.JTextField)
-                    {
-                        ((javax.swing.JTextField) c).setText(text);
-                        return;
-                    }
-                }
+                javax.swing.JTextField found = firstField((java.awt.Container) c);
+                if (found != null) return found;
             }
         }
-        throw new IllegalArgumentException("no sheet field");
+        return null;
     }
 
     /** The sheet's buttons, in tree order (rows, pager, choices). */

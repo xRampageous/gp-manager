@@ -50,6 +50,9 @@ class LivePage implements Shell.Page {
         /** Owner live 2026-10-14: Reset re-bases a running Net aim without completing it. */
         default void resetTarget() {}
 
+        /** The ACTIVE clock: start fresh (Free play) or end the Grind (owner 2026-10-16). */
+        default void startFresh() {}
+
         default void hideRecent(String name, boolean charge) {}
 
         /** Opens the Start Grind sheet. */
@@ -83,7 +86,7 @@ class LivePage implements Shell.Page {
     /** The header's right cluster: the aim icons, single row (owner live 2026-10-14). */
     JPanel targetTopActions = new JPanel(new FlowLayout(FlowLayout.RIGHT, 3, 0));
     /** The last laid-out button shape; the rows rebuild only when it changes. */
-    String actionsShape = "";
+    Object actionsShape;
     JButton againButton;
     JButton resetButton;
     JButton doneButton;
@@ -123,6 +126,7 @@ class LivePage implements Shell.Page {
         endGrind.setToolTipText("End this Grind");
         counts.setOpaque(false);
         hero.controls(counts, startGrind, endGrind);
+        Hero.clickable(hero.clock, () -> actions.startFresh());
         Hero.clickable(hero.name, actions::renameGrind);
         // Clicking the Net total sets or changes the target (owner 2026-09-28: no Target button).
         Hero.clickable(hero.net, actions::editTarget);
@@ -280,7 +284,7 @@ class LivePage implements Shell.Page {
                 openTotal += row.value;
             } else {
                 rows.add(rowOf(row));
-                recentTotal += row.value;
+                recentTotal += row.net();
             }
         offers.setTitle("OFFERS · " + open.size())
                 .setRows(open)
@@ -354,40 +358,31 @@ class LivePage implements Shell.Page {
         // Pause needs a timer that can still run; an ended one has nothing to stop.
         pauseButton.setVisible(timerSet && !goal.timeDone);
         pauseButton.setText(timerPaused ? "\u25B6" : "||");
-        doneButton.setVisible(completed || timerPaused);
+        // A Net-only aim has no timer to pause, so Done shows while it runs (owner 1.5.0).
+        doneButton.setVisible(completed || timerPaused || !timerSet);
         editButton.setVisible(true);
         // Again: a reached Net re-runs the setup (needs a custom run); an ended timer re-arms
         // and works in Free play too. Reset re-bases a still-running Net aim in place.
         againButton.setVisible(
                 (goal.reached && !snapshot.freePlay)
                         || (goal.timeDone && (!goal.reached || goal.time)));
-        resetButton.setVisible(
-                snapshot.goal != null && !snapshot.goal.time && !snapshot.goal.reached);
-        String shape = (completed ? "b" : "t")
-                + (againButton.isVisible() ? "a" : "")
-                + (resetButton.isVisible() ? "r" : "")
-                + (doneButton.isVisible() ? "d" : "")
-                + (editButton.isVisible() ? "e" : "")
-                + (pauseButton.isVisible() ? "p" : "");
+        resetButton.setVisible(!goal.time && !goal.reached);
+        var shown = new ArrayList<JButton>();
+        for (JButton action :
+                completed
+                        ? new JButton[] {againButton, resetButton, doneButton, editButton, pauseButton}
+                        : new JButton[] {pauseButton, resetButton, doneButton, editButton}) {
+            if (action.isVisible()) shown.add(action);
+        }
+        List<Object> shape = List.of(completed, shown);
         if (!shape.equals(actionsShape)) {
             actionsShape = shape;
             targetActions.removeAll();
             targetTopActions.removeAll();
-            if (completed) {
-                for (JButton action :
-                        new JButton[] {againButton, resetButton, doneButton, editButton, pauseButton}) {
-                    if (action.isVisible()) targetActions.add(action);
-                }
-                targetTopActions.setVisible(false);
-                targetActions.setVisible(true);
-            } else {
-                for (JButton action : new JButton[] {pauseButton, resetButton, doneButton, editButton}) {
-                    if (action.isVisible()) targetTopActions.add(action);
-                }
-                targetTopActions.setVisible(targetTopActions.getComponentCount() > 0);
-                // No bottom row while the run goes on: the header cluster carries it.
-                targetActions.setVisible(false);
-            }
+            for (JButton action : shown) (completed ? targetActions : targetTopActions).add(action);
+            // No bottom row while the run goes on: the header cluster carries it.
+            targetActions.setVisible(completed);
+            targetTopActions.setVisible(!completed && !shown.isEmpty());
             target.revalidate();
         }
         targetPace.setVisible(!goal.reached || goal.eta != null);
@@ -411,7 +406,7 @@ class LivePage implements Shell.Page {
             menu.add(new Table.Menu("Hide charge from recent", () -> actions.hideRecent(row.name, true)));
         // Ore a failed smelt lost sits beside the ore the bars used: say which is which.
         String name = msg("failed").equals(row.actionLabel) ? row.name + " (failed)" : row.name;
-        return new Row(
+        Row drawn = new Row(
                 row.contributionId + "|" + row.receiptId,
                 icon,
                 name,
@@ -423,6 +418,8 @@ class LivePage implements Shell.Page {
                 false,
                 () -> actions.openLedger(entry),
                 menu);
+        drawn.color = row.highlight;
+        return drawn;
     }
 
     List<List<Cell>> strips(LiveSnapshot snapshot) {
@@ -434,39 +431,14 @@ class LivePage implements Shell.Page {
                             new Cell("LOSS", "—", DIM, "", null)));
         }
         Runnable ledger = () -> actions.openLedger(Entry.current());
-        var money = new ArrayList<Cell>();
-        money.add(
-                new Cell(
-                        "GAINS",
-                        signed(snapshot.gains),
-                        GAIN,
-                        msg("loot-other") + exact(snapshot.gains) + " gp",
-                        ledger));
-        if (snapshot.costSplitAvailable) {
-            money.add(
-                    new Cell(
-                            "SUPPLY",
-                            signed(-snapshot.supplies),
-                            SUPPLY,
-                            msg("food-potions") + exact(snapshot.supplies) + " gp",
-                            ledger));
-            money.add(
-                    new Cell(
-                            "LOSS",
-                            signed(-snapshot.loss),
-                            LOSS,
-                            msg("deaths-tax") + exact(snapshot.loss) + " gp",
-                            ledger));
-        } else {
-            // The split cannot be vouched for: the truthful total, never invented parts.
-            money.add(
-                    new Cell(
-                            "COSTS",
-                            signed(-snapshot.costs),
-                            LOSS,
-                            msg("everything-spent"),
-                            ledger));
-        }
+        var money =
+                Hero.money(
+                        snapshot.gains,
+                        snapshot.supplies,
+                        snapshot.loss,
+                        snapshot.costs,
+                        snapshot.costSplitAvailable,
+                        ledger);
         if (snapshot.marketResult != 0L || snapshot.marketPending > 0) {
             money.add(
                     new Cell(
@@ -678,7 +650,7 @@ class LivePage implements Shell.Page {
             return "review".equals(row.tag)
                     ? "?"
                     : row.marketSide.isEmpty() ? "Pending" : row.marketSide;
-        return signed(row.value);
+        return row.market ? signed(row.value) : worth(row.value);
     }
 
     /** What the row is: its state for review / unpriced rows, else action and quantity. */

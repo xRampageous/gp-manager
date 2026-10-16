@@ -3,17 +3,23 @@ package com.gpmanager;
 import static com.gpmanager.Fmt.*;
 import static com.gpmanager.GameData.msg;
 import static com.gpmanager.SafeMath.*;
-
 import static java.lang.Math.*;
 
 import com.gpmanager.Accounting.MarketFold;
 import com.gpmanager.LedgerData.CostView;
 import com.gpmanager.MarketRows.Row;
 import com.gpmanager.Semantics.*;
-
-import lombok.*;
-
+import java.awt.Color;
 import java.util.*;
+import javax.inject.*;
+import lombok.*;
+import lombok.AllArgsConstructor;
+import lombok.RequiredArgsConstructor;
+import net.runelite.client.config.ConfigManager;
+import net.runelite.client.plugins.*;
+import net.runelite.client.plugins.grounditems.*;
+import net.runelite.client.util.*;
+import org.slf4j.*;
 
 /**
  * Everything the Live page paints, captured in one read from the current schema-102 engine so the
@@ -124,6 +130,17 @@ class LiveSnapshot {
 
         /** A charge or dose spend row: the charge hide may be offered on it (owner 1.3.4). */
         boolean chargeRow;
+
+        /** Ground Items' highlight colour for a highlighted gain; null otherwise. */
+        Color highlight;
+
+        /**
+         * The row's share of Net. A Market row moves Net by its Result only, never by the cash it
+         * moved: a GE buy is neutral (owner live 2026-10-15), an unproven Result counts nothing.
+         */
+        long net() {
+            return !market ? value : valueAvailable ? marketResult : 0L;
+        }
     }
 
     boolean hasSession;
@@ -307,6 +324,11 @@ class LiveSnapshot {
             long timeRemaining = -1L;
             boolean timeDone = false;
             boolean timerPaused = false;
+            // The aim's own pace: Net and Active Time since it was set, so free play before it
+            // never counts (owner 2026-10-16).
+            long since = active.profitTargetActiveMillis(elapsed);
+            boolean established = RateReadiness.isEstablished(since);
+            long rate = since <= 0L ? 0L : round(current * 3_600_000d / since);
             if (timeTarget != null && timeTarget > 0L) {
                 // Owner live 2026-10-13: with both targets set the hero keeps the live Net read
                 // and the card adds the tracked Active Time pair; the countdown replaces the
@@ -314,41 +336,38 @@ class LiveSnapshot {
                 long timeElapsed = active.getActiveTimeTargetWindowMillis(elapsed);
                 timeDetail = timeDetail(timeElapsed, timeTarget);
                 timeRemaining = max(0L, timeTarget - timeElapsed);
-                boolean timeReached = timeElapsed >= timeTarget;
-                timeDone = timeReached;
+                timeDone = timeElapsed >= timeTarget;
                 timerPaused = active.isTimeTargetPaused();
                 GrindsData.Pace pace =
                         GrindsData.pace(
                                 null,
                                 timeTarget,
                                 current,
-                                RateReadiness.isEstablished(elapsed),
-                                metrics.profitPerHour,
+                                established,
+                                rate,
                                 timeElapsed);
-                if (timeReached && reached) {
+                if (timeDone && reached) {
                     // Owner 2026-10-14: both aims done keeps a short projection, not a blank line.
-                    eta =
-                            RateReadiness.isEstablished(elapsed)
-                                    ? GrindsData.nextHour(current, metrics.profitPerHour)
-                                    : null;
-                } else if (timeReached) {
+                    eta = established ? GrindsData.nextHour(current, rate) : null;
+                } else if (timeDone) {
                     eta = pace == null || !pace.available ? null : pace.line;
                 } else if (pace != null && pace.available) {
-                    eta = durationCount(max(0L, timeTarget - timeElapsed)) + " left \u00b7 " + pace.line;
+                    eta = durationCount(timeRemaining) + " left · " + pace.line;
                 }
-            } else if (!reached && RateReadiness.isEstablished(elapsed)) {
-                if (metrics.profitPerHour > 0L) {
-                    long minutes = round((target - current) * 60d / metrics.profitPerHour);
-                    eta =
-                            (minutes < 1L ? "<1m" : "~" + GrindsData.durationMinutes(minutes))
-                                    + msg("play-left");
-                } else {
-                    // Owner live 2026-10-13: an established non-positive rate says so honestly.
-                    eta = "Not earning at this rate";
-                }
-            } else if (reached && RateReadiness.isEstablished(elapsed)) {
-                // Owner 2026-10-14: a reached Net aim keeps the short next-hour projection.
-                eta = GrindsData.nextHour(current, metrics.profitPerHour);
+            } else if (established) {
+                // Owner 2026-10-14: a reached Net aim keeps the short next-hour projection; an
+                // established non-positive rate says so honestly (owner live 2026-10-13).
+                long minutes =
+                        rate > 0L
+                                ? round((target - current) * 60d / rate)
+                                : 0L;
+                eta =
+                        reached
+                                ? GrindsData.nextHour(current, rate)
+                                : rate <= 0L
+                                        ? "Not earning at this rate"
+                                        : (minutes < 1L ? "<1m" : "~" + GrindsData.durationMinutes(minutes))
+                                                + msg("play-left");
             }
             return new Goal(
                     target,
@@ -493,6 +512,10 @@ class LiveSnapshot {
                             group.table == Semantics.Table.COSTS_SUPPLIES && group.chargeRow())) {
                 continue;
             }
+            // A Ground Items-highlighted gain stands out in its highlight colour (owner 1.5.0, after
+            // Better Loot Notifier).
+            if (filter != null && row.value > 0L && !row.market)
+                row.highlight = filter.highlight(row.name, row.quantity);
             rows.add(row);
             if (rows.size() == RECENT_ROWS) break;
         }
@@ -602,7 +625,8 @@ class LiveSnapshot {
                 settlementValue,
                 marketSide,
                 marketRow != null && LedgerData.isPending(marketRow.lifecycle),
-                group.chargeRow());
+                group.chargeRow(),
+                null);
     }
 
     /**
@@ -610,6 +634,8 @@ class LiveSnapshot {
      * cakes, otherwise "\u00d7N" (a sapling planted from its pot is not a portion).
      */
     static String quantityText(Group group) {
+        // Coins read as their value only (owner 2026-10-16).
+        if (group.itemId == 995) return null;
         String name = group.primaryName.toLowerCase(Locale.ROOT);
         String unit =
                 Phrases.has(name, "pizza", "cake", "pie")
@@ -624,5 +650,432 @@ class LiveSnapshot {
             return "\u2212" + Math.max(1L, group.quantity);
         }
         return group.quantity > 1L ? times(group.quantity) : null;
+    }
+}
+
+/**
+ * Plugin-side facts the Live read model cannot read from the engine: the current owner's idle-badge
+ * state, the presentation marks noted for that owner, the loot visibility preferences, the cached
+ * client-thread PvP sample and the activity context label.
+ *
+ * <p>Forward-port note: the historical context also carried the notable-drop threshold, the live
+ * encounter summary and the sidebar net-graph toggle. Those producers no longer exist in schema
+ * 102, so nothing is fabricated here; the fields that remain are the ones the current plugin can
+ * state truthfully.
+ */
+class LiveContext {
+    static final LiveContext NONE =
+            new LiveContext(false, null, 0L, PvpState.NONE, "", false, "", false);
+    boolean idle;
+
+    /** Presentation-only item filter; null means every booked row stays visible. */
+    RecentFilter filter;
+
+    /** Hide gained rows whose unit price is below this value; 0 shows all. Never hides costs. */
+    long minimumDisplayedLootValue;
+
+    /** Cached client-thread PvP sample; presentation only. */
+    PvpState pvp;
+
+    /** Activity context label for the status line; empty means "use the owner name". */
+    String activity;
+
+    /** Freshest client-thread interaction target for the shared activity label; empty when none. */
+    String target;
+
+    /** The client is at the login screen; only read when no Grind is active. */
+    boolean offline;
+
+    /** A world hop is in flight: presentation says Reconnecting, never Logged out. */
+    boolean hopping;
+
+    LiveContext(
+            boolean idle,
+            RecentFilter filter,
+            long minimumDisplayedLootValue,
+            PvpState pvp,
+            String activity,
+            boolean offline,
+            String target) {
+        this(idle, filter, minimumDisplayedLootValue, pvp, activity, offline, target, false);
+    }
+
+    LiveContext(
+            boolean idle,
+            RecentFilter filter,
+            long minimumDisplayedLootValue,
+            PvpState pvp,
+            String activity,
+            boolean offline,
+            String target,
+            boolean hopping) {
+        this.idle = idle;
+        this.filter = filter;
+        this.minimumDisplayedLootValue = SafeMath.nonNeg(minimumDisplayedLootValue);
+        this.pvp = pvp == null ? PvpState.NONE : pvp;
+        this.activity = Phrases.orEmpty(activity);
+        this.offline = offline;
+        this.target = Phrases.orEmpty(target);
+        this.hopping = hopping;
+    }
+
+    /** Whether one flow stays on a presentation row under the current visibility settings. */
+    boolean flowVisible(Flow flow) {
+        if (flow == null) return false;
+        // Costs, fees and deaths are never hidden by the display loot filter.
+        if (flow.quantityDelta <= 0L) return true;
+        // Always show beats Ground Items' hidden list and the minimum (owner 1.5.0, after Better
+        // Loot Notifier); Hidden Recent items still wins on Recent.
+        if (filter != null && filter.alwaysShows(flow)) return true;
+        // Unknown / unpriced gains remain discoverable for Review; the minimum is
+        // compared against the unit price so quantity cannot defeat it.
+        if (flow.unitPrice > 0 && flow.unitPrice < minimumDisplayedLootValue) return false;
+        return filter == null || filter.isFlowIncluded(flow);
+    }
+}
+
+/**
+ * Client-side PvP facts the plugin observes on its tick (Wilderness / PvP world, skull, Protect
+ * Item, what a death would lose). Presentation only; nothing here touches accounting.
+ */
+@AllArgsConstructor
+class PvpState {
+    static final PvpState NONE = new PvpState(false, false, false, 0L);
+    boolean pvpPossible;
+    boolean skulled;
+    boolean protectItem;
+
+    /** GP a death here would lose; 0 where no death can be lost. */
+    long risk;
+
+    /**
+     * Every held unit but the most valuable 3 (none when skulled), one more with Protect Item, at
+     * today's prices; an unpriced unit counts as 0. A stack keeps units, not the whole stack.
+     */
+    static long risk(List<Flow> held, boolean skulled, boolean protectItem) {
+        var stacks = new ArrayList<Flow>();
+        for (Flow flow : held) {
+            if (flow != null && flow.quantityDelta > 0L) stacks.add(flow);
+        }
+        stacks.sort((a, b) -> Long.compare(deathValue(b), deathValue(a)));
+        long keep = (skulled ? 0 : 3) + (protectItem ? 1 : 0);
+        long risk = 0L;
+        for (Flow stack : stacks) {
+            long kept = Math.min(keep, stack.quantityDelta);
+            keep -= kept;
+            risk =
+                    SafeMath.safeAdd(
+                            risk, Math.max(0L, deathValue(stack)) * (stack.quantityDelta - kept));
+        }
+        return risk;
+    }
+
+    /**
+     * What a death weighs the item at. Since 2026-07-29 the game ranks every Avernic defender at
+     * 600,000, its repair cost when it breaks unprotected (OSRS Wiki).
+     */
+    static long deathValue(Flow stack) {
+        return GameData.pattern("avernic").matcher(Phrases.lower(stack.itemName)).matches()
+                ? 600_000L
+                : stack.unitPrice;
+    }
+}
+
+/**
+ * Presentation-only item eligibility for the Live Recent rows. The panel binds the current {@code
+ * LootPresentationFilterService} decision behind this seam so the kit stays free of plugin
+ * dependencies and the existing filter authority stays the only policy.
+ */
+@FunctionalInterface
+interface RecentFilter {
+    /**
+     * @return true when presentation may show a row carrying this flow
+     */
+    boolean isFlowIncluded(Flow flow);
+
+    /** An Always show item: shown whatever Ground Items or the minimum value say. */
+    default boolean alwaysShows(Flow flow) {
+        return false;
+    }
+
+    /** Ground Items' highlight colour for a highlighted item; null when it is not one. */
+    default Color highlight(String name, long quantity) {
+        return null;
+    }
+
+    /**
+     * A charge spend row also answers to the separate charge list, so its family's spends can be
+     * hidden while the item's other rows (a gain) still show.
+     */
+    default boolean showRecent(String name, long quantity, boolean charge) {
+        return true;
+    }
+
+    default void hideRecent(String name, boolean charge) {}
+
+    /** Changes whenever the decisions may change, so the Live list is rebuilt only then. */
+    default String version() {
+        return "";
+    }
+}
+
+/**
+ * Small presentation-only Ground Items preference adapter. It keeps the user's list choices
+ * available to filtered projections, but does not retain a second price/rule evaluator or any
+ * accounting state.
+ */
+@Singleton
+@RequiredArgsConstructor(onConstructor_ = @Inject)
+class LootPresentationFilterService {
+    static final int NONE = 0;
+    static final int HIGHLIGHTED = 1;
+    static final int HIDDEN = 2;
+    final GroundItemsConfigReader configReader;
+    volatile GroundItemsPrefs snapshot;
+    volatile String fingerprint = "";
+
+    /** Test helper with a fixed snapshot (no live ConfigManager). */
+    LootPresentationFilterService(GroundItemsPrefs snapshot) {
+        configReader = null;
+        replaceSnapshotForTests(snapshot);
+    }
+
+    synchronized void refresh() {
+        if (configReader == null) return;
+        replaceSnapshotForTests(configReader.read());
+    }
+
+    /** Applies only explicit list preferences; ambiguous value/price rules stay visible. */
+    boolean isFlowIncluded(Flow flow, LootFilter mode) {
+        LootFilter effective = mode == null ? LootFilter.ALL_ITEMS : mode;
+        if (effective == LootFilter.ALL_ITEMS || flow == null) return true;
+        ensureSnapshot();
+        GroundItemsPrefs current = snapshot;
+        if (!current.pluginEnabled) return true;
+        int state =
+                listState(
+                        current.highlightedCsv,
+                        current.hiddenCsv,
+                        flow.itemName,
+                        SafeMath.nonNeg(Math.abs(flow.quantityDelta)));
+        if (state == HIDDEN) return false;
+        return effective != LootFilter.HIGHLIGHTED_LIST_ONLY
+                ? !current.showHighlightedOnly || state == HIGHLIGHTED
+                : state == HIGHLIGHTED;
+    }
+
+    /** Ground Items' highlight colour for an item on its highlighted list, unless filters are off. */
+    Color highlight(String name, long quantity, LootFilter mode) {
+        ensureSnapshot();
+        GroundItemsPrefs current = snapshot;
+        return mode == LootFilter.ALL_ITEMS
+                        || !current.pluginEnabled
+                        || listState(current.highlightedCsv, "", name, quantity) != HIGHLIGHTED
+                ? null
+                : current.highlight;
+    }
+
+    /** HUD+'s big-drop line: Ground Items' insane value when the display follows it, else 10M. */
+    long big(LootFilter mode) {
+        ensureSnapshot();
+        GroundItemsPrefs current = snapshot;
+        return mode == LootFilter.FOLLOW_GROUND_ITEMS
+                        && current.pluginEnabled
+                        && current.insane > 0L
+                ? current.insane
+                : HudTray.BIG_DROP;
+    }
+
+    synchronized void replaceSnapshotForTests(GroundItemsPrefs value) {
+        snapshot = value == null ? GroundItemsPrefs.disabled() : value;
+        fingerprint = snapshot.fingerprint();
+    }
+
+    synchronized void ensureSnapshot() {
+        if (snapshot == null) refresh();
+        if (snapshot == null) replaceSnapshotForTests(null);
+    }
+
+    static int listState(String highlightedCsv, String hiddenCsv, String itemName, long quantity) {
+        int exact = listMatch(highlightedCsv, itemName, quantity, false);
+        if (exact != NONE) return HIGHLIGHTED;
+        exact = listMatch(hiddenCsv, itemName, quantity, false);
+        if (exact != NONE) return HIDDEN;
+        int wildcard = listMatch(highlightedCsv, itemName, quantity, true);
+        if (wildcard != NONE) return HIGHLIGHTED;
+        return listMatch(hiddenCsv, itemName, quantity, true) == NONE ? NONE : HIDDEN;
+    }
+
+    /** The Recent charge pattern for a row: its dose family, wildcarded (Burning amulet*). */
+    static String chargePattern(String itemName) {
+        return ActionReader.doseBaseName(itemName) + "*";
+    }
+
+    static int listMatch(String csv, String itemName, long quantity, boolean wildcard) {
+        String name = Phrases.orEmpty(itemName);
+        for (Rule rule : rules(csv)) {
+            if (rule.wildcard == wildcard && rule.matches(name, quantity)) return 1;
+        }
+        return NONE;
+    }
+
+    /** Parsed list rules by list text: the Ground Items lists are parsed once, not per item. */
+    static final java.util.Map<String, java.util.List<Rule>> RULES =
+            new java.util.concurrent.ConcurrentHashMap<>();
+
+    static java.util.List<Rule> rules(String csv) {
+        if (RULES.size() > 16) RULES.clear();
+        return RULES.computeIfAbsent(
+                Phrases.orEmpty(csv),
+                text -> {
+                    var parsed = new java.util.ArrayList<Rule>();
+                    for (String raw : Text.fromCSV(text)) {
+                        Rule rule = Rule.parse(raw);
+                        if (rule != null) parsed.add(rule);
+                    }
+                    return parsed;
+                });
+    }
+
+    @AllArgsConstructor
+    static class Rule {
+        String name;
+        int quantity;
+        boolean lessThan;
+        boolean wildcard;
+
+        static Rule parse(String value) {
+            if (Phrases.blank(value)) return null;
+            String text = value.trim();
+            int split = -1;
+            for (int i = text.length() - 1; i >= 0; i--) {
+                char c = text.charAt(i);
+                if (Character.isDigit(c) || Character.isWhitespace(c)) continue;
+                if (c == '<' || c == '>') split = i;
+                break;
+            }
+            int quantity = 0;
+            boolean less = false;
+            if (split >= 0 && split + 1 < text.length()) {
+                try {
+                    quantity = Integer.parseInt(text.substring(split + 1).trim());
+                    less = text.charAt(split) == '<';
+                    text = text.substring(0, split).trim();
+                } catch (NumberFormatException ignored) {
+                }
+            }
+            return new Rule(text, Math.max(0, quantity), less, text.contains("*"));
+        }
+
+        boolean matches(String itemName, long count) {
+            if (wildcard
+                    ? !WildcardMatcher.matches(name, itemName)
+                    : !name.equalsIgnoreCase(itemName)) return false;
+            return lessThan ? count < quantity : count > quantity;
+        }
+    }
+}
+
+/**
+ * Reads only the active Ground Items list preferences through supported RuneLite APIs. Never
+ * reflects into private Ground Items fields or package-private matchers.
+ */
+@Singleton
+@RequiredArgsConstructor(onConstructor_ = @Inject)
+class GroundItemsConfigReader {
+    static final Logger log = LoggerFactory.getLogger(GroundItemsConfigReader.class);
+    final ConfigManager configManager;
+    final PluginManager pluginManager;
+
+    GroundItemsPrefs read() {
+        boolean enabled = isGroundItemsEnabled();
+        GroundItemsConfig config;
+        try {
+            config = configManager.getConfig(GroundItemsConfig.class);
+        } catch (RuntimeException ex) {
+            log.debug(msg("ground-items"), ex);
+            return GroundItemsPrefs.disabled();
+        }
+        if (config == null) return GroundItemsPrefs.disabled();
+        var read =
+                new GroundItemsPrefs(
+                        enabled,
+                        config.getHighlightItems(),
+                        config.getHiddenItems(),
+                        config.showHighlightedOnly());
+        read.insane = config.insaneValuePrice();
+        read.highlight = config.highlightedColor();
+        read.fingerprint = read.buildFingerprint();
+        return read;
+    }
+
+    boolean isGroundItemsEnabled() {
+        if (pluginManager == null) return false;
+        for (Plugin plugin : pluginManager.getPlugins()) {
+            if (plugin instanceof GroundItemsPlugin) return pluginManager.isPluginEnabled(plugin);
+        }
+        return false;
+    }
+}
+
+/**
+ * Immutable snapshot of the Ground Items list preferences readable through the supported {@code
+ * ConfigManager.getConfig(GroundItemsConfig.class)} API. It does not retain a second price/rule
+ * evaluator or touch private plugin fields.
+ *
+ * <p>Verified against RuneLite Ground Items (config group {@code grounditems}, public {@code
+ * GroundItemsConfig} surface).
+ */
+@EqualsAndHashCode(of = "fingerprint")
+class GroundItemsPrefs {
+    /** The Ground Items config group whose changes invalidate this snapshot. */
+    static final String GROUP = "grounditems";
+
+    boolean pluginEnabled;
+    String highlightedCsv;
+    String hiddenCsv;
+    boolean showHighlightedOnly;
+
+    /**
+     * Ground Items' insane value: HUD+'s big-drop line while the loot display follows Ground Items.
+     */
+    long insane = HudTray.BIG_DROP;
+
+    /** Ground Items' highlighted-item colour, for highlighted drops on the tray and Live. */
+    Color highlight;
+
+    String fingerprint;
+
+    GroundItemsPrefs(
+            boolean pluginEnabled,
+            String highlightedCsv,
+            String hiddenCsv,
+            boolean showHighlightedOnly) {
+        this.pluginEnabled = pluginEnabled;
+        this.highlightedCsv = Phrases.orEmpty(highlightedCsv);
+        this.hiddenCsv = Phrases.orEmpty(hiddenCsv);
+        this.showHighlightedOnly = showHighlightedOnly;
+        fingerprint = buildFingerprint();
+    }
+
+    /** Empty / disabled fallback — callers treat filtering as pass-through. */
+    static GroundItemsPrefs disabled() {
+        return new GroundItemsPrefs(false, "", msg("vial-ashes"), false);
+    }
+
+    String fingerprint() {
+        return fingerprint;
+    }
+
+    String buildFingerprint() {
+        return pluginEnabled
+                + "|"
+                + highlightedCsv
+                + "|"
+                + hiddenCsv
+                + "|"
+                + showHighlightedOnly
+                + "|"
+                + highlight;
     }
 }
