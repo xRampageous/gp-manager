@@ -65,7 +65,7 @@ public class SmeltingSupplyTest
         Transaction result = null;
         for (int i = 0; i < 3; i++)
         {
-            Transaction settled = engine.processIfDirty(new ContainerSnapshot(new HashMap<>(held)), now + i * 600L);
+            Transaction settled = engine.processIfDirty(new ContainerSnapshot(new HashMap<>(held)), now + i * 600L, null);
             if (settled != null)
             {
                 result = settled;

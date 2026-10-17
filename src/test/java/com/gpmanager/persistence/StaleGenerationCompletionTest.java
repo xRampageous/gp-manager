@@ -105,7 +105,7 @@ public class StaleGenerationCompletionTest
         /** Alice books a note, then a save for her generation is started and parked inside the repository. */
         long startParkedAliceSave() throws Exception
         {
-            assertTrue(coordinator.switchIdentity(new TrackingIdentity(ALICE, TrackingIdentity.ACCOUNT_HASH_INVALID), true));
+            assertTrue(coordinator.switchIdentity(new TrackingIdentity(ALICE, TrackingIdentity.ACCOUNT_HASH_INVALID), true, true));
             engine.ensureSession(NOW - 10_000L);
             engine.getGeneralSession().rename("Alice general");
             assertTrue(coordinator.saveNow());
@@ -140,7 +140,7 @@ public class StaleGenerationCompletionTest
             // Logout, then Bob logs in while Alice's write is still parked. No flush is possible
             // (the write is in flight), so the switch goes through the unbound state.
             rig.coordinator.onHashInvalidated(false);
-            assertTrue(rig.coordinator.switchIdentity(new TrackingIdentity(BOB, TrackingIdentity.ACCOUNT_HASH_INVALID), true));
+            assertTrue(rig.coordinator.switchIdentity(new TrackingIdentity(BOB, TrackingIdentity.ACCOUNT_HASH_INVALID), true, true));
             rig.engine.ensureSession(NOW);
             rig.engine.getGeneralSession().rename("Bob general");
             long bobGeneration = rig.repository.scopeGeneration;

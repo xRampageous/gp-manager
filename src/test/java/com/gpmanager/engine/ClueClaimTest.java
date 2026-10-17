@@ -57,7 +57,7 @@ public class ClueClaimTest
     };
 
     private final Map<Integer, Long> inventory = new HashMap<>();
-    private final Engine engine = new Engine(new Valuation(CONFIG, ClueClaimTest::composition,
+    private final Engine engine = new Engine(ModelProbe.valuation(CONFIG, ClueClaimTest::composition,
         id -> id == PLATEBODY ? 38_000
             : id == ECLECTIC ? 20_000
             : id == EMPTY_JAR ? 290
@@ -171,8 +171,8 @@ public class ClueClaimTest
         }
         inventory.values().removeIf(quantity -> quantity == 0L);
         now += 3_000L;
-        engine.processIfDirty(new ContainerSnapshot(new HashMap<>(inventory)), now);
-        engine.processIfDirty(new ContainerSnapshot(new HashMap<>(inventory)), now + 600L);
+        engine.processIfDirty(new ContainerSnapshot(new HashMap<>(inventory)), now, null);
+        engine.processIfDirty(new ContainerSnapshot(new HashMap<>(inventory)), now + 600L, null);
     }
 
     private long net()

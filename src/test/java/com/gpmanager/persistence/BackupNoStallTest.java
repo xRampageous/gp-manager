@@ -18,7 +18,7 @@ public class BackupNoStallTest
     public void aBackupHoldingTheLockNeverStallsTheGameThread() throws Exception
     {
         SessionRepository repository = new SessionRepository(new com.google.gson.Gson(),
-            FilepathTestSupport.root(Files.createTempDirectory("gp-busy")));
+            FilepathTestSupport.root(Files.createTempDirectory("gp-busy")), false);
         Persistence persistence = new Persistence(null, null, repository, new OrderedPersistenceWriter(repository, null), null);
         persistence.okay = true;
         CountDownLatch held = new CountDownLatch(1);

@@ -1,5 +1,7 @@
 package com.gpmanager;
 
+import com.gpmanager.GpManagerConfig.Retention;
+
 import java.util.ArrayList;
 import java.util.Collections;
 import java.util.HashMap;
@@ -197,9 +199,9 @@ public class LiveMarketExclusionTest
 
         LiveSnapshot plain = LiveSnapshot.capture(market.engine, market.now + 1_000L, null);
         LiveSnapshot threshold = LiveSnapshot.capture(market.engine, market.now + 1_000L,
-            new LiveContext(false, null, 1_000L, PvpState.NONE, "", false, ""));
+            new LiveContext(false, null, 1_000L, PvpState.NONE, "", false, "", false));
         LiveSnapshot itemFiltered = LiveSnapshot.capture(market.engine, market.now + 1_000L,
-            new LiveContext(false, flow -> flow.itemId != CHEAP, 0L, PvpState.NONE, "", false, ""));
+            new LiveContext(false, flow -> flow.itemId != CHEAP, 0L, PvpState.NONE, "", false, "", false));
 
         assertEquals("cheap hidden loot still counts in canonical Gains", 13_200L, threshold.gains);
         assertEquals(plain.gains, threshold.gains);
@@ -371,7 +373,7 @@ public class LiveMarketExclusionTest
                 TransactionType.GAIN, Context.GENERIC, "", "Loot", true,
                 Collections.singletonList(new Flow(itemId, "Item " + itemId, quantity, unit, value,
                     PriceSource.GRAND_EXCHANGE)),
-                Confidence.CONFIRMED, "", null), 500);
+                Confidence.CONFIRMED, "", null), 500, false);
         }
 
         /** An unrelated ordinary loss (a distinct item, so no tracked coverage is depleted). */
@@ -381,7 +383,7 @@ public class LiveMarketExclusionTest
                 TransactionType.CONSUMPTION, Context.GENERIC, "", "Loss", true,
                 Collections.singletonList(new Flow(385, "Shark", -value / 100L, 100, -value,
                     PriceSource.GRAND_EXCHANGE)),
-                Confidence.CONFIRMED, "", null), 500);
+                Confidence.CONFIRMED, "", null), 500, false);
         }
 
         void adjustment(long coins, long at)
@@ -393,7 +395,7 @@ public class LiveMarketExclusionTest
                     PriceSource.FACE_VALUE)),
                 Confidence.CONFIRMED,
                 "Grand Exchange batch settlement adjustment: exact observed cash differs from "
-                    + "attributed gross execution; per-offer allocation is not provable.", null), 500);
+                    + "attributed gross execution; per-offer allocation is not provable.", null), 500, false);
         }
 
         void sell(int slot, int item, long qty, int limit, long spent, long cash)
@@ -434,7 +436,7 @@ public class LiveMarketExclusionTest
             ContainerSnapshot snapshot = new ContainerSnapshot(inventory);
             for (int i = 0; i < 3; i++)
             {
-                engine.processIfDirty(snapshot, now);
+                engine.processIfDirty(snapshot, now, null);
                 now += 5_000L;
             }
         }

@@ -57,7 +57,7 @@ public class ImbueSwapTest
     @Test
     public void theImbuedLegPricesFromItsPlainItem()
     {
-        Valuation valuation = new Valuation(new GpManagerConfig() { }, id -> null,
+        Valuation valuation = ModelProbe.valuation(new GpManagerConfig() { }, id -> null,
             id -> id == ItemID.BERZERKER_RING ? 2_800_000
                 : id == ItemID.RING_OF_WEALTH_5 ? 400_000
                 : id == ItemID.MAGIC_SHORTBOW ? 1_800 : 0);
@@ -162,7 +162,7 @@ public class ImbueSwapTest
         engine.markDirty();
         for (int tick = 1; tick <= 5; tick++)
         {
-            engine.processIfDirty(new ContainerSnapshot(new HashMap<>(after)), 1_000_000L + tick * 600L);
+            engine.processIfDirty(new ContainerSnapshot(new HashMap<>(after)), 1_000_000L + tick * 600L, null);
         }
         return engine;
     }

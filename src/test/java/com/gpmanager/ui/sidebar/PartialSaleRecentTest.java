@@ -109,7 +109,7 @@ public class PartialSaleRecentTest
         inventory.values().removeIf(quantity -> quantity == 0L);
         now += 600L;
         engine.markDirty();
-        engine.processIfDirty(new ContainerSnapshot(new HashMap<>(inventory)), now);
-        engine.processIfDirty(new ContainerSnapshot(new HashMap<>(inventory)), now + 1L);
+        engine.processIfDirty(new ContainerSnapshot(new HashMap<>(inventory)), now, null);
+        engine.processIfDirty(new ContainerSnapshot(new HashMap<>(inventory)), now + 1L, null);
     }
 }

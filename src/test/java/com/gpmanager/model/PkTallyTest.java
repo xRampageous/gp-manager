@@ -26,7 +26,7 @@ public class PkTallyTest
     {
         String id = session.addEncounter(true, at);
         Transaction loot = loot(at, gp);
-        session.addTransaction(loot, limit);
+        session.addTransaction(loot, limit, false);
         session.attachToEncounter(loot.getId(), id, false);
         return loot;
     }
@@ -53,18 +53,18 @@ public class PkTallyTest
         String id = session.addEncounter(true, 1_000L);
         Transaction first = loot(1_000L, 400L);
         Transaction second = loot(1_100L, 500L);
-        session.addTransaction(first, 3);
+        session.addTransaction(first, 3, false);
         session.attachToEncounter(first.getId(), id, false);
-        session.addTransaction(second, 3);
+        session.addTransaction(second, 3, false);
         session.attachToEncounter(second.getId(), id, false);
         assertEquals(900L, session.bestKill());
 
-        session.addTransaction(filler(2_000L), 3);
-        session.addTransaction(filler(3_000L), 3);
+        session.addTransaction(filler(2_000L), 3, false);
+        session.addTransaction(filler(3_000L), 3, false);
         assertEquals("one receipt compacted, one live", 900L, session.bestKill());
         assertEquals(1, session.pk().compactedKillNet.size());
 
-        session.addTransaction(filler(4_000L), 3);
+        session.addTransaction(filler(4_000L), 3, false);
         assertEquals(900L, session.bestKill());
         assertTrue("the kill folds once its last receipt goes", session.pk().compactedKillNet.isEmpty());
     }
@@ -76,10 +76,10 @@ public class PkTallyTest
         String death = session.addEncounter(false, 1_000L);
         Transaction lost = Tx.of(1_000L, TransactionType.PK_DEATH_LOSS, Context.PK_DEATH, "", true,
             Collections.singletonList(new Flow(2, "Loot", -1L, 900, -900L)));
-        session.addTransaction(lost, 10);
+        session.addTransaction(lost, 10, false);
         session.attachToEncounter(lost.getId(), death, false);
         Transaction clue = loot(2_000L, 5_000L);
-        session.addTransaction(clue, 10);
+        session.addTransaction(clue, 10, false);
         session.attachToEncounter(clue.getId(), "loot:Reward casket", false);
 
         assertEquals(0L, session.bestKill());

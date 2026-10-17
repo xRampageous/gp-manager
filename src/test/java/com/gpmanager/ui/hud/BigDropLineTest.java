@@ -1,5 +1,7 @@
 package com.gpmanager;
 
+import com.gpmanager.GpManagerConfig.LootFilter;
+
 import org.junit.Test;
 
 import static com.gpmanager.HudTrayTest.flow;

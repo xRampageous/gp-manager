@@ -18,11 +18,8 @@ import java.util.function.*;
 import javax.inject.Singleton;
 import lombok.*;
 import net.runelite.api.*;
-import net.runelite.api.GrandExchangeOfferState;
 import net.runelite.api.gameval.ItemID;
 import static com.gpmanager.Phrases.*;
-import static com.gpmanager.SafeMath.nonNeg;
-import java.util.Set;
 
 /**
  * Durable schema-104 GE custody ledger.
@@ -163,9 +160,7 @@ class GeCustodyLedger {
         for (GeOffer record : records) {
             if (record.side != SELL || record.itemId != itemId) continue;
             if (record.reservedQty() <= 0L && record.reservedBasis() <= 0L) continue;
-            long capturedAt =
-                    record.basisCapturedAtEpochMillis > 0L
-                            ? record.basisCapturedAtEpochMillis
+            long capturedAt = record.basisCapturedAtEpochMillis > 0L ? record.basisCapturedAtEpochMillis
                             : record.placedAtEpochMillis;
             latest = max(latest, capturedAt);
         }
@@ -183,8 +178,7 @@ class GeCustodyLedger {
         List<Flow> claimedFlows;
 
         Transaction lastBooking() {
-            List<Transaction> bookings =
-                    countedBookings.isEmpty() ? transferBookings : countedBookings;
+            List<Transaction> bookings = countedBookings.isEmpty() ? transferBookings : countedBookings;
             return bookings.isEmpty() ? null : bookings.get(bookings.size() - 1);
         }
     }
@@ -231,10 +225,7 @@ class GeCustodyLedger {
             return;
         }
         boolean active = OfferSlots.isActive(current.state);
-        if (base == null
-                || active
-                        && (OfferSlots.sideOf(base.state) != side
-                                || base.itemId != current.itemId)) {
+        if (base == null || active && (OfferSlots.sideOf(base.state) != side || base.itemId != current.itemId)) {
             if (base != null) {
                 // Item/side changed mid-life without Modify evidence: retire the old lifecycle and
                 // quarantine the next; never inherit prior basis or progress.
@@ -246,9 +237,7 @@ class GeCustodyLedger {
                 replacedSlots.add(slot);
             }
             baselines.put(slot, current);
-            if (base == null
-                    && previous != null
-                    && previous.state != GrandExchangeOfferState.EMPTY) {
+            if (base == null && previous != null && previous.state != GrandExchangeOfferState.EMPTY) {
                 // A missed placement cannot be dated: quarantine the lifecycle, emit no fill.
                 desync(slot, current, current, itemName);
                 return;
@@ -257,21 +246,12 @@ class GeCustodyLedger {
             advance(slot, current, current, current.quantityTraded, current.spent);
             return;
         }
-        if (active
-                && (base.totalQuantity != current.totalQuantity || base.price != current.price)) {
+        if (active && (base.totalQuantity != current.totalQuantity || base.price != current.price)) {
             // A price-only Modify keeps the lifecycle and its basis; a quantity change has no exact
             // per-slice basis allocation, so realization fails closed to Review.
             boolean priceOnly = base.totalQuantity == current.totalQuantity;
-            baselines.put(
-                    slot,
-                    new Snapshot(
-                            slot,
-                            base.state,
-                            base.itemId,
-                            current.totalQuantity,
-                            base.quantityTraded,
-                            priceOnly ? current.price : base.price,
-                            base.spent));
+            baselines.put(slot, new Snapshot(slot, base.state, base.itemId, current.totalQuantity, base.quantityTraded,
+                            priceOnly ? current.price : base.price, base.spent));
             GeOffer record = touch(slot, base);
             if (record != null && priceOnly) {
                 record.listedPrice = nonNeg(current.price);
@@ -283,16 +263,8 @@ class GeCustodyLedger {
         }
         long quantity = current.quantityTraded - base.quantityTraded;
         long spent = current.spent - base.spent;
-        baselines.put(
-                slot,
-                new Snapshot(
-                        slot,
-                        base.state,
-                        base.itemId,
-                        base.totalQuantity,
-                        current.quantityTraded,
-                        base.price,
-                        current.spent));
+        baselines.put(slot, new Snapshot(slot, base.state, base.itemId, base.totalQuantity, current.quantityTraded,
+                        base.price, current.spent));
         if (quantity < 0L || spent < 0L || quantity == 0L && spent > 0L) {
             desync(slot, base, current, itemName);
             return;
@@ -303,10 +275,8 @@ class GeCustodyLedger {
     /** A new offer in the slot: a duplicate replay of the live lifecycle changes nothing. */
     void place(int slot, Side side, Snapshot offer, String itemName) {
         GeOffer previous = forSlot(slot);
-        if (previous != null
-                && isSameIdentity(previous, side, offer.itemId, offer.totalQuantity, offer.price)
-                && !previous.cleared
-                && !previous.isTerminal()) {
+        if (previous != null && isSameIdentity(previous, side, offer.itemId, offer.totalQuantity, offer.price)
+                && !previous.cleared && !previous.isTerminal()) {
             previous.lastSeenAtEpochMillis = now;
             return;
         }
@@ -316,10 +286,7 @@ class GeCustodyLedger {
             previous.stage = CLOSED;
             previous = null;
         }
-        if (previous != null
-                && previous.cleared
-                && previous.isTerminal()
-                && trusted(previous, previous.side)) {
+        if (previous != null && previous.cleared && previous.isTerminal() && trusted(previous, previous.side)) {
             // Owner 1.2: a finished offer collected moments before its slot is reused still waits
             // for
             // its items or coins to settle; it gives up the slot instead of going to Review.
@@ -369,12 +336,8 @@ class GeCustodyLedger {
     GeOffer lateLoginReplay(int slot, Side side, Snapshot current) {
         GeOffer record = forSlot(slot);
         Long clearedAt = record == null ? null : loginClearedAtEpochMillis.get(record.offerId);
-        return clearedAt != null
-                        && now - clearedAt <= LOGIN_REPLAY_MILLIS
-                        && isSameIdentity(
-                                record, side, current.itemId, current.totalQuantity, current.price)
-                ? record
-                : null;
+        return clearedAt != null && now - clearedAt <= LOGIN_REPLAY_MILLIS && isSameIdentity(
+                                record, side, current.itemId, current.totalQuantity, current.price) ? record : null;
     }
 
     /**
@@ -394,17 +357,8 @@ class GeCustodyLedger {
 
     /** A new lifecycle for the offer in this snapshot's slot, last seen in {@code state}. */
     GeOffer newRecord(Snapshot offer, String itemName, GrandExchangeOfferState state) {
-        var record =
-                new GeOffer(
-                        UUID.randomUUID().toString(),
-                        offer.slot,
-                        OfferSlots.sideOf(offer.state),
-                        offer.itemId,
-                        itemName,
-                        offer.totalQuantity,
-                        offer.price,
-                        now,
-                        Phrases.orEmpty(sessionId));
+        var record = new GeOffer(UUID.randomUUID().toString(), offer.slot, OfferSlots.sideOf(offer.state), offer.itemId,
+                        itemName, offer.totalQuantity, offer.price, now, Phrases.orEmpty(sessionId));
         record.lastSeenAtEpochMillis = now;
         record.offerState = state.name();
         return record;
@@ -414,8 +368,7 @@ class GeCustodyLedger {
      * Record the login slot baseline: resume a persisted matching lifecycle, quarantine active
      * offers first seen now as legacy/unbased, and hand off records whose slot changed identity.
      */
-    synchronized List<Transaction> seedSlots(
-            Map<Integer, Snapshot> snapshots, long now, String sessionId) {
+    synchronized List<Transaction> seedSlots(Map<Integer, Snapshot> snapshots, long now, String sessionId) {
         begin(now, sessionId);
         baselines.clear();
         loginClearedAtEpochMillis.clear();
@@ -435,12 +388,7 @@ class GeCustodyLedger {
             if (side == null) continue;
             // Pre-existing progress is only a baseline, never replayed as a fill.
             baselines.put(snapshot.slot, snapshot);
-            if (existing != null
-                    && isSameIdentity(
-                            existing,
-                            side,
-                            snapshot.itemId,
-                            snapshot.totalQuantity,
+            if (existing != null && isSameIdentity(existing, side, snapshot.itemId, snapshot.totalQuantity,
                             snapshot.price)) {
                 resume(existing, snapshot);
                 continue;
@@ -495,18 +443,10 @@ class GeCustodyLedger {
             // finished
             // fill of the same side or a cancellation of the other brings them back. Passive
             // progress on an open offer explains nothing.
-            boolean fits =
-                    flow.isCost()
-                            ? buy == coins
-                                    && spent == null
-                                    && !record.isUnbased()
-                                    && !record.isCancelled()
+            boolean fits = flow.isCost() ? buy == coins && spent == null && !record.isUnbased() && !record.isCancelled()
                                     && now - record.placedAtEpochMillis <= PLACEMENT_WINDOW_MILLIS
-                            : (spent == null || spent < seen)
-                                    && now - seen <= COLLECTION_WINDOW_MILLIS
-                                    && (buy != coins
-                                            ? record.filledQty > 0L && record.isTerminal()
-                                            : record.isCancelled());
+                            : (spent == null || spent < seen) && now - seen <= COLLECTION_WINDOW_MILLIS && (buy != coins
+                                            ? record.filledQty > 0L && record.isTerminal() : record.isCancelled());
             if (fits && (coins || record.itemId == flow.itemId)) return key;
         }
         return null;
@@ -521,11 +461,7 @@ class GeCustodyLedger {
      * whole-transaction safety gates. {@code collectionEvidence} is a bounded player Collect
      * interaction; without it, collection claims need an observed terminal offer state.
      */
-    synchronized Partition partition(
-            List<Flow> incoming,
-            long now,
-            String sessionId,
-            IntPredicate itemAllowed,
+    synchronized Partition partition(List<Flow> incoming, long now, String sessionId, IntPredicate itemAllowed,
             boolean collectionEvidence) {
         begin(now, sessionId);
         var transfers = new ArrayList<Transaction>();
@@ -541,18 +477,9 @@ class GeCustodyLedger {
         claimBuyCollections(collectionEvidence);
         claimSellSettlements(collectionEvidence);
         if (!claimed.isEmpty()) {
-            transfers.add(
-                    new Transaction(
-                            now,
-                            TransactionType.TRANSFER,
-                            Context.TRANSFER,
-                            msg("grand-exchange-custody"),
-                            "Market",
-                            false,
-                            new ArrayList<>(claimed),
-                            Confidence.CONFIRMED,
-                            msg("ownership-neutral-grand"),
-                            null));
+            transfers.add(new Transaction(now, TransactionType.TRANSFER, Context.TRANSFER,
+                            msg("grand-exchange-custody"), "Market", false, new ArrayList<>(claimed),
+                            Confidence.CONFIRMED, msg("ownership-neutral-grand"), null));
         }
         // A hold created by this settle retries immediately: a batch whose evidence is complete
         // fails closed at once instead of waiting invisibly for a later event.
@@ -600,15 +527,12 @@ class GeCustodyLedger {
             // from
             // the offer itself instead of waiting for Review; held collect cash may still be its
             // own.
-            if (cleared
-                    && now - record.lastSeenAtEpochMillis > BANK_COLLECT_MILLIS
-                    && pendingSettlementCashGp <= 0L
+            if (cleared && now - record.lastSeenAtEpochMillis > BANK_COLLECT_MILLIS && pendingSettlementCashGp <= 0L
                     && banked(record)) {
                 continue;
             }
             boolean buyTerminal = record.side != SELL && record.isTerminal();
-            if ((cleared || buyTerminal)
-                    && now - record.lastSeenAtEpochMillis > UNOBSERVED_GRACE_MILLIS) {
+            if ((cleared || buyTerminal) && now - record.lastSeenAtEpochMillis > UNOBSERVED_GRACE_MILLIS) {
                 handoffAndRemove(record, msg("settlement-observed"));
             }
         }
@@ -627,18 +551,12 @@ class GeCustodyLedger {
 
     /** Offers one side's trusted lifecycles a gain or loss of coins or items, oldest first. */
     void claimFlows(Side side, boolean gain, boolean coins, ClaimStep step) {
-        FlowFilters.claim(
-                residual,
-                flow ->
-                        (gain ? flow.isGain() : flow.isCost())
-                                && (flow.itemId == ItemID.COINS) == coins
-                                && (coins || allowed.test(flow.itemId)),
+        FlowFilters.claim(residual, flow -> (gain ? flow.isGain() : flow.isCost())
+                                && (flow.itemId == ItemID.COINS) == coins && (coins || allowed.test(flow.itemId)),
                 (flow, magnitude) -> {
                     long remaining = magnitude;
                     for (GeOffer record : byPlacement()) {
-                        if (remaining > 0L
-                                && trusted(record, side)
-                                && (coins || record.itemId == flow.itemId))
+                        if (remaining > 0L && trusted(record, side) && (coins || record.itemId == flow.itemId))
                             remaining -= nonNeg(step.claim(record, flow, remaining));
                     }
                     return magnitude - remaining;
@@ -647,32 +565,21 @@ class GeCustodyLedger {
 
     /** A lifecycle observed from its placement with no identity desync. */
     static boolean trusted(GeOffer record, Side side) {
-        return record.side == side
-                && !record.isUnbased()
-                && record.confidence != CustodyConfidence.AMBIGUOUS;
+        return record.side == side && !record.isUnbased() && record.confidence != CustodyConfidence.AMBIGUOUS;
     }
 
     /** SELL placement principal (item loss). */
     void claimSellPlacements() {
-        claimFlows(
-                SELL,
-                false,
-                false,
-                (record, flow, remaining) -> {
+        claimFlows(SELL, false, false, (record, flow, remaining) -> {
                     long claim = min(remaining, record.offeredQty);
-                    if (record.isCancelled()
-                            || record.cleared
-                            || record.capturedQty > 0L
-                            || now - record.placedAtEpochMillis > PLACEMENT_WINDOW_MILLIS
-                            || claim <= 0L) {
+                    if (record.isCancelled() || record.cleared || record.capturedQty > 0L
+                            || now - record.placedAtEpochMillis > PLACEMENT_WINDOW_MILLIS || claim <= 0L) {
                         return 0L;
                     }
                     captureBasis(record, flow);
                     if (basisLedger != null) {
-                        TrackedBasisLedger.Reservation reservation =
-                                basisLedger.reserve(record.itemId, claim, now);
-                        record.reservedTrackedQty =
-                                nonNeg(safeAdd(record.reservedTrackedQty, reservation.trackedQty));
+                        TrackedBasisLedger.Reservation reservation = basisLedger.reserve(record.itemId, claim, now);
+                        record.reservedTrackedQty = nonNeg(safeAdd(record.reservedTrackedQty, reservation.trackedQty));
                         record.reservedTrackedBasisGp =
                                 nonNeg(safeAdd(record.reservedTrackedBasisGp, reservation.basisGp));
                     }
@@ -686,29 +593,20 @@ class GeCustodyLedger {
     /** BUY observed reserve (coin loss). */
     void claimBuyReserves() {
         Set<Integer> gainItems = gainQuantities(residual, ANY).keySet();
-        claimFlows(
-                BUY,
-                false,
-                true,
-                (record, flow, remaining) -> {
+        claimFlows(BUY, false, true, (record, flow, remaining) -> {
                     long reserve = nonNeg(record.offeredQty * record.listedPrice);
                     // Owner 1.2: an offer placed, bought and collected inside one settle shows only
                     // its exact spend, the reserve with its change already back; the purchase books
                     // it, never Review.
-                    boolean instant =
-                            gainItems.contains(record.itemId)
-                                    && record.isTerminal()
+                    boolean instant = gainItems.contains(record.itemId) && record.isTerminal()
                                     && remaining == record.spentGp;
                     long claim = instant ? remaining : min(remaining, reserve);
                     // A same-item acquisition alongside the coin loss is a purchase, not a reserve:
                     // leave the mixed movement to the normal classification path. An offer that
                     // filled at once still took these coins; only a cancelled one kept none.
-                    if (record.isCancelled()
-                            || record.cleared && !instant
-                            || record.reserveGp > 0L
+                    if (record.isCancelled() || record.cleared && !instant || record.reserveGp > 0L
                             || now - record.placedAtEpochMillis > PLACEMENT_WINDOW_MILLIS
-                            || !instant && gainItems.contains(record.itemId)
-                            || claim <= 0L) {
+                            || !instant && gainItems.contains(record.itemId) || claim <= 0L) {
                         return 0L;
                     }
                     record.reserveGp = instant ? reserve : nonNeg(claim);
@@ -721,28 +619,17 @@ class GeCustodyLedger {
 
     /** BUY refund (coin gain). */
     void claimBuyRefunds() {
-        claimFlows(
-                BUY,
-                true,
-                true,
-                (record, flow, remaining) -> {
-                    long refundRoom =
-                            nonNeg(record.offeredQty * record.listedPrice - record.spentGp)
+        claimFlows(BUY, true, true, (record, flow, remaining) -> {
+                    long refundRoom = nonNeg(record.offeredQty * record.listedPrice - record.spentGp)
                                     - record.refundedGp;
                     // An offer paid from the bank (the GE draws there once the pack runs out) never
                     // showed its reserve, yet its change still lands in the pack: as the slot
                     // clears, up to the exact change owed is the player's own coins coming back
                     // (owner live 2026-10-16: two bank-paid buys sent their change to Review).
                     Long clearedAt = slotClearedAtEpochMillis.get(record.offerId);
-                    boolean bankPaid =
-                            record.reserveGp == 0L
-                                    && clearedAt != null
+                    boolean bankPaid = record.reserveGp == 0L && clearedAt != null
                                     && Math.abs(now - clearedAt) <= 2 * SLOT_WINDOW_MILLIS;
-                    long claim =
-                            min(
-                                    remaining,
-                                    min(
-                                            nonNeg(refundRoom),
+                    long claim = min(remaining, min(nonNeg(refundRoom),
                                             bankPaid ? refundRoom : record.reserveOutstanding()));
                     // Change is owed once the offer is finished (bought or cancelled) or its slot
                     // cleared.
@@ -761,15 +648,10 @@ class GeCustodyLedger {
     synchronized boolean claimOldChange(long gp, long at) {
         GeOffer match = null;
         for (GeOffer record : records) {
-            if (record.side == BUY
-                    && record.reserveGp == 0L
-                    && (record.isTerminal() || record.cleared)
-                    && record.placedAtEpochMillis <= at
-                    && at - record.placedAtEpochMillis <= COLLECTION_WINDOW_MILLIS
-                    && nonNeg(record.offeredQty * record.listedPrice - record.spentGp)
-                                    - record.refundedGp
-                            >= gp
-                    && (match == null || record.placedAtEpochMillis > match.placedAtEpochMillis))
+            if (record.side == BUY && record.reserveGp == 0L && (record.isTerminal() || record.cleared)
+                    && record.placedAtEpochMillis <= at && at - record.placedAtEpochMillis <= COLLECTION_WINDOW_MILLIS
+                    && nonNeg(record.offeredQty * record.listedPrice - record.spentGp) - record.refundedGp
+                            >= gp && (match == null || record.placedAtEpochMillis > match.placedAtEpochMillis))
                 match = record;
         }
         if (match == null) return false;
@@ -779,45 +661,31 @@ class GeCustodyLedger {
 
     /** SELL cancellation return (item gain). */
     void claimSellReturns() {
-        claimFlows(
-                SELL,
-                true,
-                false,
-                (record, flow, remaining) -> {
+        claimFlows(SELL, true, false, (record, flow, remaining) -> {
                     long claim = min(remaining, record.heldQty());
                     if (!(record.isCancelled() || record.cleared) || claim <= 0L) return 0L;
                     releaseShare(record, claim);
                     record.returnedQty = safeAdd(record.returnedQty, claim);
                     // The returned principal is neutral at its frozen custody basis, never the
                     // current live quote; with no frozen basis it stays the observed movement.
-                    claimed.add(
-                            record.basisUnitPrice > 0L
-                                    ? flow.part(
-                                            claim, record.basisUnitPrice, record.getBasisSource())
-                                    : flow.part(claim));
+                    claimed.add(record.basisUnitPrice > 0L ? flow.part(
+                                            claim, record.basisUnitPrice, record.getBasisSource()) : flow.part(claim));
                     return claim;
                 });
     }
 
     /** BUY collection (item gain). */
     void claimBuyCollections(boolean collectionEvidence) {
-        claimFlows(
-                BUY,
-                true,
-                false,
-                (record, flow, remaining) -> {
+        claimFlows(BUY, true, false, (record, flow, remaining) -> {
                     long claim = min(remaining, record.pendingQty());
                     // Passive progress alone never turns a same-item delta into a collection.
-                    if (record.quantityModified
-                            || claim <= 0L
+                    if (record.quantityModified || claim <= 0L
                             || !(collectionEvidence || record.isTerminal() || record.cleared)) {
                         return 0L;
                     }
                     if (record.basisSource == null) captureBasis(record, flow);
                     record.collectedQty = nonNeg(safeAdd(record.collectedQty, claim));
-                    record.collectedValueGp =
-                            safeAdd(
-                                    record.collectedValueGp,
+                    record.collectedValueGp = safeAdd(record.collectedValueGp,
                                     SafeMath.safeMultiply(claim, flow.unitPrice));
                     record.lastSeenAtEpochMillis = now;
                     claimed.add(flow.part(claim));
@@ -841,11 +709,7 @@ class GeCustodyLedger {
         // Net-neutral and the acquired quantity becomes known coverage at that exact spend.
         flows.add(itemFlow(record, settleQty, execution / settleQty, execution));
         flows.add(coins(-execution));
-        settled(
-                record,
-                buildMarket(flows, clean, clean, msg("grand-exchange-purchase")),
-                settleQty,
-                execution,
+        settled(record, buildMarket(flows, clean, clean, msg("grand-exchange-purchase")), settleQty, execution,
                 execution);
         record.collectedQty = nonNeg(record.settledQty);
         record.collectedValueGp = 0L;
@@ -857,29 +721,14 @@ class GeCustodyLedger {
 
     /** One flow of the offer's item, carrying its frozen basis source and capture time. */
     static Flow itemFlow(GeOffer record, long quantity, long unitPrice, long value) {
-        return new Flow(
-                record.itemId,
-                record.itemName,
-                quantity,
-                toInt(unitPrice),
-                value,
-                record.getBasisSource(),
+        return new Flow(record.itemId, record.itemName, quantity, toInt(unitPrice), value, record.getBasisSource(),
                 record.basisCapturedAtEpochMillis);
     }
 
     /** An uncounted Market row left for Review: the observed movement, never a guess. */
     Transaction reviewRow(List<Flow> flows, String explanation) {
-        return new Transaction(
-                now,
-                UNCERTAIN,
-                MARKET,
-                "Grand Exchange",
-                "Market",
-                false,
-                flows,
-                Confidence.UNCERTAIN,
-                explanation,
-                null);
+        return new Transaction(now, UNCERTAIN, MARKET, "Grand Exchange", "Market", false, flows, Confidence.UNCERTAIN,
+                explanation, null);
     }
 
     /** Claims a whole coin gain as held or settled GE cash. */
@@ -906,10 +755,7 @@ class GeCustodyLedger {
             claimSellsWithoutCollect();
             return;
         }
-        FlowFilters.claim(
-                residual,
-                flow -> flow.isGain() && flow.itemId == ItemID.COINS,
-                (flow, magnitude) -> {
+        FlowFilters.claim(residual, flow -> flow.isGain() && flow.itemId == ItemID.COINS, (flow, magnitude) -> {
                     long cashGp = flow.valueDelta;
                     List<GeOffer> candidates = settlementCandidates(true);
                     // Coins may arrive before the offer's execution/terminal evidence. A live
@@ -933,8 +779,7 @@ class GeCustodyLedger {
                         // long hold
                         // keeps waiting for it.
                         holdCash(cashGp);
-                        pendingSettlementAwaitingEvidence |=
-                                attribution.kind == AttributionKind.NONE
+                        pendingSettlementAwaitingEvidence |= attribution.kind == AttributionKind.NONE
                                         && hasPendingSellEvidence();
                         return claimWhole(flow);
                     }
@@ -954,10 +799,7 @@ class GeCustodyLedger {
      * a gain between the whole waiting sale and that sale less its largest possible tax settles it.
      */
     void claimSellsWithoutCollect() {
-        FlowFilters.claim(
-                residual,
-                flow -> flow.isGain() && flow.itemId == ItemID.COINS,
-                (flow, magnitude) -> {
+        FlowFilters.claim(residual, flow -> flow.isGain() && flow.itemId == ItemID.COINS, (flow, magnitude) -> {
                     List<GeOffer> candidates = settlementCandidates(false);
                     long totalExecution = 0L;
                     for (GeOffer record : candidates)
@@ -965,8 +807,7 @@ class GeCustodyLedger {
                     long original = flow.valueDelta;
                     // Without a Collect click only the whole waiting sale, less at most its GE
                     // tax (2%), can explain the coins: an alch or a shop sale never claims it.
-                    if (original > totalExecution
-                            || original < totalExecution - totalExecution / 50) return 0L;
+                    if (original > totalExecution || original < totalExecution - totalExecution / 50) return 0L;
                     long claimCash = min(original, totalExecution);
                     if (claimCash <= 0L) return 0L;
                     if (candidates.size() > 1) {
@@ -980,11 +821,8 @@ class GeCustodyLedger {
                             // exact combined gap.
                             expectedTax = safeAdd(expectedTax, nonNeg(pendingSellTax(record)));
                         }
-                        boolean taxAttributed =
-                                expectedTax > 0L && totalExecution - claimCash == expectedTax;
-                        if (!taxAttributed
-                                && (expectedTax > 0L || claimCash != totalExecution)
-                                && !allKnownCoverage) {
+                        boolean taxAttributed = expectedTax > 0L && totalExecution - claimCash == expectedTax;
+                        if (!taxAttributed && (expectedTax > 0L || claimCash != totalExecution) && !allKnownCoverage) {
                             allClean = false;
                             for (GeOffer record : candidates) record.collectionAmbiguous = true;
                         }
@@ -997,10 +835,7 @@ class GeCustodyLedger {
                             long settleQty = record.pendingQty();
                             long execution = record.pendingExecution();
                             if (settleQty > 0L && execution > 0L) {
-                                long cash =
-                                        taxAttributed
-                                                ? execution - nonNeg(pendingSellTax(record))
-                                                : execution;
+                                long cash = taxAttributed ? execution - nonNeg(pendingSellTax(record)) : execution;
                                 bookSellSettlement(record, settleQty, cash, execution, allClean);
                                 allocated = safeAdd(allocated, cash);
                             }
@@ -1008,29 +843,18 @@ class GeCustodyLedger {
                         if (claimCash != allocated) {
                             // Legacy (non-collect) batch adjustment row; collect interactions never
                             // produce one.
-                            bookings.add(
-                                    new Transaction(
-                                            now,
-                                            allClean ? TRADE : UNCERTAIN,
-                                            MARKET,
-                                            msg("grand-exchange-settlement"),
-                                            "Market",
-                                            allClean,
+                            bookings.add(new Transaction(now, allClean ? TRADE : UNCERTAIN, MARKET,
+                                            msg("grand-exchange-settlement"), "Market", allClean,
                                             singletonList(coins(claimCash - allocated)),
                                             allClean ? Confidence.CONFIRMED : Confidence.UNCERTAIN,
-                                            msg("grand-exchange-batch"),
-                                            null));
+                                            msg("grand-exchange-batch"), null));
                         }
                     } else {
                         GeOffer record = candidates.get(0);
                         long execution = record.pendingExecution();
                         boolean over = original > execution;
                         record.collectionAmbiguous = record.collectionAmbiguous || over;
-                        bookSellSettlement(
-                                record,
-                                record.pendingQty(),
-                                over ? execution : claimCash,
-                                execution,
+                        bookSellSettlement(record, record.pendingQty(), over ? execution : claimCash, execution,
                                 !over && isCleanRealization(record));
                     }
                     claimed.add(flow.part(claimCash, 1, FACE_VALUE));
@@ -1081,8 +905,7 @@ class GeCustodyLedger {
         long tax = pendingSellTax(record);
         if (execution <= 0L || quantity <= 0L) return null;
         if (tax >= 0L) return new long[] {execution - tax, execution - tax};
-        long least =
-                execution >= 250_000_000L ? 0L : max(0L, (execution - 49L * quantity + 49L) / 50L);
+        long least = execution >= 250_000_000L ? 0L : max(0L, (execution - 49L * quantity + 49L) / 50L);
         return new long[] {execution - execution / 50L, execution - least};
     }
 
@@ -1106,11 +929,8 @@ class GeCustodyLedger {
     List<GeOffer> settlementCandidates(boolean collectionEvidence) {
         var candidates = new ArrayList<GeOffer>();
         for (GeOffer record : byPlacement()) {
-            if (record.side == SELL
-                    && record.pendingQty() > 0L
-                    && record.capturedQty > 0L
-                    && record.settleableQty() >= record.pendingQty()
-                    && !record.isUnbased()
+            if (record.side == SELL && record.pendingQty() > 0L && record.capturedQty > 0L
+                    && record.settleableQty() >= record.pendingQty() && !record.isUnbased()
                     && (collectionEvidence || record.isTerminal() || record.cleared)) {
                 candidates.add(record);
             }
@@ -1164,9 +984,7 @@ class GeCustodyLedger {
             // §2.3: slot evidence may still select exactly one matching subset.
             matches.removeIf(subset -> !subset.containsAll(cleared));
             contradicted = !cleared.isEmpty() && matches.isEmpty();
-            kind =
-                    contradicted
-                            ? AttributionKind.NONE
+            kind = contradicted ? AttributionKind.NONE
                             : matches.size() == 1 ? AttributionKind.SETTLE : AttributionKind.TIE;
             match = matches.size() == 1 ? matches.get(0) : null;
         } else if (matches.size() == 1) {
@@ -1175,9 +993,7 @@ class GeCustodyLedger {
             // no slot outside it cleared, and §2.2: a slot cleared outside it contradicts it.
             match = matches.get(0);
             contradicted = !match.containsAll(cleared);
-            kind =
-                    match.equals(cleared)
-                            ? AttributionKind.SETTLE
+            kind = match.equals(cleared) ? AttributionKind.SETTLE
                             : contradicted ? AttributionKind.NONE : AttributionKind.CONFIRM;
         }
         var records = new ArrayList<GeOffer>();
@@ -1238,10 +1054,7 @@ class GeCustodyLedger {
     /** True while an observed sell lifecycle can still receive execution/terminal evidence. */
     boolean hasPendingSellEvidence() {
         for (GeOffer record : records) {
-            if (record.side == SELL
-                    && record.capturedQty > 0L
-                    && !record.isUnbased()
-                    && !record.isTerminal()
+            if (record.side == SELL && record.capturedQty > 0L && !record.isUnbased() && !record.isTerminal()
                     && !record.cleared) {
                 return true;
             }
@@ -1258,16 +1071,12 @@ class GeCustodyLedger {
         if (pendingSettlementCashGp <= 0L) return;
         // The held cash IS a collect interaction, so the retry sees the same candidate set that
         // interaction saw (still-active sells whose fills may still be collected included).
-        Attribution attribution =
-                attribute(
-                        settlementCandidates(true),
-                        pendingSettlementCashGp,
+        Attribution attribution = attribute(settlementCandidates(true), pendingSettlementCashGp,
                         pendingSettlementHeldSinceEpochMillis);
         boolean windowClosed = now - pendingSettlementHeldSinceEpochMillis > SLOT_WINDOW_MILLIS;
         // §2.2b: a unique match settles at the window end with no contradicting slot evidence; the
         // existing long hold also books as soon as its missing execution evidence completes.
-        if (attribution.kind == AttributionKind.SETTLE
-                || attribution.kind == AttributionKind.CONFIRM
+        if (attribution.kind == AttributionKind.SETTLE || attribution.kind == AttributionKind.CONFIRM
                         && (windowClosed || pendingSettlementAwaitingEvidence)) {
             settleAttributed(attribution.records, pendingSettlementCashGp);
             clearPendingSettlement();
@@ -1275,13 +1084,9 @@ class GeCustodyLedger {
         }
         // §2.2 contradiction, §2.3 an unresolved tie, and §2.4/§3 exhausted evidence fail closed:
         // only slot-evidenced candidates are quarantined and the held cash goes to Review.
-        if (attribution.contradicted
-                || now - pendingSettlementAtEpochMillis > UNOBSERVED_GRACE_MILLIS
-                || attribution.kind == AttributionKind.TIE && windowClosed
-                || attribution.kind == AttributionKind.NONE
-                        && (pendingSettlementAwaitingEvidence
-                                ? !hasPendingSellEvidence()
-                                : windowClosed)) {
+        if (attribution.contradicted || now - pendingSettlementAtEpochMillis > UNOBSERVED_GRACE_MILLIS
+                || attribution.kind == AttributionKind.TIE && windowClosed || attribution.kind == AttributionKind.NONE
+                        && (pendingSettlementAwaitingEvidence ? !hasPendingSellEvidence() : windowClosed)) {
             quarantineAmbiguous(attribution.quarantinable);
             releasePendingSettlement();
         }
@@ -1302,8 +1107,7 @@ class GeCustodyLedger {
         bookings.add(reviewRow(singletonList(coins(held)), msg("grand-exchange-collection")));
     }
 
-    void bookSellSettlement(
-            GeOffer record, long settleQty, long cashValue, long execution, boolean clean) {
+    void bookSellSettlement(GeOffer record, long settleQty, long cashValue, long execution, boolean clean) {
         long remainingQty = record.reservedQty();
         long remainingBasis = record.reservedBasis();
         long knownQty = min(settleQty, remainingQty);
@@ -1321,9 +1125,7 @@ class GeCustodyLedger {
         // its actual Received cash. Only an exact per-item match counts; the tax is never inferred
         // from a reference, a guide price or a difference.
         long provenTax = pendingSellTax(record);
-        long acceptedTax =
-                fullyUnknown && clean && provenTax > 0L && execution - cashValue == provenTax
-                        ? provenTax
+        long acceptedTax = fullyUnknown && clean && provenTax > 0L && execution - cashValue == provenTax ? provenTax
                         : 0L;
         boolean knownCostOnly = acceptedTax > 0L;
         var flows = new ArrayList<Flow>(2);
@@ -1340,12 +1142,7 @@ class GeCustodyLedger {
             // Unknown coverage without a proven tax: the full observed movement stays as
             // liquidation evidence and is Net-neutral. It is never a fake cost and never
             // automatic profit.
-            flows.add(
-                    itemFlow(
-                            record,
-                            -settleQty,
-                            record.basisUnitPrice,
-                            -record.basisFor(settleQty)));
+            flows.add(itemFlow(record, -settleQty, record.basisUnitPrice, -record.basisFor(settleQty)));
             flows.add(coins(cashValue));
         } else {
             if (knownBasis > 0L) {
@@ -1354,26 +1151,17 @@ class GeCustodyLedger {
             }
             flows.add(coins(knownProceeds));
         }
-        String explanation =
-                knownCostOnly
-                        ? msg("grand-exchange-sale-settled-proven")
-                        : fullyUnknown
-                                ? msg("grand-exchange-sale-settled")
-                                : knownQty < settleQty
-                                        ? msg("grand-exchange-sale-settled-quantity")
-                                        : msg("grand-exchange-sale");
+        String explanation = knownCostOnly ? msg("grand-exchange-sale-settled-proven") : fullyUnknown
+                                ? msg("grand-exchange-sale-settled") : knownQty < settleQty
+                                        ? msg("grand-exchange-sale-settled-quantity") : msg("grand-exchange-sale");
         // Counted when the lifecycle is exact AND either the realized quantity carries known
         // coverage
         // or the actual GE tax is proven. An unknown sale without a proven tax stays an exact,
         // uncounted evidence row (liquidation cash retained, Net-neutral, never a Review nag).
         if (provenTax >= 0L) record.settledTaxGp = nonNeg(safeAdd(record.settledTaxGp, provenTax));
         record.realizedResultGp = safeAdd(record.realizedResultGp, knownProceeds - knownBasis);
-        settled(
-                record,
-                buildMarket(flows, clean, clean && (!fullyUnknown || knownCostOnly), explanation),
-                settleQty,
-                execution,
-                cashValue);
+        settled(record, buildMarket(flows, clean, clean && (!fullyUnknown || knownCostOnly), explanation), settleQty,
+                execution, cashValue);
     }
 
     /** Books one settlement row and advances the offer's settled counters by what it booked. */
@@ -1396,12 +1184,8 @@ class GeCustodyLedger {
         if (basisLedger != null && (releaseQty > 0L || releaseBasis > 0L)) {
             basisLedger.release(record.itemId, releaseQty, releaseBasis);
         }
-        record.reservedTrackedQty =
-                nonNeg(max(record.consumedTrackedQty, record.reservedTrackedQty - releaseQty));
-        record.reservedTrackedBasisGp =
-                nonNeg(
-                        max(
-                                record.consumedTrackedBasisGp,
+        record.reservedTrackedQty = nonNeg(max(record.consumedTrackedQty, record.reservedTrackedQty - releaseQty));
+        record.reservedTrackedBasisGp = nonNeg(max(record.consumedTrackedBasisGp,
                                 record.reservedTrackedBasisGp - releaseBasis));
     }
 
@@ -1417,31 +1201,15 @@ class GeCustodyLedger {
     /**
      * One Market row: exact lifecycles book as trades, anything else stays uncounted for review.
      */
-    Transaction buildMarket(
-            List<Flow> flows, boolean exact, boolean countsInNet, String explanation) {
-        return new Transaction(
-                now,
-                exact ? TRADE : UNCERTAIN,
-                MARKET,
-                "Grand Exchange",
-                "Market",
-                countsInNet,
-                flows,
-                exact ? Confidence.CONFIRMED : Confidence.UNCERTAIN,
-                exact
-                        ? explanation
-                        : explanation
-                                + msg("lifecycle-could-settled-exactly")
-                                + msg("stays-uncounted"),
-                null);
+    Transaction buildMarket(List<Flow> flows, boolean exact, boolean countsInNet, String explanation) {
+        return new Transaction(now, exact ? TRADE : UNCERTAIN, MARKET, "Grand Exchange", "Market", countsInNet, flows,
+                exact ? Confidence.CONFIRMED : Confidence.UNCERTAIN, exact ? explanation : explanation
+                                + msg("lifecycle-could-settled-exactly") + msg("stays-uncounted"), null);
     }
 
     boolean isCleanRealization(GeOffer record) {
-        if (record.isUnbased()
-                || record.confidence == CustodyConfidence.AMBIGUOUS
-                || record.quantityModified
-                || record.collectionAmbiguous
-                || !record.hasFrozenBasis()) {
+        if (record.isUnbased() || record.confidence == CustodyConfidence.AMBIGUOUS || record.quantityModified
+                || record.collectionAmbiguous || !record.hasFrozenBasis()) {
             return false;
         }
         if (record.originSessionId.isEmpty() && sessionId != null && !sessionId.isEmpty()) {
@@ -1510,8 +1278,7 @@ class GeCustodyLedger {
         for (GeOffer record : newestBySlot.values()) closedByOffer.remove(record.offerId);
         records.addAll(newestBySlot.values());
         records.addAll(closedByOffer.values());
-        records.sort(
-                (left, right) -> Long.compare(left.placedAtEpochMillis, right.placedAtEpochMillis));
+        records.sort((left, right) -> Long.compare(left.placedAtEpochMillis, right.placedAtEpochMillis));
     }
 
     /** Destructive reset: custody state is financial continuity state and clears with it. */
@@ -1550,8 +1317,7 @@ class GeCustodyLedger {
     // ---------------------------------------------------------------------------------------
     List<GeOffer> byPlacement() {
         var sorted = new ArrayList<GeOffer>(records);
-        sorted.sort(
-                (left, right) -> {
+        sorted.sort((left, right) -> {
                     int byTime = Long.compare(left.placedAtEpochMillis, right.placedAtEpochMillis);
                     return byTime != 0 ? byTime : Integer.compare(left.slot, right.slot);
                 });
@@ -1569,9 +1335,7 @@ class GeCustodyLedger {
     GeOffer latestClosed(int slot) {
         GeOffer latest = null;
         for (GeOffer record : records) {
-            if (record.slot == slot
-                    && record.stage == CLOSED
-                    && (latest == null
+            if (record.slot == slot && record.stage == CLOSED && (latest == null
                             || record.placedAtEpochMillis >= latest.placedAtEpochMillis)) {
                 latest = record;
             }
@@ -1582,9 +1346,7 @@ class GeCustodyLedger {
     GeOffer oldestClosed() {
         GeOffer oldest = null;
         for (GeOffer record : records) {
-            if (record.stage == CLOSED
-                    && (oldest == null
-                            || record.placedAtEpochMillis < oldest.placedAtEpochMillis)) {
+            if (record.stage == CLOSED && (oldest == null || record.placedAtEpochMillis < oldest.placedAtEpochMillis)) {
                 oldest = record;
             }
         }
@@ -1600,9 +1362,7 @@ class GeCustodyLedger {
         int itemId = offer == null ? 0 : offer.itemId;
         GeOffer match = null;
         for (GeOffer record : records) {
-            if (record.slot != slot
-                    || side != null && side != record.side
-                    || itemId > 0 && record.itemId != itemId) {
+            if (record.slot != slot || side != null && side != record.side || itemId > 0 && record.itemId != itemId) {
                 continue;
             }
             if (record.stage != CLOSED) {
@@ -1617,9 +1377,7 @@ class GeCustodyLedger {
     }
 
     boolean isSameIdentity(GeOffer record, Side side, int itemId, long totalQty, long price) {
-        return record.side == side
-                && record.itemId == itemId
-                && record.offeredQty == totalQty
+        return record.side == side && record.itemId == itemId && record.offeredQty == totalQty
                 && record.listedPrice == price;
     }
 
@@ -1680,16 +1438,9 @@ class GeCustodyLedger {
         var flows = new ArrayList<Flow>(2);
         long unit = record.basisUnitPrice;
         if (unsettledQty > 0L) {
-            long value =
-                    buy && record.collectedValueGp != 0L
-                            ? SafeMath.abs(record.collectedValueGp)
+            long value = buy && record.collectedValueGp != 0L ? SafeMath.abs(record.collectedValueGp)
                             : record.basisFor(unsettledQty);
-            flows.add(
-                    itemFlow(
-                            record,
-                            buy ? unsettledQty : -unsettledQty,
-                            unit,
-                            buy ? value : -value));
+            flows.add(itemFlow(record, buy ? unsettledQty : -unsettledQty, unit, buy ? value : -value));
         }
         if (execution > 0L) flows.add(coins(buy ? -execution : execution));
         return reviewRow(flows, msg("grand-exchange-lifecycle") + reason + msg("known-facts"));
@@ -1739,9 +1490,7 @@ class OfferSlots {
     synchronized Optional<Transition> observe(Snapshot current) {
         Objects.requireNonNull(current, "current");
         Snapshot previous = bySlot.put(current.slot, current);
-        if (loginSeed
-                || current.equals(previous)
-                || current.state == GrandExchangeOfferState.EMPTY
+        if (loginSeed || current.equals(previous) || current.state == GrandExchangeOfferState.EMPTY
                         && (previous == null || previous.state == GrandExchangeOfferState.EMPTY)) {
             return Optional.empty();
         }
@@ -1758,15 +1507,10 @@ class OfferSlots {
 
     /** The offer side a state belongs to; null for an empty slot. */
     static GeOffer.Side sideOf(GrandExchangeOfferState state) {
-        return state == GrandExchangeOfferState.BUYING
-                        || state == GrandExchangeOfferState.BOUGHT
-                        || state == GrandExchangeOfferState.CANCELLED_BUY
-                ? GeOffer.Side.BUY
-                : state == GrandExchangeOfferState.SELLING
-                                || state == GrandExchangeOfferState.SOLD
-                                || state == GrandExchangeOfferState.CANCELLED_SELL
-                        ? GeOffer.Side.SELL
-                        : null;
+        return state == GrandExchangeOfferState.BUYING || state == GrandExchangeOfferState.BOUGHT
+                        || state == GrandExchangeOfferState.CANCELLED_BUY ? GeOffer.Side.BUY
+                : state == GrandExchangeOfferState.SELLING || state == GrandExchangeOfferState.SOLD
+                                || state == GrandExchangeOfferState.CANCELLED_SELL ? GeOffer.Side.SELL : null;
     }
 
     static boolean isActive(GrandExchangeOfferState state) {
@@ -1795,14 +1539,8 @@ class OfferSlots {
         long spent;
 
         static Snapshot fromOffer(int slot, GrandExchangeOffer offer) {
-            return new Snapshot(
-                    slot,
-                    offer.getState(),
-                    offer.getItemId(),
-                    offer.getTotalQuantity(),
-                    offer.getQuantitySold(),
-                    offer.getPrice(),
-                    offer.getSpent());
+            return new Snapshot(slot, offer.getState(), offer.getItemId(), offer.getTotalQuantity(),
+                    offer.getQuantitySold(), offer.getPrice(), offer.getSpent());
         }
     }
 
@@ -1834,8 +1572,7 @@ class OfferSlots {
 class GeOffer {
     /** Durable offer side. */
     enum Side {
-        BUY,
-        SELL
+        BUY, SELL
     }
 
     /** Durable lifecycle stage. Behavioural projection states are derived from these facts. */
@@ -1964,16 +1701,8 @@ class GeOffer {
         // Gson
     }
 
-    GeOffer(
-            String offerId,
-            int slot,
-            Side side,
-            int itemId,
-            String itemName,
-            long offeredQty,
-            long listedPrice,
-            long placedAtEpochMillis,
-            String originSessionId) {
+    GeOffer(String offerId, int slot, Side side, int itemId, String itemName, long offeredQty, long listedPrice,
+            long placedAtEpochMillis, String originSessionId) {
         this.offerId = offerId;
         this.slot = slot;
         this.side = side;
@@ -2044,9 +1773,7 @@ class GeOffer {
 
     /** A fresh basis can still be frozen at the first matched owned movement. */
     boolean hasFrozenBasis() {
-        return basisSource != null
-                && basisSource != PriceSource.UNPRICED
-                && basisSource != PriceSource.UNKNOWN
+        return basisSource != null && basisSource != PriceSource.UNPRICED && basisSource != PriceSource.UNKNOWN
                 && basisUnitPrice > 0L;
     }
 
@@ -2101,9 +1828,7 @@ class GeOffer {
         if (side == Side.SELL) {
             return pendingQty() == 0L && heldQty() == 0L && (isTerminal() || cleared);
         }
-        return pendingQty() == 0L
-                && nonNeg(filledQty - collectedQty) == 0L
-                && reserveOutstanding() == 0L
+        return pendingQty() == 0L && nonNeg(filledQty - collectedQty) == 0L && reserveOutstanding() == 0L
                 && (isTerminal() || cleared);
     }
 

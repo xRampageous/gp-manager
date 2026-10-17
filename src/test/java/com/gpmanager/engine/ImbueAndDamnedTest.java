@@ -15,7 +15,7 @@ import static org.junit.Assert.assertNotNull;
  */
 public class ImbueAndDamnedTest
 {
-    private final Valuation valuation = new Valuation(new GpManagerConfig() { }, ImbueAndDamnedTest::composition,
+    private final Valuation valuation = ModelProbe.valuation(new GpManagerConfig() { }, ImbueAndDamnedTest::composition,
         id -> id == 8921 ? 1_000_000 : id == 12851 ? 29_000 : 0);
 
     @Test

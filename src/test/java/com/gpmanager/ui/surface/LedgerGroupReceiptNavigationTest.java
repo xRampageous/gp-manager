@@ -1,5 +1,7 @@
 package com.gpmanager;
 
+import com.gpmanager.GpManagerConfig.Retention;
+
 import java.awt.Component;
 import java.awt.Container;
 import java.util.ArrayList;
@@ -189,7 +191,7 @@ public class LedgerGroupReceiptNavigationTest
                 PriceSource.GRAND_EXCHANGE)),
             Confidence.CONFIRMED, "", null);
         eat.setActionKind(ActionKind.EAT);
-        market.engine.getActiveSession().addTransaction(eat, 100);
+        market.engine.getActiveSession().addTransaction(eat, 100, false);
         LedgerData base = LedgerData.capture(market.engine, market.now + 1_000L,
             LedgerData.Entry.current());
         Semantics.Group group = null;
@@ -209,8 +211,9 @@ public class LedgerGroupReceiptNavigationTest
         List<String> rows = LedgerPageProbe.detailReceiptRowTexts(page);
         assertTrue("action groups count their receipts: " + texts,
             texts.stream().anyMatch(text -> text.startsWith("1 entry · Latest ")));
-        assertTrue("the receipt section renders (" + group.primaryName + " market=" + group.market
-            + " rows=" + rows + "): " + texts, texts.stream().anyMatch(text -> text.startsWith("ENTRIES")));
+        // Owner 1.5.2: one entry opens straight on its detail instead of a list of one.
+        assertFalse("no list of one (" + rows + "): " + texts, texts.stream().anyMatch(text -> text.startsWith("ENTRIES")));
+        assertTrue("its detail is open: " + texts, texts.stream().anyMatch(text -> text.contains("Ate \u00b7 ")));
     }
 
     @Test
@@ -311,7 +314,7 @@ public class LedgerGroupReceiptNavigationTest
             engine.getActiveSession().addTransaction(new Transaction(T0 + 10_000L + i * 1_000L, TransactionType.LOOT, Context.LOOT,
                 "", "Vorkath", true,
                 Collections.singletonList(new Flow(536, "Dragon bones", 1L, 2_000, 2_000L)),
-                Confidence.CONFIRMED, "", null), 500);
+                Confidence.CONFIRMED, "", null), 500, false);
         }
         String groupId = lootGroupId(engine);
         LedgerPage page = page(lootCapture(engine, groupId));
@@ -340,7 +343,7 @@ public class LedgerGroupReceiptNavigationTest
         other.startCustom("Zulrah", T0);
         other.getActiveSession().addTransaction(new Transaction(T0 + 10_000L, TransactionType.LOOT, Context.LOOT, "", "Zulrah",
             true, Collections.singletonList(new Flow(1753, "Blue dragonhide", 1L, 2_000, 2_000L)),
-            Confidence.CONFIRMED, "", null), 500);
+            Confidence.CONFIRMED, "", null), 500, false);
         page.apply(lootCapture(other, lootGroupId(other)));
         assertEquals("a different group starts at the first page", 0, page.detailReceipts.page);
 
@@ -395,7 +398,7 @@ public class LedgerGroupReceiptNavigationTest
             Collections.singletonList(new Flow(itemId, "Law rune", quantity, unitPrice,
                 quantity * unitPrice, PriceSource.GRAND_EXCHANGE)),
             Confidence.CONFIRMED, "", null);
-        market.engine.getActiveSession().addTransaction(transaction, 200);
+        market.engine.getActiveSession().addTransaction(transaction, 200, false);
         return transaction;
     }
 
@@ -550,7 +553,7 @@ public class LedgerGroupReceiptNavigationTest
                 TransactionType.GAIN, Context.GENERIC, "", "Law rune", true,
                 Collections.singletonList(new Flow(item, "Law rune", qty, quote[0],
                     qty * quote[0], PriceSource.GRAND_EXCHANGE)),
-                Confidence.CONFIRMED, "", null), 500);
+                Confidence.CONFIRMED, "", null), 500, false);
             inventory.put(item, qty);
             engine.setBaseline(new ContainerSnapshot(inventory));
             offer(slot, GrandExchangeOfferState.SELLING, item, (int) qty, 0, limit, 0);
@@ -577,7 +580,7 @@ public class LedgerGroupReceiptNavigationTest
             ContainerSnapshot snapshot = new ContainerSnapshot(inventory);
             for (int i = 0; i < 3; i++)
             {
-                engine.processIfDirty(snapshot, now);
+                engine.processIfDirty(snapshot, now, null);
                 now += 5_000L;
             }
         }

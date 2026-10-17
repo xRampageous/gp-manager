@@ -109,13 +109,13 @@ public class GeSellClassificationTest
         inventory.put(ItemID.NATURERUNE, 4L);
         ContainerSnapshot snapshot = new ContainerSnapshot(inventory);
         engine.markDirty();
-        engine.processIfDirty(snapshot, now);
+        engine.processIfDirty(snapshot, now, null);
 
         OfferSlots ledger = new OfferSlots();
         noteGe(engine, ledger, 0, SELLING, ItemID.NATURERUNE, 5, 0, 200, 0, now + 100L);
 
-        Transaction settled = engine.processIfDirty(snapshot, now + 600L);
-        Transaction finalSettle = engine.processIfDirty(snapshot, now + 1_200L);
+        Transaction settled = engine.processIfDirty(snapshot, now + 600L, null);
+        Transaction finalSettle = engine.processIfDirty(snapshot, now + 1_200L, null);
         Transaction sale = finalSettle == null ? settled : finalSettle;
         assertNotNull(sale);
         assertEquals(TransactionType.TRANSFER, sale.getType());
@@ -329,7 +329,7 @@ public class GeSellClassificationTest
         Transaction result = null;
         for (int i = 0; i < 3; i++)
         {
-            Transaction settled = engine.processIfDirty(snapshot, now + i * 600L);
+            Transaction settled = engine.processIfDirty(snapshot, now + i * 600L, null);
             if (settled != null)
             {
                 result = settled;

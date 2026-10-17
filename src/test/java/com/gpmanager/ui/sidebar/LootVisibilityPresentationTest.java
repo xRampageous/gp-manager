@@ -23,15 +23,15 @@ public class LootVisibilityPresentationTest
         long now = System.currentTimeMillis();
         engine.startCustom("Vorkath", now);
         engine.getActiveSession().addTransaction(
-            transaction(now + 1_000L, "Cheap bones", 1, TransactionType.GAIN, 2, 100, 200L), 2_000);
+            transaction(now + 1_000L, "Cheap bones", 1, TransactionType.GAIN, 2, 100, 200L), 2_000, false);
         engine.getActiveSession().addTransaction(
-            transaction(now + 2_000L, "Valuable hide", 2, TransactionType.GAIN, 1, 5_000, 5_000L), 2_000);
+            transaction(now + 2_000L, "Valuable hide", 2, TransactionType.GAIN, 1, 5_000, 5_000L), 2_000, false);
         long net = engine.getMetrics(now + 3_000L).net;
 
         LiveSnapshot unfiltered = LiveSnapshot.capture(engine, now + 3_000L, LiveContext.NONE);
         assertEquals("both gains are visible with no minimum", 2, unfiltered.recent.size());
 
-        LiveContext minimum = new LiveContext(false, null, 1_000L, PvpState.NONE, "", false, "");
+        LiveContext minimum = new LiveContext(false, null, 1_000L, PvpState.NONE, "", false, "", false);
         LiveSnapshot filtered = LiveSnapshot.capture(engine, now + 3_000L, minimum);
         assertEquals("the cheap gain is hidden from presentation", 1, filtered.recent.size());
         assertEquals("Valuable hide", filtered.recent.get(0).name);
@@ -48,12 +48,12 @@ public class LootVisibilityPresentationTest
         long now = System.currentTimeMillis();
         engine.startCustom("Vorkath", now);
         engine.getActiveSession().addTransaction(
-            transaction(now + 1_000L, "Prayer potion(4)", 3, TransactionType.CONSUMPTION, -2, 9_800, -19_600L), 2_000);
+            transaction(now + 1_000L, "Prayer potion(4)", 3, TransactionType.CONSUMPTION, -2, 9_800, -19_600L), 2_000, false);
         // Unit price 0: the price is unknown, so the minimum cannot judge it.
         engine.getActiveSession().addTransaction(
-            transaction(now + 2_000L, "Unidentified mineral", 8, TransactionType.GAIN, 8, 0, 0L), 2_000);
+            transaction(now + 2_000L, "Unidentified mineral", 8, TransactionType.GAIN, 8, 0, 0L), 2_000, false);
 
-        LiveContext minimum = new LiveContext(false, null, 1_000_000L, PvpState.NONE, "", false, "");
+        LiveContext minimum = new LiveContext(false, null, 1_000_000L, PvpState.NONE, "", false, "", false);
         LiveSnapshot filtered = LiveSnapshot.capture(engine, now + 3_000L, minimum);
         assertEquals("costs stay discoverable and unpriced gains stay reviewable", 2, filtered.recent.size());
         LiveSnapshot.Recent mineral = null;
@@ -75,14 +75,14 @@ public class LootVisibilityPresentationTest
         long now = System.currentTimeMillis();
         engine.startCustom("Vorkath", now);
         engine.getActiveSession().addTransaction(
-            transaction(now + 1_000L, "Vial", 1, TransactionType.GAIN, 3, 1, 3L), 2_000);
+            transaction(now + 1_000L, "Vial", 1, TransactionType.GAIN, 3, 1, 3L), 2_000, false);
         engine.getActiveSession().addTransaction(
-            transaction(now + 2_000L, "Dragon bones", 1, TransactionType.GAIN, 2, 3_200, 6_400L), 2_000);
+            transaction(now + 2_000L, "Dragon bones", 1, TransactionType.GAIN, 2, 3_200, 6_400L), 2_000, false);
         long net = engine.getMetrics(now + 3_000L).net;
 
         SidebarPanel panel = onEdt(() ->
         {
-            SidebarPanel created = new SidebarPanel(engine, PresentationLifecycleTest.config(), null);
+            SidebarPanel created = new SidebarPanel(engine, PresentationLifecycleTest.config(), null, null, null);
             created.bindFilter(flow -> !"Vial".equals(flow.itemName));
             SidebarPanelProbe.refresh(created);
             return created;
@@ -116,9 +116,9 @@ public class LootVisibilityPresentationTest
         long now = System.currentTimeMillis();
         engine.startCustom("Vorkath", now);
         engine.getActiveSession().addTransaction(
-            transaction(now + 1_000L, "Cheap bones", 1, TransactionType.GAIN, 2, 100, 200L), 2_000);
+            transaction(now + 1_000L, "Cheap bones", 1, TransactionType.GAIN, 2, 100, 200L), 2_000, false);
 
-        SidebarPanel panel = onEdt(() -> new SidebarPanel(engine, minimumConfig("500"), null));
+        SidebarPanel panel = onEdt(() -> new SidebarPanel(engine, minimumConfig("500"), null, null, null));
         onEdt(() ->
         {
             SidebarPanelProbe.refresh(panel);
@@ -126,7 +126,7 @@ public class LootVisibilityPresentationTest
         });
         assertTrue("a 500 gp minimum hides a 100 gp unit-price gain", SidebarPanelProbe.live(panel).recent.isEmpty());
 
-        SidebarPanel open = onEdt(() -> new SidebarPanel(engine, minimumConfig("0"), null));
+        SidebarPanel open = onEdt(() -> new SidebarPanel(engine, minimumConfig("0"), null, null, null));
         onEdt(() ->
         {
             SidebarPanelProbe.refresh(open);

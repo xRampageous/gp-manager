@@ -27,7 +27,7 @@ public class SyntheticLongSessionPerfTest
     public void syntheticSaveWorkloadRecordsDurationAndGrowth() throws Exception
     {
         Path root = folder.newFolder("profit-manager").toPath();
-        SessionRepository repository = new SessionRepository(new Gson(), FilepathTestSupport.root(root));
+        SessionRepository repository = new SessionRepository(new Gson(), FilepathTestSupport.root(root), false);
         long t0 = 1_700_000_000_000L;
         final int transactions = 2_000;
 
@@ -45,7 +45,7 @@ public class SyntheticLongSessionPerfTest
                     Context.GENERIC,
                     "Skilling",
                     true,
-                    Collections.singletonList(new Flow(1511, "Logs", 1L, 39, 39L))), transactions);
+                    Collections.singletonList(new Flow(1511, "Logs", 1L, 39, 39L))), transactions, false);
             }
             assertEquals("Measure retained records, not only compacted totals", transactions, session.getTransactions().size());
             SavedState state = new SavedState(session, null, Collections.emptyList());

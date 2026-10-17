@@ -1,5 +1,7 @@
 package com.gpmanager;
 
+import com.gpmanager.GpManagerConfig.Retention;
+
 import com.google.gson.Gson;
 import java.time.Instant;
 import java.time.LocalDate;
@@ -41,12 +43,6 @@ public class C8rMigrationTest
             @Override
             public boolean autoStartSession() { return false; }
         };
-    }
-
-    private static Engine engine()
-    {
-        return new Engine(deltas -> Collections.emptyList(), new TransactionClassifier(),
-            config());
     }
 
     // ── schema matrix ─────────────────────────────────────────────────────────

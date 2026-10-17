@@ -17,7 +17,7 @@ public class ShellNavigationTest
     public void navigationHasExactlyTheThreeFinalLabelsWithoutDecorativeGlyphs() throws Exception
     {
         SidebarPanel panel = onEdt(() -> new SidebarPanel(PresentationLifecycleTest.engine(),
-            PresentationLifecycleTest.config(), null));
+            PresentationLifecycleTest.config(), null, null, null));
         Shell shell = panel.shell();
         assertEquals(3, ShellProbe.tabLabels(shell).length);
         assertEquals("live", shell.currentPage());
@@ -34,7 +34,7 @@ public class ShellNavigationTest
     public void ledgerPlaceholderIsReplacedByTheRealAuditSurface() throws Exception
     {
         SidebarPanel panel = onEdt(() -> new SidebarPanel(PresentationLifecycleTest.engine(),
-            PresentationLifecycleTest.config(), null));
+            PresentationLifecycleTest.config(), null, null, null));
         panel.shell().show(Shell.LEDGER);
         java.util.List<String> labels = new java.util.ArrayList<>();
         collectLabels(panel, labels);
@@ -45,7 +45,7 @@ public class ShellNavigationTest
     public void notificationShowsOneMessageAndDismissesOnDemand() throws Exception
     {
         SidebarPanel panel = onEdt(() -> new SidebarPanel(PresentationLifecycleTest.engine(),
-            PresentationLifecycleTest.config(), null));
+            PresentationLifecycleTest.config(), null, null, null));
         Shell shell = panel.shell();
         onEdt(() ->
         {
@@ -114,7 +114,7 @@ public class ShellNavigationTest
     public void everyPageIsSelectableAndTheShellReturnsToLive() throws Exception
     {
         SidebarPanel panel = onEdt(() -> new SidebarPanel(PresentationLifecycleTest.engine(),
-            PresentationLifecycleTest.config(), null));
+            PresentationLifecycleTest.config(), null, null, null));
         Shell shell = panel.shell();
 
         shell.show(Shell.LEDGER);

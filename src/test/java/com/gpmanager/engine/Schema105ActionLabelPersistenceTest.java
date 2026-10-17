@@ -1,5 +1,7 @@
 package com.gpmanager;
 
+import com.gpmanager.GpManagerConfig.Retention;
+
 import com.google.gson.Gson;
 import java.nio.file.Files;
 import java.nio.file.Path;
@@ -37,11 +39,11 @@ public class Schema105ActionLabelPersistenceTest
     @Test
     public void exactLabelIsDurableInSchema105StateAndReloads()
     {
-        Session session = new Session("General", 1_000L);
+        Session session = new Session("General", 1_000L, SessionMode.GENERAL);
         Transaction labelled = cast("Ice Burst", 2_000L);
         Transaction generic = genericCast(3_000L);
-        session.addTransaction(labelled, 100);
-        session.addTransaction(generic, 100);
+        session.addTransaction(labelled, 100, false);
+        session.addTransaction(generic, 100, false);
         SavedState state = new SavedState(session, null, Collections.emptyList());
         assertEquals(110, state.schemaVersion);
         String json = new Gson().toJson(state);
@@ -88,7 +90,7 @@ public class Schema105ActionLabelPersistenceTest
         Engine engine = engine();
         engine.startCustom("Vorkath", T0);
         Transaction transaction = cast(null, T0 + 100L);
-        engine.getActiveSession().addTransaction(transaction, 100);
+        engine.getActiveSession().addTransaction(transaction, 100, false);
         String before = fingerprint(transaction);
         long netBefore = engine.getMetrics(T0 + 200L).net;
 
@@ -113,7 +115,7 @@ public class Schema105ActionLabelPersistenceTest
         Engine engine = engine();
         engine.startCustom("Vorkath", T0);
         Transaction cast = cast("Ice Burst", T0 + 100L);
-        engine.getActiveSession().addTransaction(cast, 100);
+        engine.getActiveSession().addTransaction(cast, 100, false);
         long net = engine.getMetrics(T0 + 200L).net;
 
         engine.clearActionEvidence();
@@ -146,13 +148,13 @@ public class Schema105ActionLabelPersistenceTest
         long now = System.currentTimeMillis();
         Engine source = engine();
         source.startCustom("Vorkath", now);
-        source.getActiveSession().addTransaction(cast("Ice Burst", now + 1_000L), 100);
-        source.getActiveSession().addTransaction(cast("Ice Burst", now + 2_000L), 100);
+        source.getActiveSession().addTransaction(cast("Ice Burst", now + 1_000L), 100, false);
+        source.getActiveSession().addTransaction(cast("Ice Burst", now + 2_000L), 100, false);
         // Runes that name no spell (a staff covered them) keep the click; runes that do name one win.
         Transaction smoke = genericCast(now + 3_000L);
         smoke.setActionLabel(ActionLabel.of("Smoke Barrage"));
-        source.getActiveSession().addTransaction(smoke, 100);
-        source.getActiveSession().addTransaction(genericCast(now + 4_000L), 100);
+        source.getActiveSession().addTransaction(smoke, 100, false);
+        source.getActiveSession().addTransaction(genericCast(now + 4_000L), 100, false);
         SavedState detached = source.savedState();
         assertEquals("detach keeps the bounded label", "Ice Burst",
             detached.getActiveSession().getTransactions().get(0).actionLabel().value());
@@ -171,7 +173,7 @@ public class Schema105ActionLabelPersistenceTest
         String stableGroupId = burst.semanticGroupId;
         assertTrue("search terms survive restore", burst.searchTerms.contains("Ice Burst"));
 
-        session.addTransaction(cast("Ice Burst", now + 6_000L), 100);
+        session.addTransaction(cast("Ice Burst", now + 6_000L), 100, false);
         Semantics.Result after = Semantics.capture(
             session.getTransactions(), null, session.getId(), null);
         Semantics.Group merged = groupNamed(after.groups, "Ice Burst");
@@ -190,17 +192,17 @@ public class Schema105ActionLabelPersistenceTest
     public void repositoryRoundTripAndBackupRotationPreserveTheLabel() throws Exception
     {
         Path directory = temporary.newFolder().toPath();
-        Session session = new Session("General", 1_000L);
+        Session session = new Session("General", 1_000L, SessionMode.GENERAL);
         Transaction labelled = cast("Ice Burst", 2_000L);
-        session.addTransaction(labelled, 100);
+        session.addTransaction(labelled, 100, false);
         SavedState state = new SavedState(session, null, Collections.emptyList());
-        SessionRepository repository = new SessionRepository(new Gson(), FilepathTestSupport.root(directory));
+        SessionRepository repository = new SessionRepository(new Gson(), FilepathTestSupport.root(directory), false);
         PersistenceProbe.save(repository, state);
         // Ordinary next save rotates the previous labelled generation into the backup file.
-        session.addTransaction(cast("Smoke Barrage", 3_000L), 100);
+        session.addTransaction(cast("Smoke Barrage", 3_000L), 100, false);
         PersistenceProbe.save(repository, new SavedState(session, null, Collections.emptyList()));
 
-        SavedState reloaded = new SessionRepository(new Gson(), FilepathTestSupport.root(directory)).load();
+        SavedState reloaded = new SessionRepository(new Gson(), FilepathTestSupport.root(directory), false).load();
         assertEquals(110, reloaded.schemaVersion);
         Transaction restored = reloaded.getActiveSession().getTransactions().get(0);
         assertEquals(labelled.getId(), restored.getId());
@@ -217,7 +219,7 @@ public class Schema105ActionLabelPersistenceTest
         long old = T0 - 400L * 24L * 60L * 60L * 1_000L;
         Engine engine = engine();
         engine.startCustom("Old Grind", old);
-        engine.getActiveSession().addTransaction(cast("Ice Burst", old + 1_000L), 100);
+        engine.getActiveSession().addTransaction(cast("Ice Burst", old + 1_000L), 100, false);
         String sessionId = engine.getActiveSession().getId();
         engine.finishCustom(old + 2_000L);
         engine.compactOlderThan(1, T0);
@@ -251,8 +253,8 @@ public class Schema105ActionLabelPersistenceTest
 
     private static SavedState stateWith(Transaction transaction)
     {
-        Session session = new Session("General", 1_000L);
-        session.addTransaction(transaction, 100);
+        Session session = new Session("General", 1_000L, SessionMode.GENERAL);
+        session.addTransaction(transaction, 100, false);
         return new SavedState(session, null, Collections.emptyList());
     }
 

@@ -68,7 +68,7 @@ public class SeedPackTest
     {
         Transaction row = null;
         for (long t = firstTick; row == null && t < firstTick + 4_000L; t += 600L)
-            row = engine.processIfDirty(snapshot, t);
+            row = engine.processIfDirty(snapshot, t, null);
         return row;
     }
 }

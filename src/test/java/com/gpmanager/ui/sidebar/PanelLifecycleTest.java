@@ -20,7 +20,7 @@ public class PanelLifecycleTest
         long now = System.currentTimeMillis();
         engine.startCustom("Vorkath", now);
         String sessionId = engine.getActiveSession().getId();
-        SidebarPanel panel = onEdt(() -> new SidebarPanel(engine, PresentationLifecycleTest.config(), null));
+        SidebarPanel panel = onEdt(() -> new SidebarPanel(engine, PresentationLifecycleTest.config(), null, null, null));
 
         panel.suspend();
 
@@ -36,10 +36,10 @@ public class PanelLifecycleTest
         engine.startCustom("Vorkath", now);
         engine.getActiveSession().addTransaction(Tx.of(now + 1_000L, null, TransactionType.GAIN,
             Context.GENERIC, "", "Vorkath", true,
-            Collections.singletonList(new Flow(1, "Dragon bones", 2, 3_200, 6_400L))), 2_000);
+            Collections.singletonList(new Flow(1, "Dragon bones", 2, 3_200, 6_400L))), 2_000, false);
         long bookedNet = engine.getMetrics(now + 2_000L).net;
 
-        SidebarPanel panel = onEdt(() -> new SidebarPanel(engine, PresentationLifecycleTest.config(), null));
+        SidebarPanel panel = onEdt(() -> new SidebarPanel(engine, PresentationLifecycleTest.config(), null, null, null));
         onEdt(() ->
         {
             SidebarPanelProbe.refresh(panel);
@@ -57,7 +57,7 @@ public class PanelLifecycleTest
     public void repeatedRefreshesStayCoalescedAndKeepExactlyOneShell() throws Exception
     {
         SidebarPanel panel = onEdt(() -> new SidebarPanel(PresentationLifecycleTest.engine(),
-            PresentationLifecycleTest.config(), null));
+            PresentationLifecycleTest.config(), null, null, null));
         for (int i = 0; i < 50; i++)
         {
             panel.refresh();

@@ -18,7 +18,7 @@ public class LateSpriteRefreshTest
         Engine engine = new Engine(deltas -> Collections.emptyList(), new TransactionClassifier(),
             new GpManagerConfig() {});
         SidebarPanel[] holder = new SidebarPanel[1];
-        SwingUtilities.invokeAndWait(() -> holder[0] = new SidebarPanel(engine, new GpManagerConfig() {}, null));
+        SwingUtilities.invokeAndWait(() -> holder[0] = new SidebarPanel(engine, new GpManagerConfig() {}, null, null, null));
         SidebarPanel panel = holder[0];
         BufferedImage image = new BufferedImage(2, 2, BufferedImage.TYPE_INT_ARGB);
 

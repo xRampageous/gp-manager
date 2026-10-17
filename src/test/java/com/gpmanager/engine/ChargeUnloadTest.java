@@ -45,7 +45,7 @@ public class ChargeUnloadTest
         Transaction result = null;
         for (int i = 0; i < 3; i++)
         {
-            Transaction settled = engine.processIfDirty(new ContainerSnapshot(new HashMap<>(held)), T0 + 600L + i * 600L);
+            Transaction settled = engine.processIfDirty(new ContainerSnapshot(new HashMap<>(held)), T0 + 600L + i * 600L, null);
             if (settled != null)
             {
                 result = settled;
@@ -90,7 +90,7 @@ public class ChargeUnloadTest
         {
             tick[0]++;
             intake.watchReturn();
-            assertNull(engine.processIfDirty(new ContainerSnapshot(new HashMap<>(held)), now += 600L));
+            assertNull(engine.processIfDirty(new ContainerSnapshot(new HashMap<>(held)), now += 600L, null));
         }
         held.remove(ItemID.TOTS_CHARGED);
         held.put(ItemID.TOTS_UNCHARGED, 1L);
@@ -101,7 +101,7 @@ public class ChargeUnloadTest
         {
             tick[0]++;
             intake.watchReturn();
-            Transaction settled = engine.processIfDirty(new ContainerSnapshot(new HashMap<>(held)), now += 600L);
+            Transaction settled = engine.processIfDirty(new ContainerSnapshot(new HashMap<>(held)), now += 600L, null);
             if (settled != null)
             {
                 result = settled;

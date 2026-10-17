@@ -17,7 +17,7 @@ public class LiveRateTest {
         Session session = engine.getActiveSession();
         for (long at : new long[] {START + 30_000L, START + 240_000L}) {
             session.addTransaction(Tx.of(at, TransactionType.GAIN, Context.GENERIC, "Gain", true,
-                Collections.singletonList(new Flow(995, "Coins", 1_000L, 1, 1_000L))), 100);
+                Collections.singletonList(new Flow(995, "Coins", 1_000L, 1, 1_000L))), 100, false);
         }
         return engine;
     }

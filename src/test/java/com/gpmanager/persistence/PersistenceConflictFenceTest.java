@@ -36,7 +36,7 @@ public class PersistenceConflictFenceTest
     private void seed(Persistence coordinator)
     {
         JsonCodec.bind(new Gson());
-        assertTrue(coordinator.switchIdentity(ALICE, true));
+        assertTrue(coordinator.switchIdentity(ALICE, true, true));
         coordinator.engine.ensureSession(1_000L);
         coordinator.engine.getActiveSession().rename("Seed");
         assertTrue(coordinator.saveNow());
@@ -51,7 +51,7 @@ public class PersistenceConflictFenceTest
         state.getActiveSession().rename("External");
         long base = state.revision;
         state.setRevision(base + 1L);
-        assertTrue(external.save(new WriteIntent(ALICE, external.scopeGeneration, base, state)));
+        assertTrue(external.save(new WriteIntent(ALICE, external.scopeGeneration, base, state, null)));
     }
 
     private SavedState disk(Path root)
@@ -85,7 +85,7 @@ public class PersistenceConflictFenceTest
             SavedState stale = coordinator.snapshot();
             stale.setRevision(50L);
             WriteIntent retry = new WriteIntent(ALICE, repository.scopeGeneration,
-                repository.lastKnownDiskRevision, stale);
+                repository.lastKnownDiskRevision, stale, null);
             writer.submit(retry);
             assertTrue(writer.flush(Duration.ofSeconds(5)));
             assertFalse("reset cannot bypass the same conflict fence", writer.replaceNow(retry).isCommitted());
@@ -108,7 +108,7 @@ public class PersistenceConflictFenceTest
             SavedState reset = coordinator.snapshot();
             long base = repository.lastKnownDiskRevision;
             externalWrite(root);
-            assertFalse(writer.replaceNow(new WriteIntent(ALICE, repository.scopeGeneration, base, reset)).isCommitted());
+            assertFalse(writer.replaceNow(new WriteIntent(ALICE, repository.scopeGeneration, base, reset, null)).isCommitted());
             assertEquals(SaveStatus.State.CONFLICT, writer.getStatus().state);
             assertTrue(writer.getStatus().detail.contains("back up current data, then restart RuneLite"));
             assertFalse(coordinator.isTrackingReady());
@@ -178,7 +178,7 @@ public class PersistenceConflictFenceTest
         Persistence fresh = coordinator(reopened, newWriter);
         try
         {
-            assertTrue(fresh.switchIdentity(ALICE, true));
+            assertTrue(fresh.switchIdentity(ALICE, true, true));
             assertEquals("External", fresh.engine.getActiveSession().getName());
             assertTrue(fresh.isTrackingReady());
             fresh.engine.getActiveSession().rename("Reloaded local");

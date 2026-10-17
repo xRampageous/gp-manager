@@ -16,7 +16,7 @@ import static org.junit.Assert.assertSame;
 public class IronmanValueTest
 {
     private static final int WHIP = 4151;
-    private final Valuation valuation = new Valuation(new GpManagerConfig() { }, IronmanValueTest::composition, id -> id == WHIP ? 1_500_000 : 0);
+    private final Valuation valuation = ModelProbe.valuation(new GpManagerConfig() { }, IronmanValueTest::composition, id -> id == WHIP ? 1_500_000 : 0);
 
     @Test
     public void highAlchOnlyWhenChosen()

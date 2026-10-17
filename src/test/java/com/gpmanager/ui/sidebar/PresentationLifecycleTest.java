@@ -17,7 +17,7 @@ import static org.junit.Assert.assertTrue;
 public class PresentationLifecycleTest
 {
     private final RecordingNavigation navigation = new RecordingNavigation();
-    private final SidebarPanel panel = new SidebarPanel(engine(), config(), null);
+    private final SidebarPanel panel = new SidebarPanel(engine(), config(), null, null, null);
     private final BufferedImage icon = new BufferedImage(1, 1, BufferedImage.TYPE_INT_ARGB);
 
     @Test

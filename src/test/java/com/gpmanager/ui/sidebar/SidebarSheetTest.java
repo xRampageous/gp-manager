@@ -18,7 +18,7 @@ public class SidebarSheetTest
     public void startGrindSavesNewNamesAndStartsKnownOnes() throws Exception
     {
         Engine engine = PresentationLifecycleTest.engine();
-        SidebarPanel panel = onEdt(() -> new SidebarPanel(engine, PresentationLifecycleTest.config(), null));
+        SidebarPanel panel = onEdt(() -> new SidebarPanel(engine, PresentationLifecycleTest.config(), null, null, null));
         Shell shell = panel.shell();
         GrindsController grinds = new GrindsController(panel);
         onEdt(() ->
@@ -84,7 +84,7 @@ public class SidebarSheetTest
     {
         Engine engine = PresentationLifecycleTest.engine();
         engine.startCustom("Vorkath", System.currentTimeMillis());
-        SidebarPanel panel = onEdt(() -> new SidebarPanel(engine, PresentationLifecycleTest.config(), null));
+        SidebarPanel panel = onEdt(() -> new SidebarPanel(engine, PresentationLifecycleTest.config(), null, null, null));
         Shell shell = panel.shell();
         boolean[] ran = {false};
         onEdt(() ->
@@ -110,7 +110,7 @@ public class SidebarSheetTest
     {
         Engine engine = PresentationLifecycleTest.engine();
         engine.startCustom("Vorkath", System.currentTimeMillis());
-        SidebarPanel panel = onEdt(() -> new SidebarPanel(engine, PresentationLifecycleTest.config(), null));
+        SidebarPanel panel = onEdt(() -> new SidebarPanel(engine, PresentationLifecycleTest.config(), null, null, null));
         Shell shell = panel.shell();
         long before = engine.getRevision();
         onEdt(() ->
@@ -130,7 +130,7 @@ public class SidebarSheetTest
     {
         Engine engine = PresentationLifecycleTest.engine();
         engine.startCustom("Vorkath", System.currentTimeMillis());
-        SidebarPanel panel = onEdt(() -> new SidebarPanel(engine, PresentationLifecycleTest.config(), null));
+        SidebarPanel panel = onEdt(() -> new SidebarPanel(engine, PresentationLifecycleTest.config(), null, null, null));
         Shell shell = panel.shell();
         onEdt(() ->
         {
@@ -171,8 +171,8 @@ public class SidebarSheetTest
         engine.startCustom("Vorkath", now);
         engine.getActiveSession().addTransaction(new Transaction(now + 1_000L, TransactionType.LOOT,
             Context.LOOT, "", "Vorkath", true, java.util.Collections.singletonList(
-                new Flow(536, "Dragon bones", 1L, 2_000, 2_000L)), Confidence.CONFIRMED, "fixture", null), 2_000);
-        SidebarPanel panel = onEdt(() -> new SidebarPanel(engine, PresentationLifecycleTest.config(), null));
+                new Flow(536, "Dragon bones", 1L, 2_000, 2_000L)), Confidence.CONFIRMED, "fixture", null), 2_000, false);
+        SidebarPanel panel = onEdt(() -> new SidebarPanel(engine, PresentationLifecycleTest.config(), null, null, null));
         LedgerPage.Actions ledger = SidebarPanelProbe.ledgerPage(panel).actions;
         onEdt(() ->
         {
@@ -196,7 +196,7 @@ public class SidebarSheetTest
     {
         Engine engine = PresentationLifecycleTest.engine();
         engine.startCustom("Vorkath", System.currentTimeMillis());
-        SidebarPanel panel = onEdt(() -> new SidebarPanel(engine, PresentationLifecycleTest.config(), null));
+        SidebarPanel panel = onEdt(() -> new SidebarPanel(engine, PresentationLifecycleTest.config(), null, null, null));
         Shell shell = panel.shell();
         GrindsController grinds = new GrindsController(panel);
         onEdt(() ->
@@ -224,7 +224,7 @@ public class SidebarSheetTest
     {
         Engine engine = PresentationLifecycleTest.engine();
         engine.startCustom("Vorkath", System.currentTimeMillis());
-        SidebarPanel panel = onEdt(() -> new SidebarPanel(engine, PresentationLifecycleTest.config(), null));
+        SidebarPanel panel = onEdt(() -> new SidebarPanel(engine, PresentationLifecycleTest.config(), null, null, null));
         Shell shell = panel.shell();
         GrindsController grinds = new GrindsController(panel);
         for (long target : new long[]{30L * 60_000L, 90L * 60_000L, 26L * 3_600_000L + 30L * 60_000L})
@@ -245,7 +245,7 @@ public class SidebarSheetTest
     public void switchingPagesClosesTheSheet() throws Exception
     {
         SidebarPanel panel = onEdt(() -> new SidebarPanel(PresentationLifecycleTest.engine(),
-            PresentationLifecycleTest.config(), null));
+            PresentationLifecycleTest.config(), null, null, null));
         Shell shell = panel.shell();
         onEdt(() ->
         {

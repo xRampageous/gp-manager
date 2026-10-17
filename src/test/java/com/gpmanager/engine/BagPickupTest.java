@@ -102,9 +102,9 @@ public class BagPickupTest
 
     private static Transaction settle(Engine engine, ContainerSnapshot snapshot, long firstTick)
     {
-        assertNull(engine.processIfDirty(snapshot, firstTick));
-        assertNull(engine.processIfDirty(snapshot, firstTick + 600L));
-        Transaction tx = engine.processIfDirty(snapshot, firstTick + 1_200L);
+        assertNull(engine.processIfDirty(snapshot, firstTick, null));
+        assertNull(engine.processIfDirty(snapshot, firstTick + 600L, null));
+        Transaction tx = engine.processIfDirty(snapshot, firstTick + 1_200L, null);
         assertNotNull(tx);
         return tx;
     }

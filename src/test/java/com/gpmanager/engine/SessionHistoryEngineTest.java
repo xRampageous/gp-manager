@@ -26,7 +26,7 @@ public class SessionHistoryEngineTest
     {
         Session interrupted = session("Interrupted", Context.LOOT, TransactionType.LOOT, 100L);
         Engine engine = engine();
-        engine.restore(new SavedState(interrupted, null, Collections.emptyList()));
+        engine.restore(new SavedState(interrupted, null, Collections.emptyList()), SafeMath.now());
 
         assertNotNull(engine.getActiveSession());
         assertEquals(PauseReason.RECOVERY, engine.getActiveSession().getPauseReason());
@@ -118,7 +118,7 @@ public class SessionHistoryEngineTest
         long quantity = value < 0L ? -1L : 1L;
         session.addTransaction(Tx.of(
             start + 1_000L, 1_000L, type, context, name, name, true,
-            Collections.singletonList(new Flow(1, "Item", quantity, (int) Math.abs(value), value))), 100);
+            Collections.singletonList(new Flow(1, "Item", quantity, (int) Math.abs(value), value))), 100, false);
         session.close(start + 3_600_000L);
         return session;
     }
@@ -142,7 +142,7 @@ public class SessionHistoryEngineTest
                 name,
                 true,
                 Collections.singletonList(new Flow(1, "Item", quantity, (int) absolute, value))),
-            100);
+            100, false);
         return session;
     }
 }

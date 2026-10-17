@@ -1,5 +1,7 @@
 package com.gpmanager;
 
+import com.gpmanager.GpManagerConfig.LootFilter;
+
 import java.awt.Color;
 import java.util.List;
 import org.junit.Test;
@@ -56,7 +58,7 @@ public class AlwaysShowHighlightTest
 
     static LiveContext context(RecentFilter filter, long minimum)
     {
-        return new LiveContext(false, filter, minimum, PvpState.NONE, "", false, "");
+        return new LiveContext(false, filter, minimum, PvpState.NONE, "", false, "", false);
     }
 
     @Test

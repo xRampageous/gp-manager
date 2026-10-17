@@ -570,11 +570,11 @@ public class ChargeLoadReviewLifecycleTest
 
     private static Transaction settle(Engine engine, ContainerSnapshot next, long firstTick)
     {
-        Transaction result = engine.processIfDirty(next, firstTick);
+        Transaction result = engine.processIfDirty(next, firstTick, null);
         assertNull(result);
-        result = engine.processIfDirty(next, firstTick + 600L);
+        result = engine.processIfDirty(next, firstTick + 600L, null);
         assertNull(result);
-        return engine.processIfDirty(next, firstTick + 1_200L);
+        return engine.processIfDirty(next, firstTick + 1_200L, null);
     }
 
 }

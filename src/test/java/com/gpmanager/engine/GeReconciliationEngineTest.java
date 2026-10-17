@@ -80,8 +80,8 @@ public class GeReconciliationEngineTest
             engine.markContext(Context.MARKET, 10, "collect");
             inventory = new HashMap<>(next);
             engine.markDirty();
-            Transaction first = engine.processIfDirty(new ContainerSnapshot(inventory), now);
-            Transaction settled = engine.processIfDirty(new ContainerSnapshot(inventory), now + 600L);
+            Transaction first = engine.processIfDirty(new ContainerSnapshot(inventory), now, null);
+            Transaction settled = engine.processIfDirty(new ContainerSnapshot(inventory), now + 600L, null);
             now += 600L;
             return settled == null ? first : settled;
         }
@@ -308,8 +308,8 @@ public class GeReconciliationEngineTest
         h.engine.markContext(Context.TRANSFER, 10, "Bank transfer");
         h.inventory = with(h.inventory, SHARK, 5L);
         h.engine.markDirty();
-        h.engine.processIfDirty(new ContainerSnapshot(h.inventory), h.now);
-        Transaction withdrawal = h.engine.processIfDirty(new ContainerSnapshot(h.inventory), h.now + 600L);
+        h.engine.processIfDirty(new ContainerSnapshot(h.inventory), h.now, null);
+        Transaction withdrawal = h.engine.processIfDirty(new ContainerSnapshot(h.inventory), h.now + 600L, null);
         assertTrue("a later bank withdrawal is a transfer, not a gain", withdrawal == null || !withdrawal.isCounted());
         assertTrue(h.counted().isEmpty());
     }

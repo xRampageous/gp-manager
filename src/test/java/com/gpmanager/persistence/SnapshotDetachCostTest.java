@@ -19,7 +19,7 @@ public class SnapshotDetachCostTest
     public void detachLongSessionStaysUnderBudget()
     {
         Gson gson = new Gson();
-        Session session = new Session("Cost probe", 1_000L);
+        Session session = new Session("Cost probe", 1_000L, SessionMode.GENERAL);
         List<Transaction> txs = new ArrayList<>();
         for (int i = 0; i < 2_000; i++)
         {
@@ -35,7 +35,7 @@ public class SnapshotDetachCostTest
         }
         for (Transaction tx : txs)
         {
-            session.addTransaction(tx, 100_000);
+            session.addTransaction(tx, 100_000, false);
         }
         SavedState live = new SavedState(session, null, Collections.emptyList());
         live.setRevision(42L);

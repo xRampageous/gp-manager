@@ -107,10 +107,10 @@ public class GpManagerEngineTest
         engine.ensureSession(now);
         engine.beginPriming();
 
-        assertNull(engine.processIfDirty(ContainerSnapshot.empty(), now + 600L));
-        assertNull(engine.processIfDirty(snapshot(1205, 1L), now + 1_200L));
-        assertNull(engine.processIfDirty(snapshot(1205, 1L), now + 1_800L));
-        assertNull(engine.processIfDirty(snapshot(1205, 1L), now + 2_400L));
+        assertNull(engine.processIfDirty(ContainerSnapshot.empty(), now + 600L, null));
+        assertNull(engine.processIfDirty(snapshot(1205, 1L), now + 1_200L, null));
+        assertNull(engine.processIfDirty(snapshot(1205, 1L), now + 1_800L, null));
+        assertNull(engine.processIfDirty(snapshot(1205, 1L), now + 2_400L, null));
 
         assertEquals(0L, engine.getMetrics(now + 2_400L).revenue);
         assertTrue(engine.getActiveSession().getTransactions().isEmpty());
@@ -127,15 +127,15 @@ public class GpManagerEngineTest
         GpManagerConfig config = new GpManagerConfig() {
             @Override public int stabilizationTicks() { return 1; }
         };
-        Valuation service = new Valuation(config, id -> null, id -> 75);
+        Valuation service = ModelProbe.valuation(config, id -> null, id -> 75);
         Engine engine = new Engine(service, new TransactionClassifier(), config);
         long settleAt = 20_600L;
         engine.ensureSession(20_000L);
         engine.setBaseline(ContainerSnapshot.empty());
         engine.markDirty();
 
-        assertNull(engine.processIfDirty(snapshot(1942, 2L), 20_000L));
-        Transaction transaction = engine.processIfDirty(snapshot(1942, 2L), settleAt);
+        assertNull(engine.processIfDirty(snapshot(1942, 2L), 20_000L, null));
+        Transaction transaction = engine.processIfDirty(snapshot(1942, 2L), settleAt, null);
 
         assertNotNull(transaction);
         assertEquals(150L, transaction.getFlows().get(0).valueDelta);
@@ -153,8 +153,8 @@ public class GpManagerEngineTest
 
         // Equipment disappears first.
         engine.markDirty();
-        assertNull(engine.processIfDirty(ContainerSnapshot.empty(), now + 600L));
-        assertNull(engine.processIfDirty(ContainerSnapshot.empty(), now + 1_200L));
+        assertNull(engine.processIfDirty(ContainerSnapshot.empty(), now + 600L, null));
+        assertNull(engine.processIfDirty(ContainerSnapshot.empty(), now + 1_200L, null));
 
         // Loot arrives while the equipment is restored. The pending transaction
         // is recalculated from the original baseline, so the pickaxe nets to zero.
@@ -187,13 +187,13 @@ public class GpManagerEngineTest
 
         engine.markContext(Context.TRANSFER, 6, "Bank transfer");
         engine.markDirty();
-        assertNull(engine.processIfDirty(ContainerSnapshot.empty(), now + 600L));
-        assertNull(engine.processIfDirty(ContainerSnapshot.empty(), now + 1_200L));
+        assertNull(engine.processIfDirty(ContainerSnapshot.empty(), now + 600L, null));
+        assertNull(engine.processIfDirty(ContainerSnapshot.empty(), now + 1_200L, null));
 
         engine.markDirty();
-        assertNull(engine.processIfDirty(snapshot(2309, 1L), now + 1_800L));
-        assertNull(engine.processIfDirty(snapshot(2309, 1L), now + 2_400L));
-        assertNull(engine.processIfDirty(snapshot(2309, 1L), now + 3_000L));
+        assertNull(engine.processIfDirty(snapshot(2309, 1L), now + 1_800L, null));
+        assertNull(engine.processIfDirty(snapshot(2309, 1L), now + 2_400L, null));
+        assertNull(engine.processIfDirty(snapshot(2309, 1L), now + 3_000L, null));
 
         assertTrue(engine.getActiveSession().getTransactions().isEmpty());
         assertEquals(0L, engine.getMetrics(now + 3_000L).net);
@@ -403,7 +403,7 @@ public class GpManagerEngineTest
 
         for (int tick = 0; tick < 10; tick++)
         {
-            assertNull(engine.processIfDirty(ContainerSnapshot.empty(), now + 600L * (tick + 1)));
+            assertNull(engine.processIfDirty(ContainerSnapshot.empty(), now + 600L * (tick + 1), null));
         }
 
         engine.markDirty();
@@ -434,11 +434,11 @@ public class GpManagerEngineTest
         ContainerSnapshot snapshot,
         long firstTick)
     {
-        Transaction transaction = engine.processIfDirty(snapshot, firstTick);
+        Transaction transaction = engine.processIfDirty(snapshot, firstTick, null);
         assertNull(transaction);
-        transaction = engine.processIfDirty(snapshot, firstTick + 600L);
+        transaction = engine.processIfDirty(snapshot, firstTick + 600L, null);
         assertNull(transaction);
-        return engine.processIfDirty(snapshot, firstTick + 1_200L);
+        return engine.processIfDirty(snapshot, firstTick + 1_200L, null);
     }
 
     private static ContainerSnapshot snapshot(int itemId, long quantity)

@@ -279,7 +279,7 @@ public class AtesTeleportInterfaceTest
 
         Harness(ItemContainer worn, ItemContainer inventory)
         {
-            Valuation valuation = new Valuation(CONFIG, AtesTeleportInterfaceTest::compositionOf,
+            Valuation valuation = ModelProbe.valuation(CONFIG, AtesTeleportInterfaceTest::compositionOf,
                 id -> id == TEAR ? 1_000 : 0);
             engine = new Engine(valuation, new TransactionClassifier(), CONFIG);
             engine.startCustom("Ates", T0);

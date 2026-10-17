@@ -80,7 +80,7 @@ public class PersistenceLifecycleC0aTest
         Path directory = temporary.newFolder().toPath();
         CountDownLatch entered = new CountDownLatch(1);
         CountDownLatch release = new CountDownLatch(1);
-        SessionRepository repository = new SessionRepository(new Gson(), FilepathTestSupport.root(directory))
+        SessionRepository repository = new SessionRepository(new Gson(), FilepathTestSupport.root(directory), false)
         {
             @Override
             public boolean save(WriteIntent intent)
@@ -108,7 +108,7 @@ public class PersistenceLifecycleC0aTest
             writer.submit(new WriteIntent(null,
                 repository.scopeGeneration,
                 0L,
-                state("pending", 1L)));
+                state("pending", 1L), null));
             assertTrue(entered.await(5, TimeUnit.SECONDS));
 
             caller.execute(() ->
@@ -177,7 +177,7 @@ public class PersistenceLifecycleC0aTest
 
             release.countDown();
             assertTrue(String.valueOf(PersistenceProbe.identityBlockReason(coordinator)),
-                coordinator.switchIdentity(ALICE, true));
+                coordinator.switchIdentity(ALICE, true, true));
             assertEquals(ALICE, coordinator.getActiveIdentity());
         }
         finally
@@ -228,7 +228,7 @@ public class PersistenceLifecycleC0aTest
         try
         {
             coordinator.start();
-            assertTrue(coordinator.switchIdentity(ALICE, true));
+            assertTrue(coordinator.switchIdentity(ALICE, true, true));
 
             gateLoad.set(true);
             coordinator.switchIdentityAsync(bob, true);
@@ -245,7 +245,7 @@ public class PersistenceLifecycleC0aTest
 
             release.countDown();
             assertTrue(String.valueOf(PersistenceProbe.identityBlockReason(coordinator)),
-                coordinator.switchIdentity(bob, true));
+                coordinator.switchIdentity(bob, true, true));
         }
         finally
         {
@@ -304,7 +304,7 @@ public class PersistenceLifecycleC0aTest
         CountDownLatch shutdownReturned = new CountDownLatch(1);
         try
         {
-            assertTrue(coordinator.switchIdentity(ALICE, true));
+            assertTrue(coordinator.switchIdentity(ALICE, true, true));
             engine.ensureSession(1_000L);
             engine.getGeneralSession().rename("Alice");
             assertTrue(coordinator.saveNow());
@@ -352,20 +352,20 @@ public class PersistenceLifecycleC0aTest
         TrackingIdentity bob = new TrackingIdentity("rsprofile.bob", TrackingIdentity.ACCOUNT_HASH_INVALID);
         try
         {
-            assertTrue(coordinator.switchIdentity(ALICE, true));
+            assertTrue(coordinator.switchIdentity(ALICE, true, true));
             engine.ensureSession(1_000L);
             engine.getGeneralSession().rename("Alice");
             assertTrue(coordinator.saveNow());
 
-            assertTrue(coordinator.switchIdentity(bob, true));
+            assertTrue(coordinator.switchIdentity(bob, true, true));
             engine.ensureSession(2_000L);
             engine.getGeneralSession().rename("Bob");
             assertTrue(coordinator.saveNow());
 
-            assertTrue(coordinator.switchIdentity(ALICE, true));
+            assertTrue(coordinator.switchIdentity(ALICE, true, true));
             assertEquals(ALICE, coordinator.getActiveIdentity());
             assertEquals("Alice", engine.getGeneralSession().getName());
-            assertTrue(coordinator.switchIdentity(bob, true));
+            assertTrue(coordinator.switchIdentity(bob, true, true));
             assertEquals("Bob", engine.getGeneralSession().getName());
         }
         finally
@@ -389,7 +389,7 @@ public class PersistenceLifecycleC0aTest
         TrackingIdentity bob = new TrackingIdentity("rsprofile.bob", TrackingIdentity.ACCOUNT_HASH_INVALID);
         try
         {
-            assertTrue(coordinator.switchIdentity(ALICE, true));
+            assertTrue(coordinator.switchIdentity(ALICE, true, true));
             engine.ensureSession(1_000L);
             engine.getGeneralSession().rename("Alice");
             assertTrue(coordinator.saveNow());
@@ -400,7 +400,7 @@ public class PersistenceLifecycleC0aTest
             assertTrue(entered.await(5, TimeUnit.SECONDS));
 
             coordinator.onHashInvalidated(false);
-            assertTrue(coordinator.switchIdentity(bob, true));
+            assertTrue(coordinator.switchIdentity(bob, true, true));
             engine.ensureSession(2_000L);
             engine.getGeneralSession().rename("Bob");
             SaveStatus bobStatus = writer.getStatus();
@@ -424,7 +424,7 @@ public class PersistenceLifecycleC0aTest
     private static SavedState state(String name, long revision)
     {
         SavedState state = new SavedState(
-            new Session(name, 1_000L), null, Collections.emptyList());
+            new Session(name, 1_000L, SessionMode.GENERAL), null, Collections.emptyList());
         state.setRevision(revision);
         return state;
     }

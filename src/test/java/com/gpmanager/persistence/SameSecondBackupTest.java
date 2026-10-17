@@ -19,7 +19,7 @@ public class SameSecondBackupTest
     public void aSameSecondCopyIsTheNewestKept() throws Exception
     {
         SessionRepository repository = new SessionRepository(JsonCodec.gson(),
-            FilepathTestSupport.root(Files.createTempDirectory("gp-same-second")));
+            FilepathTestSupport.root(Files.createTempDirectory("gp-same-second")), false);
         Persistence persistence = new Persistence(null, null, repository, new OrderedPersistenceWriter(repository, null),
             PresentationLifecycleTest.engine());
         long now = 1_791_500_000_000L;

@@ -38,9 +38,7 @@ import com.gpmanager.LedgerPage.CorrectionOutcome;
  */
 class LedgerPage implements Shell.Page {
     enum CorrectionOutcome {
-        APPLIED,
-        REFUSED,
-        STALE
+        APPLIED, REFUSED, STALE
     }
 
     interface Actions {
@@ -56,13 +54,10 @@ class LedgerPage implements Shell.Page {
 
         CorrectionPreview preview(String transactionId, Correction correction);
 
-        CorrectionOutcome correct(
-                String transactionId, Correction correction, long previewRevision);
+        CorrectionOutcome correct(String transactionId, Correction correction, long previewRevision);
 
         /** Asks how many to keep, then hands back {itemId, keep, total} and its Net preview. */
-        void split(
-                String transactionId,
-                java.util.function.BiConsumer<long[], CorrectionPreview> previewed);
+        void split(String transactionId, java.util.function.BiConsumer<long[], CorrectionPreview> previewed);
 
         default void applySplit(String transactionId, long[] split, long previewRevision) {}
 
@@ -137,9 +132,7 @@ class LedgerPage implements Shell.Page {
         search.setBackground(CARD);
         search.setHoverBackgroundColor(SELECTED);
         search.setPreferredSize(new Dimension(0, 26));
-        search.getDocument()
-                .addDocumentListener(
-                        new DocumentListener() {
+        search.getDocument().addDocumentListener(new DocumentListener() {
                             public void insertUpdate(DocumentEvent e) {
                                 searched();
                             }
@@ -197,33 +190,23 @@ class LedgerPage implements Shell.Page {
     }
 
     void apply(LedgerData next) {
-        boolean scopeChanged =
-                data == null
-                        || data.entry.scope != next.entry.scope
+        boolean scopeChanged = data == null || data.entry.scope != next.entry.scope
                         || !String.valueOf(data.entry.historySessionId)
                                 .equals(String.valueOf(next.entry.historySessionId));
         data = next;
-        String selection =
-                next.entry.scope.name()
-                        + "|"
-                        + next.entry.highlightGroupId
-                        + "|"
-                        + next.entry.highlightContributionId
-                        + "|"
-                        + next.entry.highlightTransactionId;
+        String selection = next.entry.scope.name() + "|" + next.entry.highlightGroupId + "|"
+                        + next.entry.highlightContributionId + "|" + next.entry.highlightTransactionId;
         if (!selection.equals(anchored)) {
             anchored = selection;
             // A preview belongs to one receipt; opening another cancels it.
-            if (pendingTransaction != null
-                    && !pendingTransaction.equals(next.entry.highlightTransactionId)) {
+            if (pendingTransaction != null && !pendingTransaction.equals(next.entry.highlightTransactionId)) {
                 clearPending();
             }
         }
         scope.setText(next.scopeName + " \u2304");
         // Owner 2026-10-01 (F03): Runs today is whole runs that started today, never calendar-day
         // money.
-        scope.setToolTipText(
-                next.entry.scope == LedgerData.Scope.TODAY ? msg("current-run") : null);
+        scope.setToolTipText(next.entry.scope == LedgerData.Scope.TODAY ? msg("current-run") : null);
         if (scopeChanged) {
             for (Table table : new Table[] {gains, costs, market, pending, review, corrected})
                 table.resetPage();
@@ -256,11 +239,7 @@ class LedgerPage implements Shell.Page {
     void overview(LedgerData data) {
         fill(gains, "GAINS", data.gains.groups, data.gains.total, Tone.GAIN);
         costs.setPicker(costPicker(data.entry.costView, data.costCounts));
-        fill(
-                costs,
-                "LOSSES",
-                data.costs.groups,
-                data.costs.total,
+        fill(costs, "LOSSES", data.costs.groups, data.costs.total,
                 data.entry.costView == CostView.LOSS ? LOSS : SUPPLY);
         var settled = new ArrayList<Group>();
         var open = new ArrayList<Group>();
@@ -285,23 +264,11 @@ class LedgerPage implements Shell.Page {
             for (Group group : open) rows.add(groupRow(group, DIM));
             for (LedgerData.PendingItem item : data.pendingItems) {
                 boolean valued = item.value > 0L;
-                rows.add(
-                        new Row(
-                                "pending|" + item.name + "|" + item.itemId,
-                                icon(item.itemId),
-                                item.name,
-                                "×" + exact(item.quantity),
-                                valued ? signed(item.value) : "",
-                                DIM,
-                                item.tip,
-                                valued ? exactSigned(item.value) + " gp" : "",
-                                false,
-                                null,
-                                emptyList()));
+                rows.add(new Row("pending|" + item.name + "|" + item.itemId, icon(item.itemId), item.name,
+                                "×" + exact(item.quantity), valued ? signed(item.value) : "", DIM, item.tip,
+                                valued ? exactSigned(item.value) + " gp" : "", false, null, emptyList()));
             }
-            pending.setTitle("PENDING · " + rows.size())
-                    .setTotal("", DIM)
-                    .setMinRows(rows.size() > ROWS ? ROWS : 0)
+            pending.setTitle("PENDING · " + rows.size()).setTotal("", DIM).setMinRows(rows.size() > ROWS ? ROWS : 0)
                     .setRows(rows);
             body.add(pending);
         }
@@ -309,9 +276,7 @@ class LedgerPage implements Shell.Page {
         if (showCorrected || data.entry.focusAudit == Audit.CORRECTED) {
             var rows = new ArrayList<Row>();
             for (Receipt receipt : data.corrected) rows.add(receiptRow(receipt));
-            corrected
-                    .setTitle("CORRECTED · " + data.corrected.size())
-                    .setEmptyText(msg("nothing-corrected"))
+            corrected.setTitle("CORRECTED · " + data.corrected.size()).setEmptyText(msg("nothing-corrected"))
                     .setRows(rows);
             body.add(corrected);
         }
@@ -321,17 +286,11 @@ class LedgerPage implements Shell.Page {
         var rows = new ArrayList<Row>();
         for (Group group : groups) {
             // Under All, loss rows keep their own colour beside supplies.
-            rows.add(
-                    groupRow(
-                            group,
-                            tone == SUPPLY && group.table == Semantics.Table.COSTS_LOSS
-                                    ? LOSS
-                                    : tone));
+            rows.add(groupRow(group, tone == SUPPLY && group.table == Semantics.Table.COSTS_LOSS ? LOSS : tone));
         }
         table.setTitle(title + " · " + groups.size())
                 .setTotal(groups.isEmpty() || tone == DIM ? "" : signed(total), tone)
-                .setMinRows(rows.size() > ROWS ? ROWS : 0)
-                .setRows(rows);
+                .setMinRows(rows.size() > ROWS ? ROWS : 0).setRows(rows);
     }
 
     /**
@@ -352,14 +311,8 @@ class LedgerPage implements Shell.Page {
     JPopupMenu menu(CostView selected, int[] counts) {
         var menu = new JPopupMenu();
         for (CostView view : CostView.values()) {
-            menu.add(
-                    item(
-                            (view == selected ? "\u2713 " : "")
-                                    + view.label
-                                    + (view == CostView.ALL
-                                            ? ""
-                                            : " " + exact(counts[view.ordinal()])),
-                            () -> {
+            menu.add(item((view == selected ? "\u2713 " : "") + view.label + (view == CostView.ALL ? ""
+                                            : " " + exact(counts[view.ordinal()])), () -> {
                                 if (view != selected) actions.costViewChanged(view);
                             }));
         }
@@ -370,14 +323,8 @@ class LedgerPage implements Shell.Page {
         String value;
         Tone shown = tone;
         String meta = MarketText.groupLead(group);
-        String tip =
-                group.primaryName
-                        + " · "
-                        + (group.receiptCount > 1
-                                ? (meta.isEmpty() ? "" : meta + " · ")
-                                        + group.receiptCount
-                                        + " entries"
-                                : meta);
+        String tip = group.primaryName + " · " + (group.receiptCount > 1 ? (meta.isEmpty() ? "" : meta + " · ")
+                                        + group.receiptCount + " entries" : meta);
         if (group.reviewRequired) {
             value = "?";
             shown = REVIEW;
@@ -385,10 +332,7 @@ class LedgerPage implements Shell.Page {
             MarketRows.Row row = data.marketRow(group.marketPresentationId);
             if (MarketText.marketSettled(group, row)) {
                 value = signed(MarketText.marketPrimary(data, group));
-                tip =
-                        group.primaryName
-                                + " · "
-                                + MarketText.marketLead(data, group)
+                tip = group.primaryName + " · " + MarketText.marketLead(data, group)
                                 + msg("observed-settlement-result-affects");
             } else {
                 value = MarketText.stateWord(row);
@@ -402,31 +346,16 @@ class LedgerPage implements Shell.Page {
         } else {
             value = worth(group.value);
         }
-        String qty =
-                group.claim < 0
-                        ? "\u2212" + Math.max(1L, group.quantity)
-                        : !group.failedOf().isEmpty()
-                                ? group.failedOf()
-                                : group.quantity > 1L
-                                                && group.itemId != 995
-                                                && (!group.actionGroup() || group.chargeUse)
-                                        ? times(group.quantity)
+        String qty = group.claim < 0 ? "\u2212" + Math.max(1L, group.quantity) : !group.failedOf().isEmpty()
+                                ? group.failedOf() : group.quantity > 1L && group.itemId != 995
+                                                && (!group.actionGroup() || group.chargeUse) ? times(group.quantity)
                                         : "";
         if (group.failed > 0L) tip = group.primaryName + " · " + group.failedTip();
         Runnable open = () -> openGroup(group.semanticGroupId);
-        return new Row(
-                group.semanticGroupId,
-                icon(group.itemId),
-                group.primaryName
+        return new Row(group.semanticGroupId, icon(group.itemId), group.primaryName
                         + (group.failed > 0L && group.failedOf().isEmpty() ? " (failed)" : "")
-                        + (group.corrected ? " •" : ""),
-                qty,
-                value,
-                shown,
-                tip,
-                group.incomplete() || group.market ? "" : exactSigned(group.value) + " gp",
-                false,
-                open,
+                        + (group.corrected ? " •" : ""), qty, value, shown, tip,
+                group.incomplete() || group.market ? "" : exactSigned(group.value) + " gp", false, open,
                 singletonList(new Menu("Open", open)));
     }
 
@@ -436,19 +365,12 @@ class LedgerPage implements Shell.Page {
     }
 
     Row receiptRow(Receipt receipt) {
-        Runnable open =
-                () -> actions.selectionChanged(receipt.transactionId, receipt.contributionId, null);
-        return new Row(
-                receipt.contributionId,
-                icon(receipt.itemId),
-                receipt.itemName,
+        Runnable open = () -> actions.selectionChanged(receipt.transactionId, receipt.contributionId, null);
+        return new Row(receipt.contributionId, icon(receipt.itemId), receipt.itemName,
                 receipt.quantity > 1L && receipt.itemId != 995 ? times(receipt.quantity) : "",
-                receipt.unpriced ? "?" : worth(receipt.value),
-                receipt.unpriced ? DIM : of(receipt.category),
+                receipt.unpriced ? "?" : worth(receipt.value), receipt.unpriced ? DIM : of(receipt.category),
                 receipt.itemName + " · " + receipt.correctionLabel + " · " + receipt.why,
-                receipt.unpriced ? "" : exactSigned(receipt.value) + " gp",
-                false,
-                open,
+                receipt.unpriced ? "" : exactSigned(receipt.value) + " gp", false, open,
                 singletonList(new Menu("Open", open)));
     }
 
@@ -459,34 +381,16 @@ class LedgerPage implements Shell.Page {
             String name = row.items.isEmpty() ? "Unknown item" : row.items.get(0).name;
             boolean selected = row.transactionId.equals(reviewSelected);
             if (selected) chosen = row;
-            Runnable open =
-                    () -> {
+            Runnable open = () -> {
                         reviewSelected = selected ? "" : row.transactionId;
                         apply(this.data);
                     };
-            rows.add(
-                    new Row(
-                            row.transactionId,
-                            null,
-                            name,
-                            "",
-                            "?",
-                            REVIEW,
-                            name + " · " + row.why,
-                            exactSigned(row.value) + " gp",
-                            selected,
-                            open,
-                            singletonList(new Menu("Decide…", open))));
+            rows.add(new Row(row.transactionId, null, name, "", "?", REVIEW, name + " · " + row.why,
+                            exactSigned(row.value) + " gp", selected, open, singletonList(new Menu("Decide…", open))));
         }
-        review.setTitle("(!) REVIEW · " + data.review.scopeCount)
-                .setAction(null)
-                .setEmptyText(
-                        data.readOnly
-                                ? msg("review-read")
-                                : data.review.scopeCount == 0
-                                        ? msg("nothing-needs")
-                                        : msg("review-row"))
-                .setRows(rows);
+        review.setTitle("(!) REVIEW · " + data.review.scopeCount).setAction(null).setEmptyText(data.readOnly
+                                ? msg("review-read") : data.review.scopeCount == 0 ? msg("nothing-needs")
+                                        : msg("review-row")).setRows(rows);
         body.add(review);
         if (chosen != null && !data.readOnly) body.add(decisionPanel(chosen));
     }
@@ -501,11 +405,7 @@ class LedgerPage implements Shell.Page {
         var buttons = row();
         for (Decision decision : Decision.values()) {
             if (row.validDecisions.contains(decision)) {
-                buttons.add(
-                        button(
-                                reviewLabel(decision),
-                                false,
-                                () -> {
+                buttons.add(button(reviewLabel(decision), false, () -> {
                                     reviewSelected = "";
                                     actions.decide(row.transactionId, decision);
                                 }));
@@ -524,21 +424,15 @@ class LedgerPage implements Shell.Page {
             text.append(msg("if-counted-gain")).append(signed(net + size));
         }
         if (row.validDecisions.contains(Decision.COST)) {
-            text.append(text.length() == 0 ? msg("if-counted-cost") : " · as a cost: Net ")
-                    .append(signed(net - size));
+            text.append(text.length() == 0 ? msg("if-counted-cost") : " · as a cost: Net ").append(signed(net - size));
         }
         return text.toString();
     }
 
     JPopupMenu moreMenu() {
         var menu = new JPopupMenu();
-        menu.add(
-                item(
-                        showCorrected
-                                ? "Hide corrected"
-                                : "Show corrected"
-                                        + (data == null ? "" : " (" + data.corrected.size() + ")"),
-                        () -> {
+        menu.add(item(showCorrected ? "Hide corrected" : "Show corrected"
+                                        + (data == null ? "" : " (" + data.corrected.size() + ")"), () -> {
                             showCorrected = !showCorrected;
                             if (data != null) apply(data);
                         }));
@@ -560,34 +454,19 @@ class LedgerPage implements Shell.Page {
         long latest = group.latestActivityAt;
         for (Receipt receipt : open.receipts) latest = max(latest, receipt.at);
         int count = group.market ? open.receipts.size() : group.receiptCount;
-        detail.add(
-                title(
-                        group.primaryName,
-                        group.incomplete() ? "—" : exactSigned(group.value) + " gp",
-                        group.incomplete() ? DIM : sign(group.value),
-                        (count == 0
-                                        ? ""
-                                        : count
-                                                + (group.market
+        detail.add(title(group.primaryName, group.incomplete() ? "—" : exactSigned(group.value) + " gp",
+                        group.incomplete() ? DIM : sign(group.value), (count == 0 ? "" : count + (group.market
                                                         ? count == 1 ? " trade · " : " trades · "
-                                                        : count == 1 ? " entry · " : " entries · "))
-                                + "Latest "
+                                                        : count == 1 ? " entry · " : " entries · ")) + "Latest "
                                 + age(nonNeg(data.capturedAt - latest))));
         List<Row> items = items(group);
         // A charged weapon always lists what it spent, even one rune type (owner 1.2).
         if (!group.market && (items.size() > 1 || group.chargeUse)) {
-            detailItems
-                    .setTitle(
-                            (group.chargeUse || group.value < 0L ? "USED · " : "ITEMS · ")
-                                    + items.size())
+            detailItems.setTitle((group.chargeUse || group.value < 0L ? "USED · " : "ITEMS · ") + items.size())
                     .setRows(items);
             detail.add(detailItems);
         }
-        String receiptsFor =
-                data.entry.scope.name()
-                        + "|"
-                        + String.valueOf(data.entry.historySessionId)
-                        + "|"
+        String receiptsFor = data.entry.scope.name() + "|" + String.valueOf(data.entry.historySessionId) + "|"
                         + group.semanticGroupId;
         if (!receiptsFor.equals(detailReceiptsFor)) {
             // Owner 2026-10-01 (F07): a new group starts at the first page; refreshes keep theirs.
@@ -596,8 +475,9 @@ class LedgerPage implements Shell.Page {
         }
         receipts(data, open);
         // An offer with nothing collected yet has no receipt to show or correct; none is invented.
-        detail.add(
-                open.receipts.isEmpty() ? note(msg("collected-entries"), LABEL) : detailReceipts);
+        // One entry needs no list: the header names it and its detail opens below (owner 1.5.2).
+        if (open.receipts.isEmpty()) detail.add(note(msg("collected-entries"), LABEL));
+        else if (group.market || !LedgerData.oneEntry(open.receipts)) detail.add(detailReceipts);
         if (open.exact != null) detail.add(receipt(data, open.exact));
     }
 
@@ -606,35 +486,17 @@ class LedgerPage implements Shell.Page {
         var totals = new LinkedHashMap<String, ResourceSummary>();
         for (Card card : LedgerData.cards(group)) {
             for (ResourceSummary item : card.resources) {
-                totals.merge(
-                        item.itemId + "|" + item.itemName,
-                        item,
-                        (a, b) ->
-                                new ResourceSummary(
-                                        a.itemId,
-                                        a.itemName,
-                                        a.usedBy,
-                                        a.quantity + b.quantity,
-                                        a.value + b.value,
-                                        a.knownSubtotal + b.knownSubtotal,
-                                        a.incomplete || b.incomplete));
+                totals.merge(item.itemId + "|" + item.itemName, item, (a, b) -> new ResourceSummary(a.itemId,
+                                        a.itemName, a.usedBy, a.quantity + b.quantity, a.value + b.value,
+                                        a.knownSubtotal + b.knownSubtotal, a.incomplete || b.incomplete));
             }
         }
         var rows = new ArrayList<Row>();
         for (ResourceSummary item : totals.values()) {
-            rows.add(
-                    new Row(
-                            "item|" + item.itemId + "|" + item.itemName,
-                            icon(item.itemId),
-                            item.itemName,
-                            item.itemId == 995 ? "" : times(item.quantity),
-                            item.incomplete ? "?" : worth(item.value),
-                            item.incomplete ? DIM : sign(item.value),
-                            "",
-                            item.incomplete ? "" : exactSigned(item.value) + " gp",
-                            false,
-                            null,
-                            null));
+            rows.add(new Row("item|" + item.itemId + "|" + item.itemName, icon(item.itemId), item.itemName,
+                            item.itemId == 995 ? "" : times(item.quantity), item.incomplete ? "?" : worth(item.value),
+                            item.incomplete ? DIM : sign(item.value), "",
+                            item.incomplete ? "" : exactSigned(item.value) + " gp", false, null, null));
         }
         return rows;
     }
@@ -650,25 +512,13 @@ class LedgerPage implements Shell.Page {
             for (Receipt receipt : open.receipts) {
                 boolean realized = MarketText.receiptRealized(receipt);
                 long primary = MarketText.receiptPrimary(receipt);
-                rows.add(
-                        receiptRow(
-                                data,
-                                group,
-                                receipt.transactionId,
-                                receipt.contributionId,
-                                chosen != null
+                rows.add(receiptRow(data, group, receipt.transactionId, receipt.contributionId, chosen != null
                                         && chosen.contributionId.equals(receipt.contributionId),
-                                MarketText.receiptTitle(receipt),
-                                realized
-                                        ? signed(primary)
-                                        : MarketText.stateWord(receipt.marketSettlement),
-                                realized ? MARKET : DIM,
-                                MarketText.receiptSub(receipt, data.capturedAt)
-                                        + (receipt.corrected
-                                                ? msg("result-includes-manual-correction")
-                                                : ""),
-                                realized ? exactSigned(primary) + " gp" : "",
-                                splittable(receipt)));
+                                MarketText.receiptTitle(receipt), realized ? signed(primary)
+                                        : MarketText.stateWord(receipt.marketSettlement), realized ? MARKET : DIM,
+                                MarketText.receiptSub(receipt, data.capturedAt) + (receipt.corrected
+                                                ? msg("result-includes-manual-correction") : ""),
+                                realized ? exactSigned(primary) + " gp" : "", splittable(receipt)));
             }
         } else {
             // A multi-item group's entries say what each use spent ("Blood rune ×2"), not the group
@@ -677,73 +527,34 @@ class LedgerPage implements Shell.Page {
             for (LedgerData.Card card : LedgerData.cards(group)) {
                 boolean split = false;
                 for (Receipt receipt : open.receipts) {
-                    split |=
-                            receipt.transactionId.equals(card.transactionId) && splittable(receipt);
+                    split |= receipt.transactionId.equals(card.transactionId) && splittable(receipt);
                 }
                 // A shop exchange's currency entries are named by what they bought or sold
                 // (owner 2026-10-12): "Death rune ×5", not the tokkul that paid.
                 Receipt cardReceipt = LedgerData.firstReceipt(open.receipts, card.transactionId);
-                String rowName =
-                        several
-                                ? card.summaryText()
+                String rowName = several ? card.summaryText()
                                 : cardReceipt != null && !cardReceipt.tradedItemsShort.isEmpty()
-                                        ? cardReceipt.tradedItemsShort
-                                        : group.primaryName;
-                rows.add(
-                        receiptRow(
-                                data,
-                                group,
-                                card.transactionId,
-                                card.contributionId,
-                                chosen != null && chosen.transactionId.equals(card.transactionId),
-                                rowName,
-                                card.incomplete ? "?" : signed(card.value),
-                                card.incomplete ? DIM : sign(card.value),
-                                card.summaryText()
-                                        + " · "
-                                        + age(nonNeg(data.capturedAt - card.at))
-                                        + (card.incomplete
-                                                ? " · known value "
-                                                        + exactSigned(card.knownSubtotal)
-                                                        + " gp"
-                                                : ""),
-                                card.incomplete ? "" : exactSigned(card.value) + " gp",
-                                split));
+                                        ? cardReceipt.tradedItemsShort : group.primaryName;
+                rows.add(receiptRow(data, group, card.transactionId, card.contributionId,
+                                chosen != null && chosen.transactionId.equals(card.transactionId), rowName,
+                                card.incomplete ? "?" : signed(card.value), card.incomplete ? DIM : sign(card.value),
+                                card.summaryText() + " · " + age(nonNeg(data.capturedAt - card.at)) + (card.incomplete
+                                                ? " · known value " + exactSigned(card.knownSubtotal) + " gp" : ""),
+                                card.incomplete ? "" : exactSigned(card.value) + " gp", split));
             }
         }
         detailReceipts.setTitle("ENTRIES · " + rows.size()).setRows(rows);
     }
 
-    Row receiptRow(
-            LedgerData data,
-            Group group,
-            String transactionId,
-            String contributionId,
-            boolean selected,
-            String name,
-            String value,
-            Tone tone,
-            String tip,
-            String exact,
-            boolean splittable) {
+    Row receiptRow(LedgerData data, Group group, String transactionId, String contributionId, boolean selected,
+            String name, String value, Tone tone, String tip, String exact, boolean splittable) {
         Runnable open = () -> clickReceipt(transactionId, contributionId);
         var menus = new ArrayList<Menu>();
         if (!data.readOnly) {
             corrections(transactionId, contributionId, splittable)
                     .forEach((label, action) -> menus.add(new Menu(label, action)));
         }
-        return new Row(
-                contributionId,
-                icon(group.itemId),
-                name,
-                "",
-                value,
-                tone,
-                tip,
-                exact,
-                selected,
-                open,
-                menus);
+        return new Row(contributionId, icon(group.itemId), name, "", value, tone, tip, exact, selected, open, menus);
     }
 
     static boolean splittable(Receipt receipt) {
@@ -759,9 +570,7 @@ class LedgerPage implements Shell.Page {
     void clickReceipt(String transactionId, String contributionId) {
         Detail open = data.detail;
         Receipt chosen = open.exact;
-        if (chosen != null
-                && (open.group.market
-                        ? chosen.contributionId.equals(contributionId)
+        if (chosen != null && (open.group.market ? chosen.contributionId.equals(contributionId)
                         : chosen.transactionId.equals(transactionId))) {
             actions.selectionChanged(null, null, open.group.semanticGroupId);
         } else {
@@ -777,30 +586,13 @@ class LedgerPage implements Shell.Page {
         boolean realized = trade != null && trade.isRealizedIncluded() && trade.settledQty > 0L;
         // Why only earns its space for exceptional states; a clean realized trade says Sold /
         // Bought.
-        boolean clean =
-                realized
-                        && trade.settledQty >= trade.filledQty
-                        && !row.review
-                        && !row.corrected
-                        && !row.split;
+        boolean clean = realized && trade.settledQty >= trade.filledQty && !row.review && !row.corrected && !row.split;
         // The selected row above already names the receipt and its value: say what happened, and
         // when.
-        long at =
-                trade == null
-                        ? row.at
-                        : !realized
-                                ? trade.timestampEpochMillis
-                                : trade.settlementAtEpochMillis > 0L
-                                        ? trade.settlementAtEpochMillis
-                                        : row.at;
-        String what =
-                realized
-                        ? trade.side == GeOffer.Side.SELL ? "Sold" : "Bought"
-                        : trade != null
-                                ? MarketText.orderStateText(trade)
-                                : row.verb
-                                        + (row.actionDisplayName.isEmpty()
-                                                ? ""
+        long at = trade == null ? row.at : !realized ? trade.timestampEpochMillis : trade.settlementAtEpochMillis > 0L
+                                        ? trade.settlementAtEpochMillis : row.at;
+        String what = realized ? trade.side == GeOffer.Side.SELL ? "Sold" : "Bought" : trade != null
+                                ? MarketText.orderStateText(trade) : row.verb + (row.actionDisplayName.isEmpty() ? ""
                                                 : " · " + row.actionDisplayName);
         panel.add(note(what + " · " + age(nonNeg(data.capturedAt - at)), TEXT));
         var facts = new KeyValue(null);
@@ -812,11 +604,7 @@ class LedgerPage implements Shell.Page {
             if (!row.priceBasis.isEmpty())
                 facts.put("Price", row.priceBasis, PLAIN, row.priceBasis);
         } else {
-            facts =
-                    marketFacts(
-                            trade,
-                            row,
-                            clean ? null : realized ? row.why : MarketText.orderWhy(trade));
+            facts = marketFacts(trade, row, clean ? null : realized ? row.why : MarketText.orderWhy(trade));
         }
         if (row.corrected || row.split) {
             facts.put("Originally", "automatic · " + exactSigned(row.automaticValue) + " gp", DIM);
@@ -831,32 +619,17 @@ class LedgerPage implements Shell.Page {
                 preview.put("Keep", "×" + exact(pendingSplit[1]), PLAIN)
                         .put("Others", "×" + exact(pendingSplit[2] - pendingSplit[1]), PLAIN);
             }
-            panel.add(
-                    preview.put(
-                                    "Current Net",
-                                    exactSigned(pendingPreview.currentNet) + " gp",
-                                    PLAIN)
-                            .put(
+            panel.add(preview.put("Current Net", exactSigned(pendingPreview.currentNet) + " gp", PLAIN).put(
                                     pendingSplit != null ? "After split" : "After correction",
-                                    exactSigned(pendingPreview.afterNet) + " gp",
-                                    PLAIN)
-                            .put(
-                                    "Change",
-                                    exactSigned(pendingPreview.change) + " gp",
-                                    sign(pendingPreview.change)));
+                                    exactSigned(pendingPreview.afterNet) + " gp", PLAIN).put("Change",
+                                    exactSigned(pendingPreview.change) + " gp", sign(pendingPreview.change)));
             panel.add(note(pendingPreview.note(), LABEL));
             JButton confirm = button("Confirm", true, this::confirm);
             confirm.getAccessibleContext().setAccessibleName(msg("confirm-correction"));
-            panel.add(
-                    row(
-                            button(
-                                    "Cancel",
-                                    false,
-                                    () -> {
+            panel.add(row(button("Cancel", false, () -> {
                                         clearPending();
                                         actions.refresh();
-                                    }),
-                            confirm));
+                                    }), confirm));
         } else {
             JButton correct = button("Correct ⌄", false, () -> {});
             correct.getAccessibleContext().setAccessibleName(msg("correct-entry"));
@@ -901,8 +674,7 @@ class LedgerPage implements Shell.Page {
                 return "Unknown".equals(value) ? msg("gp-manager-did") : null;
             case "Result":
                 if ("—".equals(value)) {
-                    return msg("gp-manager-cannot")
-                            + msg("unknown-received")
+                    return msg("gp-manager-cannot") + msg("unknown-received")
                             + (trade.knownCostOnly ? msg("proven-ge") : "");
                 }
                 return value.endsWith("Partial") ? msg("result-includes-units") : null;
@@ -915,16 +687,12 @@ class LedgerPage implements Shell.Page {
      * Gain / Cost / Transfer / Ignore, then Split and Undo, for one receipt: the same list in its
      * Correct ▾ menu and its row menu. A correction opens its Net preview on that receipt first.
      */
-    Map<String, Runnable> corrections(
-            String transactionId, String contributionId, boolean splittable) {
+    Map<String, Runnable> corrections(String transactionId, String contributionId, boolean splittable) {
         var list = new LinkedHashMap<String, Runnable>();
-        for (Correction correction :
-                new Correction[] {
+        for (Correction correction : new Correction[] {
                     Correction.REVENUE, Correction.COST, Correction.TRANSFER, Correction.IGNORE
                 }) {
-            list.put(
-                    correctionLabel(correction),
-                    () -> {
+            list.put(correctionLabel(correction), () -> {
                         pendingCorrection = correction;
                         pendingTransaction = transactionId;
                         pendingPreview = actions.preview(transactionId, correction);
@@ -932,12 +700,7 @@ class LedgerPage implements Shell.Page {
                     });
         }
         if (splittable) {
-            list.put(
-                    "Split…",
-                    () ->
-                            actions.split(
-                                    transactionId,
-                                    (split, preview) -> {
+            list.put("Split…", () -> actions.split(transactionId, (split, preview) -> {
                                         clearPending();
                                         pendingTransaction = transactionId;
                                         pendingSplit = split;
@@ -965,15 +728,11 @@ class LedgerPage implements Shell.Page {
         }
         if (pendingCorrection == null || pendingPreview == null || pendingTransaction == null)
             return;
-        CorrectionOutcome outcome =
-                actions.correct(pendingTransaction, pendingCorrection, pendingPreview.revision);
+        CorrectionOutcome outcome = actions.correct(pendingTransaction, pendingCorrection, pendingPreview.revision);
         clearPending();
         actions.refresh();
         if (outcome != CorrectionOutcome.APPLIED) {
-            showNotice(
-                    outcome == CorrectionOutcome.STALE
-                            ? msg("entries-changed")
-                            : msg("correction-applied"));
+            showNotice(outcome == CorrectionOutcome.STALE ? msg("entries-changed") : msg("correction-applied"));
         }
     }
 
@@ -994,11 +753,7 @@ class LedgerPage implements Shell.Page {
 
     // ── small builders ───────────────────────────────────────────────────────────────────────
     JComponent back(String label, Runnable action) {
-        JButton back =
-                button(
-                        "‹ " + label,
-                        false,
-                        () -> {
+        JButton back = button("‹ " + label, false, () -> {
                             action.run();
                             if (data != null) apply(data);
                         });
@@ -1063,9 +818,7 @@ class LedgerController implements LedgerPage.Actions {
         menu.add(item("Runs today", () -> selectScope(TODAY, null, null)));
         var history = new ArrayList<Session>(engine.getHistory());
         history.removeIf(Objects::isNull);
-        history.sort(
-                Comparator.comparingLong((Session itemData) -> itemData.startedAtEpochMillis)
-                        .reversed()
+        history.sort(Comparator.comparingLong((Session itemData) -> itemData.startedAtEpochMillis).reversed()
                         .thenComparing(Session::getId));
         if (!history.isEmpty()) {
             menu.addSeparator();
@@ -1074,37 +827,18 @@ class LedgerController implements LedgerPage.Actions {
             panel.historyScopeMenuPage = max(0, min(pageIndex, pages - 1));
             int from = panel.historyScopeMenuPage * size;
             int to = min(history.size(), from + size);
-            var status =
-                    new JMenuItem("History " + (from + 1) + "–" + to + " of " + history.size());
+            var status = new JMenuItem("History " + (from + 1) + "–" + to + " of " + history.size());
             status.setEnabled(false);
             menu.add(status);
             if (pages > 1) {
-                menu.add(
-                        item(
-                                "Previous page",
-                                panel.historyScopeMenuPage > 0,
-                                () ->
-                                        SwingUtilities.invokeLater(
-                                                () ->
-                                                        showScopeMenu(
-                                                                anchor,
-                                                                panel.historyScopeMenuPage - 1))));
-                menu.add(
-                        item(
-                                "Next page",
-                                panel.historyScopeMenuPage + 1 < pages,
-                                () ->
-                                        SwingUtilities.invokeLater(
-                                                () ->
-                                                        showScopeMenu(
-                                                                anchor,
-                                                                panel.historyScopeMenuPage + 1))));
+                menu.add(item("Previous page", panel.historyScopeMenuPage > 0, () -> SwingUtilities.invokeLater(() ->
+                                                        showScopeMenu(anchor, panel.historyScopeMenuPage - 1))));
+                menu.add(item("Next page", panel.historyScopeMenuPage + 1 < pages, () -> SwingUtilities.invokeLater(
+                                                () -> showScopeMenu(anchor, panel.historyScopeMenuPage + 1))));
                 menu.addSeparator();
             }
             for (Session session : history.subList(from, to)) {
-                menu.add(
-                        item(
-                                msg("recent-grind") + session.getName(),
+                menu.add(item(msg("recent-grind") + session.getName(),
                                 () -> selectScope(HISTORY, session.getId(), session.getName())));
             }
         }
@@ -1140,17 +874,13 @@ class LedgerController implements LedgerPage.Actions {
         return LedgerData.preview(engine, transactionId, correction, SafeMath.now());
     }
 
-    public CorrectionOutcome correct(
-            String transactionId, Correction correction, long previewRevision) {
+    public CorrectionOutcome correct(String transactionId, Correction correction, long previewRevision) {
         if (engine.getRevision() != previewRevision) return CorrectionOutcome.STALE;
-        boolean applied =
-                engine.correctTransaction(
-                        transactionId, correction, SafeMath.now(), "Ledger correction");
+        boolean applied = engine.correctTransaction(transactionId, correction, SafeMath.now(), "Ledger correction");
         return applied ? CorrectionOutcome.APPLIED : CorrectionOutcome.REFUSED;
     }
 
-    public void split(
-            String transactionId,
+    public void split(String transactionId,
             java.util.function.BiConsumer<long[], LedgerData.CorrectionPreview> previewed) {
         Session session = engine.getActiveSession();
         Transaction transaction = session == null ? null : session.findTransaction(transactionId);
@@ -1172,23 +902,15 @@ class LedgerController implements LedgerPage.Actions {
         }
         if (itemId <= 0 || total < 2L) {
             // Owner 2026-10-01 (F02): only one kind of item in two or more units can be split.
-            panel.shell()
-                    .tell(
-                            "Not split",
-                            transaction == null ? msg("entry-longer") : msg("split-needs"),
-                            true);
+            panel.shell().tell("Not split", transaction == null ? msg("entry-longer") : msg("split-needs"), true);
             return;
         }
         int splitItem = itemId;
         long splitTotal = total;
         String splitName = itemName == null || itemName.isEmpty() ? "this item" : itemName;
         String owner = session.getId();
-        panel.shell()
-                .prompt(
-                        "Split entry",
-                        "Keep how many of " + splitName + " \u00d7" + total + " for your share?",
-                        "",
-                        value -> {
+        panel.shell().prompt("Split entry", "Keep how many of " + splitName + " \u00d7" + total + " for your share?",
+                        "", value -> {
                             long keep;
                             try {
                                 keep = Long.parseLong(value.replace(",", ""));
@@ -1196,46 +918,29 @@ class LedgerController implements LedgerPage.Actions {
                                 keep = -1L;
                             }
                             if (keep <= 0L || keep >= splitTotal) {
-                                panel.shell()
-                                        .tell(
-                                                "Not split",
-                                                msg("enter-number") + (splitTotal - 1),
-                                                true);
+                                panel.shell().tell("Not split", msg("enter-number") + (splitTotal - 1), true);
                                 return;
                             }
                             Session now = engine.getActiveSession();
-                            if (now == null
-                                    || !owner.equals(now.getId())
-                                    || !splittableSplit(
-                                            now.findTransaction(transactionId),
-                                            splitItem,
-                                            splitTotal)) {
+                            if (now == null || !owner.equals(now.getId()) || !splittableSplit(
+                                            now.findTransaction(transactionId), splitItem, splitTotal)) {
                                 panel.shell().tell("Not split", msg("entry-changed"), true);
                                 return;
                             }
                             // Owner 1.1: the split shows its Net preview first, like every other
                             // correction.
-                            previewed.accept(
-                                    new long[] {splitItem, keep, splitTotal},
-                                    LedgerData.splitPreview(
-                                            engine,
-                                            transactionId,
-                                            splitItem,
-                                            keep,
-                                            SafeMath.now()));
+                            previewed.accept(new long[] {splitItem, keep, splitTotal}, LedgerData.splitPreview(engine,
+                                            transactionId, splitItem, keep, SafeMath.now()));
                         });
     }
 
     public void applySplit(String transactionId, long[] split, long previewRevision) {
         String owner = engine.getActiveSession() == null ? "" : engine.getActiveSession().getId();
-        mutate(
-                () -> {
+        mutate(() -> {
                     // The sheet may be stale: re-check the session and the exact receipt before
                     // mutating.
                     Session now = engine.getActiveSession();
-                    Transaction current =
-                            now == null || !owner.equals(now.getId())
-                                    ? null
+                    Transaction current = now == null || !owner.equals(now.getId()) ? null
                                     : now.findTransaction(transactionId);
                     if (engine.getRevision() != previewRevision) {
                         panel.shell().tell("Not split", msg("entries-changed"), true);
@@ -1245,12 +950,7 @@ class LedgerController implements LedgerPage.Actions {
                         panel.shell().tell("Not split", msg("entry-changed"), true);
                         return;
                     }
-                    if (!engine.splitItem(
-                            transactionId,
-                            (int) split[0],
-                            split[1],
-                            SafeMath.now(),
-                            "Ledger split")) {
+                    if (!engine.splitItem(transactionId, (int) split[0], split[1], SafeMath.now(), "Ledger split")) {
                         panel.shell().tell("Not split", msg("split-applied"), true);
                     }
                 });
@@ -1285,9 +985,7 @@ class LedgerController implements LedgerPage.Actions {
      */
     boolean undoAllowed() {
         Session active = engine.getActiveSession();
-        return !LedgerData.readOnly(panel.ledgerEntry)
-                && active != null
-                && !menuTarget.isEmpty()
+        return !LedgerData.readOnly(panel.ledgerEntry) && active != null && !menuTarget.isEmpty()
                 && menuTarget.equals(active.getId());
     }
 
@@ -1311,29 +1009,14 @@ class LedgerController implements LedgerPage.Actions {
     @Override
     /** Previews one Review decision, confirms it with its Net change, then applies it undoably. */
     public void decide(String transactionId, Decision decision) {
-        Engine.DecisionPreview preview =
-                engine.previewDecision(
-                        decision,
-                        row -> row != null && transactionId.equals(row.transactionId),
-                        SafeMath.now());
+        Engine.DecisionPreview preview = engine.previewDecision(decision,
+                        row -> row != null && transactionId.equals(row.transactionId), SafeMath.now());
         if (preview.rowCount() != 1) return;
-        String message =
-                correctionLabel(decision.toCorrection())
-                        + " for this entry. Net changes by "
-                        + Fmt.signed(preview.netDelta)
-                        + " gp.";
-        panel.shell()
-                .confirm(
-                        "Review decision",
-                        message,
-                        "Apply",
-                        () ->
-                                mutate(
-                                        () -> {
+        String message = correctionLabel(decision.toCorrection()) + " for this entry. Net changes by "
+                        + Fmt.signed(preview.netDelta) + " gp.";
+        panel.shell().confirm("Review decision", message, "Apply", () -> mutate(() -> {
                                             if (engine.applyDecision(preview, SafeMath.now()) < 0) {
-                                                SwingUtilities.invokeLater(
-                                                        () ->
-                                                                panel.ledger.showNotice(
+                                                SwingUtilities.invokeLater(() -> panel.ledger.showNotice(
                                                                         msg("entries-changed")));
                                             }
                                         }));

@@ -46,7 +46,7 @@ public class EthereumChargeTest
     {
         // RuneLite's ItemMapping carries no bracelet entry; the charged form prices from the
         // uncharged form's live quote (Muse review 2026-10-12).
-        Valuation valuation = new Valuation(new GpManagerConfig() { }, EthereumChargeTest::composition,
+        Valuation valuation = ModelProbe.valuation(new GpManagerConfig() { }, EthereumChargeTest::composition,
             id -> id == ItemID.WILD_CAVE_BRACELET_UNCHARGED ? 40_000 : 0);
         Flow bracelet = valuation.valueComponent(ItemID.WILD_CAVE_BRACELET_CHARGED, 1L, 0L);
         assertEquals(40_000, bracelet.unitPrice);
@@ -181,7 +181,7 @@ public class EthereumChargeTest
         engine.markDirty();
         for (int tick = 1; tick <= 3; tick++)
         {
-            engine.processIfDirty(carried, start + tick * 600L);
+            engine.processIfDirty(carried, start + tick * 600L, null);
         }
 
         engine.markPvmDeath(1, carried.quantities);
@@ -268,9 +268,9 @@ public class EthereumChargeTest
 
     private static Transaction settle(Engine engine, ContainerSnapshot next, long firstTick)
     {
-        assertNull(engine.processIfDirty(next, firstTick));
-        assertNull(engine.processIfDirty(next, firstTick + 600L));
-        return engine.processIfDirty(next, firstTick + 1_200L);
+        assertNull(engine.processIfDirty(next, firstTick, null));
+        assertNull(engine.processIfDirty(next, firstTick + 600L, null));
+        return engine.processIfDirty(next, firstTick + 1_200L, null);
     }
 
     private static Widget item(int itemId, int slot)

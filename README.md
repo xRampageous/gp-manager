@@ -7,7 +7,7 @@ See what you actually make while you play. GP Manager tracks your gains, supplie
 | Live | Raid loot | PvP |
 |:--:|:--:|:--:|
 | ![Live](docs/screenshots/live.png) | ![A looted Theatre of Blood](docs/screenshots/raid.png) | ![PvP](docs/screenshots/pvp.png) |
-| Net, GP/h and your latest drops, with a target if you set one | A looted raid — the scythe is one entry | Kills, the victim's loot key, and what one is worth |
+| Net, GP/h and your latest drops, with a target if you set one | A looted raid — the scythe is one entry | Kills, the victim's loot key, and what a death would risk |
 
 | Grinds | Loot key claim |
 |:--:|:--:|
@@ -21,9 +21,10 @@ See what you actually make while you play. GP Manager tracks your gains, supplie
 
 ## Features
 
-- **Live** – your Net, GP/h, gains, supplies and losses as you play, plus your latest drops. Click the Net to set a GP or time target; click the ACTIVE clock to restart GP/h.
+- **Live** – your Net, GP/h, gains, supplies and losses as you play, plus your latest drops. Click the ACTIVE clock for a fresh session, or click the Net to set a GP or time target, which starts one too. Your Free play or Grind total stays under the Net and the Ledger keeps everything.
+- **Free play** – what you make outside Grinds, with an optional milestone (say 1B) and a small notice when you pass it. **⚙ › Reset free-play** starts it over and keeps the old run under Grinds › FREE PLAY, where you can restore it.
 - **Ledger** – every gain, loss, trade and death, with the reason it counted. Open any row to see the items behind it, and fix anything from one Correct menu. Anything it wasn't sure about waits in Review for you.
-- **Grinds** – start one by name (Vorkath, Zulrah, a skilling spot) and it's remembered with its targets, best run and average GP/h, so you can compare runs, including loot by the monster that dropped it. Between Grinds it tracks Free play on its own.
+- **Grinds** – start one by name (Vorkath, Zulrah, a skilling spot) and it's remembered with its targets, best run and average GP/h, so you can compare runs, including loot by the monster that dropped it. Each Grind is booked on its own; between Grinds it tracks Free play.
 - **All time** – your total Net and GP/h and your best Grinds.
 - **HUD+** – an optional box in the game window with your Net, GP/h and a loot tray for the current kill streak.
 - **PvP** – kills, deaths and player loot in dangerous areas, plus what a death there would cost you.
@@ -50,7 +51,7 @@ If it isn't sure what happened, it doesn't guess: the entry waits in Review with
 
 ## Your data
 
-Everything stays on your computer, in one profile per account. The **⚙** menu backs up or resets your profile and shows where it's kept; to restore a backup, copy it over the profile file while RuneLite is closed. GP Manager makes no network calls of its own and never plays the game for you.
+Everything stays on your computer, in one profile per account. The **⚙** menu backs up your profile, shows where it's kept and has **Delete Profile** (with or without a backup first); to restore a backup, copy it over the profile file while RuneLite is closed. GP Manager makes no network calls of its own and never plays the game for you.
 
 ## Feedback
 

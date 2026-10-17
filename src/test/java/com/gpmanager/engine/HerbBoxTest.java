@@ -64,7 +64,7 @@ public class HerbBoxTest
     private static Transaction settle(Engine engine, ContainerSnapshot snapshot, long firstTick)
     {
         Transaction row = null;
-        for (long t = firstTick; row == null && t < firstTick + 4_000L; t += 600L) row = engine.processIfDirty(snapshot, t);
+        for (long t = firstTick; row == null && t < firstTick + 4_000L; t += 600L) row = engine.processIfDirty(snapshot, t, null);
         return row;
     }
 }

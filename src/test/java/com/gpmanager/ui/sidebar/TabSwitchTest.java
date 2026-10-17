@@ -18,11 +18,11 @@ public class TabSwitchTest
         long now = System.currentTimeMillis();
         engine.startCustom("Vorkath", now);
         engine.getActiveSession().addTransaction(Tx.of(now, TransactionType.LOOT, Context.GENERIC, "", true,
-            Collections.singletonList(new Flow(536, "Dragon bones", 1, 2_000, 2_000L))), 2_000);
+            Collections.singletonList(new Flow(536, "Dragon bones", 1, 2_000, 2_000L))), 2_000, false);
         SidebarPanel[] holder = new SidebarPanel[1];
         SwingUtilities.invokeAndWait(() ->
         {
-            holder[0] = new SidebarPanel(engine, PresentationLifecycleTest.config(), null);
+            holder[0] = new SidebarPanel(engine, PresentationLifecycleTest.config(), null, null, null);
             holder[0].active = true;
         });
         SidebarPanel panel = holder[0];
@@ -38,7 +38,7 @@ public class TabSwitchTest
         assertSame("nothing changed: the Ledger keeps its rows", first, panel.ledger.data);
 
         engine.getActiveSession().addTransaction(Tx.of(now + 1_000L, TransactionType.LOOT, Context.GENERIC,
-            "", true, Collections.singletonList(new Flow(536, "Dragon bones", 1, 2_000, 2_000L))), 2_000);
+            "", true, Collections.singletonList(new Flow(536, "Dragon bones", 1, 2_000, 2_000L))), 2_000, false);
         SwingUtilities.invokeAndWait(() -> panel.shell().show(Shell.LIVE));
         SwingUtilities.invokeAndWait(() -> panel.shell().show(Shell.LEDGER));
         SwingUtilities.invokeAndWait(() -> { });

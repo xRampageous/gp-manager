@@ -234,7 +234,7 @@ public class KeyClaimsTest
     @Test
     public void localDeathClosesOnlyMatchingKeyAndNeverBooksKeyAsLoss()
     {
-        Session session = new Session("PK", 1_000L);
+        Session session = new Session("PK", 1_000L, SessionMode.GENERAL);
         Transaction row = keyAuditRow(ItemID.WILDY_LOOT_KEY0, 1L, session);
         KeyClaims claims = new KeyClaims();
         claims.open(row.getId(), ItemID.WILDY_LOOT_KEY0, 1L, 2_000L);
@@ -302,7 +302,7 @@ public class KeyClaimsTest
             Context.PK_LOOT, KeyClaims.LOOT_KEY_NOTE, "PKing", false,
             Collections.singletonList(new Flow(keyItemId, "Loot key", quantity, 0, 0L)),
             Confidence.LIKELY, "Deferred loot-key value", null);
-        session.addTransaction(row, 2_000);
+        session.addTransaction(row, 2_000, false);
         return row;
     }
 

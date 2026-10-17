@@ -66,7 +66,7 @@ public class ConsumptionBurialEngineTest
         Engine engine = new Engine(valuator, new TransactionClassifier(), CONFIG);
         engine.ensureSession(1_000L);
         engine.setBaseline(ContainerSnapshot.empty());
-        assertNull(engine.processIfDirty(snapshot(526, 1L), 1_000L));
+        assertNull(engine.processIfDirty(snapshot(526, 1L), 1_000L, null));
         engine.noteConsume(526, 8, false);
         engine.markDirty();
 
@@ -136,7 +136,7 @@ public class ConsumptionBurialEngineTest
         stale.markContext(Context.TRANSFER, 6, "Bank transfer");
         for (int tick = 1; tick <= 7; tick++)
         {
-            assertNull(stale.processIfDirty(snapshot(526, 1L), 1_000L + tick * 600L));
+            assertNull(stale.processIfDirty(snapshot(526, 1L), 1_000L + tick * 600L, null));
         }
         stale.markDirty();
         Transaction burial = settle(stale, ContainerSnapshot.empty(), 6_000L);
@@ -280,9 +280,9 @@ public class ConsumptionBurialEngineTest
         // idle context, then inventory callback arrives — must stay ownership-neutral.
         Engine engine = startedWithBones(1L);
         engine.markContext(Context.TRANSFER, 6, "Bank container transfer");
-        assertNull(engine.processIfDirty(snapshot(526, 1L), 1_200L));
+        assertNull(engine.processIfDirty(snapshot(526, 1L), 1_200L, null));
         engine.bankClosed();
-        assertNull(engine.processIfDirty(snapshot(526, 1L), 1_800L));
+        assertNull(engine.processIfDirty(snapshot(526, 1L), 1_800L, null));
 
         engine.markDirty();
         Transaction deposit = settle(engine, ContainerSnapshot.empty(), 2_400L);
@@ -337,7 +337,7 @@ public class ConsumptionBurialEngineTest
         Engine engine = startedWithBones(1L);
         engine.markContext(Context.TRANSFER, 6, "Bank container transfer");
         engine.bankClosed();
-        assertNull(engine.processIfDirty(snapshot(526, 1L), 1_200L));
+        assertNull(engine.processIfDirty(snapshot(526, 1L), 1_200L, null));
         engine.noteConsume(526, 6, false);
         engine.markDirty();
 
@@ -412,7 +412,7 @@ public class ConsumptionBurialEngineTest
         Engine engine = startedWithBones(1L);
         engine.markContext(Context.TRANSFER, 6, "Bank container transfer");
         engine.bankClosed();
-        assertNull(engine.processIfDirty(snapshot(526, 1L), 1_200L));
+        assertNull(engine.processIfDirty(snapshot(526, 1L), 1_200L, null));
         engine.noteConsume(-1, 6, false);
         engine.markDirty();
 
@@ -432,7 +432,7 @@ public class ConsumptionBurialEngineTest
         engine.setBaseline(snapshot(556, 100L)); // air rune
         engine.markContext(Context.TRANSFER, 6, "Bank container transfer");
         engine.bankClosed();
-        assertNull(engine.processIfDirty(snapshot(556, 100L), 1_200L));
+        assertNull(engine.processIfDirty(snapshot(556, 100L), 1_200L, null));
         engine.noteConsume(556, 6, false);
         engine.markDirty();
 
@@ -465,7 +465,7 @@ public class ConsumptionBurialEngineTest
         assertEquals(100L, engine.getMetrics(4_000L).costs);
         assertEquals(60L, engine.getMetrics(4_000L).revenue);
         assertNull("replaying the settled snapshot must not book alchemy twice",
-            engine.processIfDirty(new ContainerSnapshot(after), 2_800L));
+            engine.processIfDirty(new ContainerSnapshot(after), 2_800L, null));
     }
 
     @Test
@@ -578,7 +578,7 @@ public class ConsumptionBurialEngineTest
     {
         Engine engine = startedWithBones(1L);
         engine.noteConsume(526, 4, false);
-        engine.extendConsume(8);
+        engine.extendConsume(8, null);
         engine.markDirty();
 
         Transaction burial = settle(engine, ContainerSnapshot.empty(), 1_600L);
@@ -680,7 +680,7 @@ public class ConsumptionBurialEngineTest
         before.put(526, 2L);
         before.put(1942, 1L);
         engine.setBaseline(new ContainerSnapshot(before));
-        engine.extendConsume(12);
+        engine.extendConsume(12, null);
         engine.markDirty();
 
         Map<Integer, Long> after = new HashMap<>();
@@ -787,7 +787,7 @@ public class ConsumptionBurialEngineTest
         engine.setBaseline(new ContainerSnapshot(before));
 
         engine.noteConsume(-1, 12, false);
-        engine.extendConsume(12); // chat: drink / dig+bury
+        engine.extendConsume(12, null); // chat: drink / dig+bury
         engine.markDirty();
         Map<Integer, Long> afterField = new HashMap<>();
         afterField.put(526, 2L);
@@ -798,7 +798,7 @@ public class ConsumptionBurialEngineTest
         assertTrue(field.isCounted());
 
         engine.noteConsume(1942, 8, false);
-        engine.extendConsume(8); // chat: you eat the potato. yuck!
+        engine.extendConsume(8, null); // chat: you eat the potato. yuck!
         engine.markDirty();
         Map<Integer, Long> afterEat = new HashMap<>();
         afterEat.put(526, 2L);
@@ -841,10 +841,10 @@ public class ConsumptionBurialEngineTest
         Engine engine = startedWithBones(1L);
         engine.togglePause(1_100L);
         engine.markDirty();
-        assertNull(engine.processIfDirty(ContainerSnapshot.empty(), 1_600L));
+        assertNull(engine.processIfDirty(ContainerSnapshot.empty(), 1_600L, null));
         engine.togglePause(2_000L);
 
-        assertNull(engine.processIfDirty(ContainerSnapshot.empty(), 2_600L));
+        assertNull(engine.processIfDirty(ContainerSnapshot.empty(), 2_600L, null));
         assertTrue(engine.getActiveSession().getTransactions().isEmpty());
         assertEquals(0L, engine.getMetrics(3_000L).costs);
     }
@@ -888,16 +888,16 @@ public class ConsumptionBurialEngineTest
         engine.bankOpened(6);
         engine.markContext(Context.TRANSFER, 6, "Bank container transfer");
         engine.markDirty();
-        assertNull(engine.processIfDirty(snapshot(526, 26L), 1_400L));
+        assertNull(engine.processIfDirty(snapshot(526, 26L), 1_400L, null));
         engine.bankClosed();
         engine.noteConsume(526, 4, false, ActionKind.BURY);
-        assertNull(engine.processIfDirty(snapshot(526, 25L), 1_450L));
+        assertNull(engine.processIfDirty(snapshot(526, 25L), 1_450L, null));
         engine.noteConsume(526, 4, false, ActionKind.BURY);
-        assertNull(engine.processIfDirty(snapshot(526, 25L), 1_500L));
+        assertNull(engine.processIfDirty(snapshot(526, 25L), 1_500L, null));
 
         // The stable window commits one batch: +26 withdrawn, −1 bitten.
-        Transaction settled = engine.processIfDirty(snapshot(526, 25L), 1_600L);
-        if (settled == null) settled = engine.processIfDirty(snapshot(526, 25L), 1_700L);
+        Transaction settled = engine.processIfDirty(snapshot(526, 25L), 1_600L, null);
+        if (settled == null) settled = engine.processIfDirty(snapshot(526, 25L), 1_700L, null);
 
         assertNotNull(settled);
         List<Transaction> rows = engine.getActiveSession().getTransactions();
@@ -932,13 +932,13 @@ public class ConsumptionBurialEngineTest
         engine.bankOpened(6);
         engine.markContext(Context.TRANSFER, 6, "Bank container transfer");
         engine.markDirty();
-        assertNull(engine.processIfDirty(snapshot(526, 1L), 1_400L));
+        assertNull(engine.processIfDirty(snapshot(526, 1L), 1_400L, null));
         engine.bankClosed();
         engine.noteConsume(526, 4, false, ActionKind.BURY);
-        assertNull(engine.processIfDirty(ContainerSnapshot.empty(), 1_450L));
-        assertNull(engine.processIfDirty(ContainerSnapshot.empty(), 1_500L));
-        Transaction settled = engine.processIfDirty(ContainerSnapshot.empty(), 1_600L);
-        if (settled == null) settled = engine.processIfDirty(ContainerSnapshot.empty(), 1_700L);
+        assertNull(engine.processIfDirty(ContainerSnapshot.empty(), 1_450L, null));
+        assertNull(engine.processIfDirty(ContainerSnapshot.empty(), 1_500L, null));
+        Transaction settled = engine.processIfDirty(ContainerSnapshot.empty(), 1_600L, null);
+        if (settled == null) settled = engine.processIfDirty(ContainerSnapshot.empty(), 1_700L, null);
 
         assertNotNull("the single bite must book", settled);
         assertEquals(TransactionType.CONSUMPTION, settled.getType());
@@ -959,13 +959,13 @@ public class ConsumptionBurialEngineTest
         engine.setBaseline(ContainerSnapshot.empty());
         engine.markLoot(Collections.singletonMap(526, 26L), 6, "Loot from Goblin", "Goblin");
         engine.markDirty();
-        assertNull(engine.processIfDirty(snapshot(526, 26L), 1_400L));
+        assertNull(engine.processIfDirty(snapshot(526, 26L), 1_400L, null));
         engine.noteConsume(526, 4, false, ActionKind.BURY);
-        assertNull(engine.processIfDirty(snapshot(526, 25L), 1_450L));
+        assertNull(engine.processIfDirty(snapshot(526, 25L), 1_450L, null));
         engine.noteConsume(526, 4, false, ActionKind.BURY);
-        assertNull(engine.processIfDirty(snapshot(526, 25L), 1_500L));
-        Transaction settled = engine.processIfDirty(snapshot(526, 25L), 1_600L);
-        if (settled == null) settled = engine.processIfDirty(snapshot(526, 25L), 1_700L);
+        assertNull(engine.processIfDirty(snapshot(526, 25L), 1_500L, null));
+        Transaction settled = engine.processIfDirty(snapshot(526, 25L), 1_600L, null);
+        if (settled == null) settled = engine.processIfDirty(snapshot(526, 25L), 1_700L, null);
         assertNotNull(settled);
 
         List<Transaction> rows = engine.getActiveSession().getTransactions();
@@ -1088,9 +1088,9 @@ public class ConsumptionBurialEngineTest
 
     private static Transaction settle(Engine engine, ContainerSnapshot snapshot, long firstTick)
     {
-        assertNull(engine.processIfDirty(snapshot, firstTick));
-        assertNull(engine.processIfDirty(snapshot, firstTick + 600L));
-        return engine.processIfDirty(snapshot, firstTick + 1_200L);
+        assertNull(engine.processIfDirty(snapshot, firstTick, null));
+        assertNull(engine.processIfDirty(snapshot, firstTick + 600L, null));
+        return engine.processIfDirty(snapshot, firstTick + 1_200L, null);
     }
 
     private static ContainerSnapshot snapshot(int itemId, long quantity)

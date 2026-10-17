@@ -93,7 +93,7 @@ public class MarketEconomyGateTest
             assertEquals(0L, flow.valueDelta);
             engine.getActiveSession().addTransaction(new Transaction(T0 + i,
                 TransactionType.GAIN, Context.GENERIC, "", "Item " + itemId, true,
-                Collections.singletonList(flow), Confidence.CONFIRMED, "", null), 200);
+                Collections.singletonList(flow), Confidence.CONFIRMED, "", null), 200, false);
         }
 
         assertTrue("the gate never queried the automatic market", seam.asked.isEmpty());

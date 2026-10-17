@@ -27,7 +27,7 @@ public class WriterLineageAndIdentityTest
 
     private SavedState named(String name, long revision)
     {
-        SavedState state = new SavedState(new Session(name, 1_000L), null, Collections.emptyList());
+        SavedState state = new SavedState(new Session(name, 1_000L, SessionMode.GENERAL), null, Collections.emptyList());
         state.setRevision(revision);
         return state;
     }
@@ -38,7 +38,7 @@ public class WriterLineageAndIdentityTest
         Path directory = temporary.newFolder().toPath();
         CountDownLatch entered = new CountDownLatch(1);
         CountDownLatch release = new CountDownLatch(1);
-        SessionRepository repository = new SessionRepository(new Gson(), FilepathTestSupport.root(directory))
+        SessionRepository repository = new SessionRepository(new Gson(), FilepathTestSupport.root(directory), false)
         {
             @Override
             public boolean save(WriteIntent intent)
@@ -68,14 +68,14 @@ public class WriterLineageAndIdentityTest
             writer.submit(new WriteIntent(null,
                 repository.scopeGeneration,
                 repository.lastKnownDiskRevision,
-                first));
+                first, null));
             assertTrue(entered.await(5, TimeUnit.SECONDS));
 
             SavedState latest = named("Latest", 2L);
             writer.submit(new WriteIntent(null,
                 repository.scopeGeneration,
                 repository.lastKnownDiskRevision,
-                latest));
+                latest, null));
             release.countDown();
             assertTrue(writer.flush(Duration.ofSeconds(5)));
             assertEquals("Latest", repository.load().getActiveSession().getName());
@@ -91,14 +91,14 @@ public class WriterLineageAndIdentityTest
     public void intermediateSnapshotsCoalesceToNewest() throws Exception
     {
         Path directory = temporary.newFolder().toPath();
-        SessionRepository repository = new SessionRepository(new Gson(), FilepathTestSupport.root(directory));
+        SessionRepository repository = new SessionRepository(new Gson(), FilepathTestSupport.root(directory), false);
         OrderedPersistenceWriter writer = new OrderedPersistenceWriter(repository);
         try
         {
             long generation = repository.scopeGeneration;
-            writer.submit(new WriteIntent(null, generation, 0L, named("A", 1L)));
-            writer.submit(new WriteIntent(null, generation, 0L, named("B", 2L)));
-            writer.submit(new WriteIntent(null, generation, 0L, named("C", 3L)));
+            writer.submit(new WriteIntent(null, generation, 0L, named("A", 1L), null));
+            writer.submit(new WriteIntent(null, generation, 0L, named("B", 2L), null));
+            writer.submit(new WriteIntent(null, generation, 0L, named("C", 3L), null));
             assertTrue(writer.flush(Duration.ofSeconds(5)));
             assertEquals("C", repository.load().getActiveSession().getName());
             assertEquals(3L, repository.load().revision);
@@ -113,15 +113,15 @@ public class WriterLineageAndIdentityTest
     public void externalConflictIsNotSilentlyRebased() throws Exception
     {
         Path directory = temporary.newFolder().toPath();
-        SessionRepository shared = new SessionRepository(new Gson(), FilepathTestSupport.root(directory));
+        SessionRepository shared = new SessionRepository(new Gson(), FilepathTestSupport.root(directory), false);
         assertTrue(PersistenceProbe.save(shared, named("Seed", 1L)));
 
-        SessionRepository external = new SessionRepository(new Gson(), FilepathTestSupport.root(directory));
+        SessionRepository external = new SessionRepository(new Gson(), FilepathTestSupport.root(directory), false);
         external.load();
         assertTrue(external.save(new WriteIntent(null,
             external.scopeGeneration,
             1L,
-            named("External", 2L))));
+            named("External", 2L), null)));
 
         OrderedPersistenceWriter writer = new OrderedPersistenceWriter(shared);
         try
@@ -131,11 +131,11 @@ public class WriterLineageAndIdentityTest
             writer.submit(new WriteIntent(null,
                 shared.scopeGeneration,
                 1L,
-                named("Local stale", 2L)));
+                named("Local stale", 2L), null));
             assertTrue(writer.flush(Duration.ofSeconds(5)));
             assertTrue(writer.getStatus().isFailure()
                 || writer.getStatus().state == SaveStatus.State.CONFLICT);
-            assertEquals("External", new SessionRepository(new Gson(), FilepathTestSupport.root(directory)).load()
+            assertEquals("External", new SessionRepository(new Gson(), FilepathTestSupport.root(directory), false).load()
                 .getActiveSession().getName());
         }
         finally
@@ -166,12 +166,12 @@ public class WriterLineageAndIdentityTest
 
         TrackingIdentity alice = new TrackingIdentity("rsprofile.alice", TrackingIdentity.ACCOUNT_HASH_INVALID);
         TrackingIdentity bob = new TrackingIdentity("rsprofile.bob", TrackingIdentity.ACCOUNT_HASH_INVALID);
-        assertTrue(coordinator.switchIdentity(alice, true));
+        assertTrue(coordinator.switchIdentity(alice, true, true));
         engine.ensureSession(1_000L);
         engine.getActiveSession().rename("Alice live");
         assertEquals("Alice live", engine.getActiveSession().getName());
 
-        assertFalse(coordinator.switchIdentity(bob, true));
+        assertFalse(coordinator.switchIdentity(bob, true, true));
         assertEquals(alice, coordinator.getActiveIdentity());
         assertEquals("Alice live", engine.getActiveSession().getName());
         assertNotNull(PersistenceProbe.identityBlockReason(coordinator));
@@ -224,7 +224,7 @@ public class WriterLineageAndIdentityTest
             null, null, repository, writer, engine);
         try
         {
-            assertTrue(coordinator.switchIdentity(new TrackingIdentity("rsprofile.alice", TrackingIdentity.ACCOUNT_HASH_INVALID), true));
+            assertTrue(coordinator.switchIdentity(new TrackingIdentity("rsprofile.alice", TrackingIdentity.ACCOUNT_HASH_INVALID), true, true));
             engine.ensureSession(1_000L);
             locked.clear();
             assertTrue(coordinator.saveNow());
@@ -256,9 +256,9 @@ public class WriterLineageAndIdentityTest
         {
             TrackingIdentity alice = new TrackingIdentity("rsprofile.alice", TrackingIdentity.ACCOUNT_HASH_INVALID);
             TrackingIdentity bob = new TrackingIdentity("rsprofile.bob", TrackingIdentity.ACCOUNT_HASH_INVALID);
-            assertTrue(coordinator.switchIdentity(alice, true));
+            assertTrue(coordinator.switchIdentity(alice, true, true));
             engine.ensureSession(1_000L);
-            assertTrue(coordinator.switchIdentity(bob, true));
+            assertTrue(coordinator.switchIdentity(bob, true, true));
             assertEquals(bob, coordinator.getActiveIdentity());
             assertTrue(EngineProbe.isBaselinePriming(engine));
         }
@@ -284,10 +284,10 @@ public class WriterLineageAndIdentityTest
         {
             TrackingIdentity alice = new TrackingIdentity("rsprofile.alice", TrackingIdentity.ACCOUNT_HASH_INVALID);
             TrackingIdentity bob = new TrackingIdentity("rsprofile.bob", TrackingIdentity.ACCOUNT_HASH_INVALID);
-            assertTrue(coordinator.switchIdentity(alice, false));
+            assertTrue(coordinator.switchIdentity(alice, false, true));
             engine.ensureSession(1_000L);
             engine.getActiveSession().rename("Alice ephemeral");
-            assertTrue(coordinator.switchIdentity(bob, false));
+            assertTrue(coordinator.switchIdentity(bob, false, true));
             assertEquals(bob, coordinator.getActiveIdentity());
             // New account gets a fresh empty restore, not Alice's live session.
             assertTrue(engine.getActiveSession() == null

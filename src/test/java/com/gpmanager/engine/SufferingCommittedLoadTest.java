@@ -161,9 +161,9 @@ public class SufferingCommittedLoadTest
 
     private static Transaction settle(Engine engine, ContainerSnapshot next, long firstTick)
     {
-        assertNull(engine.processIfDirty(next, firstTick));
-        assertNull(engine.processIfDirty(next, firstTick + 600L));
-        return engine.processIfDirty(next, firstTick + 1_200L);
+        assertNull(engine.processIfDirty(next, firstTick, null));
+        assertNull(engine.processIfDirty(next, firstTick + 600L, null));
+        return engine.processIfDirty(next, firstTick + 1_200L, null);
     }
 
     private static Widget item(int itemId, int slot)

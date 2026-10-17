@@ -320,7 +320,7 @@ public class TrackedBasisKnownCoverageTest
         ContainerSnapshot back = new ContainerSnapshot(with(h.inventory, LOGS, 60L));
         for (int i = 0; i < 3; i++)
         {
-            restarted.processIfDirty(back, h.now + 1_000L + i * 600L);
+            restarted.processIfDirty(back, h.now + 1_000L + i * 600L, null);
         }
         assertEquals("cancelling after restart releases the exact reservation", 100L,
             EngineProbe.knownCoverageQty(restarted, LOGS));
@@ -352,7 +352,7 @@ public class TrackedBasisKnownCoverageTest
             Collections.singletonList(new Flow(LOGS, "Logs", 3L, 100, 300L,
                 PriceSource.GRAND_EXCHANGE)),
             Confidence.CONFIRMED, "", null);
-        migrated.getActiveSession().addTransaction(gain, 500);
+        migrated.getActiveSession().addTransaction(gain, 500, false);
         assertEquals(3L, EngineProbe.knownCoverageQty(migrated, LOGS));
         assertEquals(300L, EngineProbe.knownCoverageBasisGp(migrated, LOGS));
     }
@@ -442,7 +442,7 @@ public class TrackedBasisKnownCoverageTest
 
         void book(Transaction transaction)
         {
-            engine.getActiveSession().addTransaction(transaction, 500);
+            engine.getActiveSession().addTransaction(transaction, 500, false);
         }
 
         void sell(int slot, int item, long qty, int limit, long cash)
@@ -488,7 +488,7 @@ public class TrackedBasisKnownCoverageTest
             Transaction result = null;
             for (int i = 0; i < 3; i++)
             {
-                Transaction settled = engine.processIfDirty(snapshot, now);
+                Transaction settled = engine.processIfDirty(snapshot, now, null);
                 if (settled != null)
                 {
                     result = settled;

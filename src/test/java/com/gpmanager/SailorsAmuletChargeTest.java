@@ -337,9 +337,9 @@ public class SailorsAmuletChargeTest
 
     private static Transaction settle(Engine engine, ContainerSnapshot next, long firstTick)
     {
-        assertNull(engine.processIfDirty(next, firstTick));
-        assertNull(engine.processIfDirty(next, firstTick + 600L));
-        return engine.processIfDirty(next, firstTick + 1_200L);
+        assertNull(engine.processIfDirty(next, firstTick, null));
+        assertNull(engine.processIfDirty(next, firstTick + 600L, null));
+        return engine.processIfDirty(next, firstTick + 1_200L, null);
     }
 
     private static final class Harness
@@ -349,7 +349,7 @@ public class SailorsAmuletChargeTest
 
         Harness(ItemContainer worn, ItemContainer inventory)
         {
-            Valuation valuation = new Valuation(CONFIG, SailorsAmuletChargeTest::compositionOf,
+            Valuation valuation = ModelProbe.valuation(CONFIG, SailorsAmuletChargeTest::compositionOf,
                 id -> id == LAW ? 100 : id == WATER ? 4 : 0);
             engine = new Engine(SailorsAmuletChargeTest::flows, new TransactionClassifier(), CONFIG);
             engine.startCustom("Sailors", T0);

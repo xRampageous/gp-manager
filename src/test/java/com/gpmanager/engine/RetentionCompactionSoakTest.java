@@ -1,5 +1,7 @@
 package com.gpmanager;
 
+import com.gpmanager.GpManagerConfig.Retention;
+
 import com.google.gson.Gson;
 import java.io.IOException;
 import java.nio.charset.StandardCharsets;
@@ -100,7 +102,7 @@ public class RetentionCompactionSoakTest
         // Uncompacted save/load through the repository: the 10k+ profile round trip and its cost.
         Path uncompactedDir = folder.newFolder("uncompacted").toPath();
         SessionRepository uncompacted = new SessionRepository(GSON,
-            FilepathTestSupport.root(uncompactedDir));
+            FilepathTestSupport.root(uncompactedDir), false);
         long t = System.nanoTime();
         assertTrue(PersistenceProbe.save(uncompacted, copy(fullJson)));
         line("uncompacted_save_ms=" + ms(t));
@@ -286,28 +288,6 @@ public class RetentionCompactionSoakTest
         }
     }
 
-    private static String[] splitCsv(String line)
-    {
-        List<String> cells = new ArrayList<>();
-        StringBuilder cell = new StringBuilder();
-        boolean quoted = false;
-        for (int i = 0; i < line.length(); i++)
-        {
-            char c = line.charAt(i);
-            if (quoted)
-            {
-                if (c == '"' && i + 1 < line.length() && line.charAt(i + 1) == '"') { cell.append('"'); i++; }
-                else if (c == '"') quoted = false;
-                else cell.append(c);
-            }
-            else if (c == '"') quoted = true;
-            else if (c == ',') { cells.add(cell.toString()); cell.setLength(0); }
-            else cell.append(c);
-        }
-        cells.add(cell.toString());
-        return cells.toArray(new String[0]);
-    }
-
     // ── merge ─────────────────────────────────────────────────────────────────
 
     // ── repeated save / reload ────────────────────────────────────────────────
@@ -316,7 +296,7 @@ public class RetentionCompactionSoakTest
     {
         Path directory = folder.newFolder("reload").toPath();
         SessionRepository repository = new SessionRepository(GSON,
-            FilepathTestSupport.root(directory));
+            FilepathTestSupport.root(directory), false);
         Engine engine = seed;
         String fingerprint = fingerprint(engine);
         long saveNs = 0L;
@@ -398,20 +378,20 @@ public class RetentionCompactionSoakTest
                 Transaction loot = row(start + (i + 1) * 60_000L, TransactionType.LOOT, Context.LOOT,
                     "Woodcutting", true, Confidence.CONFIRMED,
                     new Flow(LOGS, "Logs", logsQuantity, 39, logsQuantity * 39L));
-                session.addTransaction(loot, 100_000);
+                session.addTransaction(loot, 100_000, false);
                 if (i == 1) splitTarget = loot.getId();
                 if (i == 2) ignoreTarget = loot.getId();
                 session.recordAction("Woodcutting", loot.timestampEpochMillis);
             }
             session.addTransaction(row(start + 8 * 60_000L, TransactionType.CONSUMPTION, Context.GENERIC,
                 "Woodcutting", true, Confidence.CONFIRMED,
-                new Flow(SHARK, "Shark", -2L, 385, -770L)), 100_000);
+                new Flow(SHARK, "Shark", -2L, 385, -770L)), 100_000, false);
             session.addTransaction(row(start + 9 * 60_000L, TransactionType.UNCERTAIN, Context.GENERIC,
                 "Woodcutting", false, Confidence.UNCERTAIN,
-                new Flow(COINS, "Coins", 1_000L, 1, 1_000L)), 100_000);
+                new Flow(COINS, "Coins", 1_000L, 1, 1_000L)), 100_000, false);
             session.addTransaction(row(start + 10 * 60_000L, TransactionType.LOOT, Context.LOOT,
                 "Woodcutting", true, Confidence.LIKELY,
-                new Flow(UNPRICED, "Abyssal whip", 1L, 0, 0L)), 100_000);
+                new Flow(UNPRICED, "Abyssal whip", 1L, 0, 0L)), 100_000, false);
             if (day % 3 == 0) assertTrue(session.correctTransaction(ignoreTarget, Correction.IGNORE, start + 11 * 60_000L, "Not mine"));
             if (day % 3 == 1) assertTrue(session.correctTransaction(ignoreTarget, Correction.COST, start + 11 * 60_000L, "Bought"));
             if (day % 3 == 2) assertTrue(session.splitItem(splitTarget, LOGS, logsQuantity / 2, start + 11 * 60_000L, "half"));
@@ -421,7 +401,7 @@ public class RetentionCompactionSoakTest
                     "Loot key audit", false, Confidence.CONFIRMED,
                     new Flow(KEY, "Loot key", 1L, 0, 0L));
                 PENDING_CLAIM_ROW = audit.getId();
-                session.addTransaction(audit, 100_000);
+                session.addTransaction(audit, 100_000, false);
             }
             if (day == 4)
             {
@@ -429,7 +409,7 @@ public class RetentionCompactionSoakTest
                     "Loot key chest", true, Confidence.CONFIRMED,
                     new Flow(COINS, "Coins", 5_000L, 1, 5_000L));
                 settlement.setSourceClaimId(SETTLED_CLAIM_ID);
-                session.addTransaction(settlement, 100_000);
+                session.addTransaction(settlement, 100_000, false);
             }
             if (pk)
             {
@@ -437,13 +417,13 @@ public class RetentionCompactionSoakTest
                 String kill = session.addEncounter(true, killAt);
                 Transaction loot = row(killAt + 1_000L, TransactionType.PK_LOOT, Context.PK_LOOT, "PKing", true,
                     Confidence.CONFIRMED, new Flow(COINS, "Coins", 50_000L + (DAYS - day) * 10L, 1, 50_000L + (DAYS - day) * 10L));
-                session.addTransaction(loot, 100_000);
+                session.addTransaction(loot, 100_000, false);
                 session.attachToEncounter(loot.getId(), kill, false);
                 long deathAt = start + 12L * 3_600_000L;
                 String death = session.addEncounter(false, deathAt);
                 Transaction loss = row(deathAt + 1_000L, TransactionType.PK_DEATH_LOSS, Context.PK_DEATH, "PKing", true,
                     Confidence.CONFIRMED, new Flow(SHARK, "Shark", -(80L + day % 7), 385, -(80L + day % 7) * 385L));
-                session.addTransaction(loss, 100_000);
+                session.addTransaction(loss, 100_000, false);
                 session.attachToEncounter(loss.getId(), death, false);
             }
             session.close(pk ? start + 13L * 3_600_000L : start + 60 * 60_000L);

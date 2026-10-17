@@ -22,7 +22,7 @@ def pluginMainClass = devTools ? 'com.gpmanager.DevLauncher' : 'com.gpmanager.Gp
 
 group = 'com.gpmanager'
 // Plugin metadata and build version must agree; development identity is generated below.
-version = '1.5.1'
+version = '1.5.2'
 
 
 
@@ -167,7 +167,7 @@ def shortRevision = {
 // The single source of truth for the durable schema, read at build time so the DEV footer can
 // never disagree with SavedState.
 def currentSchemaVersion = {
-    def match = (file('src/main/java/com/gpmanager/persistence/SavedState.java').getText('UTF-8')
+    def match = (file('src/main/java/com/gpmanager/persistence/Persistence.java').getText('UTF-8')
         =~ /CURRENT_SCHEMA_VERSION = (\d+)/)
     return match.find() ? match.group(1) : ''
 }
@@ -591,7 +591,7 @@ tasks.register('configurationStabilityAudit') {
                 throw new GradleException("config audit failed: deleted visible setting remains: ${marker}")
             }
         }
-        def savedStateSource = file('src/main/java/com/gpmanager/persistence/SavedState.java').getText('UTF-8')
+        def savedStateSource = file('src/main/java/com/gpmanager/persistence/Persistence.java').getText('UTF-8')
         if (!savedStateSource.contains('CURRENT_SCHEMA_VERSION = 110')
             || !savedStateSource.contains('return schemaVersion == CURRENT_SCHEMA_VERSION;')) {
             throw new GradleException('data schema audit failed: the 1.3.4 SavedState schema 110 (reading only 110) is missing.')
@@ -611,8 +611,8 @@ tasks.register('brandingCompatibilityAudit') {
         file('runelite-plugin.properties').withInputStream { metadata.load(it) }
         def pluginSource = file('src/main/java/com/gpmanager/GpManagerPlugin.java').getText('UTF-8')
         def configSource = file('src/main/java/com/gpmanager/GpManagerConfig.java').getText('UTF-8')
-        def repositorySource = file('src/main/java/com/gpmanager/persistence/SessionRepository.java').getText('UTF-8')
-        def savedStateSource = file('src/main/java/com/gpmanager/persistence/SavedState.java').getText('UTF-8')
+        def repositorySource = file('src/main/java/com/gpmanager/persistence/Persistence.java').getText('UTF-8')
+        def savedStateSource = file('src/main/java/com/gpmanager/persistence/Persistence.java').getText('UTF-8')
         def pluginFile = file('src/main/java/com/gpmanager/GpManagerPlugin.java').canonicalFile
 
         def descriptor = (pluginSource =~ /(?s)@PluginDescriptor\((.*?)\)\s*public class GpManagerPlugin/)

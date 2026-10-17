@@ -132,7 +132,7 @@ public class DropPickupTest
         settle(engine, new ContainerSnapshot(Collections.singletonMap(DART, 1L)), 2_000L);
         ChargeDelta delta = new ChargeDelta(ChargeCheck.ChargedItem.BLOWPIPE,
             Arrays.asList(new ChargeDelta.ComponentDelta(DART, -1L),
-                new ChargeDelta.ComponentDelta(SCALES, -1L)));
+                new ChargeDelta.ComponentDelta(SCALES, -1L)), ChargeDelta.CheckResult.SPEND);
         engine.bookChargeSpend(delta, "Toxic blowpipe",
             Arrays.asList(new Flow(DART, "Iron dart", -1L, 10, -10L),
                 new Flow(SCALES, "Zulrah's scales", -1L, 10, -10L)), 5_000L, "pipe");
@@ -144,7 +144,7 @@ public class DropPickupTest
     {
         Engine engine = blowpipeShot();
         ChargeDelta delta = new ChargeDelta(ChargeCheck.ChargedItem.BLOWPIPE,
-            Collections.singletonList(new ChargeDelta.ComponentDelta(SCALES, -1L)));
+            Collections.singletonList(new ChargeDelta.ComponentDelta(SCALES, -1L)), ChargeDelta.CheckResult.SPEND);
         engine.bookChargeSpend(delta, "Toxic blowpipe",
             Collections.singletonList(new Flow(SCALES, "Zulrah's scales", -1L, 10, -10L)), 1_500L, "pipe");
         engine.clearPendingEstimates("pipe", Collections.singleton(DART));
@@ -175,9 +175,9 @@ public class DropPickupTest
 
     private static Transaction settle(Engine engine, ContainerSnapshot snapshot, long firstTick)
     {
-        assertNull(engine.processIfDirty(snapshot, firstTick));
-        assertNull(engine.processIfDirty(snapshot, firstTick + 600L));
-        Transaction tx = engine.processIfDirty(snapshot, firstTick + 1_200L);
+        assertNull(engine.processIfDirty(snapshot, firstTick, null));
+        assertNull(engine.processIfDirty(snapshot, firstTick + 600L, null));
+        Transaction tx = engine.processIfDirty(snapshot, firstTick + 1_200L, null);
         assertNotNull(tx);
         return tx;
     }

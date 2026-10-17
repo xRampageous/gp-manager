@@ -33,10 +33,10 @@ public class ReleasePerfTest
         Engine engine = PresentationLifecycleTest.engine();
         for (int grind = 0; grind < 300; grind++)
         {
-            Session done = new Session("Grind " + grind, T0 - (300 - grind) * 3_600_000L);
+            Session done = new Session("Grind " + grind, T0 - (300 - grind) * 3_600_000L, SessionMode.GENERAL);
             for (int i = 0; i < 60; i++)
             {
-                done.addTransaction(receipt(done.startedAtEpochMillis + i * 1_000L), 2_000);
+                done.addTransaction(receipt(done.startedAtEpochMillis + i * 1_000L), 2_000, false);
             }
             done.close(done.startedAtEpochMillis + 3_000_000L);
             engine.history.add(0, done);
@@ -44,7 +44,7 @@ public class ReleasePerfTest
         engine.startCustom("Greater Nechryael", T0);
         for (int i = 0; i < 2_000; i++)
         {
-            engine.getActiveSession().addTransaction(receipt(T0 + i * 1_800L), 2_000);
+            engine.getActiveSession().addTransaction(receipt(T0 + i * 1_800L), 2_000, false);
         }
         long now = T0 + 4_000_000L;
 
@@ -56,7 +56,7 @@ public class ReleasePerfTest
         report("session metrics", () -> engine.getActiveSession().metrics(now).net);
         int[] flip = {0};
         report("Live capture (cold)", () -> LiveSnapshot.capture(engine, now,
-            new LiveContext(false, null, flip[0]++ % 2, PvpState.NONE, "", false, "")).net);
+            new LiveContext(false, null, flip[0]++ % 2, PvpState.NONE, "", false, "", false)).net);
         report("Live capture (warm)", () -> LiveSnapshot.capture(engine, now, LiveContext.NONE).net);
         report("Ledger capture", () -> LedgerData.capture(engine, now, LedgerData.Entry.current()).net);
         report("Grinds capture", () -> GrindsData.capture(engine, now, false, null).myGrinds.size());
@@ -79,7 +79,7 @@ public class ReleasePerfTest
         report("detach round trip", () -> gson.fromJson(gson.toJson(engine.savedState()), SavedState.class).schemaVersion);
         report("save snapshot + JSON", () -> gson.toJson(engine.savedState()).length());
         SessionRepository repository = new SessionRepository(gson,
-            FilepathTestSupport.root(java.nio.file.Files.createTempDirectory("gp-perf")));
+            FilepathTestSupport.root(java.nio.file.Files.createTempDirectory("gp-perf")), false);
         Persistence coordinator = new Persistence(null, null, repository,
             new OrderedPersistenceWriter(repository, null), engine);
         report("save intent (client thread)", () -> coordinator.currentIntent().expectedBaseRevision);

@@ -167,7 +167,7 @@ public class TrackedBasisCorrectionFenceTest
             TransactionType.UNCERTAIN, Context.GENERIC, "", "Review", false,
             Collections.singletonList(new Flow(LOGS, "Logs", -4L, 100, -400L,
                 PriceSource.GRAND_EXCHANGE)), Confidence.UNCERTAIN, "", null);
-        h.engine.getActiveSession().addTransaction(uncounted, 500);
+        h.engine.getActiveSession().addTransaction(uncounted, 500, false);
 
         assertTrue(h.engine.correctTransaction(uncounted.getId(), Correction.COST,
             h.now, "spent"));
@@ -188,7 +188,7 @@ public class TrackedBasisCorrectionFenceTest
             TransactionType.UNCERTAIN, Context.GENERIC, "", "Review", false,
             Collections.singletonList(new Flow(LOGS, "Logs", -4L, 100, -400L,
                 PriceSource.GRAND_EXCHANGE)), Confidence.UNCERTAIN, "", null);
-        h.engine.getActiveSession().addTransaction(review, 500);
+        h.engine.getActiveSession().addTransaction(review, 500, false);
         h.gain(LOGS, 5L, 1_000L, h.now - 10_000L);
 
         assertFalse(h.engine.correctTransaction(review.getId(), Correction.COST,
@@ -285,7 +285,7 @@ public class TrackedBasisCorrectionFenceTest
                 Collections.singletonList(new Flow(item, name(item), qty,
                     (int) (qty > 0L ? value / qty : 0L), value, PriceSource.GRAND_EXCHANGE)),
                 Confidence.CONFIRMED, "", null);
-            engine.getActiveSession().addTransaction(transaction, 500);
+            engine.getActiveSession().addTransaction(transaction, 500, false);
             return transaction.getId();
         }
 
@@ -295,7 +295,7 @@ public class TrackedBasisCorrectionFenceTest
                 TransactionType.CONSUMPTION, Context.GENERIC, "", "Used", true,
                 Collections.singletonList(new Flow(item, name(item), -qty, 100, -qty * 100L,
                     PriceSource.GRAND_EXCHANGE)),
-                Confidence.CONFIRMED, "", null), 500);
+                Confidence.CONFIRMED, "", null), 500, false);
         }
 
         void sell(int slot, int item, long qty, int limit, long cash)
@@ -331,7 +331,7 @@ public class TrackedBasisCorrectionFenceTest
             Transaction result = null;
             for (int i = 0; i < 3; i++)
             {
-                Transaction settled = engine.processIfDirty(snapshot, now);
+                Transaction settled = engine.processIfDirty(snapshot, now, null);
                 if (settled != null)
                 {
                     result = settled;

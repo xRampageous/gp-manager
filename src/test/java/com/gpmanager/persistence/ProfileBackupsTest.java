@@ -34,7 +34,7 @@ public class ProfileBackupsTest
         try
         {
             JsonCodec.bind(new Gson());
-            assertTrue(coordinator.switchIdentity(ALICE, true));
+            assertTrue(coordinator.switchIdentity(ALICE, true, true));
             engine.ensureSession(1_000L);
             engine.getActiveSession().rename("Before restore");
             assertTrue(coordinator.saveNow());

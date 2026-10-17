@@ -15,10 +15,10 @@ public class ProfitSessionTest
     @Test
     public void undoRestoresPriorCorrectionReasonAcrossSplitAndReload()
     {
-        Session session = new Session("Test", 1_000L);
+        Session session = new Session("Test", 1_000L, SessionMode.GENERAL);
         Transaction transaction = Tx.of(1_100L, TransactionType.LOOT, Context.LOOT,
             "Loot", true, Collections.singletonList(new Flow(526, "Bones", 4L, 100, 400L)));
-        session.addTransaction(transaction, 100);
+        session.addTransaction(transaction, 100, false);
         assertTrue(session.correctTransaction(transaction.getId(), Correction.REVENUE, 1_200L, "First reason"));
         assertTrue(session.correctTransaction(transaction.getId(), Correction.COST, 1_300L, "Second reason"));
         session = new Gson().fromJson(new Gson().toJson(session), Session.class);
@@ -38,10 +38,10 @@ public class ProfitSessionTest
     @Test
     public void undoRestoresTheLatestReasonWhenTheCorrectionEnumWasUnchanged()
     {
-        Session session = new Session("Test", 1_000L);
+        Session session = new Session("Test", 1_000L, SessionMode.GENERAL);
         Transaction transaction = Tx.of(1_100L, TransactionType.LOOT, Context.LOOT,
             "Loot", true, Collections.singletonList(new Flow(526, "Bones", 1L, 100, 100L)));
-        session.addTransaction(transaction, 100);
+        session.addTransaction(transaction, 100, false);
         assertTrue(session.correctTransaction(transaction.getId(), Correction.REVENUE, 1_200L, "A"));
         assertTrue(session.correctTransaction(transaction.getId(), Correction.REVENUE, 1_300L, "B"));
         assertTrue(session.correctTransaction(transaction.getId(), Correction.COST, 1_400L, "C"));
@@ -59,7 +59,7 @@ public class ProfitSessionTest
     {
         Session session = new Session("General", 0L, SessionMode.AUTO);
         session.addTransaction(Tx.of(1L, TransactionType.LOOT, Context.LOOT, "loot", true,
-            Collections.singletonList(new Flow(995, "Coins", 100, 1, 100))), 10);
+            Collections.singletonList(new Flow(995, "Coins", 100, 1, 100))), 10, false);
         long net = session.metrics(2L).net;
         assertTrue(session.setProfitTargetGp(1_000L));
         assertEquals(net, session.metrics(2L).net);
@@ -71,7 +71,7 @@ public class ProfitSessionTest
     public void calculatesRevenueCostsNetAndRate()
     {
         long start = 1_000_000L;
-        Session session = new Session("Bossing", start);
+        Session session = new Session("Bossing", start, SessionMode.GENERAL);
 
         session.addTransaction(
             Tx.of(
@@ -81,7 +81,7 @@ public class ProfitSessionTest
                 "Loot",
                 true,
                 Collections.singletonList(new Flow(1, "Drop", 1, 1_000, 1_000))),
-            100);
+            100, false);
 
         Transaction food = Tx.of(
             start + 2_000L,
@@ -91,7 +91,7 @@ public class ProfitSessionTest
             true,
             Collections.singletonList(new Flow(2, "Food", -2, 100, -200)));
         food.setActionKind(ActionKind.EAT);
-        session.addTransaction(food, 100);
+        session.addTransaction(food, 100, false);
 
         Metrics metrics = session.metrics(start + 3_600_000L);
 
@@ -109,7 +109,7 @@ public class ProfitSessionTest
     @Test
     public void pausedTimeIsExcluded()
     {
-        Session session = new Session("Test", 1_000L);
+        Session session = new Session("Test", 1_000L, SessionMode.GENERAL);
         session.pause(2_000L, PauseReason.MANUAL);
         session.resume(12_000L);
 
@@ -119,7 +119,7 @@ public class ProfitSessionTest
     @Test
     public void boundsTransactionHistory()
     {
-        Session session = new Session("Test", 0L);
+        Session session = new Session("Test", 0L, SessionMode.GENERAL);
         for (int index = 0; index < 5; index++)
         {
             session.addTransaction(
@@ -130,7 +130,7 @@ public class ProfitSessionTest
                     "",
                     true,
                     Arrays.asList(new Flow(index, "Item", 1, 1, 1))),
-                3);
+                3, false);
         }
 
         assertEquals(3, session.getTransactions().size());
@@ -143,18 +143,18 @@ public class ProfitSessionTest
     @Test
     public void compactionPreservesCorrectedTotalsAcrossReloadAndUndo()
     {
-        Session session = new Session("Long session", 0L);
+        Session session = new Session("Long session", 0L, SessionMode.GENERAL);
         Transaction corrected = Tx.of(1L, TransactionType.UNCERTAIN,
             Context.GENERIC, "Review", false,
             Collections.singletonList(new Flow(1, "Loot", 1, 100, 100)));
-        session.addTransaction(corrected, 1);
+        session.addTransaction(corrected, 1, false);
         session.correctTransaction(corrected.getId(), Correction.REVENUE, 2L, "Manual correction");
         session.addTransaction(Tx.of(3L, TransactionType.CONSUMPTION,
             Context.GENERIC, "Cost", true,
-            Collections.singletonList(new Flow(2, "Food", -1, 25, -25))), 1);
+            Collections.singletonList(new Flow(2, "Food", -1, 25, -25))), 1, false);
         session.addTransaction(Tx.of(4L, TransactionType.TRANSFER,
             Context.TRANSFER, "Bank", false,
-            Collections.singletonList(new Flow(3, "Coins", 1000, 1, 1000))), 1);
+            Collections.singletonList(new Flow(3, "Coins", 1000, 1, 1000))), 1, false);
 
         com.google.gson.Gson gson = new com.google.gson.Gson();
         Session restored = gson.fromJson(gson.toJson(session), Session.class);
@@ -171,16 +171,16 @@ public class ProfitSessionTest
     @Test
     public void correctedCostCompactionKeepsEffectiveSessionAmounts()
     {
-        Session session = new Session("Corrected compaction", 0L);
+        Session session = new Session("Corrected compaction", 0L, SessionMode.GENERAL);
         Transaction correctedGain = Tx.of(1L, TransactionType.GAIN,
             Context.GENERIC, "Manual cost", true,
             Collections.singletonList(new Flow(1, "Item", 1, 50, 50L)));
-        session.addTransaction(correctedGain, 1);
+        session.addTransaction(correctedGain, 1, false);
         assertTrue(session.correctTransaction(correctedGain.getId(), Correction.COST,
             2L, "Owner correction"));
         session.addTransaction(Tx.of(3L, TransactionType.LOOT,
             Context.LOOT, "Later gain", true,
-            Collections.singletonList(new Flow(2, "Later item", 1, 1, 1L))), 1);
+            Collections.singletonList(new Flow(2, "Later item", 1, 1, 1L))), 1, false);
 
         com.google.gson.Gson gson = new com.google.gson.Gson();
         session = gson.fromJson(gson.toJson(session), Session.class);
@@ -206,12 +206,12 @@ public class ProfitSessionTest
     @Test
     public void suppliesLossSplitSurvivesSerializationAndCompaction()
     {
-        Session session = new Session("Costs", 0L);
-        session.addTransaction(cost(TransactionType.CONSUMPTION, "Food", 1, -100L), 1);
-        session.addTransaction(cost(TransactionType.TRADE, "GE buy", 2, -200L), 1);
-        session.addTransaction(cost(TransactionType.PK_DEATH_LOSS, "Death", 3, -300L), 1);
-        session.addTransaction(cost(TransactionType.CONSUMPTION, "Death reclaim", 4, -25L), 1);
-        session.addTransaction(cost(TransactionType.CONSUMPTION, "Food", 5, -50L), 1);
+        Session session = new Session("Costs", 0L, SessionMode.GENERAL);
+        session.addTransaction(cost(TransactionType.CONSUMPTION, "Food", 1, -100L), 1, false);
+        session.addTransaction(cost(TransactionType.TRADE, "GE buy", 2, -200L), 1, false);
+        session.addTransaction(cost(TransactionType.PK_DEATH_LOSS, "Death", 3, -300L), 1, false);
+        session.addTransaction(cost(TransactionType.CONSUMPTION, "Death reclaim", 4, -25L), 1, false);
+        session.addTransaction(cost(TransactionType.CONSUMPTION, "Food", 5, -50L), 1, false);
         com.google.gson.Gson gson = new com.google.gson.Gson();
         session = gson.fromJson(gson.toJson(session), Session.class);
 
@@ -246,7 +246,7 @@ public class ProfitSessionTest
     @Test
     public void pausedRatesRemainFrozenAndResumeOnActiveTime()
     {
-        Session session = new Session("Test", 0L);
+        Session session = new Session("Test", 0L, SessionMode.GENERAL);
         session.addTransaction(
             Tx.of(
                 1_000L,
@@ -256,7 +256,7 @@ public class ProfitSessionTest
                 "",
                 true,
                 Arrays.asList(new Flow(1, "Item", 1, 1_000, 1_000))),
-            10);
+            10, false);
 
         session.pause(2_000L, PauseReason.MANUAL);
         Metrics atPause = session.metrics(2_000L);
@@ -274,7 +274,7 @@ public class ProfitSessionTest
     @Test
     public void manualCorrectionsAreReversibleAndAudited()
     {
-        Session session = new Session("Test", 0L);
+        Session session = new Session("Test", 0L, SessionMode.GENERAL);
         Transaction transaction = Tx.of(
             1_000L,
             TransactionType.CONSUMPTION,
@@ -282,7 +282,7 @@ public class ProfitSessionTest
             "",
             true,
             Collections.singletonList(new Flow(1, "Item", -1, 500, -500)));
-        session.addTransaction(transaction, 10);
+        session.addTransaction(transaction, 10, false);
 
         session.correctTransaction(transaction.getId(), Correction.REVENUE, 2_000L, "Manual correction");
         assertEquals(500L, session.metrics(3_000L).net);
@@ -300,7 +300,7 @@ public class ProfitSessionTest
     @Test
     public void undoCorrectionPreservesAppliedRecordAndUndoLinkAcrossPersistence()
     {
-        Session session = new Session("Test", 0L);
+        Session session = new Session("Test", 0L, SessionMode.GENERAL);
         Transaction transaction = Tx.of(
             1_000L,
             TransactionType.CONSUMPTION,
@@ -308,7 +308,7 @@ public class ProfitSessionTest
             "",
             true,
             Collections.singletonList(new Flow(1, "Item", -1, 500, -500)));
-        session.addTransaction(transaction, 10);
+        session.addTransaction(transaction, 10, false);
         session.correctTransaction(transaction.getId(), Correction.REVENUE, 2_000L, "Audit fix");
 
         assertTrue(session.undoCorrection(3_000L));
@@ -328,7 +328,7 @@ public class ProfitSessionTest
     @Test
     public void savedSplitRecordStillUndoes()
     {
-        Session session = new Session("Test", 0L);
+        Session session = new Session("Test", 0L, SessionMode.GENERAL);
         Transaction transaction = Tx.of(
             1_000L,
             TransactionType.GAIN,
@@ -336,7 +336,7 @@ public class ProfitSessionTest
             "",
             true,
             Collections.singletonList(new Flow(1, "Item", 10, 100, 1_000)));
-        session.addTransaction(transaction, 10);
+        session.addTransaction(transaction, 10, false);
         assertTrue(session.splitItem(transaction.getId(), 1, 4, 2_000L, null));
         assertEquals(400L, session.metrics(3_000L).net);
 
@@ -351,7 +351,7 @@ public class ProfitSessionTest
     @Test
     public void undoWalksBackToPreviousActiveCorrection()
     {
-        Session session = new Session("Test", 0L);
+        Session session = new Session("Test", 0L, SessionMode.GENERAL);
         Transaction transaction = Tx.of(
             1_000L,
             TransactionType.CONSUMPTION,
@@ -359,7 +359,7 @@ public class ProfitSessionTest
             "",
             true,
             Collections.singletonList(new Flow(1, "Item", -1, 500, -500)));
-        session.addTransaction(transaction, 10);
+        session.addTransaction(transaction, 10, false);
         session.correctTransaction(transaction.getId(), Correction.REVENUE, 2_000L, "First");
         session.correctTransaction(transaction.getId(), Correction.IGNORE, 3_000L, "Second");
 
@@ -375,7 +375,7 @@ public class ProfitSessionTest
     @Test
     public void undoKeepsTheRemovedTransaction()
     {
-        Session session = new Session("Test", 0L);
+        Session session = new Session("Test", 0L, SessionMode.GENERAL);
         Transaction transaction = Tx.of(
             1_000L,
             TransactionType.LOOT,
@@ -383,7 +383,7 @@ public class ProfitSessionTest
             "Loot",
             true,
             Collections.singletonList(new Flow(1, "Item", 1, 250, 250)));
-        session.addTransaction(transaction, 10);
+        session.addTransaction(transaction, 10, false);
 
         Transaction removed = session.undoTransaction();
         assertEquals(transaction.getId(), removed.getId());
@@ -396,7 +396,7 @@ public class ProfitSessionTest
     @Test
     public void latestUndoCanBeRestoredWithoutLosingAuditRecord()
     {
-        Session session = new Session("Test", 0L);
+        Session session = new Session("Test", 0L, SessionMode.GENERAL);
         Transaction transaction = Tx.of(
             1_000L,
             TransactionType.LOOT,
@@ -404,7 +404,7 @@ public class ProfitSessionTest
             "Loot",
             true,
             Collections.singletonList(new Flow(1, "Item", 1, 250, 250)));
-        session.addTransaction(transaction, 10);
+        session.addTransaction(transaction, 10, false);
         session.undoTransaction();
 
         Transaction restored = session.restoreUndo();
@@ -417,7 +417,7 @@ public class ProfitSessionTest
     @Test
     public void undoHistoryIsBoundedAndRestoreRespectsTransactionCapacity()
     {
-        Session session = new Session("Test", 0L);
+        Session session = new Session("Test", 0L, SessionMode.GENERAL);
         for (int index = 0; index < 40; index++)
         {
             session.addTransaction(Tx.of(
@@ -426,7 +426,7 @@ public class ProfitSessionTest
                 Context.LOOT,
                 "Loot",
                 true,
-                Collections.singletonList(new Flow(index, "Item", 1, 1, 1))), 100);
+                Collections.singletonList(new Flow(index, "Item", 1, 1, 1))), 100, false);
             session.undoTransaction();
         }
         assertEquals(32, session.undoHistory.size());
@@ -437,10 +437,10 @@ public class ProfitSessionTest
         Transaction second = Tx.of(
             51_000L, TransactionType.LOOT, Context.LOOT, "Second", true,
             Collections.singletonList(new Flow(51, "Second", 1, 20, 20)));
-        Session bounded = new Session("Bounded", 0L);
-        bounded.addTransaction(first, 1);
+        Session bounded = new Session("Bounded", 0L, SessionMode.GENERAL);
+        bounded.addTransaction(first, 1, false);
         bounded.undoTransaction();
-        bounded.addTransaction(second, 1);
+        bounded.addTransaction(second, 1, false);
         assertEquals(first.getId(), bounded.restoreUndo().getId());
         assertEquals(1, bounded.getTransactions().size());
         assertEquals(first.getId(), bounded.getTransactions().get(0).getId());
@@ -462,7 +462,7 @@ public class ProfitSessionTest
             "",
             true,
             Collections.singletonList(new Flow(1, "Food", -1, 100, -100)));
-        session.addTransaction(supply, 10);
+        session.addTransaction(supply, 10, false);
 
         String encounter = session.addEncounter(true, 2_000L);
         session.attachRecentCosts(encounter, 2_000L, 10_000L);
@@ -476,7 +476,7 @@ public class ProfitSessionTest
             "PKing",
             true,
             Collections.singletonList(new Flow(2, "Loot", 1, 1_000, 1_000)));
-        session.addTransaction(loot, 10);
+        session.addTransaction(loot, 10, false);
         session.attachToEncounter(loot.getId(), encounter, false);
 
         assertEquals(1, session.pk().kills);
@@ -496,8 +496,8 @@ public class ProfitSessionTest
         Transaction loot = Tx.of(2_000L, TransactionType.PK_LOOT,
             Context.PK_LOOT, "PK loot", true,
             Collections.singletonList(new Flow(2, "Loot", 1L, 1_000, 1_000L)));
-        session.addTransaction(food, 2);
-        session.addTransaction(loot, 2);
+        session.addTransaction(food, 2, false);
+        session.addTransaction(loot, 2, false);
         String kill = session.addEncounter(true, 2_100L);
         session.attachToEncounter(food.getId(), kill, true);
         session.attachToEncounter(loot.getId(), kill, false);
@@ -513,8 +513,8 @@ public class ProfitSessionTest
             Context.GENERIC, "", false, Collections.emptyList());
         Transaction fillerTwo = Tx.of(6_000L, TransactionType.ADJUSTMENT,
             Context.GENERIC, "", false, Collections.emptyList());
-        session.addTransaction(fillerOne, 2);
-        session.addTransaction(fillerTwo, 2);
+        session.addTransaction(fillerOne, 2, false);
+        session.addTransaction(fillerTwo, 2, false);
 
         assertEquals("compaction keeps the kill", 900L, session.bestKill());
         assertTrue(session.pk().compactedKillNet.isEmpty());

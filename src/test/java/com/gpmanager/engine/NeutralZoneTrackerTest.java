@@ -138,8 +138,8 @@ public class NeutralZoneTrackerTest
         // The bounded capture expires even though the tracker continues to mark
         // every in-zone sample as TRANSFER. A later supply loss cannot join the
         // set of entry-stored items.
-        engine.processIfDirty(new ContainerSnapshot(secondBatchItems), 4_600L);
-        engine.processIfDirty(new ContainerSnapshot(secondBatchItems), 5_200L);
+        engine.processIfDirty(new ContainerSnapshot(secondBatchItems), 4_600L, null);
+        engine.processIfDirty(new ContainerSnapshot(secondBatchItems), 5_200L, null);
         engine.markTransfer("Neutral zone instance", config.stabilizationTicks() + 4);
         engine.markDirty();
         java.util.Map<Integer, Long> afterSupplyUse = new java.util.HashMap<>();
@@ -184,9 +184,9 @@ public class NeutralZoneTrackerTest
 
     private static Transaction settle(Engine engine, ContainerSnapshot snapshot, long firstTick)
     {
-        engine.processIfDirty(snapshot, firstTick);
-        engine.processIfDirty(snapshot, firstTick + 600L);
-        return engine.processIfDirty(snapshot, firstTick + 1_200L);
+        engine.processIfDirty(snapshot, firstTick, null);
+        engine.processIfDirty(snapshot, firstTick + 600L, null);
+        return engine.processIfDirty(snapshot, firstTick + 1_200L, null);
     }
 
     private static final class GpManagerConfigStub implements GpManagerConfig

@@ -83,7 +83,7 @@ public class PresentationWiringTest
         Engine engine = new Engine(deltas -> Collections.emptyList(),
             new TransactionClassifier(), config);
         SidebarPanel[] panel = new SidebarPanel[1];
-        SwingUtilities.invokeAndWait(() -> panel[0] = new SidebarPanel(engine, config, null));
+        SwingUtilities.invokeAndWait(() -> panel[0] = new SidebarPanel(engine, config, null, null, null));
         set(plugin, "engine", engine);
         set(plugin, "activityPanel", panel[0]);
         return panel[0];

@@ -30,7 +30,7 @@ public class SaveFailureQuietTest
         Path dir = temporary.newFolder("rename").toPath();
         Files.writeString(dir.resolve("sessions.next.json"), "{}", StandardCharsets.UTF_8);
         int[] attempts = {0};
-        SessionRepository repository = new SessionRepository(new Gson(), FilepathTestSupport.root(dir))
+        SessionRepository repository = new SessionRepository(new Gson(), FilepathTestSupport.root(dir), false)
         {
             @Override
             void atomicMove(Filepath source, Filepath target) throws java.io.IOException
@@ -53,7 +53,7 @@ public class SaveFailureQuietTest
     {
         boolean[] fail = {true};
         SessionRepository repository = new SessionRepository(new Gson(),
-            FilepathTestSupport.root(temporary.newFolder("writer").toPath()))
+            FilepathTestSupport.root(temporary.newFolder("writer").toPath()), false)
         {
             @Override
             synchronized boolean save(WriteIntent intent)
@@ -90,7 +90,7 @@ public class SaveFailureQuietTest
     {
         SavedState state = new SavedState();
         state.setRevision(revision);
-        writer.submit(new WriteIntent(null, repository.scopeGeneration, repository.lastKnownDiskRevision, state));
+        writer.submit(new WriteIntent(null, repository.scopeGeneration, repository.lastKnownDiskRevision, state, null));
         assertTrue(writer.flush(Duration.ofSeconds(5)));
     }
 }

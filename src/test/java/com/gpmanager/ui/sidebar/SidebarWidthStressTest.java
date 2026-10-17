@@ -26,7 +26,7 @@ public class SidebarWidthStressTest
         engine.startCustom(name, NOW);
         SidebarPanel panel = onEdt(() ->
         {
-            SidebarPanel created = new SidebarPanel(engine, PresentationLifecycleTest.config(), null);
+            SidebarPanel created = new SidebarPanel(engine, PresentationLifecycleTest.config(), null, null, null);
             SidebarPanelProbe.refresh(created);
             return created;
         });
@@ -45,11 +45,11 @@ public class SidebarWidthStressTest
         Engine engine = PresentationLifecycleTest.engine();
         engine.startCustom("Fishing trawler veteran of the north", NOW);
         engine.getActiveSession().addTransaction(booked(NOW + 1_000L, "Twisted bow", 20997, 1L,
-            2_147_483_647, 2_147_483_647L), 2_000);
+            2_147_483_647, 2_147_483_647L), 2_000, false);
         engine.setTargets(2_147_483_647L, null, NOW + 2_000L);
         SidebarPanel panel = onEdt(() ->
         {
-            SidebarPanel created = new SidebarPanel(engine, PresentationLifecycleTest.config(), null);
+            SidebarPanel created = new SidebarPanel(engine, PresentationLifecycleTest.config(), null, null, null);
             created.shell().show(Shell.LEDGER);
             SidebarPanelProbe.refresh(created);
             return created;
@@ -87,7 +87,7 @@ public class SidebarWidthStressTest
     public void theLossesPickerOffersEveryViewWithItsCount() throws Exception
     {
         SidebarPanel panel = onEdt(() -> new SidebarPanel(PresentationLifecycleTest.engine(),
-            PresentationLifecycleTest.config(), null));
+            PresentationLifecycleTest.config(), null, null, null));
         javax.swing.JPopupMenu menu = onEdt(() -> panel.ledger.menu(LedgerData.CostView.SUPPLIES,
             new int[] {2_000, 2_000, 2_000, 2_000}));
         assertTrue("every choice stays present", onEdt(() -> menu.getComponentCount()) == 4);
@@ -108,8 +108,8 @@ public class SidebarWidthStressTest
             created.setTotal(Fmt.signed(2_147_483_647L), Kit.Tone.GAIN);
             created.setRowsPerPage(1);
             created.setRows(new ArrayList<>(java.util.Arrays.asList(
-                Table.Row.of("a", "A", "1", "+1", Kit.Tone.GAIN),
-                Table.Row.of("b", "B", "1", "+1", Kit.Tone.GAIN))));
+                TableRows.row("a", "A", "1", "+1", Kit.Tone.GAIN),
+                TableRows.row("b", "B", "1", "+1", Kit.Tone.GAIN))));
             return created;
         });
         assertTrue("the header fits the sidebar: " + onEdt(() -> table.header.getPreferredSize()),

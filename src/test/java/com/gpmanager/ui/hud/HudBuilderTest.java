@@ -61,7 +61,7 @@ public class HudBuilderTest
         engine.startCustom("Vorkath", NOW);
         engine.getActiveSession().id = "hud-test-grind";
         engine.getActiveSession().addTransaction(receipt(NOW + 1_000L, TransactionType.LOOT,
-            flow(536, "Dragon bones", 1L, (int) net)), 2_000);
+            flow(536, "Dragon bones", 1L, (int) net)), 2_000, false);
         if (target != null)
         {
             engine.getActiveSession().setProfitTargetGp(target);
@@ -100,7 +100,7 @@ public class HudBuilderTest
         assertFalse("held reward-window loot is not booked yet", builder
             .update(LiveSnapshot.capture(free, NOW + 10L, null), f -> true, NOW + 10L).visible);
         free.getActiveSession().addTransaction(receipt(NOW + 20L, TransactionType.LOOT,
-            flow(536, "Dragon bones", 1L, 2_000)), 2_000);
+            flow(536, "Dragon bones", 1L, 2_000)), 2_000, false);
         assertTrue("Free play shows once something is booked", builder
             .update(LiveSnapshot.capture(free, NOW + 30L, null), f -> true, NOW + 30L).visible);
     }
@@ -121,7 +121,7 @@ public class HudBuilderTest
         Engine done = engine();
         done.startCustom("Vorkath", NOW);
         done.getActiveSession().addTransaction(receipt(NOW + 1_000L, TransactionType.LOOT,
-            flow(536, "Dragon bones", 1L, 300_000)), 2_000);
+            flow(536, "Dragon bones", 1L, 300_000)), 2_000, false);
         done.getActiveSession().setProfitTargetGp(200_000L);
         HudFrame reached = new HudBuilder(config(true, 4), null)
             .update(LiveSnapshot.capture(done, NOW + 2_000L, null), f -> true, NOW + 2_000L);
@@ -237,7 +237,7 @@ public class HudBuilderTest
         Engine engine = engine();
         engine.startCustom("Zulrah", NOW);
         engine.getActiveSession().addTransaction(receipt(NOW + 1_000L, TransactionType.CONSUMPTION,
-            flow(385, "Shark", -10L, 900)), 2_000);
+            flow(385, "Shark", -10L, 900)), 2_000, false);
         engine.getActiveSession().setProfitTargetGp(1_000_000L);
         HudFrame s = new HudBuilder(config(true, 4), null)
             .update(LiveSnapshot.capture(engine, NOW + 2_000L, null), f -> true, NOW);
@@ -378,7 +378,7 @@ public class HudBuilderTest
         HudBuilder builder = new HudBuilder(config(false, 4), null);
         builder.interaction("Goblin", true);
         LiveSnapshot curated = LiveSnapshot.capture(engine(), NOW,
-            new LiveContext(false, null, 0L, PvpState.NONE, "Theatre of Blood (Hard Mode)", false, ""));
+            new LiveContext(false, null, 0L, PvpState.NONE, "Theatre of Blood (Hard Mode)", false, "", false));
         assertEquals("", builder.update(curated, f -> true, NOW).title);
     }
 

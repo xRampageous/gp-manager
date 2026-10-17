@@ -27,8 +27,8 @@ public class SipAccountingTest
     @Test
     public void twelveSipsAreTwelveDosesNotTwelvePotionsAndTwelveGains()
     {
-        Session session = new Session("Vorkath", 0L);
-        session.addTransaction(sips(12L, null), 100);
+        Session session = new Session("Vorkath", 0L, SessionMode.GENERAL);
+        session.addTransaction(sips(12L, null), 100, false);
         Metrics metrics = session.metrics(2_000L);
         assertEquals("the (3) left over is no gain", 0L, metrics.revenue);
         assertEquals("only the doses drunk are a cost", 12L * 2_450L, metrics.costs);
@@ -41,8 +41,8 @@ public class SipAccountingTest
     @Test
     public void aCorrectedRowKeepsItsGrossAmounts()
     {
-        Session session = new Session("Vorkath", 0L);
-        session.addTransaction(sips(1L, Correction.COST), 100);
+        Session session = new Session("Vorkath", 0L, SessionMode.GENERAL);
+        session.addTransaction(sips(1L, Correction.COST), 100, false);
         assertEquals("a Cost correction still costs the gross, as before", 9_800L + 7_350L,
             session.metrics(2_000L).costs);
     }

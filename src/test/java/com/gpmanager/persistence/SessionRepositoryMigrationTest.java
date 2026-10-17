@@ -23,7 +23,7 @@ public class SessionRepositoryMigrationTest
             "{\"schemaVersion\":110,\"generalSession\":{\"name\":\"Legacy\",\"transactions\":[]},\"history\":[]}",
             StandardCharsets.UTF_8);
 
-        SavedState state = new SessionRepository(new Gson(), FilepathTestSupport.root(current)).load();
+        SavedState state = new SessionRepository(new Gson(), FilepathTestSupport.root(current), false).load();
 
         assertEquals("Legacy", state.getActiveSession().getName());
         assertTrue(state.getActiveSession().undoHistory.isEmpty());
@@ -41,7 +41,7 @@ public class SessionRepositoryMigrationTest
             "{\"schemaVersion\":110,\"generalSession\":{\"name\":\"Broken undo\",\"transactions\":[],\"undoHistory\":[null,{\"timestampEpochMillis\":5}]},\"history\":[]}",
             StandardCharsets.UTF_8);
 
-        SavedState state = new SessionRepository(new Gson(), FilepathTestSupport.root(current)).load();
+        SavedState state = new SessionRepository(new Gson(), FilepathTestSupport.root(current), false).load();
 
         assertEquals(2, state.getActiveSession().undoHistory.size());
         assertNull(state.getActiveSession().restoreUndo());

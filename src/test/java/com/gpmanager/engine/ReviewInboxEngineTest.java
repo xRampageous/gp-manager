@@ -20,9 +20,9 @@ public class ReviewInboxEngineTest
         Transaction first = uncertain("Mixed inventory change", now - 5_000L, 100L);
         Transaction second = uncertain("Mixed inventory change", now - 2_000L, 200L);
         Transaction otherReason = uncertain("Unknown source", now - 1_000L, 300L);
-        engine.getActiveSession().addTransaction(first, 20);
-        engine.getActiveSession().addTransaction(second, 20);
-        engine.getActiveSession().addTransaction(otherReason, 20);
+        engine.getActiveSession().addTransaction(first, 20, false);
+        engine.getActiveSession().addTransaction(second, 20, false);
+        engine.getActiveSession().addTransaction(otherReason, 20, false);
         assertTrue(engine.correctTransaction(second.getId(), Correction.COST,
             now - 500L, "Owner already decided"));
 
@@ -49,9 +49,9 @@ public class ReviewInboxEngineTest
         Transaction first = uncertain("Review", now - 3_000L, 100L);
         Transaction second = uncertain("Review", now - 2_000L, 200L);
         Transaction handCorrected = uncertain("Review", now - 1_000L, 50L);
-        engine.getActiveSession().addTransaction(first, 20);
-        engine.getActiveSession().addTransaction(second, 20);
-        engine.getActiveSession().addTransaction(handCorrected, 20);
+        engine.getActiveSession().addTransaction(first, 20, false);
+        engine.getActiveSession().addTransaction(second, 20, false);
+        engine.getActiveSession().addTransaction(handCorrected, 20, false);
         assertTrue(engine.correctTransaction(handCorrected.getId(), Correction.COST,
             now - 500L, "Single decision"));
 
@@ -83,9 +83,9 @@ public class ReviewInboxEngineTest
         Transaction first = uncertain("Review", now - 3_000L, 100L);
         Transaction second = uncertain("Review", now - 2_000L, 200L);
         Transaction handCorrected = uncertain("Review", now - 1_000L, 50L);
-        engine.getActiveSession().addTransaction(first, 20);
-        engine.getActiveSession().addTransaction(second, 20);
-        engine.getActiveSession().addTransaction(handCorrected, 20);
+        engine.getActiveSession().addTransaction(first, 20, false);
+        engine.getActiveSession().addTransaction(second, 20, false);
+        engine.getActiveSession().addTransaction(handCorrected, 20, false);
         assertTrue(engine.correctTransaction(handCorrected.getId(), Correction.COST, now - 500L, "Single"));
 
         Engine.DecisionPreview gain = engine.previewDecision(Decision.GAIN, row -> true, now);
@@ -98,7 +98,7 @@ public class ReviewInboxEngineTest
 
         // A canonical mutation after the preview moves the revision: the stale preview never applies.
         long before = engine.getRevision();
-        engine.getActiveSession().addTransaction(uncertain("Review", now - 100L, 5L), 20);
+        engine.getActiveSession().addTransaction(uncertain("Review", now - 100L, 5L), 20, false);
         assertTrue(engine.getRevision() != before);
         assertEquals(-1, engine.applyDecision(gain, now));
         assertEquals(Correction.AUTO, first.getCorrection());

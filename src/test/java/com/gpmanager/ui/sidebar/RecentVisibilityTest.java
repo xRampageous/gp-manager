@@ -1,5 +1,7 @@
 package com.gpmanager;
 
+import com.gpmanager.GpManagerConfig.LootFilter;
+
 import java.util.*;
 import net.runelite.api.gameval.ItemID;
 import net.runelite.client.config.ConfigManager;
@@ -19,7 +21,7 @@ public class RecentVisibilityTest
         engine.startCustom("Fishing", now);
         Transaction gain = Tx.of(now, TransactionType.GAIN, Context.GENERIC, "", true,
             List.of(new Flow(385, "Shark", 2L, 900, 1_800L)));
-        engine.getActiveSession().addTransaction(gain, 2_000);
+        engine.getActiveSession().addTransaction(gain, 2_000, false);
         RecentFilter filter = new RecentFilter()
         {
             public boolean isFlowIncluded(Flow flow) { return true; }
@@ -30,7 +32,7 @@ public class RecentVisibilityTest
             }
             public String version() { return config.hiddenRecentItems(); }
         };
-        LiveContext context = new LiveContext(false, filter, 0L, PvpState.NONE, "", false, "");
+        LiveContext context = new LiveContext(false, filter, 0L, PvpState.NONE, "", false, "", false);
         LiveSnapshot before = LiveSnapshot.capture(engine, now + 600L, context);
         LivePage page = new LivePage(new LivePage.Actions()
         {
@@ -82,7 +84,7 @@ public class RecentVisibilityTest
         // not a charge.
         Transaction bones = Tx.of(1_000L, TransactionType.CONSUMPTION, Context.GENERIC, "Buried", true,
             List.of(new Flow(526, "Bones", -1L, 90, -90L)));
-        LiveContext context = new LiveContext(false, null, 0L, PvpState.NONE, "", false, "");
+        LiveContext context = new LiveContext(false, null, 0L, PvpState.NONE, "", false, "", false);
         List<LiveSnapshot.Recent> rows = LiveProbe.recent(List.of(bones), context);
         assertEquals(1, rows.size());
         LivePage page = new LivePage(new LivePage.Actions()
@@ -117,12 +119,12 @@ public class RecentVisibilityTest
         engine.startCustom("Teleports", now);
         engine.getActiveSession().addTransaction(Tx.of(now, TransactionType.CONSUMPTION, Context.GENERIC, "", true,
             List.of(new Flow(21173, "Burning amulet(2)", -1L, 828, -828L),
-                new Flow(21175, "Burning amulet(1)", 1L, 414, 414L))), 2_000);
+                new Flow(21175, "Burning amulet(1)", 1L, 414, 414L))), 2_000, false);
         engine.getActiveSession().addTransaction(Tx.of(now + 1_000L, TransactionType.CONSUMPTION, Context.GENERIC, "", true,
             List.of(new Flow(21171, "Burning amulet(3)", -1L, 1_242, -1_242L),
-                new Flow(21173, "Burning amulet(2)", 1L, 828, 828L))), 2_000);
+                new Flow(21173, "Burning amulet(2)", 1L, 828, 828L))), 2_000, false);
         engine.getActiveSession().addTransaction(Tx.of(now + 2_000L, TransactionType.GAIN, Context.GENERIC, "", true,
-            List.of(new Flow(21166, "Burning amulet(5)", 1L, 2_070, 2_070L))), 2_000);
+            List.of(new Flow(21166, "Burning amulet(5)", 1L, 2_070, 2_070L))), 2_000, false);
         RecentFilter filter = new RecentFilter()
         {
             public boolean isFlowIncluded(Flow flow) { return true; }
@@ -135,7 +137,7 @@ public class RecentVisibilityTest
             }
             public String version() { return config.hiddenRecentItems() + "|" + config.hiddenRecentCharges(); }
         };
-        LiveContext context = new LiveContext(false, filter, 0L, PvpState.NONE, "", false, "");
+        LiveContext context = new LiveContext(false, filter, 0L, PvpState.NONE, "", false, "", false);
         LiveSnapshot before = LiveSnapshot.capture(engine, now + 3_000L, context);
         assertEquals("one merged charge row and one gain", 2, before.recent.size());
         LiveSnapshot.Recent spend = before.recent.stream().filter(row -> row.value < 0L)
@@ -186,7 +188,7 @@ public class RecentVisibilityTest
             List.of(new Flow(560, "Death rune", -1L, 100, -100L, PriceSource.GRAND_EXCHANGE)),
             Confidence.LIKELY, "Estimated", null);
         estimate.setActionKind(ActionKind.CAST);
-        LiveContext context = new LiveContext(false, null, 0L, PvpState.NONE, "", false, "");
+        LiveContext context = new LiveContext(false, null, 0L, PvpState.NONE, "", false, "", false);
         List<LiveSnapshot.Recent> visible = LiveProbe.recent(List.of(estimate), context);
         assertEquals("a charge cast is listed by default", 1, visible.size());
         assertEquals("Trident of the Seas", visible.get(0).name);
@@ -197,7 +199,7 @@ public class RecentVisibilityTest
             public boolean isFlowIncluded(Flow flow) { return true; }
             public boolean showRecent(String name, long quantity, boolean charge) { return !charge; }
         };
-        LiveContext hidden = new LiveContext(false, hiding, 0L, PvpState.NONE, "", false, "");
+        LiveContext hidden = new LiveContext(false, hiding, 0L, PvpState.NONE, "", false, "", false);
         assertTrue("the charge list hides it like any charge",
             LiveProbe.recent(List.of(estimate), hidden).isEmpty());
 
@@ -223,10 +225,10 @@ public class RecentVisibilityTest
         long now = 1_700_000_000_000L;
         engine.startCustom("Smithing", now);
         engine.getActiveSession().addTransaction(Tx.of(now, TransactionType.PROCESSING, Context.PRODUCTION, "Smithing", true,
-            List.of(new Flow(2351, "Iron bar", 1L, 187, 187L), new Flow(440, "Iron ore", -1L, 72, -72L))), 2_000);
+            List.of(new Flow(2351, "Iron bar", 1L, 187, 187L), new Flow(440, "Iron ore", -1L, 72, -72L))), 2_000, false);
         engine.getActiveSession().addTransaction(Tx.of(now + 3_000L, TransactionType.CONSUMPTION, Context.PRODUCTION, "Smelting", true,
-            List.of(new Flow(440, "Iron ore", -1L, 72, -72L))), 2_000);
-        LiveSnapshot live = LiveSnapshot.capture(engine, now + 3_600L, new LiveContext(false, null, 0L, PvpState.NONE, "", false, ""));
+            List.of(new Flow(440, "Iron ore", -1L, 72, -72L))), 2_000, false);
+        LiveSnapshot live = LiveSnapshot.capture(engine, now + 3_600L, new LiveContext(false, null, 0L, PvpState.NONE, "", false, "", false));
         LivePage page = new LivePage(new LivePage.Actions()
         {
             public void togglePause() { }
@@ -245,8 +247,8 @@ public class RecentVisibilityTest
         Engine alone = PresentationLifecycleTest.engine();
         alone.startCustom("Smithing", now);
         alone.getActiveSession().addTransaction(Tx.of(now, TransactionType.CONSUMPTION, Context.PRODUCTION, "Smelting", true,
-            List.of(new Flow(440, "Iron ore", -1L, 72, -72L))), 2_000);
-        LiveSnapshot first = LiveSnapshot.capture(alone, now + 600L, new LiveContext(false, null, 0L, PvpState.NONE, "", false, ""));
+            List.of(new Flow(440, "Iron ore", -1L, 72, -72L))), 2_000, false);
+        LiveSnapshot first = LiveSnapshot.capture(alone, now + 600L, new LiveContext(false, null, 0L, PvpState.NONE, "", false, "", false));
         assertEquals("Iron ore (failed)", page.rowOf(first.recent.get(0)).name);
 
         // The Ledger shows the same single row, and its detail keeps both kinds of receipt.
@@ -256,7 +258,7 @@ public class RecentVisibilityTest
         assertEquals("one Ledger ore row", 1, oreGroups.size());
         assertEquals("1/2", oreGroups.get(0).failedOf());
         assertEquals(2, oreGroups.get(0).receipts.size());
-        SidebarPanel panel = new SidebarPanel(PresentationLifecycleTest.engine(), PresentationLifecycleTest.config(), null);
+        SidebarPanel panel = new SidebarPanel(PresentationLifecycleTest.engine(), PresentationLifecycleTest.config(), null, null, null);
         Table.Row row = panel.ledger.groupRow(oreGroups.get(0), Kit.Tone.SUPPLY);
         assertEquals("Iron ore", row.name);
         assertEquals("1/2", row.qty);
@@ -274,7 +276,7 @@ public class RecentVisibilityTest
             Tx.of(2_000L, TransactionType.GAIN, Context.GENERIC, "", true, List.of(pouchPickup)),
             Tx.of(3_000L, TransactionType.GAIN, Context.GENERIC, "", true, List.of(pouchSpend,
                 new Flow(995, "Coins", 300L, 1, 300L, PriceSource.FACE_VALUE))));
-        LiveContext context = new LiveContext(false, flow -> true, 0L, PvpState.NONE, "", false, "");
+        LiveContext context = new LiveContext(false, flow -> true, 0L, PvpState.NONE, "", false, "", false);
         List<LiveSnapshot.Recent> visible = LiveProbe.recent(receipts, context);
         assertEquals("one merged pickup row and one merged open row", 2, visible.size());
         LiveSnapshot.Recent open = visible.stream().filter(row -> "Coin pouch".equals(row.name)
@@ -294,7 +296,7 @@ public class RecentVisibilityTest
     {
         // The minimum loot value would hide a small coin gain; the open's net is the action's
         // income, so the merged row stays visible with both the count and the net.
-        LiveContext context = new LiveContext(false, null, 100L, PvpState.NONE, "", false, "");
+        LiveContext context = new LiveContext(false, null, 100L, PvpState.NONE, "", false, "", false);
         List<Transaction> receipts = List.of(Tx.of(3_000L, TransactionType.GAIN, Context.GENERIC, "", true, List.of(
             new Flow(ItemID.PICKPOCKET_COIN_POUCH_ELF, "Coin pouch", -3L, 0, 0L, PriceSource.DEFERRED_CLAIM),
             new Flow(995, "Coins", 9L, 1, 9L, PriceSource.FACE_VALUE))));
@@ -321,7 +323,7 @@ public class RecentVisibilityTest
                 List.of(new Flow(385, "Shark", -1L, 900, -900L))));
         LiveContext context = new LiveContext(false,
             flow -> ground.isFlowIncluded(flow, LootFilter.FOLLOW_GROUND_ITEMS),
-            0L, PvpState.NONE, "", false, "");
+            0L, PvpState.NONE, "", false, "", false);
         List<LiveSnapshot.Recent> visible = LiveProbe.recent(receipts, context);
         assertEquals("hidden gains stay off Recent; costs remain discoverable", 1, visible.size());
         assertEquals(-900L, visible.get(0).value);

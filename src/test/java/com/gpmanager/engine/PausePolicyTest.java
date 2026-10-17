@@ -74,7 +74,7 @@ public class PausePolicyTest
         Engine engine = engine(true);
         engine.ensureSession(1_000L);
         engine.togglePause(2_000L);
-        engine.restore(engine.savedState());
+        engine.restore(engine.savedState(), SafeMath.now());
         assertEquals(PauseReason.RECOVERY, engine.getActiveSession().getPauseReason());
         engine.resume(2_500L, PauseReason.LIFECYCLE);
         assertTrue("Login must not clear Recovery", engine.getActiveSession().paused);
@@ -84,7 +84,7 @@ public class PausePolicyTest
         engine = engine(true);
         engine.ensureSession(1_000L);
         engine.togglePause(2_000L);
-        engine.restore(engine.savedState());
+        engine.restore(engine.savedState(), SafeMath.now());
         engine.togglePause(4_000L);
         assertFalse(engine.getActiveSession().paused);
     }
@@ -111,10 +111,10 @@ public class PausePolicyTest
         logs.put(1511, 5L);
         engine.setBaseline(new ContainerSnapshot(empty));
         engine.togglePause(2_000L);
-        assertNull(engine.processIfDirty(new ContainerSnapshot(logs), 3_000L));
+        assertNull(engine.processIfDirty(new ContainerSnapshot(logs), 3_000L, null));
         assertEquals(0L, engine.getMetrics(3_000L).net);
         engine.togglePause(4_000L);
-        assertNull(engine.processIfDirty(new ContainerSnapshot(logs), 5_000L));
+        assertNull(engine.processIfDirty(new ContainerSnapshot(logs), 5_000L, null));
         assertEquals(0L, engine.getMetrics(5_000L).net);
     }
 
@@ -144,10 +144,10 @@ public class PausePolicyTest
         assertEquals(PauseReason.IDLE, engine.getActiveSession().getPauseReason());
         // The pause aligns its baseline on the next tick; then the action's gain settles
         // while still paused, and that gain is what wakes the session.
-        engine.processIfDirty(new ContainerSnapshot(empty), 2_500L);
-        engine.processIfDirty(new ContainerSnapshot(logs), 3_000L);
+        engine.processIfDirty(new ContainerSnapshot(empty), 2_500L, null);
+        engine.processIfDirty(new ContainerSnapshot(logs), 3_000L, null);
         assertFalse("the resuming gain wakes the session", engine.getActiveSession().paused);
-        engine.processIfDirty(new ContainerSnapshot(logs), 4_000L);
+        engine.processIfDirty(new ContainerSnapshot(logs), 4_000L, null);
         assertEquals("the action that resumed the session counts", 195L,
             engine.getMetrics(4_000L).net);
     }
@@ -158,7 +158,7 @@ public class PausePolicyTest
         Engine disabled = engine(false);
         assertFalse(disabled.autoStart(1_000L));
         assertNull(disabled.getActiveSession());
-        assertNull(disabled.processIfDirty(new ContainerSnapshot(Collections.emptyMap()), 1_100L));
+        assertNull(disabled.processIfDirty(new ContainerSnapshot(Collections.emptyMap()), 1_100L, null));
 
         Engine enabled = engine(true);
         assertTrue(enabled.autoStart(1_000L));

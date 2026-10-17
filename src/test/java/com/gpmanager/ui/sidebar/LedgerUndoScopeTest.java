@@ -108,7 +108,7 @@ public class LedgerUndoScopeTest
             try
             {
                 SidebarPanel[] holder = new SidebarPanel[1];
-                SwingUtilities.invokeAndWait(() -> holder[0] = new SidebarPanel(engine, new GpManagerConfig() {}, null));
+                SwingUtilities.invokeAndWait(() -> holder[0] = new SidebarPanel(engine, new GpManagerConfig() {}, null, null, null));
                 panel = holder[0];
             }
             catch (Exception ex)

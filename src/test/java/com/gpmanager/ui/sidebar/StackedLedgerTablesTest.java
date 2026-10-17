@@ -29,8 +29,8 @@ public class StackedLedgerTablesTest
     public void threeStackedTablesReplaceTheGlobalTabStrip() throws Exception
     {
         Engine engine = session();
-        engine.getActiveSession().addTransaction(gain(T0 + 1_000L, "Dragon bones", 536, 1L, 3_200, 3_200L), 2_000);
-        engine.getActiveSession().addTransaction(food(T0 + 2_000L, "Shark", SHARK, 950L), 2_000);
+        engine.getActiveSession().addTransaction(gain(T0 + 1_000L, "Dragon bones", 536, 1L, 3_200, 3_200L), 2_000, false);
+        engine.getActiveSession().addTransaction(food(T0 + 2_000L, "Shark", SHARK, 950L), 2_000, false);
         LedgerData data = capture(engine, T0 + 3_000L, LedgerData.Entry.current());
         LedgerPage page = onEdt(() ->
         {
@@ -55,8 +55,8 @@ public class StackedLedgerTablesTest
     public void searchKeepsWholeGroupsAndFindsDistinctSpellsWithoutMerging()
     {
         Engine engine = session();
-        engine.getActiveSession().addTransaction(exactCast(T0 + 1_000L, "Ice Burst", 1, 1, 1), 2_000);
-        engine.getActiveSession().addTransaction(exactCast(T0 + 2_000L, "Blood Barrage", 1, 1, 1), 2_000);
+        engine.getActiveSession().addTransaction(exactCast(T0 + 1_000L, "Ice Burst", 1, 1, 1), 2_000, false);
+        engine.getActiveSession().addTransaction(exactCast(T0 + 2_000L, "Blood Barrage", 1, 1, 1), 2_000, false);
 
         LedgerData data = capture(engine, T0 + 3_000L, new LedgerData.Entry(
             LedgerData.Scope.CURRENT_GRIND, null, null, LedgerData.CostView.SUPPLIES,
@@ -79,12 +79,12 @@ public class StackedLedgerTablesTest
         Engine engine = session();
         for (int i = 0; i < 25; i++)
         {
-            engine.getActiveSession().addTransaction(gain(T0 + i * 1_000L, "Item " + i, 2_000 + i, 1L, 100, 100L), 2_000);
+            engine.getActiveSession().addTransaction(gain(T0 + i * 1_000L, "Item " + i, 2_000 + i, 1L, 100, 100L), 2_000, false);
         }
         for (int i = 0; i < 25; i++)
         {
             engine.getActiveSession().addTransaction(food(T0 + 50_000L + i * 1_000L, "Food " + i,
-                3_000 + i, 10L), 2_000);
+                3_000 + i, 10L), 2_000, false);
         }
         LedgerData data = capture(engine, T0 + 100_000L, new LedgerData.Entry(
             LedgerData.Scope.CURRENT_GRIND, null, null, LedgerData.CostView.SUPPLIES,
@@ -92,7 +92,7 @@ public class StackedLedgerTablesTest
         assertEquals("gains carry every row; the page table pages them", 25, data.gains.groups.size());
         assertEquals("costs carry every row", 25, data.costs.groups.size());
 
-        engine.getActiveSession().addTransaction(gain(T0 + 200_000L, "Newest", 9_999, 1L, 100, 100L), 2_000);
+        engine.getActiveSession().addTransaction(gain(T0 + 200_000L, "Newest", 9_999, 1L, 100, 100L), 2_000, false);
         LedgerData later = capture(engine, T0 + 300_000L, new LedgerData.Entry(
             LedgerData.Scope.CURRENT_GRIND, null, null, LedgerData.CostView.SUPPLIES,
             "", null, null, null, null));
@@ -106,11 +106,11 @@ public class StackedLedgerTablesTest
     {
         Engine engine = session();
         Transaction oldest = gain(T0 + 1_000L, "Oldest gain", 1_111, 1L, 100, 100L);
-        engine.getActiveSession().addTransaction(oldest, 2_000);
+        engine.getActiveSession().addTransaction(oldest, 2_000, false);
         for (int i = 0; i < 25; i++)
         {
             engine.getActiveSession().addTransaction(gain(T0 + 2_000L + i * 1_000L, "Item " + i,
-                2_000 + i, 1L, 100, 100L), 2_000);
+                2_000 + i, 1L, 100, 100L), 2_000, false);
         }
         LedgerData anchored = capture(engine, T0 + 50_000L, new LedgerData.Entry(
             LedgerData.Scope.CURRENT_GRIND, null, null, LedgerData.CostView.SUPPLIES,
@@ -121,7 +121,7 @@ public class StackedLedgerTablesTest
         for (int i = 0; i < 5; i++)
         {
             engine.getActiveSession().addTransaction(gain(T0 + 100_000L + i * 1_000L, "Newer " + i,
-                5_000 + i, 1L, 100, 100L), 2_000);
+                5_000 + i, 1L, 100, 100L), 2_000, false);
         }
         LedgerData stillAnchored = capture(engine, T0 + 200_000L, new LedgerData.Entry(
             LedgerData.Scope.CURRENT_GRIND, null, null, LedgerData.CostView.SUPPLIES,
@@ -135,8 +135,8 @@ public class StackedLedgerTablesTest
     public void totalsReconcileAndCountUniqueReceipts()
     {
         Engine engine = session();
-        engine.getActiveSession().addTransaction(gain(T0 + 1_000L, "Dragon bones", 536, 1L, 3_200, 3_200L), 2_000);
-        engine.getActiveSession().addTransaction(food(T0 + 2_000L, "Shark", SHARK, 950L), 2_000);
+        engine.getActiveSession().addTransaction(gain(T0 + 1_000L, "Dragon bones", 536, 1L, 3_200, 3_200L), 2_000, false);
+        engine.getActiveSession().addTransaction(food(T0 + 2_000L, "Shark", SHARK, 950L), 2_000, false);
         // A mixed alchemy-shaped receipt contributes one Gain and one Cost entry from one receipt.
         Transaction alchemy = new Transaction(T0 + 3_000L, TransactionType.CONSUMPTION,
             Context.GENERIC, "", "Vorkath", true, Arrays.asList(
@@ -144,7 +144,7 @@ public class StackedLedgerTablesTest
                 new Flow(995, "Coins", 120L, 1, 120L, PriceSource.FACE_VALUE)),
             Confidence.CONFIRMED, "High alchemy", null);
         alchemy.setActionKind(ActionKind.CAST);
-        engine.getActiveSession().addTransaction(alchemy, 2_000);
+        engine.getActiveSession().addTransaction(alchemy, 2_000, false);
 
         LedgerData data = capture(engine, T0 + 4_000L, LedgerData.Entry.current());
         long net = engine.getMetrics(T0 + 4_000L).net;
@@ -166,7 +166,7 @@ public class StackedLedgerTablesTest
                 PriceSource.UNPRICED)),
             Confidence.CONFIRMED, "Unpriced food", null);
         unpriced.setActionKind(ActionKind.EAT);
-        engine.getActiveSession().addTransaction(unpriced, 2_000);
+        engine.getActiveSession().addTransaction(unpriced, 2_000, false);
 
         LedgerData data = capture(engine, T0 + 2_000L, LedgerData.Entry.current());
         assertEquals("the unpriced supply belongs to Costs/Supplies", 1, data.costs.entries);
@@ -184,10 +184,10 @@ public class StackedLedgerTablesTest
             Context.GENERIC, "", "Vorkath", true,
             java.util.Collections.singletonList(new Flow(777, "Unknown rune", -1L, 0, 0L)),
             Confidence.UNCERTAIN, "Awaiting a decision", null);
-        engine.getActiveSession().addTransaction(uncertain, 2_000);
+        engine.getActiveSession().addTransaction(uncertain, 2_000, false);
         Transaction corrected = gain(T0 + 2_000L, "Willow logs", 1519, 1L, 100, 120L);
         corrected.applyCorrection(Correction.IGNORE, T0 + 3_000L, "excluded");
-        engine.getActiveSession().addTransaction(corrected, 2_000);
+        engine.getActiveSession().addTransaction(corrected, 2_000, false);
 
         LedgerData data = capture(engine, T0 + 4_000L, LedgerData.Entry.current());
         assertEquals("only genuine review decisions are listed", 1, data.review.scopeCount);
@@ -204,7 +204,7 @@ public class StackedLedgerTablesTest
         for (int i = 0; i < 6; i++)
         {
             engine.getActiveSession().addTransaction(gain(T0 + 1_000L + i * 1_000L, "Item " + i,
-                2_000 + i, 1L, 100, 100L), 2_000);
+                2_000 + i, 1L, 100, 100L), 2_000, false);
         }
         LedgerData data = capture(engine, T0 + 10_000L, LedgerData.Entry.current());
         LedgerPage page = onEdt(() ->
@@ -237,7 +237,7 @@ public class StackedLedgerTablesTest
         Engine engine = PresentationLifecycleTest.engine();
         long old = T0 - 400L * 24L * 60L * 60L * 1_000L;
         engine.startCustom("Old Grind", old);
-        engine.getActiveSession().addTransaction(gain(old + 1_000L, "Old bones", 536, 1L, 3_200, 3_200L), 2_000);
+        engine.getActiveSession().addTransaction(gain(old + 1_000L, "Old bones", 536, 1L, 3_200, 3_200L), 2_000, false);
         String sessionId = engine.getActiveSession().getId();
         engine.finishCustom(old + 2_000L);
         long compactedNet = engine.historySession(sessionId).compactedContribution().getNet();

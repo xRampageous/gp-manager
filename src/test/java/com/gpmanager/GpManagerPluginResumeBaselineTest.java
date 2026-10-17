@@ -85,8 +85,8 @@ public class GpManagerPluginResumeBaselineTest
             long now = System.currentTimeMillis();
             engine.markDirty();
             ContainerSnapshot potato = new ContainerSnapshot(Collections.singletonMap(1942, 1L));
-            assertNull("the gain still stabilizes", engine.processIfDirty(potato, now + 600L));
-            Transaction gain = engine.processIfDirty(potato, now + 1_200L);
+            assertNull("the gain still stabilizes", engine.processIfDirty(potato, now + 600L, null));
+            Transaction gain = engine.processIfDirty(potato, now + 1_200L, null);
 
             assertNotNull("the first action books, not the baseline", gain);
             assertEquals(TransactionType.GAIN, gain.getType());

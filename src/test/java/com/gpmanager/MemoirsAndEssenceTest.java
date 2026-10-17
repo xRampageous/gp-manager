@@ -55,7 +55,7 @@ public class MemoirsAndEssenceTest
         for (int tick = 1; tick <= 5; tick++)
         {
             engine.processIfDirty(new ContainerSnapshot(new HashMap<>(Map.of(ItemID.BLOOD_ESSENCE_INACTIVE, 1L, ItemID.BLOOD_ESSENCE_ACTIVE, 1L))),
-                T0 + tick * 600L);
+                T0 + tick * 600L, null);
         }
         assertTrue(engine.getActiveSession().getTransactions().toString(),
             engine.getActiveSession().getTransactions().stream().allMatch(row -> row.autoType() == TransactionType.CONSUMPTION));
@@ -80,7 +80,7 @@ public class MemoirsAndEssenceTest
         RUNES.forEach((id, quantity) -> after.put(id, quantity - 20L));
         for (int tick = 1; tick <= 5; tick++)
         {
-            engine.processIfDirty(new ContainerSnapshot(new HashMap<>(after)), T0 + tick * 600L);
+            engine.processIfDirty(new ContainerSnapshot(new HashMap<>(after)), T0 + tick * 600L, null);
         }
         return engine;
     }

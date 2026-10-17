@@ -19,7 +19,7 @@ public class DevMarkerPresentationTest
     public void developmentBadgeShowsVersionAndBuildIdentityAtRealWidth() throws Exception
     {
         SidebarPanel panel = onEdt(() -> new SidebarPanel(PresentationLifecycleTest.engine(),
-            PresentationLifecycleTest.config(), null));
+            PresentationLifecycleTest.config(), null, null, null));
         onEdt(() ->
         {
             DevBadge.apply(panel, BuildInfo.of("1.2.0", "1.2.0-dev", "105",
@@ -45,7 +45,7 @@ public class DevMarkerPresentationTest
     public void releaseBuildLeavesTheFooterCollapsed() throws Exception
     {
         SidebarPanel panel = onEdt(() -> new SidebarPanel(PresentationLifecycleTest.engine(),
-            PresentationLifecycleTest.config(), null));
+            PresentationLifecycleTest.config(), null, null, null));
         onEdt(() ->
         {
             DevBadge.apply(panel, BuildInfo.of("1.0.0", "1.0.0", "104",
@@ -61,7 +61,7 @@ public class DevMarkerPresentationTest
     public void missingMetadataDegradesToTheBareDevelopmentMarker() throws Exception
     {
         SidebarPanel panel = onEdt(() -> new SidebarPanel(PresentationLifecycleTest.engine(),
-            PresentationLifecycleTest.config(), null));
+            PresentationLifecycleTest.config(), null, null, null));
         onEdt(() ->
         {
             DevBadge.apply(panel, null);
@@ -84,11 +84,11 @@ public class DevMarkerPresentationTest
             now + 1L, TransactionType.CONSUMPTION,
             Context.GENERIC, "", "Vorkath", true,
             java.util.Arrays.asList(new Flow(385, "Shark", -1L, 950, -950L)),
-            Confidence.CONFIRMED, "Exact cost fixture", null), 2_000);
+            Confidence.CONFIRMED, "Exact cost fixture", null), 2_000, false);
         long net = engine.getMetrics(now + 2L).net;
         int receipts = engine.getActiveSession().getTransactions().size();
 
-        SidebarPanel panel = onEdt(() -> new SidebarPanel(engine, PresentationLifecycleTest.config(), null));
+        SidebarPanel panel = onEdt(() -> new SidebarPanel(engine, PresentationLifecycleTest.config(), null, null, null));
         onEdt(() ->
         {
             DevBadge.apply(panel, BuildInfo.of("1.2.0", "1.2.0-dev", "105",

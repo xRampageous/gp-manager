@@ -105,7 +105,7 @@ public final class HudPreview
         }, new TransactionClassifier(), config);
         timed.startCustom("Vorkath", now - 61_000L);
         timed.getActiveSession().addTransaction(receipt(now - 500L, TransactionType.LOOT,
-            flow(536, "Dragon bones", 2L, 3_930)), 2_000);
+            flow(536, "Dragon bones", 2L, 3_930)), 2_000, false);
         timed.getActiveSession().setActiveTimeTargetMillis(60_000L, now);
         timed.getActiveSession().activeTimeTargetSetMillis = 9_000L;
         HudBuilder timedBuilder = new HudBuilder(config, HudPreview::icon);
@@ -128,7 +128,7 @@ public final class HudPreview
         builder.update(LiveSnapshot.capture(engine, now, null), f -> true, now);
         shot(out, "hud-empty.png", builder, config);
         builder.tray().booked(receipt(now, TransactionType.LOOT, flow(526, "Bones", 1L, 41)), now, false);
-        engine.getActiveSession().addTransaction(receipt(now, TransactionType.LOOT, flow(526, "Bones", 1L, 41)), 2_000);
+        engine.getActiveSession().addTransaction(receipt(now, TransactionType.LOOT, flow(526, "Bones", 1L, 41)), 2_000, false);
         builder.update(LiveSnapshot.capture(engine, now + 10L, null), f -> false, now + 10L);
         shot(out, "hud-filtered.png", builder, config);
         shot(out, "hud-narrow.png", builder, new GpManagerConfig()
@@ -169,7 +169,7 @@ public final class HudPreview
 
     private static void add(Engine engine, HudTray tray, long at, Flow item)
     {
-        engine.getActiveSession().addTransaction(receipt(at, TransactionType.LOOT, item), 2_000);
+        engine.getActiveSession().addTransaction(receipt(at, TransactionType.LOOT, item), 2_000, false);
         tray.booked(receipt(at, TransactionType.LOOT, item), at, false);
     }
 

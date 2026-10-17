@@ -91,7 +91,7 @@ public class ReviewFollowupTest {
     @Test public void resetAndItsSafetyCopyMustStayWithTheAccountThatWasConfirmed() throws Exception {
         JsonCodec.bind(new Gson());
         Engine e = ReviewFixesTest.engine();
-        SessionRepository repository = new SessionRepository(new Gson(), FilepathTestSupport.root(temporary.newFolder().toPath()));
+        SessionRepository repository = new SessionRepository(new Gson(), FilepathTestSupport.root(temporary.newFolder().toPath()), false);
         OrderedPersistenceWriter writer = new OrderedPersistenceWriter(repository);
         TrackingIdentity alice = new TrackingIdentity("rsprofile.alice", TrackingIdentity.ACCOUNT_HASH_INVALID);
         TrackingIdentity bob = new TrackingIdentity("rsprofile.bob", TrackingIdentity.ACCOUNT_HASH_INVALID);
@@ -114,22 +114,22 @@ public class ReviewFollowupTest {
         };
         c.start();
         try {
-            assertTrue(c.switchIdentity(alice, true));
+            assertTrue(c.switchIdentity(alice, true, true));
             e.ensureSession(System.currentTimeMillis());
             SwingUtilities.invokeAndWait(() -> {
                 SidebarPanel p = new SidebarPanel(e, ReviewFixesTest.CONFIG, null, repository, c);
                 new GrindsController(p).factoryReset();
-                ShellProbe.pressSheet(p.shell, "Reset");
+                ShellProbe.pressSheet(p.shell, "Back up & delete");
                 try {
                     assertTrue("Alice's backup completed", backupFinished.await(5, TimeUnit.SECONDS));
                     // A profile switch finishes while the backup's EDT callback is queued.
                     current.set(bob);
-                    assertTrue(c.switchIdentity(bob, false));
+                    assertTrue(c.switchIdentity(bob, false, true));
                     long now = System.currentTimeMillis();
                     e.ensureSession(now);
                     e.getActiveSession().addTransaction(new Transaction(now, TransactionType.GAIN, Context.GENERIC, "", "", true,
                         Collections.singletonList(new Flow(526, "Bones", 2L, 100, 200L)),
-                        Confidence.CONFIRMED, "fixture", null), 2_000);
+                        Confidence.CONFIRMED, "fixture", null), 2_000, false);
                     assertEquals("Bob has unrelated history before the callback", 200L, e.getMetrics(now).net);
                 } catch (InterruptedException ex) {
                     throw new AssertionError(ex);

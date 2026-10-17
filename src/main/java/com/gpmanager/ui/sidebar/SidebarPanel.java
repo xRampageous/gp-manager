@@ -13,7 +13,6 @@ import javax.imageio.ImageIO;
 import javax.swing.*;
 import net.runelite.client.game.ItemManager;
 import net.runelite.client.ui.*;
-import net.runelite.client.ui.PluginPanel;
 import net.runelite.client.util.AsyncBufferedImage;
 import org.slf4j.*;
 
@@ -78,18 +77,10 @@ class SidebarPanel extends PluginPanel {
     boolean suspended;
     LiveSnapshot lastSnapshot;
 
-    SidebarPanel(Engine engine, GpManagerConfig config, ItemManager itemManager) {
-        this(engine, config, itemManager, null, null);
-    }
-
     /**
      * The plugin supplies the current export/backup/recovery services; tests and previews may not.
      */
-    SidebarPanel(
-            Engine engine,
-            GpManagerConfig config,
-            ItemManager itemManager,
-            SessionRepository repository,
+    SidebarPanel(Engine engine, GpManagerConfig config, ItemManager itemManager, SessionRepository repository,
             Persistence persistence) {
         super(false);
         this.engine = engine;
@@ -108,11 +99,7 @@ class SidebarPanel extends PluginPanel {
         add(shell, BorderLayout.CENTER);
         shell.show(Shell.LIVE);
         shell.onShow = this::schedule;
-        shell.onGear =
-                anchor ->
-                        new GrindsController(this)
-                                .dataMenu()
-                                .show(anchor, 0, anchor.getHeight() + 2);
+        shell.onGear = anchor -> new GrindsController(this).dataMenu().show(anchor, 0, anchor.getHeight() + 2);
         SwingUtilities.invokeLater(() -> active = true);
     }
 
@@ -194,10 +181,7 @@ class SidebarPanel extends PluginPanel {
      */
     volatile long lastTickAt;
 
-    Timer clockPulse =
-            new Timer(
-                    1_000,
-                    e -> {
+    Timer clockPulse = new Timer(1_000, e -> {
                         if (SafeMath.now() - lastTickAt > 1_200L) schedule();
                     });
 
@@ -243,16 +227,9 @@ class SidebarPanel extends PluginPanel {
         synchronized (engine) {
             key = engine.getRevision() + ":" + minute;
             HudBuilder boundHud = hud;
-            context =
-                    new LiveContext(
-                            engine.isIdlePaused(),
-                            filter,
-                            Fmt.parseGp(config.minimumDisplayedLootValue()),
-                            pvp,
-                            activityLabel(),
-                            !loggedInSource.getAsBoolean(),
-                            boundHud == null ? "" : boundHud.target(),
-                            hoppingSource.getAsBoolean());
+            context = new LiveContext(engine.isIdlePaused(), filter, Fmt.parseGp(config.minimumDisplayedLootValue()),
+                            pvp, activityLabel(), !loggedInSource.getAsBoolean(),
+                            boundHud == null ? "" : boundHud.target(), hoppingSource.getAsBoolean());
             snapshot = LiveSnapshot.capture(engine, now, context);
             if (pageForced) {
                 // A setting, search or scope change can alter a page without a new revision.
@@ -269,6 +246,12 @@ class SidebarPanel extends PluginPanel {
             hud.filter = context.filter;
             hud.update(snapshot, context::flowVisible, now);
         }
+        // Free play's milestone: one small notice when it is crossed while playing, never at login
+        // (owner 1.5.2: no bar, no HUD+ line).
+        Boolean reached = snapshot.milestone == null ? null : snapshot.milestoneReached();
+        if (Boolean.TRUE.equals(reached) && Boolean.FALSE.equals(milestoneWas))
+            shell().tell("Milestone reached", "Free play passed " + Fmt.compact(snapshot.milestone) + ".", false);
+        milestoneWas = reached;
         if (!showing) return;
         pageForced = false;
         lastSnapshot = snapshot;
@@ -292,10 +275,7 @@ class SidebarPanel extends PluginPanel {
         if (status.isFailure()) {
             // Owner 2026-10-01 (F06): a save failure stays visible until the backend recovers.
             String detail = status.detail.isEmpty() ? status.state.name() : status.detail;
-            shell.notifySticky(
-                    "Data not saved",
-                    detail,
-                    status.retryAvailable ? "Retry" : null,
+            shell.notifySticky("Data not saved", detail, status.retryAvailable ? "Retry" : null,
                     status.retryAvailable ? persistence::scheduleSave : null);
             return;
         }
@@ -315,10 +295,7 @@ class SidebarPanel extends PluginPanel {
         if (!config.showItemIcons()) return null;
         if (itemId < -1 && spriteManager != null && !sprites.containsKey(itemId)) {
             // A named spell's row shows its spellbook icon; the sprite id arrives negated.
-            spriteManager.getSpriteAsync(
-                    -itemId,
-                    0,
-                    image -> {
+            spriteManager.getSpriteAsync(-itemId, 0, image -> {
                         if (image != null) spriteLoaded(itemId, image);
                     });
         }
@@ -356,8 +333,7 @@ class SidebarPanel extends PluginPanel {
         suspended = true;
         sprites.clear();
         engine.clearActionEvidence();
-        runOnEdt(
-                () -> {
+        runOnEdt(() -> {
                     ledgerEntry = Entry.current();
                     ledgerSearch = "";
                     grindsDetailId = null;
@@ -373,8 +349,7 @@ class SidebarPanel extends PluginPanel {
     }
 
     void resume() {
-        runOnEdt(
-                () -> {
+        runOnEdt(() -> {
                     suspended = false;
                     refreshNow();
                 });
@@ -407,60 +382,9 @@ class SidebarPanel extends PluginPanel {
             new GrindsController(SidebarPanel.this).openTargets();
         }
 
-        /** Owner live 2026-10-13/14: Again restarts the completed aim; a reached Net asks whether
-         * to keep the run (re-basing the aim) or start the same setup fresh. */
+        /** Again: a new session with the same target, in the same run (owner 1.5.2). */
         public void againTarget() {
-            long now = SafeMath.now();
-            String sessionId;
-            synchronized (engine) {
-                Session active = engine.getActiveSession();
-                if (active == null) return;
-                Long netTarget = active.getProfitTargetGp();
-                boolean netDone = netTarget != null && netTarget > 0L
-                        && active.profitTargetProgress(engine.getMetrics(now).net) >= netTarget;
-                if (!netDone) {
-                    // An ended timer re-arms in place, in any run.
-                    engine.restartTimeTarget(now);
-                    return;
-                }
-                if (!engine.isCustomActive()) return;
-                sessionId = active.getId();
-            }
-            // The sheet is Swing-only and runs on the EDT (the button handler), outside the engine
-            // monitor; its choices re-validate the pinned run before acting.
-            shell()
-                    .sheet(
-                            "Again",
-                            "Retain this run's net, or start the same setup fresh?",
-                            null,
-                            new Shell.Choice("Retain net", true, () -> mutate(() ->
-                            {
-                                long at = SafeMath.now();
-                                Session run = engine.getActiveSession();
-                                if (run == null || !sessionId.equals(run.getId())) return;
-                                Long aim = run.getProfitTargetGp();
-                                if (aim == null
-                                        || run.profitTargetProgress(engine.getMetrics(at).net) < aim) {
-                                    return;
-                                }
-                                engine.rebaseNetTarget(at);
-                            })),
-                            new Shell.Choice("Start fresh", false, () -> mutate(() ->
-                            {
-                                long at = SafeMath.now();
-                                Session run = engine.getActiveSession();
-                                if (run == null
-                                        || !sessionId.equals(run.getId())
-                                        || !engine.isCustomActive()) {
-                                    return;
-                                }
-                                String name = run.getName();
-                                String grindId = run.getGrindId();
-                                Long net = run.getProfitTargetGp();
-                                Long time = run.getActiveTimeTargetMillis();
-                                engine.finishCustom(at);
-                                engine.startGrind(name, grindId, net, time, at);
-                            })));
+            mutate(() -> engine.restartTarget(SafeMath.now()));
         }
 
         public void doneTarget() {
@@ -470,11 +394,6 @@ class SidebarPanel extends PluginPanel {
         /** Owner live 2026-10-14: the timer's own pause; the session pause stays the hero dot. */
         public void toggleTimerPause() {
             mutate(() -> engine.toggleTimeTargetPause(SafeMath.now()));
-        }
-
-        /** Owner live 2026-10-14: Reset re-bases a running Net aim without completing it. */
-        public void resetTarget() {
-            mutate(() -> engine.rebaseNetTarget(SafeMath.now()));
         }
 
         @Override
@@ -491,10 +410,7 @@ class SidebarPanel extends PluginPanel {
         @Override
         public void renameGrind() {
             if (engine.isCustomActive()) {
-                shell.prompt(
-                        "Rename Grind",
-                        "Grind name",
-                        engine.getActiveSession().getName(),
+                shell.prompt("Rename Grind", "Grind name", engine.getActiveSession().getName(),
                         name -> mutate(() -> engine.renameActive(name)));
             }
         }
@@ -505,8 +421,12 @@ class SidebarPanel extends PluginPanel {
         }
 
         @Override
-        public void restartRate() {
-            new GrindsController(SidebarPanel.this).restartRate();
+        public void showWholeRun() {
+            mutate(() -> engine.showWholeRun());
+        }
+
+        public void newSession() {
+            new GrindsController(SidebarPanel.this).newSession();
         }
 
         @Override
@@ -524,11 +444,13 @@ class SidebarPanel extends PluginPanel {
         refresh();
     }
 
+    /** Whether Free play's milestone was reached at the last refresh; null with none set. */
+    Boolean milestoneWas;
+
     void mutate(Runnable domain) {
         // The change runs on the mutation owner (the client thread in the plugin); the redraw is
         // queued only after it has applied, so the sidebar never repaints the pre-click state.
-        mutationOwner.accept(
-                () -> {
+        mutationOwner.accept(() -> {
                     domain.run();
                     // A sidebar edit (rename, targets, Start/End) saves now rather than at the next
                     // heartbeat.
@@ -586,12 +508,7 @@ class NavButton {
      */
     synchronized boolean install(NavigationHost navigation, PluginPanel panel, BufferedImage icon) {
         if (button != null || navigation == null || panel == null || icon == null) return false;
-        NavigationButton next =
-                NavigationButton.builder()
-                        .tooltip("GP Manager")
-                        .icon(icon)
-                        .priority(5)
-                        .panel(panel)
+        NavigationButton next = NavigationButton.builder().tooltip("GP Manager").icon(icon).priority(5).panel(panel)
                         .build();
         navigation.add(next);
         button = next;

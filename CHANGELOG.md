@@ -1,5 +1,19 @@
 # GP Manager changelog
 
+## 1.5.2 - 2026-10-17
+
+**New**
+- Click the ACTIVE clock for a new session: Net, Recent, GP/h and the clock start at zero. Free play or your Grind keeps its whole total, shown under your Net ("Free play +420M"; click it to show the whole run on Live again), and the Ledger keeps every row.
+- Setting a target starts a new session too. Everything it makes still counts toward Free play or your Grind, reached or not. ✓ Done clears the target and the session keeps counting; ↻ Again starts a new session with the same target.
+- ⚙ Reset free-play: your Free play so far moves to the new FREE PLAY list on the Grinds tab (nothing is deleted) and a new Free play starts at zero. Restore any past Free play from that list; the current one takes its place, so you can swap back.
+- ⚙ Delete Profile (formerly Factory reset) deletes this account's data: "Back up & delete" saves a safety copy first, or "Delete without backup".
+- Free play milestone: set a Net milestone (100m to 5b) in Targets. It counts all of Free play; its progress shows under Grinds › FREE PLAY and when you hover the Free play total, and a small notice tells you when you pass it.
+
+**Changed**
+- Risk moved from the top line to under your Net, and long NPC, activity and target names shrink to fit before they're cut.
+- The NPC or activity name on Live stays for the Activity label timeout (15 s by default) between kills instead of dropping after 5 s.
+- Nothing is said twice: a time target shows one line ("2h 50m left of 3h 00m · 6%") with no projected Net, a reached target adds no next-hour guess, the Grinds tab no longer repeats a Grind's last Net and average, and a Ledger group with one entry opens straight on it.
+
 ## 1.5.1 - 2026-10-17
 
 **New**

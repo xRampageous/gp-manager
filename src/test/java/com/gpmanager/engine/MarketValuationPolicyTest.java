@@ -417,12 +417,12 @@ public class MarketValuationPolicyTest
             Context.GENERIC, "", "Old drop", true,
             Collections.singletonList(new Flow(560, "Death rune", 200L, 184, 36_800L,
                 PriceSource.GRAND_EXCHANGE)),
-            Confidence.CONFIRMED, "", null), 100);
+            Confidence.CONFIRMED, "", null), 100, false);
         // A new receipt booked under the unified policy.
         Flow newFlow = service.value(Collections.singletonMap(560, 200L), T0 + 2L).get(0);
         session.addTransaction(new Transaction(T0 + 2L, TransactionType.GAIN,
             Context.GENERIC, "", "New drop", true, Collections.singletonList(newFlow),
-            Confidence.CONFIRMED, "", null), 100);
+            Confidence.CONFIRMED, "", null), 100, false);
 
         assertEquals(184, session.getTransactions().get(0).getFlows().get(0).unitPrice);
         assertEquals(190, session.getTransactions().get(1).getFlows().get(0).unitPrice);
@@ -560,7 +560,7 @@ public class MarketValuationPolicyTest
             ContainerSnapshot snapshot = new ContainerSnapshot(inventory);
             for (int i = 0; i < 3; i++)
             {
-                engine.processIfDirty(snapshot, now);
+                engine.processIfDirty(snapshot, now, null);
                 now += 600L;
             }
         }

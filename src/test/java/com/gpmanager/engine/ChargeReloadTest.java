@@ -63,7 +63,7 @@ public class ChargeReloadTest
         engine.markDirty();
         for (long tick = firstTick; tick <= firstTick + 1_800L; tick += 600L)
         {
-            engine.processIfDirty(snapshot, tick);
+            engine.processIfDirty(snapshot, tick, null);
         }
     }
 

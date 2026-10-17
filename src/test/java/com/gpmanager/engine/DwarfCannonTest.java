@@ -261,7 +261,7 @@ public class DwarfCannonTest
     private static Transaction settle(Engine engine, ContainerSnapshot snapshot, long firstTick)
     {
         Transaction row = null;
-        for (long t = firstTick; row == null && t < firstTick + 6_000L; t += 600L) row = engine.processIfDirty(snapshot, t);
+        for (long t = firstTick; row == null && t < firstTick + 6_000L; t += 600L) row = engine.processIfDirty(snapshot, t, null);
         assertNotNull(row);
         return row;
     }
@@ -269,6 +269,6 @@ public class DwarfCannonTest
     private static void wait(Engine engine, ContainerSnapshot snapshot, long ticks, long firstTick)
     {
         long now = firstTick;
-        for (long tick = 0; tick < ticks; tick++) engine.processIfDirty(snapshot, now += 600L);
+        for (long tick = 0; tick < ticks; tick++) engine.processIfDirty(snapshot, now += 600L, null);
     }
 }

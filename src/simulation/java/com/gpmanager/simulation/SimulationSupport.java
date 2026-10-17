@@ -111,11 +111,11 @@ final class SimulationSupport
         ContainerSnapshot snapshot,
         long firstTick)
     {
-        Transaction transaction = engine.processIfDirty(snapshot, firstTick);
+        Transaction transaction = engine.processIfDirty(snapshot, firstTick, null);
         equal(null, transaction, "transaction must wait for first stable tick");
-        transaction = engine.processIfDirty(snapshot, firstTick + 600L);
+        transaction = engine.processIfDirty(snapshot, firstTick + 600L, null);
         equal(null, transaction, "transaction must wait for second stable tick");
-        return engine.processIfDirty(snapshot, firstTick + 1_200L);
+        return engine.processIfDirty(snapshot, firstTick + 1_200L, null);
     }
 
     static Flow gain(int itemId, long quantity)

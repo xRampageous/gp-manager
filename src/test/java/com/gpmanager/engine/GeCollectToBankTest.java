@@ -171,8 +171,8 @@ public class GeCollectToBankTest
     {
         engine.markDirty();
         ContainerSnapshot snapshot = new ContainerSnapshot(new HashMap<>(inventory));
-        engine.processIfDirty(snapshot, at);
-        engine.processIfDirty(snapshot, at + 1L);
+        engine.processIfDirty(snapshot, at, null);
+        engine.processIfDirty(snapshot, at + 1L, null);
     }
 
     private static Engine engine(Map<Integer, Long> inventory)

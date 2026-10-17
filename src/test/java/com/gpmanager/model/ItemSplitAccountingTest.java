@@ -12,7 +12,7 @@ public class ItemSplitAccountingTest
     @Test
     public void applyItemSplitKeepsPersonalShareAndRecordsUndoableCorrection()
     {
-        Session session = new Session("Split", 0L);
+        Session session = new Session("Split", 0L, SessionMode.GENERAL);
         long priceCapturedAt = 1_725_000_000_123L;
         Transaction loot = Tx.of(
             1_000L,
@@ -22,7 +22,7 @@ public class ItemSplitAccountingTest
             true,
             Collections.singletonList(new Flow(995, "Coins", 10, 1, 10,
                 PriceSource.FACE_VALUE, priceCapturedAt)));
-        session.addTransaction(loot, 50);
+        session.addTransaction(loot, 50, false);
 
         assertEquals(10L, session.metrics(2_000L).net);
         assertTrue(session.splitItem(loot.getId(), 995, 4L, 3_000L, "team"));
@@ -44,7 +44,7 @@ public class ItemSplitAccountingTest
     @Test
     public void fullGiveawayIgnoresSingleItemGain()
     {
-        Session session = new Session("Split", 0L);
+        Session session = new Session("Split", 0L, SessionMode.GENERAL);
         Transaction loot = Tx.of(
             1_000L,
             TransactionType.LOOT,
@@ -52,7 +52,7 @@ public class ItemSplitAccountingTest
             "Loot",
             true,
             Collections.singletonList(new Flow(526, "Bones", 3, 50, 150)));
-        session.addTransaction(loot, 50);
+        session.addTransaction(loot, 50, false);
 
         assertTrue(session.splitItem(loot.getId(), 526, 0L, 2_000L, null));
         assertEquals(Correction.IGNORE, loot.getCorrection());

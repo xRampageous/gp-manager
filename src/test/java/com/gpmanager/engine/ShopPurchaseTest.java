@@ -219,8 +219,8 @@ public class ShopPurchaseTest
         inventory.values().removeIf(quantity -> quantity == 0L);
         int before = engine.getActiveSession().getTransactions().size();
         now += 3_000L;
-        engine.processIfDirty(new ContainerSnapshot(new HashMap<>(inventory)), now);
-        engine.processIfDirty(new ContainerSnapshot(new HashMap<>(inventory)), now + 600L);
+        engine.processIfDirty(new ContainerSnapshot(new HashMap<>(inventory)), now, null);
+        engine.processIfDirty(new ContainerSnapshot(new HashMap<>(inventory)), now + 600L, null);
         List<Transaction> all = engine.getActiveSession().getTransactions();
         return all.size() > before ? all.get(all.size() - 1) : null;
     }

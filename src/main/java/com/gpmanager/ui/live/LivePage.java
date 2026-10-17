@@ -47,11 +47,11 @@ class LivePage implements Shell.Page {
         /** Owner live 2026-10-14: the timer's own pause, distinct from the session pause. */
         default void toggleTimerPause() {}
 
-        /** Owner live 2026-10-14: Reset re-bases a running Net aim without completing it. */
-        default void resetTarget() {}
+        /** The ACTIVE clock: a new session on Live; the run keeps everything (owner 1.5.2). */
+        default void newSession() {}
 
-        /** The ACTIVE clock: start fresh (Free play) or end the Grind (owner 2026-10-16). */
-        default void restartRate() {}
+        /** The run total under the Net: Live shows the whole run again (owner 1.5.2). */
+        default void showWholeRun() {}
 
         default void hideRecent(String name, boolean charge) {}
 
@@ -82,13 +82,17 @@ class LivePage implements Shell.Page {
     JLabel targetValue = label("", numbers(12f), TEXT);
     JLabel targetPace = label("", small(), LABEL);
     JLabel targetTime = label("", small(), LABEL);
+
+    /** Under the Net while Live counts fresh: the run's whole total, "Free play +420M". */
+    JLabel runTotal = label("", small(), LABEL);
+
+    JLabel risk = label("", small(), LOSS.color);
     JPanel targetActions = new JPanel(new FlowLayout(FlowLayout.LEFT, 3, 0));
     /** The header's right cluster: the aim icons, single row (owner live 2026-10-14). */
     JPanel targetTopActions = new JPanel(new FlowLayout(FlowLayout.RIGHT, 3, 0));
     /** The last laid-out button shape; the rows rebuild only when it changes. */
     Object actionsShape;
     JButton againButton;
-    JButton resetButton;
     JButton doneButton;
     JButton editButton;
     JButton pauseButton;
@@ -109,8 +113,7 @@ class LivePage implements Shell.Page {
     /** Pending counts as small icons: loot keys, GE offers, grave reclaim. */
     JPanel counts = new JPanel(new FlowLayout(FlowLayout.RIGHT, 4, 0));
 
-    ImageIcon geIcon =
-            icon(() -> ImageUtil.loadImageResource(GrandExchangePlugin.class, "ge_icon.png"));
+    ImageIcon geIcon = icon(() -> ImageUtil.loadImageResource(GrandExchangePlugin.class, "ge_icon.png"));
     ImageIcon graveIcon = new ImageIcon(grave(LOSS.color));
     String drawnCounts = "";
 
@@ -126,10 +129,14 @@ class LivePage implements Shell.Page {
         endGrind.setToolTipText("End this Grind");
         counts.setOpaque(false);
         hero.controls(counts, startGrind, endGrind);
-        Hero.clickable(hero.clock, () -> actions.restartRate());
+        Hero.clickable(hero.clock, () -> actions.newSession());
         Hero.clickable(hero.name, actions::renameGrind);
         // Clicking the Net total sets or changes the target (owner 2026-09-28: no Target button).
         Hero.clickable(hero.net, actions::editTarget);
+        Hero.clickable(runTotal, actions::showWholeRun);
+        risk.setToolTipText(msg("what-death"));
+        hero.under.add(runTotal);
+        hero.under.add(risk);
         target.setBackground(CARD);
         pad(target, 4, 6, 5, 6);
         // Owner live 2026-10-14: Pause and Done ride the header's right; Again / Reset / Edit sit
@@ -138,12 +145,10 @@ class LivePage implements Shell.Page {
         // 2026-10-14). Their homes are rebuilt per state (see applyTarget): the bottom row
         // carries the completed action set; while running the icons ride the header's right.
         againButton = button("\u21BB", false, actions::againTarget);
-        resetButton = button("\u21BA", false, actions::resetTarget);
         doneButton = button("\u2713", false, actions::doneTarget);
         editButton = button("\u2026", false, actions::editTarget);
         pauseButton = button("||", false, actions::toggleTimerPause);
-        againButton.setToolTipText("Again: retain this run's net, or start the setup fresh");
-        resetButton.setToolTipText("Reset the aim's count");
+        againButton.setToolTipText("Again: a new session with the same target");
         doneButton.setToolTipText("Done: clear the goal");
         editButton.setToolTipText("Edit targets");
         pauseButton.setToolTipText("Pause or resume the timer");
@@ -169,9 +174,7 @@ class LivePage implements Shell.Page {
         // A set target is edited by clicking its card.
         target.setToolTipText(msg("click-change"));
         Hero.clickable(target, actions::editTarget);
-        recent.setRowsPerPage(LiveSnapshot.RECENT_ROWS)
-                .setFill(true)
-                .setEmptyText("Nothing booked yet");
+        recent.setRowsPerPage(LiveSnapshot.RECENT_ROWS).setFill(true).setEmptyText("Nothing booked yet");
         JButton all = button("View all", false, () -> actions.openLedger(Entry.current()));
         recent.setAction(all);
         pad(body, 0, GAP, GAP, 0);
@@ -206,19 +209,23 @@ class LivePage implements Shell.Page {
 
     void apply(LiveSnapshot snapshot) {
         boolean loggedIn = !snapshot.loggedOut;
-        hero.status(
-                dotColor(snapshot),
-                statusTooltip(snapshot),
-                identityOf(snapshot),
-                wordOf(snapshot),
+        hero.status(dotColor(snapshot), statusTooltip(snapshot), identityOf(snapshot), wordOf(snapshot),
                 loggedIn ? actions::togglePause : null);
         hero.icons(statusIcons(snapshot));
+        // Owner 1.5.2: Risk lives off the header, so a long name keeps its room.
+        runTotal.setVisible(snapshot.fresh);
+        // Clicking it shows the whole run again; a running target keeps its own session.
+        runTotal.setToolTipText((snapshot.goal == null ? msg("run-total") : msg("run-total-target"))
+                        + (snapshot.milestone == null ? "" : " Milestone " + compact(snapshot.milestone) + ": "
+                                        + percent(Math.max(0d, Math.min(1d, (double) snapshot.runNet / snapshot.milestone)))
+                                        + "."));
+        runTotal.setText((snapshot.freePlay ? "Free play " : "Grind ") + signed(snapshot.runNet));
+        risk.setVisible(snapshot.pvpPossible && snapshot.risk > 0L);
+        risk.setText("RISK " + compact(snapshot.risk));
+        hero.under.setVisible(runTotal.isVisible() || risk.isVisible());
         counts(snapshot);
         // Nothing booked yet reads as a dash, never the font's slashed zero.
-        boolean booked =
-                snapshot.gains != 0L
-                        || snapshot.costs != 0L
-                        || snapshot.marketResult != 0L
+        boolean booked = snapshot.fresh || snapshot.gains != 0L || snapshot.costs != 0L || snapshot.marketResult != 0L
                         || !snapshot.recent.isEmpty();
         if (snapshot.hasSession) {
             // Owner live 2026-10-13: with a Net target the hero carries the live pair
@@ -230,41 +237,20 @@ class LivePage implements Shell.Page {
                 // Owner live 2026-10-14: the pair is spaced while it fits the hero line; long
                 // values fall back to the tight form so it never clips.
                 String spaced = signed(snapshot.goal.current) + " / " + snapshot.goal.label;
-                heroNet =
-                        spaced.length() <= HERO_PAIR_SPACED_MAX
-                                ? spaced
+                heroNet = spaced.length() <= HERO_PAIR_SPACED_MAX ? spaced
                                 : signed(snapshot.goal.current) + "/" + snapshot.goal.label;
             }
-            hero.big(
-                    booked ? heroNet : "—",
+            hero.big(booked ? heroNet : "—",
                     // The pair's colour follows the number it shows (owner live 2026-10-14).
-                    booked
-                            ? (snapshot.goal != null && !snapshot.goal.time
-                                    ? sign(snapshot.goal.current)
-                                    : sign(snapshot.net))
-                            : DIM,
-                    exactSigned(snapshot.net)
-                            + " gp · gains "
-                            + exact(snapshot.gains)
-                            + (snapshot.costSplitAvailable
-                                    ? " · supplies "
-                                            + exact(snapshot.supplies)
-                                            + " · losses "
-                                            + exact(snapshot.loss)
-                                    : " · costs "
-                                            + exact(snapshot.costs)
-                                            + msg("split-unavailable"))
-                            + (snapshot.goal == null
-                                    ? msg("click-set")
-                                    : snapshot.goal.time
-                                            ? ""
-                                            : " · aim "
-                                                    + exactSigned(snapshot.goal.current)
-                                                    + " of "
-                                                    + exact(snapshot.goal.target)
-                                                    + " gp"),
-                    rateText(snapshot.rateEstablished, snapshot.gpPerHour),
-                    snapshot.rateEstablished,
+                    booked ? (snapshot.goal != null && !snapshot.goal.time ? sign(snapshot.goal.current)
+                                    : sign(snapshot.net)) : DIM, exactSigned(snapshot.net) + " gp · gains "
+                            + exact(snapshot.gains) + (snapshot.costSplitAvailable ? " · supplies "
+                                            + exact(snapshot.supplies) + " · losses " + exact(snapshot.loss)
+                                    : " · costs " + exact(snapshot.costs) + msg("split-unavailable"))
+                            + (snapshot.goal == null ? msg("click-set") : snapshot.goal.time ? "" : " · aim "
+                                                    + exactSigned(snapshot.goal.current) + " of "
+                                                    + exact(snapshot.goal.target) + " gp"),
+                    rateText(snapshot.rateEstablished, snapshot.gpPerHour), snapshot.rateEstablished,
                     clock(snapshot.elapsedMillis) + " ACTIVE");
         } else {
             hero.big("—", DIM, msg("nothing-tracked"), "—", false, "");
@@ -286,20 +272,12 @@ class LivePage implements Shell.Page {
                 rows.add(rowOf(row));
                 recentTotal += row.net();
             }
-        offers.setTitle("OFFERS · " + open.size())
-                .setRows(open)
-                .setTotal(signed(openTotal), null);
+        offers.setTitle("OFFERS · " + open.size()).setRows(open).setTotal(signed(openTotal), null);
         offers.setVisible(!open.isEmpty());
         // Owner 2026-10-01 (F13): the empty card says which event starts tracking, never a fake
         // start.
-        String empty =
-                snapshot.loggedOut
-                        ? msg("tracking-waits")
-                        : !snapshot.freePlay
-                                ? "Nothing booked yet"
-                                : actions.autoStartArmed()
-                                        ? msg("tracking-starts")
-                                        : msg("press-grind");
+        String empty = snapshot.loggedOut ? msg("tracking-waits") : !snapshot.freePlay ? "Nothing booked yet"
+                                : actions.autoStartArmed() ? msg("tracking-starts") : msg("press-grind");
         if (!empty.equals(emptyRecent)) {
             emptyRecent = empty;
             recent.setEmptyText(empty);
@@ -312,24 +290,21 @@ class LivePage implements Shell.Page {
         LiveSnapshot.Goal goal = snapshot.goal;
         startGrind.setVisible(snapshot.freePlay && !snapshot.loggedOut);
         endGrind.setVisible(!snapshot.freePlay);
-        hero.name.setToolTipText(
-                snapshot.freePlay
-                        ? null
-                        : "Click to rename"
-                                + (identityOf(snapshot).equals(hero.name.getText())
-                                        ? ""
+        hero.name.setToolTipText(snapshot.freePlay ? null : "Click to rename"
+                                + (identityOf(snapshot).equals(hero.name.getText()) ? ""
                                         : " \u00b7 " + identityOf(snapshot)));
         target.setVisible(goal != null);
         if (goal == null) return;
+        String title;
         if (goal.time) {
             // Owner 2026-10-01 (F10): a time target reads tracked Active Time, not fabricated Net.
-            targetTitle.setText("TARGET · " + goal.label);
+            title = goal.reached ? "TARGET · reached" : "TARGET";
             targetValue.setText(goal.timeDetail);
             targetValue.setToolTipText(duration(goal.target) + " of active play");
             targetValue.setVisible(true);
             targetTime.setVisible(false);
         } else {
-            targetTitle.setText("TARGET · " + goal.label + " · " + goal.progress);
+            title = "TARGET · " + goal.label + " · " + goal.progress;
             // The hero owns the live Net pair; the card never repeats it (owner live 2026-10-13).
             targetValue.setText("");
             targetValue.setToolTipText(null);
@@ -340,38 +315,23 @@ class LivePage implements Shell.Page {
         }
         targetBar.setValue((int) Math.round(goal.fraction * 1000));
         targetBar.setForeground(goal.reached ? GAIN.color : ACCENT);
-        // Owner live 2026-10-13: a started time goal shows its countdown; a net pace line carries
-        // its own wording.
+        // A time target's line already counts down (owner 1.5.2: said once); a Net aim's pace line
+        // carries its own wording, or waits for the rate.
         String pace = goal.eta;
-        if (goal.time && !goal.reached) {
-            String left = durationCount(Math.max(0L, goal.target - goal.current)) + " left";
-            pace = pace == null ? left : left + " \u00b7 " + pace;
-        }
         targetPace.setText(pace == null ? msg("pace-once") : pace);
-        // Button layout (owner live 2026-10-14): while the run is going Pause sits on the
-        // header's right with Reset / Done / Edit under it and no bottom row; a completed or
-        // paused aim lays the full set along the bottom as before. Pause is the timer's own —
+        // Button layout (owner live 2026-10-14): while the aim runs its icons sit on the header's
+        // right with no bottom row; a completed aim lays them along the bottom. Pause is the timer's own —
         // the run keeps tracking.
         boolean completed = goal.reached || goal.timeDone;
         boolean timerPaused = goal.timerPaused;
         boolean timerSet = goal.timeDetail != null;
-        // Pause needs a timer that can still run; an ended one has nothing to stop.
+        // Pause needs a timer that can still run; an ended one has nothing to stop. Done and Again
+        // are always there: Again is a new session with the same target (owner 1.5.2).
         pauseButton.setVisible(timerSet && !goal.timeDone);
         pauseButton.setText(timerPaused ? "\u25B6" : "||");
-        // A Net-only aim has no timer to pause, so Done shows while it runs (owner 1.5.0).
-        doneButton.setVisible(completed || timerPaused || !timerSet);
-        editButton.setVisible(true);
-        // Again: a reached Net re-runs the setup (needs a custom run); an ended timer re-arms
-        // and works in Free play too. Reset re-bases a still-running Net aim in place.
-        againButton.setVisible(
-                (goal.reached && !snapshot.freePlay)
-                        || (goal.timeDone && (!goal.reached || goal.time)));
-        resetButton.setVisible(!goal.time && !goal.reached);
         var shown = new ArrayList<JButton>();
-        for (JButton action :
-                completed
-                        ? new JButton[] {againButton, resetButton, doneButton, editButton, pauseButton}
-                        : new JButton[] {pauseButton, resetButton, doneButton, editButton}) {
+        for (JButton action : completed ? new JButton[] {againButton, doneButton, editButton, pauseButton}
+                        : new JButton[] {pauseButton, againButton, doneButton, editButton}) {
             if (action.isVisible()) shown.add(action);
         }
         List<Object> shape = List.of(completed, shown);
@@ -385,7 +345,16 @@ class LivePage implements Shell.Page {
             targetTopActions.setVisible(!completed && !shown.isEmpty());
             target.revalidate();
         }
-        targetPace.setVisible(!goal.reached || goal.eta != null);
+        targetPace.setVisible(goal.eta != null || !goal.reached && goal.timeDetail == null);
+        // The title shrinks before it is cut beside the icons; hover keeps it whole (owner 1.5.2).
+        int room = target.getWidth() - 14
+                        - (targetTopActions.isVisible() ? targetTopActions.getPreferredSize().width : 0);
+        String fitted = Kit.fitShrinking(targetTitle, title, small(), room);
+        // Still too long: the card says it is a target, so the label and progress go first.
+        if (!fitted.equals(title))
+            fitted = Kit.fitShrinking(targetTitle, title.substring("TARGET · ".length()), small(), room);
+        targetTitle.setText(fitted);
+        targetTitle.setToolTipText(title);
     }
 
     Row rowOf(Recent row) {
@@ -398,25 +367,13 @@ class LivePage implements Shell.Page {
             menu.add(new Table.Menu("Hide item from recent", () -> actions.hideRecent(row.name, false)));
         // A charge or dose row can hide its whole family's spends from Recent without hiding the
         // item; an ordinary supply (buried bones) offers only the item hide (owner 1.3.4).
-        if (!row.open
-                && row.itemId > 0
-                && row.chargeRow
-                && (row.ledgerCostView == CostView.SUPPLIES
+        if (!row.open && row.itemId > 0 && row.chargeRow && (row.ledgerCostView == CostView.SUPPLIES
                         || row.ledgerCostView == CostView.CHARGES))
             menu.add(new Table.Menu("Hide charge from recent", () -> actions.hideRecent(row.name, true)));
         // Ore a failed smelt lost sits beside the ore the bars used: say which is which.
         String name = msg("failed").equals(row.actionLabel) ? row.name + " (failed)" : row.name;
-        Row drawn = new Row(
-                row.contributionId + "|" + row.receiptId,
-                icon,
-                name,
-                row.qty,
-                valueText(row),
-                toneOf(row),
-                tipOf(row),
-                numeric(row) ? exactSigned(row.value) + " gp" : "",
-                false,
-                () -> actions.openLedger(entry),
+        Row drawn = new Row(row.contributionId + "|" + row.receiptId, icon, name, row.qty, valueText(row), toneOf(row),
+                tipOf(row), numeric(row) ? exactSigned(row.value) + " gp" : "", false, () -> actions.openLedger(entry),
                 menu);
         drawn.color = row.highlight;
         return drawn;
@@ -424,29 +381,15 @@ class LivePage implements Shell.Page {
 
     List<List<Cell>> strips(LiveSnapshot snapshot) {
         if (!snapshot.hasSession) {
-            return singletonList(
-                    Arrays.asList(
-                            new Cell("GAINS", "—", DIM, "", null),
-                            new Cell("SUPPLY", "—", DIM, "", null),
-                            new Cell("LOSS", "—", DIM, "", null)));
+            return singletonList(Arrays.asList(new Cell("GAINS", "—", DIM, "", null),
+                            new Cell("SUPPLY", "—", DIM, "", null), new Cell("LOSS", "—", DIM, "", null)));
         }
         Runnable ledger = () -> actions.openLedger(Entry.current());
-        var money =
-                Hero.money(
-                        snapshot.gains,
-                        snapshot.supplies,
-                        snapshot.loss,
-                        snapshot.costs,
-                        snapshot.costSplitAvailable,
-                        ledger);
+        var money = Hero.money(snapshot.gains, snapshot.supplies, snapshot.loss, snapshot.costs,
+                        snapshot.costSplitAvailable, ledger);
         if (snapshot.marketResult != 0L || snapshot.marketPending > 0) {
-            money.add(
-                    new Cell(
-                            "TRADE",
-                            snapshot.marketResult == 0L ? "open" : signed(snapshot.marketResult),
-                            MARKET,
-                            msg("realized-market"),
-                            ledger));
+            money.add(new Cell("TRADE", snapshot.marketResult == 0L ? "open" : signed(snapshot.marketResult), MARKET,
+                            msg("realized-market"), ledger));
         }
         var rows = new ArrayList<List<Cell>>(singletonList(money));
         // Owner live 2026-10-13: skull and protect states are not shown (immersion); a PvP Grind
@@ -454,22 +397,10 @@ class LivePage implements Shell.Page {
         // took a whole row).
         if (snapshot.pvpSession) {
             var pvp = new ArrayList<Cell>();
-            pvp.add(
-                        new Cell(
-                                        "BEST KILL",
-                                        snapshot.bestKill == 0L ? "—" : signed(snapshot.bestKill),
-                                        GAIN,
-                                        snapshot.kills + " kills · " + snapshot.deaths + " deaths",
-                                        null)
-                                .weight(3));
-            pvp.add(
-                    new Cell(
-                                    "STREAK",
-                                    String.valueOf(snapshot.streak),
-                                    snapshot.streak > 0 ? GAIN : DIM,
-                                    msg("kills-since") + snapshot.bestStreak + " this Grind",
-                                    null)
-                            .weight(2));
+            pvp.add(new Cell("BEST KILL", snapshot.bestKill == 0L ? "—" : signed(snapshot.bestKill), GAIN,
+                                        snapshot.kills + " kills · " + snapshot.deaths + " deaths", null).weight(3));
+            pvp.add(new Cell("STREAK", String.valueOf(snapshot.streak), snapshot.streak > 0 ? GAIN : DIM,
+                                    msg("kills-since") + snapshot.bestStreak + " this Grind", null).weight(2));
             rows.add(pvp);
         }
         return rows;
@@ -477,16 +408,8 @@ class LivePage implements Shell.Page {
 
     List<Cell> statusIcons(LiveSnapshot snapshot) {
         var list = new ArrayList<Cell>();
-        if (snapshot.pvpPossible && snapshot.risk > 0L)
-            list.add(new Cell("", "RISK " + compact(snapshot.risk), LOSS, msg("what-death"), null));
         if (snapshot.reviewCount > 0) {
-            list.add(
-                    new Cell(
-                            "",
-                            "(!)" + snapshot.reviewCount,
-                            REVIEW,
-                            snapshot.reviewCount == 1
-                                    ? msg("item-needs")
+            list.add(new Cell("", "(!)" + snapshot.reviewCount, REVIEW, snapshot.reviewCount == 1 ? msg("item-needs")
                                     : snapshot.reviewCount + msg("items-need"),
                             () -> actions.openLedger(Entry.current(Audit.REVIEW, null))));
         }
@@ -495,46 +418,20 @@ class LivePage implements Shell.Page {
 
     /** Rebuilds the count icons only when a count changes, so hover survives a tick. */
     void counts(LiveSnapshot snapshot) {
-        String key =
-                snapshot.pendingKeys
-                        + "|"
-                        + snapshot.pendingKeyValue
-                        + "|"
-                        + snapshot.marketPending
-                        + "|"
+        String key = snapshot.pendingKeys + "|" + snapshot.pendingKeyValue + "|" + snapshot.marketPending + "|"
                         + snapshot.reclaimItems;
         if (key.equals(drawnCounts)) return;
         drawnCounts = key;
         counts.removeAll();
         Runnable pending = () -> actions.openLedger(Entry.current());
         BufferedImage keyImage = sprites.apply(ItemID.WILDY_LOOT_KEY0);
-        String keyTip =
-                msg("loot-keys")
-                        + snapshot.pendingKeys
-                        + (snapshot.pendingKeyValue > 0L
-                                ? msg("loot-keys-worth") + compact(snapshot.pendingKeyValue)
-                                : "");
-        count(
-                snapshot.pendingKeys,
-                keyImage == null ? null : new ImageIcon(keyImage),
-                "key",
-                DIM,
-                keyTip,
+        String keyTip = msg("loot-keys") + snapshot.pendingKeys + (snapshot.pendingKeyValue > 0L
+                                ? msg("loot-keys-worth") + compact(snapshot.pendingKeyValue) : "");
+        count(snapshot.pendingKeys, keyImage == null ? null : new ImageIcon(keyImage), "key", DIM, keyTip, pending);
+        count(snapshot.marketPending, geIcon, "GE", MARKET, msg("grand-exchange-offers") + snapshot.marketPending,
                 pending);
-        count(
-                snapshot.marketPending,
-                geIcon,
-                "GE",
-                MARKET,
-                msg("grand-exchange-offers") + snapshot.marketPending,
-                pending);
-        count(
-                snapshot.reclaimItems,
-                graveIcon,
-                "grave",
-                LOSS,
-                msg("items-waiting-reclaimed-after") + snapshot.reclaimItems,
-                pending);
+        count(snapshot.reclaimItems, graveIcon, "grave", LOSS,
+                msg("items-waiting-reclaimed-after") + snapshot.reclaimItems, pending);
         counts.revalidate();
         counts.repaint();
     }
@@ -545,10 +442,7 @@ class LivePage implements Shell.Page {
         var label = new JButton(image == null ? fallback + " " + n : String.valueOf(n));
         label.setFont(small());
         label.setForeground(tone.color);
-        label.setIcon(
-                image == null || image.getIconHeight() <= 12
-                        ? image
-                        : new ImageIcon(
+        label.setIcon(image == null || image.getIconHeight() <= 12 ? image : new ImageIcon(
                                 image.getImage().getScaledInstance(-1, 12, Image.SCALE_SMOOTH)));
         label.setIconTextGap(2);
         label.setToolTipText(tip);
@@ -580,10 +474,7 @@ class LivePage implements Shell.Page {
         java.awt.geom.Path2D.Float stone = new java.awt.geom.Path2D.Float();
         stone.moveTo(2.5f, 10f);
         stone.lineTo(2.5f, 4.5f);
-        stone.append(
-                new java.awt.geom.Arc2D.Float(
-                        2.5f, 1.5f, 6f, 6f, 180f, -180f, java.awt.geom.Arc2D.OPEN),
-                true);
+        stone.append(new java.awt.geom.Arc2D.Float(2.5f, 1.5f, 6f, 6f, 180f, -180f, java.awt.geom.Arc2D.OPEN), true);
         stone.lineTo(8.5f, 10f);
         stone.closePath();
         g.draw(stone);
@@ -609,9 +500,7 @@ class LivePage implements Shell.Page {
     }
 
     static boolean numeric(Recent row) {
-        return !row.neutral
-                && !row.unpriced
-                && !"canceled".equals(row.tag)
+        return !row.neutral && !row.unpriced && !"canceled".equals(row.tag)
                 && (!row.market || row.marketSettlementValue || row.valueAvailable);
     }
 
@@ -627,8 +516,7 @@ class LivePage implements Shell.Page {
         if (row.market && !row.valueAvailable && !row.marketSettlementValue)
             tip.append(msg("market-result"));
         if (row.market && row.marketSettlementValue)
-            tip.append(
-                    row.valueAvailable ? msg("primary-value") : msg("observed-settlement-result"));
+            tip.append(row.valueAvailable ? msg("primary-value") : msg("observed-settlement-result"));
         if (row.receipts > 1 && !metaOf(row).contains("entries"))
             tip.append(" · ").append(row.receipts).append(" entries");
         return tip.toString();
@@ -640,9 +528,7 @@ class LivePage implements Shell.Page {
         if (row.unpriced) return "?";
         if ("canceled".equals(row.tag)) return "Canceled";
         if (row.market && !row.marketSettlementValue && !row.valueAvailable)
-            return "review".equals(row.tag)
-                    ? "?"
-                    : row.marketSide.isEmpty() ? "Pending" : row.marketSide;
+            return "review".equals(row.tag) ? "?" : row.marketSide.isEmpty() ? "Pending" : row.marketSide;
         return row.market ? signed(row.value) : worth(row.value);
     }
 
@@ -651,26 +537,17 @@ class LivePage implements Shell.Page {
         if ("review".equals(row.tag)) return "Needs review";
         if ("unpriced".equals(row.tag)) return "Unpriced";
         String qty = row.qty == null ? "" : " · " + row.qty;
-        if (!row.market
-                && (row.actionLabel.isEmpty()
-                        || (row.composite && row.name.equalsIgnoreCase(row.actionLabel))))
+        if (!row.market && (row.actionLabel.isEmpty() || (row.composite && row.name.equalsIgnoreCase(row.actionLabel))))
             return Phrases.orEmpty(row.qty);
         return row.actionLabel + qty;
     }
 
     /** Stable receipt identity drives Live navigation; search text stays a user-owned filter. */
     static Entry entryFor(Recent row) {
-        return new Entry(
-                LedgerData.Scope.CURRENT_GRIND,
-                null,
-                null,
+        return new Entry(LedgerData.Scope.CURRENT_GRIND, null, null,
                 // The Ledger always opens its Losses view on All (owner live 2026-10-13); the
                 // row's own cost view still colours the tray and its menus.
-                LedgerData.CostView.ALL,
-                "",
-                row.receiptId,
-                row.contributionId,
-                null,
+                LedgerData.CostView.ALL, "", row.receiptId, row.contributionId, null,
                 row.ledgerReview ? Audit.REVIEW : null);
     }
 
@@ -696,17 +573,9 @@ class LivePage implements Shell.Page {
     }
 
     static String statusTooltip(LiveSnapshot snapshot) {
-        String wording =
-                snapshot.hopping
-                        ? "Reconnecting"
-                        : snapshot.loggedOut
-                                ? msg("logged-out")
-                                : !snapshot.hasSession
-                                        ? msg("tracking-click")
-                                        : snapshot.paused && !snapshot.idle
-                                                ? msg("tracking-paused-click")
-                                                : snapshot.idle
-                                                        ? msg("waiting-activity")
+        String wording = snapshot.hopping ? "Reconnecting" : snapshot.loggedOut ? msg("logged-out")
+                                : !snapshot.hasSession ? msg("tracking-click") : snapshot.paused && !snapshot.idle
+                                                ? msg("tracking-paused-click") : snapshot.idle ? msg("waiting-activity")
                                                         : msg("live-tracking");
         var tip = new StringBuilder(wording);
         if (snapshot.hasSession) tip.append(" · active ").append(duration(snapshot.elapsedMillis));

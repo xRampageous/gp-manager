@@ -16,109 +16,108 @@ public interface GpManagerConfig extends Config {
     String generalSection = "generalSection";
 
     @ConfigSection(
-            name = "Accounting",
-            description = "What counts toward Net, and manual prices",
-            position = 10)
+            name = "Accounting", description = "What counts toward Net, and manual prices", position = 10)
     String accountingSection = "accountingSection";
 
     @ConfigSection(
-            name = "Loot display",
-            description = "What the tray, Live and Ledger lists show. Does not change Net",
+            name = "Loot display", description = "What the tray, Live and Ledger lists show. Does not change Net",
             position = 20)
     String lootSection = "lootSection";
 
     @ConfigSection(
-            name = "HUD+",
-            description = "The HUD+ overlay. Does not change Net or Ledger",
-            position = 30,
+            name = "HUD+", description = "The HUD+ overlay. Does not change Net or Ledger", position = 30,
             closedByDefault = true)
     String hudLiveSection = "hudLiveSection";
 
     @ConfigSection(
-            name = "History",
-            description = "Saved Grinds and entry detail",
-            position = 40,
-            closedByDefault = true)
+            name = "History", description = "Saved Grinds and entry detail", position = 40, closedByDefault = true)
     String grindsSection = "grindsSection";
 
     @ConfigItem(
-            keyName = "lootPresentationFilter",
-            name = "Display loot filter",
-            description =
+            keyName = "lootPresentationFilter", name = "Display loot filter", description =
                     "Hide Ground Items-hidden gains on the tray, Live lists and Ledger; the tray mirrors display filters and Ledger costs stay visible. Totals stay unchanged",
-            position = 0,
-            section = lootSection)
+            position = 0, section = lootSection)
     default LootFilter lootPresentationFilter() {
         return LootFilter.FOLLOW_GROUND_ITEMS;
     }
 
     @ConfigItem(
-            keyName = "minimumDisplayedLootValue",
-            name = "Minimum displayed loot value",
-            description = "Hide gains worth less than this each on the tray and Live. 0 shows all",
-            position = 1,
+            keyName = "minimumDisplayedLootValue", name = "Minimum displayed loot value",
+            description = "Hide gains worth less than this each on the tray and Live. 0 shows all", position = 1,
             section = lootSection)
     default String minimumDisplayedLootValue() {
         return "0";
     }
 
     @ConfigItem(
-            keyName = "showItemIcons",
-            name = "Item icons",
-            description = "Show item and spell icons on the tray, Live and Ledger",
-            position = 2,
-            section = lootSection)
+            keyName = "showItemIcons", name = "Item icons",
+            description = "Show item and spell icons on the tray, Live and Ledger", position = 2, section = lootSection)
     default boolean showItemIcons() {
         return true;
     }
 
     @ConfigItem(
-            keyName = "alwaysShowItems",
-            name = "Always show items",
-            description =
+            keyName = "alwaysShowItems", name = "Always show items", description =
                     "Comma-separated names always shown on the tray and Live, even when Ground Items hides them or they are under the minimum value. Hidden Recent items still wins",
-            position = 3,
-            section = lootSection)
+            position = 3, section = lootSection)
     default String alwaysShowItems() {
         return "";
     }
 
     @ConfigItem(
-            keyName = "hiddenRecentItems",
-            name = "Hidden Recent items",
-            description = "Comma-separated names hidden from Recent. Net is unchanged",
-            position = 4,
+            keyName = "hiddenRecentItems", name = "Hidden Recent items",
+            description = "Comma-separated names hidden from Recent. Net is unchanged", position = 4,
             section = lootSection)
     default String hiddenRecentItems() {
         return "";
     }
 
     @ConfigItem(
-            keyName = "hiddenRecentCharges",
-            name = "Hidden Recent charges",
-            description =
+            keyName = "hiddenRecentCharges", name = "Hidden Recent charges", description =
                     "Comma-separated names whose charge spends are hidden from Recent; their other rows stay. Net and the Ledger are unchanged",
-            position = 5,
-            section = lootSection)
+            position = 5, section = lootSection)
     default String hiddenRecentCharges() {
         return "";
     }
 
     enum TextSize {
-        Small,
-        Normal,
-        Large
+        Small, Normal, Large
     }
 
     enum HudTimer {
-        Compact,
-        Full
+        Compact, Full
     }
 
     @RequiredArgsConstructor
     enum HudTray {
-        AUTO_FOLD("Auto-fold"),
-        ALWAYS_OPEN("Always open");
+        AUTO_FOLD("Auto-fold"), ALWAYS_OPEN("Always open");
+        final String label;
+
+        public String toString() {
+            return label;
+        }
+    }
+
+    /** Bounded inspectable-detail windows (section L). */
+    @RequiredArgsConstructor
+    enum Retention {
+        DAYS_30("30 days", 30), DAYS_90("90 days", 90), DAYS_180("180 days", 180), DAYS_365("365 days", 365);
+        final String label;
+        @lombok.Getter final int days;
+
+        public String toString() {
+            return label;
+        }
+    }
+
+    /**
+     * Optional item eligibility filter shared by reward presentation and all local accounting
+     * projections. Stored source history is never deleted.
+     */
+    @RequiredArgsConstructor
+    enum LootFilter {
+        ALL_ITEMS("All items"), FOLLOW_GROUND_ITEMS(GameData.msg("follow-ground")),
+        HIGHLIGHTED_LIST_ONLY(GameData.msg("highlighted-list"));
         final String label;
 
         public String toString() {
@@ -128,8 +127,7 @@ public interface GpManagerConfig extends Config {
 
     @RequiredArgsConstructor
     enum HudTrayKeeps {
-        STREAK("This streak"),
-        SESSION("Whole session");
+        STREAK("This streak"), SESSION("Whole session");
         final String label;
 
         public String toString() {
@@ -138,31 +136,22 @@ public interface GpManagerConfig extends Config {
     }
 
     @ConfigItem(
-            keyName = "showHud",
-            name = "Show HUD+",
-            description = "Show the HUD+ overlay",
-            position = 0,
+            keyName = "showHud", name = "Show HUD+", description = "Show the HUD+ overlay", position = 0,
             section = hudLiveSection)
     default boolean showHud() {
         return true;
     }
 
     @ConfigItem(
-            keyName = "hudHideWhenIdle",
-            name = "Hide when not tracking",
-            description =
-                    "Hide HUD+ when nothing is tracking, and in Free play until something is booked",
-            position = 1,
+            keyName = "hudHideWhenIdle", name = "Hide when not tracking", description =
+                    "Hide HUD+ when nothing is tracking, and in Free play until something is booked", position = 1,
             section = hudLiveSection)
     default boolean hudHideWhenIdle() {
         return true;
     }
 
     @ConfigItem(
-            keyName = "hudTextSize",
-            name = "Text size",
-            description = "HUD+ text size",
-            position = 9,
+            keyName = "hudTextSize", name = "Text size", description = "HUD+ text size", position = 9,
             section = hudLiveSection)
     default TextSize hudTextSize() {
         return TextSize.Small;
@@ -170,10 +159,8 @@ public interface GpManagerConfig extends Config {
 
     @Range(min = 120, max = 320)
     @ConfigItem(
-            keyName = "hudMaxWidth",
-            name = "Max width",
-            description = "HUD+ fits its content up to this width; longer names end in …",
-            position = 10,
+            keyName = "hudMaxWidth", name = "Max width",
+            description = "HUD+ fits its content up to this width; longer names end in …", position = 10,
             section = hudLiveSection)
     default int hudMaxWidth() {
         return 260;
@@ -181,134 +168,102 @@ public interface GpManagerConfig extends Config {
 
     @Range(max = 100)
     @ConfigItem(
-            keyName = "hudOpacity",
-            name = "Background opacity",
-            description = "HUD+ background opacity, percent",
-            position = 11,
-            section = hudLiveSection)
+            keyName = "hudOpacity", name = "Background opacity", description = "HUD+ background opacity, percent",
+            position = 11, section = hudLiveSection)
     default int hudOpacity() {
         return 75;
     }
 
     @ConfigItem(
-            keyName = "hudTimer",
-            name = "Timer",
-            description = "Compact (39m52s) or full (0:39:52); counts tracked active time",
-            position = 2,
+            keyName = "hudTimer", name = "Timer",
+            description = "Compact (39m52s) or full (0:39:52); counts tracked active time", position = 2,
             section = hudLiveSection)
     default HudTimer hudTimer() {
         return HudTimer.Compact;
     }
 
     @ConfigItem(
-            keyName = "hudTray",
-            name = "Item tray",
-            description = "Fold the tray after loot, or keep it open",
-            position = 3,
-            section = hudLiveSection)
+            keyName = "hudTray", name = "Item tray", description = "Fold the tray after loot, or keep it open",
+            position = 3, section = hudLiveSection)
     default HudTray hudTray() {
         return HudTray.AUTO_FOLD;
     }
 
     @Range(min = 1, max = 60)
     @ConfigItem(
-            keyName = "hudTraySeconds",
-            name = "Tray stays open",
-            description = "Seconds the tray stays open after loot",
-            position = 4,
-            section = hudLiveSection)
+            keyName = "hudTraySeconds", name = "Tray stays open",
+            description = "Seconds the tray stays open after loot", position = 4, section = hudLiveSection)
     default int hudTraySeconds() {
         return 5;
     }
 
     @Range(min = 1, max = 10)
     @ConfigItem(
-            keyName = "hudTrayRows",
-            name = "Visible item rows",
-            description = "Tray rows before \"+N more\"",
-            position = 5,
-            section = hudLiveSection)
+            keyName = "hudTrayRows", name = "Visible item rows", description = "Tray rows before \"+N more\"",
+            position = 5, section = hudLiveSection)
     default int hudTrayRows() {
         return 4;
     }
 
     @ConfigItem(
-            keyName = "hudTrayKeeps",
-            name = "Tray keeps rows for",
-            description = "Keep this streak's items, or the whole session's",
-            position = 6,
-            section = hudLiveSection)
+            keyName = "hudTrayKeeps", name = "Tray keeps rows for",
+            description = "Keep this streak's items, or the whole session's", position = 6, section = hudLiveSection)
     default HudTrayKeeps hudTrayKeeps() {
         return HudTrayKeeps.STREAK;
     }
 
     @Range(min = 10, max = 3600)
     @ConfigItem(
-            keyName = "streakEndSeconds",
-            name = "Streak ends after",
-            description = "Seconds after the last kill before the HUD tray streak ends.",
-            position = 7,
+            keyName = "streakEndSeconds", name = "Streak ends after",
+            description = "Seconds after the last kill before the HUD tray streak ends.", position = 7,
             section = hudLiveSection)
     default int streakEndSeconds() {
         return 60;
     }
 
     @ConfigItem(
-            keyName = "reducedMotion",
-            name = "Reduced motion",
-            description = "Skip HUD+ tray entry animation; loot still shows.",
-            position = 8,
-            section = hudLiveSection)
+            keyName = "reducedMotion", name = "Reduced motion",
+            description = "Skip HUD+ tray entry animation; loot still shows.", position = 8, section = hudLiveSection)
     default boolean reducedMotion() {
         return false;
     }
 
     @Range(min = 0, max = 300)
     @ConfigItem(
-            keyName = "hudTargetWarningSeconds",
-            name = "Target countdown warning",
+            keyName = "hudTargetWarningSeconds", name = "Target countdown warning",
             description = "Flash the HUD target countdown in its final seconds (solid with Reduced motion); 0 turns it off",
-            position = 12,
-            section = hudLiveSection)
+            position = 12, section = hudLiveSection)
     default int hudTargetWarningSeconds() {
         return 10;
     }
 
     @ConfigItem(
-            keyName = "autoStartSession",
-            name = "Automatic tracking",
+            keyName = "autoStartSession", name = "Automatic tracking",
             description = "Start Free play when gameplay is seen, or at the first login when Start tracking on login is on",
-            position = 0,
-            section = generalSection)
+            position = 0, section = generalSection)
     default boolean autoStartSession() {
         return true;
     }
 
     @ConfigItem(
-            keyName = "autoStartOnLogin",
-            name = "Start tracking on login",
+            keyName = "autoStartOnLogin", name = "Start tracking on login",
             description = "Start or resume tracking at the first login of a RuneLite session instead of waiting for the first action",
-            position = 1,
-            section = generalSection)
+            position = 1, section = generalSection)
     default boolean autoStartOnLogin() {
         return true;
     }
 
     @ConfigItem(
-            keyName = "includeEquipment",
-            name = "Include equipment",
-            description = "Combine equipment with inventory so gear swaps remain neutral",
-            position = 0,
+            keyName = "includeEquipment", name = "Include equipment",
+            description = "Combine equipment with inventory so gear swaps remain neutral", position = 0,
             section = accountingSection)
     default boolean includeEquipment() {
         return true;
     }
 
     @ConfigItem(
-            keyName = "includeRunePouch",
-            name = "Include rune pouch",
-            description = "Count rune pouch runes, so casting from it is a cost",
-            position = 1,
+            keyName = "includeRunePouch", name = "Include rune pouch",
+            description = "Count rune pouch runes, so casting from it is a cost", position = 1,
             section = accountingSection)
     default boolean includeRunePouch() {
         return true;
@@ -325,11 +280,8 @@ public interface GpManagerConfig extends Config {
     }
 
     @ConfigItem(
-            keyName = "persistHistory",
-            name = "Save history",
-            description = "Save sessions locally between RuneLite launches",
-            position = 0,
-            section = grindsSection)
+            keyName = "persistHistory", name = "Save history",
+            description = "Save sessions locally between RuneLite launches", position = 0, section = grindsSection)
     default boolean persistHistory() {
         return true;
     }
@@ -340,11 +292,8 @@ public interface GpManagerConfig extends Config {
     }
 
     @ConfigItem(
-            keyName = "receiptRetentionDays",
-            name = "Entry detail retention",
-            description = "Compact entries older than this; their totals stay",
-            position = 1,
-            section = grindsSection)
+            keyName = "receiptRetentionDays", name = "Entry detail retention",
+            description = "Compact entries older than this; their totals stay", position = 1, section = grindsSection)
     default Retention receiptRetentionDays() {
         return Retention.DAYS_90;
     }
@@ -355,62 +304,48 @@ public interface GpManagerConfig extends Config {
     }
 
     @ConfigItem(
-            keyName = "enablePkTracking",
-            name = "PK accounting",
-            description = "Passively group RuneLite player-loot and confirmed player-death events",
-            position = 2,
+            keyName = "enablePkTracking", name = "PK accounting",
+            description = "Passively group RuneLite player-loot and confirmed player-death events", position = 2,
             section = accountingSection)
     default boolean enablePkTracking() {
         return true;
     }
 
     @ConfigItem(
-            keyName = "countUncertainMixedChanges",
-            name = "Count uncertain mixed changes",
-            description = "Count simultaneous gains and costs without a confirmed context",
-            position = 3,
+            keyName = "countUncertainMixedChanges", name = "Count uncertain mixed changes",
+            description = "Count simultaneous gains and costs without a confirmed context", position = 3,
             section = accountingSection)
     default boolean countUncertainMixedChanges() {
         return false;
     }
 
     @ConfigItem(
-            keyName = "manualPriceOverrides",
-            name = "Manual price overrides",
-            description = "Comma-separated itemId=gp pairs, for example 995=1,1234=250",
-            position = 5,
+            keyName = "manualPriceOverrides", name = "Manual price overrides",
+            description = "Comma-separated itemId=gp pairs, for example 995=1,1234=250", position = 5,
             section = accountingSection)
     default String manualPriceOverrides() {
         return "";
     }
 
     @ConfigItem(
-            keyName = "ironmanAlch",
-            name = "Ironman: value at high alch",
-            description =
+            keyName = "ironmanAlch", name = "Ironman: value at high alch", description =
                     "On an ironman account, value items at their high alchemy price (coins you can make) instead of the Grand Exchange",
-            position = 4,
-            section = accountingSection)
+            position = 4, section = accountingSection)
     default boolean ironmanAlch() {
         return false;
     }
 
     @ConfigItem(
-            keyName = "autoActivityDetection",
-            name = "Automatic activity detection",
-            description = "Name the activity from what you do",
-            position = 2,
-            section = generalSection)
+            keyName = "autoActivityDetection", name = "Automatic activity detection",
+            description = "Name the activity from what you do", position = 2, section = generalSection)
     default boolean autoActivityDetection() {
         return true;
     }
 
     @Range(min = 5, max = 300)
     @ConfigItem(
-            keyName = "activityLabelSeconds",
-            name = "Activity label timeout",
-            description = "Seconds without an attack before the activity label clears",
-            position = 3,
+            keyName = "activityLabelSeconds", name = "Activity label timeout",
+            description = "Seconds without an attack before the activity label clears", position = 3,
             section = generalSection)
     default int activityLabelSeconds() {
         return 15;
@@ -419,11 +354,9 @@ public interface GpManagerConfig extends Config {
     @Units(Units.MINUTES)
     @Range(max = 60)
     @ConfigItem(
-            keyName = "afkPauseMinutes",
-            name = "AFK pause",
+            keyName = "afkPauseMinutes", name = "AFK pause",
             description = "Pause tracking after this long without playing, so GP/hr leaves AFK time out (0 = off)",
-            position = 4,
-            section = generalSection)
+            position = 4, section = generalSection)
     default int afkPauseMinutes() {
         // On by default (owner 1.5.1): only standing still pauses; skilling animates.
         return 3;

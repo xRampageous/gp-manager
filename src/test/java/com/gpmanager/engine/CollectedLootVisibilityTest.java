@@ -1,5 +1,7 @@
 package com.gpmanager;
 
+import com.gpmanager.GpManagerConfig.LootFilter;
+
 import java.util.Collections;
 import org.junit.Test;
 import static org.junit.Assert.*;
@@ -25,13 +27,13 @@ public class CollectedLootVisibilityTest
         assertEquals(0, engine.getMetrics(1600).net);
         ContainerSnapshot picked = new ContainerSnapshot(Collections.singletonMap(526, 1L));
         engine.markDirty();
-        engine.processIfDirty(picked, 2200);
-        engine.processIfDirty(picked, 2800);
+        engine.processIfDirty(picked, 2200, null);
+        engine.processIfDirty(picked, 2800, null);
         assertEquals(500, engine.getMetrics(2800).net);
         engine.bankOpened(6);
         engine.markDirty();
-        engine.processIfDirty(ContainerSnapshot.empty(), 3400);
-        engine.processIfDirty(ContainerSnapshot.empty(), 4000);
+        engine.processIfDirty(ContainerSnapshot.empty(), 3400, null);
+        engine.processIfDirty(ContainerSnapshot.empty(), 4000, null);
         assertEquals(500, engine.getMetrics(4000).net);
     }
 }

@@ -14,7 +14,7 @@ public class SessionTargetCountTest
     @Test
     public void settingAChangedTargetRestartsItsCountAndTheSameValueKeepsIt()
     {
-        Session session = new Session("Vorkath", T0 - 60_000L);
+        Session session = new Session("Vorkath", T0 - 60_000L, SessionMode.GENERAL);
         assertEquals("no target, no count baseline", 0L,
             session.getActiveTimeTargetSetMillis());
 
@@ -38,18 +38,20 @@ public class SessionTargetCountTest
             session.getActiveTimeTargetSetMillis());
 
         // A completed window re-saves as a fresh start (owner live 2026-10-13: Edit > Save).
-        Session done = new Session("Vorkath", T0 - 60_000L);
+        Session done = new Session("Vorkath", T0 - 60_000L, SessionMode.GENERAL);
         done.setActiveTimeTargetMillis(120_000L, T0);
         done.activeTimeTargetSetMillis = 0L;
+        done.sessionStartAt = null;
         assertTrue("re-saving a completed aim begins again",
             done.setActiveTimeTargetMillis(120_000L, T0 + 180_000L));
         assertEquals("the count restarts at the save moment",
             done.getElapsedMillis(T0 + 180_000L), done.getActiveTimeTargetSetMillis());
 
         // The timer pauses without the run (owner live 2026-10-14).
-        Session timed = new Session("Vorkath", T0 - 60_000L);
+        Session timed = new Session("Vorkath", T0 - 60_000L, SessionMode.GENERAL);
         timed.setActiveTimeTargetMillis(120_000L, T0);
         timed.activeTimeTargetSetMillis = 0L;
+        timed.sessionStartAt = null;
         assertTrue(timed.pauseTimeTarget(T0 + 30_000L));
         long atPause = timed.getElapsedMillis(T0 + 30_000L);
         assertEquals("the window freezes", atPause,
@@ -68,7 +70,7 @@ public class SessionTargetCountTest
     @Test
     public void aNetAimCountsFromTheMomentItIsSet()
     {
-        Session session = new Session("Vorkath", T0);
+        Session session = new Session("Vorkath", T0, SessionMode.GENERAL);
         assertTrue(session.setProfitTargetGp(200_000L, 10_000_000L, 0L));
         assertEquals("a set aim starts at zero", 0L, session.profitTargetProgress(10_000_000L));
 
@@ -92,7 +94,7 @@ public class SessionTargetCountTest
     @Test
     public void aNetAimPacesFromWhenItWasSet()
     {
-        Session session = new Session("General", 0L);
+        Session session = new Session("General", 0L, SessionMode.GENERAL);
         long hour = 3_600_000L;
         assertTrue(session.setProfitTargetGp(200_000L, 0L, hour));
         long elapsed = hour + 10L * 60_000L;

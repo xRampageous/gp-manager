@@ -280,8 +280,8 @@ public class GeEvidenceOwnershipTest
     {
         engine.markDirty();
         ContainerSnapshot snapshot = new ContainerSnapshot(next);
-        Transaction first = engine.processIfDirty(snapshot, now);
-        Transaction settled = engine.processIfDirty(snapshot, now + 600L);
+        Transaction first = engine.processIfDirty(snapshot, now, null);
+        Transaction settled = engine.processIfDirty(snapshot, now + 600L, null);
         return settled == null ? first : settled;
     }
 

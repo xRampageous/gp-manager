@@ -136,8 +136,8 @@ public class PvpContextTest
     {
         engine.markDirty();
         ContainerSnapshot snapshot = new ContainerSnapshot(quantities);
-        Transaction result = engine.processIfDirty(snapshot, now);
-        return result != null ? result : engine.processIfDirty(snapshot, now + 1L);
+        Transaction result = engine.processIfDirty(snapshot, now, null);
+        return result != null ? result : engine.processIfDirty(snapshot, now + 1L, null);
     }
 
     private static Engine engine()

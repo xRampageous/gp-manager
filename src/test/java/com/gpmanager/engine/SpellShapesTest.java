@@ -130,7 +130,7 @@ public class SpellShapesTest
         Transaction decided = old(TransactionType.CONSUMPTION, Confidence.LIKELY, true, "",
             new Flow(TABLET, "Bones to peaches", -1L, 100, -100L, PriceSource.GRAND_EXCHANGE));
         decided.applyCorrection(Correction.IGNORE, T0);
-        for (Transaction row : List.of(ate, shards, review, high, low, dropped, decided)) session.addTransaction(row, 2_000);
+        for (Transaction row : List.of(ate, shards, review, high, low, dropped, decided)) session.addTransaction(row, 2_000, false);
 
         engine.recheck(id -> id == PLATESKIRT ? 38_400 : 0);
 
@@ -224,7 +224,7 @@ public class SpellShapesTest
     @Test
     public void anUntradeableWithNoAlchValueIsWorthNothingNotUnpriced()
     {
-        Valuation valuation = new Valuation(new GpManagerConfig() { }, SpellShapesTest::composition, id -> 0);
+        Valuation valuation = ModelProbe.valuation(new GpManagerConfig() { }, SpellShapesTest::composition, id -> 0);
         Flow hat = valuation.valueComponent(HAT, 1L, 0L);
         assertSame("a known zero", PriceSource.NO_VALUE, hat.getPriceSource());
         assertEquals(0, hat.unitPrice);

@@ -34,7 +34,7 @@ public class LivePresentationTest
                 new Flow(3, "Water rune", -1, 124, -124L)),
             Confidence.CONFIRMED, "Cast evidence.", null);
         cast.setActionKind(ActionKind.CAST);
-        engine.getActiveSession().addTransaction(cast, 2_000);
+        engine.getActiveSession().addTransaction(cast, 2_000, false);
 
         LiveSnapshot.Recent live = LiveProbe.toRecent(cast);
         assertEquals("Cast", live.name);
@@ -48,7 +48,7 @@ public class LivePresentationTest
         Engine engine = PresentationLifecycleTest.engine();
         long now = System.currentTimeMillis() - 5 * 60_000L;
         engine.startCustom("Vorkath", now);
-        engine.getActiveSession().addTransaction(booked(now + 1_000L, "Dragon bones", 1, 2, 3_200, 6_400), 2_000);
+        engine.getActiveSession().addTransaction(booked(now + 1_000L, "Dragon bones", 1, 2, 3_200, 6_400), 2_000, false);
         engine.getActiveSession().setProfitTargetGp(1_000_000L);
         LiveSnapshot snapshot = LiveSnapshot.capture(engine, now + 60_000L, LiveContext.NONE);
 
@@ -71,9 +71,9 @@ public class LivePresentationTest
         Engine engine = PresentationLifecycleTest.engine();
         long now = System.currentTimeMillis();
         engine.startCustom("Vorkath", now);
-        engine.getActiveSession().addTransaction(booked(now + 1_000L, "Dragon bones", 1, 1, 3_200, 3_200), 2_000);
-        engine.getActiveSession().addTransaction(booked(now + 2_000L, "Dragon bones", 1, 1, 3_200, 3_200), 2_000);
-        engine.getActiveSession().addTransaction(booked(now + 3_000L, "Dragon bones", 1, 1, 3_200, 3_200), 2_000);
+        engine.getActiveSession().addTransaction(booked(now + 1_000L, "Dragon bones", 1, 1, 3_200, 3_200), 2_000, false);
+        engine.getActiveSession().addTransaction(booked(now + 2_000L, "Dragon bones", 1, 1, 3_200, 3_200), 2_000, false);
+        engine.getActiveSession().addTransaction(booked(now + 3_000L, "Dragon bones", 1, 1, 3_200, 3_200), 2_000, false);
         LiveSnapshot snapshot = LiveSnapshot.capture(engine, now + 4_000L, LiveContext.NONE);
 
         assertEquals("three equivalent receipts render as one row", 1, snapshot.recent.size());
@@ -93,11 +93,11 @@ public class LivePresentationTest
         Engine engine = PresentationLifecycleTest.engine();
         long now = System.currentTimeMillis();
         engine.startCustom("Vorkath", now);
-        engine.getActiveSession().addTransaction(booked(now + 1_000L, "Dragon bones", 1, 2, 3_200, 6_400), 2_000);
-        engine.getActiveSession().addTransaction(consumed(now + 2_000L, "Dragon bones", 1, -1, 3_200, -3_200), 2_000);
-        engine.getActiveSession().addTransaction(booked(now + 3_000L, "Unidentified mineral", 4, 1, 50, 50), 2_000);
-        engine.getActiveSession().addTransaction(unpriced(now + 4_000L, "Unidentified mineral", 4), 2_000);
-        engine.getActiveSession().addTransaction(review(now + 5_000L, "Unidentified mineral", 4, 1L), 2_000);
+        engine.getActiveSession().addTransaction(booked(now + 1_000L, "Dragon bones", 1, 2, 3_200, 6_400), 2_000, false);
+        engine.getActiveSession().addTransaction(consumed(now + 2_000L, "Dragon bones", 1, -1, 3_200, -3_200), 2_000, false);
+        engine.getActiveSession().addTransaction(booked(now + 3_000L, "Unidentified mineral", 4, 1, 50, 50), 2_000, false);
+        engine.getActiveSession().addTransaction(unpriced(now + 4_000L, "Unidentified mineral", 4), 2_000, false);
+        engine.getActiveSession().addTransaction(review(now + 5_000L, "Unidentified mineral", 4, 1L), 2_000, false);
         LiveSnapshot snapshot = LiveSnapshot.capture(engine, now + 6_000L, LiveContext.NONE);
 
         assertEquals("gain, cost, priced, unpriced and review all stay separate", 5, snapshot.recent.size());
@@ -116,7 +116,7 @@ public class LivePresentationTest
         Engine engine = PresentationLifecycleTest.engine();
         long now = System.currentTimeMillis();
         engine.startCustom("Vorkath", now);
-        engine.getActiveSession().addTransaction(unpriced(now + 1_000L, "Unidentified mineral", 8), 2_000);
+        engine.getActiveSession().addTransaction(unpriced(now + 1_000L, "Unidentified mineral", 8), 2_000, false);
         LiveSnapshot snapshot = LiveSnapshot.capture(engine, now + 2_000L, LiveContext.NONE);
 
         assertEquals(1, snapshot.recent.size());
@@ -131,7 +131,7 @@ public class LivePresentationTest
         Engine engine = PresentationLifecycleTest.engine();
         long now = System.currentTimeMillis();
         engine.startCustom("Vorkath", now);
-        engine.getActiveSession().addTransaction(review(now + 1_000L, "Unidentified mineral", 8, 1L), 2_000);
+        engine.getActiveSession().addTransaction(review(now + 1_000L, "Unidentified mineral", 8, 1L), 2_000, false);
         LiveSnapshot snapshot = LiveSnapshot.capture(engine, now + 2_000L, LiveContext.NONE);
 
         assertEquals(1, snapshot.reviewCount);
@@ -180,7 +180,7 @@ public class LivePresentationTest
     public void targetCardShowsProgressOrTheNetTotalSetsOne() throws Exception
     {
         LivePage without = pageWithSession(6_400L, null, false);
-        assertTrue("the Net total says it sets a target", onEdt(() -> without.hero.net.getToolTipText()).endsWith("click to set a target"));
+        assertTrue("the Net total says it sets a target", onEdt(() -> without.hero.net.getToolTipText()).contains("click to set a target"));
         assertFalse("no target row or card", anyContains(labels(without), "TARGET"));
         assertTrue("clicking the Net total sets a target", without.hero.net.getMouseListeners().length > 0);
 
@@ -203,12 +203,12 @@ public class LivePresentationTest
         engine.ensureSession(System.currentTimeMillis());
         SidebarPanel panel = onEdt(() ->
         {
-            SidebarPanel created = new SidebarPanel(engine, PresentationLifecycleTest.config(), null);
+            SidebarPanel created = new SidebarPanel(engine, PresentationLifecycleTest.config(), null, null, null);
             SidebarPanelProbe.refresh(created);
             return created;
         });
         LivePage free = (LivePage) SidebarPanelProbe.livePage(panel);
-        assertTrue("Free play offers a target", onEdt(() -> free.hero.net.getToolTipText()).endsWith("click to set a target"));
+        assertTrue("Free play offers a target", onEdt(() -> free.hero.net.getToolTipText()).contains("click to set a target"));
         engine.setTargets(500_000L, null, System.currentTimeMillis());
         onEdt(() ->
         {
@@ -226,19 +226,19 @@ public class LivePresentationTest
         long now = System.currentTimeMillis();
         engine.startCustom("Vorkath", now - 20L * 60_000L);
         engine.getActiveSession().addTransaction(booked(now - 15L * 60_000L, "Dragon bones", 1, 2,
-            100_000, 200_000L), 2_000);
+            100_000, 200_000L), 2_000, false);
         engine.getActiveSession().setActiveTimeTargetMillis(5L * 3_600_000L, System.currentTimeMillis());
         SidebarPanel panel = onEdt(() ->
         {
-            SidebarPanel created = new SidebarPanel(engine, PresentationLifecycleTest.config(), null);
+            SidebarPanel created = new SidebarPanel(engine, PresentationLifecycleTest.config(), null, null, null);
             SidebarPanelProbe.refresh(created);
             return created;
         });
         LivePage page = (LivePage) SidebarPanelProbe.livePage(panel);
-        assertTrue("the time target keeps its card", labels(page).contains(
-            "TARGET · " + Fmt.durationShort(5L * 3_600_000L)));
-        assertTrue("a fresh set starts its own count at zero", labels(page).contains(
-            Fmt.durationCount(0L) + " / " + Fmt.durationShort(5L * 3_600_000L) + " · 0%"));
+        // Owner 1.5.2: the time is said once, "5h 00m left of 5h 00m · 0%".
+        assertTrue("the time target keeps its card", labels(page).contains("TARGET"));
+        assertTrue("a fresh set starts its own count at zero", anyContains(labels(page),
+            " left of " + Fmt.durationShort(5L * 3_600_000L) + " · 0%"));
         assertEquals("a time target leaves the hero on the plain Net",
             Fmt.signed(200_000L), onEdt(() -> HeroProbe.netText(page.hero)));
         // Owner live 2026-10-13: the window counts from the set moment, not the run's start.
@@ -249,11 +249,10 @@ public class LivePresentationTest
             SidebarPanelProbe.refresh(panel);
             return null;
         });
-        assertTrue("the window counts from when it was set", labels(page).contains(
-            Fmt.durationShort(20L * 60_000L) + " / " + Fmt.durationShort(5L * 3_600_000L)
-                + " · " + Fmt.percent(20L * 60_000L / (double) (5L * 3_600_000L))));
-        assertTrue("the established rate projects Net at the target",
-            anyContains(labels(page), "projected Net"));
+        assertTrue("the window counts from when it was set", anyContains(labels(page),
+            " left of " + Fmt.durationShort(5L * 3_600_000L) + " · " + Fmt.percent(20L * 60_000L / (double) (5L * 3_600_000L))));
+        assertTrue("one line says it", labels(page).stream().noneMatch(label -> label.endsWith(" left")));
+        assertFalse("with no projected Net", anyContains(labels(page), "projected"));
     }
 
     /** Owner live 2026-10-13: both targets set keep the Net read and add the Active Time timer. */
@@ -264,17 +263,18 @@ public class LivePresentationTest
         long now = System.currentTimeMillis();
         engine.startCustom("Vorkath", now - 20L * 60_000L);
         engine.getActiveSession().addTransaction(
-            booked(now - 15L * 60_000L, "Dragon bones", 1, 1, 100_000, 100_000L), 2_000);
+            booked(now - 15L * 60_000L, "Dragon bones", 1, 1, 100_000, 100_000L), 2_000, false);
         engine.setTargets(200_000L, 5L * 3_600_000L, System.currentTimeMillis());
         // The fixtures show aims set at the run's start: baseline zero.
         engine.getActiveSession().profitTargetSetNet = 0L;
+        engine.getActiveSession().sessionStartAt = null;
         engine.getActiveSession().profitTargetSetActiveMillis = 0L;
         // The Timer window is the run's last 20m: the count starts when the target is set.
         engine.getActiveSession().activeTimeTargetSetMillis =
             engine.getActiveSession().getElapsedMillis(System.currentTimeMillis()) - 20L * 60_000L;
         SidebarPanel panel = onEdt(() ->
         {
-            SidebarPanel created = new SidebarPanel(engine, PresentationLifecycleTest.config(), null);
+            SidebarPanel created = new SidebarPanel(engine, PresentationLifecycleTest.config(), null, null, null);
             SidebarPanelProbe.refresh(created);
             return created;
         });
@@ -287,11 +287,10 @@ public class LivePresentationTest
             onEdt(() -> HeroProbe.netText(page.hero)));
         assertEquals("the pair is never duplicated on the card",
             1, Collections.frequency(labels, Fmt.signed(100_000L) + " / " + Fmt.compact(200_000L)));
-        assertTrue("the Active Time pair rides under it", labels.contains(
-            Fmt.durationShort(20L * 60_000L) + " / " + Fmt.durationShort(5L * 3_600_000L)
-                + " · " + Fmt.percent(20L * 60_000L / (double) (5L * 3_600_000L))));
-        assertTrue("the countdown carries the projection",
-            anyContains(labels, "left · ~") && anyContains(labels, "projected Net"));
+        assertTrue("the time line rides under it", anyContains(labels,
+            " left of " + Fmt.durationShort(5L * 3_600_000L) + " · " + Fmt.percent(20L * 60_000L / (double) (5L * 3_600_000L))));
+        assertTrue("said once, with no projection", labels.stream().noneMatch(label -> label.endsWith(" left"))
+            && !anyContains(labels, "projected"));
     }
 
     /** A completed aim swaps the pace line for the Again / Done / Edit row (owner live 2026-10-13). */
@@ -303,14 +302,15 @@ public class LivePresentationTest
         long now = System.currentTimeMillis();
         reachedNet.startCustom("Vorkath", now - 20L * 60_000L);
         reachedNet.getActiveSession().addTransaction(
-            booked(now - 15L * 60_000L, "Dragon bones", 1, 1, 100_000, 100_000L), 2_000);
+            booked(now - 15L * 60_000L, "Dragon bones", 1, 1, 100_000, 100_000L), 2_000, false);
         reachedNet.setTargets(10_000L, 5L * 3_600_000L, System.currentTimeMillis());
         // The aim counts the run's net (baseline at zero), not from this mid-test save.
         reachedNet.getActiveSession().profitTargetSetNet = 0L;
+        reachedNet.getActiveSession().sessionStartAt = null;
         reachedNet.getActiveSession().profitTargetSetActiveMillis = 0L;
         SidebarPanel netPanel = onEdt(() ->
         {
-            SidebarPanel created = new SidebarPanel(reachedNet, PresentationLifecycleTest.config(), null);
+            SidebarPanel created = new SidebarPanel(reachedNet, PresentationLifecycleTest.config(), null, null, null);
             SidebarPanelProbe.refresh(created);
             return created;
         });
@@ -323,59 +323,60 @@ public class LivePresentationTest
         Engine reachedTime = PresentationLifecycleTest.engine();
         reachedTime.startCustom("Vorkath", now - 10L * 60_000L);
         reachedTime.getActiveSession().addTransaction(
-            booked(now - 5L * 60_000L, "Dragon bones", 1, 1, 100_000, 100_000L), 2_000);
+            booked(now - 5L * 60_000L, "Dragon bones", 1, 1, 100_000, 100_000L), 2_000, false);
         reachedTime.setTargets(200_000L, 5L * 60_000L, System.currentTimeMillis());
         // The window is the run's whole 10m, past the 5m target (the count starts at the run).
         reachedTime.getActiveSession().activeTimeTargetSetMillis = 0L;
+        reachedTime.getActiveSession().sessionStartAt = null;
         SidebarPanel timePanel = onEdt(() ->
         {
-            SidebarPanel created = new SidebarPanel(reachedTime, PresentationLifecycleTest.config(), null);
+            SidebarPanel created = new SidebarPanel(reachedTime, PresentationLifecycleTest.config(), null, null, null);
             SidebarPanelProbe.refresh(created);
             return created;
         });
         LivePage timePage = (LivePage) SidebarPanelProbe.livePage(timePanel);
-        assertTrue("the window clamps at its aim",
-            anyContains(labels(timePage), "5m / 5m · 100%"));
+        assertTrue("the window says it is done", anyContains(labels(timePage), "Time target reached"));
         assertTrue("a reached window offers the completed row too",
             anyContains(labels(timePage), "\u21BB"));
     }
 
-    /** Owner 2026-10-14: a reached aim keeps a short next-hour projection on the card. */
+    /** Owner 1.5.2: a reached aim adds no projection; the hero's GP/h already says the pace. */
     @Test
-    public void aReachedAimKeepsTheNextHourProjection() throws Exception
+    public void aReachedAimAddsNoProjection() throws Exception
     {
         Engine engine = PresentationLifecycleTest.engine();
         long now = System.currentTimeMillis();
         engine.startCustom("Vorkath", now - 20L * 60_000L);
         engine.getActiveSession().addTransaction(
-            booked(now - 15L * 60_000L, "Dragon bones", 1, 1, 100_000, 100_000L), 2_000);
+            booked(now - 15L * 60_000L, "Dragon bones", 1, 1, 100_000, 100_000L), 2_000, false);
         engine.setTargets(10_000L, null, System.currentTimeMillis());
         // The aim counts the run's net (baseline at zero), not from this mid-test save.
         engine.getActiveSession().profitTargetSetNet = 0L;
+        engine.getActiveSession().sessionStartAt = null;
         engine.getActiveSession().profitTargetSetActiveMillis = 0L;
         SidebarPanel panel = onEdt(() ->
         {
-            SidebarPanel created = new SidebarPanel(engine, PresentationLifecycleTest.config(), null);
+            SidebarPanel created = new SidebarPanel(engine, PresentationLifecycleTest.config(), null, null, null);
             SidebarPanelProbe.refresh(created);
             return created;
         });
         LivePage page = (LivePage) SidebarPanelProbe.livePage(panel);
         assertTrue("the header still says reached", anyContains(labels(page), "reached"));
-        assertTrue("a reached aim keeps the next-hour projection",
-            anyContains(labels(page), "in 1h"));
+        assertFalse("no next-hour projection", anyContains(labels(page), "in 1h"));
 
         // An immature rate keeps the line blank rather than fabricating an hour.
         Engine fresh = PresentationLifecycleTest.engine();
         fresh.startCustom("Vorkath", System.currentTimeMillis() - 5_000L);
         fresh.getActiveSession().addTransaction(
             booked(System.currentTimeMillis() - 2_000L, "Dragon bones", 1, 1, 5_000, 5_000L),
-            2_000);
+            2_000, false);
         fresh.setTargets(1L, null, System.currentTimeMillis());
         fresh.getActiveSession().profitTargetSetNet = 0L;
+        fresh.getActiveSession().sessionStartAt = null;
         fresh.getActiveSession().profitTargetSetActiveMillis = 0L;
         SidebarPanel freshPanel = onEdt(() ->
         {
-            SidebarPanel created = new SidebarPanel(fresh, PresentationLifecycleTest.config(), null);
+            SidebarPanel created = new SidebarPanel(fresh, PresentationLifecycleTest.config(), null, null, null);
             SidebarPanelProbe.refresh(created);
             return created;
         });
@@ -384,188 +385,66 @@ public class LivePresentationTest
             anyContains(labels(freshPage), "in 1h"));
     }
 
-    /** Owner live 2026-10-13: Again restarts the completed setup, Done clears the goal. */
+    /**
+     * Owner 1.5.2: the card offers Edit, Pause (a running timer), Done and Again. Done clears the
+     * target and the session keeps counting; Again is a new session with the same target.
+     */
     @Test
-    public void completedRowRestartsOrClearsTheGoal() throws Exception
+    public void targetCardOffersDoneAndAgain() throws Exception
     {
-        // Done clears both aims.
         Engine engine = PresentationLifecycleTest.engine();
         long now = System.currentTimeMillis();
         engine.startCustom("Vorkath", now - 20L * 60_000L);
+        engine.setTargets(200_000L, 5L * 60_000L, now - 10L * 60_000L);
         engine.getActiveSession().addTransaction(
-            booked(now - 15L * 60_000L, "Dragon bones", 1, 1, 100_000, 100_000L), 2_000);
-        engine.setTargets(200_000L, null, System.currentTimeMillis());
-        // The aim counts the run's net (baseline at zero), not from this mid-test save.
-        engine.getActiveSession().profitTargetSetNet = 0L;
-        engine.getActiveSession().profitTargetSetActiveMillis = 0L;
+            booked(now - 5L * 60_000L, "Dragon bones", 1, 1, 100_000, 100_000L), 2_000, false);
+        String runId = engine.getActiveSession().getId();
+        Long session = engine.getActiveSession().sessionStartAt;
         SidebarPanel panel = onEdt(() ->
         {
-            SidebarPanel created = new SidebarPanel(engine, PresentationLifecycleTest.config(), null);
+            SidebarPanel created = new SidebarPanel(engine, PresentationLifecycleTest.config(), null, null, null);
             SidebarPanelProbe.refresh(created);
             return created;
         });
         LivePage page = (LivePage) SidebarPanelProbe.livePage(panel);
-        assertFalse("a pending aim shows no completed row", onEdt(() -> page.againButton.isVisible()));
+        assertTrue("Again is always there", onEdt(() -> page.againButton.isVisible()));
+        assertTrue("so is Done", onEdt(() -> page.doneButton.isVisible()));
+        assertTrue(onEdt(() -> page.editButton.isVisible()));
+
+        onEdt(() ->
+        {
+            page.againButton.doClick();
+            return null;
+        });
+        assertEquals("Again keeps the run", runId, engine.getActiveSession().getId());
+        assertEquals("and the target", Long.valueOf(200_000L), engine.getActiveSession().getProfitTargetGp());
+        assertNotEquals("with a new session", session, engine.getActiveSession().sessionStartAt);
+        assertEquals("that counts from zero", 0L,
+            engine.getActiveSession().profitTargetProgress(engine.getMetrics(System.currentTimeMillis()).net));
+        assertFalse(engine.getActiveSession().isTimeTargetPaused());
 
         engine.getActiveSession().addTransaction(
-            booked(now - 10L * 60_000L, "Zulrah's scales", 12934, 1, 150_000, 150_000L), 2_000);
+            booked(System.currentTimeMillis() + 1L, "Zulrah's scales", 12934, 1, 40_000, 40_000L), 2_000, false);
+        Long afterAgain = engine.getActiveSession().sessionStartAt;
         onEdt(() ->
         {
             SidebarPanelProbe.refresh(panel);
-            return null;
-        });
-        assertTrue("a reached aim shows the completed row", onEdt(() -> page.againButton.isVisible()));
-        onEdt(() ->
-        {
             page.doneButton.doClick();
             return null;
         });
         assertNull("Done clears the Net aim", engine.getActiveSession().getProfitTargetGp());
-        assertNull("Done clears the timer too", engine.getActiveSession().getActiveTimeTargetMillis());
+        assertNull("and the timer", engine.getActiveSession().getActiveTimeTargetMillis());
+        assertEquals("the session keeps counting", afterAgain, engine.getActiveSession().sessionStartAt);
+        assertEquals(40_000L, LiveSnapshot.capture(engine, System.currentTimeMillis() + 2L, null).net);
 
-        // Again on a reached Net asks: Retain net re-bases the aim in the same run, Start fresh
-        // re-runs the setup as a new instance (owner live 2026-10-14).
-        Engine again = PresentationLifecycleTest.engine();
-        long now2 = System.currentTimeMillis();
-        again.startCustom("Zulrah", now2 - 20L * 60_000L);
-        again.getActiveSession().addTransaction(
-            booked(now2 - 15L * 60_000L, "Zulrah's scales", 12934, 1, 50_000, 50_000L), 2_000);
-        again.setTargets(10_000L, null, now2);
-        again.getActiveSession().profitTargetSetNet = 0L;
-        again.getActiveSession().profitTargetSetActiveMillis = 0L;
-        String firstId = again.getActiveSession().getId();
-        SidebarPanel retainPanel = onEdt(() ->
-        {
-            SidebarPanel created = new SidebarPanel(again, PresentationLifecycleTest.config(), null);
-            SidebarPanelProbe.refresh(created);
-            return created;
-        });
-        LivePage retainPage = (LivePage) SidebarPanelProbe.livePage(retainPanel);
-        onEdt(() ->
-        {
-            retainPage.againButton.doClick();
-            return null;
-        });
-        assertEquals("the fork waits for the choice", firstId, again.getActiveSession().getId());
-        onEdt(() ->
-        {
-            ShellProbe.pressSheet(retainPanel.shell(), "Retain net");
-            return null;
-        });
-        assertEquals("Retain net keeps the run", firstId, again.getActiveSession().getId());
-        assertEquals("and re-bases the aim on the net so far", 50_000L,
-            again.getActiveSession().getProfitTargetSetNet());
-        assertEquals(Long.valueOf(10_000L), again.getActiveSession().getProfitTargetGp());
-
-        // Retain leaves a running timer exactly as it was, pause included (owner live 2026-10-14).
-        Engine bothRun = PresentationLifecycleTest.engine();
-        long now5 = System.currentTimeMillis();
-        bothRun.startCustom("Zulrah", now5 - 20L * 60_000L);
-        bothRun.getActiveSession().addTransaction(
-            booked(now5 - 15L * 60_000L, "Zulrah's scales", 12934, 1, 50_000, 50_000L), 2_000);
-        bothRun.setTargets(10_000L, 5L * 60_000L, now5);
-        bothRun.getActiveSession().profitTargetSetNet = 0L;
-        bothRun.getActiveSession().profitTargetSetActiveMillis = 0L;
-        bothRun.getActiveSession().pauseTimeTarget(now5);
-        String bothId = bothRun.getActiveSession().getId();
-        SidebarPanel bothPanel = onEdt(() ->
-        {
-            SidebarPanel created = new SidebarPanel(bothRun, PresentationLifecycleTest.config(), null);
-            SidebarPanelProbe.refresh(created);
-            return created;
-        });
-        LivePage bothPage = (LivePage) SidebarPanelProbe.livePage(bothPanel);
-        onEdt(() ->
-        {
-            bothPage.againButton.doClick();
-            return null;
-        });
-        onEdt(() ->
-        {
-            ShellProbe.pressSheet(bothPanel.shell(), "Retain net");
-            return null;
-        });
-        assertEquals("the run stays", bothId, bothRun.getActiveSession().getId());
-        assertTrue("the timer stays paused", bothRun.getActiveSession().isTimeTargetPaused());
-        assertEquals("the aim re-bases", 50_000L,
-            bothRun.getActiveSession().getProfitTargetSetNet());
-        assertEquals("and the aim keeps its value", Long.valueOf(10_000L),
-            bothRun.getActiveSession().getProfitTargetGp());
-
-        // Reset re-bases a still-running Net aim in place without completing it (owner live
-        // 2026-10-14).
-        Engine reset = PresentationLifecycleTest.engine();
-        long now6 = System.currentTimeMillis();
-        reset.startCustom("Zulrah", now6 - 20L * 60_000L);
-        reset.getActiveSession().addTransaction(
-            booked(now6 - 15L * 60_000L, "Zulrah's scales", 12934, 1, 50_000, 50_000L), 2_000);
-        reset.setTargets(200_000L, null, now6);
-        reset.getActiveSession().profitTargetSetNet = 0L;
-        reset.getActiveSession().profitTargetSetActiveMillis = 0L;
-        String resetId = reset.getActiveSession().getId();
-        SidebarPanel resetPanel = onEdt(() ->
-        {
-            SidebarPanel created = new SidebarPanel(reset, PresentationLifecycleTest.config(), null);
-            SidebarPanelProbe.refresh(created);
-            return created;
-        });
-        LivePage resetPage = (LivePage) SidebarPanelProbe.livePage(resetPanel);
-        assertTrue("a running aim offers Reset", onEdt(() -> resetPage.resetButton.isVisible()));
-        assertFalse("and not Again", onEdt(() -> resetPage.againButton.isVisible()));
-        assertTrue("and Done, since a Net-only aim has no timer to pause",
-            onEdt(() -> resetPage.doneButton.isVisible()));
-        onEdt(() ->
-        {
-            resetPage.resetButton.doClick();
-            return null;
-        });
-        assertEquals("Reset keeps the run", resetId, reset.getActiveSession().getId());
-        assertEquals("restarts the aim's count at the net so far", 0L,
-            reset.getActiveSession().profitTargetProgress(reset.getMetrics(now6).net));
-        assertEquals("the run's net stays", 50_000L, reset.getMetrics(now6).net);
-
-        // The other side of the fork starts the setup over as a fresh instance.
-        Engine fresh = PresentationLifecycleTest.engine();
-        long now4 = System.currentTimeMillis();
-        fresh.startCustom("Zulrah", now4 - 20L * 60_000L);
-        fresh.getActiveSession().addTransaction(
-            booked(now4 - 15L * 60_000L, "Zulrah's scales", 12934, 1, 50_000, 50_000L), 2_000);
-        fresh.setTargets(10_000L, null, now4);
-        fresh.getActiveSession().profitTargetSetNet = 0L;
-        fresh.getActiveSession().profitTargetSetActiveMillis = 0L;
-        String freshId = fresh.getActiveSession().getId();
-        SidebarPanel freshPanel = onEdt(() ->
-        {
-            SidebarPanel created = new SidebarPanel(fresh, PresentationLifecycleTest.config(), null);
-            SidebarPanelProbe.refresh(created);
-            return created;
-        });
-        LivePage freshPage = (LivePage) SidebarPanelProbe.livePage(freshPanel);
-        onEdt(() ->
-        {
-            freshPage.againButton.doClick();
-            return null;
-        });
-        onEdt(() ->
-        {
-            ShellProbe.pressSheet(freshPanel.shell(), "Start fresh");
-            return null;
-        });
-        assertNotEquals("Start fresh starts a new instance", freshId,
-            fresh.getActiveSession().getId());
-        assertEquals("the setup travels", "Zulrah", fresh.getActiveSession().getName());
-        assertEquals("the Net aim travels", Long.valueOf(10_000L),
-            fresh.getActiveSession().getProfitTargetGp());
-
-        // The timer's own pause (owner live 2026-10-14): a running timer offers Pause; pausing
-        // freezes the window and shows Done / Edit / Resume; the run itself keeps tracking.
+        // The timer's own pause (owner live 2026-10-14): the run itself keeps tracking.
         Engine timed = PresentationLifecycleTest.engine();
         long now3 = System.currentTimeMillis();
         timed.startCustom("Vorkath", now3 - 5L * 60_000L);
         timed.getActiveSession().setActiveTimeTargetMillis(5L * 60_000L, now3);
         SidebarPanel third = onEdt(() ->
         {
-            SidebarPanel created = new SidebarPanel(timed, PresentationLifecycleTest.config(), null);
+            SidebarPanel created = new SidebarPanel(timed, PresentationLifecycleTest.config(), null, null, null);
             SidebarPanelProbe.refresh(created);
             return created;
         });
@@ -575,7 +454,6 @@ public class LivePresentationTest
         assertFalse("with no bottom row while it runs",
             onEdt(() -> thirdPage.targetActions.isVisible()));
         assertEquals("with the pause icon", "||", onEdt(() -> thirdPage.pauseButton.getText()));
-        assertFalse("Done waits for the pause", onEdt(() -> thirdPage.doneButton.isVisible()));
         onEdt(() ->
         {
             thirdPage.pauseButton.doClick();
@@ -589,9 +467,6 @@ public class LivePresentationTest
             return null;
         });
         assertEquals("with the resume icon", "\u25B6", onEdt(() -> thirdPage.pauseButton.getText()));
-        assertTrue("Done shows while paused", onEdt(() -> thirdPage.doneButton.isVisible()));
-        assertTrue("and Edit", onEdt(() -> thirdPage.editButton.isVisible()));
-        assertFalse("but not Again", onEdt(() -> thirdPage.againButton.isVisible()));
         onEdt(() ->
         {
             thirdPage.pauseButton.doClick();
@@ -608,11 +483,12 @@ public class LivePresentationTest
         long now = System.currentTimeMillis();
         engine.startCustom("Vorkath", now - 20L * 60_000L);
         engine.getActiveSession().addTransaction(
-            booked(now - 15L * 60_000L, "Dragon bones", 1, 1, 100_000, 100_000L), 2_000);
-        engine.setTargets(200_000L, null, System.currentTimeMillis());
+            booked(now - 15L * 60_000L, "Dragon bones", 1, 1, 100_000, 100_000L), 2_000, false);
+        long set = System.currentTimeMillis();
+        engine.setTargets(200_000L, null, set);
         SidebarPanel panel = onEdt(() ->
         {
-            SidebarPanel created = new SidebarPanel(engine, PresentationLifecycleTest.config(), null);
+            SidebarPanel created = new SidebarPanel(engine, PresentationLifecycleTest.config(), null, null, null);
             SidebarPanelProbe.refresh(created);
             return created;
         });
@@ -621,7 +497,7 @@ public class LivePresentationTest
             onEdt(() -> HeroProbe.netText(page.hero)));
 
         engine.getActiveSession().addTransaction(
-            booked(now - 10L * 60_000L, "Zulrah's scales", 12934, 1, 50_000, 50_000L), 2_000);
+            booked(set + 1L, "Zulrah's scales", 12934, 1, 50_000, 50_000L), 2_000, false);
         onEdt(() ->
         {
             SidebarPanelProbe.refresh(panel);
@@ -640,10 +516,10 @@ public class LivePresentationTest
         long now = System.currentTimeMillis();
         engine.startCustom("Vorkath", now - 5L * 60_000L);
         engine.getActiveSession().addTransaction(booked(now - 4L * 60_000L, "Dragon bones", 1, 2,
-            100_000, 200_000L), 2_000);
+            100_000, 200_000L), 2_000, false);
         SidebarPanel panel = onEdt(() ->
         {
-            SidebarPanel created = new SidebarPanel(engine, PresentationLifecycleTest.config(), null);
+            SidebarPanel created = new SidebarPanel(engine, PresentationLifecycleTest.config(), null, null, null);
             SidebarPanelProbe.refresh(created);
             return created;
         });
@@ -661,7 +537,7 @@ public class LivePresentationTest
         Engine engine = PresentationLifecycleTest.engine();
         long now = System.currentTimeMillis();
         engine.startCustom("Flipping", now);
-        engine.getActiveSession().addTransaction(booked(now + 1_000L, "Dragon bones", 1, 2, 2_000, 4_000L), 2_000);
+        engine.getActiveSession().addTransaction(booked(now + 1_000L, "Dragon bones", 1, 2, 2_000, 4_000L), 2_000, false);
         LivePage before = page(engine);
         assertFalse("no offers, no Offers table", onEdt(() -> before.offers.isVisible()));
 
@@ -704,7 +580,7 @@ public class LivePresentationTest
     {
         SidebarPanel panel = onEdt(() ->
         {
-            SidebarPanel created = new SidebarPanel(engine, PresentationLifecycleTest.config(), null);
+            SidebarPanel created = new SidebarPanel(engine, PresentationLifecycleTest.config(), null, null, null);
             SidebarPanelProbe.refresh(created);
             return created;
         });
@@ -742,7 +618,7 @@ public class LivePresentationTest
         engine.pauseForLifecycle(now + 1_000L);
         SidebarPanel panel = onEdt(() ->
         {
-            SidebarPanel created = new SidebarPanel(engine, PresentationLifecycleTest.config(), null);
+            SidebarPanel created = new SidebarPanel(engine, PresentationLifecycleTest.config(), null, null, null);
             SidebarPanelProbe.refresh(created);
             return created;
         });
@@ -770,7 +646,7 @@ public class LivePresentationTest
         engine.resetData(now + 1_000L);
         SidebarPanel panel = onEdt(() ->
         {
-            SidebarPanel created = new SidebarPanel(engine, PresentationLifecycleTest.config(), null);
+            SidebarPanel created = new SidebarPanel(engine, PresentationLifecycleTest.config(), null, null, null);
             SidebarPanelProbe.refresh(created);
             return created;
         });
@@ -801,7 +677,7 @@ public class LivePresentationTest
         engine.togglePause(now + 1_000L);
         SidebarPanel panel = onEdt(() ->
         {
-            SidebarPanel created = new SidebarPanel(engine, PresentationLifecycleTest.config(), null);
+            SidebarPanel created = new SidebarPanel(engine, PresentationLifecycleTest.config(), null, null, null);
             SidebarPanelProbe.refresh(created);
             return created;
         });
@@ -825,16 +701,16 @@ public class LivePresentationTest
         long now = System.currentTimeMillis();
         engine.startCustom("Vorkath", now);
 
-        LiveContext target = new LiveContext(false, null, 0L, PvpState.NONE, "Woodcutting", false, "Goblin");
+        LiveContext target = new LiveContext(false, null, 0L, PvpState.NONE, "Woodcutting", false, "Goblin", false);
         assertEquals("the named run, never the activity", "Vorkath",
             LivePage.identityOf(LiveSnapshot.capture(engine, now + 1_000L, target)));
 
         Engine free = PresentationLifecycleTest.engine();
         free.ensureSession(now);
         // Owner live 2026-10-14: free play shows the detected activity label ("Trade").
-        LiveContext trade = new LiveContext(false, null, 0L, PvpState.NONE, "Trade", false, "");
+        LiveContext trade = new LiveContext(false, null, 0L, PvpState.NONE, "Trade", false, "", false);
         assertEquals("Trade", LivePage.identityOf(LiveSnapshot.capture(free, now + 1_000L, trade)));
-        LiveContext quiet = new LiveContext(false, null, 0L, PvpState.NONE, "", false, "");
+        LiveContext quiet = new LiveContext(false, null, 0L, PvpState.NONE, "", false, "", false);
         assertEquals("", LivePage.identityOf(LiveSnapshot.capture(free, now + 1_000L, quiet)));
     }
 
@@ -846,7 +722,7 @@ public class LivePresentationTest
         engine.startCustom("Vorkath", now);
         SidebarPanel panel = onEdt(() ->
         {
-            SidebarPanel created = new SidebarPanel(engine, PresentationLifecycleTest.config(), null);
+            SidebarPanel created = new SidebarPanel(engine, PresentationLifecycleTest.config(), null, null, null);
             SidebarPanelProbe.refresh(created);
             return created;
         });
@@ -870,7 +746,7 @@ public class LivePresentationTest
         LivePage page = onEdt(() ->
         {
             SidebarPanel panel = new SidebarPanel(PresentationLifecycleTest.engine(),
-                PresentationLifecycleTest.config(), null);
+                PresentationLifecycleTest.config(), null, null, null);
             SidebarPanelProbe.refresh(panel);
             return (LivePage) SidebarPanelProbe.livePage(panel);
         });
@@ -890,7 +766,7 @@ public class LivePresentationTest
         LivePage page = onEdt(() ->
         {
             SidebarPanel panel = new SidebarPanel(PresentationLifecycleTest.engine(),
-                PresentationLifecycleTest.config(), null);
+                PresentationLifecycleTest.config(), null, null, null);
             panel.bindLoggedIn(() -> false);
             SidebarPanelProbe.refresh(panel);
             assertEquals("LOGGED OUT", LivePage.wordOf(SidebarPanelProbe.live(panel)));
@@ -907,10 +783,10 @@ public class LivePresentationTest
         Engine engine = PresentationLifecycleTest.engine();
         long now = System.currentTimeMillis();
         engine.startCustom("Wilderness", now);
-        engine.getActiveSession().addTransaction(booked(now + 1_000L, "Dragon bones", 1, 1, 3_200, 3_200), 2_000);
+        engine.getActiveSession().addTransaction(booked(now + 1_000L, "Dragon bones", 1, 1, 3_200, 3_200), 2_000, false);
         engine.getActiveSession().addEncounter(false, now + 1_500L);
 
-        SidebarPanel panel = onEdt(() -> new SidebarPanel(engine, PresentationLifecycleTest.config(), null));
+        SidebarPanel panel = onEdt(() -> new SidebarPanel(engine, PresentationLifecycleTest.config(), null, null, null));
         onEdt(() ->
         {
             panel.bindPvp(() -> new PvpState(true, true, true, 0L));
@@ -944,19 +820,19 @@ public class LivePresentationTest
         engine.startCustom("Vorkath", now);
         long gains = Math.abs(net) + 100L;
         engine.getActiveSession().addTransaction(booked(now + 1_000L, "Dragon bones", 1, 2,
-            (int) Math.max(1L, gains / 2), gains), 2_000);
-        engine.getActiveSession().addTransaction(consumed(now + 2_000L, "Prayer potion(4)", 3, -1, 100, -100L), 2_000);
+            (int) Math.max(1L, gains / 2), gains), 2_000, false);
+        engine.getActiveSession().addTransaction(consumed(now + 2_000L, "Prayer potion(4)", 3, -1, 100, -100L), 2_000, false);
         if (target != null)
         {
             engine.getActiveSession().setProfitTargetGp(target);
         }
         if (review)
         {
-            engine.getActiveSession().addTransaction(review(now + 3_000L, "Unidentified mineral", 8, 1L), 2_000);
+            engine.getActiveSession().addTransaction(review(now + 3_000L, "Unidentified mineral", 8, 1L), 2_000, false);
         }
         SidebarPanel panel = onEdt(() ->
         {
-            SidebarPanel created = new SidebarPanel(engine, PresentationLifecycleTest.config(), null);
+            SidebarPanel created = new SidebarPanel(engine, PresentationLifecycleTest.config(), null, null, null);
             SidebarPanelProbe.refresh(created);
             return created;
         });
@@ -1090,19 +966,6 @@ public class LivePresentationTest
         return false;
     }
 
-    private static <T> T find(LivePage page, Class<T> type)
-    {
-        for (Component root : roots(page))
-        {
-            T found = findIn(root, type);
-            if (found != null)
-            {
-                return found;
-            }
-        }
-        return null;
-    }
-
     private static <T> T findIn(Component root, Class<T> type)
     {
         if (type.isInstance(root))
@@ -1182,18 +1045,6 @@ public class LivePresentationTest
         for (String label : labels)
         {
             if (label.contains(needle))
-            {
-                return true;
-            }
-        }
-        return false;
-    }
-
-    private static boolean anyAccessibleContains(LivePage page, String needle)
-    {
-        for (Component root : roots(page))
-        {
-            if (anyAccessibleContainsIn(root, needle))
             {
                 return true;
             }

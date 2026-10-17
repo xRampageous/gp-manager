@@ -48,12 +48,12 @@ public class GroundBasisTest
     private void settle(Engine engine, ContainerSnapshot snapshot)
     {
         engine.markDirty();
-        for (int tick = 0; tick < 4; tick++) engine.processIfDirty(snapshot, now += 600L);
+        for (int tick = 0; tick < 4; tick++) engine.processIfDirty(snapshot, now += 600L, null);
     }
 
     private void wait(Engine engine, ContainerSnapshot snapshot, long ticks)
     {
-        for (long tick = 0; tick < ticks; tick++) engine.processIfDirty(snapshot, now += 600L);
+        for (long tick = 0; tick < ticks; tick++) engine.processIfDirty(snapshot, now += 600L, null);
     }
 
     /** Ten counted bolts (known coverage 10), then three dropped. */
@@ -109,7 +109,7 @@ public class GroundBasisTest
         Engine restarted = new Engine(valuator, new TransactionClassifier(), CONFIG);
         restarted.restore(saved, now);
         assertEquals(10L, EngineProbe.knownCoverageQty(restarted, BOLTS));
-        restarted.processIfDirty(pack(BOLTS, 7L), now += 600L);
+        restarted.processIfDirty(pack(BOLTS, 7L), now += 600L, null);
         assertEquals("its pickup memory did not survive", 7L, EngineProbe.knownCoverageQty(restarted, BOLTS));
     }
 
@@ -142,7 +142,7 @@ public class GroundBasisTest
         settle(engine, pack(DART, 10L));
         assertEquals(10L, EngineProbe.knownCoverageQty(engine, DART));
         ChargeDelta delta = new ChargeDelta(ChargeCheck.ChargedItem.BLOWPIPE,
-            Collections.singletonList(new ChargeDelta.ComponentDelta(DART, -4L)));
+            Collections.singletonList(new ChargeDelta.ComponentDelta(DART, -4L)), ChargeDelta.CheckResult.SPEND);
         Transaction spent = engine.bookChargeSpend(delta, "Toxic blowpipe",
             Collections.singletonList(new Flow(DART, "Iron dart", -4L, 10, -40L, PriceSource.GRAND_EXCHANGE)),
             now, null);

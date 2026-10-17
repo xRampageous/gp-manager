@@ -95,7 +95,7 @@ public class PersistentSaveStatusTest
 
         Fixture() throws Exception
         {
-            panel = onEdt(() -> new SidebarPanel(engine(), new GpManagerConfig() {}, null));
+            panel = onEdt(() -> new SidebarPanel(engine(), new GpManagerConfig() {}, null, null, null));
             shell = panel.shell();
         }
     }

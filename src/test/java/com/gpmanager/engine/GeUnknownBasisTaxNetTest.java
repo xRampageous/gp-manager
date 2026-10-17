@@ -1,5 +1,7 @@
 package com.gpmanager;
 
+import com.gpmanager.GpManagerConfig.Retention;
+
 import java.util.ArrayList;
 import java.util.Collections;
 import java.util.HashMap;
@@ -303,7 +305,7 @@ public class GeUnknownBasisTaxNetTest
                 new Flow(COINS, "Coins", 980L, 1, 980L, PriceSource.FACE_VALUE),
                 new Flow(CostKind.GE_TAX_ITEM_ID, "GE sell tax", -20L, 1, -20L,
                     PriceSource.FACE_VALUE)),
-            Confidence.CONFIRMED, "legacy booking", null), 500);
+            Confidence.CONFIRMED, "legacy booking", null), 500, false);
         long legacyNet = -1_000L + 980L - 20L;
 
         market.sellUnknown(0, VIAL, 4L, 8_536, 33_804, 33_128);
@@ -419,7 +421,7 @@ public class GeUnknownBasisTaxNetTest
             Collections.singletonList(new Flow(item, name(item), quantity,
                 (int) (quantity > 0L ? value / quantity : 0L), value,
                 PriceSource.GRAND_EXCHANGE)),
-            Confidence.CONFIRMED, "", null), 500);
+            Confidence.CONFIRMED, "", null), 500, false);
     }
 
     private static String name(int itemId)
@@ -511,7 +513,7 @@ public class GeUnknownBasisTaxNetTest
             ContainerSnapshot snapshot = new ContainerSnapshot(inventory);
             for (int i = 0; i < 3; i++)
             {
-                engine.processIfDirty(snapshot, now);
+                engine.processIfDirty(snapshot, now, null);
                 now += 1_000L;
             }
         }

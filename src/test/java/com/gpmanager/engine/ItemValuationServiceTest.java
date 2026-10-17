@@ -26,7 +26,7 @@ public class ItemValuationServiceTest
         prices.put(139, 2_600);
         prices.put(141, 1_900);
         prices.put(143, 1_000);
-        Valuation service = new Valuation(new GpManagerConfig() { },
+        Valuation service = ModelProbe.valuation(new GpManagerConfig() { },
             id -> composition(names.getOrDefault(id, "Item " + id), 0), id -> prices.getOrDefault(id, 0));
         int[][] steps = {{2434, 139}, {139, 141}, {141, 143}};
         for (int[] step : steps)
@@ -128,7 +128,7 @@ public class ItemValuationServiceTest
 
     @Test public void frozenTearsPriceFromTheirLiveMarketQuote()
     {
-        Valuation service = new Valuation(new GpManagerConfig() { },
+        Valuation service = ModelProbe.valuation(new GpManagerConfig() { },
             id -> composition(id == ItemID.FROZEN_TEAR ? "Frozen tear" : "Item " + id, 0),
             id -> id == ItemID.FROZEN_TEAR ? 272 : 0);
         List<Flow> raw = service.value(
@@ -141,7 +141,7 @@ public class ItemValuationServiceTest
 
     @Test public void coinPouchesAreUnopenedClaimsHeldAtZero()
     {
-        Valuation service = new Valuation(new GpManagerConfig() { },
+        Valuation service = ModelProbe.valuation(new GpManagerConfig() { },
             id -> composition(id == ItemID.PICKPOCKET_COIN_POUCH_ELF ? "Coin pouch" : "Item " + id, 0),
             id -> id == ItemID.PICKPOCKET_COIN_POUCH_ELF ? 1 : 995);
         long now = 1_725_000_000_123L;
@@ -219,7 +219,7 @@ public class ItemValuationServiceTest
     @Test public void unpricedQuantitiesAreAlwaysKeptForReviewAndNeverBecomeZeroGp()
     {
         // Hub v1 has no automatic unpriced/ignored-item accounting exclusion (charter D).
-        Valuation service = new Valuation(new GpManagerConfig() { }, id -> null, id -> 0);
+        Valuation service = ModelProbe.valuation(new GpManagerConfig() { }, id -> null, id -> 0);
         Flow flow = service.value(Collections.singletonMap(1942, 3L)).get(0);
         assertEquals(3L, flow.quantityDelta);
         assertEquals(PriceSource.UNPRICED, flow.getPriceSource());
@@ -231,7 +231,7 @@ public class ItemValuationServiceTest
         GpManagerConfig config = new GpManagerConfig() {
             public String manualPriceOverrides() { return "1942=50"; }
         };
-        Valuation service = new Valuation(config,
+        Valuation service = ModelProbe.valuation(config,
             id -> { throw new IllegalStateException("Definition not ready"); },
             id -> { fail("Manual override must not query market"); return 0; });
         Flow flow = service.value(Collections.singletonMap(1942, 2L)).get(0);
@@ -243,7 +243,7 @@ public class ItemValuationServiceTest
     {
         GpManagerConfig config = new GpManagerConfig() { };
         int[] price = {50};
-        Valuation service = new Valuation(config, id -> null, id -> price[0]);
+        Valuation service = ModelProbe.valuation(config, id -> null, id -> price[0]);
         Flow first = service.value(Collections.singletonMap(1942, 2L)).get(0);
         price[0] = 70;
         assertEquals(140, service.value(Collections.singletonMap(1942, 2L)).get(0).valueDelta);
@@ -256,7 +256,7 @@ public class ItemValuationServiceTest
     @Test public void explicitValuationTimeIsAttachedOnlyWhenPriceEvidenceExists()
     {
         GpManagerConfig config = new GpManagerConfig() { };
-        Valuation service = new Valuation(config, id -> null,
+        Valuation service = ModelProbe.valuation(config, id -> null,
             id -> id == 1942 ? 75 : 0);
 
         Flow captured = service.value(Collections.singletonMap(1942, 2L), 1_725_000_000_123L).get(0);
@@ -279,7 +279,7 @@ public class ItemValuationServiceTest
         GpManagerConfig config = new GpManagerConfig() {
             @Override public String manualPriceOverrides() { return "995=999,13204=1"; }
         };
-        Valuation service = new Valuation(config, id -> null,
+        Valuation service = ModelProbe.valuation(config, id -> null,
             id -> { fail("fixed currencies must not query the market"); return 0; });
 
         Flow coins = service.value(Collections.singletonMap(ItemID.COINS, 7L)).get(0);
@@ -307,7 +307,7 @@ public class ItemValuationServiceTest
         // Owner 2026-10-12: a tokkul reads at the uncut onyx exchange (300,000 per onyx;
         // 260,000 while Karamja gloves are worn). A currency with no fixed exchange
         // (stardust → coins) still stays unpriced.
-        Valuation service = new Valuation(new GpManagerConfig() { }, id -> null, id -> {
+        Valuation service = ModelProbe.valuation(new GpManagerConfig() { }, id -> null, id -> {
             if (id == ItemID.UNCUT_ONYX) return 3_000_000;
             return 0;
         });
@@ -332,7 +332,7 @@ public class ItemValuationServiceTest
         // RuneLite 1.12.39 ItemManager maps these untradeable currency ids to coal when no
         // direct quote exists. GP Manager must not turn that platform identity normalization into
         // automatic monetary identity; only an explicit owner override may price them.
-        Valuation service = new Valuation(new GpManagerConfig() {},
+        Valuation service = ModelProbe.valuation(new GpManagerConfig() {},
             id -> null, id -> 123);
 
         Flow minerals = service.value(Collections.singletonMap(21341, 1L)).get(0);
@@ -361,7 +361,7 @@ public class ItemValuationServiceTest
         GpManagerConfig config = new GpManagerConfig() {
             public String manualPriceOverrides() { return "6529=7"; }
         };
-        Valuation service = new Valuation(config, id -> null, id -> 0);
+        Valuation service = ModelProbe.valuation(config, id -> null, id -> 0);
         Flow flow = service.value(Collections.singletonMap(6529, 2L)).get(0);
         assertEquals(PriceSource.MANUAL_OVERRIDE, flow.getPriceSource());
         assertEquals(14, flow.valueDelta);
@@ -371,13 +371,13 @@ public class ItemValuationServiceTest
     {
         // Owner 2026-10-16: an item no market can quote (untradeable here) is worth its alch value
         // for every account; with a GE price as well, a normal account keeps the GE price.
-        Valuation service = new Valuation(new GpManagerConfig() { },
+        Valuation service = ModelProbe.valuation(new GpManagerConfig() { },
             id -> composition("Unpriced hat", 48_000), id -> 0);
         Flow flow = service.value(Collections.singletonMap(1942, 1L)).get(0);
         assertEquals(PriceSource.HIGH_ALCHEMY, flow.getPriceSource());
         assertEquals(48_000, flow.unitPrice);
         assertEquals(48_000L, flow.valueDelta);
-        Valuation quoted = new Valuation(new GpManagerConfig() { },
+        Valuation quoted = ModelProbe.valuation(new GpManagerConfig() { },
             id -> composition("Unpriced hat", 48_000), id -> id == 1942 ? 50_000 : 0);
         assertEquals(PriceSource.GRAND_EXCHANGE, quoted.value(Collections.singletonMap(1942, 1L)).get(0).getPriceSource());
     }
@@ -385,7 +385,7 @@ public class ItemValuationServiceTest
     @Test public void identityMappingNeverManufacturesCrossItemValue()
     {
         // Only the flow's own item id may be priced; a sibling quote is not evidence for it.
-        Valuation service = new Valuation(new GpManagerConfig() { },
+        Valuation service = ModelProbe.valuation(new GpManagerConfig() { },
             id -> null, id -> id == 1942 ? 100 : 0);
         Flow flow = service.value(Collections.singletonMap(1943, 1L)).get(0);
         assertEquals(PriceSource.UNPRICED, flow.getPriceSource());
@@ -397,7 +397,7 @@ public class ItemValuationServiceTest
         GpManagerConfig config = new GpManagerConfig() {
             public String manualPriceOverrides() { return ItemID.KONAR_KEY + "=900000"; }
         };
-        Valuation service = new Valuation(config,
+        Valuation service = ModelProbe.valuation(config,
             id -> composition("Brimstone key", 48_000),
             id -> { fail("Deferred keys must bypass GE and HA pricing"); return 0; });
 
@@ -410,7 +410,7 @@ public class ItemValuationServiceTest
         Transaction transaction = new Transaction(1L, TransactionType.TRANSFER,
             Context.TRANSFER, "Key held · Brimstone chest", "Brimstone chest", false,
             Collections.singletonList(flow), Confidence.CONFIRMED, "", null);
-        Contribution contribution = Contribution.from(transaction, flow);
+        Contribution contribution = Contribution.from(transaction, flow, 0);
         assertNotNull(contribution);
         assertFalse("Deferred claim is not an unknown/unpriced review edge", contribution.isUnpriced());
         assertFalse("Confirmed deferred claim should not be flagged for review", contribution.needsReview);
@@ -418,7 +418,7 @@ public class ItemValuationServiceTest
 
     @Test public void tradeableCrystalKeyKeepsGeOpportunityCost()
     {
-        Valuation service = new Valuation(new GpManagerConfig() { },
+        Valuation service = ModelProbe.valuation(new GpManagerConfig() { },
             id -> composition("Crystal key", 10), id -> 18_000);
         Flow flow = service.value(Collections.singletonMap(ItemID.CRYSTAL_KEY, -1L)).get(0);
         assertEquals(-18_000L, flow.valueDelta);
@@ -504,9 +504,9 @@ public class ItemValuationServiceTest
     {
         engine.markDirty();
         ContainerSnapshot snapshot = new ContainerSnapshot(inventory);
-        assertNull(engine.processIfDirty(snapshot, now));
-        assertNull(engine.processIfDirty(snapshot, now + 600L));
-        Transaction sip = engine.processIfDirty(snapshot, now + 1_200L);
+        assertNull(engine.processIfDirty(snapshot, now, null));
+        assertNull(engine.processIfDirty(snapshot, now + 600L, null));
+        Transaction sip = engine.processIfDirty(snapshot, now + 1_200L, null);
         assertNotNull(sip);
         return sip;
     }
@@ -532,7 +532,7 @@ public class ItemValuationServiceTest
         prices.put(143, oneDosePrice);
         prices.put(ItemID.VIAL_EMPTY, 8);
         prices.put(ItemID.VIAL_WATER, 12);
-        return new Valuation(config,
+        return ModelProbe.valuation(config,
             id -> composition(names.getOrDefault(id, "Item " + id), 0),
             id -> prices.getOrDefault(id, 0));
     }

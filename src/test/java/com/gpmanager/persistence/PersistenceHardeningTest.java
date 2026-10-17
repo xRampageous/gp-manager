@@ -44,7 +44,7 @@ public class PersistenceHardeningTest
 
     private static SavedState state(String name, long revision)
     {
-        SavedState s = new SavedState(new Session(name, 1_000L), null, Collections.emptyList());
+        SavedState s = new SavedState(new Session(name, 1_000L, SessionMode.GENERAL), null, Collections.emptyList());
         s.setRevision(revision);
         return s;
     }
@@ -53,7 +53,7 @@ public class PersistenceHardeningTest
     public void oneCrashCopyHoldsThePreviousSaveAndRecoversIt() throws Exception
     {
         Path dir = temporary.newFolder("rotation").toPath();
-        SessionRepository repository = new SessionRepository(new Gson(), FilepathTestSupport.root(dir));
+        SessionRepository repository = new SessionRepository(new Gson(), FilepathTestSupport.root(dir), false);
         for (int i = 1; i <= 6; i++)
         {
             assertTrue(PersistenceProbe.save(repository, state("Save " + i, 0L)));
@@ -66,7 +66,7 @@ public class PersistenceHardeningTest
 
         // A damaged primary loads from the crash copy and says so.
         Files.writeString(dir.resolve("sessions.json"), "{not json", StandardCharsets.UTF_8);
-        SessionRepository reopened = new SessionRepository(new Gson(), FilepathTestSupport.root(dir));
+        SessionRepository reopened = new SessionRepository(new Gson(), FilepathTestSupport.root(dir), false);
         SavedState loaded = reopened.load();
         assertEquals("Save 5", loaded.getActiveSession().getName());
         assertEquals("sessions.backup.json", reopened.lastRecoveredFrom);
@@ -81,7 +81,7 @@ public class PersistenceHardeningTest
     public void resetDropsRotatedBackupsSoClearedDataCannotReturn() throws Exception
     {
         Path dir = temporary.newFolder("reset").toPath();
-        SessionRepository repository = new SessionRepository(new Gson(), FilepathTestSupport.root(dir));
+        SessionRepository repository = new SessionRepository(new Gson(), FilepathTestSupport.root(dir), false);
         for (int i = 1; i <= 5; i++)
         {
             assertTrue(PersistenceProbe.save(repository, state("Before " + i, 0L)));
@@ -91,7 +91,7 @@ public class PersistenceHardeningTest
         // Even with primary and backup gone, nothing older than the reset can come back.
         Files.deleteIfExists(dir.resolve("sessions.json"));
         Files.deleteIfExists(dir.resolve("sessions.backup.json"));
-        SavedState loaded = new SessionRepository(new Gson(), FilepathTestSupport.root(dir)).load();
+        SavedState loaded = new SessionRepository(new Gson(), FilepathTestSupport.root(dir), false).load();
         assertTrue(loaded == null || loaded.getActiveSession() == null || !loaded.getActiveSession().getName().startsWith("Before"));
     }
 
@@ -141,7 +141,7 @@ public class PersistenceHardeningTest
         // An older primary is never read or rewritten: it is moved aside unchanged and the
         // profile starts fresh on the current schema.
         Path directory = temporary.newFolder().toPath();
-        SessionRepository repository = new SessionRepository(new Gson(), FilepathTestSupport.root(directory));
+        SessionRepository repository = new SessionRepository(new Gson(), FilepathTestSupport.root(directory), false);
         SavedState version101 = state("Schema 101", 1L);
         version101.setSchemaVersion(101);
         Path primary = FilepathTestSupport.path(repository.dataDir().joinSegment("sessions.json"));
@@ -159,7 +159,7 @@ public class PersistenceHardeningTest
         }
         assertEquals(original, Files.readString(kept, StandardCharsets.UTF_8));
         assertTrue(repository.save(new WriteIntent(null, repository.scopeGeneration,
-            repository.lastKnownDiskRevision, state("Current", 2L))));
+            repository.lastKnownDiskRevision, state("Current", 2L), null)));
     }
 
     @Test
@@ -175,7 +175,7 @@ public class PersistenceHardeningTest
         CountDownLatch inSave = new CountDownLatch(1);
         CountDownLatch readDone = new CountDownLatch(1);
         AtomicBoolean readDuringSave = new AtomicBoolean();
-        SessionRepository repository = new SessionRepository(new Gson(), FilepathTestSupport.root(dir))
+        SessionRepository repository = new SessionRepository(new Gson(), FilepathTestSupport.root(dir), false)
         {
             @Override
             public synchronized boolean save(WriteIntent intent)
@@ -200,7 +200,7 @@ public class PersistenceHardeningTest
         {
             SavedState detached = engine.savedState();
             writer.submit(new WriteIntent(null,
-                repository.scopeGeneration, repository.lastKnownDiskRevision, detached));
+                repository.scopeGeneration, repository.lastKnownDiskRevision, detached, null));
             assertTrue("the save started", inSave.await(5L, TimeUnit.SECONDS));
             engine.getMetrics(now);
             readDone.countDown();
@@ -356,8 +356,8 @@ public class PersistenceHardeningTest
     private static Transaction settle(Engine engine, ContainerSnapshot snapshot, long now)
     {
         engine.markDirty();
-        Transaction first = engine.processIfDirty(snapshot, now);
-        Transaction settled = engine.processIfDirty(snapshot, now + 600L);
+        Transaction first = engine.processIfDirty(snapshot, now, null);
+        Transaction settled = engine.processIfDirty(snapshot, now + 600L, null);
         return settled == null ? first : settled;
     }
 

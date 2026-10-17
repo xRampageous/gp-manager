@@ -190,7 +190,7 @@ public class ReviewFixesTest {
         };
         AtomicReference<GrindsController> controller = new AtomicReference<>();
         SwingUtilities.invokeAndWait(() -> controller.set(new GrindsController(new SidebarPanel(engine(), CONFIG, null, null, disk))));
-        SwingUtilities.invokeLater(controller.get()::resetNow);
+        SwingUtilities.invokeLater(() -> controller.get().resetNow(true));
         try {
             assertTrue("the reset was dispatched", diskEntered.await(2, TimeUnit.SECONDS));
             SwingUtilities.invokeLater(uiHeartbeat::countDown);

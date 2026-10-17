@@ -83,7 +83,7 @@ public class ClosedRateReadinessTest
     {
         session.addTransaction(new Transaction(at, TransactionType.LOOT, Context.LOOT, "", "Vorkath", true,
             Collections.singletonList(new Flow(536, "Dragon bones", 1L, (int) value, value)),
-            Confidence.CONFIRMED, "fixture", null), 2_000);
+            Confidence.CONFIRMED, "fixture", null), 2_000, false);
     }
 
     private static Engine engine()

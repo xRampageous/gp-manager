@@ -53,12 +53,12 @@ public class QuickSaveTest
         assertEquals(plain(gson, engine), strip(coordinator.snapshotJson(null, true)));
         closed.compactBefore(closed.startedAtEpochMillis + 5_000L, null);
         assertEquals(plain(gson, engine), strip(coordinator.snapshotJson(null, true)));
-        Session newlyClosed = new Session("Fresh", T0);
-        newlyClosed.addTransaction(receipt(T0 + 1L), 2_000);
+        Session newlyClosed = new Session("Fresh", T0, SessionMode.GENERAL);
+        newlyClosed.addTransaction(receipt(T0 + 1L), 2_000, false);
         newlyClosed.close(T0 + 10L);
         engine.history.add(0, newlyClosed);
         assertEquals(plain(gson, engine), strip(coordinator.snapshotJson(null, true)));
-        engine.getActiveSession().addTransaction(receipt(T0 + 2L), 2_000);
+        engine.getActiveSession().addTransaction(receipt(T0 + 2L), 2_000, false);
         assertEquals(plain(gson, engine), strip(coordinator.snapshotJson(null, true)));
     }
 
@@ -97,24 +97,24 @@ public class QuickSaveTest
         Engine engine = new Engine(deltas -> Collections.emptyList(), new TransactionClassifier(), new GpManagerConfig() {});
         for (int grind = 0; grind < 5; grind++)
         {
-            Session done = new Session("Grind <" + grind + "> & 'co'", T0 - (5 - grind) * 3_600_000L);
+            Session done = new Session("Grind <" + grind + "> & 'co'", T0 - (5 - grind) * 3_600_000L, SessionMode.GENERAL);
             for (int i = 0; i < 8; i++)
             {
-                done.addTransaction(receipt(done.startedAtEpochMillis + i * 1_000L), 2_000);
+                done.addTransaction(receipt(done.startedAtEpochMillis + i * 1_000L), 2_000, false);
             }
             done.close(done.startedAtEpochMillis + 30_000L);
             engine.history.add(0, done);
         }
         engine.history.add(2, null);
         engine.startCustom("Greater Nechryael", T0);
-        engine.getActiveSession().addTransaction(receipt(T0), 2_000);
+        engine.getActiveSession().addTransaction(receipt(T0), 2_000, false);
         return engine;
     }
 
     private static Persistence coordinator(Gson gson, Engine engine) throws Exception
     {
         SessionRepository repository = new SessionRepository(gson,
-            FilepathTestSupport.root(Files.createTempDirectory("gp-quick")));
+            FilepathTestSupport.root(Files.createTempDirectory("gp-quick")), false);
         return new Persistence(null, null, repository, new OrderedPersistenceWriter(repository, null), engine);
     }
 

@@ -1,5 +1,7 @@
 package com.gpmanager;
 
+import com.gpmanager.GpManagerConfig.Retention;
+
 import java.util.ArrayList;
 import java.util.Collections;
 import java.util.HashMap;
@@ -406,7 +408,7 @@ public class MarketReceiptDetailTest
         market.engine.getActiveSession().addTransaction(new Transaction(market.now - 5_000L,
             TransactionType.GAIN, Context.GENERIC, "", "Chaos rune", true,
             Collections.singletonList(new Flow(CHAOS, "Chaos rune", 1L, 105, 105L)),
-            Confidence.CONFIRMED, "", null), 100);
+            Confidence.CONFIRMED, "", null), 100, false);
         LedgerData base = LedgerData.capture(market.engine, market.now + 1_000L,
             LedgerData.Entry.current());
         Semantics.Group gain = null;
@@ -633,7 +635,7 @@ public class MarketReceiptDetailTest
                 TransactionType.GAIN, Context.GENERIC, "", "Chaos rune", true,
                 Collections.singletonList(new Flow(item, "Chaos rune", filled, quote[0],
                     filled * quote[0], PriceSource.GRAND_EXCHANGE)),
-                Confidence.CONFIRMED, "", null), 500);
+                Confidence.CONFIRMED, "", null), 500, false);
             inventory.put(item, offered);
             engine.setBaseline(new ContainerSnapshot(inventory));
             offer(slot, GrandExchangeOfferState.SELLING, item, (int) offered, 0, limit, 0);
@@ -671,7 +673,7 @@ public class MarketReceiptDetailTest
             ContainerSnapshot snapshot = new ContainerSnapshot(inventory);
             for (int i = 0; i < 3; i++)
             {
-                engine.processIfDirty(snapshot, now);
+                engine.processIfDirty(snapshot, now, null);
                 now += 5_000L;
             }
         }

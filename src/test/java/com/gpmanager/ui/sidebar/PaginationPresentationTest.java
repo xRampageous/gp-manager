@@ -22,7 +22,7 @@ public class PaginationPresentationTest
         {
             Transaction transaction = booked(now + i + 1L, "Item " + i, 1_000 + i, 100L);
             if (oldest == null) oldest = transaction;
-            engine.getActiveSession().addTransaction(transaction, 2_000);
+            engine.getActiveSession().addTransaction(transaction, 2_000, false);
         }
         assertNotNull(oldest);
         final String oldId = oldest.getId();
@@ -63,11 +63,11 @@ public class PaginationPresentationTest
 
         GrindsData data = GrindsData.capture(engine, now + 2_000L, false, null);
         assertEquals("every saved Grind reaches the table", 31, data.myGrinds.size());
-        assertEquals("no Recent runs cap", 31, data.recent.size());
+        assertEquals("no Recent runs cap", 31, data.recent.stream().filter(run -> !run.freePlay).count());
 
         long recentAt = Instant.parse("2024-01-01T11:00:00Z").toEpochMilli();
         long profileNow = Instant.parse("2024-01-01T13:00:00Z").toEpochMilli();
-        GrindsData.Recent sample = new GrindsData.Recent("s", "Grind", recentAt, 0L, 0L);
+        GrindsData.Recent sample = new GrindsData.Recent("s", "Grind", recentAt, 0L, 0L, false);
         String label = GrindsPage.contextLine(sample, profileNow, ZoneId.of("Pacific/Kiritimati"));
         assertTrue("Recent Grind day labels follow the supplied analytics zone", label.startsWith("Today"));
     }

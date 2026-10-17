@@ -20,7 +20,7 @@ public class SchemaFreshStartTest
 
     private static SavedState state(String name)
     {
-        return new SavedState(new Session(name, 1_000L), null, Collections.emptyList());
+        return new SavedState(new Session(name, 1_000L, SessionMode.GENERAL), null, Collections.emptyList());
     }
 
     /** Rewrites the saved file's schema field; a negative schema removes it. */
@@ -48,7 +48,7 @@ public class SchemaFreshStartTest
     private void startsFresh(int olderSchema) throws Exception
     {
         Path directory = temporary.newFolder().toPath();
-        SessionRepository repository = new SessionRepository(new Gson(), FilepathTestSupport.root(directory));
+        SessionRepository repository = new SessionRepository(new Gson(), FilepathTestSupport.root(directory), false);
         assertTrue(PersistenceProbe.save(repository, state("Old")));
         assertTrue(PersistenceProbe.save(repository, state("Older backup")));
         stamp(directory, olderSchema);
@@ -85,13 +85,13 @@ public class SchemaFreshStartTest
     public void aSaveThatMeetsAnOlderFileSetsItAsideInsteadOfRefusing() throws Exception
     {
         Path directory = temporary.newFolder().toPath();
-        SessionRepository writer = new SessionRepository(new Gson(), FilepathTestSupport.root(directory));
+        SessionRepository writer = new SessionRepository(new Gson(), FilepathTestSupport.root(directory), false);
         assertTrue(PersistenceProbe.save(writer, state("Old")));
         stamp(directory, 108);
 
-        SessionRepository fresh = new SessionRepository(new Gson(), FilepathTestSupport.root(directory));
+        SessionRepository fresh = new SessionRepository(new Gson(), FilepathTestSupport.root(directory), false);
         assertTrue(fresh.save(new WriteIntent(null, fresh.scopeGeneration, fresh.lastKnownDiskRevision,
-            state("New"))));
+            state("New"), null)));
         assertEquals("New", fresh.load().getActiveSession().getName());
         assertEquals(1L, setAside(directory));
     }
@@ -100,7 +100,7 @@ public class SchemaFreshStartTest
     public void aNewerSaveIsNeverReadAsCurrentOrOverwritten() throws Exception
     {
         Path directory = temporary.newFolder().toPath();
-        SessionRepository repository = new SessionRepository(new Gson(), FilepathTestSupport.root(directory));
+        SessionRepository repository = new SessionRepository(new Gson(), FilepathTestSupport.root(directory), false);
         assertTrue(PersistenceProbe.save(repository, state("Future")));
         stamp(directory, SavedState.CURRENT_SCHEMA_VERSION + 1);
         String before = Files.readString(directory.resolve("sessions.json"));

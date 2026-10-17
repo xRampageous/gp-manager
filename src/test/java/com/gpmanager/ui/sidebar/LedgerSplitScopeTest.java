@@ -175,7 +175,7 @@ public class LedgerSplitScopeTest
         {
             this.engine = engine;
             JsonCodec.bind(new com.google.gson.Gson());
-            panel = onEdt(() -> new SidebarPanel(engine, new GpManagerConfig() {}, null));
+            panel = onEdt(() -> new SidebarPanel(engine, new GpManagerConfig() {}, null, null, null));
             controller = new LedgerController(panel);
             engine.startCustom("Vorkath", NOW);
         }
@@ -189,7 +189,7 @@ public class LedgerSplitScopeTest
         {
             Transaction transaction = new Transaction(NOW + 1_000L, TransactionType.LOOT, Context.LOOT, "", "Vorkath", true,
                 Arrays.asList(flows), Confidence.CONFIRMED, "fixture", null);
-            engine.getActiveSession().addTransaction(transaction, 2_000);
+            engine.getActiveSession().addTransaction(transaction, 2_000, false);
             return transaction;
         }
 

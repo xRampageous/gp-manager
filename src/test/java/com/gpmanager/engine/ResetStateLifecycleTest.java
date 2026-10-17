@@ -51,7 +51,7 @@ public class ResetStateLifecycleTest
         engine.setBaseline(new ContainerSnapshot(new HashMap<>()));
         engine.getActiveSession().addTransaction(Tx.of(1_500L, TransactionType.GAIN,
             Context.GENERIC, "Old", true,
-            Collections.singletonList(new Flow(OAK_LOGS, "Oak logs", 5L, 40, 200L))), 100);
+            Collections.singletonList(new Flow(OAK_LOGS, "Oak logs", 5L, 40, 200L))), 100, false);
         engine.resetData(2_000L);
         return engine;
     }
@@ -92,8 +92,8 @@ public class ResetStateLifecycleTest
         engine.markDirty();
         Map<Integer, Long> logs = new HashMap<>();
         logs.put(OAK_LOGS, 1L);
-        assertNull(engine.processIfDirty(new ContainerSnapshot(logs), 3_200L));
-        Transaction gain = engine.processIfDirty(new ContainerSnapshot(logs), 3_800L);
+        assertNull(engine.processIfDirty(new ContainerSnapshot(logs), 3_200L, null));
+        Transaction gain = engine.processIfDirty(new ContainerSnapshot(logs), 3_800L, null);
         assertNotNull(gain);
         assertEquals(40L, gain.getNet());
         assertEquals(40L, engine.getMetrics(4_000L).net);
@@ -107,7 +107,7 @@ public class ResetStateLifecycleTest
         ContainerSnapshot unchanged = new ContainerSnapshot(new HashMap<>());
         for (int tick = 0; tick < 20; tick++)
         {
-            assertNull(engine.processIfDirty(unchanged, 2_200L + tick * 600L));
+            assertNull(engine.processIfDirty(unchanged, 2_200L + tick * 600L, null));
         }
         engine.resume(15_000L, PauseReason.LIFECYCLE);
         engine.resume(15_000L, PauseReason.IDLE, PauseReason.RECOVERY);

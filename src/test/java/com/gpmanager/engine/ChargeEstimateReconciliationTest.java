@@ -48,7 +48,7 @@ public class ChargeEstimateReconciliationTest
             Arrays.asList(new ChargeDelta.ComponentDelta(ItemID.DEATHRUNE, -2L),
                 new ChargeDelta.ComponentDelta(ItemID.CHAOSRUNE, -3L),
                 new ChargeDelta.ComponentDelta(ItemID.FIRERUNE, -10L),
-                new ChargeDelta.ComponentDelta(ItemID.COINS, -20L)));
+                new ChargeDelta.ComponentDelta(ItemID.COINS, -20L)), ChargeDelta.CheckResult.SPEND);
         Transaction measured = engine.bookChargeSpend(delta, "Trident of the seas",
             flows(
                 flow(ItemID.DEATHRUNE, "Death rune", -2L, 100),
@@ -82,7 +82,7 @@ public class ChargeEstimateReconciliationTest
             Correction.COST, T0 + 2L, "Owner decision"));
 
         ChargeDelta delta = new ChargeDelta(ChargeCheck.ChargedItem.TRIDENT_SEAS,
-            Collections.singletonList(new ChargeDelta.ComponentDelta(ItemID.DEATHRUNE, -2L)));
+            Collections.singletonList(new ChargeDelta.ComponentDelta(ItemID.DEATHRUNE, -2L)), ChargeDelta.CheckResult.SPEND);
         Transaction measured = engine.bookChargeSpend(delta, "Trident of the seas",
             Collections.singletonList(flow(ItemID.DEATHRUNE, "Death rune", -2L, 100)), T0 + 3L, "slot-a");
 
@@ -104,7 +104,7 @@ public class ChargeEstimateReconciliationTest
         engine.startCustom("Custom", T0 + 2L);
 
         ChargeDelta delta = new ChargeDelta(ChargeCheck.ChargedItem.TRIDENT_SEAS,
-            Collections.singletonList(new ChargeDelta.ComponentDelta(ItemID.DEATHRUNE, -2L)));
+            Collections.singletonList(new ChargeDelta.ComponentDelta(ItemID.DEATHRUNE, -2L)), ChargeDelta.CheckResult.SPEND);
         Transaction measured = engine.bookChargeSpend(delta, "Trident of the seas",
             Collections.singletonList(flow(ItemID.DEATHRUNE, "Death rune", -2L, 100)), T0 + 3L, "slot-a");
 
@@ -158,12 +158,4 @@ public class ChargeEstimateReconciliationTest
         return Arrays.asList(values);
     }
 
-    private static List<Flow> tridentLosses(long death)
-    {
-        return flows(flow(ItemID.DEATHRUNE, "Death rune", death, 100),
-            flow(ItemID.CHAOSRUNE, "Chaos rune", death, 50),
-            flow(ItemID.FIRERUNE, "Fire rune", death * 5L, 5),
-            new Flow(ItemID.COINS, "Coins", death * 10L, 1, death * 10L,
-                PriceSource.FACE_VALUE));
-    }
 }

@@ -38,7 +38,7 @@ public class KeyChestClaimTest
 
         engine.observeChest("Open", "Brimstone chest");
         assertNull("menu click alone is not a claim",
-            engine.processIfDirty(snapshot(ItemID.KONAR_KEY, 1L), 2_800L));
+            engine.processIfDirty(snapshot(ItemID.KONAR_KEY, 1L), 2_800L, null));
         PendingClaim pending = engine.getPendingClaims().get(0);
         assertEquals(received.getId(), pending.getClaimId());
         assertEquals(ItemID.KONAR_KEY, pending.itemOrKeyId);
@@ -360,8 +360,8 @@ public class KeyChestClaimTest
     private static Transaction settle(Engine engine, ContainerSnapshot snapshot, long now)
     {
         engine.markDirty();
-        Transaction first = engine.processIfDirty(snapshot, now);
-        Transaction settled = engine.processIfDirty(snapshot, now + 600L);
+        Transaction first = engine.processIfDirty(snapshot, now, null);
+        Transaction settled = engine.processIfDirty(snapshot, now + 600L, null);
         return settled == null ? first : settled;
     }
 

@@ -71,7 +71,7 @@ public class PickupWithRoutineSpendTest
         Transaction result = null;
         for (int i = 0; i < 3; i++)
         {
-            Transaction settled = engine.processIfDirty(new ContainerSnapshot(new HashMap<>(held)), T0 + 600L + i * 600L);
+            Transaction settled = engine.processIfDirty(new ContainerSnapshot(new HashMap<>(held)), T0 + 600L + i * 600L, null);
             if (settled != null)
             {
                 result = settled;

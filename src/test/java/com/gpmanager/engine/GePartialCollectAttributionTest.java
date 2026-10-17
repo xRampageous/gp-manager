@@ -1,5 +1,7 @@
 package com.gpmanager;
 
+import com.gpmanager.GpManagerConfig.Retention;
+
 import java.util.ArrayList;
 import java.util.Collections;
 import java.util.HashMap;
@@ -749,7 +751,7 @@ public class GePartialCollectAttributionTest
                 Collections.singletonList(new Flow(item, name(item), quantity,
                     (int) (quantity > 0L ? value / quantity : 0L), value,
                     PriceSource.GRAND_EXCHANGE)),
-                Confidence.CONFIRMED, "", null), 500);
+                Confidence.CONFIRMED, "", null), 500, false);
         }
 
         private void offer(int slot, GrandExchangeOfferState state, int item, int total, int traded,
@@ -768,8 +770,8 @@ public class GePartialCollectAttributionTest
         {
             engine.markDirty();
             ContainerSnapshot snapshot = new ContainerSnapshot(inventory);
-            engine.processIfDirty(snapshot, at);
-            engine.processIfDirty(snapshot, at + 1L);
+            engine.processIfDirty(snapshot, at, null);
+            engine.processIfDirty(snapshot, at + 1L, null);
         }
 
         MarketRows.Row row(int itemId)

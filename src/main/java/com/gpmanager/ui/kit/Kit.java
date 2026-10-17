@@ -11,15 +11,11 @@ import java.awt.event.*;
 import java.awt.image.BufferedImage;
 import java.util.*;
 import java.util.List;
-import java.util.Map;
 import java.util.function.Consumer;
 import java.util.function.Function;
 import javax.swing.*;
 import javax.swing.Timer;
 import lombok.*;
-import lombok.AllArgsConstructor;
-import lombok.EqualsAndHashCode;
-import lombok.RequiredArgsConstructor;
 import net.runelite.client.plugins.config.ConfigPlugin;
 import net.runelite.client.ui.*;
 import net.runelite.client.ui.components.materialtabs.*;
@@ -47,8 +43,7 @@ class Kit {
     static final int ROW = 20;
 
     /** The item's sprite as an icon, cached per item until the sprite image changes. */
-    static ImageIcon icon(
-            Map<Integer, ImageIcon> cache, Function<Integer, BufferedImage> sprites, int itemId) {
+    static ImageIcon icon(Map<Integer, ImageIcon> cache, Function<Integer, BufferedImage> sprites, int itemId) {
         BufferedImage image = sprites.apply(itemId);
         if (image == null) return null;
         ImageIcon icon = cache.get(itemId);
@@ -74,12 +69,8 @@ class Kit {
     /** What a value is, which decides its colour. */
     @RequiredArgsConstructor
     enum Tone {
-        GAIN(ColorScheme.GRAND_EXCHANGE_PRICE),
-        SUPPLY(ColorScheme.GRAND_EXCHANGE_ALCH),
-        LOSS(new Color(255, 122, 107)),
-        MARKET(new Color(90, 180, 255)),
-        REVIEW(ColorScheme.PROGRESS_INPROGRESS_COLOR),
-        PLAIN(Color.WHITE),
+        GAIN(ColorScheme.GRAND_EXCHANGE_PRICE), SUPPLY(ColorScheme.GRAND_EXCHANGE_ALCH), LOSS(new Color(255, 122, 107)),
+        MARKET(new Color(90, 180, 255)), REVIEW(ColorScheme.PROGRESS_INPROGRESS_COLOR), PLAIN(Color.WHITE),
         DIM(ColorScheme.LIGHT_GRAY_COLOR);
         final Color color;
 
@@ -141,10 +132,7 @@ class Kit {
     private static final Font BODY_TXT =
             loaded("/com/gpmanager/fonts/Inter-Regular.ttf", 12.5f, FontManager.getRunescapeFont());
     private static final Font SMALL_TXT = BODY_TXT.deriveFont(11f);
-    private static final Font BOLD_TXT =
-            loaded(
-                    "/com/gpmanager/fonts/Inter-SemiBold.ttf",
-                    12.5f,
+    private static final Font BOLD_TXT = loaded("/com/gpmanager/fonts/Inter-SemiBold.ttf", 12.5f,
                     FontManager.getRunescapeBoldFont());
 
     /** A bundled resource face when the build ships it; else the RuneLite font. */
@@ -198,8 +186,7 @@ class Kit {
     }
 
     /** Apply pager text and navigation state; callers retain their different text formats. */
-    static void applyPager(
-            JLabel label, JButton previous, JButton next, int page, int pages, String text) {
+    static void applyPager(JLabel label, JButton previous, JButton next, int page, int pages, String text) {
         label.setText(text);
         previous.setEnabled(page > 0);
         next.setEnabled(page < pages - 1);
@@ -234,12 +221,23 @@ class Kit {
         return text.substring(0, low) + "\u2026";
     }
 
+    /**
+     * Fits text by shrinking its font, down to 10 pt, before cutting it with an ellipsis, so a
+     * long name stays readable (owner 1.5.2); the caller keeps the full text in a tooltip.
+     */
+    static String fitShrinking(JLabel label, String text, Font font, int budget) {
+        Font size = font;
+        while (budget > 0 && size.getSize2D() > 10f
+                && label.getFontMetrics(size).stringWidth(Phrases.orEmpty(text)) > budget)
+            size = size.deriveFont(size.getSize2D() - 0.5f);
+        label.setFont(size);
+        return fit(label, text, budget);
+    }
+
     static JLabel label(String text, Font font, Color color) {
         var label = new JLabel(Phrases.orEmpty(text));
         // Symbols the RuneScape font cannot draw fall back to the platform face at the same size.
-        label.setFont(
-                label.getText().isEmpty() || font.canDisplayUpTo(label.getText()) < 0
-                        ? font
+        label.setFont(label.getText().isEmpty() || font.canDisplayUpTo(label.getText()) < 0 ? font
                         : new Font(Font.DIALOG, font.getStyle(), font.getSize()));
         label.setForeground(color);
         return label;
@@ -311,11 +309,7 @@ class Kit {
     /** Wrapped small text; a sheet's narrower box uses a smaller width so nothing is cut. */
     static JLabel note(String text, Color color, int width) {
         String safe = (Phrases.orEmpty(text)).replace("&", "&amp;").replace("<", "&lt;");
-        JLabel label =
-                label(
-                        "<html><div style='width:" + width + "px'>" + safe + "</div></html>",
-                        small(),
-                        color);
+        JLabel label = label("<html><div style='width:" + width + "px'>" + safe + "</div></html>", small(), color);
         pad(label, 0, GAP, 0, GAP);
         return label;
     }
@@ -327,9 +321,7 @@ class Kit {
         button.setForeground(TEXT);
         button.setBackground(CARD);
         button.setFocusPainted(false);
-        button.setBorder(
-                BorderFactory.createCompoundBorder(
-                        BorderFactory.createLineBorder(primary ? ACCENT : LINE),
+        button.setBorder(BorderFactory.createCompoundBorder(BorderFactory.createLineBorder(primary ? ACCENT : LINE),
                         BorderFactory.createEmptyBorder(3, 8, 3, 8)));
         button.addActionListener(e -> action.run());
         return button;
@@ -357,9 +349,7 @@ class Kit {
                 bottom = i / w;
             }
         }
-        return right < 0
-                ? new Rectangle(w, h)
-                : new Rectangle(left, top, right - left + 1, bottom - top + 1);
+        return right < 0 ? new Rectangle(w, h) : new Rectangle(left, top, right - left + 1, bottom - top + 1);
     }
 
     /**
@@ -371,28 +361,13 @@ class Kit {
         double scale = Math.min(1d, box / (double) Math.max(crop.width, crop.height));
         int w = Math.max(1, (int) Math.round(crop.width * scale));
         int h = Math.max(1, (int) Math.round(crop.height * scale));
-        var out =
-                new java.awt.image.BufferedImage(
-                        box, box, java.awt.image.BufferedImage.TYPE_INT_ARGB);
+        var out = new java.awt.image.BufferedImage(box, box, java.awt.image.BufferedImage.TYPE_INT_ARGB);
         Graphics2D g = out.createGraphics();
-        g.setRenderingHint(
-                RenderingHints.KEY_INTERPOLATION,
-                scale < 1d
-                        ? RenderingHints.VALUE_INTERPOLATION_BILINEAR
+        g.setRenderingHint(RenderingHints.KEY_INTERPOLATION, scale < 1d ? RenderingHints.VALUE_INTERPOLATION_BILINEAR
                         : RenderingHints.VALUE_INTERPOLATION_NEAREST_NEIGHBOR);
         int x = (box - w) / 2;
         int y = (box - h) / 2;
-        g.drawImage(
-                image,
-                x,
-                y,
-                x + w,
-                y + h,
-                crop.x,
-                crop.y,
-                crop.x + crop.width,
-                crop.y + crop.height,
-                null);
+        g.drawImage(image, x, y, x + w, y + h, crop.x, crop.y, crop.x + crop.width, crop.y + crop.height, null);
         g.dispose();
         return out;
     }
@@ -402,10 +377,7 @@ class Kit {
         return NUMBERS.deriveFont(size);
     }
 
-    private static final Font NUMBERS =
-            loaded(
-                    "/com/gpmanager/fonts/JetBrainsMono-Regular.ttf",
-                    12f,
+    private static final Font NUMBERS = loaded("/com/gpmanager/fonts/JetBrainsMono-Regular.ttf", 12f,
                     new Font(Font.MONOSPACED, Font.PLAIN, 12));
 
 }
@@ -422,9 +394,7 @@ class KeyValue extends JPanel {
         setBackground(CARD);
         if (title != null) {
             JLabel header = label(title, small(), LABEL);
-            header.setBorder(
-                    BorderFactory.createCompoundBorder(
-                            BorderFactory.createMatteBorder(0, 0, 1, 0, LINE),
+            header.setBorder(BorderFactory.createCompoundBorder(BorderFactory.createMatteBorder(0, 0, 1, 0, LINE),
                             BorderFactory.createEmptyBorder(0, 6, 0, 6)));
             header.setPreferredSize(new Dimension(0, HEADER));
             add(header, BorderLayout.NORTH);
@@ -453,13 +423,8 @@ class KeyValue extends JPanel {
         // The key keeps its width; a value too long for the rest ends in "…" and hovers in full.
         line.add(label(key, small(), LABEL), BorderLayout.WEST);
         char first = value.isEmpty() ? ' ' : value.charAt(0);
-        boolean numeral =
-                Character.isDigit(first) || first == '\u2212' || first == '-' || first == '+';
-        JLabel shown =
-                label(
-                        value,
-                        numeral ? numbers(11.5f) : body(),
-                        (tone == null ? Kit.Tone.PLAIN : tone).color);
+        boolean numeral = Character.isDigit(first) || first == '\u2212' || first == '-' || first == '+';
+        JLabel shown = label(value, numeral ? numbers(11.5f) : body(), (tone == null ? Kit.Tone.PLAIN : tone).color);
         shown.setHorizontalAlignment(JLabel.RIGHT);
         shown.setToolTipText(exact == null ? value : exact);
         line.add(shown, BorderLayout.CENTER);
@@ -517,6 +482,13 @@ class Hero extends JPanel {
 
     JLabel rate = label("", bold(), TEXT);
     JLabel clock = label("", small(), LABEL);
+
+    /**
+     * A slim line under the Net: the run's whole total while Live counts fresh, and Risk where you
+     * can be attacked (owner 1.5.2: out of the header). Hidden when it has nothing to say.
+     */
+    JPanel under = new JPanel(new FlowLayout(FlowLayout.LEFT, 6, 0));
+
     JPanel strips = stack(CARD, 0);
     JPanel controls = new JPanel(new FlowLayout(FlowLayout.RIGHT, 2, 0));
     JPanel big = new JPanel(new BorderLayout(GAP, 0));
@@ -546,8 +518,7 @@ class Hero extends JPanel {
         right.add(icons);
         right.add(controls);
         status.add(right, BorderLayout.EAST);
-        dot.addMouseListener(
-                new MouseAdapter() {
+        dot.addMouseListener(new MouseAdapter() {
                     public void mouseClicked(MouseEvent e) {
                         if (onDot != null) onDot.run();
                     }
@@ -567,6 +538,10 @@ class Hero extends JPanel {
         top.setOpaque(false);
         top.add(status, BorderLayout.NORTH);
         top.add(big, BorderLayout.CENTER);
+        under.setOpaque(false);
+        pad(under, 0, 0, 4, 0);
+        under.setVisible(false);
+        top.add(under, BorderLayout.SOUTH);
         add(top, BorderLayout.NORTH);
         add(strips, BorderLayout.CENTER);
     }
@@ -577,13 +552,10 @@ class Hero extends JPanel {
     Hero status(Color dotColor, String dotTip, String title, String statusWord, Runnable toggle) {
         dot.setForeground(dotColor);
         dot.setToolTipText(dotTip);
-        dot.setCursor(
-                toggle == null
-                        ? Cursor.getDefaultCursor()
-                        : Cursor.getPredefinedCursor(Cursor.HAND_CURSOR));
+        dot.setCursor(toggle == null ? Cursor.getDefaultCursor() : Cursor.getPredefinedCursor(Cursor.HAND_CURSOR));
         onDot = toggle;
         // Owner 2026-10-01 (F17): a long name is bounded; the full text stays in its tooltip.
-        name.setText(Kit.fit(name, title, nameBudget()));
+        name.setText(Kit.fitShrinking(name, title, bold(), nameBudget()));
         name.setToolTipText(orEmpty(title).isEmpty() ? null : title);
         word.setText(orEmpty(statusWord));
         word.setVisible(!word.getText().isEmpty());
@@ -598,13 +570,8 @@ class Hero extends JPanel {
             // Before the first layout: the standard sidebar budget.
             return 120;
         }
-        int used =
-                16
-                        + dot.getPreferredSize().width
-                        + word.getPreferredSize().width
-                        + icons.getPreferredSize().width
-                        + controls.getPreferredSize().width
-                        + 24;
+        int used = 16 + dot.getPreferredSize().width + word.getPreferredSize().width + icons.getPreferredSize().width
+                        + controls.getPreferredSize().width + 24;
         return Math.max(40, width - used);
     }
 
@@ -635,13 +602,7 @@ class Hero extends JPanel {
     }
 
     /** The big line: Net (tone by sign), its exact hover, the rate and the active clock. */
-    Hero big(
-            String netText,
-            Kit.Tone tone,
-            String exact,
-            String rateText,
-            boolean rateReady,
-            String clockText) {
+    Hero big(String netText, Kit.Tone tone, String exact, String rateText, boolean rateReady, String clockText) {
         big.setVisible(netText != null);
         if (netText == null) return this;
         // RuneLite's font has no true minus sign (U+2212); a hyphen reads the same.
@@ -670,39 +631,17 @@ class Hero extends JPanel {
      * The money strip Live and a Grind's detail share: Gains, then Supply and Loss when the split
      * is known, else the truthful Costs total, never invented parts.
      */
-    static List<Cell> money(
-            long gains, long supplies, long losses, long costs, boolean split, Runnable open) {
+    static List<Cell> money(long gains, long supplies, long losses, long costs, boolean split, Runnable open) {
         var cells = new ArrayList<Cell>();
-        cells.add(
-                new Cell(
-                        "GAINS",
-                        Fmt.signed(gains),
-                        Tone.GAIN,
-                        GameData.msg("loot-other") + Fmt.exact(gains) + " gp",
+        cells.add(new Cell("GAINS", Fmt.signed(gains), Tone.GAIN, GameData.msg("loot-other") + Fmt.exact(gains) + " gp",
                         open));
         if (split) {
-            cells.add(
-                    new Cell(
-                            "SUPPLY",
-                            Fmt.signed(-supplies),
-                            Tone.SUPPLY,
-                            GameData.msg("food-potions") + Fmt.exact(supplies) + " gp",
-                            open));
-            cells.add(
-                    new Cell(
-                            "LOSS",
-                            Fmt.signed(-losses),
-                            Tone.LOSS,
-                            GameData.msg("deaths-tax") + Fmt.exact(losses) + " gp",
-                            open));
+            cells.add(new Cell("SUPPLY", Fmt.signed(-supplies), Tone.SUPPLY,
+                            GameData.msg("food-potions") + Fmt.exact(supplies) + " gp", open));
+            cells.add(new Cell("LOSS", Fmt.signed(-losses), Tone.LOSS,
+                            GameData.msg("deaths-tax") + Fmt.exact(losses) + " gp", open));
         } else {
-            cells.add(
-                    new Cell(
-                            "COSTS",
-                            Fmt.signed(-costs),
-                            Tone.LOSS,
-                            GameData.msg("everything-spent"),
-                            open));
+            cells.add(new Cell("COSTS", Fmt.signed(-costs), Tone.LOSS, GameData.msg("everything-spent"), open));
         }
         return cells;
     }
@@ -710,9 +649,7 @@ class Hero extends JPanel {
     static JPanel strip(List<Cell> cells) {
         boolean weighted = false;
         for (Cell cell : cells) weighted |= cell.weight != 1;
-        var row =
-                weighted
-                        ? new JPanel(new GridBagLayout())
+        var row = weighted ? new JPanel(new GridBagLayout())
                         : new JPanel(new GridLayout(1, Math.max(1, cells.size()), 1, 0));
         row.setBackground(LINE);
         row.setBorder(BorderFactory.createMatteBorder(1, 0, 0, 0, LINE));
@@ -747,8 +684,7 @@ class Hero extends JPanel {
     static void clickable(JComponent component, Runnable open) {
         if (open == null) return;
         component.setCursor(Cursor.getPredefinedCursor(Cursor.HAND_CURSOR));
-        component.addMouseListener(
-                new MouseAdapter() {
+        component.addMouseListener(new MouseAdapter() {
                     public void mouseClicked(MouseEvent e) {
                         if (e.getButton() == MouseEvent.BUTTON1) open.run();
                     }
@@ -781,18 +717,8 @@ class Table extends JPanel {
         /** The name's colour when it is not plain text: a Ground Items-highlighted drop. */
         Color color;
 
-        Row(
-                String key,
-                Icon icon,
-                String name,
-                String qty,
-                String value,
-                Kit.Tone tone,
-                String tip,
-                String exact,
-                boolean selected,
-                Runnable open,
-                List<Menu> menu) {
+        Row(String key, Icon icon, String name, String qty, String value, Kit.Tone tone, String tip, String exact,
+                boolean selected, Runnable open, List<Menu> menu) {
             this.key = orEmpty(key);
             this.icon = icon;
             this.name = orEmpty(name);
@@ -806,9 +732,6 @@ class Table extends JPanel {
             this.menu = menu == null ? emptyList() : menu;
         }
 
-        static Row of(String key, String name, String qty, String value, Kit.Tone tone) {
-            return new Row(key, null, name, qty, value, tone, "", "", false, null, emptyList());
-        }
     }
 
     /** A right-click menu entry. */
@@ -853,9 +776,7 @@ class Table extends JPanel {
         setBackground(CARD);
         this.title.setText(title);
         header.setBackground(CARD);
-        header.setBorder(
-                BorderFactory.createCompoundBorder(
-                        BorderFactory.createMatteBorder(0, 0, 1, 0, LINE),
+        header.setBorder(BorderFactory.createCompoundBorder(BorderFactory.createMatteBorder(0, 0, 1, 0, LINE),
                         BorderFactory.createEmptyBorder(0, 6, 0, 2)));
         header.setPreferredSize(new Dimension(0, HEADER));
         left.setOpaque(false);
@@ -866,8 +787,7 @@ class Table extends JPanel {
         header.add(right, BorderLayout.EAST);
         chevron.setVisible(false);
         chevron.setCursor(Cursor.getPredefinedCursor(Cursor.HAND_CURSOR));
-        chevron.addMouseListener(
-                new MouseAdapter() {
+        chevron.addMouseListener(new MouseAdapter() {
                     public void mouseClicked(MouseEvent e) {
                         setFolded(!folded);
                     }
@@ -925,8 +845,7 @@ class Table extends JPanel {
     /** Let this table (the last on its page) take the sidebar height left below it. */
     Table setFill(boolean value) {
         if (value && !fill) {
-            addHierarchyBoundsListener(
-                    new HierarchyBoundsAdapter() {
+            addHierarchyBoundsListener(new HierarchyBoundsAdapter() {
                         public void ancestorResized(HierarchyEvent e) {
                             fitLater();
                         }
@@ -935,8 +854,7 @@ class Table extends JPanel {
                             fitLater();
                         }
                     });
-            addComponentListener(
-                    new ComponentAdapter() {
+            addComponentListener(new ComponentAdapter() {
                         public void componentMoved(ComponentEvent e) {
                             fitLater();
                         }
@@ -1025,8 +943,7 @@ class Table extends JPanel {
     void showPage(int requested) {
         page = Kit.clampPage(requested, pages());
         int from = page * rowsPerPage;
-        List<Row> visible =
-                rows.subList(min(from, rows.size()), min(from + rowsPerPage, rows.size()));
+        List<Row> visible = rows.subList(min(from, rows.size()), min(from + rowsPerPage, rows.size()));
         if (!visible.equals(drawn)) {
             drawn = new ArrayList<>(visible);
             body.removeAll();
@@ -1037,10 +954,7 @@ class Table extends JPanel {
             // The quantity column hugs each row's own text, so one wide "×2 doses" row no longer
             // steals width from every name; right edges stay aligned against the value column.
             for (Row row : visible) body.add(rowComponent(row, rowHeight));
-            int height =
-                    visible.isEmpty()
-                            ? max(1, minRows) * ROW
-                            : max(minRows, visible.size()) * rowHeight;
+            int height = visible.isEmpty() ? max(1, minRows) * ROW : max(minRows, visible.size()) * rowHeight;
             body.setPreferredSize(new Dimension(0, height));
         }
         rebuildHeader();
@@ -1075,9 +989,7 @@ class Table extends JPanel {
             icon.setPreferredSize(new Dimension(ICON_WIDTH, ICON_ROW));
             line.add(icon, BorderLayout.WEST);
         }
-        line.add(
-                label(row.name, body().deriveFont(11.5f), row.color == null ? TEXT : row.color),
-                BorderLayout.CENTER);
+        line.add(label(row.name, body().deriveFont(11.5f), row.color == null ? TEXT : row.color), BorderLayout.CENTER);
         var numbers = new JPanel(new BorderLayout(row.qty.isEmpty() ? 0 : 4, 0));
         numbers.setOpaque(false);
         if (!row.qty.isEmpty()) {
@@ -1091,8 +1003,7 @@ class Table extends JPanel {
         if (!row.tip.isEmpty()) line.setToolTipText(row.tip);
         if (row.open != null) {
             line.setCursor(Cursor.getPredefinedCursor(Cursor.HAND_CURSOR));
-            line.addMouseListener(
-                    new MouseAdapter() {
+            line.addMouseListener(new MouseAdapter() {
                         public void mouseClicked(MouseEvent e) {
                             if (e.getButton() == MouseEvent.BUTTON1) row.open.run();
                         }
@@ -1153,10 +1064,8 @@ class Shell extends JPanel {
     static final String LEDGER = "ledger";
     static final String GRINDS = "grinds";
     static final String[][] TABS = {{LIVE, "Live"}, {LEDGER, "Ledger"}, {GRINDS, "Grinds"}};
-    static final javax.swing.border.Border SELECTED =
-            BorderFactory.createCompoundBorder(
-                    BorderFactory.createMatteBorder(0, 0, 1, 0, ACCENT),
-                    BorderFactory.createEmptyBorder(5, 2, 4, 2));
+    static final javax.swing.border.Border SELECTED = BorderFactory.createCompoundBorder(
+                    BorderFactory.createMatteBorder(0, 0, 1, 0, ACCENT), BorderFactory.createEmptyBorder(5, 2, 4, 2));
     static final javax.swing.border.Border UNSELECTED = BorderFactory.createEmptyBorder(5, 2, 5, 2);
     MaterialTabGroup tabs = new MaterialTabGroup();
     Map<String, MaterialTab> tabById = new LinkedHashMap<>();
@@ -1192,19 +1101,15 @@ class Shell extends JPanel {
         super(new BorderLayout());
         setBackground(PANEL);
         for (String[] tab : TABS) {
-            var material =
-                    new MaterialTab(tab[1], tabs, null) {
+            var material = new MaterialTab(tab[1], tabs, null) {
                         public void setBorder(javax.swing.border.Border border) {
                             // Stock tabs pad 10 px a side; four need narrower sides at sidebar
                             // width.
-                            super.setBorder(
-                                    border instanceof javax.swing.border.CompoundBorder
-                                            ? SELECTED
+                            super.setBorder(border instanceof javax.swing.border.CompoundBorder ? SELECTED
                                             : UNSELECTED);
                         }
                     };
-            material.setOnSelectEvent(
-                    () -> {
+            material.setOnSelectEvent(() -> {
                         if (!selecting) show(tab[0]);
                         return true;
                     });
@@ -1225,11 +1130,7 @@ class Shell extends JPanel {
         var strip = new JPanel(new BorderLayout());
         strip.setOpaque(false);
         strip.setBorder(BorderFactory.createMatteBorder(0, 0, 1, 0, LINE));
-        JButton gear =
-                new JButton(
-                        new ImageIcon(
-                                ImageUtil.loadImageResource(
-                                        ConfigPlugin.class, msg("config-edit"))));
+        JButton gear = new JButton(new ImageIcon(ImageUtil.loadImageResource(ConfigPlugin.class, msg("config-edit"))));
         gear.setBorder(BorderFactory.createEmptyBorder(0, 6, 0, 6));
         gear.setContentAreaFilled(false);
         gear.setFocusPainted(false);
@@ -1252,8 +1153,7 @@ class Shell extends JPanel {
         notice.setBackground(CARD);
         notice.setVisible(false);
         noticeText.setCursor(Cursor.getPredefinedCursor(Cursor.HAND_CURSOR));
-        noticeText.addMouseListener(
-                new MouseAdapter() {
+        noticeText.addMouseListener(new MouseAdapter() {
                     public void mouseClicked(MouseEvent e) {
                         noticeClicked();
                     }
@@ -1271,10 +1171,7 @@ class Shell extends JPanel {
         view.setOpaque(false);
         pad(view, GAP, 0, 0, GAP);
         view.add(page.body(), BorderLayout.NORTH);
-        var scroll =
-                new JScrollPane(
-                        view,
-                        JScrollPane.VERTICAL_SCROLLBAR_AS_NEEDED,
+        var scroll = new JScrollPane(view, JScrollPane.VERTICAL_SCROLLBAR_AS_NEEDED,
                         JScrollPane.HORIZONTAL_SCROLLBAR_NEVER);
         scroll.setBorder(null);
         scroll.getViewport().setOpaque(false);
@@ -1284,11 +1181,9 @@ class Shell extends JPanel {
         // The client can resize the sidebar without laying this pane out again, leaving its bar
         // stuck until a click; Live and Grinds re-fit their tables on resize, so they never
         // showed it. Every page now lays out again after a resize (owner 1.5.0).
-        scroll.addComponentListener(
-                new ComponentAdapter() {
+        scroll.addComponentListener(new ComponentAdapter() {
                     public void componentResized(ComponentEvent e) {
-                        SwingUtilities.invokeLater(
-                                () -> {
+                        SwingUtilities.invokeLater(() -> {
                                     view.revalidate();
                                     scroll.revalidate();
                                     scroll.repaint();
@@ -1385,32 +1280,17 @@ class Shell extends JPanel {
         if (!noticeSticky) dismiss();
     }
 
-    void render(
-            String title,
-            String detail,
-            boolean warning,
-            String action,
-            Runnable onAction,
-            boolean sticky) {
+    void render(String title, String detail, boolean warning, String action, Runnable onAction, boolean sticky) {
         Color color = warning ? Kit.Tone.REVIEW.color : Kit.Tone.GAIN.color;
-        notice.setBorder(
-                BorderFactory.createCompoundBorder(
-                        BorderFactory.createMatteBorder(1, 3, 0, 0, color),
+        notice.setBorder(BorderFactory.createCompoundBorder(BorderFactory.createMatteBorder(1, 3, 0, 0, color),
                         BorderFactory.createEmptyBorder(4, GAP, 4, GAP)));
-        String safe =
-                (title + (Phrases.empty(detail) ? "" : " · " + detail))
-                        .replace("&", "&amp;")
+        String safe = (title + (Phrases.empty(detail) ? "" : " · " + detail)).replace("&", "&amp;")
                         .replace("<", "&lt;");
-        noticeText.setText(
-                msg("div-style") + (action == null ? 190 : 130) + "px'>" + safe + "</div></html>");
+        noticeText.setText(msg("div-style") + (action == null ? 190 : 130) + "px'>" + safe + "</div></html>");
         noticeText.setToolTipText(title + (detail == null ? "" : " · " + detail));
         noticeAction.removeAll();
         if (action != null && onAction != null) {
-            JButton button =
-                    button(
-                            action,
-                            true,
-                            () -> {
+            JButton button = button(action, true, () -> {
                                 dismiss();
                                 onAction.run();
                             });
@@ -1435,9 +1315,7 @@ class Shell extends JPanel {
     void sheet(String title, String message, JComponent content, Choice... choices) {
         sheet.removeAll();
         sheetTitle = title;
-        sheet.setBorder(
-                BorderFactory.createCompoundBorder(
-                        BorderFactory.createMatteBorder(1, 0, 0, 0, ACCENT),
+        sheet.setBorder(BorderFactory.createCompoundBorder(BorderFactory.createMatteBorder(1, 0, 0, 0, ACCENT),
                         BorderFactory.createEmptyBorder(GAP, GAP, GAP, GAP)));
         sheet.add(label(title, bold(), Color.WHITE));
         if (message != null && !message.isEmpty()) {
@@ -1449,11 +1327,7 @@ class Shell extends JPanel {
         var buttons = new JPanel(new FlowLayout(FlowLayout.RIGHT, 4, 0));
         buttons.setOpaque(false);
         for (Choice choice : choices) {
-            buttons.add(
-                    button(
-                            choice.label,
-                            choice.primary,
-                            () -> {
+            buttons.add(button(choice.label, choice.primary, () -> {
                                 closeSheet();
                                 choice.action.run();
                             }));
@@ -1472,13 +1346,11 @@ class Shell extends JPanel {
         JPanel content = stack(CARD, 2);
         content.add(label(label, small(), LABEL));
         content.add(field);
-        Runnable ok =
-                () -> {
+        Runnable ok = () -> {
                     String value = field.getText().trim();
                     if (!value.isEmpty()) onOk.accept(value);
                 };
-        field.addActionListener(
-                e -> {
+        field.addActionListener(e -> {
                     closeSheet();
                     ok.run();
                 });
@@ -1562,8 +1434,7 @@ class Fmt {
         for (String[] row : PHRASES)
             value = value.replaceAll("(?i)" + java.util.regex.Pattern.quote(row[0]), row[1]);
         int open = value.lastIndexOf(" (");
-        boolean raid =
-                value.startsWith("ToB") || value.startsWith("CoX") || value.startsWith("ToA");
+        boolean raid = value.startsWith("ToB") || value.startsWith("CoX") || value.startsWith("ToA");
         return open > 0 && value.endsWith(")") && !raid ? value.substring(0, open) : value;
     }
 
@@ -1639,9 +1510,7 @@ class Fmt {
         long h = total / 3600L;
         long m = (total % 3600L) / 60L;
         long s = total % 60L;
-        return h > 0L
-                ? String.format(ROOT, "%d:%02d:%02d", h, m, s)
-                : String.format(ROOT, "%d:%02d", m, s);
+        return h > 0L ? String.format(ROOT, "%d:%02d:%02d", h, m, s) : String.format(ROOT, "%d:%02d", m, s);
     }
 
     /** Short duration for labels: {@code 8m 04s}, {@code 1h 12m}, {@code 2d 3h}. */
@@ -1692,6 +1561,9 @@ class Fmt {
 
     /** A Net target the field reads back exactly: {@code 5m}, {@code 9.12m}, {@code 750k}. */
     static String targetNet(long gp) {
+        // "1b", not "1000m", so the 1b pick lights up (owner 1.5.2 milestone).
+        if (gp >= 1_000_000_000L && gp % 10_000_000L == 0L)
+            return java.math.BigDecimal.valueOf(gp, 9).stripTrailingZeros().toPlainString() + "b";
         if (gp >= 1_000_000L && gp % 10_000L == 0L)
             return java.math.BigDecimal.valueOf(gp, 6).stripTrailingZeros().toPlainString() + "m";
         return gp < 1_000_000L && gp % 1_000L == 0L ? gp / 1_000L + "k" : exact(gp);
@@ -1715,8 +1587,7 @@ class Fmt {
     static String when(long epochMillis, long now) {
         ZoneId zone = ZoneId.systemDefault();
         var moment = Instant.ofEpochMilli(epochMillis).atZone(zone);
-        return dayLabel(moment.toLocalDate(), now, zone)
-                + " "
+        return dayLabel(moment.toLocalDate(), now, zone) + " "
                 + moment.format(DateTimeFormatter.ofPattern("HH:mm", ROOT));
     }
 

@@ -32,9 +32,9 @@ public class BankVisibilityRegressionTest
             else engine.bankClosed();
             engine.markDirty();
             ContainerSnapshot next = consuming ? ContainerSnapshot.empty() : held;
-            engine.processIfDirty(next, 1600);
+            engine.processIfDirty(next, 1600, null);
             assertEquals(consuming ? TransactionType.CONSUMPTION : TransactionType.GAIN,
-                engine.processIfDirty(next, 2200).getType());
+                engine.processIfDirty(next, 2200, null).getType());
             assertEquals(consuming ? -50 : 50, engine.getMetrics(2200).net);
         }
     }

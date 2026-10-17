@@ -10,6 +10,19 @@ public final class ModelProbe
     {
     }
 
+    /** A valuation from a plain price per item id: NORMAL economy, no guard (moved out of the plugin). */
+    public static Valuation valuation(GpManagerConfig config, java.util.function.IntFunction<net.runelite.api.ItemComposition> compositions,
+        java.util.function.IntUnaryOperator prices)
+    {
+        return new Valuation(config, compositions, (id, active) -> prices.applyAsInt(id));
+    }
+
+    public static Valuation valuation(GpManagerConfig config, java.util.function.IntFunction<net.runelite.api.ItemComposition> compositions,
+        Valuation.MarketQuote quotes)
+    {
+        return new Valuation(config, compositions, quotes);
+    }
+
     /** The session's corrections that have not been undone, oldest first. */
     public static List<CorrectionRecord> activeCorrections(Session session)
     {

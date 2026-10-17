@@ -19,7 +19,7 @@ public class TableTest
         List<Table.Row> rows = new ArrayList<>();
         for (int i = 0; i < count; i++)
         {
-            rows.add(Table.Row.of("k" + i, "Item " + i, "×" + i, "+" + i, Kit.Tone.GAIN));
+            rows.add(TableRows.row("k" + i, "Item " + i, "×" + i, "+" + i, Kit.Tone.GAIN));
         }
         return rows;
     }
@@ -160,7 +160,7 @@ public class TableTest
             new java.awt.image.BufferedImage(36, 32, java.awt.image.BufferedImage.TYPE_INT_ARGB));
         Table table = new Table("RECENT").setRows(java.util.Arrays.asList(
             new Table.Row("a", icon, "Oak plank", "", "+4.9k", Kit.Tone.GAIN, "", "", false, null, null),
-            Table.Row.of("b", "Coins", "", "+10", Kit.Tone.GAIN)));
+            TableRows.row("b", "Coins", "", "+10", Kit.Tone.GAIN)));
         assertEquals(2 * Kit.ICON_ROW, table.body.getPreferredSize().height);
         for (java.awt.Component row : table.body.getComponents())
         {

@@ -24,13 +24,13 @@ public class LedgerResizeScrollTest
         for (int i = 0; i < 30; i++)
         {
             engine.getActiveSession().addTransaction(Tx.of(now + i, TransactionType.LOOT, Context.GENERIC, "", true,
-                Collections.singletonList(new Flow(536 + i * 2, "Item " + i, 1, 2_000 + i, 2_000L + i))), 2_000);
+                Collections.singletonList(new Flow(536 + i * 2, "Item " + i, 1, 2_000 + i, 2_000L + i))), 2_000, false);
         }
         SidebarPanel[] holder = new SidebarPanel[1];
         JFrame[] frame = new JFrame[1];
         SwingUtilities.invokeAndWait(() ->
         {
-            holder[0] = new SidebarPanel(engine, PresentationLifecycleTest.config(), null);
+            holder[0] = new SidebarPanel(engine, PresentationLifecycleTest.config(), null, null, null);
             holder[0].active = true;
             holder[0].shell().show(Shell.LEDGER);
             holder[0].refreshNow();

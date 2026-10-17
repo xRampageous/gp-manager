@@ -1,5 +1,7 @@
 package com.gpmanager;
 
+import com.gpmanager.GpManagerConfig.LootFilter;
+
 import java.util.ArrayList;
 import java.util.Collections;
 import java.util.EnumSet;
@@ -63,7 +65,7 @@ public class LootDisplayModesTest
     {
         RecentFilter filter = flow -> service.isFlowIncluded(flow, mode);
         LiveSnapshot snapshot = LiveSnapshot.capture(engine, T0 + 4_000L,
-            new LiveContext(false, filter, 0L, PvpState.NONE, "", false, ""));
+            new LiveContext(false, filter, 0L, PvpState.NONE, "", false, "", false));
         List<String> names = new ArrayList<>();
         for (LiveSnapshot.Recent row : snapshot.recent)
         {
@@ -77,6 +79,6 @@ public class LootDisplayModesTest
     private static void book(Engine engine, long at, Flow flow)
     {
         engine.getActiveSession().addTransaction(Tx.of(at, TransactionType.LOOT, Context.LOOT,
-            "Loot from Guard", true, Collections.singletonList(flow)), 2_000);
+            "Loot from Guard", true, Collections.singletonList(flow)), 2_000, false);
     }
 }

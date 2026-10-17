@@ -58,7 +58,7 @@ public class PvpRiskTest
         Engine engine = HudBuilderTest.engine();
         engine.startCustom("Revenants", HudBuilderTest.NOW);
         LiveSnapshot s = LiveSnapshot.capture(engine, HudBuilderTest.NOW, new LiveContext(false, null, 0L,
-            new PvpState(true, true, false, 12_400_000L), "", false, ""));
+            new PvpState(true, true, false, 12_400_000L), "", false, "", false));
         HudBuilder builder = new HudBuilder(HudBuilderTest.config(false, 4), null);
         assertEquals("no PvP line on HUD+", "", builder.update(s, f -> true, HudBuilderTest.NOW).context);
 
@@ -74,9 +74,13 @@ public class PvpRiskTest
                 cells.add(cell.label + " " + cell.value);
             }
         }
-        // Owner 1.5.1: risk sits beside the Review badge instead of a row of its own.
         assertFalse("no Risk row: " + cells, cells.toString().contains("RISK"));
-        assertTrue(page.statusIcons(s).stream().anyMatch(cell -> "RISK 12.4M".equals(cell.value)));
+        // Owner 1.5.2: risk sits under the Net, beside the clock, out of the header.
+        assertTrue(page.statusIcons(s).stream().noneMatch(cell -> cell.value.contains("RISK")));
+        javax.swing.SwingUtilities.invokeAndWait(() -> page.apply(s));
+        assertEquals("RISK 12.4M", page.risk.getText());
+        assertTrue(page.risk.isVisible() && page.hero.under.isVisible());
+        assertFalse("no run total while Live shows the whole run", page.runTotal.isVisible());
         assertFalse("skull and Protect are never shown (owner live 2026-10-13)",
             cells.toString().contains("SKULL") || cells.toString().contains("PROTECT"));
     }

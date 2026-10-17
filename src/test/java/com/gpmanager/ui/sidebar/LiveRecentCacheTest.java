@@ -19,7 +19,7 @@ public class LiveRecentCacheTest
         long now = 1_700_000_000_000L;
         engine.startCustom("Vorkath", now);
         engine.getActiveSession().addTransaction(Tx.of(now, TransactionType.LOOT, Context.GENERIC, "", true,
-            Collections.singletonList(new Flow(536, "Dragon bones", 1, 2_000, 2_000L))), 2_000);
+            Collections.singletonList(new Flow(536, "Dragon bones", 1, 2_000, 2_000L))), 2_000, false);
 
         boolean[] hideBones = {false};
         String[] version = {"a"};
@@ -35,14 +35,14 @@ public class LiveRecentCacheTest
                 return version[0];
             }
         };
-        LiveContext context = new LiveContext(false, filter, 0L, PvpState.NONE, "", false, "");
+        LiveContext context = new LiveContext(false, filter, 0L, PvpState.NONE, "", false, "", false);
         LiveSnapshot first = LiveSnapshot.capture(engine, now + 1_000L, context);
         LiveSnapshot tick = LiveSnapshot.capture(engine, now + 1_600L, context);
         assertSame("an unchanged tick reuses the list", first.recent, tick.recent);
         assertEquals(1, tick.recent.size());
 
         engine.getActiveSession().addTransaction(Tx.of(now + 2_000L, TransactionType.LOOT, Context.GENERIC,
-            "", true, Collections.singletonList(new Flow(385, "Shark", 1, 900, 900L))), 2_000);
+            "", true, Collections.singletonList(new Flow(385, "Shark", 1, 900, 900L))), 2_000, false);
         LiveSnapshot booked = LiveSnapshot.capture(engine, now + 2_200L, context);
         assertNotSame("a booking rebuilds it", tick.recent, booked.recent);
         assertEquals(2, booked.recent.size());

@@ -54,7 +54,7 @@ public class ChargeLoadAnyItemTest
         engine.markDirty();
         for (int tick = 1; tick <= 5; tick++)
         {
-            engine.processIfDirty(new ContainerSnapshot(new HashMap<>(Map.of(ItemID.NATURERUNE, 5_766L, ItemID.NATURE_STAFF_CHARGED, 1L))), T0 + tick * 600L);
+            engine.processIfDirty(new ContainerSnapshot(new HashMap<>(Map.of(ItemID.NATURERUNE, 5_766L, ItemID.NATURE_STAFF_CHARGED, 1L))), T0 + tick * 600L, null);
         }
         assertEquals("charging the staff is not a cost", 0L, engine.getMetrics(T0 + 10_000L).net);
         assertTrue("nor Review", engine.getActiveSession().getTransactions().stream().noneMatch(ReviewRules::needsOwnerDecision));
@@ -82,7 +82,7 @@ public class ChargeLoadAnyItemTest
         engine.markDirty();
         for (int tick = 1; tick <= 5; tick++)
         {
-            engine.processIfDirty(new ContainerSnapshot(new HashMap<>(Map.of(ItemID.BLOODRUNE, 800L, ItemID.VIAL_BLOOD, 4L))), T0 + tick * 600L);
+            engine.processIfDirty(new ContainerSnapshot(new HashMap<>(Map.of(ItemID.BLOODRUNE, 800L, ItemID.VIAL_BLOOD, 4L))), T0 + tick * 600L, null);
         }
         assertEquals("charging the scythe is not a cost", 0L, engine.getMetrics(T0 + 10_000L).net);
     }
@@ -100,7 +100,7 @@ public class ChargeLoadAnyItemTest
         engine.markDirty();
         for (int tick = 1; tick <= 5; tick++)
         {
-            engine.processIfDirty(new ContainerSnapshot(new HashMap<>(Map.of(ItemID.PRIF_CRYSTAL_SHARD, 400L))), T0 + tick * 600L);
+            engine.processIfDirty(new ContainerSnapshot(new HashMap<>(Map.of(ItemID.PRIF_CRYSTAL_SHARD, 400L))), T0 + tick * 600L, null);
         }
         return engine;
     }

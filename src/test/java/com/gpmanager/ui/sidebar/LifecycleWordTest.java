@@ -53,7 +53,7 @@ public class LifecycleWordTest
         Engine engine = engine();
         engine.startCustom("Vorkath", NOW);
         engine.pauseForLifecycle(NOW + 1_000L);
-        SidebarPanel panel = onEdt(() -> new SidebarPanel(engine, new GpManagerConfig() {}, null));
+        SidebarPanel panel = onEdt(() -> new SidebarPanel(engine, new GpManagerConfig() {}, null, null, null));
         onEdt(() ->
         {
             panel.bindHopping(() -> true);

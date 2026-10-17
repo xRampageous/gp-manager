@@ -107,40 +107,16 @@ public class GrindRecapTest
         if (gainValue != 0L)
         {
             engine.getActiveSession().addTransaction(
-                gain(start + 1_000L, "Dragon bones", 1, 1, (int) gainValue, gainValue), 2_000);
+                gain(start + 1_000L, "Dragon bones", 1, 1, (int) gainValue, gainValue), 2_000, false);
         }
         if (costValue != 0L)
         {
             Transaction consumed = cost(start + 2_000L, "Prayer potion(4)", 3, costValue);
             consumed.setActionKind(ActionKind.DRINK);
-            engine.getActiveSession().addTransaction(consumed, 2_000);
+            engine.getActiveSession().addTransaction(consumed, 2_000, false);
         }
         engine.finishCustom(end);
         return grindId;
-    }
-
-    private static String runLinked(Engine engine, String name, String grindId, long start, long end,
-        long net)
-    {
-        engine.startGrind(name, grindId, null, null, start);
-        if (net >= 0L)
-        {
-            engine.getActiveSession().addTransaction(gain(start + 1_000L, "Dragon bones", 1, 1, (int) net, net), 2_000);
-        }
-        else
-        {
-            engine.getActiveSession().addTransaction(cost(start + 1_000L, "Prayer potion(4)", 3, -net), 2_000);
-        }
-        engine.finishCustom(end);
-        return engine.getHistory().get(0).getId();
-    }
-
-    private static String runUnlinked(Engine engine, String name, long start, long end, long net)
-    {
-        engine.startCustom(name, start);
-        engine.getActiveSession().addTransaction(gain(start + 1_000L, "Dragon bones", 1, 1, (int) net, net), 2_000);
-        engine.finishCustom(end);
-        return engine.getHistory().get(0).getId();
     }
 
     private static Transaction gain(long at, String name, int itemId, long quantity, int unitPrice, long value)
@@ -180,37 +156,4 @@ public class GrindRecapTest
         }
     }
 
-    private static boolean anyContains(java.util.List<String> labels, String needle)
-    {
-        for (String label : labels)
-        {
-            if (label.contains(needle))
-            {
-                return true;
-            }
-        }
-        return false;
-    }
-
-    private static <T> T onEdt(java.util.concurrent.Callable<T> callable) throws Exception
-    {
-        AtomicReference<T> result = new AtomicReference<>();
-        AtomicReference<Exception> failure = new AtomicReference<>();
-        SwingUtilities.invokeAndWait(() ->
-        {
-            try
-            {
-                result.set(callable.call());
-            }
-            catch (Exception ex)
-            {
-                failure.set(ex);
-            }
-        });
-        if (failure.get() != null)
-        {
-            throw failure.get();
-        }
-        return result.get();
-    }
 }

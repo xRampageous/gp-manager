@@ -77,7 +77,7 @@ public class GeCustodyEngineTest
             Transaction result = null;
             for (int i = 0; i < 3; i++)
             {
-                Transaction settled = engine.processIfDirty(snapshot, now);
+                Transaction settled = engine.processIfDirty(snapshot, now, null);
                 if (settled != null)
                 {
                     result = settled;
@@ -95,7 +95,7 @@ public class GeCustodyEngineTest
                 Collections.singletonList(new Flow(item, name(item), quantity,
                     (int) (quantity > 0L ? value / quantity : 0L), value,
                     PriceSource.GRAND_EXCHANGE)),
-                Confidence.CONFIRMED, "", null), 500);
+                Confidence.CONFIRMED, "", null), 500, false);
         }
 
         long net()
@@ -560,7 +560,7 @@ public class GeCustodyEngineTest
             GameData.msg("grand-exchange-collect"), "Market", false,
             Collections.singletonList(new Flow(COINS, "Coins", 20L, 1, 20L, PriceSource.FACE_VALUE)),
             Confidence.UNCERTAIN, GameData.msg("grand-exchange-movement"), null);
-        h.engine.getActiveSession().addTransaction(old, 2_000);
+        h.engine.getActiveSession().addTransaction(old, 2_000, false);
         h.engine.recheck(item -> 0);
         assertEquals(TransactionType.TRANSFER, old.getType());
         assertTrue("with audit rows on, the neutral change stays as one", h.transactions().contains(old));

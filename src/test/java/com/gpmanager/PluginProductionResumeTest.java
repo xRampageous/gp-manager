@@ -123,7 +123,7 @@ public class PluginProductionResumeTest
         harness.xp.put(Skill.FLETCHING, 1_100);
         harness.plugin.onStatChanged(new StatChanged(Skill.FLETCHING, 1_100, 1, 1));
         assertEquals(PauseReason.MANUAL, harness.plugin.engine.activeSession.getPauseReason());
-        assertNull(harness.plugin.engine.processIfDirty(new ContainerSnapshot(Map.of(BOW, 1L)), T0 + 3_000L));
+        assertNull(harness.plugin.engine.processIfDirty(new ContainerSnapshot(Map.of(BOW, 1L)), T0 + 3_000L, null));
         assertTrue(harness.plugin.engine.activeSession.getTransactions().isEmpty());
     }
 
@@ -225,8 +225,8 @@ public class PluginProductionResumeTest
             next.merge(BOW, 1L, Long::sum);
             inventory = new ContainerSnapshot(next);
             plugin.engine.markDirty();
-            assertNull(plugin.engine.processIfDirty(inventory, now));
-            Transaction row = plugin.engine.processIfDirty(inventory, now + 600L);
+            assertNull(plugin.engine.processIfDirty(inventory, now, null));
+            Transaction row = plugin.engine.processIfDirty(inventory, now + 600L, null);
             assertNotNull(row);
             return row;
         }

@@ -47,7 +47,7 @@ public final class PkProfitSimulation
                 SimulationSupport.cost(385, 20L),
                 SimulationSupport.cost(561, 50L),
                 SimulationSupport.cost(555, 1_000L)));
-        session.addTransaction(supplies, 100);
+        session.addTransaction(supplies, 100, false);
 
         String kill = session.addEncounter(true, 10_000L);
         session.attachRecentCosts(kill, 10_000L, 90_000L);
@@ -58,7 +58,7 @@ public final class PkProfitSimulation
             Context.PK_LOOT,
             "PK loot",
             Collections.singletonList(SimulationSupport.gain(10001, 1L)));
-        session.addTransaction(loot, 100);
+        session.addTransaction(loot, 100, false);
         session.attachToEncounter(loot.getId(), kill, false);
 
         long[] money = money(session, kill);
@@ -94,9 +94,9 @@ public final class PkProfitSimulation
             "Reclaim fee",
             Collections.singletonList(SimulationSupport.cost(10003, 1L)));
 
-        session.addTransaction(supplies, 100);
-        session.addTransaction(risk, 100);
-        session.addTransaction(fee, 100);
+        session.addTransaction(supplies, 100, false);
+        session.addTransaction(risk, 100, false);
+        session.addTransaction(fee, 100, false);
         session.attachToEncounter(supplies.getId(), death, false);
         session.attachToEncounter(risk.getId(), death, false);
         session.attachToEncounter(fee.getId(), death, false);
@@ -122,7 +122,7 @@ public final class PkProfitSimulation
             "PKing",
             false,
             Collections.singletonList(SimulationSupport.gain(11941, 1L)));
-        session.addTransaction(keyReceipt, 100);
+        session.addTransaction(keyReceipt, 100, false);
         session.attachToEncounter(keyReceipt.getId(), kill, false);
 
         Transaction contents = transaction(
@@ -131,7 +131,7 @@ public final class PkProfitSimulation
             Context.PK_LOOT,
             "Loot key opened",
             Collections.singletonList(SimulationSupport.gain(10001, 1L)));
-        session.addTransaction(contents, 100);
+        session.addTransaction(contents, 100, false);
         session.attachToEncounter(contents.getId(), kill, false);
 
         Transaction keyRemoval = Tx.of(
@@ -143,7 +143,7 @@ public final class PkProfitSimulation
             "PKing",
             false,
             Collections.singletonList(SimulationSupport.cost(11941, 1L)));
-        session.addTransaction(keyRemoval, 100);
+        session.addTransaction(keyRemoval, 100, false);
         session.attachToEncounter(keyRemoval.getId(), kill, false);
 
         long[] money = money(session, kill);
@@ -169,8 +169,8 @@ public final class PkProfitSimulation
             Context.PK_LOOT,
             "Partial PK loot 2",
             Collections.singletonList(SimulationSupport.valuedFlow(12002, "Second pickup", 1L, 480_000)));
-        session.addTransaction(firstPickup, 100);
-        session.addTransaction(secondPickup, 100);
+        session.addTransaction(firstPickup, 100, false);
+        session.addTransaction(secondPickup, 100, false);
         session.attachToEncounter(firstPickup.getId(), kill, false);
         session.attachToEncounter(secondPickup.getId(), kill, false);
 
@@ -193,9 +193,9 @@ public final class PkProfitSimulation
             30_000L, TransactionType.TRANSFER, Context.TRANSFER,
             "Banked PK loot", false,
             Arrays.asList(SimulationSupport.cost(10004, 1L), SimulationSupport.cost(10005, 1L)));
-        session.addTransaction(firstLoot, 100);
-        session.addTransaction(secondLoot, 100);
-        session.addTransaction(bank, 100);
+        session.addTransaction(firstLoot, 100, false);
+        session.addTransaction(secondLoot, 100, false);
+        session.addTransaction(bank, 100, false);
         session.attachToEncounter(firstLoot.getId(), first, false);
         session.attachToEncounter(secondLoot.getId(), second, false);
 
@@ -211,14 +211,14 @@ public final class PkProfitSimulation
         Transaction loot = transaction(
             11_000L, TransactionType.PK_LOOT, Context.PK_LOOT,
             "Carried PK loot", Collections.singletonList(SimulationSupport.gain(10004, 1L)));
-        session.addTransaction(loot, 100);
+        session.addTransaction(loot, 100, false);
         session.attachToEncounter(loot.getId(), kill, false);
 
         String death = session.addEncounter(false, 20_000L);
         Transaction loss = transaction(
             20_000L, TransactionType.PK_DEATH_LOSS, Context.PK_DEATH,
             "Carried PK loot lost", Collections.singletonList(SimulationSupport.cost(10004, 1L)));
-        session.addTransaction(loss, 100);
+        session.addTransaction(loss, 100, false);
         session.attachToEncounter(loss.getId(), death, false);
 
         SimulationSupport.equal(1, session.pk().kills, "carry-death kills");
@@ -243,7 +243,7 @@ public final class PkProfitSimulation
             Confidence.UNCERTAIN,
             "No confirmed player-loot correlation was available.",
             kill);
-        session.addTransaction(uncertain, 100);
+        session.addTransaction(uncertain, 100, false);
         session.attachToEncounter(uncertain.getId(), kill, false);
         SimulationSupport.equal(0L, session.bestKill(), "uncertain PK net before correction");
 
@@ -264,14 +264,14 @@ public final class PkProfitSimulation
         Transaction loot = transaction(
             11_000L, TransactionType.PK_LOOT, Context.PK_LOOT,
             "PK loot", Collections.singletonList(SimulationSupport.gain(10004, 1L)));
-        session.addTransaction(loot, 100);
+        session.addTransaction(loot, 100, false);
         session.attachToEncounter(loot.getId(), kill, false);
 
         String death = session.addEncounter(false, 20_000L);
         Transaction loss = transaction(
             20_000L, TransactionType.PK_DEATH_LOSS, Context.PK_DEATH,
             "Risk lost", Collections.singletonList(SimulationSupport.cost(10002, 1L)));
-        session.addTransaction(loss, 100);
+        session.addTransaction(loss, 100, false);
         session.attachToEncounter(loss.getId(), death, false);
         session.close(61_000L);
 

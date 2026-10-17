@@ -20,14 +20,14 @@ public class SessionRepositoryRecoveryTest
 
     private SavedState state(String name)
     {
-        return new SavedState(new Session(name, 1_000L), null, Collections.emptyList());
+        return new SavedState(new Session(name, 1_000L, SessionMode.GENERAL), null, Collections.emptyList());
     }
 
     @Test
     public void damagedPrimaryRecoversPreviousSaveAndPreservesEvidence() throws Exception
     {
         Path directory = temporary.newFolder().toPath();
-        SessionRepository repository = new SessionRepository(new Gson(), FilepathTestSupport.root(directory));
+        SessionRepository repository = new SessionRepository(new Gson(), FilepathTestSupport.root(directory), false);
         PersistenceProbe.save(repository, state("Previous"));
         PersistenceProbe.save(repository, state("Latest"));
         Files.writeString(directory.resolve("sessions.json"), "{broken");
@@ -45,7 +45,7 @@ public class SessionRepositoryRecoveryTest
     public void missingOrEmptyPrimaryRecoversBackup() throws Exception
     {
         Path directory = temporary.newFolder().toPath();
-        SessionRepository repository = new SessionRepository(new Gson(), FilepathTestSupport.root(directory));
+        SessionRepository repository = new SessionRepository(new Gson(), FilepathTestSupport.root(directory), false);
         PersistenceProbe.save(repository, state("Previous"));
         PersistenceProbe.save(repository, state("Latest"));
         Files.delete(directory.resolve("sessions.json"));
@@ -58,9 +58,9 @@ public class SessionRepositoryRecoveryTest
     public void failedPrimaryReplacementKeepsCommittedState() throws Exception
     {
         Path directory = temporary.newFolder().toPath();
-        SessionRepository repository = new SessionRepository(new Gson(), FilepathTestSupport.root(directory));
+        SessionRepository repository = new SessionRepository(new Gson(), FilepathTestSupport.root(directory), false);
         PersistenceProbe.save(repository, state("Committed"));
-        SessionRepository failing = new SessionRepository(new Gson(), FilepathTestSupport.root(directory))
+        SessionRepository failing = new SessionRepository(new Gson(), FilepathTestSupport.root(directory), false)
         {
             @Override
             void replaceFile(Filepath source, Filepath target) throws IOException
@@ -81,7 +81,7 @@ public class SessionRepositoryRecoveryTest
     public void corruptPrimaryCannotPoisonGoodBackupOnSave() throws Exception
     {
         Path directory = temporary.newFolder().toPath();
-        SessionRepository repository = new SessionRepository(new Gson(), FilepathTestSupport.root(directory));
+        SessionRepository repository = new SessionRepository(new Gson(), FilepathTestSupport.root(directory), false);
         PersistenceProbe.save(repository, state("Good backup"));
         PersistenceProbe.save(repository, state("Latest"));
         Files.writeString(directory.resolve("sessions.json"), "null");
@@ -94,7 +94,7 @@ public class SessionRepositoryRecoveryTest
     public void longSessionSaveReloadPreservesTotalsAfterCompaction() throws Exception
     {
         Path directory = temporary.newFolder().toPath();
-        Session session = new Session("Soak", 1_000L);
+        Session session = new Session("Soak", 1_000L, SessionMode.GENERAL);
         for (int i = 0; i < 200; i++)
         {
             for (int row = 0; row < 50; row++)
@@ -103,11 +103,11 @@ public class SessionRepositoryRecoveryTest
                     2_000L + i * 50L + row,
                     TransactionType.GAIN,
                     Context.GENERIC, "Gain", true,
-                    Collections.singletonList(new Flow(995, "Coins", 1, 1, 1))), 100);
+                    Collections.singletonList(new Flow(995, "Coins", 1, 1, 1))), 100, false);
             }
-            SessionRepository writer = new SessionRepository(new Gson(), FilepathTestSupport.root(directory));
+            SessionRepository writer = new SessionRepository(new Gson(), FilepathTestSupport.root(directory), false);
             PersistenceProbe.save(writer, new SavedState(session, null, Collections.emptyList()));
-            SavedState reloaded = new SessionRepository(new Gson(), FilepathTestSupport.root(directory)).load();
+            SavedState reloaded = new SessionRepository(new Gson(), FilepathTestSupport.root(directory), false).load();
             session = reloaded.getActiveSession();
             assertEquals((i + 1L) * 50L, session.metrics(20_000L).net);
             assertTrue(session.getTransactions().size() <= 100);
@@ -120,14 +120,14 @@ public class SessionRepositoryRecoveryTest
     public void explicitGeneralAndCustomOwnersRoundTripWithoutMerging() throws Exception
     {
         Path directory = temporary.newFolder().toPath();
-        Session general = new Session("General", 1_000L);
-        Session custom = new Session("Custom", 2_000L);
+        Session general = new Session("General", 1_000L, SessionMode.GENERAL);
+        Session custom = new Session("Custom", 2_000L, SessionMode.GENERAL);
         general.setProfitTargetGp(1_000_000_000L);
         custom.setProfitTargetGp(500_000_000L);
-        Session archived = new Session("Archived", 500L);
+        Session archived = new Session("Archived", 500L, SessionMode.GENERAL);
         archived.close(900L);
 
-        SessionRepository repository = new SessionRepository(new Gson(), FilepathTestSupport.root(directory));
+        SessionRepository repository = new SessionRepository(new Gson(), FilepathTestSupport.root(directory), false);
         PersistenceProbe.save(repository, new SavedState(general, custom, Collections.singletonList(archived)));
         SavedState restored = repository.load();
 
@@ -143,7 +143,7 @@ public class SessionRepositoryRecoveryTest
     public void replacementStateReplacesBothPrimaryAndRecoveryCopies() throws Exception
     {
         Path directory = temporary.newFolder().toPath();
-        SessionRepository repository = new SessionRepository(new Gson(), FilepathTestSupport.root(directory));
+        SessionRepository repository = new SessionRepository(new Gson(), FilepathTestSupport.root(directory), false);
         PersistenceProbe.save(repository, state("Old"));
         PersistenceProbe.save(repository, state("Older backup"));
         assertTrue(PersistenceProbe.replaceStateDetailed(repository, state("Fresh stopped General")).isCommitted());

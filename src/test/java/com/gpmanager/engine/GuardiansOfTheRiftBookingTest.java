@@ -57,7 +57,7 @@ public class GuardiansOfTheRiftBookingTest
         engine.markDirty();
         for (int tick = 1; tick <= 5; tick++)
         {
-            engine.processIfDirty(new ContainerSnapshot(new HashMap<>(after)), 1_000_000L + tick * 600L);
+            engine.processIfDirty(new ContainerSnapshot(new HashMap<>(after)), 1_000_000L + tick * 600L, null);
         }
         return engine;
     }

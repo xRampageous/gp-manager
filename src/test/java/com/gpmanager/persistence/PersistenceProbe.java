@@ -54,8 +54,8 @@ public final class PersistenceProbe
         }
         long base = repository.lastKnownDiskRevision;
         return repository.boundIdentity == null
-            ? new WriteIntent(null, repository.scopeGeneration, base, state)
-            : new WriteIntent(repository.boundIdentity, repository.scopeGeneration, base, state);
+            ? new WriteIntent(null, repository.scopeGeneration, base, state, null)
+            : new WriteIntent(repository.boundIdentity, repository.scopeGeneration, base, state, null);
     }
 
     /**

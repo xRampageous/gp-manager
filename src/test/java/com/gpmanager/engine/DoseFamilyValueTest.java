@@ -90,7 +90,7 @@ public class DoseFamilyValueTest
 
     static Valuation service(GpManagerConfig config, Map<Integer, Integer> prices)
     {
-        return new Valuation(config,
+        return ModelProbe.valuation(config,
             id -> composition(NAMES.getOrDefault(id, "Item " + id)),
             id -> prices.getOrDefault(id, 0));
     }

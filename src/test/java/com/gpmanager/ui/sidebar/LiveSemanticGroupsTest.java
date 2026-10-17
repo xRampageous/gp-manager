@@ -24,9 +24,9 @@ public class LiveSemanticGroupsTest
     public void repeatedExactSpellUpdatesOneLiveRowAndBubbles()
     {
         Engine engine = session("Vorkath");
-        engine.getActiveSession().addTransaction(exactCast(T0 + 1_000L, "Ice Barrage", 1, 1, 1), 2_000);
-        engine.getActiveSession().addTransaction(exactCast(T0 + 2_000L, "Ice Barrage", 1, 1, 1), 2_000);
-        engine.getActiveSession().addTransaction(exactCast(T0 + 3_000L, "Ice Barrage", 1, 1, 1), 2_000);
+        engine.getActiveSession().addTransaction(exactCast(T0 + 1_000L, "Ice Barrage", 1, 1, 1), 2_000, false);
+        engine.getActiveSession().addTransaction(exactCast(T0 + 2_000L, "Ice Barrage", 1, 1, 1), 2_000, false);
+        engine.getActiveSession().addTransaction(exactCast(T0 + 3_000L, "Ice Barrage", 1, 1, 1), 2_000, false);
 
         LiveSnapshot snapshot = LiveSnapshot.capture(engine, T0 + 4_000L, LiveContext.NONE);
 
@@ -37,7 +37,7 @@ public class LiveSemanticGroupsTest
         assertEquals(-540L, row.value);
         assertEquals("Cast \u00b7 \u00d73", LivePage.metaOf(row));
 
-        engine.getActiveSession().addTransaction(exactCast(T0 + 5_000L, "Blood Barrage", 1, 1, 1), 2_000);
+        engine.getActiveSession().addTransaction(exactCast(T0 + 5_000L, "Blood Barrage", 1, 1, 1), 2_000, false);
         LiveSnapshot bubbled = LiveSnapshot.capture(engine, T0 + 6_000L, LiveContext.NONE);
         assertEquals(2, bubbled.recent.size());
         assertEquals("the newest group bubbles to the top", "Blood Barrage", bubbled.recent.get(0).name);
@@ -49,10 +49,10 @@ public class LiveSemanticGroupsTest
     public void genericCastCompositionsStaySeparateAndGeneric()
     {
         Engine engine = session("Vorkath");
-        engine.getActiveSession().addTransaction(genericCast(T0 + 1_000L, 1, 1, 1), 2_000);
+        engine.getActiveSession().addTransaction(genericCast(T0 + 1_000L, 1, 1, 1), 2_000, false);
         // 2/2/2 would be Ice Rush's exact cost (named since 2026-09-28); 3/3/3 is no spell's.
-        engine.getActiveSession().addTransaction(genericCast(T0 + 2_000L, 3, 3, 3), 2_000);
-        engine.getActiveSession().addTransaction(bloodGenericCast(T0 + 3_000L), 2_000);
+        engine.getActiveSession().addTransaction(genericCast(T0 + 2_000L, 3, 3, 3), 2_000, false);
+        engine.getActiveSession().addTransaction(bloodGenericCast(T0 + 3_000L), 2_000, false);
 
         LiveSnapshot snapshot = LiveSnapshot.capture(engine, T0 + 4_000L, LiveContext.NONE);
         assertEquals("same normalised composition groups, a different one splits", 2, snapshot.recent.size());
@@ -73,7 +73,7 @@ public class LiveSemanticGroupsTest
         for (int i = 0; i < LiveSnapshot.RECENT_ROWS + 2; i++)
         {
             engine.getActiveSession().addTransaction(
-                gain(T0 + 1_000L + i * 1_000L, "Item " + i, 2_000 + i, 1L, 100, 100L), 2_000);
+                gain(T0 + 1_000L + i * 1_000L, "Item " + i, 2_000 + i, 1L, 100, 100L), 2_000, false);
         }
         LiveSnapshot snapshot = LiveSnapshot.capture(engine, T0 + 20_000L, LiveContext.NONE);
 
@@ -86,8 +86,8 @@ public class LiveSemanticGroupsTest
     public void unpricedFinancialRowsAreNotReviewButCanonicalReviewStillIs()
     {
         Engine engine = session("Vorkath");
-        engine.getActiveSession().addTransaction(unpricedGain(T0 + 1_000L, "Unidentified mineral", 8), 2_000);
-        engine.getActiveSession().addTransaction(review(T0 + 2_000L, "Unknown rune", 777), 2_000);
+        engine.getActiveSession().addTransaction(unpricedGain(T0 + 1_000L, "Unidentified mineral", 8), 2_000, false);
+        engine.getActiveSession().addTransaction(review(T0 + 2_000L, "Unknown rune", 777), 2_000, false);
 
         LiveSnapshot snapshot = LiveSnapshot.capture(engine, T0 + 3_000L, LiveContext.NONE);
 
@@ -107,9 +107,9 @@ public class LiveSemanticGroupsTest
     public void measuredResourceRowsShowInRecentAndStayInTheLedgerChargesChip()
     {
         Engine engine = session("Vorkath");
-        engine.getActiveSession().addTransaction(gain(T0 + 500L, "Older gain", 999, 1L, 50, 50L), 2_000);
-        engine.getActiveSession().addTransaction(blowpipeSpend(T0 + 1_000L), 2_000);
-        engine.getActiveSession().addTransaction(blowpipeSpend(T0 + 2_000L), 2_000);
+        engine.getActiveSession().addTransaction(gain(T0 + 500L, "Older gain", 999, 1L, 50, 50L), 2_000, false);
+        engine.getActiveSession().addTransaction(blowpipeSpend(T0 + 1_000L), 2_000, false);
+        engine.getActiveSession().addTransaction(blowpipeSpend(T0 + 2_000L), 2_000, false);
 
         LiveSnapshot snapshot = LiveSnapshot.capture(engine, T0 + 3_000L, LiveContext.NONE);
 
@@ -135,8 +135,8 @@ public class LiveSemanticGroupsTest
     {
         Engine engine = session("Vorkath");
         Transaction newest = exactCast(T0 + 2_000L, "Ice Barrage", 1, 1, 1);
-        engine.getActiveSession().addTransaction(exactCast(T0 + 1_000L, "Ice Barrage", 1, 1, 1), 2_000);
-        engine.getActiveSession().addTransaction(newest, 2_000);
+        engine.getActiveSession().addTransaction(exactCast(T0 + 1_000L, "Ice Barrage", 1, 1, 1), 2_000, false);
+        engine.getActiveSession().addTransaction(newest, 2_000, false);
 
         LiveSnapshot snapshot = LiveSnapshot.capture(engine, T0 + 3_000L, LiveContext.NONE);
         LiveSnapshot.Recent row = snapshot.recent.get(0);

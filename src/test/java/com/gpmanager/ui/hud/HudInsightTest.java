@@ -136,7 +136,7 @@ public class HudInsightTest
         HudBuilder builder = new HudBuilder(config(true, 4), null);
         builder.update(LiveSnapshot.capture(engine, NOW, null), f -> true, NOW);
         engine.getActiveSession().addTransaction(receipt(NOW + 1L, TransactionType.LOOT,
-            flow(536, "Dragon bones", 1L, 1_000_000)), 2_000);
+            flow(536, "Dragon bones", 1L, 1_000_000)), 2_000, false);
         builder.tray().booked(receipt(NOW + 1L, TransactionType.LOOT, flow(536, "Dragon bones", 1L, 1_000_000)),
             NOW + 1L, false);
         HudFrame first = builder.update(LiveSnapshot.capture(engine, NOW + 2L, null), f -> true,

@@ -32,7 +32,7 @@ public class GeCollectRecheckTest
         Session session = engine.getActiveSession();
         Transaction old = geReview(Context.GENERIC, coins(19_911L));
         String id = old.getId();
-        session.addTransaction(old, 2_000);
+        session.addTransaction(old, 2_000, false);
         assertTrue("it starts in Review", ReviewRules.needsOwnerDecision(old));
         long revision = engine.getRevision();
 
@@ -73,7 +73,7 @@ public class GeCollectRecheckTest
             new Flow(BONES, "Bones", 1L, 100, 100L, PriceSource.GRAND_EXCHANGE));
         Transaction counted = geReview(Context.GENERIC, coins(5_000L));
         counted.applyCorrection(Correction.REVENUE, T0);
-        for (Transaction row : List.of(market, withLoss, withItem, counted)) session.addTransaction(row, 2_000);
+        for (Transaction row : List.of(market, withLoss, withItem, counted)) session.addTransaction(row, 2_000, false);
         long revision = engine.getRevision();
 
         engine.recheck(item -> 0);

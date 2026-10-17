@@ -48,10 +48,10 @@ public final class GeneralProfitSimulation
         engine.ensureSession(start);
         engine.beginPriming();
 
-        SimulationSupport.equal(null, engine.processIfDirty(ContainerSnapshot.empty(), start + 600L), "warm-up tick 1");
-        SimulationSupport.equal(null, engine.processIfDirty(SimulationSupport.snapshot(1265, 1L), start + 1_200L), "warm-up tick 2");
-        SimulationSupport.equal(null, engine.processIfDirty(SimulationSupport.snapshot(1265, 1L), start + 1_800L), "warm-up tick 3");
-        SimulationSupport.equal(null, engine.processIfDirty(SimulationSupport.snapshot(1265, 1L), start + 2_400L), "warm-up tick 4");
+        SimulationSupport.equal(null, engine.processIfDirty(ContainerSnapshot.empty(), start + 600L, null), "warm-up tick 1");
+        SimulationSupport.equal(null, engine.processIfDirty(SimulationSupport.snapshot(1265, 1L), start + 1_200L, null), "warm-up tick 2");
+        SimulationSupport.equal(null, engine.processIfDirty(SimulationSupport.snapshot(1265, 1L), start + 1_800L, null), "warm-up tick 3");
+        SimulationSupport.equal(null, engine.processIfDirty(SimulationSupport.snapshot(1265, 1L), start + 2_400L, null), "warm-up tick 4");
 
         SimulationSupport.equal(0L, engine.getMetrics(start + 2_400L).net, "opening inventory net");
         SimulationSupport.equal(0, engine.getActiveSession().getTransactions().size(), "opening inventory transactions");
@@ -71,13 +71,13 @@ public final class GeneralProfitSimulation
 
         engine.markContext(Context.TRANSFER, 8, "Bank transfer");
         engine.markDirty();
-        SimulationSupport.equal(null, engine.processIfDirty(ContainerSnapshot.empty(), start + 600L), "temporary removal tick 1");
-        SimulationSupport.equal(null, engine.processIfDirty(ContainerSnapshot.empty(), start + 1_200L), "temporary removal tick 2");
+        SimulationSupport.equal(null, engine.processIfDirty(ContainerSnapshot.empty(), start + 600L, null), "temporary removal tick 1");
+        SimulationSupport.equal(null, engine.processIfDirty(ContainerSnapshot.empty(), start + 1_200L, null), "temporary removal tick 2");
 
         engine.markDirty();
-        SimulationSupport.equal(null, engine.processIfDirty(SimulationSupport.snapshot(1265, 1L), start + 1_800L), "restore tick 1");
-        SimulationSupport.equal(null, engine.processIfDirty(SimulationSupport.snapshot(1265, 1L), start + 2_400L), "restore tick 2");
-        SimulationSupport.equal(null, engine.processIfDirty(SimulationSupport.snapshot(1265, 1L), start + 3_000L), "restore settle");
+        SimulationSupport.equal(null, engine.processIfDirty(SimulationSupport.snapshot(1265, 1L), start + 1_800L, null), "restore tick 1");
+        SimulationSupport.equal(null, engine.processIfDirty(SimulationSupport.snapshot(1265, 1L), start + 2_400L, null), "restore tick 2");
+        SimulationSupport.equal(null, engine.processIfDirty(SimulationSupport.snapshot(1265, 1L), start + 3_000L, null), "restore settle");
 
         SimulationSupport.equal(0, engine.getActiveSession().getTransactions().size(), "round-trip transaction count");
         SimulationSupport.equal(0L, engine.getMetrics(start + 3_000L).net, "round-trip net");
@@ -180,7 +180,7 @@ public final class GeneralProfitSimulation
                 "General",
                 true,
                 Collections.singletonList(SimulationSupport.valuedFlow(20001, "Test gain", 1L, 1_000))),
-            100);
+            100, false);
 
         session.pause(2_000L, PauseReason.MANUAL);
         Metrics atPause = session.metrics(2_000L);
@@ -215,7 +215,7 @@ public final class GeneralProfitSimulation
     {
         Path stateDirectory = output.resolve("state-recovery");
         Files.createDirectories(stateDirectory);
-        SessionRepository repository = new SessionRepository(new Gson(), Filepath.Unchecked.getRooted(stateDirectory));
+        SessionRepository repository = new SessionRepository(new Gson(), Filepath.Unchecked.getRooted(stateDirectory), false);
         Session session = new Session("Recovered session", 1_000L, SessionMode.GENERAL);
         session.addTransaction(
             Tx.of(
@@ -225,9 +225,9 @@ public final class GeneralProfitSimulation
                 "Recovered loot",
                 true,
                 Collections.singletonList(SimulationSupport.gain(526, 2L))),
-            100);
+            100, false);
         repository.save(new WriteIntent(null, repository.scopeGeneration,
-            repository.lastKnownDiskRevision, new SavedState(session, null, Collections.emptyList())));
+            repository.lastKnownDiskRevision, new SavedState(session, null, Collections.emptyList()), null));
 
         SavedState restored = repository.load();
         SimulationSupport.check(restored.getActiveSession() != null, "active session should restore");
@@ -235,7 +235,7 @@ public final class GeneralProfitSimulation
         SimulationSupport.equal(62L, restored.getActiveSession().metrics(3_000L).net, "restored session net");
 
         Engine engine = SimulationSupport.newEngine(SessionMode.GENERAL);
-        engine.restore(restored);
+        engine.restore(restored, SafeMath.now());
         SimulationSupport.equal(PauseReason.RECOVERY, engine.getActiveSession().getPauseReason(),
             "interrupted active session waits paused for recovery");
     }
@@ -253,7 +253,7 @@ public final class GeneralProfitSimulation
                 "General",
                 true,
                 Collections.singletonList(SimulationSupport.valuedFlow(20010, "Profit", 1L, 1_000))),
-            100);
+            100, false);
         profitable.close(3_600_000L);
 
         Session loss = new Session("Loss", 0L, SessionMode.GENERAL);
@@ -267,7 +267,7 @@ public final class GeneralProfitSimulation
                 "General",
                 true,
                 Collections.singletonList(SimulationSupport.valuedFlow(20011, "Cost", -1L, 500))),
-            100);
+            100, false);
         loss.close(3_600_000L);
 
         Session current = new Session("Current", 0L, SessionMode.GENERAL);
@@ -281,7 +281,7 @@ public final class GeneralProfitSimulation
                 "General",
                 true,
                 Collections.singletonList(SimulationSupport.valuedFlow(20012, "Current", 1L, 600))),
-            100);
+            100, false);
 
         Engine engine = SimulationSupport.newEngine(SessionMode.GENERAL);
         engine.restore(new SavedState(current, null, Arrays.asList(profitable, loss)), 3_600_000L);
@@ -305,7 +305,7 @@ public final class GeneralProfitSimulation
                 "Bossing",
                 true,
                 Collections.singletonList(SimulationSupport.valuedFlow(21000, "Boss drop", 1L, 1_000))),
-            100);
+            100, false);
         pvm.close(3_600_000L);
 
         Session skilling = new Session("Fletching", 0L, SessionMode.GENERAL);
@@ -319,7 +319,7 @@ public final class GeneralProfitSimulation
                 "Fletching",
                 true,
                 Collections.singletonList(SimulationSupport.valuedFlow(21001, "Bow", 1L, 500))),
-            100);
+            100, false);
         skilling.close(3_600_000L);
 
         Session trading = new Session("Flipping", 0L, SessionMode.GENERAL);
@@ -332,7 +332,7 @@ public final class GeneralProfitSimulation
             "Market",
             true,
             Collections.singletonList(SimulationSupport.valuedFlow(21002, "Trade", -1L, 200)));
-        trading.addTransaction(tradeLoss, 100);
+        trading.addTransaction(tradeLoss, 100, false);
         trading.close(3_600_000L);
 
         Engine engine = SimulationSupport.newEngine(SessionMode.GENERAL);
@@ -375,7 +375,7 @@ public final class GeneralProfitSimulation
         long quantity = value < 0L ? -1L : 1L;
         session.addTransaction(Tx.of(
             start + 1_000L, 1_000L, type, context, name, name, true,
-            Collections.singletonList(new Flow(31_000, "Item", quantity, (int) Math.abs(value), value))), 100);
+            Collections.singletonList(new Flow(31_000, "Item", quantity, (int) Math.abs(value), value))), 100, false);
         session.close(start + 3_600_000L);
         return session;
     }
@@ -396,7 +396,7 @@ public final class GeneralProfitSimulation
                 Confidence.CONFIRMED,
                 "Offline simulation of confirmed NPC loot.",
                 null),
-            100);
+            100, false);
         session.addTransaction(
             Tx.of(
                 3_000L,
@@ -407,7 +407,7 @@ public final class GeneralProfitSimulation
                 "Goblin",
                 true,
                 Collections.singletonList(SimulationSupport.cost(379, 1L))),
-            100);
+            100, false);
         session.close(61_000L);
 
         SimulationSupport.check(!session.getTransactions().isEmpty(), "the Grind keeps its receipts");

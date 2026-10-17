@@ -29,9 +29,9 @@ public class LedgerDetailDisclosureTest
     {
         Engine engine = session();
         Transaction first = iceBurst(T0 + 1_000L);
-        engine.getActiveSession().addTransaction(first, 2_000);
-        engine.getActiveSession().addTransaction(iceBurst(T0 + 2_000L), 2_000);
-        engine.getActiveSession().addTransaction(iceBurst(T0 + 3_000L), 2_000);
+        engine.getActiveSession().addTransaction(first, 2_000, false);
+        engine.getActiveSession().addTransaction(iceBurst(T0 + 2_000L), 2_000, false);
+        engine.getActiveSession().addTransaction(iceBurst(T0 + 3_000L), 2_000, false);
         // A Shark group whose transaction also carries an unrelated coin gain.
         Transaction mixed = new Transaction(T0 + 4_000L, TransactionType.CONSUMPTION,
             Context.GENERIC, "", "Vorkath", true, Arrays.asList(
@@ -39,7 +39,7 @@ public class LedgerDetailDisclosureTest
                 new Flow(995, "Coins", 500L, 1, 500L, PriceSource.FACE_VALUE)),
             Confidence.CONFIRMED, "Loot and food", null);
         mixed.setActionKind(ActionKind.EAT);
-        engine.getActiveSession().addTransaction(mixed, 2_000);
+        engine.getActiveSession().addTransaction(mixed, 2_000, false);
 
         LedgerData data = capture(engine, T0 + 10_000L,
             entry(LedgerData.CostView.SUPPLIES, first.getId()));
@@ -95,8 +95,8 @@ public class LedgerDetailDisclosureTest
     public void anUnpricedChildMakesItsReceiptRowIncomplete()
     {
         Engine engine = session();
-        engine.getActiveSession().addTransaction(unpricedDeathBurst(T0 + 1_000L), 2_000);
-        engine.getActiveSession().addTransaction(unpricedDeathBurst(T0 + 2_000L), 2_000);
+        engine.getActiveSession().addTransaction(unpricedDeathBurst(T0 + 1_000L), 2_000, false);
+        engine.getActiveSession().addTransaction(unpricedDeathBurst(T0 + 2_000L), 2_000, false);
         LedgerData data = capture(engine, T0 + 10_000L,
             entry(LedgerData.CostView.SUPPLIES, null));
         // Its runes are Ice Burst's exact cost, so the row reads as the spell (owner 2026-09-28).
@@ -114,8 +114,8 @@ public class LedgerDetailDisclosureTest
     public void measuredContextsNeverShareAGroup()
     {
         Engine engine = session();
-        engine.getActiveSession().addTransaction(measuredLead(T0 + 1_000L, "Measured charge spend · Toxic blowpipe"), 2_000);
-        engine.getActiveSession().addTransaction(measuredLead(T0 + 2_000L, "Measured charge spend · Trident of the swamp"), 2_000);
+        engine.getActiveSession().addTransaction(measuredLead(T0 + 1_000L, "Measured charge spend · Toxic blowpipe"), 2_000, false);
+        engine.getActiveSession().addTransaction(measuredLead(T0 + 2_000L, "Measured charge spend · Trident of the swamp"), 2_000, false);
         LedgerData data = capture(engine, T0 + 10_000L,
             entry(LedgerData.CostView.CHARGES, null));
         // Owner 2026-09-28: measured charge use has its own Charges chip, apart from Supplies.
@@ -145,7 +145,7 @@ public class LedgerDetailDisclosureTest
     {
         Engine engine = session();
         Transaction first = iceBurst(T0 + 1_000L);
-        engine.getActiveSession().addTransaction(first, 2_000);
+        engine.getActiveSession().addTransaction(first, 2_000, false);
         LedgerData data = capture(engine, T0 + 2_000L,
             entry(LedgerData.CostView.SUPPLIES, first.getId()));
         LedgerPage page = onEdt(() ->
@@ -157,7 +157,7 @@ public class LedgerDetailDisclosureTest
         assertEquals("EXACT", onEdt(() -> LedgerPageProbe.drill(page)));
 
         // A compatible new receipt keeps the open detail anchored and updates its totals.
-        engine.getActiveSession().addTransaction(iceBurst(T0 + 3_000L), 2_000);
+        engine.getActiveSession().addTransaction(iceBurst(T0 + 3_000L), 2_000, false);
         LedgerData updated = capture(engine, T0 + 4_000L,
             entry(LedgerData.CostView.SUPPLIES, first.getId()));
         assertNotNull("the open group detail survives new compatible activity", updated.detail);
@@ -207,8 +207,9 @@ public class LedgerDetailDisclosureTest
         List<String> used = onEdt(() -> TableRows.of(page.body(), "USED"));
         assertEquals("one rune type is still listed: " + used, 1, used.size());
         assertTrue(used.get(0), used.get(0).startsWith("Blood rune|" + Fmt.times(2) + "|"));
+        // Owner 1.5.2: one entry needs no ENTRIES list; USED already names the spend.
         List<String> entries = onEdt(() -> TableRows.of(page.body(), "ENTRIES"));
-        assertTrue("the entry names its spend: " + entries, entries.get(0).startsWith("Blood rune " + Fmt.times(2) + "|"));
+        assertTrue("no list of one: " + entries, entries.isEmpty());
     }
 
     private static Engine session()
@@ -281,7 +282,7 @@ public class LedgerDetailDisclosureTest
     public void estimatedChargeCastsLandInTheChargesChip()
     {
         Engine engine = session();
-        engine.getActiveSession().addTransaction(estimatedCharge(T0 + 1_000L), 2_000);
+        engine.getActiveSession().addTransaction(estimatedCharge(T0 + 1_000L), 2_000, false);
         LedgerData charges = capture(engine, T0 + 2_000L,
             entry(LedgerData.CostView.CHARGES, null));
         assertEquals(1, charges.costCounts[LedgerData.CostView.CHARGES.ordinal()]);
@@ -297,9 +298,9 @@ public class LedgerDetailDisclosureTest
     {
         Engine engine = session();
         Transaction estimate = singleRuneEstimate(T0 + 1_000L);
-        engine.getActiveSession().addTransaction(estimate, 2_000);
+        engine.getActiveSession().addTransaction(estimate, 2_000, false);
         Transaction measured = measuredLead(T0 + 2_000L, "Measured charge spend \u00b7 Toxic blowpipe");
-        engine.getActiveSession().addTransaction(measured, 2_000);
+        engine.getActiveSession().addTransaction(measured, 2_000, false);
 
         LedgerPage estimatePage = receiptPage(engine, estimate.getId());
         List<String> estimateLabels = onEdt(() -> labels(estimatePage.body()));

@@ -29,7 +29,7 @@ public class FirstUseCopyTest
         Engine namedEngine = new Engine(deltas -> Collections.emptyList(), new TransactionClassifier(),
             namedConfig);
         namedEngine.startCustom("Vorkath", 1_700_000_000_000L);
-        SidebarPanel named = onEdt(() -> new SidebarPanel(namedEngine, namedConfig, null));
+        SidebarPanel named = onEdt(() -> new SidebarPanel(namedEngine, namedConfig, null, null, null));
         refresh(named);
         assertEquals("Nothing booked yet", named.live.recent.emptyText);
 
@@ -42,7 +42,7 @@ public class FirstUseCopyTest
     private static SidebarPanel panel(GpManagerConfig config) throws Exception
     {
         Engine engine = new Engine(deltas -> Collections.emptyList(), new TransactionClassifier(), config);
-        return onEdt(() -> new SidebarPanel(engine, config, null));
+        return onEdt(() -> new SidebarPanel(engine, config, null, null, null));
     }
 
     private static void refresh(SidebarPanel panel) throws Exception

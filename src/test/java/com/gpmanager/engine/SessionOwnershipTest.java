@@ -39,8 +39,8 @@ public class SessionOwnershipTest
         assertTrue(general.paused);
         engine.setBaseline(snapshot(0L));
         engine.markDirty();
-        engine.processIfDirty(snapshot(250L), 200L);
-        Transaction transaction = engine.processIfDirty(snapshot(250L), 201L);
+        engine.processIfDirty(snapshot(250L), 200L, null);
+        Transaction transaction = engine.processIfDirty(snapshot(250L), 201L, null);
 
         assertEquals(250L, transaction.getNet());
         assertEquals(1, custom.getTransactions().size());
@@ -66,7 +66,7 @@ public class SessionOwnershipTest
         assertEquals(generalId, saved.generalSession.getId());
         assertEquals(0, saved.getHistory().size());
         Engine restored = engine(10);
-        restored.restore(saved);
+        restored.restore(saved, SafeMath.now());
         assertEquals(generalId, restored.getActiveSession().getId());
         assertEquals(PauseReason.RECOVERY, restored.getActiveSession().getPauseReason());
     }
@@ -132,7 +132,7 @@ public class SessionOwnershipTest
         SavedState saved = new Gson().fromJson(new Gson().toJson(engine.savedState()), SavedState.class);
 
         Engine restored = engine(10);
-        restored.restore(saved);
+        restored.restore(saved, SafeMath.now());
         restored.finishCustom(1_300L);
 
         assertEquals(PauseReason.IDLE, restored.getGeneralSession().getPauseReason());
@@ -151,7 +151,7 @@ public class SessionOwnershipTest
 
         SavedState saved = new Gson().fromJson(new Gson().toJson(engine.savedState()), SavedState.class);
         Engine restored = engine(10);
-        restored.restore(saved);
+        restored.restore(saved, SafeMath.now());
 
         assertEquals(generalId, restored.getGeneralSession().getId());
         assertEquals(customId, restored.getActiveSession().getId());

@@ -54,8 +54,8 @@ public class GpManagerPluginAutoStartTest
         long now = System.currentTimeMillis();
         engine.markDirty();
         ContainerSnapshot potato = new ContainerSnapshot(Collections.singletonMap(1942, 1L));
-        assertNull(engine.processIfDirty(potato, now + 600L));
-        Transaction gain = engine.processIfDirty(potato, now + 1_200L);
+        assertNull(engine.processIfDirty(potato, now + 600L, null));
+        Transaction gain = engine.processIfDirty(potato, now + 1_200L, null);
 
         assertNotNull(gain);
         assertEquals(TransactionType.GAIN, gain.getType());

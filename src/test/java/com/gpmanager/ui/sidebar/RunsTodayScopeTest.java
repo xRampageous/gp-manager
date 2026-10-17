@@ -79,7 +79,7 @@ public class RunsTodayScopeTest
         long now = System.currentTimeMillis();
         engine.startCustom("Live", now);
 
-        SidebarPanel panel = onEdt(() -> new SidebarPanel(engine, new GpManagerConfig() {}, null));
+        SidebarPanel panel = onEdt(() -> new SidebarPanel(engine, new GpManagerConfig() {}, null, null, null));
         onEdt(() ->
         {
             panel.ledger.apply(LedgerData.capture(engine, now,
@@ -117,7 +117,7 @@ public class RunsTodayScopeTest
         Transaction receipt = new Transaction(at, TransactionType.LOOT, Context.LOOT, "", "Vorkath", true,
             Collections.singletonList(new Flow(536, "Dragon bones", 1L, (int) value, value)),
             Confidence.CONFIRMED, "fixture", null);
-        engine.getActiveSession().addTransaction(receipt, 2_000);
+        engine.getActiveSession().addTransaction(receipt, 2_000, false);
         return receipt;
     }
 

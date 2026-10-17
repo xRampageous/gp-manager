@@ -160,7 +160,7 @@ public class DeathReclaimLifecycleTest
         // removal settles. The separate captured-stack evidence remains live.
         for (int i = 0; i < 5; i++)
         {
-            assertNull(engine.processIfDirty(carried, 1_100L + i * 600L));
+            assertNull(engine.processIfDirty(carried, 1_100L + i * 600L, null));
         }
         engine.markDirty();
         Transaction wipe = settle(engine, ContainerSnapshot.empty(), 5_000L);
@@ -239,7 +239,7 @@ public class DeathReclaimLifecycleTest
         engine.markPvmDeath(1, carried.quantities);
         for (int i = 0; i < 5; i++)
         {
-            assertNull(engine.processIfDirty(carried, 1_100L + i * 600L));
+            assertNull(engine.processIfDirty(carried, 1_100L + i * 600L, null));
         }
 
         engine.markDirty();
@@ -291,7 +291,7 @@ public class DeathReclaimLifecycleTest
         engine.markPvmDeath(1, carried.quantities);
         for (int i = 0; i < 3; i++)
         {
-            assertNull(engine.processIfDirty(carried, 1_100L + i * 600L));
+            assertNull(engine.processIfDirty(carried, 1_100L + i * 600L, null));
         }
         engine.markContext(Context.MARKET, 100, "Grand Exchange sale");
         engine.markDirty();
@@ -315,7 +315,7 @@ public class DeathReclaimLifecycleTest
         engine.markPvmDeath(1, carried.quantities);
         for (int i = 0; i < 3; i++)
         {
-            assertNull(engine.processIfDirty(carried, 1_100L + i * 600L));
+            assertNull(engine.processIfDirty(carried, 1_100L + i * 600L, null));
         }
         engine.noteConsume(WHIP, 20, false);
         engine.markDirty();
@@ -363,7 +363,7 @@ public class DeathReclaimLifecycleTest
         while (engine.deathStatus().ageTicks
             < DeathReclaimLifecycle.AWAIT_TICKS - 1L)
         {
-            assertNull(engine.processIfDirty(ContainerSnapshot.empty(), 4_000L));
+            assertNull(engine.processIfDirty(ContainerSnapshot.empty(), 4_000L, null));
         }
         // The final return can be observed before a delayed/missed dirty callback.
         Transaction returned = settle(engine, carried, 5_000L);
@@ -425,7 +425,7 @@ public class DeathReclaimLifecycleTest
         int maxWait = DeathReclaimLifecycle.AWAIT_TICKS + stabilization[0] + 5;
         for (int i = 0; i < maxWait; i++)
         {
-            Transaction tick = engine.processIfDirty(changing, 4_000L + i * 600L);
+            Transaction tick = engine.processIfDirty(changing, 4_000L + i * 600L, null);
             if (tick != null && "Death reclaim expired".equals(tick.getNote()))
             {
                 expired = tick;
@@ -442,7 +442,7 @@ public class DeathReclaimLifecycleTest
         assertTrue(unrelatedGain.isCounted());
         assertTrue(expired.getFlows().isEmpty());
         assertFalse(engine.deathStatus().awaiting);
-        engine.processIfDirty(changing, 4_000L + maxWait * 600L);
+        engine.processIfDirty(changing, 4_000L + maxWait * 600L, null);
     }
 
     @Test
@@ -531,7 +531,7 @@ public class DeathReclaimLifecycleTest
         ContainerSnapshot afterPartialReturn = gear(1L, 0L, 0L, 0L);
         for (int i = 0; i < DeathReclaimLifecycle.AWAIT_TICKS; i++)
         {
-            Transaction tick = engine.processIfDirty(afterPartialReturn, 6_000L + i * 600L);
+            Transaction tick = engine.processIfDirty(afterPartialReturn, 6_000L + i * 600L, null);
             if (tick != null)
             {
                 expired = tick;
@@ -605,7 +605,7 @@ public class DeathReclaimLifecycleTest
 
         // Respawn with the coins for the fee (coins are kept on death in this fixture).
         engine.markDirty();
-        assertNull(engine.processIfDirty(gear(0L, 0L, 150_000L, 0L), 4_000L));
+        assertNull(engine.processIfDirty(gear(0L, 0L, 150_000L, 0L), 4_000L, null));
         engine.setBaseline(gear(0L, 0L, 150_000L, 0L));
 
         // Reclaim at Zul-Gwenwynig: 100k leaves, whip + torture return in the same settle.
@@ -904,7 +904,7 @@ public class DeathReclaimLifecycleTest
         assertNotNull(wipe);
         assertTrue(EngineProbe.isAwaitingDeathReclaim(engine));
 
-        engine.restore(new SavedState());
+        engine.restore(new SavedState(), SafeMath.now());
         engine.ensureSession(4_000L);
         engine.setBaseline(ContainerSnapshot.empty());
 
@@ -931,7 +931,7 @@ public class DeathReclaimLifecycleTest
         assertTrue(EngineProbe.isAwaitingDeathReclaim(engine));
 
         engine.pauseForLifecycle(3_000L);
-        assertNull("paused inventory churn is ignored", engine.processIfDirty(gear(0L, 0L, 0L, 1L), 3_200L));
+        assertNull("paused inventory churn is ignored", engine.processIfDirty(gear(0L, 0L, 0L, 1L), 3_200L, null));
         engine.resume(4_000L, PauseReason.LIFECYCLE);
         engine.setBaseline(ContainerSnapshot.empty());
         assertTrue("pause must not discard same-owner death ownership evidence",
@@ -1168,9 +1168,9 @@ public class DeathReclaimLifecycleTest
 
     private static Transaction settle(Engine engine, ContainerSnapshot snapshot, long firstTick)
     {
-        assertNull(engine.processIfDirty(snapshot, firstTick));
-        assertNull(engine.processIfDirty(snapshot, firstTick + 600L));
-        return engine.processIfDirty(snapshot, firstTick + 1_200L);
+        assertNull(engine.processIfDirty(snapshot, firstTick, null));
+        assertNull(engine.processIfDirty(snapshot, firstTick + 600L, null));
+        return engine.processIfDirty(snapshot, firstTick + 1_200L, null);
     }
 
     private static Transaction sw(Engine engine, String note)

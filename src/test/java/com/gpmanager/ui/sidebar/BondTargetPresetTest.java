@@ -58,10 +58,12 @@ public class BondTargetPresetTest
     @Test
     public void readableTargetsParseBackExactly()
     {
-        for (long gp : new long[] {750_000L, 1_000_000L, 9_120_000L, 10_000_000L, 9_120_345L, 1_234L})
+        for (long gp : new long[] {750_000L, 1_000_000L, 9_120_000L, 10_000_000L, 9_120_345L, 1_234L,
+            1_000_000_000L, 2_500_000_000L, 1_005_000_000L})
         {
             assertEquals(gp, GrindsData.parseNet(Fmt.targetNet(gp)));
         }
+        assertEquals("the 1b pick lights", "1b", Fmt.targetNet(1_000_000_000L));
         for (long minutes : new long[] {30L, 60L, 90L, 180L, 1_590L})
         {
             assertEquals(minutes * 60_000L, GrindsData.parseTime(Fmt.targetTime(minutes * 60_000L)));

@@ -1,5 +1,7 @@
 package com.gpmanager;
 
+import com.gpmanager.GpManagerConfig.Retention;
+
 import java.awt.Component;
 import java.awt.Container;
 import java.util.ArrayList;
@@ -35,6 +37,36 @@ public class CrossSurfaceConsistencyTest
     }
 
     // ── Live ───────────────────────────────────────────────────────────────────────────────────
+
+    /** Owner 1.5.2: an offer still on the exchange stays under Offers through a new session. */
+    @Test
+    public void anOpenOfferOutlivesANewSession() throws Exception
+    {
+        MarketFixture market = new MarketFixture();
+        market.pendingSell(0, 561, 10);
+        long later = market.now + 1_000L;
+        assertTrue("the offer is open first",
+            LiveSnapshot.capture(market.engine, later, null).recent.stream().anyMatch(row -> row.open));
+        market.engine.newLiveSession(later);
+        LiveSnapshot fresh = LiveSnapshot.capture(market.engine, later + 1L, null);
+        assertTrue("it stays under Offers", fresh.recent.stream().anyMatch(row -> row.open));
+        assertTrue("while Recent itself starts empty", fresh.recent.stream().allMatch(row -> row.open));
+    }
+
+    /** Owner live 2026-10-17: a GE sale before a target leaves Recent with the rest of the run. */
+    @Test
+    public void aTradeBeforeANewSessionLeavesRecent() throws Exception
+    {
+        MarketFixture market = new MarketFixture();
+        market.sell(0, 561, 10);
+        long later = market.now + 1_000L;
+        assertFalse("the sale shows first", LiveSnapshot.capture(market.engine, later, null).recent.isEmpty());
+        market.engine.setTargets(5_000_000L, null, later);
+        LiveSnapshot fresh = LiveSnapshot.capture(market.engine, later + 1L, null);
+        assertTrue("the target's Recent starts empty: " + fresh.recent.size(),
+            fresh.recent.stream().noneMatch(row -> !row.open));
+        assertEquals(0L, fresh.marketResult);
+    }
 
     @Test
     public void liveSeparatesRealizedMarketWithoutDoubleDescribingIt() throws Exception
@@ -100,8 +132,8 @@ public class CrossSurfaceConsistencyTest
             Context.GENERIC, "", "Vorkath", true,
             Collections.singletonList(new Flow(777, "Unknown rune", -1L, 0, 0L)),
             Confidence.UNCERTAIN, "Awaiting a decision", null);
-        engine.getActiveSession().addTransaction(uncertain, 100);
-        engine.getActiveSession().addTransaction(unpriced(T0 + 2_000L), 100);
+        engine.getActiveSession().addTransaction(uncertain, 100, false);
+        engine.getActiveSession().addTransaction(unpriced(T0 + 2_000L), 100, false);
 
         LiveSnapshot live = LiveSnapshot.capture(engine, T0 + 3_000L, null);
         LedgerData ledger = captureLedger(engine, T0 + 3_000L);
@@ -111,7 +143,7 @@ public class CrossSurfaceConsistencyTest
 
         Engine quiet = engine();
         quiet.startCustom("Vorkath", T0);
-        quiet.getActiveSession().addTransaction(unpriced(T0 + 1_000L), 100);
+        quiet.getActiveSession().addTransaction(unpriced(T0 + 1_000L), 100, false);
         LiveSnapshot quietLive = LiveSnapshot.capture(quiet, T0 + 2_000L, null);
         LedgerData quietLedger = captureLedger(quiet, T0 + 2_000L);
         assertEquals("unpriced alone is never Review", 0, quietLive.reviewCount);
@@ -123,8 +155,8 @@ public class CrossSurfaceConsistencyTest
     {
         Engine engine = engine();
         engine.startCustom("Vorkath", T0);
-        engine.getActiveSession().addTransaction(gain(T0 + 1_000L, "Dragon bones", 536, 3_200L), 100);
-        engine.getActiveSession().addTransaction(food(T0 + 2_000L, "Shark", 950L), 100);
+        engine.getActiveSession().addTransaction(gain(T0 + 1_000L, "Dragon bones", 536, 3_200L), 100, false);
+        engine.getActiveSession().addTransaction(food(T0 + 2_000L, "Shark", 950L), 100, false);
 
         LiveSnapshot live = LiveSnapshot.capture(engine, T0 + 3_000L, null);
         LedgerData ledger = captureLedger(engine, T0 + 3_000L);
@@ -146,7 +178,7 @@ public class CrossSurfaceConsistencyTest
     {
         Engine engine = engine();
         engine.startCustom("Vorkath", T0);
-        engine.getActiveSession().addTransaction(gain(T0 + 1_000L, "Dragon bones", 536, 3_200L), 100);
+        engine.getActiveSession().addTransaction(gain(T0 + 1_000L, "Dragon bones", 536, 3_200L), 100, false);
         LedgerData data = captureLedger(engine, T0 + 2_000L);
 
         LedgerPage page = onEdt(() ->
@@ -228,22 +260,6 @@ public class CrossSurfaceConsistencyTest
         return transaction;
     }
 
-    private static Transaction cast(String label, long at)
-    {
-        Transaction transaction = new Transaction(at, TransactionType.CONSUMPTION,
-            Context.GENERIC, "", "Vorkath", true, Arrays.asList(
-                new Flow(560, "Death rune", -2L, 188, -376L, PriceSource.GRAND_EXCHANGE),
-                new Flow(562, "Chaos rune", -4L, 106, -424L, PriceSource.GRAND_EXCHANGE),
-                new Flow(555, "Water rune", -4L, 5, -20L, PriceSource.GRAND_EXCHANGE)),
-            Confidence.CONFIRMED, "Exact fixture", null);
-        transaction.setActionKind(ActionKind.CAST);
-        if (label != null)
-        {
-            transaction.setActionLabel(ActionLabel.of(label));
-        }
-        return transaction;
-    }
-
     /** Engine-level GE custody fixture: realized or pending market settlements. */
     private static final class MarketFixture
     {
@@ -269,7 +285,7 @@ public class CrossSurfaceConsistencyTest
                 TransactionType.GAIN, Context.GENERIC, "", "Vorkath", true,
                 Collections.singletonList(new Flow(item, "Rune " + item, 10L, 7, 70L,
                     PriceSource.GRAND_EXCHANGE)),
-                Confidence.CONFIRMED, "Loot", null), 500);
+                Confidence.CONFIRMED, "Loot", null), 500, false);
             offer(slot, GrandExchangeOfferState.SELLING, item, 10, 0, price, 0);
             inventory.remove(item);
             settle();
@@ -292,7 +308,7 @@ public class CrossSurfaceConsistencyTest
             ContainerSnapshot snapshot = new ContainerSnapshot(inventory);
             for (int i = 0; i < 3; i++)
             {
-                engine.processIfDirty(snapshot, now);
+                engine.processIfDirty(snapshot, now, null);
                 now += 600L;
             }
         }

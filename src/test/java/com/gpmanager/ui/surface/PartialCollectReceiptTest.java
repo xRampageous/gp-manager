@@ -1,5 +1,7 @@
 package com.gpmanager;
 
+import com.gpmanager.GpManagerConfig.Retention;
+
 import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.List;
@@ -251,8 +253,8 @@ public class PartialCollectReceiptTest
         {
             engine.markDirty();
             ContainerSnapshot snapshot = new ContainerSnapshot(inventory);
-            engine.processIfDirty(snapshot, at);
-            engine.processIfDirty(snapshot, at + 1L);
+            engine.processIfDirty(snapshot, at, null);
+            engine.processIfDirty(snapshot, at + 1L, null);
         }
 
         MarketRows.Row row(int itemId)

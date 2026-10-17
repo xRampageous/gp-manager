@@ -44,7 +44,7 @@ public class DataManagementEngineTest
             GameData.msg("grand-exchange-custody"), "Market", false,
             java.util.List.of(new Flow(995, "Coins", 430L, 1, 430L, PriceSource.FACE_VALUE)),
             Confidence.CONFIRMED, GameData.msg("ownership-neutral-grand"), null);
-        engine.getActiveSession().addTransaction(change, 2_000);
+        engine.getActiveSession().addTransaction(change, 2_000, false);
         engine.recheck(id -> 0);
         assertTrue(engine.getActiveSession().getTransactions().isEmpty());
     }
@@ -56,7 +56,7 @@ public class DataManagementEngineTest
         Transaction ate = new Transaction(5L, TransactionType.CONSUMPTION, Context.GENERIC, "", "General", true,
             new java.util.ArrayList<>(java.util.List.of(new Flow(7220, "Half a summer pie", -1L, 0, 0L, PriceSource.UNPRICED))),
             Confidence.LIKELY, "", null);
-        engine.getActiveSession().addTransaction(ate, 2_000);
+        engine.getActiveSession().addTransaction(ate, 2_000, false);
         engine.recheck(id -> 0);
         Flow pie = engine.getActiveSession().getTransactions().get(0).getFlows().get(0);
         assertNotSame(PriceSource.UNPRICED, pie.getPriceSource());
@@ -71,15 +71,16 @@ public class DataManagementEngineTest
         Session run = engine.getGeneralSession();
         run.addTransaction(new Transaction(5L, TransactionType.GAIN, Context.GENERIC, "", "General", true,
             java.util.List.of(new Flow(995, "Coins", 1_000L, 1, 1_000L, PriceSource.FACE_VALUE)),
-            Confidence.LIKELY, "", null), 2_000);
+            Confidence.LIKELY, "", null), 2_000, false);
         long hour = 3_600_000L;
-        engine.restartRate(hour);
+        engine.newLiveSession(hour);
         run.addTransaction(new Transaction(hour + 5L, TransactionType.GAIN, Context.GENERIC, "", "General", true,
             java.util.List.of(new Flow(995, "Coins", 500L, 1, 500L, PriceSource.FACE_VALUE)),
-            Confidence.LIKELY, "", null), 2_000);
+            Confidence.LIKELY, "", null), 2_000, false);
 
         LiveSnapshot live = LiveSnapshot.capture(engine, 2 * hour, null);
-        assertEquals("Net keeps the whole run", 1_500L, live.net);
+        assertEquals("Net counts the new session", 500L, live.net);
+        assertEquals("the run keeps its whole total", 1_500L, live.runNet);
         assertEquals("the clock counts from the restart", hour, live.elapsedMillis);
         assertEquals("GP/h is what came in since", 500L, live.gpPerHour);
         assertSame("the same run, nothing moved to history", run, engine.getActiveSession());

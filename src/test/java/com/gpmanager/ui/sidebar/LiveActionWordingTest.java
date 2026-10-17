@@ -26,8 +26,8 @@ public class LiveActionWordingTest
         Transaction generic = cast(now + 2L, "",
             rune("Death rune", 560, -1L, -100L), rune("Chaos rune", 562, -1L, -50L),
             rune("Water rune", 555, -1L, -30L));
-        engine.getActiveSession().addTransaction(exact, 2_000);
-        engine.getActiveSession().addTransaction(generic, 2_000);
+        engine.getActiveSession().addTransaction(exact, 2_000, false);
+        engine.getActiveSession().addTransaction(generic, 2_000, false);
 
         LiveSnapshot snapshot = LiveSnapshot.capture(engine, now + 10L, LiveContext.NONE);
         LiveSnapshot.Recent exactRow = snapshot.recent.stream()

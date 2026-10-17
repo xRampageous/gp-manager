@@ -56,12 +56,12 @@ public class ResetSafetyCopyTest
                     return backup;
                 }
             };
-            assertTrue(persistence.switchIdentity(PROFILE, true));
+            assertTrue(persistence.switchIdentity(PROFILE, true, true));
             engine.ensureSession(NOW);
             engine.getActiveSession().rename("Before reset");
-            engine.getActiveSession().addTransaction(receipt(NOW), 2_000);
-            Session closed = new Session("Closed history", NOW - 60_000L);
-            closed.addTransaction(receipt(NOW - 30_000L), 2_000);
+            engine.getActiveSession().addTransaction(receipt(NOW), 2_000, false);
+            Session closed = new Session("Closed history", NOW - 60_000L, SessionMode.GENERAL);
+            closed.addTransaction(receipt(NOW - 30_000L), 2_000, false);
             closed.close(NOW - 1_000L);
             engine.history.add(closed);
             assertTrue(persistence.saveNow());
@@ -105,6 +105,20 @@ public class ResetSafetyCopyTest
         }
     }
 
+    /** Owner 1.5.2: Delete Profile without a backup deletes and writes no safety copy. */
+    @Test
+    public void deleteWithoutBackupWritesNoCopy() throws Exception
+    {
+        try (Fixture fixture = new Fixture(temporary.newFolder().toPath()))
+        {
+            Persistence persistence = fixture.persistence;
+            Persistence.ResetOutcome reset = persistence.factoryReset(NOW + 1_000L, false);
+            assertTrue(reset.getDetail(), reset.isApplied());
+            assertEquals(0, persistence.backups().size());
+            assertNull(persistence.engine.getActiveSession());
+        }
+    }
+
     @Test
     public void anEarlierBackupIsKeptAndResetWritesItsOwnCopy() throws Exception
     {
@@ -128,7 +142,7 @@ public class ResetSafetyCopyTest
             Persistence persistence = fixture.persistence;
             Filepath backup = persistence.writeBackup(NOW);
             persistence.engine.getActiveSession().rename("Changed before reset");
-            persistence.engine.getActiveSession().addTransaction(receipt(NOW + 500L), 2_000);
+            persistence.engine.getActiveSession().addTransaction(receipt(NOW + 500L), 2_000, false);
             assertTrue(persistence.factoryReset(NOW + 1_000L).isApplied());
             assertEquals(2, persistence.backups().size());
             assertEquals("Before reset", read(backup).generalSession.getName());

@@ -10,7 +10,6 @@ import static com.gpmanager.Inbox.*;
 import static com.gpmanager.PauseReason.*;
 import static com.gpmanager.Phrases.*;
 import static com.gpmanager.TransactionType.*;
-import static com.gpmanager.TransactionType.TRANSFER;
 import static java.lang.Math.*;
 import static java.util.Collections.*;
 
@@ -21,8 +20,6 @@ import com.gpmanager.ReviewRow.Item;
 import com.gpmanager.SavedState.*;
 import java.time.ZoneId;
 import java.util.*;
-import java.util.UUID;
-import java.util.function.Predicate;
 import javax.inject.*;
 import lombok.*;
 import net.runelite.api.gameval.ItemID;
@@ -32,6 +29,10 @@ import java.util.function.*;
 import static java.util.Locale.*;
 import java.util.regex.*;
 import net.runelite.api.MenuAction;
+import static com.gpmanager.Correction.*;
+import static com.gpmanager.PriceSource.*;
+import static com.gpmanager.SafeMath.safeAdd;
+import java.math.BigInteger;
 
 @Singleton
 class Engine {
@@ -173,10 +174,7 @@ class Engine {
         this((FlowValuator) valuationService, classifier, config);
     }
 
-    Engine(
-            FlowValuator valuationService,
-            TransactionClassifier classifier,
-            GpManagerConfig config) {
+    Engine(FlowValuator valuationService, TransactionClassifier classifier, GpManagerConfig config) {
         this.valuationService = valuationService;
         this.classifier = classifier;
         this.config = config;
@@ -190,10 +188,6 @@ class Engine {
         this.contributionEligibility = contributionEligibility;
     }
 
-    synchronized void restore(SavedState state) {
-        restore(state, SafeMath.now());
-    }
-
     /**
      * Restore using a supplied clock so retention and recovery rules are deterministic in tests.
      */
@@ -202,9 +196,7 @@ class Engine {
         history.clear();
         archive.clear();
         savedGrinds.clear();
-        profileTimeZoneId =
-                state != null && validZone(state.getProfileTimeZoneId())
-                        ? state.getProfileTimeZoneId()
+        profileTimeZoneId = state != null && validZone(state.getProfileTimeZoneId()) ? state.getProfileTimeZoneId()
                         : ZoneId.systemDefault().getId();
         bumpRevision();
         claims.clear();
@@ -235,10 +227,7 @@ class Engine {
                 session.sanitize();
                 attachListeners(session);
             }
-            activeSession =
-                    customSession != null && !customSession.isClosed()
-                            ? customSession
-                            : generalSession;
+            activeSession = customSession != null && !customSession.isClosed() ? customSession : generalSession;
             if (activeSession != null && !activeSession.isClosed()) {
                 if (!activeSession.paused) {
                     long savedAt = state.savedAtEpochMillis;
@@ -281,12 +270,9 @@ class Engine {
         for (Session session : uniqueSessions()) {
             for (Transaction row : session.getTransactions()) {
                 if (row.getCorrection() != Correction.AUTO || Contribution.isSplit(row)) continue;
-                if (row.getType() == UNCERTAIN
-                        && msg("grand-exchange-collect").equals(row.getNote())
-                        && row.getFlows().size() == 1
-                        && row.getFlows().get(0).itemId == ItemID.COINS
-                        && geCustody.claimOldChange(
-                                row.getFlows().get(0).valueDelta, row.timestampEpochMillis)) {
+                if (row.getType() == UNCERTAIN && msg("grand-exchange-collect").equals(row.getNote())
+                        && row.getFlows().size() == 1 && row.getFlows().get(0).itemId == ItemID.COINS
+                        && geCustody.claimOldChange(row.getFlows().get(0).valueDelta, row.timestampEpochMillis)) {
                     // A bank-paid buy's change is the player's own coins coming back (owner 1.5.1).
                     row.type = TransactionType.TRANSFER;
                     row.counted = false;
@@ -297,10 +283,8 @@ class Engine {
                     changed = true;
                 }
                 // Neutral GE change stays only as an audit row, like a live custody move.
-                if (row.getType() == TransactionType.TRANSFER
-                        && msg("grand-exchange-custody").equals(row.getNote())
-                        && row.getFlows().size() == 1
-                        && row.getFlows().get(0).itemId == ItemID.COINS) {
+                if (row.getType() == TransactionType.TRANSFER && msg("grand-exchange-custody").equals(row.getNote())
+                        && row.getFlows().size() == 1 && row.getFlows().get(0).itemId == ItemID.COINS) {
                     if (!config.keepTransferAuditRows()) drops.add(() -> session.drop(row));
                     continue;
                 }
@@ -336,12 +320,8 @@ class Engine {
                     row.recalculate();
                     changed = true;
                 }
-                String spell =
-                        row.getActionKind() != null
-                                        || row.getType() != CONSUMPTION && row.getType() != UNCERTAIN
-                                        || has(row.getNote(), "Dropped", "Destroyed")
-                                ? null
-                                : spellOf(row, alchPrice);
+                String spell = row.getActionKind() != null || row.getType() != CONSUMPTION && row.getType() != UNCERTAIN
+                                        || has(row.getNote(), "Dropped", "Destroyed") ? null : spellOf(row, alchPrice);
                 if (spell == null) continue;
                 if (ReviewRules.needsOwnerDecision(row)) {
                     row.type = CONSUMPTION;
@@ -363,9 +343,7 @@ class Engine {
      * Collect click, which today's rule books as a pickup. A real collect is always MARKET.
      */
     static boolean preCollectGate(Transaction row) {
-        if (row.getType() != UNCERTAIN
-                || row.getContext() == MARKET
-                || !"Grand Exchange".equals(row.getNote())
+        if (row.getType() != UNCERTAIN || row.getContext() == MARKET || !"Grand Exchange".equals(row.getNote())
                 || !msg("grand-exchange-movement").equals(row.getExplanation())
                 || row.getFlows().isEmpty()) return false;
         for (Flow flow : row.getFlows()) if (flow.itemId != ItemID.COINS || !flow.isGain()) return false;
@@ -403,10 +381,8 @@ class Engine {
         if (!nature) return null;
         if (gain.equals("peach") || gain.equals("banana"))
             return gain.equals("peach") ? "Bones to Peaches" : "Bones to Bananas";
-        return items != 1 || coins <= 0L || !gain.isEmpty()
-                ? null
-                : coins == -item.quantityDelta * alchPrice.applyAsInt(item.itemId)
-                        ? "High Level Alchemy"
+        return items != 1 || coins <= 0L || !gain.isEmpty() ? null
+                : coins == -item.quantityDelta * alchPrice.applyAsInt(item.itemId) ? "High Level Alchemy"
                         : "Low Level Alchemy";
     }
 
@@ -424,14 +400,79 @@ class Engine {
     }
 
     /**
-     * The ACTIVE clock's restart: GP/h and the clock count from now, while Net, Recent and the Ledger
-     * keep the whole run; only a factory reset clears it (owner 1.5.1).
+     * New session (owner 1.5.2): Live's Net, Recent, GP/h and clock start at zero and a set target
+     * counts again with it, while the run keeps every booking and its whole total.
      */
-    synchronized void restartRate(long now) {
+    synchronized void newLiveSession(long now) {
         if (activeSession == null) return;
-        activeSession.rateSetNet = getMetrics(now).net;
-        activeSession.rateSetMillis = activeSession.getElapsedMillis(now);
+        Session run = activeSession;
+        long elapsed = run.getElapsedMillis(now);
+        run.rebaseProfitTarget(getMetrics(now).net, elapsed);
+        run.rearmTimeTarget(now);
+        run.sessionStartAt = now;
+        run.sessionStartMillis = elapsed;
         bumpRevision();
+    }
+
+    /**
+     * Back to the whole run on Live, from the run total under the Net (owner 1.5.2): the session
+     * ends, nothing else changes. A running target is its own session, so it stays.
+     */
+    synchronized void showWholeRun() {
+        if (activeSession == null || activeSession.getProfitTargetGp() != null
+                || activeSession.getActiveTimeTargetMillis() != null) return;
+        activeSession.sessionStartAt = null;
+        bumpRevision();
+    }
+
+    /**
+     * Reset free-play (owner 1.5.2): the run so far moves to Grinds history, nothing deleted,
+     * and a new Free play starts at zero with the same milestone. Not during a Grind.
+     */
+    synchronized boolean startFreePlayOver(long now) {
+        if (customSession != null || generalSession == null) return false;
+        becomeFreePlay(newSession(Session.DURABLE_OWNER_NAME, now, false), now);
+        return true;
+    }
+
+    /**
+     * Restore (owner 1.5.2): a past Free play run becomes Free play again and the current one takes
+     * its place in history, so the two can swap back; nothing is deleted. Not during a Grind.
+     */
+    synchronized boolean restoreFreePlay(String sessionId, long now) {
+        Session old = historySession(sessionId);
+        if (customSession != null || generalSession == null || old == null || old.grind) return false;
+        history.remove(old);
+        old.reopen(now);
+        old.rename(Session.DURABLE_OWNER_NAME);
+        becomeFreePlay(old, now);
+        return true;
+    }
+
+    /**
+     * The current Free play moves to history as "Free play" (an empty one is dropped) and {@code
+     * next} takes over, keeping the milestone and a manual pause.
+     */
+    void becomeFreePlay(Session next, long now) {
+        Session done = generalSession;
+        clearGeCollect();
+        done.rename("Free play");
+        done.close(max(done.startedAtEpochMillis, now));
+        if (!done.getTransactions().isEmpty()) history.add(0, done);
+        archive.trimHistory();
+        generalSession = activeSession = next;
+        next.milestoneGp = done.milestoneGp;
+        if (done.getPauseReason() == MANUAL) next.pause(now, MANUAL);
+        resetTracking(true);
+        bumpRevision();
+    }
+
+    /** Free play's Net milestone (owner 1.5.2): it counts Free play's whole Net; null clears it. */
+    synchronized boolean setMilestone(Long gp) {
+        if (generalSession == null || isCustomActive()) return false;
+        generalSession.milestoneGp = gp == null || gp <= 0L ? null : gp;
+        bumpRevision();
+        return true;
     }
 
     synchronized void startCustom(String name, long now) {
@@ -490,9 +531,7 @@ class Engine {
 
     /** Resumes an automatic pause of one of these reasons; Manual Pause always needs the owner. */
     synchronized boolean resume(long now, PauseReason... reasons) {
-        if (activeSession != null
-                && activeSession.paused
-                && !separateWorld
+        if (activeSession != null && activeSession.paused && !separateWorld
                 && Arrays.asList(reasons).contains(activeSession.getPauseReason())) {
             activeSession.resume(now);
             arm(now);
@@ -691,11 +730,7 @@ class Engine {
     }
 
     /** Exact spell text is an optional presentation hint; it is not part of action matching. */
-    synchronized void noteConsume(
-            int itemId,
-            int ticks,
-            boolean destroy,
-            ActionKind actionKind,
+    synchronized void noteConsume(int itemId, int ticks, boolean destroy, ActionKind actionKind,
             ActionLabel actionLabel) {
         // Eat/Bury/Drink/Cast/etc. — clear any pending Drop intent for the same click window.
         inbox.drop(DROP_CLICK);
@@ -710,13 +745,8 @@ class Engine {
             if (actionLabel != null) prior.label = actionLabel;
             return;
         }
-        if (prior != null
-                && itemId >= 0
-                && prior.item >= 0
-                && prior.item != itemId
-                && pendingSnapshot != null
-                && baseline != null
-                && pendingSnapshot.quantityOf(prior.item) < baseline.quantityOf(prior.item)) {
+        if (prior != null && itemId >= 0 && prior.item >= 0 && prior.item != itemId && pendingSnapshot != null
+                && baseline != null && pendingSnapshot.quantityOf(prior.item) < baseline.quantityOf(prior.item)) {
             // The earlier click's item already left the pack and its change has not settled: it
             // keeps its own evidence while the new click arms (owner live 2026-10-16: an Eat two
             // ticks after a Break left the tablet in Review).
@@ -744,15 +774,6 @@ class Engine {
      */
     synchronized void clearActionEvidence() {
         inbox.drop(CONSUME, SPENT_CONSUME);
-    }
-
-    /**
-     * Extends an existing consume intent TTL, or arms an open intent when chat confirms
-     * Eat/Bury/Drink after the menu click failed to expose an item id. Preserves a pending Destroy
-     * stamp; never invents destroy from chat alone.
-     */
-    synchronized void extendConsume(int ticks) {
-        extendConsume(ticks, null);
     }
 
     /**
@@ -792,11 +813,8 @@ class Engine {
     /** Fire or Load: the balls it takes (granite first) are remembered until it is picked up. */
     synchronized void loadCannon(int ticks) {
         if (baseline != null)
-            noteDrop(
-                    baseline.quantityOf(ItemID.GRANITE_CANNONBALL) > 0
-                            ? ItemID.GRANITE_CANNONBALL
-                            : ItemID.MCANNONBALL,
-                    ticks);
+            noteDrop(baseline.quantityOf(ItemID.GRANITE_CANNONBALL) > 0 ? ItemID.GRANITE_CANNONBALL
+                            : ItemID.MCANNONBALL, ticks);
     }
 
     /**
@@ -805,40 +823,23 @@ class Engine {
      * sit in {@link #cannonball}; the exact ids here add the chainshot and incendiary types, so a
      * ship-cannon volley reads the same as a dwarf load (owner 1.3.4 ship sweep).
      */
-    private static final Set<Integer> SAIL_CANNONBALLS =
-            Set.of(
-                    ItemID.BRONZE_CANNONBALL,
-                    ItemID.IRON_CANNONBALL,
-                    ItemID.MITHRIL_CANNONBALL,
-                    ItemID.ADAMANT_CANNONBALL,
-                    ItemID.RUNE_CANNONBALL,
-                    ItemID.DRAGON_CANNONBALL,
-                    ItemID.BRONZE_CHAINSHOT_CANNONBALL,
-                    ItemID.IRON_CHAINSHOT_CANNONBALL,
-                    ItemID.STEEL_CHAINSHOT_CANNONBALL,
-                    ItemID.MITHRIL_CHAINSHOT_CANNONBALL,
-                    ItemID.ADAMANT_CHAINSHOT_CANNONBALL,
-                    ItemID.RUNE_CHAINSHOT_CANNONBALL,
-                    ItemID.DRAGON_CHAINSHOT_CANNONBALL,
-                    ItemID.BRONZE_INCENDIARY_CANNONBALL,
-                    ItemID.IRON_INCENDIARY_CANNONBALL,
-                    ItemID.STEEL_INCENDIARY_CANNONBALL,
-                    ItemID.MITHRIL_INCENDIARY_CANNONBALL,
-                    ItemID.ADAMANT_INCENDIARY_CANNONBALL,
-                    ItemID.RUNE_INCENDIARY_CANNONBALL,
-                    ItemID.DRAGON_INCENDIARY_CANNONBALL);
+    private static final Set<Integer> SAIL_CANNONBALLS = Set.of(ItemID.BRONZE_CANNONBALL, ItemID.IRON_CANNONBALL,
+                    ItemID.MITHRIL_CANNONBALL, ItemID.ADAMANT_CANNONBALL, ItemID.RUNE_CANNONBALL,
+                    ItemID.DRAGON_CANNONBALL, ItemID.BRONZE_CHAINSHOT_CANNONBALL, ItemID.IRON_CHAINSHOT_CANNONBALL,
+                    ItemID.STEEL_CHAINSHOT_CANNONBALL, ItemID.MITHRIL_CHAINSHOT_CANNONBALL,
+                    ItemID.ADAMANT_CHAINSHOT_CANNONBALL, ItemID.RUNE_CHAINSHOT_CANNONBALL,
+                    ItemID.DRAGON_CHAINSHOT_CANNONBALL, ItemID.BRONZE_INCENDIARY_CANNONBALL,
+                    ItemID.IRON_INCENDIARY_CANNONBALL, ItemID.STEEL_INCENDIARY_CANNONBALL,
+                    ItemID.MITHRIL_INCENDIARY_CANNONBALL, ItemID.ADAMANT_INCENDIARY_CANNONBALL,
+                    ItemID.RUNE_INCENDIARY_CANNONBALL, ItemID.DRAGON_INCENDIARY_CANNONBALL);
 
     static boolean cannonball(int itemId) {
-        return itemId == ItemID.MCANNONBALL
-                || itemId == ItemID.GRANITE_CANNONBALL
-                || SAIL_CANNONBALLS.contains(itemId);
+        return itemId == ItemID.MCANNONBALL || itemId == ItemID.GRANITE_CANNONBALL || SAIL_CANNONBALLS.contains(itemId);
     }
 
     /** The four dwarf multicannon parts, unnoted ids as placed (TWPART1..4). */
     static boolean cannonPart(int itemId) {
-        return itemId == ItemID.TWPART1
-                || itemId == ItemID.TWPART2
-                || itemId == ItemID.TWPART3
+        return itemId == ItemID.TWPART1 || itemId == ItemID.TWPART2 || itemId == ItemID.TWPART3
                 || itemId == ItemID.TWPART4;
     }
 
@@ -875,9 +876,7 @@ class Engine {
         Gson gson = JsonCodec.gson();
         SavedState detached = state == null ? null : gson.fromJson(gson.toJson(state), SavedState.class);
         String stateOwner = detached == null ? null : detached.ownerKey;
-        if (!next.isEmpty()
-                && !blank(stateOwner)
-                && !next.equals(stateOwner)) {
+        if (!next.isEmpty() && !blank(stateOwner) && !next.equals(stateOwner)) {
             throw new IllegalArgumentException(msg("savedstate-owner"));
         }
         Engine staged = prepareProfile(next, detached, now);
@@ -1010,15 +1009,11 @@ class Engine {
     void latchHardTransfer() {
         pendingClue().transfer = true;
         pendingClue().hard = true;
-        if (pendingClue().context == GENERIC
-                || Context.TRANSFER.priority > pendingClue().context.priority) {
+        if (pendingClue().context == GENERIC || Context.TRANSFER.priority > pendingClue().context.priority) {
             // Keep the producer's own note (minigame wipe, neutral zone, death) — a
             // generic "Bank transfer" would otherwise win the priority race and mislabel
             // every non-bank transfer row.
-            String note =
-                    liveClue().context == Context.TRANSFER
-                                    && !blank(liveClue().note)
-                            ? liveClue().note
+            String note = liveClue().context == Context.TRANSFER && !blank(liveClue().note) ? liveClue().note
                             : "Bank transfer";
             applyPendingContext(Context.TRANSFER, note, emptyMap(), null);
         } else if (pendingClue().context == Context.TRANSFER) {
@@ -1032,8 +1027,7 @@ class Engine {
      * genuine deposits. Cleared by {@link #bankClosed()} when the pending change was only a stale
      * latch after the UI was already gone (plugin closes before dirty when {@code !isBankOpen()}).
      */
-    synchronized void markLoot(
-            Map<Integer, Long> expectedLoot, int ticks, String note, String activityName) {
+    synchronized void markLoot(Map<Integer, Long> expectedLoot, int ticks, String note, String activityName) {
         Map<Integer, Long> safeExpectedLoot = positiveEntries(expectedLoot);
         if (!safeExpectedLoot.isEmpty()) {
             loot(safeExpectedLoot, ticks, note, activityName, LOOT, null);
@@ -1044,15 +1038,8 @@ class Engine {
     /**
      * Each private drop proves its own remaining quantity; attribution has the old shorter window.
      */
-    void loot(
-            Map<Integer, Long> quantities,
-            int ticks,
-            String note,
-            String name,
-            Context context,
-            String id) {
-        quantities.forEach(
-                (item, qty) -> {
+    void loot(Map<Integer, Long> quantities, int ticks, String note, String name, Context context, String id) {
+        quantities.forEach((item, qty) -> {
                     Observation e = inbox.add(PRIVATE_LOOT, item, qty, 99, orEmpty(note));
                     e.at = inbox.now + max(1, ticks) - 1;
                     e.name = nonBlank(name, "General");
@@ -1061,12 +1048,7 @@ class Engine {
                 });
     }
 
-    void setContext(
-            Context newContext,
-            int ticks,
-            String note,
-            Map<Integer, Long> expectedLoot,
-            String encounterId) {
+    void setContext(Context newContext, int ticks, String note, Map<Integer, Long> expectedLoot, String encounterId) {
         Context safeContext = newContext == null ? GENERIC : newContext;
         Map<Integer, Long> safeExpectedLoot = positiveEntries(expectedLoot);
         supersedeDeathMarker(safeContext, note);
@@ -1085,13 +1067,9 @@ class Engine {
      */
     void supersedeDeathMarker(Context safeContext, String note) {
         boolean newDeathMarker = safeContext == Context.TRANSFER && isDeathHeldNote(note);
-        boolean activeDeathMarker =
-                liveClue().context == Context.TRANSFER && isDeathHeldNote(liveClue().note);
-        boolean pendingDeathMarker =
-                pendingClue().context == Context.TRANSFER && isDeathHeldNote(pendingClue().note);
-        if (!newDeathMarker
-                && safeContext != GENERIC
-                && (activeDeathMarker || pendingDeathMarker)) {
+        boolean activeDeathMarker = liveClue().context == Context.TRANSFER && isDeathHeldNote(liveClue().note);
+        boolean pendingDeathMarker = pendingClue().context == Context.TRANSFER && isDeathHeldNote(pendingClue().note);
+        if (!newDeathMarker && safeContext != GENERIC && (activeDeathMarker || pendingDeathMarker)) {
             if (activeDeathMarker) {
                 liveClue().clear();
                 inbox.drop(CLOCK);
@@ -1162,11 +1140,8 @@ class Engine {
 
     /** Current presentation read model for the local death-reclaim indicator. */
     synchronized DeathReclaimStatus deathStatus() {
-        return new DeathReclaimStatus(
-                deathReclaim.isAwaitingReclaim(),
-                deathReclaim.isReclaimArmed(),
-                deathReclaim.outstandingItemCount(),
-                deathReclaim.ageTicks());
+        return new DeathReclaimStatus(deathReclaim.isAwaitingReclaim(), deathReclaim.isReclaimArmed(),
+                deathReclaim.outstandingItemCount(), deathReclaim.ageTicks());
     }
 
     static Transaction first(Transaction... candidates) {
@@ -1182,46 +1157,26 @@ class Engine {
      * stay in the ordinary settle. A fee is booked only from an observed coin loss with a live
      * service interaction or a matched return in the same settle.
      */
-    Transaction settleReclaim(
-            List<Flow> flows,
-            long now,
-            Map<Integer, Long> observedLootQuantities,
+    Transaction settleReclaim(List<Flow> flows, long now, Map<Integer, Long> observedLootQuantities,
             boolean allowObservedFee) {
         if (empty(flows) || !deathReclaim.isAwaitingReclaim() && !deathReclaim.isReclaimArmed())
             return null;
         Service service = deathReclaim.reclaimService;
         Map<Integer, Long> sourceBacked = positiveEntries(observedLootQuantities);
         // Source-backed loot quantities are protected first.
-        List<Flow> returned =
-                claim(
-                        flows,
-                        Flow::isGain,
-                        (flow, quantity) ->
-                                deathReclaim.matchReturnedItem(
-                                        flow.itemId,
+        List<Flow> returned = claim(flows, Flow::isGain, (flow, quantity) -> deathReclaim.matchReturnedItem(flow.itemId,
                                         quantity - take(sourceBacked, flow.itemId, quantity)));
-        long coinsPaid =
-                lossQuantities(flows, itemId -> itemId == ItemID.COINS)
-                        .getOrDefault(ItemID.COINS, 0L);
+        long coinsPaid = lossQuantities(flows, itemId -> itemId == ItemID.COINS).getOrDefault(ItemID.COINS, 0L);
         boolean hasOtherLoss = hasLoss(flows, itemId -> itemId != ItemID.COINS);
         Transaction recovered = null;
         if (!returned.isEmpty()) {
             String source = service == null ? msg("gravestone-retrieval") : service.interactable;
-            recovered =
-                    bookNeutral(
-                            now,
-                            msg("death-reclaim-items"),
-                            "Death reclaim",
-                            returned,
-                            msg("items-recovered") + source + msg("after-death"),
-                            null);
+            recovered = bookNeutral(now, msg("death-reclaim-items"), "Death reclaim", returned,
+                            msg("items-recovered") + source + msg("after-death"), null);
             audit(recovered);
         }
         boolean feeEvidence = service != null || !returned.isEmpty();
-        if (allowObservedFee
-                && coinsPaid > 0L
-                && feeEvidence
-                && (!hasOtherLoss || !returned.isEmpty())) {
+        if (allowObservedFee && coinsPaid > 0L && feeEvidence && (!hasOtherLoss || !returned.isEmpty())) {
             String why = service == null ? msg("death-reclaim-fee") : service.why(coinsPaid);
             flows.removeIf(flow -> flow.itemId == ItemID.COINS && flow.isCost());
             return bookDeathFee(coinsPaid, why, now);
@@ -1233,31 +1188,20 @@ class Engine {
     Transaction deathWipeTransfer(List<Flow> flows, Map<Integer, Long> measuredLosses, long now) {
         if (empty(flows) || empty(measuredLosses)) return null;
         var outstanding = new HashMap<Integer, Long>(measuredLosses);
-        List<Flow> transferred =
-                claim(
-                        flows,
-                        Flow::isCost,
+        List<Flow> transferred = claim(flows, Flow::isCost,
                         (flow, quantity) -> take(outstanding, flow.itemId, quantity));
         if (transferred.isEmpty()) return null;
-        Transaction transfer =
-                bookNeutral(
-                        now,
-                        msg("death-items"),
-                        "Death reclaim",
-                        transferred,
-                        msg("ownership-neutral-transfer"),
-                        null);
+        Transaction transfer = bookNeutral(now, msg("death-items"), "Death reclaim", transferred,
+                        msg("ownership-neutral-transfer"), null);
         audit(transfer);
         return transfer;
     }
 
     void recordZoneEntry(Map<Integer, Long> deltas) {
         if (deltas != null) {
-            deltas.forEach(
-                    (itemId, delta) -> {
+            deltas.forEach((itemId, delta) -> {
                         if (itemId != null && delta != null && delta < 0L) {
-                            neutralZoneStoredItems.merge(
-                                    itemId, SafeMath.abs(delta), SafeMath::safeAdd);
+                            neutralZoneStoredItems.merge(itemId, SafeMath.abs(delta), SafeMath::safeAdd);
                         }
                     });
         }
@@ -1268,25 +1212,16 @@ class Engine {
      * with a matched observed-loot event remain counted as loot even if they happen to overlap the
      * stored gear.
      */
-    Transaction settleZoneRestore(
-            List<Flow> flows, Map<Integer, Long> observedLootQuantities, long now) {
+    Transaction settleZoneRestore(List<Flow> flows, Map<Integer, Long> observedLootQuantities, long now) {
         if (neutralZoneRestoreTicks <= 0 || neutralZoneStoredItems.isEmpty() || empty(flows)) {
             return null;
         }
         Map<Integer, Long> sourceBacked = positiveEntries(observedLootQuantities);
-        List<Flow> restored =
-                claim(
-                        flows,
-                        Flow::isGain,
-                        (flow, quantity) ->
-                                take(
-                                        neutralZoneStoredItems,
-                                        flow.itemId,
+        List<Flow> restored = claim(flows, Flow::isGain, (flow, quantity) -> take(neutralZoneStoredItems, flow.itemId,
                                         quantity - take(sourceBacked, flow.itemId, quantity)));
         if (restored.isEmpty()) return null;
         if (neutralZoneStoredItems.isEmpty()) neutralZoneRestoreTicks = 0;
-        return bookNeutral(
-                now, msg("neutral-zone-exit"), "Gauntlet", restored, msg("items-restored"), null);
+        return bookNeutral(now, msg("neutral-zone-exit"), "Gauntlet", restored, msg("items-restored"), null);
     }
 
     synchronized void markPkDeath(long now) {
@@ -1295,12 +1230,7 @@ class Engine {
         if (activeSession == null && !autoStart(now)) return;
         if (!live()) return;
         String encounter = activeSession.addEncounter(false, now);
-        setContext(
-                PK_DEATH,
-                max(30, config.stabilizationTicks() + 4),
-                "PK death loss",
-                emptyMap(),
-                encounter);
+        setContext(PK_DEATH, max(30, config.stabilizationTicks() + 4), "PK death loss", emptyMap(), encounter);
     }
 
     /**
@@ -1319,14 +1249,9 @@ class Engine {
         var netByPiece = new HashMap<String, Long>();
         for (Flow flow : flows)
             if (piece(flow) != null) netByPiece.merge(piece(flow), flow.quantityDelta, Long::sum);
-        List<Flow> stepped =
-                claim(
-                        flows,
-                        flow -> piece(flow) != null && netByPiece.get(piece(flow)) == 0L,
+        List<Flow> stepped = claim(flows, flow -> piece(flow) != null && netByPiece.get(piece(flow)) == 0L,
                         (flow, quantity) -> quantity);
-        return stepped.isEmpty()
-                ? null
-                : bookNeutral(
+        return stepped.isEmpty() ? null : bookNeutral(
                         now, msg("barrows-wear"), "Barrows", stepped, msg("barrows-gear"), null);
     }
 
@@ -1338,30 +1263,18 @@ class Engine {
     Transaction wornOut(List<Flow> flows, long now) {
         if (!hasLoss(flows, id -> id == ItemID.ABYSSAL_TENTACLE)
                 || gains(flows, id -> id == ItemID.KRAKEN_TENTACLE).isEmpty()) return null;
-        List<Flow> pair =
-                claim(
-                        flows,
-                        flow ->
-                                flow.itemId == ItemID.ABYSSAL_TENTACLE
-                                        ? flow.isCost()
+        List<Flow> pair = claim(flows, flow -> flow.itemId == ItemID.ABYSSAL_TENTACLE ? flow.isCost()
                                         : flow.itemId == ItemID.KRAKEN_TENTACLE && flow.isGain(),
                         (flow, quantity) -> 1L);
-        return bookCharge(
-                now, msg("tentacle-used"), Confidence.CONFIRMED, msg("tentacle-whip"), pair, null,
-                false);
+        return bookCharge(now, msg("tentacle-used"), Confidence.CONFIRMED, msg("tentacle-whip"), pair, null, false);
     }
 
     /** A dwarf multicannon's parts set up or picked up: the same items, yours wherever they stand. */
     Transaction cannon(List<Flow> flows, long now) {
         if (inbox.peek(CANNON) == null) return null;
-        List<Flow> parts =
-                claim(
-                        flows,
-                        flow -> GameData.pattern("cannon").matcher(flow.itemName).matches(),
+        List<Flow> parts = claim(flows, flow -> GameData.pattern("cannon").matcher(flow.itemName).matches(),
                         (flow, quantity) -> quantity);
-        return parts.isEmpty()
-                ? null
-                : bookNeutral(now, msg("cannon-parts"), "Cannon", parts, msg("cannon-why"), null);
+        return parts.isEmpty() ? null : bookNeutral(now, msg("cannon-parts"), "Cannon", parts, msg("cannon-why"), null);
     }
 
     /** The Barrows piece a flow is, whatever its stage; null for anything else. */
@@ -1378,23 +1291,13 @@ class Engine {
     Transaction servant(List<Flow> flows, long now) {
         if (inbox.peek(SERVANT) == null) return null;
         boolean sawmill = inbox.peek(SAWMILL) != null;
-        List<Flow> moved =
-                claim(
-                        flows,
-                        flow -> flow.itemId != ItemID.COINS && !(sawmill && wood(flow)),
+        List<Flow> moved = claim(flows, flow -> flow.itemId != ItemID.COINS && !(sawmill && wood(flow)),
                         (flow, quantity) -> quantity);
         // The sawmill trip ends when its planks come back.
         if (sawmill && flows.stream().anyMatch(flow -> flow.isGain() && wood(flow)))
             inbox.drop(SAWMILL);
-        return moved.isEmpty()
-                ? null
-                : bookNeutral(
-                        now,
-                        msg("servant-bank"),
-                        "Construction",
-                        moved,
-                        msg("house-servant"),
-                        null);
+        return moved.isEmpty() ? null : bookNeutral(now, msg("servant-bank"), "Construction", moved,
+                        msg("house-servant"), null);
     }
 
     /** Logs a sawmill trip takes, or the planks it brings back. */
@@ -1427,22 +1330,15 @@ class Engine {
             return;
         String sessionId = activeSession.getId();
         long now = SafeMath.now();
-        for (ChargeEstimateJournal.Receipt receipt :
-                chargeEstimateJournal.receiptsFor(sessionId, targetIdentity)) {
+        for (ChargeEstimateJournal.Receipt receipt : chargeEstimateJournal.receiptsFor(sessionId, targetIdentity)) {
             forfeit(receipt, now);
         }
         chargeEstimateJournal.clearTarget(sessionId, targetIdentity);
     }
 
-    synchronized boolean markChargeLoad(
-            ChargedItem variant,
-            int selectedItemId,
-            String selectedItemName,
-            String targetIdentity,
-            int ticks) {
-        if (variant == null
-                || ticks <= 0
-                || !ChargeCheck.isLoadComponent(variant, selectedItemId, selectedItemName))
+    synchronized boolean markChargeLoad(ChargedItem variant, int selectedItemId, String selectedItemName,
+            String targetIdentity, int ticks) {
+        if (variant == null || ticks <= 0 || !ChargeCheck.isLoadComponent(variant, selectedItemId, selectedItemName))
             return false;
         Observation e = inbox.put(LOAD_TARGET, selectedItemId, 1L, ticks - 1, null);
         e.variant = variant;
@@ -1461,14 +1357,12 @@ class Engine {
         var left = new ArrayList<Flow>();
         boolean selected = false;
         for (Flow flow : e == null || flows == null ? Collections.<Flow>emptyList() : flows) {
-            if (flow.isCost()
-                    && ChargeCheck.isLoadComponent(e.variant, flow.itemId, flow.itemName)) {
+            if (flow.isCost() && ChargeCheck.isLoadComponent(e.variant, flow.itemId, flow.itemName)) {
                 candidates.add(flow);
                 selected |= flow.itemId == e.item;
             } else left.add(flow);
         }
-        return selected
-                ? new LoadTarget(e.variant, e.id, left, candidates, e.at)
+        return selected ? new LoadTarget(e.variant, e.id, left, candidates, e.at)
                 : new LoadTarget(null, null, flows == null ? emptyList() : flows, emptyList(), 0L);
     }
 
@@ -1482,8 +1376,7 @@ class Engine {
         String target = nonBlank(targetIdentity, null);
         if (target == null) return;
         long now = SafeMath.now();
-        for (ChargeEstimateJournal.Receipt receipt :
-                chargeEstimateJournal.receiptsFor(activeSession.getId(), target)) {
+        for (ChargeEstimateJournal.Receipt receipt : chargeEstimateJournal.receiptsFor(activeSession.getId(), target)) {
             if (transactionId.equals(receipt.transactionId)) forfeit(receipt, now);
         }
     }
@@ -1544,13 +1437,9 @@ class Engine {
         neutralZoneEntryBaseline = null;
         neutralZoneEntryCaptureTicks = 0;
         neutralZoneRestoreTicks = neutralZoneStoredItems.isEmpty() ? 0 : max(1, ticks);
-        boolean pendingZoneContext =
-                pendingClue().context == Context.TRANSFER
-                        && pendingClue().note != null
+        boolean pendingZoneContext = pendingClue().context == Context.TRANSFER && pendingClue().note != null
                         && pendingClue().note.startsWith(msg("neutral-zone-instance"));
-        boolean activeZoneContext =
-                liveClue().context == Context.TRANSFER
-                        && liveClue().note != null
+        boolean activeZoneContext = liveClue().context == Context.TRANSFER && liveClue().note != null
                         && liveClue().note.startsWith(msg("neutral-zone-instance-2"));
         if (pendingZoneContext) pendingClue().clear();
         if (activeZoneContext) {
@@ -1639,11 +1528,7 @@ class Engine {
      * replacement, unobserved terminal) and settlements completed by a held collect book once.
      */
     synchronized void noteGeOffer(OfferSlots.Transition transition, String itemName, long now) {
-        for (Transaction outcome :
-                geCustody.observeTransition(
-                        transition,
-                        itemName,
-                        now,
+        for (Transaction outcome : geCustody.observeTransition(transition, itemName, now,
                         activeSession == null ? "" : activeSession.getId())) {
             bookCustody(outcome);
         }
@@ -1655,8 +1540,7 @@ class Engine {
      * changed-slot lifecycles to Review. Never invents basis and never replays old progress.
      */
     synchronized void seedGeSlots(Map<Integer, OfferSlots.Snapshot> snapshots, long now) {
-        for (Transaction handoff :
-                geCustody.seedSlots(
+        for (Transaction handoff : geCustody.seedSlots(
                         snapshots, now, activeSession == null ? "" : activeSession.getId())) {
             bookCustody(handoff);
         }
@@ -1691,8 +1575,7 @@ class Engine {
      */
     /** Effective correction-aware canonical settlement lookup for the derived Market projection. */
     Transaction transactionById(String id) {
-        for (Session session :
-                id == null || id.isEmpty() ? Collections.<Session>emptyList() : uniqueSessions()) {
+        for (Session session : id == null || id.isEmpty() ? Collections.<Session>emptyList() : uniqueSessions()) {
             Transaction found = findTransaction(session, id);
             if (found != null) return found;
         }
@@ -1763,9 +1646,7 @@ class Engine {
         var seen = new HashSet<Integer>();
         for (SavedState.PendingClaim claim : claims.all()) {
             if (claim == null || !claim.isValid() || !seen.add(claim.itemOrKeyId)) continue;
-            total =
-                    SafeMath.safeAdd(
-                            total, pricedContents(claims.observedContents(claim.itemOrKeyId), now));
+            total = SafeMath.safeAdd(total, pricedContents(claims.observedContents(claim.itemOrKeyId), now));
         }
         return total;
     }
@@ -1788,24 +1669,10 @@ class Engine {
     }
 
     /** A non-counted, ownership-neutral audit row: transfers, holds, restores and reclaims. */
-    Transaction bookNeutral(
-            long now,
-            String note,
-            String activityName,
-            List<Flow> flows,
-            String explanation,
+    Transaction bookNeutral(long now, String note, String activityName, List<Flow> flows, String explanation,
             String encounterId) {
-        return bookTransaction(
-                now,
-                TransactionType.TRANSFER,
-                Context.TRANSFER,
-                note,
-                activityName,
-                false,
-                flows,
-                Confidence.CONFIRMED,
-                explanation,
-                encounterId);
+        return bookTransaction(now, TransactionType.TRANSFER, Context.TRANSFER, note, activityName, false, flows,
+                Confidence.CONFIRMED, explanation, encounterId);
     }
 
     /** A session is open and not paused. */
@@ -1827,56 +1694,22 @@ class Engine {
 
     /** Books the custody settlements that came due; true when any did. */
     boolean maintainCustody(long now) {
-        List<Transaction> bookings =
-                geCustody.maintenance(now, activeSession.getId());
+        List<Transaction> bookings = geCustody.maintenance(now, activeSession.getId());
         bookings.forEach(booking -> add(booking, true));
         return !bookings.isEmpty();
     }
 
-    Transaction bookTransaction(
-            long now,
-            TransactionType type,
-            Context context,
-            String note,
-            String activityName,
-            boolean counted,
-            List<Flow> flows,
-            Confidence confidence,
-            String explanation,
-            String encounterId) {
-        return new Transaction(
-                now,
-                type,
-                context,
-                note,
-                activityName,
-                counted,
-                flows,
-                confidence,
-                explanation,
+    Transaction bookTransaction(long now, TransactionType type, Context context, String note, String activityName,
+            boolean counted, List<Flow> flows, Confidence confidence, String explanation, String encounterId) {
+        return new Transaction(now, type, context, note, activityName, counted, flows, confidence, explanation,
                 encounterId);
     }
 
     /** A booked charge row: counted consumption with the current activity, then its action kind. */
-    private Transaction bookCharge(
-            long now,
-            String note,
-            Confidence confidence,
-            String explanation,
-            List<Flow> flows,
-            ActionKind kind,
-            boolean estimate) {
-        Transaction transaction =
-                bookTransaction(
-                        now,
-                        CONSUMPTION,
-                        GENERIC,
-                        note,
-                        nonBlank(activeSession.getActivityHint(), "General"),
-                        true,
-                        flows,
-                        confidence,
-                        explanation,
+    private Transaction bookCharge(long now, String note, Confidence confidence, String explanation, List<Flow> flows,
+            ActionKind kind, boolean estimate) {
+        Transaction transaction = bookTransaction(now, CONSUMPTION, GENERIC, note,
+                        nonBlank(activeSession.getActivityHint(), "General"), true, flows, confidence, explanation,
                         null);
         transaction.setActionKind(kind);
         // An estimated blowpipe dart lands by the target like a fired bolt; its scales are used up.
@@ -1892,27 +1725,14 @@ class Engine {
      */
     synchronized void spent(String item, List<Flow> charges, long now) {
         if (live())
-            bookCharge(
-                    now,
-                    msg("measured-charge") + item,
-                    Confidence.CONFIRMED,
-                    msg("game-counted") + item + ".",
-                    charges,
-                    CAST,
-                    false);
+            bookCharge(now, msg("measured-charge") + item, Confidence.CONFIRMED, msg("game-counted") + item + ".",
+                    charges, CAST, false);
     }
 
     synchronized void chug(List<Flow> doses, long now) {
         if (live())
-            bookCharge(
-                            now,
-                            "Chugging barrel",
-                            Confidence.CONFIRMED,
-                            msg("drunk-chugging"),
-                            doses,
-                            ActionKind.DRINK,
-                            false)
-                    .setActionLabel(ActionLabel.of("Chugging barrel"));
+            bookCharge(now, "Chugging barrel", Confidence.CONFIRMED, msg("drunk-chugging"), doses, ActionKind.DRINK,
+                            false).setActionLabel(ActionLabel.of("Chugging barrel"));
     }
 
     /**
@@ -1920,38 +1740,19 @@ class Engine {
      * at the captured prices with LIKELY confidence; a later measured Check reconciles it. Priced
      * components enter the transient journal so a Check can shrink them without repricing.
      */
-    synchronized Transaction bookEstimatedCharge(
-            String targetIdentity,
-            String family,
-            ActionKind kind,
-            List<Flow> componentLosses,
-            long now) {
+    synchronized Transaction bookEstimatedCharge(String targetIdentity, String family, ActionKind kind,
+            List<Flow> componentLosses, long now) {
         String target = nonBlank(targetIdentity, null);
         String label = nonBlank(family, null);
-        if (!live()
-                || target == null
-                || label == null
-                || componentLosses == null
-                || componentLosses.isEmpty()) {
+        if (!live() || target == null || label == null || componentLosses == null || componentLosses.isEmpty()) {
             return null;
         }
-        Transaction transaction =
-                bookCharge(
-                        now,
-                        msg("estimated-charge") + label,
-                        Confidence.LIKELY,
-                        "Estimated",
-                        componentLosses,
-                        kind == null ? CAST : kind,
-                        true);
+        Transaction transaction = bookCharge(now, msg("estimated-charge") + label, Confidence.LIKELY, "Estimated",
+                        componentLosses, kind == null ? CAST : kind, true);
         String sessionId = activeSession.getId();
         for (Flow flow : transaction.getFlows()) {
             if (flow.isCost() && flow.unitPrice > 0) {
-                chargeEstimateJournal.record(
-                        sessionId,
-                        target,
-                        transaction.getId(),
-                        flow.itemId,
+                chargeEstimateJournal.record(sessionId, target, transaction.getId(), flow.itemId,
                         abs(flow.quantityDelta));
             }
         }
@@ -1965,11 +1766,9 @@ class Engine {
      * confirmed; manually corrected receipts are only consumed, never edited. Returns the covered
      * quantity.
      */
-    private long reconcileEstimate(
-            String sessionId, String target, int itemId, long measured, long now) {
+    private long reconcileEstimate(String sessionId, String target, int itemId, long measured, long now) {
         long left = measured;
-        for (ChargeEstimateJournal.Receipt receipt :
-                chargeEstimateJournal.receipts(sessionId, target, itemId)) {
+        for (ChargeEstimateJournal.Receipt receipt : chargeEstimateJournal.receipts(sessionId, target, itemId)) {
             long remaining = receipt.remainingQuantity;
             if (remaining <= 0L) continue;
             Transaction estimate = activeSession.findTransaction(receipt.transactionId);
@@ -1992,8 +1791,7 @@ class Engine {
         }
         // The measured window is closed here: automatic estimates left over are overestimates
         // and are removed, while manually corrected rows are preserved for future credit.
-        for (ChargeEstimateJournal.Receipt receipt :
-                chargeEstimateJournal.receipts(sessionId, target, itemId)) {
+        for (ChargeEstimateJournal.Receipt receipt : chargeEstimateJournal.receipts(sessionId, target, itemId)) {
             forfeit(receipt, now);
         }
         return measured - left;
@@ -2004,8 +1802,7 @@ class Engine {
         if (receipt == null || receipt.remainingQuantity <= 0L || activeSession == null) return;
         Transaction estimate = activeSession.findTransaction(receipt.transactionId);
         if (estimate == null || estimate.getCorrection() != Correction.AUTO) return;
-        activeSession.settleEstimate(
-                estimate, receipt.itemId, receipt.remainingQuantity, "Check reconciled");
+        activeSession.settleEstimate(estimate, receipt.itemId, receipt.remainingQuantity, "Check reconciled");
         chargeEstimateJournal.consume(receipt, receipt.remainingQuantity);
     }
 
@@ -2015,12 +1812,8 @@ class Engine {
      * measurement adds nothing beyond what estimates already booked. Generic inventory losses, menu
      * intent and animations cannot authorize this.
      */
-    synchronized Transaction bookChargeSpend(
-            ChargeDelta measuredDelta,
-            String itemName,
-            List<Flow> componentLosses,
-            long now,
-            String targetIdentity) {
+    synchronized Transaction bookChargeSpend(ChargeDelta measuredDelta, String itemName, List<Flow> componentLosses,
+            long now, String targetIdentity) {
         if (!live() || measuredDelta == null || measuredDelta.exactCost(componentLosses) <= 0L) {
             return null;
         }
@@ -2031,22 +1824,11 @@ class Engine {
             String sessionId = activeSession.getId();
             for (Flow flow : componentLosses) {
                 long measured = abs(flow.quantityDelta);
-                long extra =
-                        measured
-                                - reconcileEstimate(sessionId, target, flow.itemId, measured, now)
-                                - chargeEstimateJournal.evictedOverlap(
-                                        sessionId, target, flow.itemId);
+                long extra = measured - reconcileEstimate(sessionId, target, flow.itemId, measured, now)
+                                - chargeEstimateJournal.evictedOverlap(sessionId, target, flow.itemId);
                 if (extra <= 0L) continue;
-                excess.add(
-                        extra == measured
-                                ? flow
-                                : new Flow(
-                                        flow.itemId,
-                                        flow.itemName,
-                                        -extra,
-                                        flow.unitPrice,
-                                        -SafeMath.safeMultiply(extra, flow.unitPrice),
-                                        flow.getPriceSource(),
+                excess.add(extra == measured ? flow : new Flow(flow.itemId, flow.itemName, -extra, flow.unitPrice,
+                                        -SafeMath.safeMultiply(extra, flow.unitPrice), flow.getPriceSource(),
                                         flow.priceCapturedAtEpochMillis));
             }
             if (excess.isEmpty()) return null;
@@ -2054,15 +1836,9 @@ class Engine {
         }
         // The spend belongs to what the player is doing, not to the weapon: Top activities
         // must never grow a "Toxic blowpipe" row. The weapon stays in the note.
-        Transaction transaction =
-                bookCharge(
-                        now,
-                        msg("measured-charge") + nonBlank(itemName, "Measured charges"),
-                        Confidence.CONFIRMED,
-                        msg("measured-check") + measuredDelta.variant.getDisplayName() + ".",
-                        booked,
-                        measuredDelta.variant == ChargedItem.BLOWPIPE ? FIRE : CAST,
-                        false);
+        Transaction transaction = bookCharge(now, msg("measured-charge") + nonBlank(itemName, "Measured charges"),
+                        Confidence.CONFIRMED, msg("measured-check") + measuredDelta.variant.getDisplayName() + ".",
+                        booked, measuredDelta.variant == ChargedItem.BLOWPIPE ? FIRE : CAST, false);
         return transaction;
     }
 
@@ -2101,18 +1877,9 @@ class Engine {
         bag.values().removeIf(quantity -> quantity <= 0L);
         if (bag.isEmpty()) return null;
         bag.forEach((id, quantity) -> bagAdded.merge(id, quantity, Long::sum));
-        Transaction loot =
-                bookTransaction(
-                        now,
-                        TransactionType.LOOT,
-                        LOOT,
-                        msg("bag-reward"),
-                        activeSession.getActivityHint(),
-                        true,
-                        valuationService.value(bag),
-                        Confidence.LIKELY,
-                        msg("bag-reward-why"),
-                        null);
+        Transaction loot = bookTransaction(now, TransactionType.LOOT, LOOT, msg("bag-reward"),
+                        activeSession.getActivityHint(), true, valuationService.value(bag), Confidence.LIKELY,
+                        msg("bag-reward-why"), null);
         add(loot, false);
         return loot;
     }
@@ -2125,28 +1892,15 @@ class Engine {
     /** A bank-paid fee as a plain counted CONSUMPTION cost under its own row name. */
     private Transaction bookFee(long feeGp, String label, String activity, long now) {
         if (feeGp <= 0L || !live()) return null;
-        var feeFlow =
-                new Flow(ItemID.COINS, "Coins", -feeGp, 1, -feeGp, PriceSource.FACE_VALUE, now);
-        Transaction transaction =
-                bookTransaction(
-                        now,
-                        CONSUMPTION,
-                        GENERIC,
-                        label,
-                        activity,
-                        true,
-                        singletonList(feeFlow),
-                        Confidence.CONFIRMED,
-                        label,
-                        null);
+        var feeFlow = new Flow(ItemID.COINS, "Coins", -feeGp, 1, -feeGp, PriceSource.FACE_VALUE, now);
+        Transaction transaction = bookTransaction(now, CONSUMPTION, GENERIC, label, activity, true,
+                        singletonList(feeFlow), Confidence.CONFIRMED, label, null);
         add(transaction, false);
         return transaction;
     }
 
-    synchronized boolean correctTransaction(
-            String transactionId, Correction correction, long now, String reason) {
-        boolean changed =
-                activeSession != null
+    synchronized boolean correctTransaction(String transactionId, Correction correction, long now, String reason) {
+        boolean changed = activeSession != null
                         && activeSession.correctTransaction(transactionId, correction, now, reason);
         return changed;
     }
@@ -2160,10 +1914,7 @@ class Engine {
             if (ReviewRules.needsOwnerDecision(transaction))
                 rows.add(reviewRow(activeSession, transaction, now));
         }
-        rows.sort(
-                Comparator.comparingLong(
-                                (ReviewRow itemDataValue) -> itemDataValue.timestampEpochMillis)
-                        .reversed());
+        rows.sort(Comparator.comparingLong((ReviewRow itemDataValue) -> itemDataValue.timestampEpochMillis).reversed());
         return rows;
     }
 
@@ -2184,8 +1935,7 @@ class Engine {
      * Exact rows and prospective personal-Net delta a Decide all would apply, computed from the
      * same canonical transaction ids that {@link #applyDecision} mutates.
      */
-    synchronized DecisionPreview previewDecision(
-            Decision decision, Predicate<ReviewRow> scope, long now) {
+    synchronized DecisionPreview previewDecision(Decision decision, Predicate<ReviewRow> scope, long now) {
         var selectedIds = new ArrayList<String>();
         long netDelta = 0L;
         if (activeSession != null && decision != null && scope != null) {
@@ -2196,10 +1946,7 @@ class Engine {
                     continue;
                 }
                 selectedIds.add(transaction.getId());
-                netDelta =
-                        SafeMath.safeAdd(
-                                netDelta,
-                                transaction.netUnder(correction)
+                netDelta = SafeMath.safeAdd(netDelta, transaction.netUnder(correction)
                                         - (transaction.isCounted() ? transaction.getNet() : 0L));
             }
         }
@@ -2213,11 +1960,7 @@ class Engine {
     synchronized int applyDecision(DecisionPreview preview, long now) {
         if (preview == null || activeSession == null || preview.transactionIds.isEmpty()) return 0;
         if (preview.revision != getRevision()) return -1;
-        int changed =
-                activeSession.correctAll(
-                        preview.transactionIds,
-                        preview.decision.toCorrection(),
-                        now,
+        int changed = activeSession.correctAll(preview.transactionIds, preview.decision.toCorrection(), now,
                         "Review decision: " + preview.decision.name());
         return changed;
     }
@@ -2231,8 +1974,7 @@ class Engine {
         long netDelta;
         long revision;
 
-        DecisionPreview(
-                Decision decision, List<String> transactionIds, long netDelta, long revision) {
+        DecisionPreview(Decision decision, List<String> transactionIds, long netDelta, long revision) {
             this.decision = decision;
             this.transactionIds = unmodifiableList(new ArrayList<>(transactionIds));
             this.netDelta = netDelta;
@@ -2255,22 +1997,12 @@ class Engine {
         long timestamp = transaction.timestampEpochMillis;
         long age = now > timestamp ? now - timestamp : 0L;
         EnumSet<Decision> decisions = EnumSet.allOf(Decision.class);
-        return new ReviewRow(
-                transaction.getId(),
-                session.getId(),
-                timestamp,
-                age,
-                items,
-                transaction.autoNet(),
-                why,
+        return new ReviewRow(transaction.getId(), session.getId(), timestamp, age, items, transaction.autoNet(), why,
                 decisions);
     }
 
-    synchronized boolean splitItem(
-            String transactionId, int itemId, long keepQuantity, long now, String optionalNote) {
-        boolean changed =
-                activeSession != null
-                        && activeSession.splitItem(
+    synchronized boolean splitItem(String transactionId, int itemId, long keepQuantity, long now, String optionalNote) {
+        boolean changed = activeSession != null && activeSession.splitItem(
                                 transactionId, itemId, keepQuantity, now, optionalNote);
         return changed;
     }
@@ -2292,18 +2024,10 @@ class Engine {
         if (live()) activeSession.recordAction(activityHint, SafeMath.now());
     }
 
-    synchronized Transaction processIfDirty(ContainerSnapshot current, long now) {
-        return processIfDirty(current, now, null);
-    }
-
     /** Additional source receipts are published after canonical booking has completed. */
-    synchronized Transaction processIfDirty(
-            ContainerSnapshot current,
-            long now,
+    synchronized Transaction processIfDirty(ContainerSnapshot current, long now,
             java.util.function.Consumer<Transaction> additionalBooking) {
-        inbox.hold =
-                dirty
-                        || pendingSnapshot != null
+        inbox.hold = dirty || pendingSnapshot != null
                         || (current != null && baseline != null && !current.equals(baseline));
         inbox.tick(inbox.now + 1);
         settleGround();
@@ -2323,14 +2047,8 @@ class Engine {
         // any dirty/stabilization early return so inventory churn cannot pause expiry.
         String expiredDeathReclaim = deathReclaim.tick(inbox.hold);
         if (expiredDeathReclaim != null) {
-            Transaction expiry =
-                    bookNeutral(
-                            now,
-                            msg("death-reclaim-expired"),
-                            "Death reclaim",
-                            emptyList(),
-                            expiredDeathReclaim,
-                            null);
+            Transaction expiry = bookNeutral(now, msg("death-reclaim-expired"), "Death reclaim", emptyList(),
+                            expiredDeathReclaim, null);
             add(expiry, false);
             return expiry;
         }
@@ -2339,12 +2057,8 @@ class Engine {
             // pickpocket's loot can settle before the activity detector fires): resume and
             // book it. Other pauses stay aligned so Resume never inherits pause-window
             // churn as catch-up profit (owner 2026-09-29).
-            Map<Integer, Long> woke =
-                    current == null || baseline == null ? null : current.diff(baseline);
-            boolean idleResume =
-                    activeSession.getPauseReason() == IDLE
-                            && woke != null
-                            && woke.values().stream()
+            Map<Integer, Long> woke = current == null || baseline == null ? null : current.diff(baseline);
+            boolean idleResume = activeSession.getPauseReason() == IDLE && woke != null && woke.values().stream()
                                     .anyMatch(value -> value != null && value > 0L);
             if (!idleResume) {
                 // Keep the baseline aligned while paused so Resume never treats
@@ -2445,9 +2159,7 @@ class Engine {
      * a confirmed drop's own item, actions and transfers, GE custody, then classification and
      * booking of what is left.
      */
-    Transaction settle(
-            ContainerSnapshot committed,
-            long now,
+    Transaction settle(ContainerSnapshot committed, long now,
             java.util.function.Consumer<Transaction> additionalBooking) {
         Settle settle = commit(committed, now);
         if (settle == null) return null;
@@ -2464,13 +2176,8 @@ class Engine {
         // An essence pouch's Empty/Fill carries custody of the essence it moves, never the runes a
         // craft produces in the same stabilized window: the essence stays neutral and the residual
         // classifies normally (owner 2026-10-13).
-        if ((settle.transfer || settle.hard)
-                && settle.note != null
-                && settle.note.contains("essence_pouch")) {
-            settle.flows.removeIf(
-                    flow ->
-                            flow.itemName != null
-                                    && Phrases.lower(flow.itemName).contains("essence"));
+        if ((settle.transfer || settle.hard) && settle.note != null && settle.note.contains("essence_pouch")) {
+            settle.flows.removeIf(flow -> flow.itemName != null && Phrases.lower(flow.itemName).contains("essence"));
             settle.clear();
         }
         settleDeathWipe(settle);
@@ -2479,10 +2186,7 @@ class Engine {
         Transaction held = settleHeldItems(settle);
         if (settle.flows.isEmpty()) return held;
         Transaction returned = settleReturns(settle);
-        if (settle.flows.stream()
-                        .allMatch(
-                                flow ->
-                                        flow.valueDelta == 0L
+        if (settle.flows.stream().allMatch(flow -> flow.valueDelta == 0L
                                                 && flow.getPriceSource() != PriceSource.UNPRICED
                                                 // A worthless item still moved: it books at 0
                                                 // with a dash, never vanishes (owner 2026-10-16).
@@ -2491,10 +2195,7 @@ class Engine {
                 // yet but is a
                 // drop, so it books and HUD+ shows it; opening, stepping or moving them still books
                 // nothing.
-                && !(settle.flows.stream().allMatch(Flow::isGain)
-                        && ActionReader.all(
-                                settle.flows,
-                                0,
+                && !(settle.flows.stream().allMatch(Flow::isGain) && ActionReader.all(settle.flows, 0,
                                 name -> GameData.pattern("clue").matcher(name).matches()))) {
             // A change with no value and no unpriced item is nothing to account for; a settled
             // claim still closed the deferred key audit row above. No value threshold exists.
@@ -2509,8 +2210,7 @@ class Engine {
             settle.clear();
             clearSettledContext();
         }
-        for (Transaction neutral :
-                new Transaction[] {
+        for (Transaction neutral : new Transaction[] {
                     servant(settle.flows, now), wear(settle.flows, now), cannon(settle.flows, now)
                 }) {
             if (neutral != null) {
@@ -2525,25 +2225,17 @@ class Engine {
         // when the transfer partition consumed the unmatched quantities. Without
         // that partition, an oversized same-id stack (or unrelated extra gain)
         // must follow generic gain classification rather than inherit the loot tag.
-        if (settle.loot.matched
-                && !matchesExpectedLoot(settle.flows, settle.loot.matchedQuantities))
+        if (settle.loot.matched && !matchesExpectedLoot(settle.flows, settle.loot.matchedQuantities))
             settle.loot = LootMatch.NONE;
         Transaction dropSlice = settleDropSlice(settle);
         Transaction consumeSlice = settleConsumeSlice(settle);
         settleActions(settle);
         if (dropSlice != null && settle.flows.isEmpty() && sources.isEmpty()) return dropSlice;
         if (consumeSlice != null && settle.flows.isEmpty() && sources.isEmpty()) return consumeSlice;
-        if (settle.consumed
-                && !settle.dropped
-                && !settle.destroy
-                && !settle.hard
-                && !settle.decant
-                && !settle.suppressActionEvidence
-                && ActionReader.resolve(
-                                settle.actionIntent, settle.flows, CONSUMPTION, settle.activity)
-                        == DRINK) {
-            List<Flow> normalized =
-                    valuationService.normalizeConsumedFlows(settle.flows, DRINK, settle.now);
+        if (settle.consumed && !settle.dropped && !settle.destroy && !settle.hard && !settle.decant
+                && !settle.suppressActionEvidence && ActionReader.resolve(
+                                settle.actionIntent, settle.flows, CONSUMPTION, settle.activity) == DRINK) {
+            List<Flow> normalized = valuationService.normalizeConsumedFlows(settle.flows, DRINK, settle.now);
             settle.pricingReview = normalized == null;
             if (normalized != null) settle.flows = normalized;
         }
@@ -2577,16 +2269,9 @@ class Engine {
         for (Flow flow : settle.flows) {
             if (flow.quantityDelta < 0L) losses.add(flow);
         }
-        if (losses.isEmpty()
-                || losses.size() == settle.flows.size()
-                || settle.hard
-                || settle.soft()
-                || settle.localDeath
-                || settle.dropped
-                || settle.destroy
-                || settle.asTransfer
-                || settle.context == MARKET
-                || Spells.spellFor(losses) == null) {
+        if (losses.isEmpty() || losses.size() == settle.flows.size() || settle.hard || settle.soft()
+                || settle.localDeath || settle.dropped || settle.destroy || settle.asTransfer
+                || settle.context == MARKET || Spells.spellFor(losses) == null) {
             return null;
         }
         var slice = new Settle(new Clue(), settle.committed, settle.now);
@@ -2604,10 +2289,8 @@ class Engine {
      * own (owner live 2026-10-16: 39 rune darts rode a Bones to Peaches tablet).
      */
     Transaction settleSpell(Settle settle) {
-        Set<Integer> product =
-                settle.consumed && settle.actionLabel != null
-                        ? Spells.product(Spells.named(settle.actionLabel.value()))
-                        : emptySet();
+        Set<Integer> product = settle.consumed && settle.actionLabel != null
+                        ? Spells.product(Spells.named(settle.actionLabel.value())) : emptySet();
         var legs = new ArrayList<Flow>();
         for (Flow flow : settle.flows)
             if (flow.isCost() || product.contains(flow.itemId)) legs.add(flow);
@@ -2635,9 +2318,7 @@ class Engine {
      */
     Transaction settleDropSlice(Settle settle) {
         if (settle.hard || settle.soft() || settle.transfer) return null;
-        if (settle.context == Context.TRANSFER
-                || settle.context == MARKET
-                || settle.context == PK_DEATH
+        if (settle.context == Context.TRANSFER || settle.context == MARKET || settle.context == PK_DEATH
                 || settle.context == PK_LOOT) {
             return null;
         }
@@ -2715,24 +2396,14 @@ class Engine {
         var rows = new ArrayList<Transaction>();
         for (LootMatch source : settle.loot.sources) {
             var remaining = new HashMap<Integer, Long>(source.matchedQuantities);
-            List<Flow> parts =
-                    claim(
-                            settle.flows,
-                            flow -> flow.quantityDelta > 0L,
-                            (flow, quantity) -> {
+            List<Flow> parts = claim(settle.flows, flow -> flow.quantityDelta > 0L, (flow, quantity) -> {
                                 long take = min(quantity, remaining.getOrDefault(flow.itemId, 0L));
-                                remaining.computeIfPresent(
-                                        flow.itemId, (id, wanted) -> wanted - take);
+                                remaining.computeIfPresent(flow.itemId, (id, wanted) -> wanted - take);
                                 return take;
                             });
             if (parts.isEmpty()) continue;
             var slice = new Settle(new Clue(), settle.committed, settle.now);
-            slice.offer(
-                    source.context,
-                    source.note,
-                    source.matchedQuantities,
-                    source.encounterId,
-                    true);
+            slice.offer(source.context, source.note, source.matchedQuantities, source.encounterId, true);
             slice.flows = parts;
             slice.loot = source;
             slice.lootQuantities = source.matchedQuantities;
@@ -2761,8 +2432,7 @@ class Engine {
         baseline = committed;
         invalidateChargeBaselines(deltas);
         if (captureNeutralZoneEntry && neutralZoneEntryBaseline != null) {
-            if (settle.context == Context.TRANSFER
-                    && settle.note != null
+            if (settle.context == Context.TRANSFER && settle.note != null
                     && settle.note.startsWith(msg("neutral-zone-instance-3"))) {
                 recordZoneEntry(committed.diff(neutralZoneEntryBaseline));
             }
@@ -2774,10 +2444,7 @@ class Engine {
             // baseline. Recover a named consume when invent qty fell since intent arm.
             deltas = sameTickConsumeDeltas(committed);
         }
-        settle.flows =
-                deltas.isEmpty()
-                        ? new ArrayList<>()
-                        : new ArrayList<>(valuationService.value(deltas, now));
+        settle.flows = deltas.isEmpty() ? new ArrayList<>() : new ArrayList<>(valuationService.value(deltas, now));
         if (settle.context == GENERIC && !settle.transfer && !settle.hard)
             settle.flows = withoutSwaps(settle.flows);
         // The split rewrites settle.flows only; nothing after commit() re-reads deltas, so the two
@@ -2792,8 +2459,7 @@ class Engine {
      * acquisition and the shortfall since the intent was armed, so the named consume keeps its own
      * cost flow and books Ate/Buried instead of vanishing into the transfer (owner 2026-10-12).
      */
-    void splitToppedUpConsume(
-            Settle settle, Map<Integer, Long> deltas, ContainerSnapshot committed, long now) {
+    void splitToppedUpConsume(Settle settle, Map<Integer, Long> deltas, ContainerSnapshot committed, long now) {
         if (consumeIntent() == null || consumeIntent().item < 0 || consumeIntent().held < 0L) return;
         int id = consumeIntent().item;
         Long net = deltas.get(id);
@@ -2804,15 +2470,8 @@ class Engine {
             Flow flow = settle.flows.get(index);
             if (flow.itemId != id || flow.quantityDelta <= 0L) continue;
             long gross = flow.quantityDelta + lost;
-            settle.flows.set(
-                    index,
-                    new Flow(
-                            id,
-                            flow.itemName,
-                            gross,
-                            flow.unitPrice,
-                            SafeMath.safeMultiply(gross, flow.unitPrice),
-                            flow.getPriceSource(),
+            settle.flows.set(index, new Flow(id, flow.itemName, gross, flow.unitPrice,
+                            SafeMath.safeMultiply(gross, flow.unitPrice), flow.getPriceSource(),
                             flow.priceCapturedAtEpochMillis));
             break;
         }
@@ -2822,9 +2481,7 @@ class Engine {
     /** A measured death wipe: stacks held at death that left INV stay ownership-neutral. */
     void settleDeathWipe(Settle settle) {
         boolean candidate = deathReclaim.wipePending() && hasLoss(settle.flows);
-        boolean allowed =
-                candidate
-                        && (settle.context == Context.TRANSFER && isDeathHeldNote(settle.note)
+        boolean allowed = candidate && (settle.context == Context.TRANSFER && isDeathHeldNote(settle.note)
                                 || settle.context == GENERIC && !settle.transfer && !settle.hard);
         if (candidate && !allowed) {
             // A stronger market, transfer, production or loot context owns this change.
@@ -2832,25 +2489,19 @@ class Engine {
         }
         Map<Integer, Long> actionLosses =
                 allowed ? confirmedActionLossQuantities(settle.flows, settle.hard) : emptyMap();
-        settle.deathWipeLosses =
-                allowed
-                        ? deathReclaim.onDeathItemsRemoved(
-                                without(settle.flows, actionLosses::containsKey, false))
-                        : emptyMap();
+        settle.deathWipeLosses = allowed ? deathReclaim.onDeathItemsRemoved(
+                                without(settle.flows, actionLosses::containsKey, false)) : emptyMap();
         if (!actionLosses.isEmpty()) {
             // Consume action-attributed quantities from the potential wipe whitelist,
             // but leave unrelated held-at-death ids eligible in the same settle.
             deathReclaim.excludeActionLosses(actionLosses);
         }
         settle.deathWipe = !settle.deathWipeLosses.isEmpty();
-        settle.ambiguousDeathCoinLoss =
-                settle.deathWipe
-                        && deathReclaim.isReclaimArmed()
+        settle.ambiguousDeathCoinLoss = settle.deathWipe && deathReclaim.isReclaimArmed()
                         && hasLoss(settle.flows, id -> id == ItemID.COINS)
                         && !settle.deathWipeLosses.containsKey(ItemID.COINS);
         settle.localDeath |= settle.deathWipe;
-        if (settle.context == Context.TRANSFER
-                && isDeathHeldNote(settle.note)
+        if (settle.context == Context.TRANSFER && isDeathHeldNote(settle.note)
                 && (!settle.deathWipe || settle.ambiguousDeathCoinLoss)) {
             // The short note is not ownership evidence. Without a measured whitelist
             // match, let the remaining change follow its actual action/classification.
@@ -2878,12 +2529,10 @@ class Engine {
             lootKeyAudit = pickup ? recordKeyAudit(lootKeys, settle.encounterId, settle.now) : null;
         }
         List<Flow> claimKeys = gains(settle.flows, KeyChestCatalogue::isDeferredKey);
-        boolean claimPickup =
-                !claimKeys.isEmpty() && credibleKeyPickup(settle, settle.flows, claimKeys);
+        boolean claimPickup = !claimKeys.isEmpty() && credibleKeyPickup(settle, settle.flows, claimKeys);
         settle.flows = without(settle.flows, KeyChestCatalogue::isDeferredKey, false);
         settle.expectedLoot = withoutItems(settle.expectedLoot, KeyChestCatalogue::isDeferredKey);
-        Transaction claimAudit =
-                claimPickup && !settle.localDeath ? recordClaimAudits(claimKeys, settle.now) : null;
+        Transaction claimAudit = claimPickup && !settle.localDeath ? recordClaimAudits(claimKeys, settle.now) : null;
         settle.keyAudit = claimAudit != null ? claimAudit : lootKeyAudit;
         if (gainQuantities(settle.flows, ANY).isEmpty()) {
             // The click plus measured key removal may settle a tick before the
@@ -2897,12 +2546,9 @@ class Engine {
      */
     Transaction settleHeldItems(Settle settle) {
         if (settle.localDeath || claims.awaitingDeathSettle()) {
-            claims.recordDeathLosses(
-                    settle.flows, KeyClaims.keyQuantities(settle.committed.quantities));
+            claims.recordDeathLosses(settle.flows, KeyClaims.keyQuantities(settle.committed.quantities));
         }
-        Transaction wipe =
-                settle.deathWipeLosses.isEmpty()
-                        ? null
+        Transaction wipe = settle.deathWipeLosses.isEmpty() ? null
                         : deathWipeTransfer(settle.flows, settle.deathWipeLosses, settle.now);
         if (settle.deathWipe && (wipe != null || isDeathHeldNote(settle.note))) {
             // The measured death-owned quantities have their own neutral receipt. Any
@@ -2915,8 +2561,7 @@ class Engine {
         // death annotation, but exclude the token from transaction maths. A same-ID
         // loss in a mixed claim settle has no source identity, so it never reduces the
         // manifest key quantity on that evidence alone.
-        settle.flows.removeIf(
-                flow -> flow.isCost() && KeyClaims.isLootKey(flow.itemId));
+        settle.flows.removeIf(flow -> flow.isCost() && KeyClaims.isLootKey(flow.itemId));
         // Do not let this narrow menu intent compete with stronger bank/trade/
         // transfer evidence or the loot-key lifecycle. A stale load click expires
         // once a stronger ownership context is already active.
@@ -2926,9 +2571,7 @@ class Engine {
         Transaction loadReview = null;
         if (!load.ambiguousCandidates.isEmpty()) {
             settle.flows = new ArrayList<>(load.remaining);
-            loadReview =
-                    load.variant != null && load.variant.isCommittedLoad()
-                            ? recordCommittedLoad(load, settle.now)
+            loadReview = load.variant != null && load.variant.isCommittedLoad() ? recordCommittedLoad(load, settle.now)
                             : recordAmbiguousLoad(load, settle.now);
         }
         return first(settle.keyAudit, wipe, loadReview);
@@ -2938,31 +2581,17 @@ class Engine {
     Transaction settleReturns(Settle settle) {
         // Consume source-backed loot before the reclaim partitioner so a kill drop
         // sharing an item id with the death wipe remains counted as loot.
-        settle.loot =
-                settle.context != Context.TRANSFER && settle.context != MARKET
-                        ? consumeQueuedLoot(settle.flows)
+        settle.loot = settle.context != Context.TRANSFER && settle.context != MARKET ? consumeQueuedLoot(settle.flows)
                         : LootMatch.NONE;
         settle.lootQuantities = settle.loot.matchedQuantities;
-        Map<Integer, Long> contents =
-                settle.loot.matched
-                        ? gainQuantities(settle.flows, ANY)
+        Map<Integer, Long> contents = settle.loot.matched ? gainQuantities(settle.flows, ANY)
                         : minus(gainQuantities(settle.flows, ANY), settle.lootQuantities);
-        boolean chestClaimContext =
-                !settle.localDeath
-                        && !settle.hard
-                        && !settle.soft()
-                        && settle.context != Context.TRANSFER
-                        && settle.context != MARKET
-                        && settle.context != PRODUCTION
-                        && (settle.loot.matched || settle.context == GENERIC)
+        boolean chestClaimContext = !settle.localDeath && !settle.hard && !settle.soft()
+                        && settle.context != Context.TRANSFER && settle.context != MARKET
+                        && settle.context != PRODUCTION && (settle.loot.matched || settle.context == GENERIC)
                         && onlyGainsOrKeyCosts(settle.flows);
-        KeyClaims.ChestOpen chestClaim =
-                chestClaimContext && !contents.isEmpty()
-                        ? claims.matchChest(
-                                settle.keyLosses,
-                                contents,
-                                settle.loot.matched ? settle.loot.activityName : null)
-                        : null;
+        KeyClaims.ChestOpen chestClaim = chestClaimContext && !contents.isEmpty() ? claims.matchChest(settle.keyLosses,
+                                contents, settle.loot.matched ? settle.loot.activityName : null) : null;
         if (chestClaim != null && KeyChestCatalogue.isDeferredKey(chestClaim.keyItemId)) {
             // Settlement and claim removal happen in this same revision. The settling row
             // carries the claim id only when the claim reached zero: a partial consume keeps
@@ -2973,17 +2602,10 @@ class Engine {
         if (chestClaim != null && !settle.loot.matched)
             settle.offer(LOOT, chestClaim.chestName, contents, null, true);
         boolean deathTransfer = settle.context == Context.TRANSFER && isDeathHeldNote(settle.note);
-        boolean canPartitionDeathReturns =
-                (!settle.hard || deathTransfer)
-                        && settle.context != MARKET
+        boolean canPartitionDeathReturns = (!settle.hard || deathTransfer) && settle.context != MARKET
                         && (settle.context != Context.TRANSFER || deathTransfer);
-        return canPartitionDeathReturns
-                ? settleReclaim(
-                        settle.flows,
-                        settle.now,
-                        settle.lootQuantities,
-                        !settle.ambiguousDeathCoinLoss)
-                : null;
+        return canPartitionDeathReturns ? settleReclaim(settle.flows, settle.now, settle.lootQuantities,
+                        !settle.ambiguousDeathCoinLoss) : null;
     }
 
     /**
@@ -2993,9 +2615,7 @@ class Engine {
     void settleActions(Settle settle) {
         Observation spent = inbox.peek(SPENT_CONSUME);
         Observation newer = consumeIntent();
-        boolean lead =
-                spent != null
-                        && hasLoss(settle.flows, id -> id == spent.item)
+        boolean lead = spent != null && hasLoss(settle.flows, id -> id == spent.item)
                         && (newer == null || !hasLoss(settle.flows, id -> id == newer.item));
         if (lead) {
             spent.kind = CONSUME;
@@ -3025,23 +2645,13 @@ class Engine {
         // parts custody active, ball losses are loads on their own. The clicked item must itself
         // be lost for the click path, or a lone part settle would eat the ball's intent (owner
         // live 2026-10-13).
-        boolean cannonLoad =
-                inbox.peek(CANNON) != null
-                        && consumeIntent() == null
-                        && onlyCosts(settle.flows)
+        boolean cannonLoad = inbox.peek(CANNON) != null && consumeIntent() == null && onlyCosts(settle.flows)
                         && hasLoss(settle.flows, Engine::cannonball)
                         && !hasLoss(settle.flows, id -> !cannonball(id) && !cannonPart(id));
-        settle.dropped =
-                cannonLoad
-                        || (inbox.peek(DROP_CLICK) != null
-                                && consumeIntent() == null
-                                && onlyCosts(settle.flows)
-                                && hasLoss(settle.flows, id -> id == inbox.item(DROP_CLICK))
-                                && !hasLoss(
-                                        settle.flows,
-                                        id -> id != inbox.item(DROP_CLICK) && !cannonPart(id)));
-        settle.consumed =
-                !settle.dropped && !settle.decant && matchesConsume(settle.flows, settle.hard);
+        settle.dropped = cannonLoad || (inbox.peek(DROP_CLICK) != null && consumeIntent() == null
+                                && onlyCosts(settle.flows) && hasLoss(settle.flows, id -> id == inbox.item(DROP_CLICK))
+                                && !hasLoss(settle.flows, id -> id != inbox.item(DROP_CLICK) && !cannonPart(id)));
+        settle.consumed = !settle.dropped && !settle.decant && matchesConsume(settle.flows, settle.hard);
         Observation intent = consumeIntent();
         if (settle.consumed && intent != null) {
             // Only a verb whose intent actually matched these flows may name the action; a stale
@@ -3049,30 +2659,17 @@ class Engine {
             // that moved its own item (owner 2026-10-16 sweep: a key used with an Eat armed read
             // "Ate"). Flow-level custody must never steal a quantity a named consume/drop intent
             // owns, so its item is captured here.
-            boolean own =
-                    intent.item < 0
-                            || intent.action == DRINK
-                                    && ActionReader.all(
+            boolean own = intent.item < 0 || intent.action == DRINK && ActionReader.all(
                                             settle.flows, 0, n -> ActionReader.trailingDose(n) > 0)
                             || settle.flows.stream().anyMatch(f -> f.itemId == intent.item);
             settle.actionIntent = own ? intent.action : null;
             settle.actionLabel = own ? intent.label : null;
             settle.consumedItemId = intent.item;
         }
-        settle.droppedItemId =
-                settle.dropped
-                        ? (inbox.peek(DROP_CLICK) != null
-                                ? inbox.item(DROP_CLICK)
-                                : settle.flows.stream()
-                                        .filter(flow -> flow.isCost() && cannonball(flow.itemId))
-                                        .mapToInt(flow -> flow.itemId)
-                                        .findFirst()
-                                        .orElse(-1))
-                        : -1;
-        if (!settle.consumed
-                && !settle.dropped
-                && !settle.hard
-                && !settle.decant
+        settle.droppedItemId = settle.dropped ? (inbox.peek(DROP_CLICK) != null ? inbox.item(DROP_CLICK)
+                                : settle.flows.stream().filter(flow -> flow.isCost() && cannonball(flow.itemId))
+                                        .mapToInt(flow -> flow.itemId).findFirst().orElse(-1)) : -1;
+        if (!settle.consumed && !settle.dropped && !settle.hard && !settle.decant
                 && ActionReader.isDoseStep(settle.flows)) {
             // Dose leftovers are high-confidence even when the menu/chat intent expired
             // before the inventory stabilized (common with Drink + Pick coalescing).
@@ -3094,11 +2691,7 @@ class Engine {
         // Soft bank-open alone is a weak signal. Real deposits/withdrawals are one-sided;
         // Drink+Pick / Bury+Pick mixed windows must not become ownership-neutral TRANSFER
         // (that yields Used/lost ×0 and drops harvest rows when countUncertain is off).
-        settle.asTransfer =
-                !settle.consumed
-                        && !settle.dropped
-                        && (settle.hard
-                                || settle.soft()
+        settle.asTransfer = !settle.consumed && !settle.dropped && (settle.hard || settle.soft()
                                         && (onlyCosts(settle.flows) || onlyGains(settle.flows)));
         if (settle.asTransfer) {
             // Soft evidence while bank open (one-sided), or hard evidence that outlived UI
@@ -3125,8 +2718,7 @@ class Engine {
             settle.activity = activityFromNote(settle.note);
         } else if (settle.context == PK_LOOT || settle.context == PK_DEATH) {
             settle.activity = "PKing";
-        } else if (settle.context == Context.PRODUCTION
-                && ActionSignals.TRANSFORM.containsValue(settle.note)) {
+        } else if (settle.context == Context.PRODUCTION && ActionSignals.TRANSFORM.containsValue(settle.note)) {
             // A run names its own skill: the session hint waits for a second XP drop, so a first
             // item would carry the last activity (or none).
             settle.activity = "Smelting".equals(settle.note) ? "Smithing" : settle.note;
@@ -3144,30 +2736,17 @@ class Engine {
         // Transaction-level owners (transfer/death/loot) block everything; per-item owners (a
         // named consume/drop intent or matched loot quantity) block only their own items so the
         // remaining quantities can still be claimed exactly.
-        if (settle.pricingReview
-                || settle.context == Context.TRANSFER
-                || settle.hard
-                || settle.asTransfer
-                || settle.localDeath
-                || settle.context == LOOT
-                || settle.context == PK_LOOT
-                || settle.context == PK_DEATH
-                || settle.consumed && settle.consumedItemId < 0
+        if (settle.pricingReview || settle.context == Context.TRANSFER || settle.hard || settle.asTransfer
+                || settle.localDeath || settle.context == LOOT || settle.context == PK_LOOT
+                || settle.context == PK_DEATH || settle.consumed && settle.consumedItemId < 0
                 || settle.dropped && settle.droppedItemId <= 0) {
             return null;
         }
-        var blocked =
-                new HashSet<Integer>(
-                        settle.loot.matched ? settle.loot.matchedQuantities.keySet() : emptySet());
+        var blocked = new HashSet<Integer>(settle.loot.matched ? settle.loot.matchedQuantities.keySet() : emptySet());
         if (settle.consumedItemId >= 0) blocked.add(settle.consumedItemId);
         if (settle.droppedItemId > 0) blocked.add(settle.droppedItemId);
-        GeCustodyLedger.Partition custody =
-                geCustody.partition(
-                        settle.flows,
-                        settle.now,
-                        sessionId,
-                        itemId -> !blocked.contains(itemId),
-                        settle.now <= inbox.at(GE_COLLECT));
+        GeCustodyLedger.Partition custody = geCustody.partition(settle.flows, settle.now, sessionId,
+                        itemId -> !blocked.contains(itemId), settle.now <= inbox.at(GE_COLLECT));
         if (custody.countedBookings.isEmpty() && custody.transferBookings.isEmpty()) return null;
         // Custody claimed these exact quantities; the matching offer sides are spent so
         // stale placement/fill evidence can never own a later unrelated movement.
@@ -3186,20 +2765,12 @@ class Engine {
         // only own a settle that no stronger source-specific evidence already owns — matched
         // loot/reward, a confirmed consume/drop action, or a loot/death context keeps its own
         // delta.
-        boolean strongerSourceEvidence =
-                settle.loot.matched
-                        || settle.consumed
-                        || settle.dropped
-                        || settle.context == LOOT
-                        || settle.context == PK_LOOT
-                        || settle.context == PK_DEATH;
+        boolean strongerSourceEvidence = settle.loot.matched || settle.consumed || settle.dropped
+                        || settle.context == LOOT || settle.context == PK_LOOT || settle.context == PK_DEATH;
         // A recent offer may explain a movement no custody lifecycle claimed. Custody is
         // authoritative for GE economics, so this is ancillary evidence only: it fails closed to
         // an uncounted review row instead of a quote-valued cost or automatic proceeds.
-        boolean geExplained =
-                !strongerSourceEvidence
-                        && settle.context != MARKET
-                        && settle.context != Context.TRANSFER
+        boolean geExplained = !strongerSourceEvidence && settle.context != MARKET && settle.context != Context.TRANSFER
                         && !settle.hard
                         // Proceeds reach the pack only through a Collect: without one a gain is a
                         // pickup or loot, never an uncollected sale (owner live 2026-10-16:
@@ -3215,16 +2786,12 @@ class Engine {
         // An explicit GE interaction is source evidence, not settlement authority. Any
         // residual flow that custody did not claim must await owner review, even when
         // the broad MARKET context would otherwise classify a coins-only TRADE.
-        boolean geUiUnclaimed =
-                settle.context == MARKET
-                        && settle.note != null
+        boolean geUiUnclaimed = settle.context == MARKET && settle.note != null
                         && settle.note.startsWith("Grand Exchange");
         boolean geReview = geExplained || geUiUnclaimed || settle.pricingReview;
         TransactionType type = classifier.classify(settle.context, settle.flows);
-        boolean plainUncertain =
-                !settle.asTransfer && !settle.hard && !settle.soft() && type == UNCERTAIN;
-        boolean braceletDismantle =
-                settle.dismantle
+        boolean plainUncertain = !settle.asTransfer && !settle.hard && !settle.soft() && type == UNCERTAIN;
+        boolean braceletDismantle = settle.dismantle
                         && (inbox.item(DISMANTLE_CLICK) == ItemID.WILD_CAVE_BRACELET_UNCHARGED
                                 || inbox.item(DISMANTLE_CLICK) == ItemID.WILD_CAVE_BRACELET_CHARGED);
         if (settle.dismantle && !braceletDismantle) {
@@ -3241,24 +2808,15 @@ class Engine {
             // Dose leftovers / empty vials are mixed inventory deltas; confirmed
             // consume intent still books Used/lost rather than uncertain exclusion.
             type = CONSUMPTION;
-        } else if (!settle.asTransfer
-                && type == UNCERTAIN
-                && !settle.decant
-                && (ActionReader.isDoseStep(settle.flows)
+        } else if (!settle.asTransfer && type == UNCERTAIN && !settle.decant && (ActionReader.isDoseStep(settle.flows)
                         || settle.soft() && hasLoss(settle.flows))) {
             // The classifier still sees mixed value: a dose shape alone is enough once soft
             // transfer has been refused, and a refused soft bank latch in a mixed Drink/Pick/Bury
             // window books supplies rather than dropping costs and harvest as UNCERTAIN.
             type = CONSUMPTION;
             settle.consumed = true;
-        } else if (plainUncertain
-                && ActionReader.all(
-                        settle.flows,
-                        -1,
-                        name ->
-                                ActionReader.isRune(name)
-                                        || ActionReader.isAmmo(name)
-                                        || ActionReader.isClaim(name))) {
+        } else if (plainUncertain && ActionReader.all(settle.flows, -1, name -> ActionReader.isRune(name)
+                                        || ActionReader.isAmmo(name) || ActionReader.isClaim(name))) {
             // A pickup settling with a routine spend (a dart thrown, a spell cast) is a gain net of
             // that
             // spend, as a loot receipt absorbs a cast; never an uncounted Review (owner
@@ -3273,9 +2831,7 @@ class Engine {
             // (owner 2026-10-12).
             type = TransactionType.TRANSFER;
             settle.note = "Decanted";
-        } else if (plainUncertain
-                && inbox.peek(DIALOGUE) != null
-                && ActionReader.all(
+        } else if (plainUncertain && inbox.peek(DIALOGUE) != null && ActionReader.all(
                         settle.flows, -1, GameData.pattern("cash").asMatchPredicate())) {
             // Owner 2026-10-09: coins for items while talking to an NPC is a purchase from its
             // dialogue
@@ -3284,9 +2840,7 @@ class Engine {
             type = TRADE;
             settle.context = MARKET;
             settle.note = "Bought";
-        } else if (plainUncertain
-                && inbox.peek(DIALOGUE) != null
-                && ActionReader.all(
+        } else if (plainUncertain && inbox.peek(DIALOGUE) != null && ActionReader.all(
                         settle.flows, 1, GameData.pattern("cash").asMatchPredicate())) {
             // Owner 1.3.4: items for coins with a shop window open is a sale; the window raises
             // the same conversation signal as a dialogue. Without it the change stays Review.
@@ -3296,11 +2850,8 @@ class Engine {
         }
         // A drop settle is always CONSUMPTION, so picking it back up can shrink it.
         if (settle.dropped && type != TransactionType.TRANSFER && type != TRADE) type = CONSUMPTION;
-        if (!settle.loot.matched
-                && !geReview
-                && (type == GAIN || type == TransactionType.LOOT || type == UNCERTAIN)
-                && !settle.localDeath
-                && onlyGains(settle.flows)) {
+        if (!settle.loot.matched && !geReview && (type == GAIN || type == TransactionType.LOOT || type == UNCERTAIN)
+                && !settle.localDeath && onlyGains(settle.flows)) {
             Transaction picked = pickUpDrops(settle);
             if (picked != null && settle.flows.isEmpty()) return picked;
         }
@@ -3316,85 +2867,50 @@ class Engine {
         }
         // Ancillary offer evidence with no claimable custody lifecycle fails closed to an
         // uncounted review row: never quote-valued cost, never automatic proceeds, no basis.
-        boolean counted =
-                !geReview
-                        && type != TransactionType.TRANSFER
+        boolean counted = !geReview && type != TransactionType.TRANSFER
                         && (type != UNCERTAIN || config.countUncertainMixedChanges());
         type = geReview ? UNCERTAIN : type;
         boolean retainTransaction = counted || config.keepTransferAuditRows() || type == UNCERTAIN;
         // The committed inventory baseline already deduplicates receipts. One encounter may
         // legitimately have several pickups; an encounter-wide revenue gate would discard them.
-        settle.activity =
-                type == TransactionType.TRANSFER
-                        ? "Transfer"
-                        : type == TRADE ? "Market" : settle.activity;
-        Confidence confidence =
-                geUiUnclaimed || settle.pricingReview
-                        ? Confidence.UNCERTAIN
+        settle.activity = type == TransactionType.TRANSFER ? "Transfer" : type == TRADE ? "Market" : settle.activity;
+        Confidence confidence = geUiUnclaimed || settle.pricingReview ? Confidence.UNCERTAIN
                         : confidenceFor(settle.context, type);
         // Non-bank transfers explain themselves (minigame wipe, neutral zone, death).
-        String explanation =
-                settle.pricingReview
-                        ? msg("consumed-dose")
-                        : geReview
-                                ? msg("grand-exchange-movement")
-                                : type == TransactionType.TRANSFER
-                                                && settle.note != null
-                                                && !settle.note.isEmpty()
+        String explanation = settle.pricingReview ? msg("consumed-dose") : geReview ? msg("grand-exchange-movement")
+                                : type == TransactionType.TRANSFER && settle.note != null && !settle.note.isEmpty()
                                                 && !settle.note.matches(msg("i-bank"))
                                         ? msg("ownership-neutral-transfer-2") + settle.note + "."
                                         : explanationFor(settle.context, type, counted);
-        Transaction transaction =
-                bookTransaction(
-                        settle.now,
-                        type,
-                        settle.context,
-                        settle.note,
-                        settle.activity,
-                        counted,
-                        settle.flows,
-                        confidence,
-                        explanation,
-                        settle.encounterId);
+        Transaction transaction = bookTransaction(settle.now, type, settle.context, settle.note, settle.activity,
+                        counted, settle.flows, confidence, explanation, settle.encounterId);
         if (!settle.dropped && !settle.destroy && !settle.suppressActionEvidence) {
             // Presentation-only evidence; type/valuation/counted above are unchanged.
-            transaction.setActionKind(
-                    ActionReader.resolve(settle.actionIntent, settle.flows, type, settle.activity));
+            transaction.setActionKind(ActionReader.resolve(settle.actionIntent, settle.flows, type, settle.activity));
             if (transaction.getActionKind() == CAST && settle.actionLabel != null) {
                 transaction.setActionLabel(settle.actionLabel);
             }
         }
-        if (type == CONSUMPTION
-                && !settle.destroy
-                && transaction.getActionKind() == null
-                && !settle.flows.isEmpty()
-                && settle.flows.stream()
-                        .allMatch(flow -> flow.isCost() && cannonball(flow.itemId))) {
+        if (type == CONSUMPTION && !settle.destroy && transaction.getActionKind() == null && !settle.flows.isEmpty()
+                && settle.flows.stream().allMatch(flow -> flow.isCost() && cannonball(flow.itemId))) {
             // The cannon's balls are supplies wherever they leave the pack: a Fire or Load, a
             // ship-cannon shot from the pack, a manual drop, or the loss leg of a part-pickup
             // (owner 1.3.4).
             transaction.setActionKind(SUPPLIES);
         }
         if (retainTransaction) {
-            if (type != TransactionType.TRANSFER
-                    && type != TRADE
-                    && !settle.hard
-                    && !settle.soft()
+            if (type != TransactionType.TRANSFER && type != TRADE && !settle.hard && !settle.soft()
                     && !settle.localDeath) {
                 // The relation is written only for a claim that actually closed, so restore's
                 // settled-id check can never drop a partly consumed remainder.
-                String closed =
-                        claims.settleLootKey(
-                                minus(gainQuantities(settle.flows, ANY), settle.lootQuantities),
+                String closed = claims.settleLootKey(minus(gainQuantities(settle.flows, ANY), settle.lootQuantities),
                                 lossQuantities(settle.flows, KeyClaims::isLootKey));
                 settle.settledClaimId = closed != null ? closed : settle.settledClaimId;
             }
             if (settle.settledClaimId != null) transaction.setSourceClaimId(settle.settledClaimId);
             // A drop or a shot lands on the ground: it stays off the paid-price record until its
             // pickup window closes.
-            transaction.setOnGround(
-                    counted
-                            && (settle.dropped && type == CONSUMPTION
+            transaction.setOnGround(counted && (settle.dropped && type == CONSUMPTION
                                     || transaction.getActionKind() == FIRE));
             add(transaction, false);
             if (settle.encounterId != null && !settle.encounterId.isEmpty()) {
@@ -3408,15 +2924,8 @@ class Engine {
         String[] lost = settle.dismantle ? DISMANTLE.get(inbox.item(DISMANTLE_CLICK)) : null;
         if (lost != null) {
             // Owner 1.2: a crystal tool's 120 shards are lost when it is reverted.
-            bookCharge(
-                    settle.now,
-                    settle.note,
-                    Confidence.CONFIRMED,
-                    "Lost when it was taken apart.",
-                    valuationService.value(
-                            Map.of(Integer.parseInt(lost[2]), -Long.parseLong(lost[1]))),
-                    null,
-                    false);
+            bookCharge(settle.now, settle.note, Confidence.CONFIRMED, "Lost when it was taken apart.",
+                    valuationService.value(Map.of(Integer.parseInt(lost[2]), -Long.parseLong(lost[1]))), null, false);
         }
         if (settle.dismantle) inbox.drop(DISMANTLE_CLICK);
         return transaction;
@@ -3433,8 +2942,7 @@ class Engine {
         }
         int requiredStableTicks = max(2, config.stabilizationTicks() + 1);
         int requiredObservedTicks = max(MINIMUM_BASELINE_WARMUP_TICKS, requiredStableTicks);
-        if (primingObservedTicks >= requiredObservedTicks
-                && primingStableTicks >= requiredStableTicks) {
+        if (primingObservedTicks >= requiredObservedTicks && primingStableTicks >= requiredStableTicks) {
             baseline = current;
             baselinePriming = false;
             clearPriming();
@@ -3458,18 +2966,12 @@ class Engine {
         // Capture the active context once when a pending change begins. Repeated
         // snapshot observations must not merge the same expected loot again.
         // New loot events still merge through aho/kw.
-        if (pendingClue().context == GENERIC
-                || liveClue().context.priority > pendingClue().context.priority) {
-            applyPendingContext(
-                    liveClue().context,
-                    liveClue().note,
-                    liveClue().expectedLoot,
-                    liveClue().encounterId);
+        if (pendingClue().context == GENERIC || liveClue().context.priority > pendingClue().context.priority) {
+            applyPendingContext(liveClue().context, liveClue().note, liveClue().expectedLoot, liveClue().encounterId);
         }
     }
 
-    void applyPendingContext(
-            Context newContext, String note, Map<Integer, Long> expectedLoot, String encounterId) {
+    void applyPendingContext(Context newContext, String note, Map<Integer, Long> expectedLoot, String encounterId) {
         pendingClue().transfer |= newContext == Context.TRANSFER && pendingClue().hard;
         pendingClue().offer(newContext, note, expectedLoot, encounterId, false);
     }
@@ -3479,26 +2981,16 @@ class Engine {
         var matched = new HashMap<Integer, Long>();
         var groups = new LinkedHashMap<List<Object>, LootMatch>();
         for (Observation e : new ArrayList<>(inbox.open)) {
-            if ((e.kind != PRIVATE_LOOT && e.kind != LOOT_RESERVE)
-                    || !inbox.live(e)
+            if ((e.kind != PRIVATE_LOOT && e.kind != LOOT_RESERVE) || !inbox.live(e)
                     || inbox.now > e.source().at) continue;
             Observation source = e.source();
             long qty = inbox.take(e.kind, e.item, available.getOrDefault(e.item, 0L), v -> v == e);
             if (qty <= 0L) continue;
             take(available, e.item, qty);
             matched.merge(e.item, qty, SafeMath::safeAdd);
-            LootMatch group =
-                    groups.computeIfAbsent(
-                            Arrays.asList(source.note, source.name, source.context, source.id),
-                            key ->
-                                    new LootMatch(
-                                            true,
-                                            source.note,
-                                            source.name,
-                                            source.context,
-                                            source.id,
-                                            new HashMap<>(),
-                                            emptyList()));
+            LootMatch group = groups.computeIfAbsent(Arrays.asList(source.note, source.name, source.context, source.id),
+                            key -> new LootMatch(true, source.note, source.name, source.context, source.id,
+                                            new HashMap<>(), emptyList()));
             group.matchedQuantities.merge(e.item, qty, SafeMath::safeAdd);
         }
         // A measured gain also spends private proof after its attribution window has ended.
@@ -3506,14 +2998,8 @@ class Engine {
         if (groups.isEmpty()) return LootMatch.NONE;
         var sources = new ArrayList<LootMatch>(groups.values());
         LootMatch first = sources.get(0);
-        return new LootMatch(
-                true,
-                first.note,
-                first.activityName,
-                first.context,
-                first.encounterId,
-                unmodifiableMap(matched),
-                unmodifiableList(sources));
+        return new LootMatch(true, first.note, first.activityName, first.context, first.encounterId,
+                unmodifiableMap(matched), unmodifiableList(sources));
     }
 
     String activityFromNote(String note) {
@@ -3521,26 +3007,17 @@ class Engine {
         String trimmed = note.trim();
         String prefix = "Loot from ";
         return trimmed.startsWith(prefix) && trimmed.length() > prefix.length()
-                ? trimmed.substring(prefix.length()).trim()
-                : trimmed;
+                ? trimmed.substring(prefix.length()).trim() : trimmed;
     }
 
     boolean matchesExpectedLoot(List<Flow> flows, Map<Integer, Long> expectedLoot) {
         Map<Integer, Long> gains = gainQuantities(flows, ANY);
-        return !gains.isEmpty()
-                && (expectedLoot == null
-                        || expectedLoot.isEmpty()
+        return !gains.isEmpty() && (expectedLoot == null || expectedLoot.isEmpty()
                         || gains.equals(positiveEntries(expectedLoot)));
     }
 
     Transaction recordKeyAudit(List<Flow> keyFlows, String encounterId, long now) {
-        Transaction audit =
-                bookNeutral(
-                        now,
-                        KeyClaims.LOOT_KEY_NOTE,
-                        "PKing",
-                        keyFlows,
-                        msg("settled-loot"),
+        Transaction audit = bookNeutral(now, KeyClaims.LOOT_KEY_NOTE, "PKing", keyFlows, msg("settled-loot"),
                         encounterId);
         add(audit, false);
         List<Flow> receivedKeys = gains(keyFlows, KeyClaims::isLootKey);
@@ -3552,8 +3029,7 @@ class Engine {
             Flow flow = receivedKeys.get(index);
             // One audit row can carry several key types; each independent claim needs its own
             // Deterministic identity for multi-key provenance.
-            String claimId =
-                    receivedKeys.size() == 1 ? audit.getId() : audit.getId() + "#" + (index + 1);
+            String claimId = receivedKeys.size() == 1 ? audit.getId() : audit.getId() + "#" + (index + 1);
             claims.open(claimId, flow.itemId, flow.quantityDelta, now);
         }
         if (encounterId != null && !encounterId.isEmpty()) {
@@ -3565,21 +3041,14 @@ class Engine {
     Transaction recordClaimAudits(List<Flow> keyFlows, long now) {
         Transaction last = null;
         for (Flow flow : keyFlows) {
-            if (flow.quantityDelta <= 0L
-                    || !KeyChestCatalogue.isDeferredKey(flow.itemId)) {
+            if (flow.quantityDelta <= 0L || !KeyChestCatalogue.isDeferredKey(flow.itemId)) {
                 continue;
             }
             KeyChestCatalogue.Entry entry = KeyChestCatalogue.entryForKey(flow.itemId);
             if (entry == null || entry.tradeable) continue;
-            Transaction audit =
-                    bookNeutral(
-                            now,
-                            "Key held · " + nonBlank(entry.chestName, "Chest"),
-                            entry.chestName,
-                            singletonList(flow),
-                            msg("untradeable-chest"),
-                            null);
-            audit.setActionKind(DEFERRED_CLAIM);
+            Transaction audit = bookNeutral(now, "Key held · " + nonBlank(entry.chestName, "Chest"), entry.chestName,
+                            singletonList(flow), msg("untradeable-chest"), null);
+            audit.setActionKind(ActionKind.DEFERRED_CLAIM);
             add(audit, false);
             claims.open(audit.getId(), flow.itemId, flow.quantityDelta, now);
             last = audit;
@@ -3590,8 +3059,7 @@ class Engine {
     /** Only catalogued key losses and non-key gains: the shape of a chest open. */
     static boolean onlyGainsOrKeyCosts(List<Flow> flows) {
         for (Flow flow : flows == null ? Collections.<Flow>emptyList() : flows) {
-            if (flow.quantityDelta != 0L
-                    && flow.isCost() != KeyChestCatalogue.isKey(flow.itemId)) {
+            if (flow.quantityDelta != 0L && flow.isCost() != KeyChestCatalogue.isKey(flow.itemId)) {
                 return false;
             }
         }
@@ -3606,18 +3074,12 @@ class Engine {
      */
     boolean credibleKeyPickup(Clue applied, List<Flow> originalFlows, List<Flow> keyFlows) {
         Context context = applied.context;
-        if (context == null
-                || context == Context.TRANSFER
-                || context == MARKET
-                || applied.transfer
-                || applied.hard
+        if (context == null || context == Context.TRANSFER || context == MARKET || applied.transfer || applied.hard
                 || inbox.peek(DROP_CLICK) != null) {
             return false;
         }
         TransactionType evidenceType = classifier.classify(context, originalFlows);
-        if (evidenceType != GAIN
-                && evidenceType != TransactionType.LOOT
-                && evidenceType != TransactionType.PK_LOOT) {
+        if (evidenceType != GAIN && evidenceType != TransactionType.LOOT && evidenceType != TransactionType.PK_LOOT) {
             return false;
         }
         Map<Integer, Long> keyQuantities = gainQuantities(keyFlows, ANY);
@@ -3639,8 +3101,7 @@ class Engine {
         clearPriming();
         clearSettledContext();
         resetHelpers();
-        inbox.drop(
-                PRIVATE_LOOT, LOOT_RESERVE, DISMANTLE_CLICK, CONSUME, SPENT_CONSUME, DROP_CLICK, DROPPED);
+        inbox.drop(PRIVATE_LOOT, LOOT_RESERVE, DISMANTLE_CLICK, CONSUME, SPENT_CONSUME, DROP_CLICK, DROPPED);
     }
 
     static boolean groundDart(Flow flow) {
@@ -3698,14 +3159,8 @@ class Engine {
         if (ground != null) remember(drop);
         for (Flow flow : drop.getFlows()) {
             if (onGround.test(flow))
-                inbox.add(
-                                        DROPPED,
-                                        flow.itemId,
-                                        abs(flow.quantityDelta),
-                                        cannonball(flow.itemId) ? 2_099 : 299,
-                                        null)
-                                .id =
-                        drop.getId();
+                inbox.add(DROPPED, flow.itemId, abs(flow.quantityDelta), cannonball(flow.itemId) ? 2_099 : 299, null)
+                                .id = drop.getId();
         }
     }
 
@@ -3729,18 +3184,8 @@ class Engine {
         }
         if (picked.isEmpty()) return null;
         settle.flows = rest;
-        Transaction row =
-                bookTransaction(
-                        settle.now,
-                        TransactionType.TRANSFER,
-                        Context.TRANSFER,
-                        "Picked back up",
-                        "Transfer",
-                        false,
-                        picked,
-                        Confidence.CONFIRMED,
-                        msg("picked-back-up"),
-                        null);
+        Transaction row = bookTransaction(settle.now, TransactionType.TRANSFER, Context.TRANSFER, "Picked back up",
+                        "Transfer", false, picked, Confidence.CONFIRMED, msg("picked-back-up"), null);
         if (config.keepTransferAuditRows()) add(row, false);
         return row;
     }
@@ -3839,10 +3284,7 @@ class Engine {
      * intent stores invent qty at arm — synthesize the shortfall loss.
      */
     Map<Integer, Long> sameTickConsumeDeltas(ContainerSnapshot current) {
-        if (consumeIntent() == null
-                || consumeIntent().item < 0
-                || consumeIntent().held < 0L
-                || current == null) {
+        if (consumeIntent() == null || consumeIntent().item < 0 || consumeIntent().held < 0L || current == null) {
             return emptyMap();
         }
         long nowQty = current.quantityOf(consumeIntent().item);
@@ -3869,11 +3311,8 @@ class Engine {
     }
 
     Confidence confidenceFor(Context appliedContext, TransactionType type) {
-        if (appliedContext == Context.TRANSFER
-                || appliedContext == MARKET
-                || appliedContext == LOOT
-                || appliedContext == PK_LOOT
-                || appliedContext == PK_DEATH) {
+        if (appliedContext == Context.TRANSFER || appliedContext == MARKET || appliedContext == LOOT
+                || appliedContext == PK_LOOT || appliedContext == PK_DEATH) {
             return Confidence.CONFIRMED;
         }
         if (type == UNCERTAIN) return Confidence.UNCERTAIN;
@@ -3881,12 +3320,10 @@ class Engine {
     }
 
     /** Loss ids claimed by exact consume/drop intent are excluded from the death wipe. */
-    Map<Integer, Long> confirmedActionLossQuantities(
-            List<Flow> flows, boolean hardTransferEvidence) {
+    Map<Integer, Long> confirmedActionLossQuantities(List<Flow> flows, boolean hardTransferEvidence) {
         var excluded = new HashMap<Integer, Long>();
         if (consumeIntent() == null) {
-            return inbox.peek(Inbox.DROP_CLICK) == null
-                    ? excluded
+            return inbox.peek(Inbox.DROP_CLICK) == null ? excluded
                     : lossQuantities(flows, id -> id == inbox.item(DROP_CLICK));
         }
         if (consumeIntent().item >= 0) {
@@ -3894,9 +3331,7 @@ class Engine {
         }
         // An open-id intent with only costs cannot distinguish which item was consumed; keep
         // every loss in this ambiguous batch counted.
-        return ActionReader.addDoseLosses(excluded, flows)
-                        || !matchesConsume(flows, hardTransferEvidence)
-                ? excluded
+        return ActionReader.addDoseLosses(excluded, flows) || !matchesConsume(flows, hardTransferEvidence) ? excluded
                 : lossQuantities(flows, ANY);
     }
 
@@ -3931,25 +3366,14 @@ class Engine {
      */
     Transaction recordAmbiguousLoad(LoadTarget partition, long now) {
         if (partition == null || partition.ambiguousCandidates.isEmpty() || !live()) return null;
-        Transaction transfer =
-                bookNeutral(
-                        now,
-                        msg("charge-load-transfer"),
-                        "Charge load",
-                        partition.ambiguousCandidates,
-                        msg("same-target-measured-check"),
-                        null);
+        Transaction transfer = bookNeutral(now, msg("charge-load-transfer"), "Charge load",
+                        partition.ambiguousCandidates, msg("same-target-measured-check"), null);
         transfer.setActionKind(ActionKind.CHARGE_LOAD_AMBIGUOUS);
         add(transfer, false);
         // The weapon's next Check adds these back, so a reload is never read as darts unused.
         for (Flow flow : partition.ambiguousCandidates) {
-            measuredChargeReadTracker.noteLoad(
-                    partition.variant,
-                    partition.targetIdentity,
-                    partition.clickedAt,
-                    flow.itemId,
-                    SafeMath.safeMultiply(
-                            abs(flow.quantityDelta),
+            measuredChargeReadTracker.noteLoad(partition.variant, partition.targetIdentity, partition.clickedAt,
+                    flow.itemId, SafeMath.safeMultiply(abs(flow.quantityDelta),
                             ChargeCheck.unitsPerItem(partition.variant, flow.itemId)));
         }
         return transfer;
@@ -3963,15 +3387,9 @@ class Engine {
      */
     Transaction recordCommittedLoad(LoadTarget partition, long now) {
         if (partition == null || partition.ambiguousCandidates.isEmpty() || !live()) return null;
-        return bookCharge(
-                now,
-                msg("committed-load")
-                        + nonBlank(partition.variant.getDisplayName(), "Crystal charges"),
-                Confidence.CONFIRMED,
-                msg("committed-load-why") + partition.variant.getDisplayName() + ".",
-                partition.ambiguousCandidates,
-                partition.variant.action,
-                false);
+        return bookCharge(now, msg("committed-load") + nonBlank(partition.variant.getDisplayName(), "Crystal charges"),
+                Confidence.CONFIRMED, msg("committed-load-why") + partition.variant.getDisplayName() + ".",
+                partition.ambiguousCandidates, partition.variant.action, false);
     }
 
     Transaction advanceContext(long now) {
@@ -4089,17 +3507,10 @@ class Engine {
     }
 
     /** Creates a reusable My Grind from reusable setup only; runs link to it as they start. */
-    synchronized SavedGrind saveGrind(
-            String name, Long netTargetGp, Long activeTimeMillis, boolean favorite) {
+    synchronized SavedGrind saveGrind(String name, Long netTargetGp, Long activeTimeMillis, boolean favorite) {
         String cleanName = nonBlank(name, "");
         if (cleanName.isEmpty()) return null;
-        var grind =
-                new SavedGrind(
-                        UUID.randomUUID().toString(),
-                        cleanName,
-                        netTargetGp,
-                        activeTimeMillis,
-                        favorite);
+        var grind = new SavedGrind(UUID.randomUUID().toString(), cleanName, netTargetGp, activeTimeMillis, favorite);
         savedGrinds.add(grind);
         return grind;
     }
@@ -4108,18 +3519,13 @@ class Engine {
      * Edits a My Grind. Finished runs keep the targets they ran with; a running run of this Grind
      * takes the new name and any changed target at once (owner 1.5.0: one Grind, one setup).
      */
-    synchronized boolean updateSavedGrind(
-            String grindId,
-            String name,
-            Long netTargetGp,
-            Long activeTimeMillis,
+    synchronized boolean updateSavedGrind(String grindId, String name, Long netTargetGp, Long activeTimeMillis,
             boolean favorite) {
         SavedGrind grind = savedGrind(grindId);
         if (grind == null) return false;
         String cleanName = nonBlank(name, "");
         // Only a changed target reaches the run: a rename or a favourite never re-arms its aim.
-        boolean retarget =
-                !Objects.equals(netTargetGp, grind.netTargetGp)
+        boolean retarget = !Objects.equals(netTargetGp, grind.netTargetGp)
                         || !Objects.equals(activeTimeMillis, grind.activeTimeTargetMillis);
         if (!cleanName.isEmpty()) grind.setName(cleanName);
         grind.setNetTargetGp(netTargetGp);
@@ -4214,15 +3620,15 @@ class Engine {
     /** Mid-Grind aim edit: changes the current target snapshot only, never financial truth. */
     synchronized boolean setTargets(Long netTargetGp, Long activeTimeTargetMillis, long now) {
         if (activeSession == null) return false;
-        activeSession.setProfitTargetGp(
-                netTargetGp == null || netTargetGp <= 0L ? null : netTargetGp,
-                getMetrics(now).net,
-                activeSession.getElapsedMillis(now));
-        activeSession.setActiveTimeTargetMillis(
-                activeTimeTargetMillis == null || activeTimeTargetMillis <= 0L
-                        ? null
-                        : activeTimeTargetMillis,
-                now);
+        boolean net = activeSession.setProfitTargetGp(netTargetGp == null || netTargetGp <= 0L ? null : netTargetGp,
+                        getMetrics(now).net, activeSession.getElapsedMillis(now));
+        boolean time = activeSession.setActiveTimeTargetMillis(
+                        activeTimeTargetMillis == null || activeTimeTargetMillis <= 0L ? null : activeTimeTargetMillis,
+                        now);
+        // A new or changed target starts a session; re-saving one keeps its count, and Done or
+        // Clear leaves the session counting (owner 1.5.2).
+        if ((net || time) && (activeSession.getProfitTargetGp() != null
+                        || activeSession.getActiveTimeTargetMillis() != null)) newLiveSession(now);
         return true;
     }
 
@@ -4240,21 +3646,12 @@ class Engine {
         return true;
     }
 
-    /** Restarts the running time target's window, keeping its value (owner live 2026-10-13). */
-    synchronized boolean restartTimeTarget(long now) {
-        if (activeSession == null || activeSession.getActiveTimeTargetMillis() == null) return false;
-        activeSession.rearmTimeTarget(now);
+    /** Again: a new session with the same target, in the same run (owner 1.5.2). */
+    synchronized boolean restartTarget(long now) {
+        if (activeSession == null || activeSession.getProfitTargetGp() == null
+                        && activeSession.getActiveTimeTargetMillis() == null) return false;
+        newLiveSession(now);
         return true;
-    }
-
-    /**
-     * Re-bases a Net aim on the running session, keeping the run's net (owner live 2026-10-14):
-     * the aim counts from now without a new instance, reached or not.
-     */
-    synchronized boolean rebaseNetTarget(long now) {
-        if (activeSession == null) return false;
-        return activeSession.rebaseProfitTarget(
-                getMetrics(now).net, activeSession.getElapsedMillis(now));
     }
 
     /** Toggles the timer's own pause; the run keeps tracking (owner live 2026-10-14). */
@@ -4338,12 +3735,7 @@ class Engine {
          * A higher-priority (or forced) claim replaces this one; the same context merges its
          * details.
          */
-        void offer(
-                Context claim,
-                String claimNote,
-                Map<Integer, Long> loot,
-                String encounter,
-                boolean replace) {
+        void offer(Context claim, String claimNote, Map<Integer, Long> loot, String encounter, boolean replace) {
             if (replace || claim.priority > context.priority) {
                 context = claim;
                 note = orEmpty(claimNote);
@@ -4353,9 +3745,7 @@ class Engine {
                 note = empty(claimNote) ? note : claimNote;
                 if (claim == LOOT || claim == PK_LOOT) {
                     Map<Integer, Long> merged = positiveEntries(loot);
-                    expectedLoot.forEach(
-                            (itemId, quantity) ->
-                                    merged.merge(itemId, quantity, SafeMath::safeAdd));
+                    expectedLoot.forEach((itemId, quantity) -> merged.merge(itemId, quantity, SafeMath::safeAdd));
                     expectedLoot = merged;
                 }
                 encounterId = empty(encounter) ? encounterId : encounter;
@@ -4367,15 +3757,8 @@ class Engine {
 /** Source-backed quantities and their distinct source/encounter owners, in observation order. */
 @AllArgsConstructor
 class LootMatch {
-    static final LootMatch NONE =
-            new LootMatch(
-                    false,
-                    "",
-                    "General",
-                    Context.GENERIC,
-                    null,
-                    Collections.<Integer, Long>emptyMap(),
-                    Collections.emptyList());
+    static final LootMatch NONE = new LootMatch(false, "", "General", Context.GENERIC, null,
+                    Collections.<Integer, Long>emptyMap(), Collections.emptyList());
     boolean matched;
     String note;
     String activityName;
@@ -4421,33 +3804,11 @@ class TransactionClassifier {
  */
 /** CX/CP live/stabilizing claims, CT attribution clock, SF/HF soft/hard transfer, BO bank UI. */
 class Inbox {
-    static final int FEE = 1,
-            CHEST = 2,
-            GROUND_CLICK = 3,
-            BAG_GAIN = 4,
-            KIT_SNAPSHOT = 5,
-            DISMANTLE_CLICK = 6,
-            GE_COLLECT = 7,
-            DROP_CLICK = 9,
-            DROPPED = 10,
-            CONSUME = 12,
-            PRIVATE_LOOT = 13,
-            LOOT_RESERVE = 14,
-            LOAD_TARGET = 16,
-            CHECK_LINK = 17,
-            UNCHARGE = 18,
-            LIVE_CLAIM = 19,
-            PENDING_CLAIM = 20,
-            CLOCK = 21,
-            SOFT_TRANSFER = 22,
-            HARD_TRANSFER = 23,
-            BANK_UI = 24,
-            SERVANT = 25,
-            SAWMILL = 26,
-            DIALOGUE = 27,
-            PIPE_PICKUP = 28,
-            CANNON = 29,
-            SPENT_CONSUME = 30;
+    static final int FEE = 1, CHEST = 2, GROUND_CLICK = 3, BAG_GAIN = 4, KIT_SNAPSHOT = 5, DISMANTLE_CLICK = 6,
+            GE_COLLECT = 7, DROP_CLICK = 9, DROPPED = 10, CONSUME = 12, PRIVATE_LOOT = 13, LOOT_RESERVE = 14,
+            LOAD_TARGET = 16, CHECK_LINK = 17, UNCHARGE = 18, LIVE_CLAIM = 19, PENDING_CLAIM = 20, CLOCK = 21,
+            SOFT_TRANSFER = 22, HARD_TRANSFER = 23, BANK_UI = 24, SERVANT = 25, SAWMILL = 26, DIALOGUE = 27,
+            PIPE_PICKUP = 28, CANNON = 29, SPENT_CONSUME = 30;
     volatile long owner;
 
     /** Legacy lifecycle ephemera clear here; their durable state keeps its tested lifecycle. */
@@ -4662,10 +4023,7 @@ class FlowFilters {
         var out = new HashMap<Integer, Long>();
         if (quantities != null) {
             for (Entry<Integer, Long> e : quantities.entrySet()) {
-                if (e.getKey() != null
-                        && e.getValue() != null
-                        && e.getValue() > 0L
-                        && !item.test(e.getKey())) {
+                if (e.getKey() != null && e.getValue() != null && e.getValue() > 0L && !item.test(e.getKey())) {
                     out.put(e.getKey(), e.getValue());
                 }
             }
@@ -4691,8 +4049,7 @@ class FlowFilters {
      * which returns how much its lifecycle takes, leaves only the unclaimed rest in {@code flows}
      * and returns the claimed parts.
      */
-    static List<Flow> claim(
-            List<Flow> flows, Predicate<Flow> which, ToLongBiFunction<Flow, Long> claimer) {
+    static List<Flow> claim(List<Flow> flows, Predicate<Flow> which, ToLongBiFunction<Flow, Long> claimer) {
         var parts = new ArrayList<Flow>();
         for (int index = 0; index < flows.size(); index++) {
             Flow flow = flows.get(index);
@@ -4712,9 +4069,7 @@ class FlowFilters {
         if (base != null) {
             for (Entry<Integer, Long> e : base.entrySet()) {
                 Long less = subtract == null ? null : subtract.get(e.getKey());
-                long left =
-                        (e.getValue() == null ? 0L : e.getValue())
-                                - (less == null ? 0L : nonNeg(less));
+                long left = (e.getValue() == null ? 0L : e.getValue()) - (less == null ? 0L : nonNeg(less));
                 if (e.getKey() != null && left > 0L) out.put(e.getKey(), left);
             }
         }
@@ -4725,9 +4080,7 @@ class FlowFilters {
     static boolean covers(Map<Integer, Long> available, Map<Integer, Long> wanted) {
         if (empty(wanted) || empty(available)) return false;
         for (Entry<Integer, Long> e : wanted.entrySet()) {
-            if (e.getKey() == null
-                    || e.getValue() == null
-                    || e.getValue() <= 0L
+            if (e.getKey() == null || e.getValue() == null || e.getValue() <= 0L
                     || available.getOrDefault(e.getKey(), 0L) < e.getValue()) {
                 return false;
             }
@@ -4784,10 +4137,7 @@ class FlowFilters {
             ChargeCheck.ChargedItem variant = ChargeCheck.supportedForId(cost.itemId);
             for (int j = 0; j < flows.size(); j++) {
                 Flow gain = flows.get(j);
-                if (dropped[j]
-                        || gain == null
-                        || gain.quantityDelta <= 0L
-                        || gain.itemId == cost.itemId
+                if (dropped[j] || gain == null || gain.quantityDelta <= 0L || gain.itemId == cost.itemId
                         || abs(gain.quantityDelta) != abs(cost.quantityDelta)) {
                     continue;
                 }
@@ -4926,8 +4276,7 @@ class DeathReclaimLifecycle {
         if (!wipePending()) return emptyMap();
         var removed = new HashMap<Integer, Long>();
         for (Flow flow : flows == null ? Collections.<Flow>emptyList() : flows) {
-            if (flow.quantityDelta >= 0L
-                    || flow.quantityDelta == Long.MIN_VALUE
+            if (flow.quantityDelta >= 0L || flow.quantityDelta == Long.MIN_VALUE
                     // A live retrieval interaction makes measured coin loss a possible
                     // fee; do not consume it as a delayed death wipe.
                     || flow.itemId == ItemID.COINS && isReclaimArmed()) {
@@ -5007,19 +4356,12 @@ class DeathReclaimLifecycle {
     /** The expiry audit explanation: the outstanding items, sorted by name. */
     String expiredItems() {
         var labels = new ArrayList<String>();
-        deathItems.forEach(
-                (itemId, quantity) -> {
+        deathItems.forEach((itemId, quantity) -> {
                     String name = names.getOrDefault(itemId, "item #" + itemId);
-                    labels.add(
-                            quantity == 1L
-                                    ? name
-                                    : name + " ×" + String.format(Locale.ROOT, "%,d", quantity));
+                    labels.add(quantity == 1L ? name : name + " ×" + String.format(Locale.ROOT, "%,d", quantity));
                 });
         labels.sort(String.CASE_INSENSITIVE_ORDER);
-        return msg("gravestone-timer")
-                + outstandingItemCount()
-                + msg("item-s")
-                + String.join(", ", labels)
+        return msg("gravestone-timer") + outstandingItemCount() + msg("item-s") + String.join(", ", labels)
                 + msg("item-loss");
     }
 
@@ -5042,15 +4384,13 @@ class DeathReclaimLifecycle {
     PendingDeath snapshot() {
         List<DeathItem> outstanding = items(deathItems);
         List<DeathItem> held = items(carriedAtDeath);
-        return outstanding.isEmpty() && held.isEmpty()
-                ? null
+        return outstanding.isEmpty() && held.isEmpty() ? null
                 : new PendingDeath(outstanding, held, deathWipeTicks, ageTicks);
     }
 
     static List<DeathItem> items(Map<Integer, Long> quantities) {
         var items = new ArrayList<DeathItem>();
-        positiveEntries(quantities)
-                .forEach((itemId, quantity) -> items.add(new DeathItem(itemId, quantity)));
+        positiveEntries(quantities).forEach((itemId, quantity) -> items.add(new DeathItem(itemId, quantity)));
         return items;
     }
 
@@ -5148,11 +4488,7 @@ class BossRetrievalCatalogue {
 
         /** Ledger explanation for an observed coin payment at this service. */
         String why(long observedCoins) {
-            var why =
-                    new StringBuilder(msg("item-retrieval"))
-                            .append(activity)
-                            .append(" (")
-                            .append(interactable)
+            var why = new StringBuilder(msg("item-retrieval")).append(activity).append(" (").append(interactable)
                             .append(")");
             if (expectedFee > 0L) {
                 why.append(", published ").append(String.format(ROOT, "%,d", expectedFee));
@@ -5171,15 +4507,8 @@ class BossRetrievalCatalogue {
 
     static {
         for (String[] row : GameData.rows("retrieval_services")) {
-            BY_INTERACTABLE.put(
-                    row[2].toLowerCase(ROOT),
-                    new Service(
-                            row[0],
-                            row[1],
-                            row[2],
-                            Long.parseLong(row[3]),
-                            row[4],
-                            Boolean.parseBoolean(row[5])));
+            BY_INTERACTABLE.put(row[2].toLowerCase(ROOT), new Service(row[0], row[1], row[2], Long.parseLong(row[3]),
+                            row[4], Boolean.parseBoolean(row[5])));
         }
     }
 
@@ -5232,11 +4561,8 @@ class ActionReader {
     static final Pattern FLETCHING_PART = GameData.pattern("fletching-part");
 
     /** Menu verb prefixes (a leading "~" means "contains") and the action each evidences. */
-    static final Object[] VERBS =
-            GameData.rows("action_rules").stream()
-                    .filter(a -> !a[2].isEmpty())
-                    .flatMap(a -> java.util.stream.Stream.of(a[0], ActionKind.valueOf(a[2])))
-                    .toArray();
+    static final Object[] VERBS = GameData.rows("action_rules").stream().filter(a -> !a[2].isEmpty())
+                    .flatMap(a -> java.util.stream.Stream.of(a[0], ActionKind.valueOf(a[2]))).toArray();
 
     /**
      * Final stamp for a booked change.
@@ -5247,16 +4573,13 @@ class ActionReader {
      * @param type booked accounting type (unchanged by this call)
      * @param activityName booked activity name, used only to recognise Herblore production
      */
-    static ActionKind resolve(
-            ActionKind matchedIntent, List<Flow> flows, TransactionType type, String activityName) {
+    static ActionKind resolve(ActionKind matchedIntent, List<Flow> flows, TransactionType type, String activityName) {
         if (Phrases.empty(flows)) return null;
         // A decant shape can also appear in a bank transfer or trade. Only the
         // otherwise-unclassified mixed inventory row is evidence of a player action.
         if (type == UNCERTAIN && isDecant(flows)) return DECANT;
         String activity = Phrases.lower(activityName);
-        if (type == PROCESSING
-                && activity.equals("herblore")
-                && all(flows, -1, ActionReader::isIngredient)
+        if (type == PROCESSING && activity.equals("herblore") && all(flows, -1, ActionReader::isIngredient)
                 && all(flows, 1, name -> trailingDose(name) > 0)) {
             return MIX;
         }
@@ -5275,10 +4598,8 @@ class ActionReader {
         boolean doseStep = isDoseStep(flows);
         // Every loss must be one potion's doses (Drink) or one item (Eat/Bury/...): a coalesced
         // shark or bones under the same click is not "Drank", so it falls back to Supplies.
-        boolean onePotion =
-                oneLossFamily(flows, name -> trailingDose(name) > 0 ? doseBaseName(name) : null);
-        boolean oneItem =
-                oneLossFamily(flows, name -> name.isEmpty() ? null : name)
+        boolean onePotion = oneLossFamily(flows, name -> trailingDose(name) > 0 ? doseBaseName(name) : null);
+        boolean oneItem = oneLossFamily(flows, name -> name.isEmpty() ? null : name)
                         && all(flows, -1, name -> trailingDose(name) <= 0);
         if (matchedIntent != null && hasLoss) {
             switch (matchedIntent) {
@@ -5293,19 +4614,13 @@ class ActionReader {
                     // A Cast proves its spell by what it spent: runes, or a broken tablet (the
                     // spell in item form). An alch's coins or Bones to Peaches' fruit may come
                     // back with them (owner live 2026-10-16); a bank or trade move never casts.
-                    return type != TransactionType.TRANSFER
-                                    && type != TRADE
-                                    && !all(
-                                            flows,
-                                            -1,
-                                            name -> !isRune(name) && Spells.named(name) == null)
-                            ? ActionKind.CAST
+                    return type != TransactionType.TRANSFER && type != TRADE && !all(flows, -1,
+                                            name -> !isRune(name) && Spells.named(name) == null) ? ActionKind.CAST
                             : doseStep ? ActionKind.SUPPLIES : null;
                 case SUPPLIES:
                     // This explicit intent currently comes from Light/Tend-to and the
                     // Tinderbox→fuel pair. Require the matching loss to be actual fuel.
-                    return lossOnly && all(flows, 0, name -> name.matches(msg("logs-kindling")))
-                            ? ActionKind.SUPPLIES
+                    return lossOnly && all(flows, 0, name -> name.matches(msg("logs-kindling"))) ? ActionKind.SUPPLIES
                             : null;
                 default:
                     return matchedIntent;
@@ -5354,8 +4669,7 @@ class ActionReader {
             // A loss pairs only with the one remainder it could have become, and that remainder
             // only with this loss.
             List<Integer> gains = stepPartners(flows, flows.get(lossIndex), true);
-            if (gains.size() == 1
-                    && stepPartners(flows, flows.get(gains.get(0)), false).size() == 1) {
+            if (gains.size() == 1 && stepPartners(flows, flows.get(gains.get(0)), false).size() == 1) {
                 pairs.add(new PartialUse(lossIndex, gains.get(0)));
             }
         }
@@ -5370,9 +4684,7 @@ class ActionReader {
         var partners = new ArrayList<Integer>();
         Flow loss = toGains ? flow : null;
         Flow gain = toGains ? null : flow;
-        if (flow == null
-                || (toGains
-                        ? flow.quantityDelta >= 0L || flow.quantityDelta == Long.MIN_VALUE
+        if (flow == null || (toGains ? flow.quantityDelta >= 0L || flow.quantityDelta == Long.MIN_VALUE
                         : flow.quantityDelta <= 0L)) {
             return partners;
         }
@@ -5380,12 +4692,8 @@ class ActionReader {
             Flow other = flows.get(index);
             Flow lost = toGains ? loss : other;
             Flow gained = toGains ? other : gain;
-            if (lost != null
-                    && gained != null
-                    && lost.quantityDelta < 0L
-                    && lost.quantityDelta != Long.MIN_VALUE
-                    && gained.quantityDelta > 0L
-                    && -lost.quantityDelta == gained.quantityDelta
+            if (lost != null && gained != null && lost.quantityDelta < 0L && lost.quantityDelta != Long.MIN_VALUE
+                    && gained.quantityDelta > 0L && -lost.quantityDelta == gained.quantityDelta
                     && isConsumeStep(lost.itemName, gained.itemName)) {
                 partners.add(index);
             }
@@ -5449,25 +4757,12 @@ class ActionReader {
         for (Flow flow : flows) {
             if (flow.quantityDelta < 0L) {
                 String name = Phrases.lower(flow.itemName);
-                rawBases.add(
-                        name.startsWith("raw ") && name.length() > 4
-                                ? name.substring(4).trim()
-                                : name.startsWith("uncooked ") && name.length() > 9
-                                        ? name.substring(9).trim()
-                                        : null);
+                rawBases.add(name.startsWith("raw ") && name.length() > 4 ? name.substring(4).trim()
+                                : name.startsWith("uncooked ") && name.length() > 9 ? name.substring(9).trim() : null);
             }
         }
-        return !rawBases.isEmpty()
-                && !rawBases.contains(null)
-                && all(
-                        flows,
-                        1,
-                        output ->
-                                rawBases.stream()
-                                        .anyMatch(
-                                                raw ->
-                                                        output.equals(raw)
-                                                                || output.equals("cooked " + raw)
+        return !rawBases.isEmpty() && !rawBases.contains(null) && all(flows, 1, output -> rawBases.stream().anyMatch(
+                                                raw -> output.equals(raw) || output.equals("cooked " + raw)
                                                                 || output.equals("burnt " + raw)));
     }
 
@@ -5519,9 +4814,7 @@ class ActionReader {
 
     /** Ingredient names retain their existing non-null precondition and named ingredient set. */
     static boolean isIngredient(String name) {
-        return !name.isEmpty()
-                && rule("ingredient", name)
-                && (HERBLORE_INGREDIENTS.contains(name)
+        return !name.isEmpty() && rule("ingredient", name) && (HERBLORE_INGREDIENTS.contains(name)
                         || HERBLORE_INGREDIENT_SUFFIX.matcher(name).matches());
     }
 
@@ -5581,22 +4874,19 @@ class ActionSignals {
 
     /** Use tinderbox with fuel; target normalization preserves whitespace. */
     static boolean lightsFire(String option, String target) {
-        return rule("use", Phrases.lower(option))
-                && rule("fuel", Phrases.lower(target, false))
+        return rule("use", Phrases.lower(option)) && rule("fuel", Phrases.lower(target, false))
                 && rule("fire", Phrases.lower(target, false));
     }
 
     /** Use bones/ashes on an altar. */
     static boolean offersBones(String option, String target) {
-        return rule("use", Phrases.lower(option))
-                && rule("altar", Phrases.lower(target, false))
+        return rule("use", Phrases.lower(option)) && rule("altar", Phrases.lower(target, false))
                 && rule("bones", Phrases.lower(target, false));
     }
 
     /** Positive Sinister Offering cast evidence. */
     static boolean isOffering(String option, String target) {
-        return rule("cast", Phrases.lower(option))
-                && rule("offering", Phrases.lower(target, false));
+        return rule("cast", Phrases.lower(option)) && rule("offering", Phrases.lower(target, false));
     }
 
     /** Chaos Altar saved a bone; this cannot confirm spend. */
@@ -5624,8 +4914,493 @@ class ActionSignals {
 
     /** Rake and plant still name the activity, but do not arm gather ownership evidence. */
     static boolean namesActivityOnly(String option) {
-        return option != null
-                && !"General".equals(gatherActivity(option))
-                && !rule("gather.exclude", option);
+        return option != null && !"General".equals(gatherActivity(option)) && !rule("gather.exclude", option);
+    }
+}
+
+/**
+ * Schema-106 pooled known-basis coverage memory.
+ *
+ * <p>Tracked basis is a double-count-prevention memory, never a second financial ledger: canonical
+ * counted transactions stay the only financial authority and this ledger never books, reprices or
+ * exports GP. It records only <em>known coverage</em>: quantity whose prior GP Manager accounting
+ * is proven, with the exact GP value GP Manager counted (which may legitimately be zero). Absence
+ * of coverage means UNKNOWN basis, never zero basis; unknown quantity is derived per realization
+ * and never persisted as a global unknown-owned ledger.
+ *
+ * <p>Allocation is tracked-first pooled weighted average (never FIFO/LIFO). Acquisitions add known
+ * coverage. Proven SELL placements reserve their share; cancellations release the unused
+ * reservation exactly; settlements consume the realized share; permanent ownership sinks deplete
+ * with the same rule. A per-item realization fence blocks retroactive acquisition corrections once
+ * known coverage has been realized or depleted, so canonical Net and tracked basis can never
+ * disagree about what was previously counted.
+ */
+class TrackedBasisLedger {
+    /** Exact known-coverage share a proven SELL placement captured from the available pool. */
+    @AllArgsConstructor
+    static class Reservation {
+        long trackedQty;
+        long basisGp;
+    }
+
+    Map<Integer, BasisPool> pools = new LinkedHashMap<>();
+    long basisEpochMillis;
+    java.util.function.IntFunction<Long> openReservationLookup = id -> 0L;
+
+    // ---------------------------------------------------------------------------------------
+    // Acquisition / removal / change
+    // ---------------------------------------------------------------------------------------
+    /**
+     * Book a newly added canonical transaction: add its exact known coverage, and deplete known
+     * coverage for proven permanent non-custody ownership sinks. Custody-owned settlements already
+     * consumed their reservation, so their item legs never deplete again.
+     */
+    synchronized void onAdded(Transaction transaction, boolean custodyOwned) {
+        if (transaction == null || transaction.timestampEpochMillis < basisEpochMillis) {
+            // Pre-epoch stock is UNKNOWN coverage by migration law; nothing is inferred here.
+            return;
+        }
+        if (basisEpochMillis <= 0L && transaction.timestampEpochMillis > 0L)
+            basisEpochMillis = transaction.timestampEpochMillis;
+        applyContribution(contribution(transaction), transaction.timestampEpochMillis);
+        if (!custodyOwned) depleteSinks(transaction);
+    }
+
+    /** Validate restoring a previously removed transaction; false blocks the restore. */
+    synchronized boolean canAdd(Transaction transaction) {
+        if (transaction == null) return false;
+        if (transaction.timestampEpochMillis >= basisEpochMillis && !sinkQuantities(transaction).isEmpty()) {
+            return false;
+        }
+        return canApplyAll(contribution(transaction), 1L, transaction.timestampEpochMillis);
+    }
+
+    /** Validate removing a retained transaction (undo); false blocks the canonical removal. */
+    synchronized boolean canRemove(Transaction transaction) {
+        if (transaction == null || transaction.timestampEpochMillis < basisEpochMillis) return true;
+        if (!sinkQuantities(transaction).isEmpty()) {
+            return false;
+        }
+        return canApplyAll(contribution(transaction), -1L, transaction.timestampEpochMillis);
+    }
+
+    boolean canApplyAll(Map<Integer, long[]> deltas, long sign, long timestamp) {
+        for (Entry<Integer, long[]> entry : deltas.entrySet()) {
+            if (!canApply(entry.getKey(), sign * entry.getValue()[0], sign * entry.getValue()[1], timestamp)) {
+                return false;
+            }
+        }
+        return true;
+    }
+
+    synchronized void onUsedUp(Transaction transaction) {
+        depleteSinks(transaction);
+    }
+
+    /** Reverse a previously removed transaction's exact known coverage. */
+    synchronized void onRemoved(Transaction transaction) {
+        if (transaction == null || transaction.timestampEpochMillis < basisEpochMillis) return;
+        contribution(transaction).forEach((itemId, delta) -> applyDelta(itemId, -delta[0], -delta[1]));
+    }
+
+    /**
+     * Validate a pending correction/split/undo before any canonical mutation. False means the
+     * mutation must be rejected as-is: the item's known coverage is reserved or already realized.
+     */
+    synchronized boolean canChange(Transaction transaction, Correction previousCorrection, List<Flow> previousFlows,
+            Correction nextCorrection, List<Flow> nextFlows) {
+        if (transaction == null) return false;
+        Map<Integer, long[]> before = contribution(transaction, previousCorrection, previousFlows);
+        // A null next-flow set means the caller can only promise the positive contribution
+        // shrinks; validating against the empty worst case is the strictest safe check.
+        Map<Integer, long[]> after = contribution(transaction, nextCorrection, nextFlows);
+        Map<Integer, Long> beforeSinks = sinkQuantities(transaction, previousCorrection, previousFlows);
+        Map<Integer, Long> afterSinks = sinkQuantities(transaction, nextCorrection, nextFlows);
+        if (transaction.timestampEpochMillis >= basisEpochMillis && !beforeSinks.equals(afterSinks)
+                && !canIntroduceSink(beforeSinks, afterSinks, transaction.timestampEpochMillis)) {
+            return false;
+        }
+        return canApplyAll(deltas(before, after), 1L, transaction.timestampEpochMillis);
+    }
+
+    /** Apply the exact effective delta after a permitted correction/split/undo. */
+    synchronized void onChanged(Transaction transaction, Correction previousCorrection, List<Flow> previousFlows) {
+        if (transaction == null) return;
+        Map<Integer, Long> beforeSinks = sinkQuantities(transaction, previousCorrection, previousFlows);
+        Map<Integer, Long> afterSinks = sinkQuantities(transaction);
+        applyContribution(deltas(contribution(transaction, previousCorrection, previousFlows),
+                        contribution(transaction)), transaction.timestampEpochMillis);
+        if (!beforeSinks.equals(afterSinks) && beforeSinks.isEmpty()) depleteSinks(transaction);
+    }
+
+    // ---------------------------------------------------------------------------------------
+    // Reservation / realization / depletion
+    // ---------------------------------------------------------------------------------------
+    /**
+     * Reserve the tracked-first known-coverage share for a quantity entering proven SELL custody.
+     */
+    synchronized Reservation reserve(int itemId, long quantity, long now) {
+        long requested = nonNeg(quantity);
+        BasisPool pool = pools.get(itemId);
+        long availableQty = pool == null ? 0L : pool.availableQty;
+        long availableBasis = pool == null ? 0L : pool.availableBasisGp;
+        long consumeQty = min(requested, availableQty);
+        long basis = BasisMath.shareOf(availableQty, availableBasis, consumeQty);
+        if (consumeQty <= 0L && basis <= 0L) return new Reservation(0L, 0L);
+        pool = pool(itemId);
+        pool.availableQty = nonNeg(availableQty - consumeQty);
+        pool.availableBasisGp = nonNeg(availableBasis - basis);
+        return new Reservation(consumeQty, basis);
+    }
+
+    /** A sale realized units of this item: fence retroactive corrections before {@code now}. */
+    synchronized void fenceRealized(int itemId, long now) {
+        BasisPool pool = pool(itemId);
+        pool.realizationFenceEpochMillis = max(pool.realizationFenceEpochMillis, now);
+    }
+
+    /** Return an unconsumed reservation share to the available pool (cancel/return). */
+    synchronized void release(int itemId, long quantity, long basisGp) {
+        long releaseQty = nonNeg(quantity);
+        long releaseBasis = nonNeg(basisGp);
+        if (releaseQty <= 0L && releaseBasis <= 0L) return;
+        BasisPool pool = pool(itemId);
+        pool.availableQty = nonNeg(pool.availableQty + releaseQty);
+        pool.availableBasisGp = nonNeg(pool.availableBasisGp + releaseBasis);
+    }
+
+    /** Deplete known coverage for a proven permanent ownership sink; returns basis consumed. */
+    synchronized long deplete(int itemId, long quantity, long now) {
+        long requested = nonNeg(quantity);
+        BasisPool pool = pools.get(itemId);
+        if (requested <= 0L) return 0L;
+        if (pool == null) {
+            // Even a sink with no known coverage leaves a realization fence: units left ownership,
+            // so later retroactive coverage for them can never be re-added.
+            pool(itemId).realizationFenceEpochMillis = nonNeg(now);
+            return 0L;
+        }
+        long consumeQty = min(requested, pool.availableQty);
+        long basis = BasisMath.shareOf(pool.availableQty, pool.availableBasisGp, consumeQty);
+        pool.availableQty = nonNeg(pool.availableQty - consumeQty);
+        pool.availableBasisGp = nonNeg(pool.availableBasisGp - basis);
+        pool.realizationFenceEpochMillis = max(pool.realizationFenceEpochMillis, now);
+        return basis;
+    }
+
+    /** Currency is money, never tracked owned-item value. */
+    static boolean isCurrency(int itemId) {
+        return itemId == ItemID.COINS || itemId == ItemID.PLATINUM;
+    }
+
+    // ---------------------------------------------------------------------------------------
+    // Persistence / lifecycle
+    // ---------------------------------------------------------------------------------------
+    synchronized void writeTo(SavedState state) {
+        if (state == null) return;
+        var out = new TrackedBasisState();
+        // Epoch 0 only happens for an engine that never restored or tracked anything; a positive
+        // sentinel keeps a saved pool loadable as "tracked since the beginning".
+        out.basisEpochMillis = nonNeg(basisEpochMillis > 0L ? basisEpochMillis : 1L);
+        var list = new ArrayList<BasisPool>();
+        for (BasisPool pool : pools.values()) {
+            if (pool.availableQty <= 0L && pool.availableBasisGp <= 0L && pool.realizationFenceEpochMillis <= 0L
+                    && pool.latestAcquisitionEpochMillis <= 0L) {
+                continue;
+            }
+            var copy = new BasisPool(pool.itemId);
+            copy.availableQty = pool.availableQty;
+            copy.availableBasisGp = pool.availableBasisGp;
+            copy.realizationFenceEpochMillis = pool.realizationFenceEpochMillis;
+            copy.latestAcquisitionEpochMillis = pool.latestAcquisitionEpochMillis;
+            list.add(copy);
+        }
+        list.removeIf(value -> value == null || value.itemId <= 0);
+        out.pools = new ArrayList<>(list);
+        state.setTrackedBasis(out);
+    }
+
+    /**
+     * Restore persisted continuity. A pre-106 (or absent) state starts with no known coverage at
+     * the migration boundary: existing holdings are UNKNOWN coverage, no bank value seeds basis and
+     * no history is reconstructed. Reserved shares live on the durable custody records.
+     */
+    synchronized void restore(SavedState state, long now) {
+        pools.clear();
+        TrackedBasisState saved = state == null ? null : state.getTrackedBasis();
+        if (saved != null && saved.getBasisEpochMillis() > 0L) {
+            basisEpochMillis = saved.getBasisEpochMillis();
+            for (BasisPool pool : saved.pools()) {
+                if (pool == null || pool.itemId <= 0) continue;
+                // A save is clamped once here, so the pool's fields are read directly.
+                pool.availableQty = nonNeg(pool.availableQty);
+                pool.availableBasisGp = nonNeg(pool.availableBasisGp);
+                pool.realizationFenceEpochMillis = nonNeg(pool.realizationFenceEpochMillis);
+                pool.latestAcquisitionEpochMillis = nonNeg(pool.latestAcquisitionEpochMillis);
+                pools.put(pool.itemId, pool);
+            }
+        } else {
+            basisEpochMillis = now;
+        }
+    }
+
+    /** Destructive reset: tracked basis is continuity state and clears with the rest. */
+    synchronized void reset() {
+        pools.clear();
+        basisEpochMillis = 0L;
+    }
+
+    /** Adopt another ledger's durable state during a staged profile swap. */
+    synchronized void adoptFrom(TrackedBasisLedger other) {
+        reset();
+        if (other != null) {
+            basisEpochMillis = other.basisEpochMillis;
+            other.pools.forEach((itemId, pool) -> {
+                        if (pool != null) pools.put(itemId, pool);
+                    });
+        }
+    }
+
+    // ---------------------------------------------------------------------------------------
+    // Internals
+    // ---------------------------------------------------------------------------------------
+    BasisPool pool(int itemId) {
+        return pools.computeIfAbsent(itemId, BasisPool::new);
+    }
+
+    void applyContribution(Map<Integer, long[]> contribution, long timestamp) {
+        for (Entry<Integer, long[]> entry : contribution.entrySet()) {
+            applyDelta(entry.getKey(), entry.getValue()[0], entry.getValue()[1]);
+            if (entry.getValue()[0] > 0L) {
+                BasisPool pool = pool(entry.getKey());
+                pool.latestAcquisitionEpochMillis = max(pool.latestAcquisitionEpochMillis, timestamp);
+            }
+        }
+    }
+
+    /** Deplete known coverage for each proven permanent non-custody ownership sink in the row. */
+    void depleteSinks(Transaction transaction) {
+        Map<Integer, Long> quantities = sinkQuantities(transaction);
+        for (Entry<Integer, Long> entry : quantities.entrySet())
+            deplete(entry.getKey(), entry.getValue(), transaction.timestampEpochMillis);
+    }
+
+    /** An owner may first count a Review removal while no later use has frozen its pool. */
+    boolean canIntroduceSink(Map<Integer, Long> before, Map<Integer, Long> after, long transactionTimestamp) {
+        if (!before.isEmpty() || after.isEmpty()) return false;
+        for (Integer itemId : after.keySet()) {
+            if (!canApply(itemId, 0L, 0L, transactionTimestamp)) return false;
+            BasisPool pool = pools.get(itemId);
+            if (pool != null && pool.availableQty > 0L && (pool.latestAcquisitionEpochMillis <= 0L
+                            || pool.latestAcquisitionEpochMillis > transactionTimestamp)) {
+                return false;
+            }
+        }
+        return true;
+    }
+
+    /** Physical counted removals that would require exact reversal of pooled sink depletion. */
+    Map<Integer, Long> sinkQuantities(TransactionType type, boolean counted, Correction correction, List<Flow> flows) {
+        var quantities = new LinkedHashMap<Integer, Long>();
+        if (!counted || type == TransactionType.TRANSFER || type == TransactionType.TRADE || correction == Correction.TRANSFER
+                || flows == null) {
+            // Custody-owned trade settlements consume their reservation separately. Their financial
+            // Result corrections must remain available without touching physical basis.
+            return quantities;
+        }
+        for (Flow flow : flows) {
+            if (flow.quantityDelta >= 0L || isCurrency(flow.itemId)) continue;
+            long quantity = flow.quantityDelta == Long.MIN_VALUE ? Long.MAX_VALUE : -flow.quantityDelta;
+            int itemId = flow.itemId;
+            quantities.put(itemId, safeAdd(quantities.getOrDefault(itemId, 0L), quantity));
+        }
+        return quantities;
+    }
+
+    void applyDelta(int itemId, long deltaQty, long deltaBasisGp) {
+        if (deltaQty == 0L && deltaBasisGp == 0L) return;
+        BasisPool pool = pool(itemId);
+        pool.availableQty = nonNeg(pool.availableQty + deltaQty);
+        pool.availableBasisGp = nonNeg(pool.availableBasisGp + deltaBasisGp);
+    }
+
+    boolean canApply(int itemId, long deltaQty, long deltaBasisGp, long transactionTimestamp) {
+        if (transactionTimestamp < basisEpochMillis) return false;
+        Long reservationTime = openReservationLookup.apply(itemId);
+        if (reservationTime != null && reservationTime > 0L && reservationTime >= transactionTimestamp) return false;
+        BasisPool pool = pools.get(itemId);
+        long fence = pool == null ? 0L : pool.realizationFenceEpochMillis;
+        if (fence > 0L && fence >= transactionTimestamp) return false;
+        long availableQty = pool == null ? 0L : pool.availableQty;
+        long availableBasis = pool == null ? 0L : pool.availableBasisGp;
+        if (availableQty + deltaQty < 0L || availableBasis + deltaBasisGp < 0L) return false;
+        return true;
+    }
+
+    Map<Integer, long[]> deltas(Map<Integer, long[]> before, Map<Integer, long[]> after) {
+        var out = new LinkedHashMap<Integer, long[]>();
+        for (Entry<Integer, long[]> entry : before.entrySet()) {
+            long[] target = after.get(entry.getKey());
+            long deltaQty = (target == null ? 0L : target[0]) - entry.getValue()[0];
+            long deltaBasis = (target == null ? 0L : target[1]) - entry.getValue()[1];
+            if (deltaQty != 0L || deltaBasis != 0L) {
+                out.put(entry.getKey(), new long[] {deltaQty, deltaBasis});
+            }
+        }
+        for (Entry<Integer, long[]> entry : after.entrySet()) {
+            if (!before.containsKey(entry.getKey())) {
+                out.put(entry.getKey(), new long[] {entry.getValue()[0], entry.getValue()[1]});
+            }
+        }
+        return out;
+    }
+
+    Map<Integer, long[]> contribution(Transaction transaction) {
+        return contribution(transaction, transaction.getCorrection(), transaction.getFlows());
+    }
+
+    /** The contribution the transaction would have under {@code correction} with {@code flows}. */
+    Map<Integer, long[]> contribution(Transaction transaction, Correction correction, List<Flow> flows) {
+        return flows == null ? new LinkedHashMap<>() : contribution(transaction.autoType(),
+                        effectiveCounted(transaction.autoCounted(), correction), correction, flows);
+    }
+
+    /** The row's sinks as it is booked now. */
+    Map<Integer, Long> sinkQuantities(Transaction transaction) {
+        return sinkQuantities(transaction, transaction.getCorrection(), transaction.getFlows());
+    }
+
+    Map<Integer, Long> sinkQuantities(Transaction transaction, Correction correction, List<Flow> flows) {
+        // A drop or a shot still on the ground is not a use yet: picking it up shrinks the row. It
+        // depletes the pool when its pickup window closes (Engine#settleGround).
+        if (transaction.isOnGround()) return new LinkedHashMap<>();
+        return sinkQuantities(transaction.autoType(), effectiveCounted(transaction.autoCounted(), correction),
+                correction, flows);
+    }
+
+    /** Effective counted state for an explicit correction (REVENUE/COST always count). */
+    static boolean effectiveCounted(boolean automaticallyCounted, Correction correction) {
+        Correction effective = correction == null ? AUTO : correction;
+        return effective == REVENUE || effective == COST || (effective == AUTO && automaticallyCounted);
+    }
+
+    /**
+     * Exact known coverage a counted transaction introduces, mirroring {@code Accounting.flow} for
+     * positive quantities: AUTO counts the observed positive value, REVENUE counts the gross
+     * magnitude, COST/IGNORE/TRANSFER count nothing. Quantity is tracked even when the booked value
+     * is legitimately zero; unpriced/unknown/deferred sources create no coverage at all.
+     */
+    static Map<Integer, long[]> contribution(
+            TransactionType type, boolean counted, Correction correction, List<Flow> flows) {
+        var out = new LinkedHashMap<Integer, long[]>();
+        Correction effective = correction == null ? AUTO : correction;
+        if (type == TransactionType.TRANSFER || effective == Correction.TRANSFER || !counted || effective == IGNORE
+                || flows == null) {
+            return out;
+        }
+        for (Flow flow : flows) {
+            if (flow.quantityDelta <= 0L || isCurrency(flow.itemId)) continue;
+            PriceSource source = flow.getPriceSource();
+            if (source == null || source == UNPRICED || source == UNKNOWN || source == PriceSource.DEFERRED_CLAIM) continue;
+            long revenue = effective == REVENUE ? SafeMath.abs(flow.valueDelta)
+                            : effective == COST ? 0L : nonNeg(flow.valueDelta);
+            long[] total = out.computeIfAbsent(flow.itemId, itemId -> new long[2]);
+            total[0] = safeAdd(total[0], flow.quantityDelta);
+            total[1] = safeAdd(total[1], revenue);
+        }
+        return out;
+    }
+}
+
+/**
+ * Persisted schema-106 tracked-basis continuity: the minimum state a pooled weighted-average
+ * double-count-prevention memory needs across restart.
+ *
+ * <p>{@code basisEpochMillis} is the migration boundary: acquisitions booked before it are
+ * untracked by law (no backfill, no bank-price inference), and basis-affecting corrections of those
+ * rows are fenced. Open SELL reservation shares live on their durable custody records; the ledger
+ * rebinds the pooled reserved totals from them on restore.
+ */
+class TrackedBasisState {
+    long basisEpochMillis;
+    List<BasisPool> pools = new ArrayList<>();
+
+    long getBasisEpochMillis() {
+        return nonNeg(basisEpochMillis);
+    }
+
+    /** Never null: a pre-106 file upgrades with an empty pool. */
+    List<BasisPool> pools() {
+        if (pools == null) pools = new ArrayList<>();
+        return pools;
+    }
+}
+
+/**
+ * One canonical item's pooled tracked-basis state (schema 106).
+ *
+ * <p>It is supporting ownership state, never a financial authority: canonical counted transactions
+ * stay the only financial truth. {@code available*} is the free pooled quantity/value that a new
+ * SELL reservation or permanent sink may consume (a reserved share is held by its open SELL custody
+ * record, not here); {@code realizationFenceEpochMillis} records the latest time pooled basis was
+ * realized or permanently depleted, which fences retroactive acquisition corrections for this item.
+ * No FIFO lots, no portfolio history, no mark-to-market.
+ */
+class BasisPool {
+    int itemId;
+    long availableQty;
+    long availableBasisGp;
+    long realizationFenceEpochMillis;
+
+    /** Latest proven known-coverage acquisition; fences retroactive counted removals. */
+    long latestAcquisitionEpochMillis;
+
+    BasisPool() {}
+
+    BasisPool(int itemId) {
+        this.itemId = itemId;
+    }
+}
+
+/**
+ * Integer-only pooled basis math shared by the known-basis ledger and the read model.
+ *
+ * <p>Every allocation is floor-based and the remainder stays with the other side, so parts always
+ * sum to the whole: no invented GP, no decimals, no drift. All multiplication is long-safe.
+ */
+class BasisMath {
+    /**
+     * Floor-share of a pooled quantity/basis pair; consuming everything takes the exact remainder.
+     */
+    static long shareOf(long totalQty, long totalBasisGp, long consumeQty) {
+        long qty = nonNeg(totalQty);
+        long basis = nonNeg(totalBasisGp);
+        long consume = nonNeg(consumeQty);
+        if (qty <= 0L || basis <= 0L || consume <= 0L) return 0L;
+        if (consume >= qty) return basis;
+        return multiplyDivide(basis, consume, qty);
+    }
+
+    /**
+     * Known-coverage share of an observed settlement: the known portion takes the floor share and
+     * the unknown remainder receives the integer difference, so both always sum to the settlement.
+     */
+    static long knownProceedsOf(long totalSettlementGp, long realizedQty, long knownQty) {
+        long total = nonNeg(totalSettlementGp);
+        long realized = nonNeg(realizedQty);
+        long known = nonNeg(min(knownQty, realized));
+        if (realized <= 0L || known <= 0L) return 0L;
+        if (known >= realized) return total;
+        return multiplyDivide(total, known, realized);
+    }
+
+    /** Long-safe floor(value × numerator / denominator) for non-negative inputs. */
+    static long multiplyDivide(long value, long numerator, long denominator) {
+        if (denominator <= 0L || numerator <= 0L || value <= 0L) return 0L;
+        if (numerator >= denominator) return value;
+        BigInteger product = BigInteger.valueOf(value).multiply(BigInteger.valueOf(numerator));
+        BigInteger share = product.divide(BigInteger.valueOf(denominator));
+        // b < c, so the share is below a and fits a long.
+        return share.longValue();
     }
 }

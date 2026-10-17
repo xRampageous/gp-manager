@@ -5,20 +5,14 @@ import static java.lang.Math.*;
 import java.io.*;
 import java.nio.charset.StandardCharsets;
 import java.util.*;
-import java.util.Locale;
 import java.util.regex.Pattern;
 import static com.gpmanager.PriceSource.*;
-import java.util.HashMap;
-import java.util.Map;
-import java.util.Set;
 import java.util.function.*;
 import javax.inject.*;
 import lombok.Getter;
 import net.runelite.api.*;
-import net.runelite.api.ItemComposition;
 import net.runelite.api.gameval.ItemID;
 import net.runelite.client.game.*;
-import net.runelite.client.game.ItemManager;
 import net.runelite.http.api.item.ItemPrice;
 
 /**
@@ -43,12 +37,10 @@ class GameData {
 
     /** The rows of {@code name}.tsv; a missing table is a packaging bug, so it fails loudly. */
     static List<String[]> rows(String name) {
-        InputStream stream =
-                GameData.class.getResourceAsStream("/com/gpmanager/model/" + name + ".tsv");
+        InputStream stream = GameData.class.getResourceAsStream("/com/gpmanager/model/" + name + ".tsv");
         if (stream == null) throw new IllegalStateException("Missing game data table " + name);
         var rows = new ArrayList<String[]>();
-        try (BufferedReader reader =
-                new BufferedReader(new InputStreamReader(stream, StandardCharsets.UTF_8))) {
+        try (BufferedReader reader = new BufferedReader(new InputStreamReader(stream, StandardCharsets.UTF_8))) {
             for (String line = reader.readLine(); line != null; line = reader.readLine()) {
                 if (!line.isEmpty() && !line.startsWith("#")) rows.add(line.split("\t", -1));
             }
@@ -84,16 +76,9 @@ class GameData {
         if (RULES.containsKey(name)) return RULES.get(name);
         var compiled = new LinkedHashMap<String, Phrases.Clause[][]>();
         for (String[] row : cachedRows(name)) {
-            compiled.put(
-                    row[0],
-                    Arrays.stream(text(row[1]).split("\\|", -1))
-                            .filter(d -> !d.isEmpty())
-                            .map(
-                                    d ->
-                                            Arrays.stream(d.split("\\+", -1))
-                                                    .map(Phrases.Clause::new)
-                                                    .toArray(Phrases.Clause[]::new))
-                            .toArray(Phrases.Clause[][]::new));
+            compiled.put(row[0], Arrays.stream(text(row[1]).split("\\|", -1)).filter(d -> !d.isEmpty()).map(d ->
+                                            Arrays.stream(d.split("\\+", -1)).map(Phrases.Clause::new)
+                                                    .toArray(Phrases.Clause[]::new)).toArray(Phrases.Clause[][]::new));
         }
         RULES.put(name, compiled);
         return compiled;
@@ -104,10 +89,7 @@ class GameData {
 
     static {
         for (String[] row : rows("patterns"))
-            PATTERNS.put(
-                    row[0],
-                    Pattern.compile(
-                            row[1].startsWith("@") ? msg(row[1].substring(1)) : row[1],
+            PATTERNS.put(row[0], Pattern.compile(row[1].startsWith("@") ? msg(row[1].substring(1)) : row[1],
                             Integer.parseInt(row[2])));
     }
 
@@ -282,16 +264,9 @@ class Phrases {
 
     static boolean containsAll(String text, Clause[] clauses) {
         for (Clause clause : clauses) {
-            boolean hit =
-                    clause.kind == 0
-                            ? text.equals(clause.text)
-                            : clause.kind == 1
-                                    ? text.startsWith(clause.text)
-                                    : clause.kind == 2
-                                            ? text.endsWith(clause.text)
-                                            : clause.kind == 3
-                                                    ? clause.pattern.matcher(text).matches()
-                                                    : clause.kind == 4
+            boolean hit = clause.kind == 0 ? text.equals(clause.text) : clause.kind == 1 ? text.startsWith(clause.text)
+                                    : clause.kind == 2 ? text.endsWith(clause.text) : clause.kind == 3
+                                                    ? clause.pattern.matcher(text).matches() : clause.kind == 4
                                                             ? text.equalsIgnoreCase(clause.text)
                                                             : text.contains(clause.text);
             if (hit == clause.negated) return false;
@@ -304,9 +279,7 @@ class Phrases {
 class Valuation implements FlowValuator {
     /** Whether the current world/economy permits ordinary automatic RuneLite market quotes. */
     enum Economy {
-        NORMAL,
-        UNSUPPORTED_SPECIAL,
-        UNKNOWN
+        NORMAL, UNSUPPORTED_SPECIAL, UNKNOWN
     }
 
     /**
@@ -348,12 +321,9 @@ class Valuation implements FlowValuator {
         // fall back to guide/Jagex pricing; the selected quote is captured and frozen at
         // booking time, and history is never repriced. The economy gate starts UNKNOWN until
         // the plugin observes a logged-in world, so automatic quotes fail closed meanwhile.
-        this(
-                config,
-                itemManager::getItemComposition,
+        this(config, itemManager::getItemComposition,
                 (id, active) -> unitPriceOf(itemManager.getItemPriceWithSource(id, active)),
-                id -> hasUnsupportedMapping(itemManager, id),
-                Economy.UNKNOWN);
+                id -> hasUnsupportedMapping(itemManager, id), Economy.UNKNOWN);
     }
 
     /**
@@ -366,32 +336,17 @@ class Valuation implements FlowValuator {
     }
 
     /** Test seam: deterministic NORMAL economy and no mapping guard; the boolean stays explicit. */
-    Valuation(
-            GpManagerConfig config,
-            IntFunction<ItemComposition> compositions,
-            MarketQuote marketQuotes) {
+    Valuation(GpManagerConfig config, IntFunction<ItemComposition> compositions, MarketQuote marketQuotes) {
         this(config, compositions, marketQuotes, id -> false, Economy.NORMAL);
     }
 
-    Valuation(
-            GpManagerConfig config,
-            IntFunction<ItemComposition> compositions,
-            MarketQuote marketQuotes,
-            IntPredicate unsupportedMapping,
-            Economy economyState) {
+    Valuation(GpManagerConfig config, IntFunction<ItemComposition> compositions, MarketQuote marketQuotes,
+            IntPredicate unsupportedMapping, Economy economyState) {
         this.config = config;
         this.compositions = compositions;
         this.marketQuotes = marketQuotes;
         this.unsupportedMapping = unsupportedMapping == null ? id -> false : unsupportedMapping;
         this.economyState = economyState == null ? Economy.UNKNOWN : economyState;
-    }
-
-    /** Legacy synthetic constructor retained for existing tests: NORMAL economy, no guard. */
-    Valuation(
-            GpManagerConfig config,
-            IntFunction<ItemComposition> compositions,
-            IntUnaryOperator marketPrices) {
-        this(config, compositions, (id, active) -> marketPrices.applyAsInt(id));
     }
 
     @Override
@@ -404,16 +359,10 @@ class Valuation implements FlowValuator {
         var flows = new ArrayList<Flow>();
         Map<Integer, Integer> priceOverrides = priceOverrides();
         for (Map.Entry<Integer, Long> entry : quantityDeltas.entrySet()) {
-            Flow flow =
-                    valueOne(
-                            entry.getKey(),
-                            entry.getValue(),
-                            priceOverrides,
-                            priceCapturedAtEpochMillis);
+            Flow flow = valueOne(entry.getKey(), entry.getValue(), priceOverrides, priceCapturedAtEpochMillis);
             if (flow != null) flows.add(flow);
         }
-        flows.sort(
-                Comparator.comparingLong((Flow flow) -> SafeMath.abs(flow.valueDelta)).reversed());
+        flows.sort(Comparator.comparingLong((Flow flow) -> SafeMath.abs(flow.valueDelta)).reversed());
         return flows;
     }
 
@@ -423,12 +372,8 @@ class Valuation implements FlowValuator {
      * cannot be mistaken for consumption before action settlement.
      */
     @Override
-    public List<Flow> normalizeConsumedFlows(
-            List<Flow> flows, ActionKind actionKind, long priceCapturedAtEpochMillis) {
-        if (flows == null
-                || flows.isEmpty()
-                || actionKind != ActionKind.DRINK
-                || ActionReader.isDecant(flows)) {
+    public List<Flow> normalizeConsumedFlows(List<Flow> flows, ActionKind actionKind, long priceCapturedAtEpochMillis) {
+        if (flows == null || flows.isEmpty() || actionKind != ActionKind.DRINK || ActionReader.isDecant(flows)) {
             return flows;
         }
         Map<Integer, Integer> priceOverrides = priceOverrides();
@@ -439,11 +384,7 @@ class Valuation implements FlowValuator {
         // original captured list untouched for Review.
         var normalized = new ArrayList<>(flows);
         for (ActionReader.PartialUse pair : pairs) {
-            if (!normalizePotionPair(
-                    normalized,
-                    pair.lossIndex,
-                    pair.remainderIndex,
-                    priceOverrides,
+            if (!normalizePotionPair(normalized, pair.lossIndex, pair.remainderIndex, priceOverrides,
                     priceCapturedAtEpochMillis)) {
                 return null;
             }
@@ -453,12 +394,10 @@ class Valuation implements FlowValuator {
 
     Flow doseAuthority(Flow flow, Map<Integer, Integer> priceOverrides, long now) {
         if (flow == null) return null;
-        String one =
-                (ActionReader.doseBaseName(flow.itemName) + "(1)").trim().toLowerCase(Locale.ROOT);
+        String one = (ActionReader.doseBaseName(flow.itemName) + "(1)").trim().toLowerCase(Locale.ROOT);
         Flow geCandidate = null;
         try {
-            for (int id :
-                    ItemVariationMapping.getVariations(ItemVariationMapping.map(flow.itemId))) {
+            for (int id : ItemVariationMapping.getVariations(ItemVariationMapping.map(flow.itemId))) {
                 Flow unit = valueOne(id, 1L, priceOverrides, now, false);
                 String unitName = unit == null ? "" : unit.itemName;
                 if (unitName == null || !one.equals(Phrases.lower(unitName))) continue;
@@ -491,8 +430,7 @@ class Valuation implements FlowValuator {
                 if (id == itemId) continue;
                 String otherName = compositionName(id);
                 int otherDose = ActionReader.trailingDose(otherName);
-                if (otherDose <= 0
-                        || !base.equalsIgnoreCase(ActionReader.doseBaseName(otherName))) {
+                if (otherDose <= 0 || !base.equalsIgnoreCase(ActionReader.doseBaseName(otherName))) {
                     continue;
                 }
                 Integer override = priceOverrides.get(id);
@@ -517,69 +455,40 @@ class Valuation implements FlowValuator {
         if (anchorDose <= 0 || anchorPrice <= 0) return null;
         long scaled = (long) anchorPrice * dose / anchorDose;
         if (scaled <= 0L || scaled > Integer.MAX_VALUE) return null;
-        return new Flow(
-                itemId,
-                itemName,
-                1L,
-                (int) scaled,
-                scaled,
-                manual ? MANUAL_OVERRIDE : GRAND_EXCHANGE,
-                0L);
+        return new Flow(itemId, itemName, 1L, (int) scaled, scaled, manual ? MANUAL_OVERRIDE : GRAND_EXCHANGE, 0L);
     }
 
     /** One variation family member's display name, "" when the definition is unavailable. */
     String compositionName(int id) {
         try {
             ItemComposition composition = compositions.apply(id);
-            return composition == null || composition.getName() == null
-                    ? ""
-                    : composition.getName();
+            return composition == null || composition.getName() == null ? "" : composition.getName();
         } catch (RuntimeException ignored) {
             return "";
         }
     }
 
-    private boolean normalizePotionPair(
-            List<Flow> normalized,
-            int lossIndex,
-            int remainderIndex,
-            Map<Integer, Integer> priceOverrides,
-            long now) {
+    private boolean normalizePotionPair(List<Flow> normalized, int lossIndex, int remainderIndex,
+            Map<Integer, Integer> priceOverrides, long now) {
         Flow loss = normalized.get(lossIndex);
         Flow remainder = normalized.get(remainderIndex);
         int lostDose = ActionReader.trailingDose(loss.itemName);
         int gainedDose = ActionReader.trailingDose(remainder.itemName);
-        if (lostDose <= 0
-                || gainedDose <= 0
-                || lostDose != gainedDose + 1
-                || !ActionReader.doseBaseName(loss.itemName)
+        if (lostDose <= 0 || gainedDose <= 0 || lostDose != gainedDose + 1 || !ActionReader.doseBaseName(loss.itemName)
                         .equals(ActionReader.doseBaseName(remainder.itemName))) {
             return false;
         }
         Flow authority = doseAuthority(loss, priceOverrides, now);
-        if (!compatibleWithAuthority(loss, authority)
-                || !compatibleWithAuthority(remainder, authority)) return false;
+        if (!compatibleWithAuthority(loss, authority) || !compatibleWithAuthority(remainder, authority)) return false;
         try {
             long lossUnit = multiplyExact(lostDose, (long) authority.unitPrice);
             long remainderUnit = multiplyExact(gainedDose, (long) authority.unitPrice);
-            Flow normalizedLoss =
-                    new Flow(
-                            loss.itemId,
-                            loss.itemName,
-                            loss.quantityDelta,
-                            toIntExact(lossUnit),
-                            multiplyExact(loss.quantityDelta, lossUnit),
-                            authority.getPriceSource(),
+            Flow normalizedLoss = new Flow(loss.itemId, loss.itemName, loss.quantityDelta, toIntExact(lossUnit),
+                            multiplyExact(loss.quantityDelta, lossUnit), authority.getPriceSource(),
                             authority.getPriceCapturedAtEpochMillis());
-            Flow normalizedRemainder =
-                    new Flow(
-                            remainder.itemId,
-                            remainder.itemName,
-                            remainder.quantityDelta,
-                            toIntExact(remainderUnit),
-                            multiplyExact(remainder.quantityDelta, remainderUnit),
-                            authority.getPriceSource(),
-                            authority.getPriceCapturedAtEpochMillis());
+            Flow normalizedRemainder = new Flow(remainder.itemId, remainder.itemName, remainder.quantityDelta,
+                            toIntExact(remainderUnit), multiplyExact(remainder.quantityDelta, remainderUnit),
+                            authority.getPriceSource(), authority.getPriceCapturedAtEpochMillis());
             normalized.set(lossIndex, normalizedLoss);
             normalized.set(remainderIndex, normalizedRemainder);
             return true;
@@ -657,19 +566,12 @@ class Valuation implements FlowValuator {
      */
     volatile boolean alch;
 
-    Flow valueOne(
-            int itemId,
-            long quantityDelta,
-            Map<Integer, Integer> priceOverrides,
+    Flow valueOne(int itemId, long quantityDelta, Map<Integer, Integer> priceOverrides,
             long priceCapturedAtEpochMillis) {
         return valueOne(itemId, quantityDelta, priceOverrides, priceCapturedAtEpochMillis, true);
     }
 
-    Flow valueOne(
-            int itemId,
-            long quantityDelta,
-            Map<Integer, Integer> priceOverrides,
-            long priceCapturedAtEpochMillis,
+    Flow valueOne(int itemId, long quantityDelta, Map<Integer, Integer> priceOverrides, long priceCapturedAtEpochMillis,
             boolean doseFallback) {
         boolean deferredClaim = DeferredClaims.of(itemId);
         try {
@@ -679,9 +581,7 @@ class Valuation implements FlowValuator {
             } catch (RuntimeException ignored) {
                 // No definition yet: the flow keeps a placeholder name.
             }
-            String name =
-                    composition == null || composition.getName() == null
-                            ? "Item " + itemId
+            String name = composition == null || composition.getName() == null ? "Item " + itemId
                             : composition.getName();
             // A clue scroll, scroll box or reward casket is worth nothing until its casket opens
             // (owner 2026-10-08).
@@ -699,12 +599,8 @@ class Valuation implements FlowValuator {
             // Those catalogue entries are non-GP currencies in GP Manager, so their physical
             // identity must not inherit a monetary identity from the platform mapping. An
             // explicit owner override remains authoritative.
-            if (!manualOverride
-                    && !deferredClaim
-                    && faceValue == 0
-                    && !CurrencyProxyCatalogue.isMapped(itemId)
-                    && economyState == Economy.NORMAL
-                    && !unsupportedMapping.test(itemId)) {
+            if (!manualOverride && !deferredClaim && faceValue == 0 && !CurrencyProxyCatalogue.isMapped(itemId)
+                    && economyState == Economy.NORMAL && !unsupportedMapping.test(itemId)) {
                 // GP Manager's single automatic market policy: the explicit active route,
                 // gated by the current world/economy and the mapping guard above.
                 marketPrice = quoteOrZero(itemId);
@@ -712,9 +608,7 @@ class Valuation implements FlowValuator {
             // A proxy row values the component from a market item and its fixed exchange rate.
             // The proxy's market item is priced only where market quotes are, never on unknown or
             // special worlds (Codex review 1.2).
-            int[] proxy =
-                    marketPrice == 0 && economyState == Economy.NORMAL
-                            ? CurrencyProxyCatalogue.proxyOf(itemId)
+            int[] proxy = marketPrice == 0 && economyState == Economy.NORMAL ? CurrencyProxyCatalogue.proxyOf(itemId)
                             : null;
             if (proxy != null) {
                 // Some exchanges improve while Karamja gloves are worn; the proxy row may
@@ -730,11 +624,8 @@ class Valuation implements FlowValuator {
             // RuneLite's ItemMapping carries no bracelet of ethereum entry (upstream omission,
             // verified 2026-10-12): the charged bracelet prices from its uncharged form's live
             // quote, the same relationship the revenant weapons already have.
-            if (marketPrice == 0
-                    && itemId == ItemID.WILD_CAVE_BRACELET_CHARGED
-                    && !manualOverride
-                    && economyState == Economy.NORMAL
-                    && !unsupportedMapping.test(itemId)) {
+            if (marketPrice == 0 && itemId == ItemID.WILD_CAVE_BRACELET_CHARGED && !manualOverride
+                    && economyState == Economy.NORMAL && !unsupportedMapping.test(itemId)) {
                 // No quote: the flow stays unpriced for Review.
                 marketPrice = quoteOrZero(ItemID.WILD_CAVE_BRACELET_UNCHARGED);
             }
@@ -742,26 +633,17 @@ class Valuation implements FlowValuator {
             // highest-dose quote at the same rate per dose (owner 1.3.4, GP-Per-Hour's fractional
             // model); a manual override anywhere in the family is authoritative.
             Flow doseQuote = null;
-            if (marketPrice == 0
-                    && doseFallback
-                    && !manualOverride
-                    && !deferredClaim
-                    && faceValue == 0
-                    && economyState == Economy.NORMAL
-                    && !CurrencyProxyCatalogue.isMapped(itemId)
+            if (marketPrice == 0 && doseFallback && !manualOverride && !deferredClaim && faceValue == 0
+                    && economyState == Economy.NORMAL && !CurrencyProxyCatalogue.isMapped(itemId)
                     && !unsupportedMapping.test(itemId)) {
                 doseQuote = doseFamilyQuote(itemId, name, priceOverrides);
             }
             // Half a pie, a pizza half or a cake slice is its share of the whole one's quote
             // (owner live 2026-10-16: Half a summer pie read "?").
             String part = PARTS.get(String.valueOf(itemId));
-            if (marketPrice == 0
-                    && part != null
-                    && !manualOverride
-                    && economyState == Economy.NORMAL) {
+            if (marketPrice == 0 && part != null && !manualOverride && economyState == Economy.NORMAL) {
                 String[] share = part.split(" ");
-                marketPrice =
-                        (int)
+                marketPrice = (int)
                                 ((long) quoteOrZero(Integer.parseInt(share[0]))
                                         * Integer.parseInt(share[1])
                                         / Integer.parseInt(share[2]));
@@ -792,11 +674,8 @@ class Valuation implements FlowValuator {
                 // The derived price follows its family anchor's source so provenance stays honest.
                 unitPrice = doseQuote.unitPrice;
                 priceSource = doseQuote.getPriceSource();
-            } else if (composition != null
-                    && !CurrencyProxyCatalogue.isMapped(itemId)
-                    && !unsupportedMapping.test(itemId)
-                    && (!composition.isTradeable()
-                            || economyState == Economy.NORMAL
+            } else if (composition != null && !CurrencyProxyCatalogue.isMapped(itemId)
+                    && !unsupportedMapping.test(itemId) && (!composition.isTradeable() || economyState == Economy.NORMAL
                                     && quoteOrZero(ItemID.NATURERUNE) > 0)) {
                 // No market quote (untradeable, or tradeable once prices have loaded): its alch
                 // value for every account (a crystal shard), else worth nothing (a Progress hat),
@@ -811,20 +690,11 @@ class Valuation implements FlowValuator {
             long valueDelta = safeMultiply(quantityDelta, unitPrice);
             // Only a non-zero selected price is a captured price. Unpriced/deferred flows
             // deliberately retain zero so consumers cannot present a fabricated capture time.
-            long capturedAt =
-                    unitPrice > 0 && priceSource != PriceSource.UNKNOWN && priceSource != FACE_VALUE
-                            ? SafeMath.nonNeg(priceCapturedAtEpochMillis)
-                            : 0L;
-            return new Flow(
-                    itemId, name, quantityDelta, unitPrice, valueDelta, priceSource, capturedAt);
+            long capturedAt = unitPrice > 0 && priceSource != PriceSource.UNKNOWN && priceSource != FACE_VALUE
+                            ? SafeMath.nonNeg(priceCapturedAtEpochMillis) : 0L;
+            return new Flow(itemId, name, quantityDelta, unitPrice, valueDelta, priceSource, capturedAt);
         } catch (RuntimeException ignored) {
-            return new Flow(
-                    itemId,
-                    "Item " + itemId,
-                    quantityDelta,
-                    0,
-                    0L,
-                    deferredClaim ? DEFERRED_CLAIM : UNPRICED);
+            return new Flow(itemId, "Item " + itemId, quantityDelta, 0, 0L, deferredClaim ? DEFERRED_CLAIM : UNPRICED);
         }
     }
 
@@ -973,9 +843,7 @@ class CurrencyProxyCatalogue {
         for (String[] row : GameData.rows("currencies")) {
             if (row.length > 2) {
                 String[] units = row[2].split("/");
-                PROXIES.put(
-                        Integer.parseInt(row[0]),
-                        new int[] {Integer.parseInt(row[1]), Integer.parseInt(units[0])});
+                PROXIES.put(Integer.parseInt(row[0]), new int[] {Integer.parseInt(row[1]), Integer.parseInt(units[0])});
                 if (units.length > 1) {
                     GLOVES_UNITS.put(Integer.parseInt(row[0]), Integer.parseInt(units[1]));
                 }

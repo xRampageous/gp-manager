@@ -1,5 +1,7 @@
 package com.gpmanager;
 
+import com.gpmanager.GpManagerConfig.Retention;
+
 import java.util.ArrayList;
 import java.util.Collections;
 import java.util.HashMap;
@@ -299,7 +301,7 @@ public class MarketActivityValueSemanticsTest
                 TransactionType.GAIN, Context.GENERIC, "", "Loot", true,
                 Collections.singletonList(new Flow(item, "Death rune", qty,
                     (int) (qty > 0L ? value / qty : 0L), value, PriceSource.GRAND_EXCHANGE)),
-                Confidence.CONFIRMED, "", null), 500);
+                Confidence.CONFIRMED, "", null), 500, false);
         }
 
         void sell(int slot, int item, long qty, int price)
@@ -358,7 +360,7 @@ public class MarketActivityValueSemanticsTest
             ContainerSnapshot snapshot = new ContainerSnapshot(inventory);
             for (int i = 0; i < 3; i++)
             {
-                engine.processIfDirty(snapshot, now);
+                engine.processIfDirty(snapshot, now, null);
                 now += 600L;
             }
         }

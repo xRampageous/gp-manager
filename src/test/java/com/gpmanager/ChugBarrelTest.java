@@ -36,7 +36,7 @@ public class ChugBarrelTest
     @Test
     public void aChugIsOneDrankRowOfOneDoseOfEachPotion()
     {
-        Valuation valuation = new Valuation(CONFIG, ChugBarrelTest::composition, id -> id == BREW ? 2_400 : id == RESTORE ? 3_600 : 0);
+        Valuation valuation = ModelProbe.valuation(CONFIG, ChugBarrelTest::composition, id -> id == BREW ? 2_400 : id == RESTORE ? 3_600 : 0);
         Engine engine = new Engine(valuation, new TransactionClassifier(), CONFIG);
         engine.startCustom("Chug", 1_000_000L);
         engine.setBaseline(new ContainerSnapshot(new HashMap<>()));
@@ -89,7 +89,7 @@ public class ChugBarrelTest
     public void uncharingBryophytasStaffSpendsTheRunesItDestroys()
     {
         // Owner recording 2026-10-09: the runes used to charge the staff are not returned.
-        Valuation valuation = new Valuation(CONFIG, ChugBarrelTest::composition, id -> id == 561 ? 138 : 0);
+        Valuation valuation = ModelProbe.valuation(CONFIG, ChugBarrelTest::composition, id -> id == 561 ? 138 : 0);
         Engine engine = new Engine(valuation, new TransactionClassifier(), CONFIG);
         engine.startCustom("Alching", 1_000_000L);
         engine.setBaseline(new ContainerSnapshot(new HashMap<>()));

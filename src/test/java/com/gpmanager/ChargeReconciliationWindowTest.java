@@ -52,7 +52,7 @@ public class ChargeReconciliationWindowTest
         Transaction third = estimate(engine, T0 + 3L);
 
         ChargeDelta delta = new ChargeDelta(ChargeCheck.ChargedItem.TRIDENT_SEAS,
-            Collections.singletonList(new ChargeDelta.ComponentDelta(ItemID.DEATHRUNE, -1L)));
+            Collections.singletonList(new ChargeDelta.ComponentDelta(ItemID.DEATHRUNE, -1L)), ChargeDelta.CheckResult.SPEND);
         Transaction measured = engine.bookChargeSpend(delta, "Trident of the seas",
             Collections.singletonList(flow(ItemID.DEATHRUNE, "Death rune", -1L, 100)), T0 + 4L, "slot-a");
 

@@ -991,7 +991,7 @@ false, engine.geCustody.records().get(0).hasFrozenBasis());
             Collections.singletonList(new Flow(item, "Nature rune", quantity,
                 (int) (quantity > 0L ? value / quantity : 0L), value,
                 PriceSource.GRAND_EXCHANGE)),
-            Confidence.CONFIRMED, "", null), 500);
+            Confidence.CONFIRMED, "", null), 500, false);
     }
 
     private static int countCounted(Engine engine)
@@ -1197,7 +1197,7 @@ false, engine.geCustody.records().get(0).hasFrozenBasis());
         ContainerSnapshot snapshot = new ContainerSnapshot(inventory);
         for (int i = 0; i < 20 && EngineProbe.isBaselinePriming(engine); i++)
         {
-            engine.processIfDirty(snapshot, now + i * 600L);
+            engine.processIfDirty(snapshot, now + i * 600L, null);
         }
     }
 
@@ -1208,7 +1208,7 @@ false, engine.geCustody.records().get(0).hasFrozenBasis());
         Transaction result = null;
         for (int i = 0; i < 3; i++)
         {
-            Transaction settled = engine.processIfDirty(snapshot, now + i * 600L);
+            Transaction settled = engine.processIfDirty(snapshot, now + i * 600L, null);
             if (settled != null)
             {
                 result = settled;

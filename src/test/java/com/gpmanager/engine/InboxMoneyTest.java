@@ -101,11 +101,11 @@ public class InboxMoneyTest
         plugin.onItemDespawned(new ItemDespawned(ReviewFollowupTest.tile(10, 10), ReviewFollowupTest.bones()));
         tick[0]++;
         plugin.bagSettle();
-        engine.processIfDirty(ContainerSnapshot.empty(), T0 + 600);
-        engine.processIfDirty(ContainerSnapshot.empty(), T0 + 1200);
+        engine.processIfDirty(ContainerSnapshot.empty(), T0 + 600, null);
+        engine.processIfDirty(ContainerSnapshot.empty(), T0 + 1200, null);
         assertEquals(200L, engine.getMetrics(T0 + 1200).revenue);
         plugin.bagSettle();
-        engine.processIfDirty(ContainerSnapshot.empty(), T0 + 1800);
+        engine.processIfDirty(ContainerSnapshot.empty(), T0 + 1800, null);
         assertEquals(200L, engine.getMetrics(T0 + 1800).revenue);
     }
 

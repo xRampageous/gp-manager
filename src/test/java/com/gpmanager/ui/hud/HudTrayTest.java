@@ -76,7 +76,7 @@ public class HudTrayTest
         assertEquals(HudTray.State.LOST, bones.state);
         assertTrue("a lost row carries no tag: the Dropped headline and red value say it",
             bones.state.tag.isEmpty());
-        LiveContext hideCheap = new LiveContext(false, null, 1_000L, PvpState.NONE, "", false, "");
+        LiveContext hideCheap = new LiveContext(false, null, 1_000L, PvpState.NONE, "", false, "", false);
         assertFalse("below the minimum shown value, the dropped Bones stay hidden",
             hideCheap.flowVisible(HudBuilder.flowOf(bones)));
         HudTray looting = new HudTray();
@@ -189,13 +189,6 @@ public class HudTrayTest
 
 
 
-
-    private static Transaction ownDropRecovery(long at, Flow... flows)
-    {
-        return new Transaction(at, TransactionType.TRANSFER, Context.TRANSFER,
-            "Own-drop recovery", "Drop recovery", false, Arrays.asList(flows),
-            Confidence.CONFIRMED, "Own-drop recovery", null);
-    }
 
     @Test
     public void anotherNpcStartsItsOwnStreakSoItsLootNeverJoinsTheLastOne()

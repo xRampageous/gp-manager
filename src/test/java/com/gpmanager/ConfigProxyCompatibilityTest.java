@@ -1,5 +1,8 @@
 package com.gpmanager;
 
+import com.gpmanager.GpManagerConfig.Retention;
+import com.gpmanager.GpManagerConfig.LootFilter;
+
 import net.runelite.client.config.ConfigManager;
 import org.junit.Test;
 

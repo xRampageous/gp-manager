@@ -53,7 +53,7 @@ public class GrindsAllTimeCardTest
         Session session = new Session(name, 1L, SessionMode.GENERAL);
         session.grind = grind;
         session.addTransaction(Tx.of(1_000L, TransactionType.LOOT, Context.LOOT, "Loot", true,
-            Collections.singletonList(new Flow(1, "Loot", 1L, (int) gain, gain))), 100);
+            Collections.singletonList(new Flow(1, "Loot", 1L, (int) gain, gain))), 100, false);
         return session;
     }
 }

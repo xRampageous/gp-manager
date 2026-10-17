@@ -13,6 +13,12 @@ public final class TableRows
     {
     }
 
+    /** A plain row: key, name, quantity, value and tone (moved out of the plugin, 1.5.2 trim). */
+    public static Table.Row row(String key, String name, String qty, String value, Kit.Tone tone)
+    {
+        return new Table.Row(key, null, name, qty, value, tone, "", "", false, null, java.util.Collections.emptyList());
+    }
+
     /** Rows of every table under {@code root} whose title starts with {@code title}, as "name|qty|value|exact|tip". */
     public static List<String> of(Component root, String title)
     {

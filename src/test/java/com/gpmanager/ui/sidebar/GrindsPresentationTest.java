@@ -75,7 +75,7 @@ public class GrindsPresentationTest
         Engine engine = PresentationLifecycleTest.engine();
         long now = System.currentTimeMillis();
         engine.startCustom("Vorkath", now);
-        engine.getActiveSession().addTransaction(booked(now + 1_000L, "Dragon bones", 1, 1, 3_200, 3_200), 2_000);
+        engine.getActiveSession().addTransaction(booked(now + 1_000L, "Dragon bones", 1, 1, 3_200, 3_200), 2_000, false);
         engine.setTargets(5_000_000L, 3L * 3_600_000L, now + 2_000L);
         long net = engine.getMetrics(now + 2_000L).net;
 
@@ -101,12 +101,12 @@ public class GrindsPresentationTest
         GrindsData.Pace a = GrindsData.pace(5_000_000L, null, 2_840_000L, true, 2_030_000L, 3_600_000L);
         assertTrue(a.available);
         assertTrue("~1h 4m remaining", a.line.contains("remaining"));
-        // B: Active Time target only → projected Net.
+        // B: Active Time target only → the countdown (owner 1.5.2: no projected Net).
         GrindsData.Pace b = GrindsData.pace(null, 10L * 3_600_000L, 2_840_000L, true, 2_030_000L,
             1L * 3_600_000L);
         assertTrue(b.available);
-        assertTrue("projected estimate wording", b.line.contains("projected Net"));
-        // C: both → projection + required average.
+        assertEquals("9h 0m left", b.line);
+        // C: both → the countdown + required average.
         GrindsData.Pace c = GrindsData.pace(5_000_000L, 3L * 3_600_000L, 2_840_000L, true, 2_030_000L,
             1L * 3_600_000L);
         assertTrue(c.available);
@@ -129,11 +129,11 @@ public class GrindsPresentationTest
         long now = System.currentTimeMillis();
         engine.startCustom("Vorkath", now - 20L * 60_000L);
         engine.getActiveSession().addTransaction(booked(now - 15L * 60_000L, "Dragon bones", 1, 2,
-            100_000, 200_000L), 2_000);
+            100_000, 200_000L), 2_000, false);
         engine.getActiveSession().setProfitTargetGp(5_000_000L);
         engine.getActiveSession().setActiveTimeTargetMillis(3L * 3_600_000L, now);
         String id = engine.getActiveSession().getId();
-        SidebarPanel panel = onEdt(() -> new SidebarPanel(engine, PresentationLifecycleTest.config(), null));
+        SidebarPanel panel = onEdt(() -> new SidebarPanel(engine, PresentationLifecycleTest.config(), null, null, null));
         onEdt(() ->
         {
             panel.shell().show(Shell.GRINDS);
@@ -142,7 +142,8 @@ public class GrindsPresentationTest
             return null;
         });
         List<String> texts = labels(panel);
-        assertTrue("the projected line renders: " + texts, anyContains(texts, "projected"));
+        assertTrue("the Time row counts down: " + texts, anyContains(texts, "of Active Time remaining"));
+        assertFalse("with no projection: " + texts, anyContains(texts, "projected"));
         assertTrue("the required average is used", anyContains(texts, "Required average"));
     }
 
@@ -154,10 +155,10 @@ public class GrindsPresentationTest
         long now = System.currentTimeMillis();
         engine.startCustom("Vorkath", now - 20L * 60_000L);
         engine.getActiveSession().addTransaction(booked(now - 15L * 60_000L, "Dragon bones", 1, 2,
-            100_000, 200_000L), 2_000);
+            100_000, 200_000L), 2_000, false);
         String id = engine.getActiveSession().getId();
         engine.finishCustom(now);
-        SidebarPanel panel = onEdt(() -> new SidebarPanel(engine, PresentationLifecycleTest.config(), null));
+        SidebarPanel panel = onEdt(() -> new SidebarPanel(engine, PresentationLifecycleTest.config(), null, null, null));
         onEdt(() ->
         {
             panel.shell().show(Shell.GRINDS);
@@ -329,10 +330,10 @@ public class GrindsPresentationTest
         Engine engine = PresentationLifecycleTest.engine();
         long now = System.currentTimeMillis() - 10L * 3_600_000L;
         engine.startGrind("Vorkath", null, null, null, now);
-        engine.getActiveSession().addTransaction(booked(now + 1_000L, "Dragon bones", 536, 1, 1_000_000, 1_000_000L), 2_000);
+        engine.getActiveSession().addTransaction(booked(now + 1_000L, "Dragon bones", 536, 1, 1_000_000, 1_000_000L), 2_000, false);
         engine.finishCustom(now + 3_600_000L);
         engine.startGrind("Vorkath", null, null, null, now + 4_000_000L);
-        engine.getActiveSession().addTransaction(booked(now + 4_001_000L, "Dragon bones", 536, 1, 2_000_000, 2_000_000L), 2_000);
+        engine.getActiveSession().addTransaction(booked(now + 4_001_000L, "Dragon bones", 536, 1, 2_000_000, 2_000_000L), 2_000, false);
         engine.finishCustom(now + 4_000_000L + 3_600_000L);
 
         GrindsData.MyGrind row = GrindsData.capture(engine, System.currentTimeMillis(), false, null).myGrinds.get(0);
@@ -347,7 +348,7 @@ public class GrindsPresentationTest
         Engine engine = PresentationLifecycleTest.engine();
         long now = System.currentTimeMillis();
         engine.startCustom("Vorkath", now);
-        engine.getActiveSession().addTransaction(booked(now + 1_000L, "Dragon bones", 1, 5, 3_200, 16_000), 2_000);
+        engine.getActiveSession().addTransaction(booked(now + 1_000L, "Dragon bones", 1, 5, 3_200, 16_000), 2_000, false);
         engine.getActiveSession().setProfitTargetGp(5_000_000L);
         SavedState.SavedGrind saved = engine.saveGrind("Vorkath", 5_000_000L, null, false);
         engine.getActiveSession().setGrindId(saved.getGrindId());
@@ -388,7 +389,7 @@ public class GrindsPresentationTest
         Engine engine = PresentationLifecycleTest.engine();
         long now = System.currentTimeMillis();
         engine.startCustom("Vorkath", now);
-        engine.getActiveSession().addTransaction(booked(now + 1_000L, "Dragon bones", 1, 1, 3_200, 3_200), 2_000);
+        engine.getActiveSession().addTransaction(booked(now + 1_000L, "Dragon bones", 1, 1, 3_200, 3_200), 2_000, false);
         engine.setTargets(1_000L, null, now + 2_000L);
         assertTrue(engine.getMetrics(now + 2_000L).net > 1_000L);
         assertFalse("the Grind stays open after the target", engine.getActiveSession().isClosed());
@@ -400,7 +401,7 @@ public class GrindsPresentationTest
         Engine engine = PresentationLifecycleTest.engine();
         long now = System.currentTimeMillis();
         engine.startCustom("Vorkath", now);
-        engine.getActiveSession().addTransaction(booked(now + 1_000L, "Dragon bones", 1, 1, 3_200, 3_200), 2_000);
+        engine.getActiveSession().addTransaction(booked(now + 1_000L, "Dragon bones", 1, 1, 3_200, 3_200), 2_000, false);
         engine.getActiveSession().setGrindId(engine.saveGrind("Vorkath", 5_000_000L, null, false).getGrindId());
         engine.resetData(now + 2_000L);
         assertEquals("accounting reset clears history", 0, engine.getHistory().size());
@@ -413,11 +414,11 @@ public class GrindsPresentationTest
         Engine engine = PresentationLifecycleTest.engine();
         long now = System.currentTimeMillis();
         engine.startCustom("Vorkath", now);
-        engine.getActiveSession().addTransaction(booked(now + 1_000L, "Dragon bones", 1, 1, 3_200, 3_200), 2_000);
+        engine.getActiveSession().addTransaction(booked(now + 1_000L, "Dragon bones", 1, 1, 3_200, 3_200), 2_000, false);
         engine.getActiveSession().setProfitTargetGp(5_000_000L);
         engine.saveGrind("Zulrah", null, null, true);
 
-        SidebarPanel panel = onEdt(() -> new SidebarPanel(engine, PresentationLifecycleTest.config(), null));
+        SidebarPanel panel = onEdt(() -> new SidebarPanel(engine, PresentationLifecycleTest.config(), null, null, null));
         onEdt(() ->
         {
             panel.shell().show(Shell.GRINDS);
@@ -446,7 +447,7 @@ public class GrindsPresentationTest
     {
         Engine engine = PresentationLifecycleTest.engine();
         SavedState.SavedGrind saved = engine.saveGrind("Zulrah", null, null, true);
-        SidebarPanel panel = onEdt(() -> new SidebarPanel(engine, PresentationLifecycleTest.config(), null));
+        SidebarPanel panel = onEdt(() -> new SidebarPanel(engine, PresentationLifecycleTest.config(), null, null, null));
         onEdt(() ->
         {
             panel.shell().show(Shell.GRINDS);
@@ -470,7 +471,7 @@ public class GrindsPresentationTest
         Engine engine = PresentationLifecycleTest.engine();
         SavedState.SavedGrind plain = engine.saveGrind("Zulrah", null, null, false);
         assertNotNull(engine.saveGrind("Vorkath", null, null, false));
-        SidebarPanel panel = onEdt(() -> new SidebarPanel(engine, PresentationLifecycleTest.config(), null));
+        SidebarPanel panel = onEdt(() -> new SidebarPanel(engine, PresentationLifecycleTest.config(), null, null, null));
         GrindsController controller = new GrindsController(panel);
 
         onEdt(() ->
@@ -499,7 +500,7 @@ public class GrindsPresentationTest
     public void startSheetPagerAppearsOnlyAboveFiveRows() throws Exception
     {
         Engine empty = PresentationLifecycleTest.engine();
-        SidebarPanel emptyPanel = onEdt(() -> new SidebarPanel(empty, PresentationLifecycleTest.config(), null));
+        SidebarPanel emptyPanel = onEdt(() -> new SidebarPanel(empty, PresentationLifecycleTest.config(), null, null, null));
         onEdt(() ->
         {
             new GrindsController(emptyPanel).newGrind();
@@ -513,7 +514,7 @@ public class GrindsPresentationTest
 
         Engine single = PresentationLifecycleTest.engine();
         assertNotNull(single.saveGrind("Only", null, null, false));
-        SidebarPanel singlePanel = onEdt(() -> new SidebarPanel(single, PresentationLifecycleTest.config(), null));
+        SidebarPanel singlePanel = onEdt(() -> new SidebarPanel(single, PresentationLifecycleTest.config(), null, null, null));
         onEdt(() ->
         {
             new GrindsController(singlePanel).newGrind();
@@ -534,7 +535,7 @@ public class GrindsPresentationTest
         {
             assertNotNull(engine.saveGrind("Plan " + i, null, null, false));
         }
-        SidebarPanel panel = onEdt(() -> new SidebarPanel(engine, PresentationLifecycleTest.config(), null));
+        SidebarPanel panel = onEdt(() -> new SidebarPanel(engine, PresentationLifecycleTest.config(), null, null, null));
         GrindsController controller = new GrindsController(panel);
         onEdt(() ->
         {
@@ -564,7 +565,7 @@ public class GrindsPresentationTest
         {
             assertNotNull(engine.saveGrind("Plan " + i, null, null, false));
         }
-        SidebarPanel panel = onEdt(() -> new SidebarPanel(engine, PresentationLifecycleTest.config(), null));
+        SidebarPanel panel = onEdt(() -> new SidebarPanel(engine, PresentationLifecycleTest.config(), null, null, null));
         GrindsController controller = new GrindsController(panel);
         onEdt(() ->
         {
@@ -598,7 +599,7 @@ public class GrindsPresentationTest
         long now = System.currentTimeMillis();
         engine.startCustom("Vorkath", now);
         String id = engine.getActiveSession().getId();
-        SidebarPanel panel = onEdt(() -> new SidebarPanel(engine, PresentationLifecycleTest.config(), null));
+        SidebarPanel panel = onEdt(() -> new SidebarPanel(engine, PresentationLifecycleTest.config(), null, null, null));
         GrindsController controller = new GrindsController(panel);
         onEdt(() ->
         {
@@ -685,10 +686,10 @@ public class GrindsPresentationTest
         {
             controller.factoryReset();
             List<String> buttons = ShellProbe.sheetButtonTexts(panel.shell());
-            assertTrue("Reset is offered: " + buttons, buttons.contains("Reset"));
-            assertFalse("Back up first is gone: " + buttons, buttons.contains("Back up first"));
+            assertTrue("both deletes are offered: " + buttons, buttons.contains("Back up & delete")
+                && buttons.contains("Delete without backup"));
             fake.refuse = true;
-            ShellProbe.pressSheet(panel.shell(), "Reset");
+            ShellProbe.pressSheet(panel.shell(), "Back up & delete");
             return null;
         });
         PersistenceProbe.drain(fake, 2);
@@ -703,7 +704,7 @@ public class GrindsPresentationTest
     public void ledgerAndGrindsShareTheSameAttachedToolbarBand() throws Exception
     {
         Engine engine = PresentationLifecycleTest.engine();
-        SidebarPanel panel = onEdt(() -> new SidebarPanel(engine, PresentationLifecycleTest.config(), null));
+        SidebarPanel panel = onEdt(() -> new SidebarPanel(engine, PresentationLifecycleTest.config(), null, null, null));
         onEdt(() ->
         {
             panel.shell().show(Shell.GRINDS);
@@ -783,7 +784,7 @@ public class GrindsPresentationTest
     public void grindsPageKeepsR1CopyAndOffersTheDataMenuWithoutTools() throws Exception
     {
         Engine engine = PresentationLifecycleTest.engine();
-        SidebarPanel panel = onEdt(() -> new SidebarPanel(engine, PresentationLifecycleTest.config(), null));
+        SidebarPanel panel = onEdt(() -> new SidebarPanel(engine, PresentationLifecycleTest.config(), null, null, null));
         onEdt(() ->
         {
             panel.shell().show(Shell.GRINDS);
@@ -801,7 +802,7 @@ public class GrindsPresentationTest
             }
         }
         assertEquals(java.util.Arrays.asList("Getting started", "Back up profile", "Copy data folder path", "Report a bug",
-            "Changelog", "Factory reset current profile…"), gear);
+            "Changelog", "Reset free-play…", "Delete Profile…"), gear);
         assertTrue("no standalone Search page", java.util.Arrays.stream(ShellProbe.tabLabels(panel.shell()))
             .noneMatch(label -> label.equalsIgnoreCase("Search") || label.equalsIgnoreCase("Tools")));
         assertFalse("no open-folder affordance is described",
@@ -817,7 +818,7 @@ public class GrindsPresentationTest
         // Midnight-safe day boundaries: never assume a fixed hour offset is still "today".
         long todayTimestamp = Math.max(now - 37 * 60_000L, startOfToday + 60_000L);
         GrindsData.Recent today = new GrindsData.Recent("Vorkath", "Vorkath", todayTimestamp,
-            2_840_000L, 37 * 60_000L);
+            2_840_000L, 37 * 60_000L, false);
         String context = GrindsPage.contextLine(today, now, java.time.ZoneId.systemDefault());
         assertTrue("day label leads the context: " + context, context.startsWith("Today"));
         assertTrue("duration is present: " + context, context.contains("37m"));
@@ -828,7 +829,7 @@ public class GrindsPresentationTest
         assertEquals("\u2212412k", GrindsPage.valueText(-412_000L));
 
         GrindsData.Recent yesterday = new GrindsData.Recent("Zulrah", "Zulrah",
-            startOfToday - 3_600_000L, -412_000L, 96 * 60_000L);
+            startOfToday - 3_600_000L, -412_000L, 96 * 60_000L, false);
         assertTrue("yesterday reads naturally: " + GrindsPage.contextLine(yesterday, now, java.time.ZoneId.systemDefault()),
             GrindsPage.contextLine(yesterday, now, java.time.ZoneId.systemDefault()).contains("Yesterday"));
     }
@@ -839,9 +840,9 @@ public class GrindsPresentationTest
         Engine engine = PresentationLifecycleTest.engine();
         long now = System.currentTimeMillis();
         engine.startCustom("Vorkath", now - 3_600_000L);
-        engine.getActiveSession().addTransaction(booked(now - 3_500_000L, "Dragon bones", 1, 1, 3_200, 3_200), 2_000);
+        engine.getActiveSession().addTransaction(booked(now - 3_500_000L, "Dragon bones", 1, 1, 3_200, 3_200), 2_000, false);
         engine.finishCustom(now - 3_000_000L);
-        SidebarPanel panel = onEdt(() -> new SidebarPanel(engine, PresentationLifecycleTest.config(), null));
+        SidebarPanel panel = onEdt(() -> new SidebarPanel(engine, PresentationLifecycleTest.config(), null, null, null));
         onEdt(() ->
         {
             panel.shell().show(Shell.GRINDS);

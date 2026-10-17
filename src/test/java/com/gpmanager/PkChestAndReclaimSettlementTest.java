@@ -55,16 +55,16 @@ public class PkChestAndReclaimSettlementTest
     {
         engine.markDirty();
         ContainerSnapshot snapshot = new ContainerSnapshot(Collections.singletonMap(id, qty));
-        Transaction result = engine.processIfDirty(snapshot, now);
-        return result != null ? result : engine.processIfDirty(snapshot, now + 1L);
+        Transaction result = engine.processIfDirty(snapshot, now, null);
+        return result != null ? result : engine.processIfDirty(snapshot, now + 1L, null);
     }
 
     private Transaction settleSnapshot(Engine engine, Map<Integer, Long> quantities, long now)
     {
         engine.markDirty();
         ContainerSnapshot snapshot = new ContainerSnapshot(quantities);
-        Transaction result = engine.processIfDirty(snapshot, now);
-        return result != null ? result : engine.processIfDirty(snapshot, now + 1L);
+        Transaction result = engine.processIfDirty(snapshot, now, null);
+        return result != null ? result : engine.processIfDirty(snapshot, now + 1L, null);
     }
 
     @Test
@@ -240,8 +240,8 @@ public class PkChestAndReclaimSettlementTest
         engine.markPkLoot(expected, 50, 1_100L);
         engine.markDirty();
         ContainerSnapshot gained = new ContainerSnapshot(expected);
-        engine.processIfDirty(gained, 1_600L);
-        Transaction loot = engine.processIfDirty(gained, 1_601L);
+        engine.processIfDirty(gained, 1_600L, null);
+        Transaction loot = engine.processIfDirty(gained, 1_601L, null);
 
         assertNotNull(loot);
         assertEquals(TransactionType.PK_LOOT, loot.getType());

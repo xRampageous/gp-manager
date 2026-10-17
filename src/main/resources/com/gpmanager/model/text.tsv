@@ -63,7 +63,7 @@ saved-grinds	Grinds you start appear here
 entries-changed	Entries changed while the preview was open · check again
 items-waiting-reclaimed	Items waiting to be reclaimed after death · a reclaimed item stays neutral apart from the fee
 another-client-changed	another client changed this account after the flush; nothing was overwritten.
-resets-gp	Deletes this account's runs, Ledger, My Grinds and totals. A safety copy is saved first. Only want a fresh GP/h? Click the ACTIVE clock on Live.
+resets-gp	Deletes this account's runs, Ledger, My Grinds and totals. Back up & delete saves a safety copy first; without a backup it cannot be undone. Only want fresh numbers? Click the ACTIVE clock for a new session, or Reset free-play in this menu.
 review.COST	Count as cost
 review.GAIN	Count
 review.TRANSFER	Transfer
@@ -138,7 +138,7 @@ reset-primary-committed	Reset primary committed; obsolete backup invalidated aft
 reset-primary-committed-but	Reset primary committed but backup could not be aligned; obsolete backup removed
 primary-already	Primary already holds the new revision after a partial failure
 reset-did	Reset did not commit; previous disk state retained
-reset-refused	Factory reset was not applied: 
+reset-refused	Delete Profile was not applied: 
 reset-data-changed	data changed while the safety copy was prepared; retry.
 save-did	Save did not commit; previous disk state retained
 read-corrections-apply	Read-only · corrections apply to the current grind.
@@ -302,7 +302,7 @@ text-2	<html><font color='#6ee16e'>●</font>
 corrected	 · Corrected
 current-run	Current run + runs started today; whole-run totals
 runs-today	Runs today · Current run + runs started today; whole-run totals.
-tracked-active	Tracked active time since the last restart; pauses are excluded. Click to restart GP/h.
+tracked-active	Tracked active time this session; pauses are excluded. Click for a new session.
 tracking-waits	Tracking waits until you log back in
 kills-since	Kills since your last death · best 
 value-incomplete	 · no price known
@@ -315,7 +315,7 @@ measured-exact	Measured from the exact charge Check difference.
 gp	 gp each · 
 sold-collect	Sold · collect
 bought-collect	Bought · collect
-factory-reset	Factory reset current profile…
+factory-reset	Delete Profile…
 recent-grind	Recent Grind · 
 split-needs	split needs one item with at least two units
 enter-number	enter a number from 1 to 
@@ -364,7 +364,7 @@ play-left	 of play left at this rate
 press-grind	Press Grind to start tracking
 tracking-starts	Tracking starts with your first gameplay
 nothing-tracked	Nothing tracked yet
-click-set	 · click to set a target
+click-set	 · click to set a target; it starts Live fresh
 split-unavailable	 (split unavailable)
 detail-unavailable	Detail unavailable
 partially-realized	Partially realized
@@ -380,9 +380,13 @@ tentacle-used	Abyssal tentacle used up
 tentacle-whip	The tentacle ran out or was dissolved; its abyssal whip is gone and the kraken tentacle is left.
 cannon-parts	Cannon set up or picked up
 cannon-why	A dwarf multicannon's parts stay yours wherever it stands; Nulodion replaces a lost one free.
-restart-rate	GP/h and the clock start again from now. Net, Recent and the Ledger keep the whole run.
-guide	Live: Net, GP/h and newest changes. Click the clock to restart GP/h. | Gains: loot and income. Costs: supplies, charges, deaths. Banking and trades are neutral. | Grinds: start one by name. It remembers its targets, best run and average GP/h. | Ledger: why each number changed. Check Review rows; Correct fixes any row. | HUD+: the in-game overlay. Set it up in plugin settings. | Values: GE price, else alch. — means worthless, ? means no price yet.
+new-session	Net, Recent, GP/h and the clock start at zero. Free play or this Grind keeps its total, and the Ledger keeps every row.
+guide	Live: Net, GP/h and newest changes. Click the clock for a new session; a target starts one too. Free play keeps every total; Reset free-play in the gear menu clears it. | Gains: loot and income. Costs: supplies, charges, deaths. Banking and trades are neutral. | Grinds: start one by name. It remembers its targets, best run and average GP/h. | Ledger: why each number changed. Check Review rows; Correct fixes any row. | HUD+: the in-game overlay. Set it up in plugin settings. | Values: GE price, else alch. — means worthless, ? means no price yet.
 bf-coffer	Blast Furnace coffer
 free-play-kept	Free play is kept.
 bag-reward	Agility dispenser · looting bag
 bag-reward-why	The Agility dispenser paid this into your open looting bag; its chat line named it.
+run-total	Everything since Free play or this Grind began; a new session never removes it. Click to show it all on Live again.
+free-play-over	Free play so far moves to your Grinds history as a finished run; nothing is deleted. A new Free play starts at zero, and your milestone counts it.
+run-total-target	Everything since Free play or this Grind began; a target never removes it. After Done, click here to show it all on Live again.
+restore-free-play	It becomes your Free play again, and the current one moves under FREE PLAY so you can swap back. Nothing is deleted.

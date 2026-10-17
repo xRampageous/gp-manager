@@ -1,5 +1,7 @@
 package com.gpmanager;
 
+import com.gpmanager.GpManagerConfig.LootFilter;
+
 import java.util.*;
 import org.junit.Test;
 import static org.junit.Assert.*;
@@ -45,12 +47,12 @@ public class PresentationFilterAccountingIsolationEngineTest
         ContainerSnapshot bones = new ContainerSnapshot(Collections.singletonMap(526, 1L));
         engine.setBaseline(bones);
         engine.bankOpened(6);
-        engine.processIfDirty(bones, 1000L);
+        engine.processIfDirty(bones, 1000L, null);
         engine.markDirty();
         engine.bankClosed();
-        engine.processIfDirty(ContainerSnapshot.empty(), 1600L);
-        engine.processIfDirty(ContainerSnapshot.empty(), 2200L);
-        Transaction tx = engine.processIfDirty(ContainerSnapshot.empty(), 2800L);
+        engine.processIfDirty(ContainerSnapshot.empty(), 1600L, null);
+        engine.processIfDirty(ContainerSnapshot.empty(), 2200L, null);
+        Transaction tx = engine.processIfDirty(ContainerSnapshot.empty(), 2800L, null);
         assertEquals(TransactionType.CONSUMPTION, tx.getType());
     }
 
@@ -58,7 +60,7 @@ public class PresentationFilterAccountingIsolationEngineTest
     {
         Engine engine = engine();
         onlyFeathers(engine);
-        engine.getActiveSession().addTransaction(gain(new Flow(526, "Bones", 1L, 35, 35L)), 100);
+        engine.getActiveSession().addTransaction(gain(new Flow(526, "Bones", 1L, 35, 35L)), 100, false);
         assertEquals(35L, engine.getMetrics(2800L).net);
     }
 
@@ -68,7 +70,7 @@ public class PresentationFilterAccountingIsolationEngineTest
         onlyFeathers(engine);
         Transaction tx = gain(new Flow(526, "Bones", 1L, 35, 35L),
             new Flow(314, "Feather", 1L, 10, 10L));
-        engine.getActiveSession().addTransaction(tx, 100);
+        engine.getActiveSession().addTransaction(tx, 100, false);
         assertEquals(45L, engine.getMetrics(2800L).revenue);
         engine.getActiveSession().correctTransaction(tx.getId(), Correction.REVENUE, 3000L, "Manual correction");
         assertEquals(45L, engine.getMetrics(3100L).revenue);
@@ -79,8 +81,8 @@ public class PresentationFilterAccountingIsolationEngineTest
         Engine engine = engine();
         onlyFeathers(engine);
         Session session = engine.getActiveSession();
-        session.addTransaction(gain(new Flow(526, "Bones", 1L, 35, 35L)), 1);
-        session.addTransaction(gain(new Flow(526, "Bones", 1L, 35, 35L)), 1);
+        session.addTransaction(gain(new Flow(526, "Bones", 1L, 35, 35L)), 1, false);
+        session.addTransaction(gain(new Flow(526, "Bones", 1L, 35, 35L)), 1, false);
         assertTrue(session.compactedTransactionCount > 0L);
         assertEquals(70L, engine.getMetrics(2800L).net);
     }

@@ -15,7 +15,7 @@ public class CharacterIdleGpHrGuardrailTest
     @Test
     public void characterIdleDoesNotPauseSessionOrChangeRate()
     {
-        Session session = new Session("Test", 0L);
+        Session session = new Session("Test", 0L, SessionMode.GENERAL);
         session.addTransaction(
             Tx.of(
                 1_000L,
@@ -25,7 +25,7 @@ public class CharacterIdleGpHrGuardrailTest
                 "",
                 true,
                 Collections.singletonList(new Flow(526, "Bones", 1, 100, 100L))),
-            1);
+            1, false);
 
         Metrics before = session.metrics(10_000L);
         CharacterIdleModel idle = new CharacterIdleModel();
@@ -41,10 +41,23 @@ public class CharacterIdleGpHrGuardrailTest
         assertFalse(session.paused);
     }
 
+    /** Owner live 1.5.2: the NPC's name outlasts the gap between kills (Activity label timeout). */
+    @Test
+    public void theActivityNameWaitsTheLabelTimeout()
+    {
+        CharacterIdleModel idle = new CharacterIdleModel();
+        idle.delayMillis = GpManagerPlugin.idleDelay(new GpManagerConfig() {});
+        assertEquals(15_000L, idle.delayMillis);
+        assertFalse(idle.tick(true, true, 0L));
+        assertFalse("still named 6 s after the kill", idle.tick(false, false, 1_000L));
+        assertFalse(idle.tick(false, false, 7_000L));
+        assertTrue("dropped at the timeout", idle.tick(false, false, 16_000L));
+    }
+
     @Test
     public void afkPauseStillFreezesRateAndLabelsAfk()
     {
-        Session session = new Session("Test", 0L);
+        Session session = new Session("Test", 0L, SessionMode.GENERAL);
         session.addTransaction(
             Tx.of(
                 1_000L,
@@ -54,7 +67,7 @@ public class CharacterIdleGpHrGuardrailTest
                 "",
                 true,
                 Collections.singletonList(new Flow(526, "Bones", 1, 100, 100L))),
-            1);
+            1, false);
 
         session.pause(2_000L, PauseReason.IDLE);
         Metrics atPause = session.metrics(2_000L);

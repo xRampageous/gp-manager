@@ -1,12 +1,13 @@
 package com.gpmanager;
 
+import com.gpmanager.GpManagerConfig.Retention;
+
 import static com.gpmanager.Accounting.*;
 import static com.gpmanager.Correction.*;
 import static com.gpmanager.GameData.msg;
 import static com.gpmanager.PauseReason.*;
 import static com.gpmanager.Phrases.*;
 import static com.gpmanager.SafeMath.*;
-import static com.gpmanager.SafeMath.safeAdd;
 import static java.lang.Math.*;
 import static java.util.Collections.*;
 
@@ -51,14 +52,9 @@ class Session {
         if (ownedValueObserver != null) ownedValueObserver.onAdded(transaction, custodyOwned);
     }
 
-    boolean canChangeOwnedValue(
-            Transaction transaction,
-            Correction previousCorrection,
-            List<Flow> previousFlows,
-            Correction nextCorrection,
-            List<Flow> nextFlows) {
-        return ownedValueObserver == null
-                || ownedValueObserver.canChange(
+    boolean canChangeOwnedValue(Transaction transaction, Correction previousCorrection, List<Flow> previousFlows,
+            Correction nextCorrection, List<Flow> nextFlows) {
+        return ownedValueObserver == null || ownedValueObserver.canChange(
                         transaction, previousCorrection, previousFlows, nextCorrection, nextFlows);
     }
 
@@ -101,8 +97,17 @@ class Session {
     /** The run's Active Time when the Net aim was set; its pace counts from there (owner 2026-10-16). */
     Long profitTargetSetActiveMillis;
 
-    /** Net and Active Time at the last rate restart; Live's GP/h and clock count from there. */
-    long rateSetNet, rateSetMillis;
+    /**
+     * When Live's current session began (New session, or a target set), and the run's Active Time
+     * then: Live counts from here while the run keeps everything (owner 1.5.2). Null shows the
+     * whole run (a fresh Grind, older saves).
+     */
+    Long sessionStartAt;
+
+    long sessionStartMillis;
+
+    /** Free play's Net milestone: it counts Free play's whole Net (owner 1.5.2); null with none. */
+    Long milestoneGp;
     // Signature targets: the actual Active-Time aim this Grind instance ran with, and the stable
     // My Grind lineage link it was started from. Both are metadata; neither books anything.
     Long activeTimeTargetMillis;
@@ -118,10 +123,6 @@ class Session {
         // Gson
     }
 
-    Session(String name, long startedAtEpochMillis) {
-        this(name, startedAtEpochMillis, SessionMode.GENERAL);
-    }
-
     Session(String name, long startedAtEpochMillis, SessionMode mode) {
         id = UUID.randomUUID().toString();
         this.name = normalizeName(name);
@@ -130,10 +131,6 @@ class Session {
         this.startedAtEpochMillis = startedAtEpochMillis;
         transactionLimit = 2_000;
         retainedCostSplitComplete = true;
-    }
-
-    void addTransaction(Transaction transaction, int maxTransactions) {
-        addTransaction(transaction, maxTransactions, false);
     }
 
     /**
@@ -185,8 +182,7 @@ class Session {
     boolean setProfitTargetGp(Long value, long sessionNet, long activeMillis) {
         Long next = value == null || value <= 0L ? null : value;
         if (Objects.equals(next, profitTargetGp)) {
-            return next != null
-                    && sessionNet - getProfitTargetSetNet() >= next
+            return next != null && profitTargetProgress(sessionNet) >= next
                     && rebaseProfitTarget(sessionNet, activeMillis);
         }
         profitTargetGp = next;
@@ -201,7 +197,8 @@ class Session {
 
     /** What the Net aim has counted so far; sessionNet is the run's total. */
     long profitTargetProgress(long sessionNet) {
-        return sessionNet - getProfitTargetSetNet();
+        return sessionStartAt != null ? metrics(rowsSince(sessionStartAt), 0L).net
+                : sessionNet - getProfitTargetSetNet();
     }
 
     /**
@@ -221,9 +218,7 @@ class Session {
 
     /** The actual Active-Time target this instance ran with; null when none was set. */
     Long getActiveTimeTargetMillis() {
-        return activeTimeTargetMillis != null && activeTimeTargetMillis > 0L
-                ? activeTimeTargetMillis
-                : null;
+        return activeTimeTargetMillis != null && activeTimeTargetMillis > 0L ? activeTimeTargetMillis : null;
     }
 
     /**
@@ -251,17 +246,12 @@ class Session {
 
     /** The Active Time a set target counts from; 0 with none and on older saves. */
     long getActiveTimeTargetSetMillis() {
-        return activeTimeTargetSetMillis == null || activeTimeTargetSetMillis < 0L
-                ? 0L
-                : activeTimeTargetSetMillis;
+        return activeTimeTargetSetMillis == null || activeTimeTargetSetMillis < 0L ? 0L : activeTimeTargetSetMillis;
     }
 
     /** The window a set target has counted so far; frozen while the timer is paused. */
     long getActiveTimeTargetWindowMillis(long elapsedMillis) {
-        long at =
-                activeTimeTargetPauseMillis != null
-                        ? activeTimeTargetPauseMillis
-                        : max(0L, elapsedMillis);
+        long at = activeTimeTargetPauseMillis != null ? activeTimeTargetPauseMillis : max(0L, elapsedMillis);
         return max(0L, at - getActiveTimeTargetSetMillis());
     }
 
@@ -283,8 +273,7 @@ class Session {
     /** Resumes a paused timer, keeping the window it had already counted. */
     boolean resumeTimeTarget(long now) {
         if (activeTimeTargetMillis == null || activeTimeTargetPauseMillis == null) return false;
-        activeTimeTargetSetMillis =
-                getActiveTimeTargetSetMillis()
+        activeTimeTargetSetMillis = getActiveTimeTargetSetMillis()
                         + max(0L, getElapsedMillis(now) - activeTimeTargetPauseMillis);
         activeTimeTargetPauseMillis = null;
         return true;
@@ -335,20 +324,26 @@ class Session {
         return pauseReason == null || pauseReason == NONE ? MANUAL : pauseReason;
     }
 
+    /** A closed run carries on: the time it was closed counts as paused (owner 1.5.2, Restore). */
+    void reopen(long now) {
+        if (paused) totalPausedMillis = safeAdd(totalPausedMillis, nonNeg(endedAtEpochMillis - pausedAtEpochMillis));
+        totalPausedMillis = safeAdd(totalPausedMillis, nonNeg(now - endedAtEpochMillis));
+        paused = false;
+        pausedAtEpochMillis = 0L;
+        pauseReason = NONE;
+        endedAtEpochMillis = 0L;
+        saveStamp++;
+    }
+
     void close(long now) {
         if (endedAtEpochMillis != 0L) return;
         saveStamp++;
         endedAtEpochMillis = max(now, startedAtEpochMillis);
     }
 
-    boolean correctTransaction(
-            String transactionId, Correction correction, long now, String reason) {
+    boolean correctTransaction(String transactionId, Correction correction, long now, String reason) {
         Transaction transaction = findTransaction(transactionId);
-        return transaction != null
-                && correct(
-                        singletonList(transaction),
-                        correction == null ? AUTO : correction,
-                        now,
+        return transaction != null && correct(singletonList(transaction), correction == null ? AUTO : correction, now,
                         reason);
     }
 
@@ -380,9 +375,7 @@ class Session {
             Transaction transaction = findTransaction(transactionId);
             if (ReviewRules.needsOwnerDecision(transaction)) targets.add(transaction);
         }
-        return correct(targets, next, now, nonBlank(reason, msg("bulk-review")))
-                ? targets.size()
-                : 0;
+        return correct(targets, next, now, nonBlank(reason, msg("bulk-review"))) ? targets.size() : 0;
     }
 
     /**
@@ -392,18 +385,13 @@ class Session {
     boolean correct(List<Transaction> targets, Correction next, long now, String reason) {
         var changes = new ArrayList<Change>();
         for (Transaction transaction : targets) {
-            if (!canChangeOwnedValue(
-                    transaction,
-                    transaction.getCorrection(),
-                    transaction.getFlows(),
-                    next,
+            if (!canChangeOwnedValue(transaction, transaction.getCorrection(), transaction.getFlows(), next,
                     transaction.getFlows())) {
                 // The item's known coverage is reserved or already realized; leave the rows
                 // untouched.
                 return false;
             }
-            changes.add(
-                    new Change(transaction.getId(), transaction.getCorrection(), next, null, null));
+            changes.add(new Change(transaction.getId(), transaction.getCorrection(), next, null, null));
         }
         for (Transaction transaction : targets) {
             Correction previous = transaction.getCorrection();
@@ -419,8 +407,7 @@ class Session {
      * removed from counted gain (not Used). Full give-away on a single-item row IGNORE-corrects.
      * Shares the correction undo stack.
      */
-    boolean splitItem(
-            String transactionId, int itemId, long keepQuantity, long now, String optionalNote) {
+    boolean splitItem(String transactionId, int itemId, long keepQuantity, long now, String optionalNote) {
         Transaction transaction = findTransaction(transactionId);
         if (transaction == null || itemId <= 0) return false;
         long totalGain = transaction.quantity(itemId, true);
@@ -432,8 +419,7 @@ class Session {
         var flowSnapshot = new ArrayList<Flow>(transaction.getFlows());
         String explanationSnapshot = transaction.getExplanation();
         boolean ignore = keep <= 0L && onlyGainItem(transaction, itemId);
-        if (!canChangeOwnedValue(
-                transaction, previous, flowSnapshot, ignore ? IGNORE : previous, null)) {
+        if (!canChangeOwnedValue(transaction, previous, flowSnapshot, ignore ? IGNORE : previous, null)) {
             // The known coverage this split would shrink is reserved or already realized.
             return false;
         }
@@ -441,14 +427,7 @@ class Session {
         else transaction.takeQuantity(itemId, true, totalGain - keep);
         transaction.stampSplit(reason, now);
         changed(transaction, previous, flowSnapshot);
-        log(
-                now,
-                reason,
-                new Change(
-                        transactionId,
-                        previous,
-                        transaction.getCorrection(),
-                        flowSnapshot,
+        log(now, reason, new Change(transactionId, previous, transaction.getCorrection(), flowSnapshot,
                         explanationSnapshot));
         return true;
     }
@@ -483,14 +462,9 @@ class Session {
         for (int index = 0; index < changes.size(); index++) {
             Change change = changes.get(index);
             Transaction transaction = targets.get(index);
-            List<Flow> nextFlows =
-                    change.hasFlowSnapshot() ? change.getFlowSnapshot() : transaction.getFlows();
-            if (!canChangeOwnedValue(
-                    transaction,
-                    transaction.getCorrection(),
-                    transaction.getFlows(),
-                    change.getPreviousCorrection(),
-                    nextFlows)) {
+            List<Flow> nextFlows = change.hasFlowSnapshot() ? change.getFlowSnapshot() : transaction.getFlows();
+            if (!canChangeOwnedValue(transaction, transaction.getCorrection(), transaction.getFlows(),
+                    change.getPreviousCorrection(), nextFlows)) {
                 return false;
             }
         }
@@ -516,8 +490,7 @@ class Session {
             CorrectionRecord record = correctionHistory.get(index);
             if (record == null || record.isUndone()) continue;
             for (Change change : record.getChanges()) {
-                if (transactionId.equals(change.getTransactionId())
-                        && (!change.hasFlowSnapshot()
+                if (transactionId.equals(change.getTransactionId()) && (!change.hasFlowSnapshot()
                                 || change.getPreviousCorrection() != change.newCorrection
                                 || ItemSplits.isSplitReason(record.getReason())))
                     return record.getReason();
@@ -630,8 +603,7 @@ class Session {
             Transaction transaction = transactions.get(index);
             if (transaction.timestampEpochMillis < cutoff) break;
             if (!transaction.getEncounterId().isEmpty()) continue;
-            if (transaction.revenue == 0L
-                    && transaction.costs > 0L
+            if (transaction.revenue == 0L && transaction.costs > 0L
                     && transaction.autoType() == TransactionType.CONSUMPTION) {
                 attachToEncounter(transaction.getId(), encounterId, true);
             }
@@ -688,30 +660,37 @@ class Session {
     }
 
     Metrics metrics(long now) {
-        var money =
-                new MoneyFold(
-                        retainedRevenue,
-                        retainedCosts,
-                        retainedSuppliesCosts,
-                        compactedTransactionCount == 0L || retainedCostSplitComplete);
-        for (Transaction transaction : transactions) {
+        return metrics(new MoneyFold(retainedRevenue, retainedCosts, retainedSuppliesCosts,
+                        compactedTransactionCount == 0L || retainedCostSplitComplete), transactions,
+                getElapsedMillis(now));
+    }
+
+    /**
+     * Rows booked at or after {@code at}: a target run's own (owner 1.5.2). A correction keeps its
+     * row's time, so fixes to older rows stay out; rows compacted past the row limit drop out.
+     */
+    List<Transaction> rowsSince(long at) {
+        var rows = new ArrayList<Transaction>();
+        for (Transaction row : transactions)
+            if (row != null && row.timestampEpochMillis >= at) rows.add(row);
+        return rows;
+    }
+
+    /** The money in these rows alone, over the given Active Time. */
+    Metrics metrics(List<Transaction> rows, long elapsed) {
+        return metrics(new MoneyFold(0L, 0L, 0L, true), rows, elapsed);
+    }
+
+    Metrics metrics(MoneyFold money, List<Transaction> rows, long elapsed) {
+        for (Transaction transaction : rows) {
             if (transaction == null) continue;
             money.add(transaction);
         }
         if (money.supplies > money.costs) money.costSplitAvailable = false;
         long net = safeSubtract(money.revenue, money.costs);
-        long elapsed = getElapsedMillis(now);
-        return new Metrics(
-                getActivityHint(),
-                paused,
-                elapsed,
-                money.revenue,
-                money.costs,
-                net,
-                hourly(net, elapsed),
+        return new Metrics(getActivityHint(), paused, elapsed, money.revenue, money.costs, net, hourly(net, elapsed),
                 money.costSplitAvailable ? money.supplies : 0L,
-                money.costSplitAvailable ? safeSubtract(money.costs, money.supplies) : 0L,
-                money.costSplitAvailable);
+                money.costSplitAvailable ? safeSubtract(money.costs, money.supplies) : 0L, money.costSplitAvailable);
     }
 
     /**
@@ -732,12 +711,8 @@ class Session {
     }
 
     CompactedContribution compactedContribution() {
-        return new CompactedContribution(
-                compactedTransactionCount,
-                retainedRevenue,
-                retainedCosts,
-                retainedSuppliesCosts,
-                compactedTransactionCount == 0L || retainedCostSplitComplete);
+        return new CompactedContribution(compactedTransactionCount, retainedRevenue, retainedCosts,
+                retainedSuppliesCosts, compactedTransactionCount == 0L || retainedCostSplitComplete);
     }
 
     long compactedRevenue() {
@@ -837,10 +812,7 @@ class Session {
             transactions.remove(transaction);
             compactTransaction(transaction);
         }
-        undoHistory.removeIf(
-                record ->
-                        record != null
-                                && record.transaction != null
+        undoHistory.removeIf(record -> record != null && record.transaction != null
                                 && foldedIds.contains(record.transaction.getId()));
         correctionHistory.removeIf(record -> record != null && record.touchesAny(foldedIds));
         return folded.size();
@@ -852,19 +824,12 @@ class Session {
  * Grind) is AUTO. GENERAL is the plain default of a bare {@code new Session}.
  */
 enum SessionMode {
-    AUTO,
-    GENERAL
+    AUTO, GENERAL
 }
 
 /** Persisted ownership of a paused session. NONE means the session is running. */
 enum PauseReason {
-    NONE,
-    MANUAL,
-    IDLE,
-    LIFECYCLE,
-    RECOVERY,
-    CUSTOM_SESSION,
-    WORLD
+    NONE, MANUAL, IDLE, LIFECYCLE, RECOVERY, CUSTOM_SESSION, WORLD
 }
 
 /** A transaction removed through the undo action, kept so the latest one can be restored. */
@@ -898,38 +863,13 @@ class Metrics {
         return new Metrics("General", false, 0L, 0L, 0L, 0L, 0L);
     }
 
-    Metrics(
-            String activityHint,
-            boolean paused,
-            long elapsedMillis,
-            long revenue,
-            long costs,
-            long net,
+    Metrics(String activityHint, boolean paused, long elapsedMillis, long revenue, long costs, long net,
             long profitPerHour) {
-        this(
-                activityHint,
-                paused,
-                elapsedMillis,
-                revenue,
-                costs,
-                net,
-                profitPerHour,
-                0L,
-                0L,
-                false);
+        this(activityHint, paused, elapsedMillis, revenue, costs, net, profitPerHour, 0L, 0L, false);
     }
 
-    Metrics(
-            String activityHint,
-            boolean paused,
-            long elapsedMillis,
-            long revenue,
-            long costs,
-            long net,
-            long profitPerHour,
-            long suppliesCosts,
-            long otherCosts,
-            boolean costSplitAvailable) {
+    Metrics(String activityHint, boolean paused, long elapsedMillis, long revenue, long costs, long net,
+            long profitPerHour, long suppliesCosts, long otherCosts, boolean costSplitAvailable) {
         this.activityHint = activityHint;
         this.paused = paused;
         this.elapsedMillis = elapsedMillis;
@@ -1006,16 +946,13 @@ class SessionArchive {
         // Rows still needed individually: an unresolved claim's audit row and the settlement that
         // carries a claim id keep their detail until the claim resolves (section L).
         Set<String> pendingClaimIds = engine.pendingClaimIds();
-        Predicate<Transaction> keep =
-                transaction ->
-                        isPendingClaimRow(transaction, pendingClaimIds)
+        Predicate<Transaction> keep = transaction -> isPendingClaimRow(transaction, pendingClaimIds)
                                 || (!transaction.sourceClaimId().isEmpty()
                                         && pendingClaimIds.contains(transaction.sourceClaimId()));
         int compactedReceipts = 0;
         for (Session session : engine.uniqueSessions()) {
             if (session == null || session.getTransactions().isEmpty()) continue;
-            compactedReceipts =
-                    SafeMath.safeAddCount(compactedReceipts, session.compactBefore(cutoff, keep));
+            compactedReceipts = SafeMath.safeAddCount(compactedReceipts, session.compactBefore(cutoff, keep));
         }
         if (compactedReceipts > 0) engine.bumpRevision();
         return compactedReceipts;

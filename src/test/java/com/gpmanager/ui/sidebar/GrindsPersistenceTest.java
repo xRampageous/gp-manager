@@ -53,7 +53,7 @@ public class GrindsPersistenceTest
         Engine source = PresentationLifecycleTest.engine();
         long now = System.currentTimeMillis();
         source.startCustom("Legacy grind", now);
-        source.getActiveSession().addTransaction(booked(now + 1_000L, "Dragon bones", 1, 2, 3_200, 6_400), 2_000);
+        source.getActiveSession().addTransaction(booked(now + 1_000L, "Dragon bones", 1, 2, 3_200, 6_400), 2_000, false);
         source.finishCustom(now + 2_000L);
         SavedState legacy = source.savedState();
         legacy.setSchemaVersion(102);
@@ -74,7 +74,7 @@ public class GrindsPersistenceTest
         Engine engine = PresentationLifecycleTest.engine();
         long now = System.currentTimeMillis();
         engine.startCustom("Vorkath", now);
-        engine.getActiveSession().addTransaction(booked(now + 1_000L, "Dragon bones", 1, 1, 3_200, 3_200), 2_000);
+        engine.getActiveSession().addTransaction(booked(now + 1_000L, "Dragon bones", 1, 1, 3_200, 3_200), 2_000, false);
         engine.finishCustom(now + 2_000L);
         SavedState state = engine.savedState();
         SavedState.SavedGrind grind = engine.saveGrind("Vorkath", null, null, false);
@@ -173,7 +173,7 @@ public class GrindsPersistenceTest
         Engine engine = PresentationLifecycleTest.engine();
         long now = System.currentTimeMillis();
         engine.startCustom("Vorkath", now);
-        engine.getActiveSession().addTransaction(booked(now + 1_000L, "Dragon bones", 1, 1, 3_200, 3_200), 2_000);
+        engine.getActiveSession().addTransaction(booked(now + 1_000L, "Dragon bones", 1, 1, 3_200, 3_200), 2_000, false);
         engine.setTargets(5_000_000L, 3L * 3_600_000L, now + 2_000L);
         long net = engine.getMetrics(now + 2_000L).net;
         engine.setTargets(null, null, now + 3_000L);

@@ -168,7 +168,7 @@ public class GeRingAuthorityTest
                 TransactionType.GAIN, Context.GENERIC, "", "Loot", true,
                 Collections.singletonList(new Flow(item, name(item), qty,
                     (int) (qty > 0L ? value / qty : 0L), value, PriceSource.GRAND_EXCHANGE)),
-                Confidence.CONFIRMED, "", null), 500);
+                Confidence.CONFIRMED, "", null), 500, false);
         }
 
         void offer(int slot, GrandExchangeOfferState state, int item, int total, int traded,
@@ -192,7 +192,7 @@ public class GeRingAuthorityTest
             Transaction result = null;
             for (int i = 0; i < 3; i++)
             {
-                Transaction settled = engine.processIfDirty(snapshot, now);
+                Transaction settled = engine.processIfDirty(snapshot, now, null);
                 if (settled != null)
                 {
                     result = settled;

@@ -66,7 +66,7 @@ public class VyreWellFillTest
         engine.markDirty();
         Transaction row = null;
         for (long tick = 1; row == null && tick <= 5; tick++)
-            row = engine.processIfDirty(new ContainerSnapshot(new HashMap<>()), T0 + tick * 600L);
+            row = engine.processIfDirty(new ContainerSnapshot(new HashMap<>()), T0 + tick * 600L, null);
         return row;
     }
 
@@ -129,7 +129,7 @@ public class VyreWellFillTest
         Transaction row = null;
         for (long tick = 1; row == null && tick <= 5; tick++)
             row = engine.processIfDirty(
-                new ContainerSnapshot(new HashMap<>(Map.of(VIAL, 10L, RUNE, 2_000L))), T0 + tick * 600L);
+                new ContainerSnapshot(new HashMap<>(Map.of(VIAL, 10L, RUNE, 2_000L))), T0 + tick * 600L, null);
         return row;
     }
 

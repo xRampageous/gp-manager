@@ -41,8 +41,8 @@ public class AccountingDepthTest
                 -160L, PriceSource.GRAND_EXCHANGE)));
         assertEquals(CostKind.LOSS, CostKind.of(legacyTax, legacyTax.getFlows().get(0)));
 
-        Session session = new Session("Legacy", 0L);
-        session.addTransaction(legacyTax, 100);
+        Session session = new Session("Legacy", 0L, SessionMode.GENERAL);
+        session.addTransaction(legacyTax, 100, false);
         assertEquals(160L, session.metrics(1_000L).costs);
     }
 
@@ -135,10 +135,10 @@ public class AccountingDepthTest
     @Test
     public void lmsRaidGimNeutral()
     {
-        assertEquals(GameData.msg("lms-invent-wipe"), NeutralTransfers.minigame("LMS enter loadout"));
+        assertEquals(GameData.msg("lms-invent-wipe"), NeutralTransfers.minigame("LMS enter loadout", -1));
         assertEquals(GameData.msg("gim-shared-storage"),
-            NeutralTransfers.minigame("GIM shared storage deposit"));
-        assertEquals(GameData.msg("raid-bag"), NeutralTransfers.minigame("raid bag clear"));
-        assertNull("an LMS region-only phrase needs the LMS region", NeutralTransfers.minigame("enter"));
+            NeutralTransfers.minigame("GIM shared storage deposit", -1));
+        assertEquals(GameData.msg("raid-bag"), NeutralTransfers.minigame("raid bag clear", -1));
+        assertNull("an LMS region-only phrase needs the LMS region", NeutralTransfers.minigame("enter", -1));
     }
 }

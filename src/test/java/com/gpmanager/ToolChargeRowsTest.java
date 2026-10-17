@@ -64,7 +64,7 @@ public class ToolChargeRowsTest
         for (int tick = 1; tick <= 5; tick++)
         {
             engine.processIfDirty(new ContainerSnapshot(new HashMap<>(Map.of(SHARD, 380L))),
-                T0 + tick * 600L);
+                T0 + tick * 600L, null);
         }
         assertEquals("a dismantle loses the shard charges, so the load books", true,
             engine.getActiveSession().getTransactions().stream().anyMatch(Transaction::isCounted));
@@ -91,7 +91,7 @@ public class ToolChargeRowsTest
         for (int tick = 1; tick <= 5; tick++)
         {
             engine.processIfDirty(new ContainerSnapshot(new HashMap<>(Map.of(STONE, 1L, ItemID.DRAGON_AXE, 1L))),
-                T0 + tick * 600L);
+                T0 + tick * 600L, null);
         }
         assertTrue("the stone books as a cost", engine.getMetrics(T0 + 10_000L).net < 0L);
 
@@ -101,7 +101,7 @@ public class ToolChargeRowsTest
         for (int tick = 1; tick <= 5; tick++)
         {
             engine.processIfDirty(new ContainerSnapshot(new HashMap<>(Map.of(STONE, 1L, ItemID.DRAGON_AXE, 0L))),
-                T0 + 6_000L + tick * 600L);
+                T0 + 6_000L + tick * 600L, null);
         }
         assertTrue("the dragon-tool recharge books too",
             engine.getActiveSession().getTransactions().stream()
@@ -120,7 +120,7 @@ public class ToolChargeRowsTest
         for (int tick = 1; tick <= 5; tick++)
         {
             engine.processIfDirty(new ContainerSnapshot(new HashMap<>(Map.of(ECHO, 0L, ENCHANT, 1L))),
-                T0 + tick * 600L);
+                T0 + tick * 600L, null);
         }
         assertTrue("the echo crystal books as a cost", engine.getMetrics(T0 + 10_000L).net < 0L);
 
@@ -130,7 +130,7 @@ public class ToolChargeRowsTest
         for (int tick = 1; tick <= 5; tick++)
         {
             engine.processIfDirty(new ContainerSnapshot(new HashMap<>(Map.of(ECHO, 0L, ENCHANT, 0L))),
-                T0 + 6_000L + tick * 600L);
+                T0 + 6_000L + tick * 600L, null);
         }
         assertTrue("the enchantment books too",
             engine.getActiveSession().getTransactions().stream()
@@ -151,7 +151,7 @@ public class ToolChargeRowsTest
         for (int tick = 1; tick <= 5; tick++)
         {
             Transaction row = engine.processIfDirty(
-                new ContainerSnapshot(new HashMap<>(Map.of(CHAOS, 400L))), T0 + tick * 600L);
+                new ContainerSnapshot(new HashMap<>(Map.of(CHAOS, 400L))), T0 + tick * 600L, null);
             if (row != null) load = row;
         }
         assertNotNull(load);
@@ -159,7 +159,7 @@ public class ToolChargeRowsTest
         assertEquals(0L, engine.getMetrics(T0 + 10_000L).net);
 
         // A cast books one chaos rune from the pinned cast animations.
-        Valuation valuation = new Valuation(CONFIG, ToolChargeRowsTest::compositionOf,
+        Valuation valuation = ModelProbe.valuation(CONFIG, ToolChargeRowsTest::compositionOf,
             id -> id == CHAOS ? 100 : 0);
         Engine castEngine = new Engine(ToolChargeRowsTest::flows, new TransactionClassifier(), CONFIG);
         castEngine.startCustom("Scurrius", T0);

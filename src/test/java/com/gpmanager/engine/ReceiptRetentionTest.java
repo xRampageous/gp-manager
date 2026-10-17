@@ -1,5 +1,7 @@
 package com.gpmanager;
 
+import com.gpmanager.GpManagerConfig.Retention;
+
 import com.google.gson.Gson;
 import java.util.Arrays;
 import java.util.Collections;
@@ -43,15 +45,15 @@ public class ReceiptRetentionTest
         // Section L: the cutoff is transaction time, whether the owner is closed or still active.
         long now = 100L * DAY + 12L * 60L * 60L * 1_000L;
         long cutoff = now - 30L * DAY;
-        Session boundary = new Session("Boundary", cutoff - 10_000L);
-        boundary.addTransaction(receipt(cutoff, 100L), 10);
+        Session boundary = new Session("Boundary", cutoff - 10_000L, SessionMode.GENERAL);
+        boundary.addTransaction(receipt(cutoff, 100L), 10, false);
         boundary.close(cutoff + 1_000L);
-        Session old = new Session("Old", cutoff - 10_000L);
-        old.addTransaction(receipt(cutoff - 1L, 200L), 10);
+        Session old = new Session("Old", cutoff - 10_000L, SessionMode.GENERAL);
+        old.addTransaction(receipt(cutoff - 1L, 200L), 10, false);
         old.close(cutoff + 2_000L);
-        Session active = new Session("Active", cutoff - 2L * DAY);
-        active.addTransaction(receipt(cutoff - DAY, 300L), 10);
-        active.addTransaction(receipt(cutoff + DAY, 50L), 10);
+        Session active = new Session("Active", cutoff - 2L * DAY, SessionMode.GENERAL);
+        active.addTransaction(receipt(cutoff - DAY, 300L), 10, false);
+        active.addTransaction(receipt(cutoff + DAY, 50L), 10, false);
 
         Engine engine = engine();
         engine.restore(new SavedState(null, null, Arrays.asList(boundary, old, old, active)), now);
@@ -71,9 +73,9 @@ public class ReceiptRetentionTest
     public void derivedPendingClaimIdKeepsItsOriginAuditRowRetained()
     {
         long now = 400L * DAY;
-        Session session = new Session("Loot origin", now - 200L * DAY);
+        Session session = new Session("Loot origin", now - 200L * DAY, SessionMode.GENERAL);
         Transaction audit = receipt(now - 200L * DAY + 1_000L, 0L);
-        session.addTransaction(audit, 10);
+        session.addTransaction(audit, 10, false);
         session.close(now - 200L * DAY + 2_000L);
 
         SavedState state = new SavedState(null, null, Collections.singletonList(session));
@@ -96,9 +98,9 @@ public class ReceiptRetentionTest
         long now = 400L * DAY;
         Session session = new Session("Favourite trip", now - 200L * DAY, SessionMode.AUTO);
 
-        session.addTransaction(receipt(now - 200L * DAY + 1_000L, 100L), 10);
-        session.addTransaction(receipt(now - 200L * DAY + 61_000L, 250L), 10);
-        session.addTransaction(receipt(now - 200L * DAY + 62_500L, -40L), 10);
+        session.addTransaction(receipt(now - 200L * DAY + 1_000L, 100L), 10, false);
+        session.addTransaction(receipt(now - 200L * DAY + 61_000L, 250L), 10, false);
+        session.addTransaction(receipt(now - 200L * DAY + 62_500L, -40L), 10, false);
         String encounter = session.addEncounter(true, now - 200L * DAY + 62_000L);
         session.attachToEncounter(session.getTransactions().get(1).getId(), encounter, false);
         session.close(now - 200L * DAY + 120_000L);
@@ -158,8 +160,8 @@ public class ReceiptRetentionTest
     private static Session closedWithReceipt(String name, long endedAt, long value)
     {
         long start = Math.max(0L, endedAt - 10_000L);
-        Session session = new Session(name, start);
-        session.addTransaction(receipt(start + 1_000L, value), 10);
+        Session session = new Session(name, start, SessionMode.GENERAL);
+        session.addTransaction(receipt(start + 1_000L, value), 10, false);
         session.close(endedAt);
         return session;
     }

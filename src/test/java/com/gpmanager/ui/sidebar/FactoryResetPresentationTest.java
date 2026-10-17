@@ -37,7 +37,7 @@ public class FactoryResetPresentationTest
         JsonCodec.bind(new Gson());
         GpManagerConfig config = testConfig();
         Path directory = temporary.newFolder().toPath();
-        SessionRepository repository = new SessionRepository(new Gson(), FilepathTestSupport.root(directory));
+        SessionRepository repository = new SessionRepository(new Gson(), FilepathTestSupport.root(directory), false);
         OrderedPersistenceWriter writer = new OrderedPersistenceWriter(repository);
         Engine engine = new Engine(deltas -> Collections.emptyList(),
             new TransactionClassifier(), config);
@@ -46,7 +46,7 @@ public class FactoryResetPresentationTest
         try
         {
             coordinator.start();
-            assertTrue(coordinator.switchIdentity(new TrackingIdentity("rsprofile.alice", TrackingIdentity.ACCOUNT_HASH_INVALID), true));
+            assertTrue(coordinator.switchIdentity(new TrackingIdentity("rsprofile.alice", TrackingIdentity.ACCOUNT_HASH_INVALID), true, true));
 
             long now = System.currentTimeMillis();
             engine.ensureSession(now);
@@ -88,7 +88,7 @@ public class FactoryResetPresentationTest
         JsonCodec.bind(new Gson());
         GpManagerConfig config = testConfig();
         Path directory = temporary.newFolder().toPath();
-        SessionRepository repository = new SessionRepository(new Gson(), FilepathTestSupport.root(directory));
+        SessionRepository repository = new SessionRepository(new Gson(), FilepathTestSupport.root(directory), false);
         OrderedPersistenceWriter writer = new OrderedPersistenceWriter(repository);
         Engine engine = new Engine(deltas -> Collections.emptyList(),
             new TransactionClassifier(), config);
@@ -149,12 +149,12 @@ public class FactoryResetPresentationTest
 
     private static void resetThroughTheMenu(SidebarPanel panel)
     {
-        JMenuItem reset = find(SidebarPanelProbe.dataMenu(panel), "Factory reset current profile");
+        JMenuItem reset = find(SidebarPanelProbe.dataMenu(panel), "Delete Profile");
         assertNotNull("the reset action is present", reset);
         assertTrue("the reset action is enabled", reset.isEnabled());
         reset.doClick();
-        assertEquals("Factory reset", ShellProbe.sheetTitle(panel.shell()));
-        ShellProbe.pressSheet(panel.shell(), "Reset");
+        assertEquals("Delete Profile", ShellProbe.sheetTitle(panel.shell()));
+        ShellProbe.pressSheet(panel.shell(), "Back up & delete");
         assertEquals("the sheet closes once the reset ran", "", ShellProbe.sheetTitle(panel.shell()));
     }
 

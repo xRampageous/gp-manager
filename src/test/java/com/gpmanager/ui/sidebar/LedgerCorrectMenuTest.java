@@ -22,12 +22,13 @@ public class LedgerCorrectMenuTest
         Engine engine = PresentationLifecycleTest.engine();
         engine.startCustom("Vorkath", T0);
         Transaction bones = loot(T0 + 1_000L, 536, "Dragon bones", 2L, 3_000);
-        engine.getActiveSession().addTransaction(bones, 2_000);
+        engine.getActiveSession().addTransaction(bones, 2_000, false);
         Harness harness = new Harness(engine, bones.getId());
         LedgerPage page = harness.page;
 
         List<String> opened = onEdt(() -> LedgerPageProbe.detailTexts(page));
-        assertEquals("the group title and its row name it; the receipt panel never repeats it: " + opened, 2L,
+        // Owner 1.5.2: a one-entry group shows no list of one; only its title names it.
+        assertEquals("the group title names it; nothing repeats it: " + opened, 1L,
             opened.stream().filter("Dragon bones"::equals).count());
 
         List<String> menu = onEdt(() -> LedgerPageProbe.correctMenu(page));
@@ -58,7 +59,7 @@ public class LedgerCorrectMenuTest
         Engine engine = PresentationLifecycleTest.engine();
         engine.startCustom("Vorkath", T0);
         Transaction bones = loot(T0 + 1_000L, 536, "Dragon bones", 2L, 3_000);
-        engine.getActiveSession().addTransaction(bones, 2_000);
+        engine.getActiveSession().addTransaction(bones, 2_000, false);
         Harness harness = new Harness(engine, bones.getId());
         LedgerPage page = harness.page;
 
@@ -84,7 +85,7 @@ public class LedgerCorrectMenuTest
         Engine engine = PresentationLifecycleTest.engine();
         engine.startCustom("Vorkath", T0);
         Transaction bones = loot(T0 + 1_000L, 536, "Dragon bones", 1L, 3_000);
-        engine.getActiveSession().addTransaction(bones, 2_000);
+        engine.getActiveSession().addTransaction(bones, 2_000, false);
         String id = engine.getActiveSession().getId();
         engine.finishCustom(T0 + 2_000L);
         Harness harness = new Harness(engine, bones.getId());

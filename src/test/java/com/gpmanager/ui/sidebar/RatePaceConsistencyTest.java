@@ -20,7 +20,7 @@ public class RatePaceConsistencyTest
         Engine engine = PresentationLifecycleTest.engine();
         long now = System.currentTimeMillis();
         engine.startCustom("Vorkath", now - 19_000L);
-        engine.getActiveSession().addTransaction(consumed(now - 10_000L, "Prayer potion(4)", 3, -1, 100, -100L), 2_000);
+        engine.getActiveSession().addTransaction(consumed(now - 10_000L, "Prayer potion(4)", 3, -1, 100, -100L), 2_000, false);
 
         LiveSnapshot live = LiveSnapshot.capture(engine, now, LiveContext.NONE);
         assertTrue("nineteen seconds is not a trustworthy rate window", live.elapsedMillis < RateReadiness.MIN_ACTIVE_MILLIS);
@@ -43,8 +43,8 @@ public class RatePaceConsistencyTest
         long now = System.currentTimeMillis();
         engine.startCustom("Vorkath", now - 5 * 60_000L);
         // Balanced receipts: a real booked net of zero, with a mature Active-Time window.
-        engine.getActiveSession().addTransaction(gain(now - 4 * 60_000L, 100L), 2_000);
-        engine.getActiveSession().addTransaction(consumed(now - 3 * 60_000L, "Prayer potion(4)", 3, -1, 100, -100L), 2_000);
+        engine.getActiveSession().addTransaction(gain(now - 4 * 60_000L, 100L), 2_000, false);
+        engine.getActiveSession().addTransaction(consumed(now - 3 * 60_000L, "Prayer potion(4)", 3, -1, 100, -100L), 2_000, false);
 
         LiveSnapshot live = LiveSnapshot.capture(engine, now, LiveContext.NONE);
         assertTrue("five minutes is a mature window", live.elapsedMillis >= RateReadiness.MIN_ACTIVE_MILLIS);
@@ -122,27 +122,19 @@ public class RatePaceConsistencyTest
         assertTrue(positive.available);
         assertTrue(positive.line.contains("remaining"));
 
-        // Time-only: an established zero projects a flat Net; negative projects a decline.
+        // Time-only: the countdown, whatever the rate (owner 1.5.2: no projected Net).
         GrindsData.Pace flat =
-            GrindsData.pace(null, 3L * 3_600_000L, 2_000_000L, true, 0L,
-                1L * 3_600_000L);
-        assertTrue(flat.available);
-        assertTrue("flat projection: " + flat.line, flat.line.contains("projected Net"));
-        assertTrue("flat Net keeps the current value: " + flat.line, flat.line.contains("+2.00M"));
-
-        GrindsData.Pace declining =
             GrindsData.pace(null, 3L * 3_600_000L, 2_000_000L, true, -200_000L,
                 1L * 3_600_000L);
-        assertTrue(declining.available);
-        assertTrue("declining projection stays honest: " + declining.line,
-            declining.line.contains("+1.60M"));
+        assertTrue(flat.available);
+        assertEquals("2h 0m left", flat.line);
 
-        // Both targets with an established negative rate still derive projection and requirement.
+        // Both targets with an established negative rate still give the countdown and requirement.
         GrindsData.Pace both =
             GrindsData.pace(5_000_000L, 3L * 3_600_000L, 2_000_000L, true,
                 -200_000L, 1L * 3_600_000L);
         assertTrue(both.available);
-        assertTrue(both.line.contains("projected at"));
+        assertEquals("2h 0m left", both.line);
         assertNotNull(both.second);
         assertTrue(both.second.contains("Required average"));
 
@@ -151,16 +143,11 @@ public class RatePaceConsistencyTest
             GrindsData.pace(1_000_000L, null, 2_000_000L, true, 0L, 300_000L);
         assertEquals("Target reached", reached.line);
 
-        // A reached aim's short retention line (owner 2026-10-14): the next hour at this rate.
-        assertEquals("~+11.9M in 1h", GrindsData.nextHour(11_600_000L, 300_000L));
-        assertEquals("a declining hour stays honest", "~+19.6M in 1h",
-            GrindsData.nextHour(20_000_000L, -400_000L));
-
         // Projection never writes accounting.
         Engine engine = PresentationLifecycleTest.engine();
         long now = System.currentTimeMillis();
         engine.startCustom("Vorkath", now - 5 * 60_000L);
-        engine.getActiveSession().addTransaction(gain(now - 4 * 60_000L, 1_000L), 2_000);
+        engine.getActiveSession().addTransaction(gain(now - 4 * 60_000L, 1_000L), 2_000, false);
         long net = engine.getMetrics(now).net;
         long revision = engine.getRevision();
         GrindsData.capture(engine, now, false, null);
