@@ -1,6 +1,5 @@
 package com.gpmanager;
 
-import java.lang.reflect.Field;
 import java.lang.reflect.Method;
 import java.lang.reflect.Proxy;
 import java.util.ArrayList;
@@ -21,6 +20,7 @@ import net.runelite.api.gameval.InventoryID;
 import net.runelite.api.gameval.ItemID;
 import org.junit.Test;
 
+import static com.gpmanager.GpManagerPluginProbe.set;
 import static org.junit.Assert.assertEquals;
 import static org.junit.Assert.assertNotNull;
 import static org.junit.Assert.assertTrue;
@@ -480,10 +480,4 @@ public class GpManagerPluginGeEvidenceTest
         }
     }
 
-    private static void set(Object target, String name, Object value) throws Exception
-    {
-        Field field = GpManagerPlugin.class.getDeclaredField(name);
-        field.setAccessible(true);
-        field.set(target, value);
-    }
 }

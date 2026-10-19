@@ -1,6 +1,5 @@
 package com.gpmanager;
 
-import java.lang.reflect.Field;
 import java.lang.reflect.Proxy;
 import java.util.ArrayList;
 import java.util.HashMap;
@@ -10,12 +9,18 @@ import net.runelite.api.Client;
 import net.runelite.api.GameState;
 import net.runelite.api.MenuAction;
 import net.runelite.api.MenuEntry;
+import net.runelite.api.Player;
+import net.runelite.api.ItemComposition;
+import net.runelite.api.events.AnimationChanged;
 import net.runelite.api.events.MenuOptionClicked;
+import net.runelite.api.gameval.VarPlayerID;
+import net.runelite.api.gameval.VarbitID;
 import net.runelite.api.gameval.ItemID;
 import net.runelite.api.widgets.Widget;
 import net.runelite.api.gameval.InterfaceID;
 import org.junit.Test;
 
+import static com.gpmanager.GpManagerPluginProbe.set;
 import static org.junit.Assert.assertEquals;
 import static org.junit.Assert.assertFalse;
 import static org.junit.Assert.assertNotNull;
@@ -38,6 +43,186 @@ public class ExactSpellEvidenceProductionTest
     private static final int ASTRAL_RUNE = ItemID.ASTRALRUNE;
     private static final int EARTH_RUNE = ItemID.EARTHRUNE;
     private static final int[] ICE_BURST_RUNES = {DEATH_RUNE, CHAOS_RUNE, WATER_RUNE};
+
+    @Test
+    public void autocastNameSurvivesNettedRunePickupAndPotionIntent() throws Exception
+    {
+        Harness h = harness("Nechryael");
+        h.animate("Ice Burst", 1979);
+        h.engine.noteConsume(2434, 10, false, ActionKind.DRINK);
+        h.inventory.put(CHAOS_RUNE, 66L); // pickup hides the chaos spent
+        Transaction cast = h.settle(new int[] {DEATH_RUNE, WATER_RUNE}, T0 + 100L);
+        Transaction receipt = h.engine.getActiveSession().getTransactions().stream()
+            .filter(t -> t.getActionKind() == ActionKind.CAST).findFirst().orElseThrow(AssertionError::new);
+        assertEquals("Ice Burst", receipt.spellName());
+        assertEquals("Ice Burst", recentFor(h, receipt.getId()).name);
+        assertEquals("measured net quantities stay unchanged", 46L, h.engine.getActiveSession()
+            .getTransactions().stream().flatMap(t -> t.getFlows().stream())
+            .filter(f -> f.itemId == CHAOS_RUNE).mapToLong(f -> f.quantityDelta).sum());
+        Transaction restored = new com.google.gson.Gson().fromJson(
+            new com.google.gson.Gson().toJson(receipt), Transaction.class);
+        assertEquals("the observed spell survives restart", "Ice Burst", restored.spellName());
+    }
+
+    @Test
+    public void aLaterSelectionCannotRenameTheObservedAutocast() throws Exception
+    {
+        Harness h = harness("Nechryael");
+        h.animate("Ice Burst", 1979);
+        h.select("Ice Barrage");
+        h.client.autocastName = "Ice Barrage";
+        Transaction cast = h.settle(new int[] {DEATH_RUNE, WATER_RUNE}, T0 + 100L);
+        assertEquals("Ice Burst", cast.spellName());
+    }
+
+    @Test
+    public void selectedAutocastDoesNotNameUnrelatedAnimationsOrOtherPlayers() throws Exception
+    {
+        for (int animation : new int[] {-1, 829})
+        {
+            Harness h = harness("Nechryael");
+            h.animate("Ice Burst", animation);
+            Transaction cast = h.settle(new int[] {DEATH_RUNE, WATER_RUNE}, T0 + 100L);
+            assertEquals("", cast.spellName());
+        }
+        Harness h = harness("Nechryael");
+        h.client.autocastName = "Ice Burst";
+        h.client.animation = 1979;
+        AnimationChanged other = new AnimationChanged();
+        other.setActor((Player) Proxy.newProxyInstance(
+            Player.class.getClassLoader(), new Class<?>[] {Player.class},
+            (p, m, a) -> m.getReturnType() == int.class ? 1979 : null));
+        h.plugin.onAnimationChanged(other);
+        assertEquals("", h.settle(new int[] {DEATH_RUNE, WATER_RUNE}, T0 + 100L).spellName());
+    }
+
+    @Test
+    public void differentObservedSpellsDoNotMergeDuringStabilization() throws Exception
+    {
+        Harness h = harness("Nechryael");
+        h.animate("Ice Burst", 1979);
+        h.inventory.put(DEATH_RUNE, 19L);
+        h.inventory.put(WATER_RUNE, 19L);
+        h.engine.processIfDirty(new ContainerSnapshot(h.inventory), T0 + 100L, null);
+        h.animate("Ice Barrage", 1979);
+        h.inventory.put(DEATH_RUNE, 18L);
+        h.inventory.put(WATER_RUNE, 18L);
+        settleStable(h.engine, h.inventory, T0 + 700L);
+        List<Transaction> rows = h.engine.getActiveSession().getTransactions();
+        assertEquals(2, rows.size());
+        assertEquals("Ice Burst", rows.get(0).spellName());
+        assertEquals("Ice Barrage", rows.get(1).spellName());
+        assertEquals(-260L, rows.stream().mapToLong(Transaction::getNet).sum());
+    }
+
+    @Test
+    public void confirmedAutocastEvidenceExpiresAndClearsAtOwnerFence() throws Exception
+    {
+        for (boolean fence : new boolean[] {false, true})
+        {
+            Harness h = harness("Nechryael");
+            h.animate("Ice Burst", 1979);
+            if (fence) h.engine.clearActionEvidence();
+            else h.tickStable(10, T0 + 100L);
+            assertEquals("", h.settle(new int[] {DEATH_RUNE, WATER_RUNE}, T0 + 8_000L).spellName());
+        }
+    }
+
+    @Test
+    public void observedAncientSpellWinsEvenWhenNettedCostsFitAStandardSpell() throws Exception
+    {
+        for (boolean bolt : new boolean[] {false, true})
+        {
+            Harness h = harness("Nechryael");
+            h.animate("Ice Burst", 1979);
+            h.inventory.put(bolt ? CHAOS_RUNE : DEATH_RUNE, 19L);
+            h.inventory.put(WATER_RUNE, bolt ? 18L : 17L);
+            Transaction cast = settleStable(h.engine, h.inventory, T0 + 100L);
+            assertEquals(bolt ? "Water Bolt" : "Water Blast", Spells.spellFor(cast.getFlows()));
+            assertEquals("Ice Burst", cast.spellName());
+            Transaction copied = MoneySnapshot.copy(cast);
+            assertEquals("detached UI reads keep the execution identity", "Ice Burst", copied.spellName());
+        }
+    }
+
+    @Test
+    public void disabledOrUnknownAutocastNeverSuppliesAName() throws Exception
+    {
+        for (String name : new String[] {"Ice Burst", "unknown spell"})
+        {
+            Harness h = harness("Nechryael");
+            h.client.autocastEnabled = !name.equals("Ice Burst");
+            h.animate(name, 1979);
+            assertEquals("", h.settle(new int[] {DEATH_RUNE, WATER_RUNE}, T0 + 100L).spellName());
+        }
+    }
+
+    @Test
+    public void explicitManualTargetKeepsItsSpellWithAnotherAutocastSelected() throws Exception
+    {
+        Harness h = harness("Nechryael");
+        h.select("Ice Barrage");
+        h.target("Guard");
+        h.animate("Ice Burst", 1979);
+        assertEquals("Ice Barrage", h.settle(new int[] {DEATH_RUNE, WATER_RUNE}, T0 + 100L).spellName());
+    }
+
+    @Test
+    public void malformedObservedNamesDegradeSafelyAndMemoTracksIdentity() throws Exception
+    {
+        Harness h = harness("Nechryael");
+        Transaction cast = h.settle(new int[] {DEATH_RUNE, WATER_RUNE}, T0 + 100L);
+        long net = cast.getNet();
+        assertEquals("", cast.spellName());
+        cast.observedSpellName = "Ice Burst";
+        assertEquals("Ice Burst", cast.spellName());
+        for (String invalid : new String[] {"Cast", "unknown spell", "Ice Burst\u0000", "Ice Burst".repeat(40)})
+        {
+            cast.observedSpellName = invalid;
+            assertEquals("", cast.spellName());
+        }
+        cast.observedSpellName = "Ice Burst";
+        cast.setActionKind(ActionKind.DRINK);
+        assertEquals("a non-cast ignores a spell stamp", "", cast.spellName());
+        assertEquals("identity never creates or removes money", net, cast.getNet());
+    }
+
+    @Test
+    public void pickupChurnDoesNotEraseTheAlreadyCapturedCast() throws Exception
+    {
+        Harness h = harness("Nechryael");
+        h.animate("Ice Burst", 1979);
+        h.inventory.put(DEATH_RUNE, 19L);
+        h.inventory.put(WATER_RUNE, 19L);
+        for (int tick = 0; tick < 6; tick++)
+        {
+            h.inventory.put(ItemID.COINS, 100_001L + tick);
+            h.engine.processIfDirty(new ContainerSnapshot(h.inventory), T0 + tick * 600L, null);
+        }
+        settleStable(h.engine, h.inventory, T0 + 4_000L);
+        Transaction cast = h.engine.getActiveSession().getTransactions().stream()
+            .filter(t -> t.getActionKind() == ActionKind.CAST).findFirst().orElseThrow(AssertionError::new);
+        assertEquals("Ice Burst", cast.spellName());
+    }
+
+    @Test
+    public void anUnidentifiedLaterCastCannotInheritTheEarlierSpell() throws Exception
+    {
+        Harness h = harness("Nechryael");
+        h.animate("Ice Burst", 1979);
+        h.inventory.put(DEATH_RUNE, 19L);
+        h.inventory.put(WATER_RUNE, 19L);
+        h.engine.processIfDirty(new ContainerSnapshot(h.inventory), T0 + 100L, null);
+        h.client.autocastEnabled = false;
+        h.animate("Ice Burst", 1979);
+        h.inventory.put(DEATH_RUNE, 18L);
+        h.inventory.put(WATER_RUNE, 18L);
+        settleStable(h.engine, h.inventory, T0 + 700L);
+        List<Transaction> rows = h.engine.getActiveSession().getTransactions();
+        assertEquals(2, rows.size());
+        assertEquals("Ice Burst", rows.get(0).spellName());
+        assertEquals("", rows.get(1).spellName());
+    }
 
     @Test
     public void iceBurstTwoStageWidgetTargetBooksTheExactName() throws Exception
@@ -266,6 +451,15 @@ public class ExactSpellEvidenceProductionTest
             plugin.onMenuOptionClicked(click("Cast", spell, MenuAction.CC_OP, spellWidget(spell), -1));
         }
 
+        void animate(String spell, int animation)
+        {
+            client.autocastName = spell;
+            client.animation = animation;
+            AnimationChanged event = new AnimationChanged();
+            event.setActor(client.local);
+            plugin.onAnimationChanged(event);
+        }
+
         void selectWidget(Widget widget)
         {
             client.selected = widget;
@@ -459,6 +653,17 @@ public class ExactSpellEvidenceProductionTest
     /** Client double whose selected spell widget can be set per interaction. */
     private static final class MutableSpellClient
     {
+        String autocastName;
+        boolean autocastEnabled = true;
+        int animation;
+        final Player local = (Player) Proxy.newProxyInstance(Player.class.getClassLoader(),
+            new Class<?>[] {Player.class}, (p, m, a) ->
+            {
+                if (m.getName().equals("getAnimation")) return animation;
+                if (m.getReturnType() == int.class) return 0;
+                if (m.getReturnType() == boolean.class) return false;
+                return null;
+            });
         @javax.annotation.Nullable
         Widget selected;
 
@@ -473,7 +678,14 @@ public class ExactSpellEvidenceProductionTest
                         case "getSelectedWidget": return selected;
                         case "getWidget": return null;
                         case "getItemContainer": return null;
-                        case "getLocalPlayer": return null;
+                        case "getLocalPlayer": return local;
+                        case "getVarpValue": return (int) args[0] == VarPlayerID.AUTOCAST_SPELL_OBJ
+                            && autocastName != null ? ItemID._70_ICE_BURST : 0;
+                        case "getVarbitValue": return (int) args[0] == VarbitID.AUTOCAST_SET
+                            && autocastName != null && autocastEnabled ? 1 : 0;
+                        case "getItemDefinition": return (ItemComposition) Proxy.newProxyInstance(
+                            ItemComposition.class.getClassLoader(), new Class<?>[] {ItemComposition.class},
+                            (p, m, a) -> m.getName().equals("getName") ? autocastName : null);
                         case "getTickCount": return 0;
                         default:
                             if (method.getReturnType() == boolean.class) return false;
@@ -511,10 +723,4 @@ public class ExactSpellEvidenceProductionTest
         return 10;
     }
 
-    private static void set(Object target, String name, Object value) throws Exception
-    {
-        Field field = GpManagerPlugin.class.getDeclaredField(name);
-        field.setAccessible(true);
-        field.set(target, value);
-    }
 }

@@ -85,14 +85,14 @@ public class LiveSessionTest
     }
 
     @Test
-    public void theClockOffersOneNewSession() throws Exception
+    public void theClockKeepsNewSessionAlongsideTheRateRestart() throws Exception
     {
         Engine engine = PresentationLifecycleTest.engine();
         engine.ensureSession(System.currentTimeMillis() - HOUR);
         SidebarPanel panel = MilestoneTest.onEdt(() -> new SidebarPanel(engine, PresentationLifecycleTest.config(), null, null, null));
         Shell shell = panel.shell();
         GrindsController grinds = new GrindsController(panel);
-        assertEquals("New session?", MilestoneTest.onEdt(() ->
+        assertEquals("Session controls", MilestoneTest.onEdt(() ->
         {
             grinds.newSession();
             String title = ShellProbe.sheetTitle(shell);

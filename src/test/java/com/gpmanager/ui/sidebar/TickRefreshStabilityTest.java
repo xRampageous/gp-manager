@@ -4,12 +4,11 @@ import java.awt.Component;
 import java.util.Arrays;
 import java.util.Collections;
 import java.util.List;
-import java.util.concurrent.Callable;
-import java.util.concurrent.atomic.AtomicReference;
 import javax.swing.JComponent;
 import javax.swing.SwingUtilities;
 import org.junit.Test;
 
+import static com.gpmanager.SwingTestSupport.onEdt;
 import static org.junit.Assert.assertEquals;
 import static org.junit.Assert.assertNotEquals;
 import static org.junit.Assert.assertSame;
@@ -117,25 +116,4 @@ public class TickRefreshStabilityTest
         SwingUtilities.invokeAndWait(() -> { });
     }
 
-    private static <T> T onEdt(Callable<T> callable) throws Exception
-    {
-        AtomicReference<T> result = new AtomicReference<>();
-        AtomicReference<Exception> failure = new AtomicReference<>();
-        SwingUtilities.invokeAndWait(() ->
-        {
-            try
-            {
-                result.set(callable.call());
-            }
-            catch (Exception ex)
-            {
-                failure.set(ex);
-            }
-        });
-        if (failure.get() != null)
-        {
-            throw failure.get();
-        }
-        return result.get();
-    }
 }

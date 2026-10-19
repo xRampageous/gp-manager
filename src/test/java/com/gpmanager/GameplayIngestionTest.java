@@ -1,11 +1,11 @@
 package com.gpmanager;
 
-import java.lang.reflect.Field;
 import java.lang.reflect.Proxy;
 import net.runelite.api.Client;
 import net.runelite.api.GameState;
 import org.junit.Test;
 
+import static com.gpmanager.GpManagerPluginProbe.set;
 import static org.junit.Assert.*;
 
 /** The production gate requires both login and the current account's ready state. */
@@ -43,10 +43,4 @@ public class GameplayIngestionTest
         assertFalse(plugin.canIngest());
     }
 
-    private static void set(Object target, String name, Object value) throws Exception
-    {
-        Field field = GpManagerPlugin.class.getDeclaredField(name);
-        field.setAccessible(true);
-        field.set(target, value);
-    }
 }

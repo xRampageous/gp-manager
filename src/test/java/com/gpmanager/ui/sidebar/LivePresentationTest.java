@@ -5,12 +5,11 @@ import java.awt.Container;
 import java.util.ArrayList;
 import java.util.Collections;
 import java.util.List;
-import java.util.concurrent.atomic.AtomicReference;
 import javax.annotation.Nullable;
 import javax.swing.JLabel;
-import javax.swing.SwingUtilities;
 import org.junit.Test;
 
+import static com.gpmanager.SwingTestSupport.onEdt;
 import static org.junit.Assert.assertEquals;
 import static org.junit.Assert.assertFalse;
 import static org.junit.Assert.assertNotEquals;
@@ -435,7 +434,8 @@ public class LivePresentationTest
         assertNull("Done clears the Net aim", engine.getActiveSession().getProfitTargetGp());
         assertNull("and the timer", engine.getActiveSession().getActiveTimeTargetMillis());
         assertEquals("the session keeps counting", afterAgain, engine.getActiveSession().sessionStartAt);
-        assertEquals(40_000L, LiveSnapshot.capture(engine, System.currentTimeMillis() + 2L, null).net);
+        assertEquals(40_000L, onEdt(() ->
+            LiveSnapshot.capture(engine, System.currentTimeMillis() + 2L, null)).net);
 
         // The timer's own pause (owner live 2026-10-14): the run itself keeps tracking.
         Engine timed = PresentationLifecycleTest.engine();
@@ -553,7 +553,7 @@ public class LivePresentationTest
             .noneMatch(row -> row.startsWith("Death rune")));
     }
 
-    /** Release pass 2026-09-28: Start in Free play, End and rename with a running Grind, paused too. */
+    /** Direct controls: Live retains rename in running/paused Grinds; Start and End are on Grinds. */
     @Test
     public void heroControlsFollowFreePlayAndGrindStates() throws Exception
     {
@@ -561,19 +561,17 @@ public class LivePresentationTest
         long now = System.currentTimeMillis();
         engine.ensureSession(now);
         LivePage free = page(engine);
-        assertTrue("Free play offers Start", onEdt(() -> free.startGrind.isVisible()));
-        assertFalse("nothing to End in Free play", onEdt(() -> free.endGrind.isVisible()));
+        assertNull("Free play has no duplicate toolbar", onEdt(free::pageBar));
         assertNull("Free play's name is not renamed", onEdt(() -> free.hero.name.getToolTipText()));
 
         engine.startCustom("Vorkath", now + 1_000L);
         LivePage grind = page(engine);
-        assertFalse(onEdt(() -> grind.startGrind.isVisible()));
-        assertTrue("a Grind offers End", onEdt(() -> grind.endGrind.isVisible()));
+        assertNull("Grind commands stay on Grinds", onEdt(grind::pageBar));
         assertEquals("Click to rename", onEdt(() -> grind.hero.name.getToolTipText()));
 
         engine.togglePause(now + 2_000L);
         LivePage paused = page(engine);
-        assertTrue("a paused Grind can still End", onEdt(() -> paused.endGrind.isVisible()));
+        assertEquals("a paused Grind can still be renamed", "Click to rename", onEdt(() -> paused.hero.name.getToolTipText()));
     }
 
     private static LivePage page(Engine engine) throws Exception
@@ -588,12 +586,13 @@ public class LivePresentationTest
     }
 
     @Test
-    public void recentTableHeaderCountsRowsAndLinksToLedger() throws Exception
+    public void recentListHeaderCountsRowsWithoutADuplicateLedgerShortcut() throws Exception
     {
         LivePage page = pageWithSession(6_400L, null, false);
         List<String> labels = labels(page);
         assertTrue("header copy: " + labels, labels.contains("RECENT \u00b7 2"));
-        assertTrue("action copy", labels.contains("View all"));
+        assertFalse("Ledger is already a tab", labels.contains("Ledger"));
+        assertFalse("Recent keeps its total", page.recent.total.getText().isEmpty());
         assertTrue("rows show their names", labels.contains("Dragon bones"));
     }
 
@@ -839,27 +838,6 @@ public class LivePresentationTest
         return (LivePage) SidebarPanelProbe.livePage(panel);
     }
 
-    private static <T> T onEdt(java.util.concurrent.Callable<T> callable) throws Exception
-    {
-        AtomicReference<T> result = new AtomicReference<>();
-        AtomicReference<Exception> failure = new AtomicReference<>();
-        SwingUtilities.invokeAndWait(() ->
-        {
-            try
-            {
-                result.set(callable.call());
-            }
-            catch (Exception ex)
-            {
-                failure.set(ex);
-            }
-        });
-        if (failure.get() != null)
-        {
-            throw failure.get();
-        }
-        return result.get();
-    }
 
     private static Transaction booked(long at, String name, int itemId, long quantity, int unitPrice, long value)
     {
@@ -1089,5 +1067,22 @@ public class LivePresentationTest
         assertEquals("Nightmare", Fmt.activity("The Nightmare"));
         assertEquals("Hofuthand", Fmt.activity("Hofuthand (weapons and armor)"));
         assertEquals("Vorkath", Fmt.activity("Vorkath"));
+    }
+
+    @Test
+    public void genericSkillsAndNpcsStayButMagicNeverTitlesFreePlay() throws Exception
+    {
+        Engine engine = PresentationLifecycleTest.engine();
+        engine.ensureSession(1_000L);
+        SidebarPanel panel = onEdt(() -> new SidebarPanel(engine, PresentationLifecycleTest.config(), null, null, null));
+        engine.setDetectedActivity("Magic", 2_000L);
+        assertEquals("", onEdt(panel::activityLabel));
+        for (String name : List.of("Woodcutting", "Fishing", "Mining", "Vorkath", "Theatre of Blood"))
+        {
+            engine.setDetectedActivity(name, 2_100L);
+            assertEquals("keep generic skills and named activities", name, onEdt(panel::activityLabel));
+        }
+        engine.startCustom("Magic", 3_000L);
+        assertEquals("Magic", LivePage.identityOf(LiveSnapshot.capture(engine, 4_000L, null)));
     }
 }

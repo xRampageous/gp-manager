@@ -215,6 +215,11 @@ public class ChargeCatalogueTest
         row(checked, ChargedItem.INFERNAL_HARPOON, "Infernal harpoon", true, "INFERNAL", ActionKind.SUPPLIES, 5000, NONE, NONE,
             new Object[]{ItemID.SMOULDERING_STONE, 1L, ItemID.DRAGON_HARPOON, 1L}, null, List.of(),
             ints(ItemID.INFERNAL_HARPOON, ItemID.INFERNAL_HARPOON_EMPTY));
+        row(checked, ChargedItem.DIZANAS, "Dizana's quiver", true, "CHARGES", ActionKind.FIRE, 1, NONE, NONE,
+            new Object[]{ItemID.SUNFIRESPLINTER, 1L}, null,
+            List.of("dizana's quiver (l)", "dizana's quiver (uncharged)", "dizana's quiver (l) (uncharged)"),
+            ints(ItemID.DIZANAS_QUIVER_UNCHARGED, ItemID.DIZANAS_QUIVER_UNCHARGED_TROUVER,
+                ItemID.DIZANAS_QUIVER_CHARGED, ItemID.DIZANAS_QUIVER_CHARGED_TROUVER));
         assertEquals("every family has exactly one checked row", Arrays.asList(ChargedItem.values()), checked);
     }
 

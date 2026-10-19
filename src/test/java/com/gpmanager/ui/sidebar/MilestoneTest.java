@@ -10,7 +10,7 @@ import static org.junit.Assert.assertTrue;
 
 import org.junit.Test;
 
-/** Owner 1.5.2: Free play's Net milestone counts all of Free play; a notice says when it is crossed. */
+/** Owner 1.5.2: Free play's Net milestone counts all of Free play; the HUD says when it is reached. */
 public class MilestoneTest
 {
     static LivePage page()
@@ -48,39 +48,6 @@ public class MilestoneTest
         assertEquals(Long.valueOf(1_000_000_000L), engine.getGeneralSession().milestoneGp);
     }
 
-    /** Owner 1.5.2: no bar and no HUD+ line; one small notice when it is crossed while playing. */
-    @Test
-    public void crossingItShowsOneNoticeButNotAtLogin() throws Exception
-    {
-        Engine engine = PresentationLifecycleTest.engine();
-        long now = System.currentTimeMillis();
-        engine.ensureSession(now - HOUR);
-        engine.setMilestone(1_000L);
-        coins(engine, now - 10_000L, 600L);
-        SidebarPanel panel = onEdt(() ->
-        {
-            SidebarPanel created = new SidebarPanel(engine, PresentationLifecycleTest.config(), null, null, null);
-            SidebarPanelProbe.refresh(created);
-            return created;
-        });
-        assertFalse(ShellProbe.noticeText(panel.shell()).contains("Milestone"));
-        coins(engine, now - 5_000L, 600L);
-        assertTrue(onEdt(() ->
-        {
-            SidebarPanelProbe.refresh(panel);
-            return ShellProbe.noticeText(panel.shell());
-        }).startsWith("Milestone reached"));
-
-        SidebarPanel login = onEdt(() ->
-        {
-            SidebarPanel created = new SidebarPanel(engine, PresentationLifecycleTest.config(), null, null, null);
-            SidebarPanelProbe.refresh(created);
-            return created;
-        });
-        assertFalse("already reached at login: no notice",
-            ShellProbe.noticeText(login.shell()).contains("Milestone"));
-    }
-
     /** The HUD+ kill-streak line measures the whole run, so a target start never moves it. */
     @Test
     public void aTargetStartLeavesTheHudNetBaseWhole()
@@ -105,6 +72,7 @@ public class MilestoneTest
         assertTrue("a milestone pick", onEdt(() ->
         {
             grinds.openTargets();
+            assertEquals("Set a Target", shell.sheetTitle);
             boolean picked = ShellProbe.pressSheetText(shell, "5b");
             ShellProbe.pressSheet(shell, "Save");
             return picked;

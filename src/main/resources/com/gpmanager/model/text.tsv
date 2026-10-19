@@ -1,4 +1,7 @@
 # Long user-facing text, by key: msg("key") in the code. Tab-separated; one line each.
+session-summary	GP Manager · %s%nNet: %s gp%nActive time: %s%nGP/h: %s%nGains: %s gp%nCosts: %s gp
+summary-costs	%nSupplies: %s gp%nLosses: %s gp
+summary-market	%nMarket: %s gp
 consumed-dose	The consumed dose has no supported (1) price, conflicting overrides, or an amount too large to capture. Original quotes are retained for Review; nothing is counted automatically.
 action.BURN	Burned
 action.BURY	Buried
@@ -223,7 +226,7 @@ item-needs	1 item needs your decision
 neutral-zone-exit	Neutral zone exit restore
 minimumdisplayedlootvalue	minimumDisplayedLootValue
 account-identity-bound	No account identity bound
-export-backups	Export, backups and reset
+export-backups	GP Manager actions
 collected-entries	No collected entries yet
 unreadable-session	Unreadable session state
 sessions-backup-json	sessions.backup.json.tmp
@@ -298,11 +301,10 @@ after-death	 after a death; ownership never changed.
 amulet-blood	your amulet of blood fury will work for 
 eye-ayak-been	the eye of ayak has been charged with demon tears.
 eye-ayak-been-charged	the eye of ayak has been charged with runes.
-text-2	<html><font color='#6ee16e'>●</font> 
 corrected	 · Corrected
 current-run	Current run + runs started today; whole-run totals
 runs-today	Runs today · Current run + runs started today; whole-run totals.
-tracked-active	Tracked active time this session; pauses are excluded. Click for a new session.
+tracked-active	Tracked active time for this rate window; pauses are excluded. Click to restart GP/h or start a new session.
 tracking-waits	Tracking waits until you log back in
 kills-since	Kills since your last death · best 
 value-incomplete	 · no price known
@@ -361,7 +363,7 @@ items-need	 items need your decision
 what-death	What a death here would lose: all but your 3 most valuable items (none skulled), +1 with Protect Item
 loot-other	Loot and other counted gains · 
 play-left	 of play left at this rate
-press-grind	Press Grind to start tracking
+press-grind	Open Grinds to start tracking
 tracking-starts	Tracking starts with your first gameplay
 nothing-tracked	Nothing tracked yet
 click-set	 · click to set a target; it starts Live fresh
@@ -370,7 +372,6 @@ detail-unavailable	Detail unavailable
 partially-realized	Partially realized
 counted-automatically	Counted automatically.
 recovered-backup	Recovered from backup
-nothing-changed	nothing was changed
 split-applied	that split was not applied
 entry-longer	that entry is no longer here
 active-time-remaining	 of Active Time remaining
@@ -380,13 +381,16 @@ tentacle-used	Abyssal tentacle used up
 tentacle-whip	The tentacle ran out or was dissolved; its abyssal whip is gone and the kraken tentacle is left.
 cannon-parts	Cannon set up or picked up
 cannon-why	A dwarf multicannon's parts stay yours wherever it stands; Nulodion replaces a lost one free.
-new-session	Net, Recent, GP/h and the clock start at zero. Free play or this Grind keeps its total, and the Ledger keeps every row.
-guide	Live: Net, GP/h and newest changes. Click the clock for a new session; a target starts one too. Free play keeps every total; Reset free-play in the gear menu clears it. | Gains: loot and income. Costs: supplies, charges, deaths. Banking and trades are neutral. | Grinds: start one by name. It remembers its targets, best run and average GP/h. | Ledger: why each number changed. Check Review rows; Correct fixes any row. | HUD+: the in-game overlay. Set it up in plugin settings. | Values: GE price, else alch. — means worthless, ? means no price yet.
+new-session	Restart GP/h starts Active Time at zero and uses displayed Net after one minute. New session also clears Live Net and Recent; every booking stays in the run and Ledger. Saving or continuing returns to the full run clock. Keep previous clock freezes the clock before restarting; Restore time resumes it, or uses the original run time if none was saved.
+save-session	Keep this Live session as a separate entry under Saved sessions in Grinds? Your totals are counted once.
+guide	Live: Net, GP/h and newest changes. Click the clock to restart GP/h or start a new session; a target starts a new session too. Free play keeps every total; Reset free-play in the gear menu clears it. | Gains: loot and income. Costs: supplies, charges, deaths. Banking and trades are neutral. | Grinds: start one by name. It remembers its targets, best run and average GP/h. | Ledger: why each number changed. Check Review rows; Correct fixes any row. | HUD+: the in-game overlay. Set it up in plugin settings. | Values: GE price, else alch. — means worthless, ? means no price yet.
 bf-coffer	Blast Furnace coffer
 free-play-kept	Free play is kept.
 bag-reward	Agility dispenser · looting bag
 bag-reward-why	The Agility dispenser paid this into your open looting bag; its chat line named it.
-run-total	Everything since Free play or this Grind began; a new session never removes it. Click to show it all on Live again.
+run-total	Everything since Free play or this Grind began; a new session never removes it. Click to save this session or show the whole run on Live again.
 free-play-over	Free play so far moves to your Grinds history as a finished run; nothing is deleted. A new Free play starts at zero, and your milestone counts it.
-run-total-target	Everything since Free play or this Grind began; a target never removes it. After Done, click here to show it all on Live again.
+run-total-target	Everything since Free play or this Grind began; a target never removes it. Click to save this session; after Done, you can also show the whole run again.
 restore-free-play	It becomes your Free play again, and the current one moves under FREE PLAY so you can swap back. Nothing is deleted.
+session-new-tip	Start Net, Recent and Active Time at zero; every booking stays in the run and Ledger.
+session-restore-tip	Resume the frozen saved time, or the original run time if none was saved; keep displayed Net and bookings.

@@ -1,6 +1,5 @@
 package com.gpmanager;
 
-import java.lang.reflect.Field;
 import java.lang.reflect.Method;
 import java.lang.reflect.Proxy;
 import java.util.ArrayList;
@@ -13,6 +12,7 @@ import net.runelite.api.Item;
 import net.runelite.api.ItemContainer;
 import org.junit.Test;
 
+import static com.gpmanager.GpManagerPluginProbe.set;
 import static org.junit.Assert.assertEquals;
 import static org.junit.Assert.assertNotNull;
 import static org.junit.Assert.assertNull;
@@ -102,12 +102,6 @@ public class GpManagerPluginResumeBaselineTest
         return flows;
     }
 
-    private static void set(Object target, String name, Object value) throws Exception
-    {
-        Field field = GpManagerPlugin.class.getDeclaredField(name);
-        field.setAccessible(true);
-        field.set(target, value);
-    }
 
     private static <T> T proxy(Class<T> type, java.util.function.Function<String, Object> values)
     {

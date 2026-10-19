@@ -1,5 +1,10 @@
 package com.gpmanager;
 
+
+import java.awt.geom.Path2D;
+import java.awt.geom.Arc2D;
+import java.awt.geom.Line2D;
+
 import static com.gpmanager.Fmt.*;
 import static com.gpmanager.GameData.msg;
 import static com.gpmanager.Kit.*;
@@ -28,14 +33,16 @@ import javax.swing.*;
 
 /**
  * Live = what is happening now (SIDEBAR_SPEC.md §3): the hero band, the target card with pace, and
- * the Recent table. Every component is built once; a tick only updates values, so hover, menus and
- * the Recent page survive. The page renders a {@link LiveSnapshot} and holds no engine.
+ * the plain Recent list and optional category view. Components are retained between ticks so hover
+ * and menus survive. The page renders a {@link LiveSnapshot} and holds no engine.
  */
 class LivePage implements Shell.Page {
     interface Actions {
         void togglePause();
 
         void openLedger(Entry entry);
+
+        default void openCategory(Semantics.Table table) {}
 
         void editTarget();
 
@@ -47,23 +54,18 @@ class LivePage implements Shell.Page {
         /** Owner live 2026-10-14: the timer's own pause, distinct from the session pause. */
         default void toggleTimerPause() {}
 
-        /** The ACTIVE clock: a new session on Live; the run keeps everything (owner 1.5.2). */
+        /** The ACTIVE clock: choose a rate-only restart or a new session; keep the whole run. */
         default void newSession() {}
 
         /** The run total under the Net: Live shows the whole run again (owner 1.5.2). */
         default void showWholeRun() {}
 
-        default void hideRecent(String name, boolean charge) {}
-
-        /** Opens the Start Grind sheet. */
-        default void startGrind() {}
+        default void hideRecent(String name, boolean supply) {}
 
         /** Clicking the running Grind's name renames it. */
         default void renameGrind() {}
 
-        default void endGrind() {}
-
-        /** True when gameplay alone starts tracking; false when the Grind button does. */
+        /** True when gameplay alone starts tracking; otherwise use the Grinds tab. */
         default boolean autoStartArmed() {
             return true;
         }
@@ -78,40 +80,32 @@ class LivePage implements Shell.Page {
     JPanel body = stack(PANEL, GAP);
     Hero hero = new Hero();
     JPanel target = new JPanel(new BorderLayout(0, 3));
-    JLabel targetTitle = label("", small(), LABEL);
-    JLabel targetValue = label("", numbers(12f), TEXT);
-    JLabel targetPace = label("", small(), LABEL);
-    JLabel targetTime = label("", small(), LABEL);
+    JLabel targetTitle = label("", small(), LABEL), targetValue = label("", numbers(12f), TEXT);
+    JLabel targetPace = label("", small(), LABEL), targetTime = label("", small(), LABEL);
 
     /** Under the Net while Live counts fresh: the run's whole total, "Free play +420M". */
     JLabel runTotal = label("", small(), LABEL);
 
     JLabel risk = label("", small(), LOSS.color);
-    JPanel targetActions = new JPanel(new FlowLayout(FlowLayout.LEFT, 3, 0));
+    JPanel targetActions = transparent(new FlowLayout(FlowLayout.LEFT, 3, 0));
     /** The header's right cluster: the aim icons, single row (owner live 2026-10-14). */
-    JPanel targetTopActions = new JPanel(new FlowLayout(FlowLayout.RIGHT, 3, 0));
+    JPanel targetTopActions = transparent(new FlowLayout(FlowLayout.RIGHT, 3, 0));
     /** The last laid-out button shape; the rows rebuild only when it changes. */
     Object actionsShape;
-    JButton againButton;
-    JButton doneButton;
-    JButton editButton;
-    JButton pauseButton;
+    JButton againButton, doneButton, editButton, pauseButton;
     ThinProgressBar targetBar = new ThinProgressBar();
-
-    /** Free play offers Start (the Start Grind sheet); a running Grind offers End instead. */
-    JButton startGrind;
-
-    JButton endGrind;
 
     /**
      * GE offers still on the exchange; shown only while there are some, then they move to Recent.
      */
     Table offers = new Table("OFFERS").setFoldable(true);
 
-    Table recent = new Table("RECENT").setFoldable(true);
+    Table recent = new Table("RECENT").plain();
+    JPanel breakdown = stack(PANEL, GAP);
 
     /** Pending counts as small icons: loot keys, GE offers, grave reclaim. */
-    JPanel counts = new JPanel(new FlowLayout(FlowLayout.RIGHT, 4, 0));
+    JPanel counts = transparent(new FlowLayout(FlowLayout.RIGHT, 4, 0));
+    JPanel signals = transparent(new FlowLayout(FlowLayout.RIGHT, 4, 0));
 
     ImageIcon geIcon = icon(() -> ImageUtil.loadImageResource(GrandExchangePlugin.class, "ge_icon.png"));
     ImageIcon graveIcon = new ImageIcon(grave(LOSS.color));
@@ -123,17 +117,13 @@ class LivePage implements Shell.Page {
     LivePage(Actions actions, Function<Integer, BufferedImage> sprites) {
         this.actions = actions;
         this.sprites = sprites == null ? id -> null : sprites;
-        startGrind = button("Grind", false, actions::startGrind);
-        startGrind.setToolTipText("Start a Grind");
-        endGrind = button("End", false, actions::endGrind);
-        endGrind.setToolTipText("End this Grind");
-        counts.setOpaque(false);
-        hero.controls(counts, startGrind, endGrind);
-        Hero.clickable(hero.clock, () -> actions.newSession());
-        Hero.clickable(hero.name, actions::renameGrind);
+        signals.add(hero.icons);
+        signals.add(counts);
+        Hero.clickable(hero.clock, "Clock controls", actions::newSession);
+        Hero.clickable(hero.name, "Rename Grind", actions::renameGrind);
         // Clicking the Net total sets or changes the target (owner 2026-09-28: no Target button).
-        Hero.clickable(hero.net, actions::editTarget);
-        Hero.clickable(runTotal, actions::showWholeRun);
+        Hero.clickable(hero.net, "Set a Target", actions::editTarget);
+        Hero.clickable(runTotal, "Save session or show run", actions::showWholeRun);
         risk.setToolTipText(msg("what-death"));
         hero.under.add(runTotal);
         hero.under.add(risk);
@@ -152,18 +142,14 @@ class LivePage implements Shell.Page {
         doneButton.setToolTipText("Done: clear the goal");
         editButton.setToolTipText("Edit targets");
         pauseButton.setToolTipText("Pause or resume the timer");
-        targetActions.setOpaque(false);
-        targetTopActions.setOpaque(false);
-        var head = new JPanel(new BorderLayout());
-        head.setOpaque(false);
+        var head = transparent(new BorderLayout());
         head.add(targetTitle, BorderLayout.CENTER);
         head.add(targetTopActions, BorderLayout.EAST);
         target.add(head, BorderLayout.NORTH);
         var values = stack(CARD, 1);
         values.add(targetValue);
         values.add(targetTime);
-        var line = new JPanel(new BorderLayout(0, 2));
-        line.setOpaque(false);
+        var line = transparent(new BorderLayout(0, 2));
         line.add(values, BorderLayout.NORTH);
         targetBar.setMaximumValue(1000);
         targetBar.setBackground(LINE);
@@ -173,12 +159,11 @@ class LivePage implements Shell.Page {
         target.add(targetActions, BorderLayout.SOUTH);
         // A set target is edited by clicking its card.
         target.setToolTipText(msg("click-change"));
-        Hero.clickable(target, actions::editTarget);
-        recent.setRowsPerPage(LiveSnapshot.RECENT_ROWS).setFill(true).setEmptyText("Nothing booked yet");
-        JButton all = button("View all", false, () -> actions.openLedger(Entry.current()));
-        recent.setAction(all);
+        Hero.clickable(target, "Edit target", actions::editTarget);
+        recent.setEmptyText("Nothing booked yet");
+        breakdown.setVisible(false);
         pad(body, 0, GAP, GAP, 0);
-        for (JComponent part : new JComponent[] {hero, target, offers, recent}) body.add(part);
+        for (var part : new JComponent[] {signals, hero, target, offers, recent, breakdown}) body.add(part);
     }
 
     public String id() {
@@ -193,25 +178,28 @@ class LivePage implements Shell.Page {
         return body;
     }
 
-    /** Removes the prior owner's content while the host is fenced for a profile switch. */
+    void category(LedgerPage page) {
+        recent.setVisible(page == null);
+        breakdown.setVisible(page != null);
+        if (page != null && breakdown.getComponentCount() == 0) {
+            breakdown.add(page.body);
+        }
+    }
+
+    /** A new account starts each Live table on its first page. */
     void clearOwner() {
-        recent.setRows(emptyList());
         recent.resetPage();
-        hero.big(null, PLAIN, "", "", false, "");
-        hero.strips(emptyList());
-        hero.icons(emptyList());
-        counts.removeAll();
-        drawnCounts = "";
-        target.setVisible(false);
-        offers.setRows(emptyList());
-        offers.setVisible(false);
+        offers.resetPage();
+        category(null);
     }
 
     void apply(LiveSnapshot snapshot) {
         boolean loggedIn = !snapshot.loggedOut;
+        counts(snapshot);
+        hero.icons(statusIcons(snapshot));
+        signals.setVisible(hero.icons.getComponentCount() + counts.getComponentCount() > 0);
         hero.status(dotColor(snapshot), statusTooltip(snapshot), identityOf(snapshot), wordOf(snapshot),
                 loggedIn ? actions::togglePause : null);
-        hero.icons(statusIcons(snapshot));
         // Owner 1.5.2: Risk lives off the header, so a long name keeps its room.
         runTotal.setVisible(snapshot.fresh);
         // Clicking it shows the whole run again; a running target keeps its own session.
@@ -220,12 +208,11 @@ class LivePage implements Shell.Page {
                                         + percent(Math.max(0d, Math.min(1d, (double) snapshot.runNet / snapshot.milestone)))
                                         + "."));
         runTotal.setText((snapshot.freePlay ? "Free play " : "Grind ") + signed(snapshot.runNet));
-        risk.setVisible(snapshot.pvpPossible && snapshot.risk > 0L);
+        risk.setVisible(snapshot.pvpPossible && snapshot.risk > 0);
         risk.setText("RISK " + compact(snapshot.risk));
         hero.under.setVisible(runTotal.isVisible() || risk.isVisible());
-        counts(snapshot);
         // Nothing booked yet reads as a dash, never the font's slashed zero.
-        boolean booked = snapshot.fresh || snapshot.gains != 0L || snapshot.costs != 0L || snapshot.marketResult != 0L
+        boolean booked = snapshot.fresh || snapshot.gains != 0 || snapshot.costs != 0 || snapshot.marketResult != 0
                         || !snapshot.recent.isEmpty();
         if (snapshot.hasSession) {
             // Owner live 2026-10-13: with a Net target the hero carries the live pair
@@ -262,9 +249,8 @@ class LivePage implements Shell.Page {
         applyTarget(snapshot);
         var rows = new ArrayList<Row>();
         var open = new ArrayList<Row>();
-        long openTotal = 0L;
-        long recentTotal = 0L;
-        for (Recent row : snapshot.recent)
+        long openTotal = 0, recentTotal = 0;
+        for (var row : snapshot.recent)
             if (row.open) {
                 open.add(rowOf(row));
                 openTotal += row.value;
@@ -287,9 +273,8 @@ class LivePage implements Shell.Page {
     }
 
     void applyTarget(LiveSnapshot snapshot) {
-        LiveSnapshot.Goal goal = snapshot.goal;
-        startGrind.setVisible(snapshot.freePlay && !snapshot.loggedOut);
-        endGrind.setVisible(!snapshot.freePlay);
+        var goal = snapshot.goal;
+        hero.name.setFocusable(!snapshot.freePlay && snapshot.hasSession);
         hero.name.setToolTipText(snapshot.freePlay ? null : "Click to rename"
                                 + (identityOf(snapshot).equals(hero.name.getText()) ? ""
                                         : " \u00b7 " + identityOf(snapshot)));
@@ -322,15 +307,14 @@ class LivePage implements Shell.Page {
         // Button layout (owner live 2026-10-14): while the aim runs its icons sit on the header's
         // right with no bottom row; a completed aim lays them along the bottom. Pause is the timer's own —
         // the run keeps tracking.
-        boolean completed = goal.reached || goal.timeDone;
-        boolean timerPaused = goal.timerPaused;
+        boolean completed = goal.reached || goal.timeDone, timerPaused = goal.timerPaused;
         boolean timerSet = goal.timeDetail != null;
         // Pause needs a timer that can still run; an ended one has nothing to stop. Done and Again
         // are always there: Again is a new session with the same target (owner 1.5.2).
         pauseButton.setVisible(timerSet && !goal.timeDone);
         pauseButton.setText(timerPaused ? "\u25B6" : "||");
         var shown = new ArrayList<JButton>();
-        for (JButton action : completed ? new JButton[] {againButton, doneButton, editButton, pauseButton}
+        for (var action : completed ? new JButton[] {againButton, doneButton, editButton, pauseButton}
                         : new JButton[] {pauseButton, againButton, doneButton, editButton}) {
             if (action.isVisible()) shown.add(action);
         }
@@ -339,7 +323,7 @@ class LivePage implements Shell.Page {
             actionsShape = shape;
             targetActions.removeAll();
             targetTopActions.removeAll();
-            for (JButton action : shown) (completed ? targetActions : targetTopActions).add(action);
+            for (var action : shown) (completed ? targetActions : targetTopActions).add(action);
             // No bottom row while the run goes on: the header cluster carries it.
             targetActions.setVisible(completed);
             targetTopActions.setVisible(!completed && !shown.isEmpty());
@@ -349,27 +333,27 @@ class LivePage implements Shell.Page {
         // The title shrinks before it is cut beside the icons; hover keeps it whole (owner 1.5.2).
         int room = target.getWidth() - 14
                         - (targetTopActions.isVisible() ? targetTopActions.getPreferredSize().width : 0);
-        String fitted = Kit.fitShrinking(targetTitle, title, small(), room);
+        String fitted = fitShrinking(targetTitle, title, small(), room);
         // Still too long: the card says it is a target, so the label and progress go first.
         if (!fitted.equals(title))
-            fitted = Kit.fitShrinking(targetTitle, title.substring("TARGET · ".length()), small(), room);
+            fitted = fitShrinking(targetTitle, title.replace("TARGET · ", ""), small(), room);
         targetTitle.setText(fitted);
         targetTitle.setToolTipText(title);
     }
 
     Row rowOf(Recent row) {
-        ImageIcon icon = Kit.icon(icons, sprites, row.itemId);
+        var icon = Kit.icon(icons, sprites, row.itemId);
         Entry entry = entryFor(row);
         var menu = new ArrayList<Table.Menu>();
         menu.add(new Table.Menu("Open in Ledger", () -> actions.openLedger(entry)));
         // A finished trade is one item too (owner 2026-10-08: a sold Fire rune had no Hide).
         if (!row.open && row.itemId > 0 && (!row.composite || row.market))
             menu.add(new Table.Menu("Hide item from recent", () -> actions.hideRecent(row.name, false)));
-        // A charge or dose row can hide its whole family's spends from Recent without hiding the
-        // item; an ordinary supply (buried bones) offers only the item hide (owner 1.3.4).
-        if (!row.open && row.itemId > 0 && row.chargeRow && (row.ledgerCostView == CostView.SUPPLIES
-                        || row.ledgerCostView == CostView.CHARGES))
-            menu.add(new Table.Menu("Hide charge from recent", () -> actions.hideRecent(row.name, true)));
+        if (!row.open && row.composite && !row.market && (row.itemId < -1 || "Cast".equals(row.actionLabel)))
+            menu.add(new Table.Menu("Hide spell from recent", () -> actions.hideRecent(row.name, false)));
+        // Hiding a supply's spends leaves acquisitions visible; the item hide applies to both.
+        if (!row.open && row.itemId > 0 && row.supplyRow)
+            menu.add(new Table.Menu("Hide supply from recent", () -> actions.hideRecent(row.name, true)));
         // Ore a failed smelt lost sits beside the ore the bars used: say which is which.
         String name = msg("failed").equals(row.actionLabel) ? row.name + " (failed)" : row.name;
         Row drawn = new Row(row.contributionId + "|" + row.receiptId, icon, name, row.qty, valueText(row), toneOf(row),
@@ -387,17 +371,20 @@ class LivePage implements Shell.Page {
         Runnable ledger = () -> actions.openLedger(Entry.current());
         var money = Hero.money(snapshot.gains, snapshot.supplies, snapshot.loss, snapshot.costs,
                         snapshot.costSplitAvailable, ledger);
-        if (snapshot.marketResult != 0L || snapshot.marketPending > 0) {
-            money.add(new Cell("TRADE", snapshot.marketResult == 0L ? "open" : signed(snapshot.marketResult), MARKET,
+        if (snapshot.marketResult != 0 || snapshot.marketPending > 0) {
+            money.add(new Cell("TRADE", snapshot.marketResult == 0 ? "open" : signed(snapshot.marketResult), MARKET,
                             msg("realized-market"), ledger));
         }
+        for (Cell cell : money)
+            for (var table : Semantics.Table.values())
+                if (table.label.equals(cell.label)) cell.open = () -> actions.openCategory(table);
         var rows = new ArrayList<List<Cell>>(singletonList(money));
         // Owner live 2026-10-13: skull and protect states are not shown (immersion); a PvP Grind
         // keeps Best kill and Streak. Risk sits beside the Review badge (owner 1.5.1: alone it
         // took a whole row).
         if (snapshot.pvpSession) {
             var pvp = new ArrayList<Cell>();
-            pvp.add(new Cell("BEST KILL", snapshot.bestKill == 0L ? "—" : signed(snapshot.bestKill), GAIN,
+            pvp.add(new Cell("BEST KILL", snapshot.bestKill == 0 ? "—" : signed(snapshot.bestKill), GAIN,
                                         snapshot.kills + " kills · " + snapshot.deaths + " deaths", null).weight(3));
             pvp.add(new Cell("STREAK", String.valueOf(snapshot.streak), snapshot.streak > 0 ? GAIN : DIM,
                                     msg("kills-since") + snapshot.bestStreak + " this Grind", null).weight(2));
@@ -409,7 +396,7 @@ class LivePage implements Shell.Page {
     List<Cell> statusIcons(LiveSnapshot snapshot) {
         var list = new ArrayList<Cell>();
         if (snapshot.reviewCount > 0) {
-            list.add(new Cell("", "(!)" + snapshot.reviewCount, REVIEW, snapshot.reviewCount == 1 ? msg("item-needs")
+            list.add(new Cell("Review", "(!)" + snapshot.reviewCount, REVIEW, snapshot.reviewCount == 1 ? msg("item-needs")
                                     : snapshot.reviewCount + msg("items-need"),
                             () -> actions.openLedger(Entry.current(Audit.REVIEW, null))));
         }
@@ -422,22 +409,25 @@ class LivePage implements Shell.Page {
                         + snapshot.reclaimItems;
         if (key.equals(drawnCounts)) return;
         drawnCounts = key;
+        var previous = focused(counts);
         counts.removeAll();
         Runnable pending = () -> actions.openLedger(Entry.current());
-        BufferedImage keyImage = sprites.apply(ItemID.WILDY_LOOT_KEY0);
-        String keyTip = msg("loot-keys") + snapshot.pendingKeys + (snapshot.pendingKeyValue > 0L
+        var keyImage = sprites.apply(ItemID.WILDY_LOOT_KEY0);
+        String keyTip = msg("loot-keys") + snapshot.pendingKeys + (snapshot.pendingKeyValue > 0
                                 ? msg("loot-keys-worth") + compact(snapshot.pendingKeyValue) : "");
         count(snapshot.pendingKeys, keyImage == null ? null : new ImageIcon(keyImage), "key", DIM, keyTip, pending);
         count(snapshot.marketPending, geIcon, "GE", MARKET, msg("grand-exchange-offers") + snapshot.marketPending,
                 pending);
         count(snapshot.reclaimItems, graveIcon, "grave", LOSS,
                 msg("items-waiting-reclaimed-after") + snapshot.reclaimItems, pending);
+        counts.setVisible(counts.getComponentCount() > 0);
         counts.revalidate();
+        restoreFocus(counts, previous);
         counts.repaint();
     }
 
     void count(long n, ImageIcon image, String fallback, Tone tone, String tip, Runnable open) {
-        if (n <= 0L) return;
+        if (n <= 0) return;
         // A borderless button, not a mouse listener: the safety audit bans mouse-event names.
         var label = new JButton(image == null ? fallback + " " + n : String.valueOf(n));
         label.setFont(small());
@@ -447,17 +437,20 @@ class LivePage implements Shell.Page {
         label.setIconTextGap(2);
         label.setToolTipText(tip);
         label.setBorder(null);
-        label.setBorderPainted(false);
+        label.setBorderPainted(true);
         label.setContentAreaFilled(false);
         label.setFocusPainted(false);
         label.setCursor(Cursor.getPredefinedCursor(Cursor.HAND_CURSOR));
+        focus(label);
+        label.setName(fallback);
+        label.getAccessibleContext().setAccessibleName("Open " + fallback + " details");
         label.addActionListener(e -> open.run());
         counts.add(label);
     }
 
     static ImageIcon icon(java.util.function.Supplier<BufferedImage> load) {
         try {
-            BufferedImage image = load.get();
+            var image = load.get();
             return image == null ? null : new ImageIcon(image);
         } catch (RuntimeException ex) {
             return null;
@@ -467,19 +460,19 @@ class LivePage implements Shell.Page {
     /** The design's 11px outline headstone with a cross; RuneLite ships no grave icon. */
     static BufferedImage grave(Color color) {
         var image = new BufferedImage(11, 11, BufferedImage.TYPE_INT_ARGB);
-        Graphics2D g = image.createGraphics();
+        var g = image.createGraphics();
         g.setRenderingHint(RenderingHints.KEY_ANTIALIASING, RenderingHints.VALUE_ANTIALIAS_ON);
         g.setColor(color);
         g.setStroke(new BasicStroke(1.2f));
-        java.awt.geom.Path2D.Float stone = new java.awt.geom.Path2D.Float();
+        var stone = new Path2D.Float();
         stone.moveTo(2.5f, 10f);
         stone.lineTo(2.5f, 4.5f);
-        stone.append(new java.awt.geom.Arc2D.Float(2.5f, 1.5f, 6f, 6f, 180f, -180f, java.awt.geom.Arc2D.OPEN), true);
+        stone.append(new Arc2D.Float(2.5f, 1.5f, 6f, 6f, 180f, -180f, Arc2D.OPEN), true);
         stone.lineTo(8.5f, 10f);
         stone.closePath();
         g.draw(stone);
-        g.draw(new java.awt.geom.Line2D.Float(5.5f, 4f, 5.5f, 7.5f));
-        g.draw(new java.awt.geom.Line2D.Float(4f, 5.5f, 7f, 5.5f));
+        g.draw(new Line2D.Float(5.5f, 4f, 5.5f, 7.5f));
+        g.draw(new Line2D.Float(4f, 5.5f, 7f, 5.5f));
         g.dispose();
         return image;
     }
@@ -495,7 +488,7 @@ class LivePage implements Shell.Page {
         if ("review".equals(row.tag)) return REVIEW;
         if (!numeric(row)) return DIM;
         if (row.market) return MARKET;
-        if (row.value >= 0L) return GAIN;
+        if (row.value >= 0) return GAIN;
         return row.ledgerCostView == CostView.LOSS ? LOSS : SUPPLY;
     }
 
@@ -555,7 +548,7 @@ class LivePage implements Shell.Page {
     static String wordOf(LiveSnapshot snapshot) {
         if (snapshot.hopping) return "RECONNECTING";
         if (snapshot.loggedOut) return "LOGGED OUT";
-        if (!snapshot.hasSession && snapshot.resumeInSeconds > 0L)
+        if (!snapshot.hasSession && snapshot.resumeInSeconds > 0)
             return "RESUMING " + snapshot.resumeInSeconds + "s";
         if (!snapshot.hasSession) return "";
         if (snapshot.paused && !snapshot.idle) return "PAUSED";
@@ -569,7 +562,7 @@ class LivePage implements Shell.Page {
      * 2026-10-13 retirement kept activity noise out of named runs).
      */
     static String identityOf(LiveSnapshot snapshot) {
-        return Fmt.activity(snapshot.freePlay ? snapshot.activityLabel : snapshot.ownerLabel);
+        return activity(snapshot.freePlay ? snapshot.activityLabel : snapshot.ownerLabel);
     }
 
     static String statusTooltip(LiveSnapshot snapshot) {

@@ -7,19 +7,15 @@ import java.util.Collections;
 import org.junit.Test;
 
 import static org.junit.Assert.assertEquals;
-import static org.junit.Assert.assertNotEquals;
+import static org.junit.Assert.assertNull;
 
-/**
- * 1.1 save stutter: a save writes each history session on its own and splices them into the
- * bytes one toJson gives; the periodic gameplay save reuses a closed session's JSON until it
- * changes, and every 10th quick save writes everything afresh.
- */
+/** Full and quick saves capture fresh detached state; injected Gson retains its settings. */
 public class QuickSaveTest
 {
     private static final long T0 = 1_700_000_000_000L;
 
     @Test
-    public void splicedSaveIsByteIdenticalUnderEveryGsonSetting() throws Exception
+    public void detachedSaveIsByteIdenticalUnderEveryGsonSetting() throws Exception
     {
         for (Gson gson : new Gson[] {new Gson(), new GsonBuilder().serializeNulls().create(),
             new GsonBuilder().disableHtmlEscaping().create(), new GsonBuilder().setPrettyPrinting().create()})
@@ -63,22 +59,22 @@ public class QuickSaveTest
     }
 
     @Test
-    public void everyTenthQuickSaveAndEveryFullSaveWriteEverythingAfresh() throws Exception
+    public void everyQuickAndFullSaveCapturesClosedHistoryAfresh() throws Exception
     {
         Gson gson = new Gson();
         Engine engine = engine();
         Persistence coordinator = coordinator(gson, engine);
         coordinator.currentIntent(false);
-        // A rename never stamps the session: only sidebar edits rename, and they save in full.
-        engine.history.get(0).rename("Renamed");
-        for (int quick = 1; quick < 10; quick++)
+        for (int quick = 1; quick <= 12; quick++)
         {
-            assertNotEquals(plain(gson, engine), strip(coordinator.currentIntent(true).json));
+            engine.history.get(0).rename("Renamed " + quick);
+            WriteIntent captured = coordinator.currentIntent(true);
+            assertNull("encoding belongs to the writer", captured.json);
+            assertEquals(plain(gson, engine), strip(gson.toJson(captured.state)));
         }
-        assertEquals(plain(gson, engine), strip(coordinator.currentIntent(true).json));
         engine.history.get(0).rename("Again");
-        assertEquals(plain(gson, engine), strip(coordinator.currentIntent(false).json));
-        assertEquals(plain(gson, engine), strip(coordinator.currentIntent(true).json));
+        assertEquals(plain(gson, engine), strip(gson.toJson(coordinator.currentIntent(false).state)));
+        assertEquals(plain(gson, engine), strip(gson.toJson(coordinator.currentIntent(true).state)));
     }
 
     private static String plain(Gson gson, Engine engine)

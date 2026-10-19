@@ -1,10 +1,8 @@
 package com.gpmanager;
 
-import java.util.concurrent.Callable;
-import java.util.concurrent.atomic.AtomicReference;
-import javax.swing.SwingUtilities;
 import org.junit.Test;
 
+import static com.gpmanager.SwingTestSupport.onEdt;
 import static org.junit.Assert.assertEquals;
 import static org.junit.Assert.assertFalse;
 import static org.junit.Assert.assertNull;
@@ -124,9 +122,9 @@ public class SidebarSheetTest
         assertTrue("the rename is saved", engine.getRevision() > before);
     }
 
-    /** Owner 2026-09-28: End on the Live hero ends at once; there is no second confirmation. */
+    /** End on Grinds ends at once; there is no second confirmation. */
     @Test
-    public void liveEndGrindEndsAtOnce() throws Exception
+    public void grindsEndGrindEndsAtOnce() throws Exception
     {
         Engine engine = PresentationLifecycleTest.engine();
         engine.startCustom("Vorkath", System.currentTimeMillis());
@@ -134,7 +132,7 @@ public class SidebarSheetTest
         Shell shell = panel.shell();
         onEdt(() ->
         {
-            panel.new LiveActions().endGrind();
+            new GrindsController(panel).endGrind();
             return null;
         });
         assertFalse("End ends it", engine.isCustomActive());
@@ -206,7 +204,7 @@ public class SidebarSheetTest
             ShellProbe.pressSheet(shell, "Save");
             return null;
         });
-        assertEquals("the form stays open to fix", "Targets", ShellProbe.sheetTitle(shell));
+        assertEquals("the form stays open to fix", "Set a Target", ShellProbe.sheetTitle(shell));
         assertTrue(ShellProbe.noticeText(shell).startsWith("Targets not saved"));
         assertNull("nothing is cleared or guessed", engine.getActiveSession().getProfitTargetGp());
         onEdt(() ->
@@ -271,25 +269,4 @@ public class SidebarSheetTest
         }
     }
 
-    private static <T> T onEdt(Callable<T> callable) throws Exception
-    {
-        AtomicReference<T> result = new AtomicReference<>();
-        AtomicReference<Exception> failure = new AtomicReference<>();
-        SwingUtilities.invokeAndWait(() ->
-        {
-            try
-            {
-                result.set(callable.call());
-            }
-            catch (Exception ex)
-            {
-                failure.set(ex);
-            }
-        });
-        if (failure.get() != null)
-        {
-            throw failure.get();
-        }
-        return result.get();
-    }
 }

@@ -21,19 +21,20 @@ See what you actually make while you play. GP Manager tracks your gains, supplie
 
 ## Features
 
-- **Live** – your Net, GP/h, gains, supplies and losses as you play, plus your latest drops. Click the ACTIVE clock for a fresh session, or click the Net to set a GP or time target, which starts one too. Your Free play or Grind total stays under the Net and the Ledger keeps everything.
-- **Free play** – what you make outside Grinds, with an optional milestone (say 1B) and a small notice when you pass it. **⚙ › Reset free-play** starts it over and keeps the old run under Grinds › FREE PLAY, where you can restore it.
-- **Ledger** – every gain, loss, trade and death, with the reason it counted. Open any row to see the items behind it, and fix anything from one Correct menu. Anything it wasn't sure about waits in Review for you.
+- **Live** – your Net, GP/h, gains, supplies and losses as you play, plus your latest drops. Click the ACTIVE clock to reset Active Time and recalculate GP/h from displayed Net after one active minute, start a fresh session, or Restore time to resume the frozen previous clock (the original run clock when no backup exists). Keep previous clock saves that frozen time before restarting. Saving or continuing returns to the full run clock. Click Net to set a GP or time target, which starts a new session too. Free play or your Grind keeps its whole total, and the Ledger keeps everything.
+- **Free play** – what you make outside Grinds, with an optional milestone (say 1B) and a small HUD message while it is reached. **⚙ › Reset free-play** starts it over and keeps the old run under Grinds › FREE PLAY, where you can restore it.
+- **Ledger** – every gain, loss, trade and death, with the reason it counted. The tab keeps the whole-run breakdown; Live's Gains, Supply, Loss and Trade open that displayed session instead; click the active category again to return to Recent. Search stays in Ledger. Recent keeps its total and shows 15 rows by default; change Recent rows under Loot display, up to 30. Open a row to see its receipts. Correct > Exclude removes an editable booking from totals with an undoable audit record; it applies to that whole booking. Anything it wasn't sure about waits in Review for you.
 - **Grinds** – start one by name (Vorkath, Zulrah, a skilling spot) and it's remembered with its targets, best run and average GP/h, so you can compare runs, including loot by the monster that dropped it. Each Grind is booked on its own; between Grinds it tracks Free play.
+- **Saved sessions** – click the Free play/Grind line under Live's Net and choose Save session to keep a separate, read-only snapshot in Grinds. Continue without saving keeps the usual flow; Cancel stays put. Saved copies keep their booked values and clock without adding to All time totals; the existing history limit bounds their count. Copy summary is available on saved entries; the gear menu also offers Copy Live summary.
 - **All time** – your total Net and GP/h and your best Grinds.
-- **HUD+** – an optional box in the game window with your Net, GP/h and a loot tray for the current kill streak.
+- **HUD+** – an optional box in the game window with your Net, GP/h and a loot tray for the current kill streak. Enable **Compact item rows** in HUD+ settings for an icon followed by shortened value and quantity, such as **200M ×1**. Optional **Full values below 10M** shows smaller amounts in full when they fit.
 - **PvP** – kills, deaths and player loot in dangerous areas, plus what a death there would cost you.
 
 ## Getting started
 
 1. Install **GP Manager** from the Plugin Hub.
 2. Open it from its icon in the RuneLite sidebar.
-3. Play. Tracking starts on its own; to name what you're doing, press **Grind** on the Live tab (or **Start Grind** on the Grinds tab).
+3. Play. Tracking starts on its own; to name what you're doing, press **Start Grind** on the Grinds tab.
 4. New to it? **⚙ › Getting started** has a short guide.
 
 Settings open from the wrench next to GP Manager in RuneLite's plugin list.

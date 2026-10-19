@@ -2,10 +2,9 @@ package com.gpmanager;
 
 import java.util.ArrayList;
 import java.util.List;
-import java.util.concurrent.atomic.AtomicReference;
-import javax.swing.SwingUtilities;
 import org.junit.Test;
 
+import static com.gpmanager.SwingTestSupport.onEdt;
 import static org.junit.Assert.assertEquals;
 import static org.junit.Assert.assertFalse;
 import static org.junit.Assert.assertTrue;
@@ -89,27 +88,6 @@ public class ShellNavigationTest
         }
     }
 
-    private static <T> T onEdt(java.util.concurrent.Callable<T> callable) throws Exception
-    {
-        AtomicReference<T> result = new AtomicReference<>();
-        AtomicReference<Exception> failure = new AtomicReference<>();
-        SwingUtilities.invokeAndWait(() ->
-        {
-            try
-            {
-                result.set(callable.call());
-            }
-            catch (Exception ex)
-            {
-                failure.set(ex);
-            }
-        });
-        if (failure.get() != null)
-        {
-            throw failure.get();
-        }
-        return result.get();
-    }
     @Test
     public void everyPageIsSelectableAndTheShellReturnsToLive() throws Exception
     {

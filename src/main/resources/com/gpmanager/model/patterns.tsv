@@ -65,3 +65,11 @@ cannon	cannon (?:base|stand|barrels|furnace)(?: \(or\))?	2
 # The Guardians of the Rift pool announces its deposit itself (owner 2026-10-13); chat is
 # normalized lowercase before matching.
 deposit-pool	^you deposit all of your runes into the pool\.$	0
+quiver-check	^Dizana's quiver(?: \(l\))? has \D*?([\d,]+) charges remaining\..*$	2
+gem-mined	^You just (?:found|mined) (?:a|an) (?:piece of )?([\w ]+)!$	2
+gem-thieved	^You put a gem in your (?:gem )?(?:bag|pouch|satchel|tote|sack): Uncut ([\w ]+)\.?$	2
+gem-vyre-batch	^The following stolen loot gets added to your gem (?:bag|sack): Uncut ([\w ]+) x ([\d,]+)\.?$	2
+gem-vyre-single	^You put the stolen Uncut ([\w ]+) into your gem (?:bag|sack)\.$	2
+target-net	\d+(?:\.\d+)?[kmb]?	0
+target-minutes	\d+(?:\.\d+)?	0
+target-time	^(?:(\d+(?:\.\d+)?)\s*h)?\s*(?:(\d+(?:\.\d+)?)\s*m)?$	0

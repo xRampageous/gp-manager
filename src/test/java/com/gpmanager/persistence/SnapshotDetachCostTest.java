@@ -10,13 +10,12 @@ import org.junit.Test;
 import static org.junit.Assert.assertTrue;
 
 /**
- * Measures caller-thread snapshot cost for a long synthetic session: the one serialization a
- * save runs under the engine lock before enqueue. Background disk writing alone is not enough.
+ * Measures actual caller-thread save capture for a long synthetic session. Encoding belongs to the writer.
  */
 public class SnapshotDetachCostTest
 {
     @Test
-    public void detachLongSessionStaysUnderBudget()
+    public void detachLongSessionStaysUnderBudget() throws Exception
     {
         Gson gson = new Gson();
         Session session = new Session("Cost probe", 1_000L, SessionMode.GENERAL);
@@ -37,16 +36,21 @@ public class SnapshotDetachCostTest
         {
             session.addTransaction(tx, 100_000, false);
         }
-        SavedState live = new SavedState(session, null, Collections.emptyList());
-        live.setRevision(42L);
 
+        Engine engine = new Engine(deltas -> Collections.emptyList(), new TransactionClassifier(), new GpManagerConfig() {});
+        engine.generalSession = session;
+        engine.activeSession = session;
+        SessionRepository repository = new SessionRepository(gson,
+            FilepathTestSupport.root(java.nio.file.Files.createTempDirectory("gp-capture-cost")), false);
+        Persistence persistence = new Persistence(null, null, repository, new OrderedPersistenceWriter(repository, null), engine);
         long bestNanos = Long.MAX_VALUE;
         for (int i = 0; i < 8; i++)
         {
             long started = System.nanoTime();
-            String json = gson.toJson(live);
+            WriteIntent captured = persistence.currentIntent();
             long elapsed = System.nanoTime() - started;
-            assertTrue(json.contains("\"revision\":42"));
+            org.junit.Assert.assertNull("capture leaves JSON encoding to the writer", captured.json);
+            org.junit.Assert.assertEquals(txs.size(), captured.state.generalSession.transactions.size());
             bestNanos = Math.min(bestNanos, elapsed);
         }
         long bestMillis = TimeUnit.NANOSECONDS.toMillis(bestNanos);

@@ -1,9 +1,15 @@
 package com.gpmanager;
 
+
+import static java.util.Collections.*;
+
+import static com.gpmanager.Phrases.*;
+
+import static com.gpmanager.GameData.*;
+
 import com.gpmanager.GpManagerConfig.LootFilter;
 
 import static com.gpmanager.Fmt.*;
-import static com.gpmanager.GameData.msg;
 import static com.gpmanager.SafeMath.*;
 import static java.lang.Math.*;
 
@@ -20,6 +26,7 @@ import net.runelite.client.plugins.*;
 import net.runelite.client.plugins.grounditems.*;
 import net.runelite.client.util.*;
 import org.slf4j.*;
+import static java.util.Locale.ROOT;
 
 /**
  * Everything the Live page paints, captured in one read from the current schema-102 engine so the
@@ -39,8 +46,7 @@ class LiveSnapshot {
     /** One session goal as the Live card shows it; read-only, from the session's current target. */
     @AllArgsConstructor
     static class Goal {
-        long target;
-        long current;
+        long target, current;
         boolean reached;
 
         /** "200k", or the Active Time target for a tracked-time goal. */
@@ -81,8 +87,7 @@ class LiveSnapshot {
     @AllArgsConstructor
     static class Recent {
         int itemId;
-        String name;
-        String qty;
+        String name, qty;
         long value;
         boolean neutral;
 
@@ -97,12 +102,9 @@ class LiveSnapshot {
         /** The newest canonical receipt behind the row, for Ledger context. */
         String receiptId;
 
-        String contributionId;
-        String actionLabel;
+        String contributionId, actionLabel;
         long quantity;
-        boolean composite;
-        boolean market;
-        boolean valueAvailable;
+        boolean composite, market, valueAvailable;
 
         /** The Costs view this row opens in the Ledger; null off the Costs table. */
         CostView ledgerCostView;
@@ -128,8 +130,8 @@ class LiveSnapshot {
          */
         boolean open;
 
-        /** A charge or dose spend row: the charge hide may be offered on it (owner 1.3.4). */
-        boolean chargeRow;
+        /** An item supply spend, including doses, ammunition, food and charge resources. */
+        boolean supplyRow;
 
         /** Ground Items' highlight colour for a highlighted gain; null otherwise. */
         Color highlight;
@@ -139,17 +141,15 @@ class LiveSnapshot {
          * moved: a GE buy is neutral (owner live 2026-10-15), an unproven Result counts nothing.
          */
         long net() {
-            return !market ? value : valueAvailable ? marketResult : 0L;
+            return !market ? value : valueAvailable ? marketResult : 0;
         }
     }
 
     boolean hasSession;
     String ownerLabel;
     long elapsedMillis;
-    boolean paused;
-    boolean idle;
-    long net;
-    long gains;
+    boolean paused, idle;
+    long net, gains;
 
     /** Non-consumable costs: deaths, tax, fees, drops. {@code -1} when the split is unavailable. */
     long loss;
@@ -162,8 +162,7 @@ class LiveSnapshot {
     /** Total booked cost; always the truthful figure, split or not. */
     long costs;
 
-    boolean costSplitAvailable;
-    boolean rateEstablished;
+    boolean costSplitAvailable, rateEstablished;
     long gpPerHour;
     Goal goal;
 
@@ -184,10 +183,7 @@ class LiveSnapshot {
     String target;
 
     /** Client-thread PvP sample, presentation only. */
-    boolean pvpPossible;
-
-    boolean skulled;
-    boolean protectItem;
+    boolean pvpPossible, skulled, protectItem;
     long risk;
     int reviewCount;
     List<Recent> recent;
@@ -195,8 +191,7 @@ class LiveSnapshot {
     /** True for any session that has booked a fight. */
     boolean pvpSession;
 
-    int kills;
-    int deaths;
+    int kills, deaths;
     long bestKill;
 
     /** Loot keys and chests not opened yet; a count, never a GP guess. */
@@ -232,73 +227,72 @@ class LiveSnapshot {
     /** Free play's Net milestone and Free play's whole Net (owner 1.5.2); null off Free play. */
     Long milestone;
 
+    long milestoneUntil;
+
     long runNet;
 
     /** True while Live counts from a target or a Reset Net rather than the whole run. */
     boolean fresh;
 
     boolean milestoneReached() {
-        return milestone != null && runNet >= milestone;
+        return milestone != null && milestone > 0 && runNet >= milestone;
     }
 
     /**
      * @param context plugin-side idle state, owner marks and loot visibility (may be null)
      */
     static LiveSnapshot capture(Engine engine, long now, LiveContext context) {
-        LiveContext ctx = context == null ? LiveContext.NONE : context;
-        MoneySnapshot summary = engine.summary();
-        Metrics metrics = summary.metrics(engine.getActiveSession(), now);
-        Session active = engine.getActiveSession();
-        boolean custom = engine.isCustomActive();
-        boolean freePlay = active == null || !custom;
+        var ctx = context == null ? LiveContext.NONE : context;
+        var summary = engine.summary();
+        var active = engine.getActiveSession();
+        var metrics = summary.metrics(active, now);
+        boolean custom = engine.isCustomActive(), general = active == null || !custom;
         String owner = active == null ? "Free play" : active.getName();
         long elapsed = metrics.elapsedMillis;
-        MoneySnapshot.SessionFacts facts = active == null ? null : summary.fact(active);
+        var facts = active == null ? null : summary.fact(active);
         int reviewCount = facts == null ? 0 : facts.review;
-        List<Transaction> transactions = facts == null ? Collections.emptyList() : facts.transactions;
         // One shared projection for the whole snapshot: Recent rows and the Market separation. The
         // Market rows are rebuilt on every read, so they are read once.
-        List<Row> marketRows = summary.marketRows;
+        var marketRows = summary.marketRows;
         // Hero categories are canonical and unfiltered: the whole counted Market-context
         // population is removed from ordinary Gains/Supplies/Losses and represented once by its
         // correction-aware net. Recent Activity display filters never enter this math.
-        MarketFold marketFold = facts == null ? Accounting.marketFold(transactions) : facts.market;
+        var market = facts == null ? Accounting.marketFold(emptyList()) : facts.market;
         // Live shows the current session: what was booked since it began; the run keeps every row
         // and its whole total (owner 1.5.2).
-        Metrics shown = metrics;
+        var shown = metrics;
         Long start = active == null ? null : active.sessionStartAt;
-        long from = start == null ? 0L : active.sessionStartMillis;
         if (start != null) {
-            List<Transaction> rows = active.rowsSince(start);
-            shown = active.metrics(rows, elapsed - from);
-            marketFold = Accounting.marketFold(rows);
+            var window = facts.window(active);
+            shown = window.windowMoney;
+            market = window.windowMarket;
         }
-        long since = max(0L, elapsed - from);
-        long gpPerHour = Session.hourly(shown.net, since);
-        long marketResult = marketFold.getNet();
+        long since = active == null ? 0 : active.liveElapsed(now), rate = Session.hourly(shown.net, since);
+        long marketResult = market.getNet();
         int marketPending = 0;
-        var marketByPresentation = new HashMap<String, Row>();
+        var markets = new HashMap<String, Row>();
         for (Row row : marketRows) {
             if (row != null) {
-                marketByPresentation.put(row.presentationId, row);
+                markets.put(row.presentationId, row);
                 marketPending += LedgerData.isPending(row.lifecycle) ? 1 : 0;
             }
         }
-        PkTally pk = active == null ? new PkTally() : active.pk();
+        var pk = active == null ? new PkTally() : active.pk();
         boolean pvpSession = pk.encounters() > 0;
         return new LiveSnapshot(active == null ? "" : active.getId(), active != null, owner, since, metrics.paused,
-                ctx.idle, shown.net, visibleGains(shown, marketFold), visibleLosses(shown, marketFold),
-                visibleSupplies(shown, marketFold), visibleCosts(shown, marketFold), shown.costSplitAvailable,
-                RateReadiness.isEstablished(since), gpPerHour, goal(active, metrics, elapsed), marketResult,
-                marketPending, freePlay, ctx.activity, ctx.target, ctx.pvp.pvpPossible, ctx.pvp.skulled,
+                ctx.idle, shown.net, visibleGains(shown, market), visibleLosses(shown, market),
+                visibleSupplies(shown, market), visibleCosts(shown, market), shown.costSplitAvailable,
+                RateReadiness.isEstablished(since), rate, goal(active, metrics, elapsed), marketResult,
+                marketPending, general, ctx.activity, ctx.target, ctx.pvp.pvpPossible, ctx.pvp.skulled,
                 ctx.pvp.protectItem, ctx.pvp.risk, reviewCount,
-                recent(engine, active, transactions, marketRows, marketByPresentation, ctx), pvpSession, pk.kills,
+                recent(engine, active, marketRows, markets, ctx), pvpSession, pk.kills,
                 pk.deaths, engine.bestKill(), engine.getPendingClaims().size(), engine.pendingKeysValue(now),
-                engine.deathStatus().awaiting ? max(1L, engine.deathStatus().outstandingItemCount) : 0L,
+                engine.deathStatus().awaiting ? max(1, engine.deathStatus().outstandingItemCount) : 0,
                 max(0, pk.streak), pk.bestStreak, active == null ? ctx.offline
                         : active.paused && active.getPauseReason() == PauseReason.LIFECYCLE,
                 engine.autoResumeSeconds(now), engine.calibrating(now), ctx.hopping, metrics.net - shown.net,
-                freePlay && active != null ? active.milestoneGp : null, metrics.net, start != null);
+                general && active != null ? active.milestoneGp : null,
+                general && active == engine.milestoneOwner ? engine.milestoneUntil : 0, metrics.net, start != null);
     }
 
     /**
@@ -308,38 +302,35 @@ class LiveSnapshot {
      */
     static Goal goal(Session active, Metrics metrics, long elapsed) {
         if (active == null) return null;
-        Long target = active.getProfitTargetGp();
-        Long timeTarget = active.getActiveTimeTargetMillis();
-        if (target != null && target > 0L) {
+        Long target = active.getProfitTargetGp(), duration = active.getActiveTimeTargetMillis();
+        if (target != null && target > 0) {
             long current = active.profitTargetProgress(metrics.net);
             double fraction = max(0d, min(1d, current / (double) target));
             boolean reached = current >= target;
-            String eta = null;
-            String timeDetail = null;
-            long timeRemaining = -1L;
-            boolean timeDone = false;
-            boolean timerPaused = false;
+            String eta = null, timeDetail = null;
+            long timeRemaining = -1;
+            boolean timeDone = false, timerPaused = false;
             // The aim's own pace: Net and Active Time since it was set, so free play before it
             // never counts (owner 2026-10-16).
             long since = active.profitTargetActiveMillis(elapsed);
             boolean established = RateReadiness.isEstablished(since);
-            long rate = since <= 0L ? 0L : round(current * 3_600_000d / since);
-            if (timeTarget != null && timeTarget > 0L) {
+            long rate = Session.hourly(current, since);
+            if (duration != null && duration > 0) {
                 // Owner live 2026-10-13: with both targets set the hero keeps the live Net read
                 // and the card adds the tracked Active Time pair; the countdown replaces the
                 // Net-rate estimate.
                 long timeElapsed = active.getActiveTimeTargetWindowMillis(elapsed);
-                timeDetail = timeDetail(timeElapsed, timeTarget);
-                timeRemaining = max(0L, timeTarget - timeElapsed);
-                timeDone = timeElapsed >= timeTarget;
+                timeDetail = timeDetail(timeElapsed, duration);
+                timeRemaining = nonNeg(duration - timeElapsed);
+                timeDone = timeElapsed >= duration;
                 timerPaused = active.isTimeTargetPaused();
                 // The time line says it all once; no projection repeats the hero's GP/h (owner 1.5.2).
             } else if (established && !reached) {
                 // An established non-positive rate says so honestly (owner live 2026-10-13); a reached
                 // aim adds nothing the hero does not show (owner 1.5.2).
-                long minutes = rate > 0L ? round((target - current) * 60d / rate) : 0L;
-                eta = rate <= 0L ? "Not earning at this rate"
-                                        : (minutes < 1L ? "<1m" : "~" + GrindsData.durationMinutes(minutes))
+                long minutes = rate > 0 ? round((target - current) * 60d / rate) : 0;
+                eta = rate <= 0 ? "Not earning at this rate"
+                                        : (minutes < 1 ? "<1m" : "~" + GrindsData.durationMinutes(minutes))
                                                 + msg("play-left");
             }
             return new Goal(target, current, reached, compact(target), reached ? "reached" : percent(fraction), eta,
@@ -347,14 +338,14 @@ class LiveSnapshot {
         }
         // Owner 2026-10-01 (F10): a time-only target is still a target; the card tracks Active
         // Time.
-        if (timeTarget == null || timeTarget <= 0L) return null;
+        if (duration == null || duration <= 0) return null;
         long timeElapsed = active.getActiveTimeTargetWindowMillis(elapsed);
-        double timeFraction = max(0d, min(1d, timeElapsed / (double) timeTarget));
-        boolean timeReached = timeElapsed >= timeTarget;
+        double timeFraction = max(0d, min(1d, timeElapsed / (double) duration));
+        boolean timeReached = timeElapsed >= duration;
         // The card counts down; a projected Net repeated the hero's GP/h (owner 1.5.2).
-        return new Goal(timeTarget, timeElapsed, timeReached, durationShort(timeTarget),
+        return new Goal(duration, timeElapsed, timeReached, durationShort(duration),
                 timeReached ? "reached" : percent(timeFraction), null, timeFraction, true,
-                timeDetail(timeElapsed, timeTarget), max(0L, timeTarget - timeElapsed), timeReached,
+                timeDetail(timeElapsed, duration), nonNeg(duration - timeElapsed), timeReached,
                 active.isTimeTargetPaused());
     }
 
@@ -362,10 +353,10 @@ class LiveSnapshot {
      * "2h 50m left of 3h 00m \u00b7 6%": a time target's one line, or "Time target reached" (owner 1.5.2:
      * the time is said once).
      */
-    static String timeDetail(long elapsed, long timeTarget) {
-        if (elapsed >= timeTarget) return "Time target reached";
-        return durationCount(timeTarget - elapsed) + " left of " + durationShort(timeTarget) + " \u00b7 "
-                + percent(max(0d, elapsed / (double) timeTarget));
+    static String timeDetail(long elapsed, long duration) {
+        if (elapsed >= duration) return "Time target reached";
+        return durationCount(duration - elapsed) + " left of " + durationShort(duration) + " \u00b7 "
+                + percent(max(0d, elapsed / (double) duration));
     }
 
     /** Visible ordinary Gains: canonical unfiltered revenue minus the counted Market fold. */
@@ -389,45 +380,36 @@ class LiveSnapshot {
     }
 
     /** The last Live list and what it was built from; the key covers every input of the list. */
-    static List<Object> recentKey = Collections.emptyList();
+    static List<Object> recentKey = emptyList();
 
-    static List<Recent> recentList = Collections.emptyList();
+    static List<Recent> recentList = emptyList();
 
     /**
      * The Live list is rebuilt only when a booking (the engine revision), a Market row or the loot
      * display filter changed; otherwise every tick reuses it instead of re-projecting the Grind.
      */
-    static synchronized List<Recent> recent(Engine engine, Session active, List<Transaction> transactions,
-            List<Row> marketRows, Map<String, Row> marketByPresentation, LiveContext ctx) {
+    static synchronized List<Recent> recent(Engine engine, Session active,
+            List<Row> marketRows, Map<String, Row> markets, LiveContext ctx) {
         List<Object> key = Arrays.asList(engine, engine.getRevision(), active, marketRows,
                         ctx.minimumDisplayedLootValue, ctx.filter, ctx.filter == null ? "" : ctx.filter.version(),
+                        ctx.filter == null ? RECENT_ROWS : ctx.filter.recentRows(),
                         String.valueOf(active == null ? null : active.sessionStartAt));
         if (!key.equals(recentKey)) {
-            MoneySnapshot summary = engine.summary();
-            MoneySnapshot.SessionScope scope = summary.scope(active == null ? Collections.emptyList()
-                                    : Collections.singletonList(active));
-            recentList = recentRows(summary.view(scope, ctx::flowVisible), marketByPresentation, ctx.filter);
-            Long start = active == null ? null : active.sessionStartAt;
-            if (start != null) {
-                // Live counts fresh: rows booked since the start; open GE offers stay under Offers
-                // (owner 1.5.2).
-                var fresh = new ArrayList<Recent>();
-                for (Recent row : recentList) if (row.open) fresh.add(row);
-                List<Transaction> rows = active.rowsSince(start);
+            var summary = engine.summary();
+            if (active == null || active.sessionStartAt == null) {
+                var scope = summary.scope(active == null ? emptyList() : singletonList(active));
+                recentList = recentRows(summary.view(scope, ctx::flowVisible), markets, ctx.filter);
+            } else {
+                var rows = summary.fact(active).window(active).windowRows;
                 var ids = new HashSet<String>();
-                for (Transaction row : rows) ids.add(row.getId());
-                // A GE trade joins only when it settled this session (owner live 2026-10-17: the
-                // whole run's trades stayed in Recent after a target).
-                var trades = new ArrayList<Row>();
-                for (Row trade : summary.marketRows)
-                    for (String id : (trade.settlementId + trade.earlierSettlements).split(" "))
-                        if (ids.contains(id)) {
-                            trades.add(trade);
-                            break;
-                        }
-                for (Recent row : recentRows(Semantics.capture(rows, trades, scope.ids, ctx::flowVisible),
-                                marketByPresentation, ctx.filter)) if (!row.open) fresh.add(row);
-                recentList = Collections.unmodifiableList(fresh);
+                for (var row : rows) ids.add(row.getId());
+                var trades = FlowFilters.matching(summary.marketRows, trade -> LedgerData.isPending(trade.lifecycle)
+                        || !disjoint(ids, Arrays.asList((trade.settlementId + trade.earlierSettlements).split(" "))));
+                var visible = recentRows(Semantics.capture(rows, trades, active.getId(), ctx::flowVisible), markets, ctx.filter);
+                var fresh = new ArrayList<Recent>();
+                for (var row : visible) if (row.open) fresh.add(row);
+                for (var row : visible) if (!row.open) fresh.add(row);
+                recentList = unmodifiableList(fresh);
             }
             recentKey = key;
         }
@@ -436,57 +418,56 @@ class LiveSnapshot {
 
     static List<Recent> recentRows(Semantics.Result projection, Map<String, Row> marketRows, RecentFilter filter) {
         var rows = new ArrayList<Recent>();
+        int count = 0, limit = filter == null ? RECENT_ROWS : max(1, min(30, filter.recentRows()));
         for (Group group : projection.groups) {
+            if (count >= limit && !group.market) continue;
             Recent row = toRecent(group, group.marketPresentationId.isEmpty() ? null
                                     : marketRows.get(group.marketPresentationId));
             // A canceled offer that returned everything stays in the Ledger, not Recent (owner
             // 2026-09-28).
-            if (row == null || "canceled".equals(row.tag)) continue;
-            // A charge or dose spend also answers to the separate charge list; the item list still
-            // gates every row and a dose gain is never hidden with the spends (owner 1.3.4).
-            if (!row.open && filter != null && !filter.showRecent(row.name, row.quantity,
-                            group.table == Semantics.Table.COSTS_SUPPLIES && group.chargeRow())) {
+            if (row == null || "canceled".equals(row.tag) || !row.open && count >= limit) continue;
+            // Supply spends also answer to the separate saved list; acquisitions stay visible.
+            // A composite has no item quantity; its name must still match a saved hide rule.
+            if (!row.open && filter != null && !filter.showRecent(row.name, max(1, row.quantity),
+                            row.supplyRow)) {
                 continue;
             }
             // A Ground Items-highlighted gain stands out in its highlight colour (owner 1.5.0, after
             // Better Loot Notifier).
-            if (filter != null && row.value > 0L && !row.market)
+            if (filter != null && row.value > 0 && !row.market)
                 row.highlight = filter.highlight(row.name, row.quantity);
             rows.add(row);
-            if (rows.size() == RECENT_ROWS) break;
+            if (!row.open) count++;
         }
-        return Collections.unmodifiableList(rows);
+        return unmodifiableList(rows);
     }
 
     /** One semantic group as the Live row the page paints, with proven Market value semantics. */
-    static Recent toRecent(Group group, Row marketRow) {
+    static Recent toRecent(Group group, Row row) {
         if (group == null) return null;
-        boolean market = group.market;
-        boolean realizedMarket = market && group.coverage == Coverage.COMPLETE;
+        boolean market = group.market, realizedMarket = market && group.coverage == Coverage.COMPLETE;
         long marketResult = group.value;
-        boolean marketSettlementProven = market && marketRow != null && marketRow.isRealizedIncluded()
-                        && marketRow.settledQty > 0L && marketRow.observedSettlementGp != 0L;
-        boolean marketSell = marketRow != null && "SELL".equals(marketRow.side.name());
-        boolean marketCanceled = marketRow != null && marketRow.lifecycle == MarketRows.Lifecycle.CANCELLED_RETURNED;
-        String marketSide = marketRow == null ? "" : marketRow.isRealizedIncluded() ? marketSell ? "Sold" : "Bought"
-                                : MarketText.stateWord(marketRow);
-        boolean unpriced = !market && group.coverage == Coverage.INCOMPLETE;
+        boolean settlementKnown = market && row != null && row.isRealizedIncluded()
+                        && row.settledQty > 0 && row.observedSettlementGp != 0;
+        boolean marketSell = row != null && "SELL".equals(row.side.name());
+        boolean marketCanceled = row != null && row.lifecycle == MarketRows.Lifecycle.CANCELLED_RETURNED;
+        String marketSide = row == null ? "" : row.isRealizedIncluded() ? marketSell ? "Sold" : "Bought"
+                                : MarketText.stateWord(row);
+        boolean unknown = !market && group.coverage == Coverage.INCOMPLETE;
         String tag = group.reviewRequired ? "review" : marketCanceled ? "canceled"
-                                : market ? "market" : unpriced ? "unpriced" : null;
-        String quantity = quantityText(group);
-        String qty;
-        String actionLabel;
+                                : market ? "market" : unknown ? "unpriced" : null;
+        String quantity = quantityText(group), qty, label;
         if (market) {
             // Cash movement first: the primary value is the observed signed settlement; the
             // canonical Market result is the explicit secondary line, never the primary.
             String detail = realizedMarket ? (marketSide.isEmpty() ? "Result " + signed(marketResult)
-                                    : marketSide + " \u00b7 Result " + signed(marketResult)) : marketSettlementProven
+                                    : marketSide + " \u00b7 Result " + signed(marketResult)) : settlementKnown
                                     ? marketSide + " \u00b7 Result \u2014" : group.contextLine;
             // A finished trade shows its quantity like any item ("\u00d7500"); the line keeps its
             // side
             // and Result (owner 2026-10-08).
-            qty = marketSettlementProven ? quantityText(group) : null;
-            actionLabel = detail;
+            qty = settlementKnown ? quantityText(group) : null;
+            label = detail;
         } else if (group.actionGroup()) {
             // An exact named spell is its own title, so the verb plus the receipt count is the
             // honest second line. A generic action keeps its composition, which is the only
@@ -496,31 +477,32 @@ class LiveSnapshot {
             String casts = group.receiptCount > 1 ? times(group.receiptCount) : null;
             qty = !group.primaryName.equalsIgnoreCase(group.actionLabel) ? casts
                             : casts == null ? group.contextLine : group.contextLine + " · " + casts;
-            actionLabel = group.actionLabel;
+            label = group.actionLabel;
         } else if (!group.failedOf().isEmpty()) {
             qty = group.failedOf();
-            actionLabel = group.failedTip();
+            label = group.failedTip();
         } else {
             qty = quantity;
             // A run whose every unit failed so far reads as failed, whichever receipt came first.
-            actionLabel = group.failed > 0L ? msg("failed") : group.actionLabel;
+            label = group.failed > 0 ? msg("failed") : group.actionLabel;
         }
         CostView ledgerCostView = group.table == Semantics.Table.COSTS_SUPPLIES
                         ? group.chargeUse ? CostView.CHARGES : CostView.SUPPLIES
                         : group.table == Semantics.Table.COSTS_LOSS ? CostView.LOSS : null;
         boolean neutral = group.neutral;
-        long value = neutral ? 0L : group.value;
+        long value = neutral ? 0 : group.value;
         boolean settlementValue = false;
-        if (marketSettlementProven && !neutral) {
-            value = marketSell ? Math.abs(marketRow.observedSettlementGp) : -Math.abs(marketRow.observedSettlementGp);
+        if (settlementKnown && !neutral) {
+            value = MarketText.settlementCash(row, marketSell);
             settlementValue = true;
         }
-        return new Recent(group.itemId, group.primaryName, qty, value, neutral, unpriced, tag, group.receiptCount,
-                group.representativeTransactionId, group.representativeContributionId, actionLabel,
-                SafeMath.nonNeg(group.quantity), group.composite, market,
-                market ? group.coverage == Coverage.COMPLETE : !unpriced, ledgerCostView, group.reviewRequired,
+        return new Recent(group.itemId, group.primaryName, qty, value, neutral, unknown, tag, group.receiptCount,
+                group.representativeTransactionId, group.representativeContributionId, label,
+                nonNeg(group.quantity), group.composite, market,
+                market ? group.coverage == Coverage.COMPLETE : !unknown, ledgerCostView, group.reviewRequired,
                 marketResult, settlementValue, marketSide,
-                marketRow != null && LedgerData.isPending(marketRow.lifecycle), group.chargeRow(), null);
+                row != null && LedgerData.isPending(row.lifecycle),
+                group.table == Semantics.Table.COSTS_SUPPLIES, null);
     }
 
     /**
@@ -530,18 +512,18 @@ class LiveSnapshot {
     static String quantityText(Group group) {
         // Coins read as their value only (owner 2026-10-16).
         if (group.itemId == 995) return null;
-        String name = group.primaryName.toLowerCase(Locale.ROOT);
-        String unit = Phrases.has(name, "pizza", "cake", "pie") ? "portion"
+        String name = group.primaryName.toLowerCase(ROOT);
+        String unit = has(name, "pizza", "cake", "pie") ? "portion"
                         : group.actionLabel.equals("Drank") ? "dose" : null;
         if (group.normalizedConsume && unit != null) {
-            if (group.quantity == 1L) return "1 " + unit;
-            return group.quantity > 1L ? times(group.quantity) + " " + unit + "s" : null;
+            if (group.quantity == 1) return "1 " + unit;
+            return group.quantity > 1 ? times(group.quantity) + " " + unit + "s" : null;
         }
         if (group.claim < 0) {
             // A claim spend reads as its own signed count ("-1 pouch"); a pickup stays "×N".
-            return "\u2212" + Math.max(1L, group.quantity);
+            return "\u2212" + max(1, group.quantity);
         }
-        return group.quantity > 1L ? times(group.quantity) : null;
+        return group.quantity > 1 ? times(group.quantity) : null;
     }
 }
 
@@ -584,11 +566,11 @@ class LiveContext {
             boolean offline, String target, boolean hopping) {
         this.idle = idle;
         this.filter = filter;
-        this.minimumDisplayedLootValue = SafeMath.nonNeg(minimumDisplayedLootValue);
+        this.minimumDisplayedLootValue = nonNeg(minimumDisplayedLootValue);
         this.pvp = pvp == null ? PvpState.NONE : pvp;
-        this.activity = Phrases.orEmpty(activity);
+        this.activity = orEmpty(activity);
         this.offline = offline;
-        this.target = Phrases.orEmpty(target);
+        this.target = orEmpty(target);
         this.hopping = hopping;
     }
 
@@ -596,7 +578,7 @@ class LiveContext {
     boolean flowVisible(Flow flow) {
         if (flow == null) return false;
         // Costs, fees and deaths are never hidden by the display loot filter.
-        if (flow.quantityDelta <= 0L) return true;
+        if (flow.quantityDelta <= 0) return true;
         // Always show beats Ground Items' hidden list and the minimum (owner 1.5.0, after Better
         // Loot Notifier); Hidden Recent items still wins on Recent.
         if (filter != null && filter.alwaysShows(flow)) return true;
@@ -614,9 +596,7 @@ class LiveContext {
 @AllArgsConstructor
 class PvpState {
     static final PvpState NONE = new PvpState(false, false, false, 0L);
-    boolean pvpPossible;
-    boolean skulled;
-    boolean protectItem;
+    boolean pvpPossible, skulled, protectItem;
 
     /** GP a death here would lose; 0 where no death can be lost. */
     long risk;
@@ -628,15 +608,14 @@ class PvpState {
     static long risk(List<Flow> held, boolean skulled, boolean protectItem) {
         var stacks = new ArrayList<Flow>();
         for (Flow flow : held) {
-            if (flow != null && flow.quantityDelta > 0L) stacks.add(flow);
+            if (flow != null && flow.quantityDelta > 0) stacks.add(flow);
         }
         stacks.sort((a, b) -> Long.compare(deathValue(b), deathValue(a)));
-        long keep = (skulled ? 0 : 3) + (protectItem ? 1 : 0);
-        long risk = 0L;
+        long keep = (skulled ? 0 : 3) + (protectItem ? 1 : 0), risk = 0;
         for (Flow stack : stacks) {
-            long kept = Math.min(keep, stack.quantityDelta);
+            long kept = min(keep, stack.quantityDelta);
             keep -= kept;
-            risk = SafeMath.safeAdd(risk, Math.max(0L, deathValue(stack)) * (stack.quantityDelta - kept));
+            risk = safeAdd(risk, nonNeg(deathValue(stack)) * (stack.quantityDelta - kept));
         }
         return risk;
     }
@@ -646,7 +625,7 @@ class PvpState {
      * 600,000, its repair cost when it breaks unprotected (OSRS Wiki).
      */
     static long deathValue(Flow stack) {
-        return GameData.pattern("avernic").matcher(Phrases.lower(stack.itemName)).matches() ? 600_000L
+        return pattern("avernic").matcher(lower(stack.itemName)).matches() ? 600_000L
                 : stack.unitPrice;
     }
 }
@@ -674,14 +653,19 @@ interface RecentFilter {
     }
 
     /**
-     * A charge spend row also answers to the separate charge list, so its family's spends can be
+     * A supply spend row also answers to the separate supply list, so its family's spends can be
      * hidden while the item's other rows (a gain) still show.
      */
-    default boolean showRecent(String name, long quantity, boolean charge) {
+    default boolean showRecent(String name, long quantity, boolean supply) {
         return true;
     }
 
-    default void hideRecent(String name, boolean charge) {}
+    /** Visible Recent rows; the reader clamps the setting to one through thirty. */
+    default int recentRows() {
+        return LiveSnapshot.RECENT_ROWS;
+    }
+
+    default void hideRecent(String name, boolean supply) {}
 
     /** Changes whenever the decisions may change, so the Live list is rebuilt only then. */
     default String version() {
@@ -697,9 +681,7 @@ interface RecentFilter {
 @Singleton
 @RequiredArgsConstructor(onConstructor_ = @Inject)
 class LootPresentationFilterService {
-    static final int NONE = 0;
-    static final int HIGHLIGHTED = 1;
-    static final int HIDDEN = 2;
+    static final int NONE = 0, HIGHLIGHTED = 1, HIDDEN = 2;
     final GroundItemsConfigReader configReader;
     volatile GroundItemsPrefs snapshot;
     volatile String fingerprint = "";
@@ -717,13 +699,13 @@ class LootPresentationFilterService {
 
     /** Applies only explicit list preferences; ambiguous value/price rules stay visible. */
     boolean isFlowIncluded(Flow flow, LootFilter mode) {
-        LootFilter effective = mode == null ? LootFilter.ALL_ITEMS : mode;
+        var effective = mode == null ? LootFilter.ALL_ITEMS : mode;
         if (effective == LootFilter.ALL_ITEMS || flow == null) return true;
         ensureSnapshot();
-        GroundItemsPrefs current = snapshot;
+        var current = snapshot;
         if (!current.pluginEnabled) return true;
         int state = listState(current.highlightedCsv, current.hiddenCsv, flow.itemName,
-                        SafeMath.nonNeg(Math.abs(flow.quantityDelta)));
+                        nonNeg(Math.abs(flow.quantityDelta)));
         if (state == HIDDEN) return false;
         return effective != LootFilter.HIGHLIGHTED_LIST_ONLY ? !current.showHighlightedOnly || state == HIGHLIGHTED
                 : state == HIGHLIGHTED;
@@ -732,7 +714,7 @@ class LootPresentationFilterService {
     /** Ground Items' highlight colour for an item on its highlighted list, unless filters are off. */
     Color highlight(String name, long quantity, LootFilter mode) {
         ensureSnapshot();
-        GroundItemsPrefs current = snapshot;
+        var current = snapshot;
         return mode == LootFilter.ALL_ITEMS || !current.pluginEnabled
                         || listState(current.highlightedCsv, "", name, quantity) != HIGHLIGHTED ? null
                 : current.highlight;
@@ -741,8 +723,8 @@ class LootPresentationFilterService {
     /** HUD+'s big-drop line: Ground Items' insane value when the display follows it, else 10M. */
     long big(LootFilter mode) {
         ensureSnapshot();
-        GroundItemsPrefs current = snapshot;
-        return mode == LootFilter.FOLLOW_GROUND_ITEMS && current.pluginEnabled && current.insane > 0L ? current.insane
+        var current = snapshot;
+        return mode == LootFilter.FOLLOW_GROUND_ITEMS && current.pluginEnabled && current.insane > 0 ? current.insane
                 : HudTray.BIG_DROP;
     }
 
@@ -756,23 +738,23 @@ class LootPresentationFilterService {
         if (snapshot == null) replaceSnapshotForTests(null);
     }
 
-    static int listState(String highlightedCsv, String hiddenCsv, String itemName, long quantity) {
-        int exact = listMatch(highlightedCsv, itemName, quantity, false);
+    static int listState(String highlights, String hiddenCsv, String name, long quantity) {
+        int exact = listMatch(highlights, name, quantity, false);
         if (exact != NONE) return HIGHLIGHTED;
-        exact = listMatch(hiddenCsv, itemName, quantity, false);
+        exact = listMatch(hiddenCsv, name, quantity, false);
         if (exact != NONE) return HIDDEN;
-        int wildcard = listMatch(highlightedCsv, itemName, quantity, true);
+        int wildcard = listMatch(highlights, name, quantity, true);
         if (wildcard != NONE) return HIGHLIGHTED;
-        return listMatch(hiddenCsv, itemName, quantity, true) == NONE ? NONE : HIDDEN;
+        return listMatch(hiddenCsv, name, quantity, true) == NONE ? NONE : HIDDEN;
     }
 
     /** The Recent charge pattern for a row: its dose family, wildcarded (Burning amulet*). */
-    static String chargePattern(String itemName) {
-        return ActionReader.doseBaseName(itemName) + "*";
+    static String chargePattern(String name) {
+        return ActionReader.doseBaseName(name) + "*";
     }
 
-    static int listMatch(String csv, String itemName, long quantity, boolean wildcard) {
-        String name = Phrases.orEmpty(itemName);
+    static int listMatch(String csv, String title, long quantity, boolean wildcard) {
+        String name = orEmpty(title);
         for (Rule rule : rules(csv)) {
             if (rule.wildcard == wildcard && rule.matches(name, quantity)) return 1;
         }
@@ -780,12 +762,12 @@ class LootPresentationFilterService {
     }
 
     /** Parsed list rules by list text: the Ground Items lists are parsed once, not per item. */
-    static final java.util.Map<String, java.util.List<Rule>> RULES = new java.util.concurrent.ConcurrentHashMap<>();
+    static final Map<String, List<Rule>> RULES = new java.util.concurrent.ConcurrentHashMap<>();
 
-    static java.util.List<Rule> rules(String csv) {
+    static List<Rule> rules(String csv) {
         if (RULES.size() > 16) RULES.clear();
-        return RULES.computeIfAbsent(Phrases.orEmpty(csv), text -> {
-                    var parsed = new java.util.ArrayList<Rule>();
+        return RULES.computeIfAbsent(orEmpty(csv), text -> {
+                    var parsed = new ArrayList<Rule>();
                     for (String raw : Text.fromCSV(text)) {
                         Rule rule = Rule.parse(raw);
                         if (rule != null) parsed.add(rule);
@@ -798,11 +780,10 @@ class LootPresentationFilterService {
     static class Rule {
         String name;
         int quantity;
-        boolean lessThan;
-        boolean wildcard;
+        boolean lessThan, wildcard;
 
         static Rule parse(String value) {
-            if (Phrases.blank(value)) return null;
+            if (blank(value)) return null;
             String text = value.trim();
             int split = -1;
             for (int i = text.length() - 1; i >= 0; i--) {
@@ -821,11 +802,11 @@ class LootPresentationFilterService {
                 } catch (NumberFormatException ignored) {
                 }
             }
-            return new Rule(text, Math.max(0, quantity), less, text.contains("*"));
+            return new Rule(text, max(0, quantity), less, text.contains("*"));
         }
 
-        boolean matches(String itemName, long count) {
-            if (wildcard ? !WildcardMatcher.matches(name, itemName) : !name.equalsIgnoreCase(itemName)) return false;
+        boolean matches(String title, long count) {
+            if (wildcard ? !WildcardMatcher.matches(name, title) : !name.equalsIgnoreCase(title)) return false;
             return lessThan ? count < quantity : count > quantity;
         }
     }
@@ -862,7 +843,7 @@ class GroundItemsConfigReader {
 
     boolean isGroundItemsEnabled() {
         if (pluginManager == null) return false;
-        for (Plugin plugin : pluginManager.getPlugins()) {
+        for (var plugin : pluginManager.getPlugins()) {
             if (plugin instanceof GroundItemsPlugin) return pluginManager.isPluginEnabled(plugin);
         }
         return false;
@@ -883,8 +864,7 @@ class GroundItemsPrefs {
     static final String GROUP = "grounditems";
 
     boolean pluginEnabled;
-    String highlightedCsv;
-    String hiddenCsv;
+    String highlightedCsv, hiddenCsv;
     boolean showHighlightedOnly;
 
     /**
@@ -897,10 +877,10 @@ class GroundItemsPrefs {
 
     String fingerprint;
 
-    GroundItemsPrefs(boolean pluginEnabled, String highlightedCsv, String hiddenCsv, boolean showHighlightedOnly) {
+    GroundItemsPrefs(boolean pluginEnabled, String highlights, String hiddenCsv, boolean showHighlightedOnly) {
         this.pluginEnabled = pluginEnabled;
-        this.highlightedCsv = Phrases.orEmpty(highlightedCsv);
-        this.hiddenCsv = Phrases.orEmpty(hiddenCsv);
+        highlightedCsv = orEmpty(highlights);
+        this.hiddenCsv = orEmpty(hiddenCsv);
         this.showHighlightedOnly = showHighlightedOnly;
         fingerprint = buildFingerprint();
     }

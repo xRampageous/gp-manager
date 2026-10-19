@@ -1,5 +1,7 @@
 package com.gpmanager;
 
+import net.runelite.api.Skill;
+
 import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.HashMap;
@@ -430,7 +432,8 @@ public class GameDataTablesTest
     }
 
     @Test public void activityTableKeepsEveryUsedListAndPredicate() {
-        assertEquals(Set.of("curated", "short", "combat", "pursuit", "generic"), ActivityLabel.RULES.keySet());
+        Map<String, Phrases.Clause[][]> rules = GameData.rules("activity_rules");
+        assertEquals(Set.of("curated", "short", "combat", "pursuit", "generic"), rules.keySet());
         Map<String,List<String>> values = new HashMap<>();
         for (String[] row : GameData.rows("activity_rules")) {
             assertEquals(3,row.length);
@@ -440,7 +443,50 @@ public class GameDataTablesTest
         assertEquals(Arrays.asList("PKing","Trading","Death reclaim"),values.get("pursuit"));
         assertEquals(Arrays.asList("General","NPC loot"),values.get("generic"));
         for (net.runelite.api.Skill skill : net.runelite.api.Skill.values())
-            assertEquals(ActivityLabel.COMBAT.contains(skill.getName()),Phrases.has(skill.getName(),ActivityLabel.RULES.get("combat")));
+            assertEquals(Set.of(Skill.ATTACK, Skill.STRENGTH, Skill.DEFENCE, Skill.RANGED, Skill.HITPOINTS).contains(skill),
+                Phrases.has(skill.getName(), rules.get("combat")));
+    }
+
+    @Test public void castAnimationsMatchRuneLiteGamevalConstants() throws Exception {
+        List<String[]> rows = GameData.rows("cast_animations");
+        assertEquals(23, rows.size());
+        assertEquals(rows.size(), Spells.CAST_ANIMATIONS.size());
+        for (String[] row : rows) {
+            assertEquals(2, row.length);
+            assertEquals(Integer.parseInt(row[0]),
+                net.runelite.api.gameval.AnimationID.class.getField(row[1]).getInt(null));
+        }
+    }
+
+    @Test public void pouchAndKeySlotTablesKeepTheirNamedIdsAndOrder() throws Exception {
+        List<String[]> pouch=GameData.rows("rune_pouch_slots");
+        assertEquals(6,pouch.size());
+        for (int i=0;i<pouch.size();i++) {
+            String[] row=pouch.get(i);
+            for (int column=0;column<2;column++) {
+                int value=net.runelite.api.gameval.VarbitID.class.getField(row[column+2]).getInt(null);
+                assertEquals(value,ContainerSnapshotFactory.RUNE_POUCH_SLOTS[i][column]);
+                assertEquals(value,Integer.parseInt(row[column]));
+            }
+        }
+        List<String[]> keys=GameData.rows("loot_key_slots"); assertEquals(5,keys.size());
+        for (int i=0;i<keys.size();i++) {
+            String[] row=keys.get(i);
+            assertEquals(ItemID.class.getField(row[2]).getInt(null),KeyClaims.KEY_ITEM_IDS[i]);
+            assertEquals(net.runelite.api.gameval.InventoryID.class.getField(row[3]).getInt(null),KeyClaims.KEY_CONTAINER_IDS[i]);
+        }
+    }
+
+    @Test public void gemContainersAcceptOnlyThePinnedGemFamilies() throws Exception {
+        java.util.Set<Integer> uncut=java.util.Set.of(ItemID.UNCUT_OPAL,ItemID.UNCUT_JADE,ItemID.UNCUT_RED_TOPAZ,
+            ItemID.UNCUT_SAPPHIRE,ItemID.UNCUT_EMERALD,ItemID.UNCUT_RUBY,ItemID.UNCUT_DIAMOND,ItemID.UNCUT_DRAGONSTONE);
+        List<String[]> rows=GameData.rows("gem_containers"); assertEquals(5,rows.size());
+        for (String[] row:rows) {
+            assertEquals(ItemID.class.getField(row[2]).getInt(null),Integer.parseInt(row[0]));
+            for (String gem:row[1].split(",")) assertTrue(uncut.contains(Integer.parseInt(gem)));
+        }
+        assertEquals(4,GameData.rows("gem_messages").size());
+        for (String[] row:GameData.rows("gem_messages")) assertNotNull(GameData.pattern(row[0]));
     }
 
 }

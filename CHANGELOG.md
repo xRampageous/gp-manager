@@ -1,5 +1,29 @@
 # GP Manager changelog
 
+## 1.6.0 - 2026-10-20
+
+- Click Gains, Supply, Loss or Trade for that Live session's entries, 15 per page; click the same category again to return to Recent. Search is available only on Ledger. Recent stays a dark list with its count, total and row limit: 15 by default, up to 30.
+- Long runs, activity titles, table headers and saves do less repeated work. Reduced plugin size while keeping features, booked values and saved data.
+- Save an optional Live session copy in Grinds from the Free play/Grind line; bookings count once. Copies reopen safely with incomplete receipt details and retain their actual start date and captured clock.
+- Click ACTIVE to restart Active Time and calculate GP/h from displayed Net after one active minute. Keep previous clock freezes a clock for Restore time; Save session and Continue without saving return to the full run clock. Net, Recent and targets stay intact.
+- Copy the Live summary from the gear menu, or a run/saved session summary from its Grinds row menu. Supply tooltips show spending as a percentage of booked Gains when supported.
+- Recent offers separate Hide item, Hide supply and spell hiding; acquisitions stay visible when hiding supplies. Confirmations explain that Net and the Ledger stay unchanged; remove a spell from Hidden Recent items to show it again.
+- Matching pickups share one row across NPC-loot and inventory detection, retaining every receipt and its value.
+- Spells, potion doses and ammunition keep their own supply rows during mixed actions. Autocasts keep their observed spell name when rune pickups obscure costs; later selections cannot rename earlier casts.
+- HUD loot chips total bookings from the same game tick. Newest loot leads, with highlighted/high-value items first within that batch.
+- Optional Compact item rows place shortened value and quantity beside the icon (200M ×1). Full values below 10M keeps smaller values exact when they fit; names remain on by default.
+- GE status words such as Selling and Offering stay readable beside quantities. Exact negative totals retain one minus sign, including very large losses.
+- Activity titles stay on one row with a right-hand status pill; generic Magic no longer titles Free play. Review and pending counts appear only when needed.
+- Status colors: Away orange, Paused amber, Logged out red, Reconnecting blue, and Calibrating/Resuming/Complete green. Only left-clicking the status dot pauses or resumes.
+- Reached Free play milestones show on the HUD for eight seconds, fading at the end, then clear. Targets is now Set a Target.
+- Older complete mixed rune recipes become separate spell supplies without changing quantities, prices or Net; ambiguous history stays intact. Repaired spell names remain saved after temporary tooling is removed.
+- Remembered looting-bag contents and dispenser additions remain part of Risk after relogging.
+- Start and End live on Grinds, with a direct Archived filter and current Archive/Unarchive menus. Long Grind names and Ledger scopes keep nearby controls readable.
+- Sidebar controls, tabs, row menus and dialogs support local keyboard access without focus outlines. Narrow dialogs keep every choice visible; session deletion uses Delete.
+- Invalid targets retain typed Start/Edit/Set a Target fields for correction. Target cards resize, oversized time targets are rejected, and large Grind totals keep an accurate average GP/h.
+- Account changes hide previous details until fresh data is ready; backup/reset results stay with their account when switching profiles or disabling the plugin.
+- Dizana's quiver tracks ammunition from live state and Sunfire splinter use, with charge checks reconciling cost. Gems mined or stolen into gem containers count as gains; emptying stays neutral.
+
 ## 1.5.2 - 2026-10-17
 
 **New**

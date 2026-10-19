@@ -1,5 +1,8 @@
 package com.gpmanager;
 
+import static com.gpmanager.ActionReader.*;
+import static net.runelite.client.game.ItemVariationMapping.*;
+
 import static java.lang.Math.*;
 
 import java.io.*;
@@ -37,7 +40,7 @@ class GameData {
 
     /** The rows of {@code name}.tsv; a missing table is a packaging bug, so it fails loudly. */
     static List<String[]> rows(String name) {
-        InputStream stream = GameData.class.getResourceAsStream("/com/gpmanager/model/" + name + ".tsv");
+        var stream = GameData.class.getResourceAsStream("/com/gpmanager/model/" + name + ".tsv");
         if (stream == null) throw new IllegalStateException("Missing game data table " + name);
         var rows = new ArrayList<String[]>();
         try (BufferedReader reader = new BufferedReader(new InputStreamReader(stream, StandardCharsets.UTF_8))) {
@@ -55,6 +58,10 @@ class GameData {
         var map = new HashMap<Integer, String>();
         for (String[] row : rows(name)) map.put(Integer.parseInt(row[0]), row[1]);
         return map;
+    }
+
+    static int[] intColumn(String name, int column) {
+        return cachedRows(name).stream().mapToInt(row -> Integer.parseInt(row[column])).toArray();
     }
 
     /** Ordered first-column names; useful for catalogues whose first match wins. */
@@ -119,7 +126,7 @@ class GameData {
  */
 class SafeMath {
     /** The wall clock every accounting read uses; the rework's replay sets it to recorded time. */
-    static volatile java.util.function.LongSupplier clock = System::currentTimeMillis;
+    static volatile LongSupplier clock = System::currentTimeMillis;
 
     static long now() {
         return clock.getAsLong();
@@ -128,7 +135,7 @@ class SafeMath {
     /** Absolute value that saturates instead of overflowing on {@code Long.MIN_VALUE}. */
     /** The value, or zero when it is negative. */
     static long nonNeg(long value) {
-        return max(0L, value);
+        return max(0, value);
     }
 
     static long abs(long value) {
@@ -139,7 +146,7 @@ class SafeMath {
         try {
             return addExact(left, right);
         } catch (ArithmeticException ex) {
-            return right >= 0L ? Long.MAX_VALUE : Long.MIN_VALUE;
+            return right >= 0 ? Long.MAX_VALUE : Long.MIN_VALUE;
         }
     }
 
@@ -147,7 +154,7 @@ class SafeMath {
         try {
             return subtractExact(left, right);
         } catch (ArithmeticException ex) {
-            return right < 0L ? Long.MAX_VALUE : Long.MIN_VALUE;
+            return right < 0 ? Long.MAX_VALUE : Long.MIN_VALUE;
         }
     }
 
@@ -155,7 +162,7 @@ class SafeMath {
         try {
             return multiplyExact(left, right);
         } catch (ArithmeticException ex) {
-            return (left >= 0L) == (right >= 0L) ? Long.MAX_VALUE : Long.MIN_VALUE;
+            return (left >= 0) == (right >= 0) ? Long.MAX_VALUE : Long.MIN_VALUE;
         }
     }
 
@@ -173,6 +180,10 @@ class SafeMath {
 
 /** Display-name defaults and phrase matching shared by the model and the classifiers. */
 class Phrases {
+    static String uuid() {
+        return UUID.randomUUID().toString();
+    }
+
     /** Blank activity names fall back to the General bucket. */
     static String normalizeActivity(String value) {
         return nonBlank(value, "General");
@@ -196,11 +207,11 @@ class Phrases {
         return text == null || text.isEmpty();
     }
 
-    static boolean empty(java.util.Collection<?> values) {
+    static boolean empty(Collection<?> values) {
         return values == null || values.isEmpty();
     }
 
-    static boolean empty(java.util.Map<?, ?> values) {
+    static boolean empty(Map<?, ?> values) {
         return values == null || values.isEmpty();
     }
 
@@ -243,7 +254,7 @@ class Phrases {
         String text;
         int kind;
         boolean negated;
-        java.util.regex.Pattern pattern;
+        Pattern pattern;
 
         Clause(String spec) {
             if (spec.startsWith("@")) spec = GameData.msg(spec.substring(1));
@@ -263,13 +274,13 @@ class Phrases {
     }
 
     static boolean containsAll(String text, Clause[] clauses) {
-        for (Clause clause : clauses) {
-            boolean hit = clause.kind == 0 ? text.equals(clause.text) : clause.kind == 1 ? text.startsWith(clause.text)
-                                    : clause.kind == 2 ? text.endsWith(clause.text) : clause.kind == 3
-                                                    ? clause.pattern.matcher(text).matches() : clause.kind == 4
-                                                            ? text.equalsIgnoreCase(clause.text)
-                                                            : text.contains(clause.text);
-            if (hit == clause.negated) return false;
+        for (var term : clauses) {
+            boolean hit = term.kind == 0 ? text.equals(term.text) : term.kind == 1 ? text.startsWith(term.text)
+                                    : term.kind == 2 ? text.endsWith(term.text) : term.kind == 3
+                                                    ? term.pattern.matcher(text).matches() : term.kind == 4
+                                                            ? text.equalsIgnoreCase(term.text)
+                                                            : text.contains(term.text);
+            if (hit == term.negated) return false;
         }
         return true;
     }
@@ -289,7 +300,7 @@ class Valuation implements FlowValuator {
      */
     @FunctionalInterface
     interface MarketQuote {
-        int priceOf(int itemId, boolean active);
+        int priceOf(int id, boolean active);
     }
 
     static final Map<String, String> PARTS = GameData.byName("partial_food");
@@ -304,16 +315,16 @@ class Valuation implements FlowValuator {
     volatile boolean karamjaGlovesWorn;
 
     /** A market quote floored at zero; an unavailable quote reads 0 (the flow stays unpriced). */
-    int quoteOrZero(int itemId) {
+    int quoteOrZero(int id) {
         try {
-            return max(0, marketQuotes.priceOf(itemId, true));
+            return max(0, marketQuotes.priceOf(id, true));
         } catch (RuntimeException ignored) {
             return 0;
         }
     }
 
     @Inject
-    Valuation(ItemManager itemManager, GpManagerConfig config) {
+    Valuation(ItemManager items, GpManagerConfig config) {
         // Accounting explicitly requests GP Manager's chosen RuneLite active market route (the
         // boolean is always true at the call site). It must not delegate to getItemPrice(),
         // whose implementation follows the user's global useWikiItemPrices display preference
@@ -321,9 +332,9 @@ class Valuation implements FlowValuator {
         // fall back to guide/Jagex pricing; the selected quote is captured and frozen at
         // booking time, and history is never repriced. The economy gate starts UNKNOWN until
         // the plugin observes a logged-in world, so automatic quotes fail closed meanwhile.
-        this(config, itemManager::getItemComposition,
-                (id, active) -> unitPriceOf(itemManager.getItemPriceWithSource(id, active)),
-                id -> hasUnsupportedMapping(itemManager, id), Economy.UNKNOWN);
+        this(config, items::getItemComposition,
+                (id, active) -> unitPriceOf(items.getItemPriceWithSource(id, active)),
+                id -> hasUnsupportedMapping(items, id), Economy.UNKNOWN);
     }
 
     /**
@@ -332,7 +343,7 @@ class Valuation implements FlowValuator {
      * positive) stays unpriced for Review instead of booking a clamped, fabricated amount.
      */
     static int unitPriceOf(long quote) {
-        return quote <= 0L || quote > Integer.MAX_VALUE ? 0 : SafeMath.toInt(quote);
+        return quote <= 0 || quote > Integer.MAX_VALUE ? 0 : SafeMath.toInt(quote);
     }
 
     /** Test seam: deterministic NORMAL economy and no mapping guard; the boolean stays explicit. */
@@ -350,16 +361,16 @@ class Valuation implements FlowValuator {
     }
 
     @Override
-    public List<Flow> value(Map<Integer, Long> quantityDeltas) {
-        return value(quantityDeltas, 0L);
+    public List<Flow> value(Map<Integer, Long> changes) {
+        return value(changes, 0);
     }
 
     @Override
-    public List<Flow> value(Map<Integer, Long> quantityDeltas, long priceCapturedAtEpochMillis) {
+    public List<Flow> value(Map<Integer, Long> changes, long capturedAt) {
         var flows = new ArrayList<Flow>();
-        Map<Integer, Integer> priceOverrides = priceOverrides();
-        for (Map.Entry<Integer, Long> entry : quantityDeltas.entrySet()) {
-            Flow flow = valueOne(entry.getKey(), entry.getValue(), priceOverrides, priceCapturedAtEpochMillis);
+        var prices = priceOverrides();
+        for (var entry : changes.entrySet()) {
+            Flow flow = valueOne(entry.getKey(), entry.getValue(), prices, capturedAt);
             if (flow != null) flows.add(flow);
         }
         flows.sort(Comparator.comparingLong((Flow flow) -> SafeMath.abs(flow.valueDelta)).reversed());
@@ -372,33 +383,33 @@ class Valuation implements FlowValuator {
      * cannot be mistaken for consumption before action settlement.
      */
     @Override
-    public List<Flow> normalizeConsumedFlows(List<Flow> flows, ActionKind actionKind, long priceCapturedAtEpochMillis) {
-        if (flows == null || flows.isEmpty() || actionKind != ActionKind.DRINK || ActionReader.isDecant(flows)) {
+    public List<Flow> normalizeConsumedFlows(List<Flow> flows, ActionKind action, long capturedAt) {
+        if (flows == null || flows.isEmpty() || action != ActionKind.DRINK || isDecant(flows)) {
             return flows;
         }
-        Map<Integer, Integer> priceOverrides = priceOverrides();
-        List<ActionReader.PartialUse> pairs = ActionReader.partialUses(flows);
+        var prices = priceOverrides();
+        var pairs = partialUses(flows);
         if (pairs.isEmpty()) return flows;
         // Each exact pair is an atomic accounting unit. Compute both replacement flows before
         // assigning either one; an unsupported basis returns null and leaves the caller's
         // original captured list untouched for Review.
         var normalized = new ArrayList<>(flows);
-        for (ActionReader.PartialUse pair : pairs) {
-            if (!normalizePotionPair(normalized, pair.lossIndex, pair.remainderIndex, priceOverrides,
-                    priceCapturedAtEpochMillis)) {
+        for (var pair : pairs) {
+            if (!normalizePotionPair(normalized, pair.lossIndex, pair.remainderIndex, prices,
+                    capturedAt)) {
                 return null;
             }
         }
         return normalized;
     }
 
-    Flow doseAuthority(Flow flow, Map<Integer, Integer> priceOverrides, long now) {
+    Flow doseAuthority(Flow flow, Map<Integer, Integer> prices, long now) {
         if (flow == null) return null;
-        String one = (ActionReader.doseBaseName(flow.itemName) + "(1)").trim().toLowerCase(Locale.ROOT);
+        String one = (doseBaseName(flow.itemName) + "(1)").trim().toLowerCase(Locale.ROOT);
         Flow geCandidate = null;
         try {
-            for (int id : ItemVariationMapping.getVariations(ItemVariationMapping.map(flow.itemId))) {
-                Flow unit = valueOne(id, 1L, priceOverrides, now, false);
+            for (int id : getVariations(map(flow.itemId))) {
+                Flow unit = valueOne(id, 1, prices, now, false);
                 String unitName = unit == null ? "" : unit.itemName;
                 if (unitName == null || !one.equals(Phrases.lower(unitName))) continue;
                 if (unit.getPriceSource() == MANUAL_OVERRIDE) return unit;
@@ -418,22 +429,21 @@ class Valuation implements FlowValuator {
      * authoritative; RuneLite's variation mapping names the family and anything malformed fails
      * closed to null.
      */
-    Flow doseFamilyQuote(int itemId, String itemName, Map<Integer, Integer> priceOverrides) {
-        int dose = ActionReader.trailingDose(itemName);
-        String base = ActionReader.doseBaseName(itemName);
+    Flow doseFamilyQuote(int identifier, String name, Map<Integer, Integer> prices) {
+        int dose = trailingDose(name);
+        String base = doseBaseName(name);
         if (dose <= 0 || base.isEmpty()) return null;
-        int anchorDose = 0;
-        int anchorPrice = 0;
+        int anchorDose = 0, anchorPrice = 0;
         boolean manual = false;
         try {
-            for (int id : ItemVariationMapping.getVariations(ItemVariationMapping.map(itemId))) {
-                if (id == itemId) continue;
+            for (int id : getVariations(map(identifier))) {
+                if (id == identifier) continue;
                 String otherName = compositionName(id);
-                int otherDose = ActionReader.trailingDose(otherName);
-                if (otherDose <= 0 || !base.equalsIgnoreCase(ActionReader.doseBaseName(otherName))) {
+                int otherDose = trailingDose(otherName);
+                if (otherDose <= 0 || !base.equalsIgnoreCase(doseBaseName(otherName))) {
                     continue;
                 }
-                Integer override = priceOverrides.get(id);
+                Integer override = prices.get(id);
                 if (override != null && override > 0) {
                     if (!manual || otherDose > anchorDose) {
                         manual = true;
@@ -454,14 +464,14 @@ class Valuation implements FlowValuator {
         }
         if (anchorDose <= 0 || anchorPrice <= 0) return null;
         long scaled = (long) anchorPrice * dose / anchorDose;
-        if (scaled <= 0L || scaled > Integer.MAX_VALUE) return null;
-        return new Flow(itemId, itemName, 1L, (int) scaled, scaled, manual ? MANUAL_OVERRIDE : GRAND_EXCHANGE, 0L);
+        if (scaled <= 0 || scaled > Integer.MAX_VALUE) return null;
+        return new Flow(identifier, name, 1L, (int) scaled, scaled, manual ? MANUAL_OVERRIDE : GRAND_EXCHANGE, 0L);
     }
 
     /** One variation family member's display name, "" when the definition is unavailable. */
     String compositionName(int id) {
         try {
-            ItemComposition composition = compositions.apply(id);
+            var composition = compositions.apply(id);
             return composition == null || composition.getName() == null ? "" : composition.getName();
         } catch (RuntimeException ignored) {
             return "";
@@ -469,25 +479,23 @@ class Valuation implements FlowValuator {
     }
 
     private boolean normalizePotionPair(List<Flow> normalized, int lossIndex, int remainderIndex,
-            Map<Integer, Integer> priceOverrides, long now) {
-        Flow loss = normalized.get(lossIndex);
-        Flow remainder = normalized.get(remainderIndex);
-        int lostDose = ActionReader.trailingDose(loss.itemName);
-        int gainedDose = ActionReader.trailingDose(remainder.itemName);
-        if (lostDose <= 0 || gainedDose <= 0 || lostDose != gainedDose + 1 || !ActionReader.doseBaseName(loss.itemName)
-                        .equals(ActionReader.doseBaseName(remainder.itemName))) {
+            Map<Integer, Integer> prices, long now) {
+        Flow loss = normalized.get(lossIndex), rest = normalized.get(remainderIndex);
+        int lostDose = trailingDose(loss.itemName), dose = trailingDose(rest.itemName);
+        if (lostDose <= 0 || dose <= 0 || lostDose != dose + 1 || !doseBaseName(loss.itemName)
+                        .equals(doseBaseName(rest.itemName))) {
             return false;
         }
-        Flow authority = doseAuthority(loss, priceOverrides, now);
-        if (!compatibleWithAuthority(loss, authority) || !compatibleWithAuthority(remainder, authority)) return false;
+        Flow authority = doseAuthority(loss, prices, now);
+        if (!compatibleWithAuthority(loss, authority) || !compatibleWithAuthority(rest, authority)) return false;
         try {
             long lossUnit = multiplyExact(lostDose, (long) authority.unitPrice);
-            long remainderUnit = multiplyExact(gainedDose, (long) authority.unitPrice);
+            long remainderUnit = multiplyExact(dose, (long) authority.unitPrice);
             Flow normalizedLoss = new Flow(loss.itemId, loss.itemName, loss.quantityDelta, toIntExact(lossUnit),
                             multiplyExact(loss.quantityDelta, lossUnit), authority.getPriceSource(),
                             authority.getPriceCapturedAtEpochMillis());
-            Flow normalizedRemainder = new Flow(remainder.itemId, remainder.itemName, remainder.quantityDelta,
-                            toIntExact(remainderUnit), multiplyExact(remainder.quantityDelta, remainderUnit),
+            Flow normalizedRemainder = new Flow(rest.itemId, rest.itemName, rest.quantityDelta,
+                            toIntExact(remainderUnit), multiplyExact(rest.quantityDelta, remainderUnit),
                             authority.getPriceSource(), authority.getPriceCapturedAtEpochMillis());
             normalized.set(lossIndex, normalizedLoss);
             normalized.set(remainderIndex, normalizedRemainder);
@@ -512,8 +520,8 @@ class Valuation implements FlowValuator {
      * deferred claim, face value, explicit manual override, the mapping guard, the world/economy
      * gate, the explicit active RuneLite market route and UNPRICED otherwise.
      */
-    Flow valueComponent(int itemId, long quantityDelta, long now) {
-        return valueOne(itemId, quantityDelta, priceOverrides(), now);
+    Flow valueComponent(int id, long delta, long now) {
+        return valueOne(id, delta, priceOverrides(), now);
     }
 
     @Override
@@ -530,8 +538,8 @@ class Valuation implements FlowValuator {
     }
 
     /** Client-thread Karamja-gloves snapshot; picks the improved proxy rate while worn. */
-    void setKaramjaGlovesWorn(boolean worn) {
-        karamjaGlovesWorn = worn;
+    void setKaramjaGlovesWorn(boolean gear) {
+        karamjaGlovesWorn = gear;
     }
 
     /**
@@ -542,7 +550,7 @@ class Valuation implements FlowValuator {
      */
     static Economy economyFor(Collection<WorldType> worldTypes) {
         if (worldTypes == null) return Economy.UNKNOWN;
-        for (WorldType type : worldTypes) {
+        for (var type : worldTypes) {
             if (type == null) return Economy.UNKNOWN;
             switch (type) {
                 case DEADMAN:
@@ -566,141 +574,141 @@ class Valuation implements FlowValuator {
      */
     volatile boolean alch;
 
-    Flow valueOne(int itemId, long quantityDelta, Map<Integer, Integer> priceOverrides,
-            long priceCapturedAtEpochMillis) {
-        return valueOne(itemId, quantityDelta, priceOverrides, priceCapturedAtEpochMillis, true);
+    Flow valueOne(int id, long delta, Map<Integer, Integer> prices,
+            long capturedAt) {
+        return valueOne(id, delta, prices, capturedAt, true);
     }
 
-    Flow valueOne(int itemId, long quantityDelta, Map<Integer, Integer> priceOverrides, long priceCapturedAtEpochMillis,
+    Flow valueOne(int id, long delta, Map<Integer, Integer> prices, long priceCapturedAtEpochMillis,
             boolean doseFallback) {
-        boolean deferredClaim = DeferredClaims.of(itemId);
+        boolean claim = DeferredClaims.of(id);
         try {
             ItemComposition composition = null;
             try {
-                composition = compositions.apply(itemId);
+                composition = compositions.apply(id);
             } catch (RuntimeException ignored) {
                 // No definition yet: the flow keeps a placeholder name.
             }
-            String name = composition == null || composition.getName() == null ? "Item " + itemId
+            String name = composition == null || composition.getName() == null ? "Item " + id
                             : composition.getName();
             // A clue scroll, scroll box or reward casket is worth nothing until its casket opens
             // (owner 2026-10-08).
-            deferredClaim |= GameData.pattern("clue").matcher(name).matches();
+            claim |= GameData.pattern("clue").matcher(name).matches();
             // An empty vial is a physical neutral; filled variants remain ordinary items.
-            if (itemId == ItemID.VIAL_EMPTY) return null;
-            boolean manualOverride = priceOverrides.containsKey(itemId);
-            int faceValue = faceValueOf(itemId);
+            if (id == ItemID.VIAL_EMPTY) return null;
+            boolean manualOverride = prices.containsKey(id);
+            int faceValue = faceValueOf(id);
             // For ordinary items, a user override is authoritative even before RuneLite prices
             // load; fixed currencies below retain their face value by policy.
-            int marketPrice = 0;
+            int quote = 0;
             // RuneLite's ItemManager price helper is intentionally convenient: when an item has
             // no direct quote it can recurse through ItemMapping and price an untradeable variant
             // from another item (for example unidentified minerals or golden nuggets via coal).
             // Those catalogue entries are non-GP currencies in GP Manager, so their physical
             // identity must not inherit a monetary identity from the platform mapping. An
             // explicit owner override remains authoritative.
-            if (!manualOverride && !deferredClaim && faceValue == 0 && !CurrencyProxyCatalogue.isMapped(itemId)
-                    && economyState == Economy.NORMAL && !unsupportedMapping.test(itemId)) {
+            if (!manualOverride && !claim && faceValue == 0 && !CurrencyProxyCatalogue.isMapped(id)
+                    && economyState == Economy.NORMAL && !unsupportedMapping.test(id)) {
                 // GP Manager's single automatic market policy: the explicit active route,
                 // gated by the current world/economy and the mapping guard above.
-                marketPrice = quoteOrZero(itemId);
+                quote = quoteOrZero(id);
             }
             // A proxy row values the component from a market item and its fixed exchange rate.
             // The proxy's market item is priced only where market quotes are, never on unknown or
             // special worlds (Codex review 1.2).
-            int[] proxy = marketPrice == 0 && economyState == Economy.NORMAL ? CurrencyProxyCatalogue.proxyOf(itemId)
+            int[] proxy = quote == 0 && economyState == Economy.NORMAL ? CurrencyProxyCatalogue.proxyOf(id)
                             : null;
             if (proxy != null) {
                 // Some exchanges improve while Karamja gloves are worn; the proxy row may
                 // carry the improved units after a slash (tokkul: 300,000 or 260,000 per onyx).
                 int units = proxy[1];
                 if (karamjaGlovesWorn) {
-                    int glovesUnits = CurrencyProxyCatalogue.glovesUnitsOf(itemId);
+                    int glovesUnits = CurrencyProxyCatalogue.glovesUnitsOf(id);
                     if (glovesUnits > 0) units = glovesUnits;
                 }
                 // No proxy quote: the flow stays unpriced for Review.
-                marketPrice = quoteOrZero(proxy[0]) / units;
+                quote = quoteOrZero(proxy[0]) / units;
             }
             // RuneLite's ItemMapping carries no bracelet of ethereum entry (upstream omission,
             // verified 2026-10-12): the charged bracelet prices from its uncharged form's live
             // quote, the same relationship the revenant weapons already have.
-            if (marketPrice == 0 && itemId == ItemID.WILD_CAVE_BRACELET_CHARGED && !manualOverride
-                    && economyState == Economy.NORMAL && !unsupportedMapping.test(itemId)) {
+            if (quote == 0 && id == ItemID.WILD_CAVE_BRACELET_CHARGED && !manualOverride
+                    && economyState == Economy.NORMAL && !unsupportedMapping.test(id)) {
                 // No quote: the flow stays unpriced for Review.
-                marketPrice = quoteOrZero(ItemID.WILD_CAVE_BRACELET_UNCHARGED);
+                quote = quoteOrZero(ItemID.WILD_CAVE_BRACELET_UNCHARGED);
             }
             // A partial dose RuneLite cannot quote (Burning amulet(4)) is priced from its family's
             // highest-dose quote at the same rate per dose (owner 1.3.4, GP-Per-Hour's fractional
             // model); a manual override anywhere in the family is authoritative.
             Flow doseQuote = null;
-            if (marketPrice == 0 && doseFallback && !manualOverride && !deferredClaim && faceValue == 0
-                    && economyState == Economy.NORMAL && !CurrencyProxyCatalogue.isMapped(itemId)
-                    && !unsupportedMapping.test(itemId)) {
-                doseQuote = doseFamilyQuote(itemId, name, priceOverrides);
+            if (quote == 0 && doseFallback && !manualOverride && !claim && faceValue == 0
+                    && economyState == Economy.NORMAL && !CurrencyProxyCatalogue.isMapped(id)
+                    && !unsupportedMapping.test(id)) {
+                doseQuote = doseFamilyQuote(id, name, prices);
             }
             // Half a pie, a pizza half or a cake slice is its share of the whole one's quote
             // (owner live 2026-10-16: Half a summer pie read "?").
-            String part = PARTS.get(String.valueOf(itemId));
-            if (marketPrice == 0 && part != null && !manualOverride && economyState == Economy.NORMAL) {
+            String part = PARTS.get(String.valueOf(id));
+            if (quote == 0 && part != null && !manualOverride && economyState == Economy.NORMAL) {
                 String[] share = part.split(" ");
-                marketPrice = (int)
+                quote = (int)
                                 ((long) quoteOrZero(Integer.parseInt(share[0]))
                                         * Integer.parseInt(share[1])
                                         / Integer.parseInt(share[2]));
             }
-            int unitPrice;
-            PriceSource priceSource;
-            if (deferredClaim) {
+            int price;
+            PriceSource source;
+            if (claim) {
                 // A non-tradeable key is an unopened claim, not held wealth. Its
                 // contents become ordinary valued inventory gains only on receipt.
-                unitPrice = 0;
-                priceSource = DEFERRED_CLAIM;
+                price = 0;
+                source = DEFERRED_CLAIM;
             } else if (faceValue > 0) {
-                unitPrice = faceValue;
-                priceSource = FACE_VALUE;
+                price = faceValue;
+                source = FACE_VALUE;
             } else if (manualOverride) {
-                unitPrice = priceOverrides.get(itemId);
-                priceSource = MANUAL_OVERRIDE;
+                price = prices.get(id);
+                source = MANUAL_OVERRIDE;
             } else if (alch && composition != null && composition.getHaPrice() > 0) {
-                unitPrice = composition.getHaPrice();
-                priceSource = HIGH_ALCHEMY;
-            } else if (marketPrice > 0) {
+                price = composition.getHaPrice();
+                source = HIGH_ALCHEMY;
+            } else if (quote > 0) {
                 // The item's own market quote is a supported observation. Non-GP currencies
                 // without a quote stay unpriced; an exchange relationship is never converted into
                 // booked GP.
-                unitPrice = marketPrice;
-                priceSource = proxy == null ? GRAND_EXCHANGE : CURRENCY_PROXY;
+                price = quote;
+                source = proxy == null ? GRAND_EXCHANGE : CURRENCY_PROXY;
             } else if (doseQuote != null) {
                 // The derived price follows its family anchor's source so provenance stays honest.
-                unitPrice = doseQuote.unitPrice;
-                priceSource = doseQuote.getPriceSource();
-            } else if (composition != null && !CurrencyProxyCatalogue.isMapped(itemId)
-                    && !unsupportedMapping.test(itemId) && (!composition.isTradeable() || economyState == Economy.NORMAL
+                price = doseQuote.unitPrice;
+                source = doseQuote.getPriceSource();
+            } else if (composition != null && !CurrencyProxyCatalogue.isMapped(id)
+                    && !unsupportedMapping.test(id) && (!composition.isTradeable() || economyState == Economy.NORMAL
                                     && quoteOrZero(ItemID.NATURERUNE) > 0)) {
                 // No market quote (untradeable, or tradeable once prices have loaded): its alch
                 // value for every account (a crystal shard), else worth nothing (a Progress hat),
                 // a known zero rather than a missing price (owner 2026-10-16). With both, the GE
                 // price above wins unless an ironman chose alch values.
-                unitPrice = max(0, composition.getHaPrice());
-                priceSource = unitPrice > 0 ? HIGH_ALCHEMY : NO_VALUE;
+                price = max(0, composition.getHaPrice());
+                source = price > 0 ? HIGH_ALCHEMY : NO_VALUE;
             } else {
-                unitPrice = 0;
-                priceSource = UNPRICED;
+                price = 0;
+                source = UNPRICED;
             }
-            long valueDelta = safeMultiply(quantityDelta, unitPrice);
+            long value = safeMultiply(delta, price);
             // Only a non-zero selected price is a captured price. Unpriced/deferred flows
             // deliberately retain zero so consumers cannot present a fabricated capture time.
-            long capturedAt = unitPrice > 0 && priceSource != PriceSource.UNKNOWN && priceSource != FACE_VALUE
-                            ? SafeMath.nonNeg(priceCapturedAtEpochMillis) : 0L;
-            return new Flow(itemId, name, quantityDelta, unitPrice, valueDelta, priceSource, capturedAt);
+            long captured = price > 0 && source != UNKNOWN && source != FACE_VALUE
+                            ? SafeMath.nonNeg(priceCapturedAtEpochMillis) : 0;
+            return new Flow(id, name, delta, price, value, source, captured);
         } catch (RuntimeException ignored) {
-            return new Flow(itemId, "Item " + itemId, quantityDelta, 0, 0L, deferredClaim ? DEFERRED_CLAIM : UNPRICED);
+            return new Flow(id, "Item " + id, delta, 0, 0L, claim ? DEFERRED_CLAIM : UNPRICED);
         }
     }
 
-    static int faceValueOf(int itemId) {
-        if (itemId == ItemID.COINS) return 1;
-        if (itemId == ItemID.PLATINUM) return 1_000;
+    static int faceValueOf(int id) {
+        if (id == ItemID.COINS) return 1;
+        if (id == ItemID.PLATINUM) return 1_000;
         return 0;
     }
 
@@ -709,10 +717,10 @@ class Valuation implements FlowValuator {
      * non-coin mapping can represent a state/base identity; quantity/rate mappings and coin targets
      * would silently manufacture monetary identity for a physically distinct item.
      */
-    static boolean hasUnsupportedMapping(ItemManager itemManager, int itemId) {
+    static boolean hasUnsupportedMapping(ItemManager items, int id) {
         try {
-            int canonicalId = itemManager.canonicalize(itemId);
-            return hasUnsupportedMapping(ItemMapping.map(canonicalId));
+            int canonical = items.canonicalize(id);
+            return hasUnsupportedMapping(ItemMapping.map(canonical));
         } catch (RuntimeException ignored) {
             return true;
         }
@@ -720,8 +728,8 @@ class Valuation implements FlowValuator {
 
     static boolean hasUnsupportedMapping(Collection<ItemMapping> mappings) {
         if (mappings == null) return false;
-        for (ItemMapping mapping : mappings) {
-            if (mapping.getQuantity() != 1L || mapping.getTradeableItem() == ItemID.COINS)
+        for (var mapping : mappings) {
+            if (mapping.getQuantity() != 1 || mapping.getTradeableItem() == ItemID.COINS)
                 return true;
         }
         return false;
@@ -749,9 +757,8 @@ class ItemRuleParser {
             String[] parts = token.trim().split("=", 2);
             if (parts.length != 2) continue;
             try {
-                int itemId = Integer.parseInt(parts[0].trim());
-                int price = Integer.parseInt(parts[1].trim());
-                if (itemId >= 0 && price >= 0) result.put(itemId, price);
+                int id = Integer.parseInt(parts[0].trim()), price = Integer.parseInt(parts[1].trim());
+                if (id >= 0 && price >= 0) result.put(id, price);
             } catch (NumberFormatException ignored) {
                 // Invalid entries are ignored so a typo cannot break tracking.
             }
@@ -762,14 +769,14 @@ class ItemRuleParser {
 
 @FunctionalInterface
 interface FlowValuator {
-    List<Flow> value(Map<Integer, Long> quantityDeltas);
+    List<Flow> value(Map<Integer, Long> changes);
 
     /**
      * Values flows using the caller's evidence-capture time. Existing valuators remain
      * source-compatible and may ignore the timestamp until they support price provenance.
      */
-    default List<Flow> value(Map<Integer, Long> quantityDeltas, long priceCapturedAtEpochMillis) {
-        return value(quantityDeltas);
+    default List<Flow> value(Map<Integer, Long> changes, long capturedAt) {
+        return value(changes);
     }
 
     /**
@@ -783,7 +790,7 @@ interface FlowValuator {
      * callers must keep the original captured flows and route the receipt to Review.
      */
     default List<Flow> normalizeConsumedFlows(
-            List<Flow> flows, ActionKind actionKind, long priceCapturedAtEpochMillis) {
+            List<Flow> flows, ActionKind action, long capturedAt) {
         return flows;
     }
 
@@ -851,17 +858,17 @@ class CurrencyProxyCatalogue {
         }
     }
 
-    static boolean isMapped(int itemId) {
-        return CURRENCIES.contains(itemId);
+    static boolean isMapped(int id) {
+        return CURRENCIES.contains(id);
     }
 
     /** The proxy price source for this item, or null. */
-    static int[] proxyOf(int itemId) {
-        return PROXIES.get(itemId);
+    static int[] proxyOf(int id) {
+        return PROXIES.get(id);
     }
 
     /** The gloves-worn units for this proxy row, or 0 when its rate does not change. */
-    static int glovesUnitsOf(int itemId) {
-        return GLOVES_UNITS.getOrDefault(itemId, 0);
+    static int glovesUnitsOf(int id) {
+        return GLOVES_UNITS.getOrDefault(id, 0);
     }
 }

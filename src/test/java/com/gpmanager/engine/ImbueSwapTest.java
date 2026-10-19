@@ -7,6 +7,7 @@ import java.util.Map;
 import net.runelite.api.gameval.ItemID;
 import org.junit.Test;
 
+import static com.gpmanager.EngineTestFixtures.mapOf;
 import static org.junit.Assert.assertEquals;
 import static org.junit.Assert.assertSame;
 import static org.junit.Assert.assertTrue;
@@ -167,13 +168,4 @@ public class ImbueSwapTest
         return engine;
     }
 
-    private static Map<Integer, Long> mapOf(Object... values)
-    {
-        Map<Integer, Long> result = new HashMap<>();
-        for (int index = 0; index + 1 < values.length; index += 2)
-        {
-            result.put((Integer) values[index], (Long) values[index + 1]);
-        }
-        return result;
-    }
 }

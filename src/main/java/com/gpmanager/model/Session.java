@@ -1,5 +1,8 @@
 package com.gpmanager;
 
+
+import static com.gpmanager.FlowFilters.matching;
+
 import com.gpmanager.GpManagerConfig.Retention;
 
 import static com.gpmanager.Accounting.*;
@@ -19,14 +22,12 @@ import java.util.*;
 import java.util.function.Predicate;
 import lombok.*;
 
-class Session {
+class Session extends SaveCopies {
     /** The always-on General tracker is shown as "Overall". */
     static final String DURABLE_OWNER_NAME = "Overall";
 
     static final int MAX_UNDO_HISTORY = 32;
-    String id;
-    String name;
-    String activityHint;
+    String id, name, activityHint;
     SessionMode mode;
 
     /** True for a named Grind; false for the Overall (free play) session. */
@@ -35,7 +36,7 @@ class Session {
     /** Runtime-only signal/revision for profile totals derived from session-day summaries. */
     transient Runnable changeListener;
 
-    /** Runtime-only change count; a quick save reuses a closed session's JSON while it holds. */
+    /** Runtime-only change count for closed-session financial view invalidation. */
     transient long saveStamp;
 
     /** Runtime-only pooled known-basis observer; the engine wires the tracked-basis ledger. */
@@ -48,43 +49,39 @@ class Session {
         notifyChanged();
     }
 
-    void notifyOwnedValue(Transaction transaction, boolean custodyOwned) {
-        if (ownedValueObserver != null) ownedValueObserver.onAdded(transaction, custodyOwned);
+    void notifyOwnedValue(Transaction transaction, boolean owned) {
+        if (ownedValueObserver != null) ownedValueObserver.onAdded(transaction, owned);
     }
 
-    boolean canChangeOwnedValue(Transaction transaction, Correction previousCorrection, List<Flow> previousFlows,
-            Correction nextCorrection, List<Flow> nextFlows) {
+    boolean canChangeOwnedValue(Transaction transaction, Correction previous, List<Flow> previousFlows,
+            Correction nextCorrection, List<Flow> next) {
         return ownedValueObserver == null || ownedValueObserver.canChange(
-                        transaction, previousCorrection, previousFlows, nextCorrection, nextFlows);
+                        transaction, previous, previousFlows, nextCorrection, next);
     }
 
     /** Announces a changed row: totals, PvP and the owned-value observer follow it. */
-    void changed(Transaction transaction, Correction previousCorrection, List<Flow> previousFlows) {
+    void changed(Transaction transaction, Correction previous, List<Flow> previousFlows) {
         transactionChanged(transaction);
         if (ownedValueObserver != null)
-            ownedValueObserver.onChanged(transaction, previousCorrection, previousFlows);
+            ownedValueObserver.onChanged(transaction, previous, previousFlows);
     }
 
     void log(long now, String reason, Change... changes) {
         correctionHistory.add(new CorrectionRecord(reason, Arrays.asList(changes)));
     }
 
-    long startedAtEpochMillis;
-    long endedAtEpochMillis;
+    long startedAtEpochMillis, endedAtEpochMillis;
 
     boolean paused;
     PauseReason pauseReason = NONE;
-    long pausedAtEpochMillis;
-    long totalPausedMillis;
+    long pausedAtEpochMillis, totalPausedMillis;
     List<Transaction> transactions = new ArrayList<>();
     PkTally pk = new PkTally();
 
     List<CorrectionRecord> correctionHistory = new ArrayList<>();
     List<UndoRecord> undoHistory = new ArrayList<>();
     int transactionLimit;
-    long retainedRevenue;
-    long retainedCosts;
-    long retainedSuppliesCosts;
+    long retainedRevenue, retainedCosts, retainedSuppliesCosts;
     boolean retainedCostSplitComplete;
     long compactedTransactionCount;
     // Nullable by design: a target is owner-local presentation metadata, never
@@ -106,6 +103,24 @@ class Session {
 
     long sessionStartMillis;
 
+    /** Optional rate-only restart; older saves use the normal Live session window. */
+    Long rateStartAt;
+    long rateSetMillis;
+    /** Optional frozen clock backup and the time resumed by Restore time. */
+    Long savedRateMillis, restoredRateMillis;
+    /** Frozen displayed duration of a saved copy; absent on canonical runs. */
+    Long savedActiveMillis;
+
+    long liveElapsed(long now) {
+        long elapsed = getElapsedMillis(now), from = sessionStartAt == null ? 0 : sessionStartMillis;
+        if (rateStartAt != null && rateSetMillis >= 0 && rateSetMillis <= elapsed && rateStartAt <= now
+                && ((rateSetMillis >= from && rateStartAt >= (sessionStartAt == null ? startedAtEpochMillis : sessionStartAt))
+                    || (rateSetMillis == 0 && rateStartAt == startedAtEpochMillis))
+                && (restoredRateMillis == null || restoredRateMillis >= 0 && restoredRateMillis <= rateSetMillis))
+            return elapsed - rateSetMillis + (restoredRateMillis == null ? 0 : restoredRateMillis);
+        return nonNeg(elapsed - from);
+    }
+
     /** Free play's Net milestone: it counts Free play's whole Net (owner 1.5.2); null with none. */
     Long milestoneGp;
     // Signature targets: the actual Active-Time aim this Grind instance ran with, and the stable
@@ -124,7 +139,7 @@ class Session {
     }
 
     Session(String name, long startedAtEpochMillis, SessionMode mode) {
-        id = UUID.randomUUID().toString();
+        id = uuid();
         this.name = normalizeName(name);
         this.mode = mode == null ? SessionMode.GENERAL : mode;
         activityHint = "General";
@@ -137,21 +152,21 @@ class Session {
      * @param custodyOwned true for transactions already realized by a custody lifecycle; their item
      *     legs consumed their reservation and must never deplete again
      */
-    void addTransaction(Transaction transaction, int maxTransactions, boolean custodyOwned) {
+    void addTransaction(Transaction transaction, int maxTransactions, boolean owned) {
         if (transaction == null) return;
         transactionLimit = max(1, maxTransactions);
         transactions.add(transaction);
         transactionChanged(transaction);
-        notifyOwnedValue(transaction, custodyOwned);
+        notifyOwnedValue(transaction, owned);
         evict(transactions.size() - transactionLimit);
     }
 
     /** Drops the oldest rows over the limit, each summarized exactly into the retained totals. */
     void evict(int overflow) {
         if (overflow <= 0) return;
-        var removed = new ArrayList<Transaction>(transactions.subList(0, overflow));
+        var removed = new ArrayList<>(transactions.subList(0, overflow));
         transactions.subList(0, overflow).clear();
-        for (Transaction transactionToRemove : removed) compactTransaction(transactionToRemove);
+        for (var transactionToRemove : removed) compactTransaction(transactionToRemove);
     }
 
     void recordAction(String hint, long now) {
@@ -160,8 +175,7 @@ class Session {
 
     void setActivityHint(String hint, long now) {
         if (blank(hint)) return;
-        String next = normalizeActivity(hint);
-        String current = getActivityHint();
+        String next = normalizeActivity(hint), current = getActivityHint();
         if (next.equalsIgnoreCase(current)) return;
         activityHint = next;
     }
@@ -171,7 +185,7 @@ class Session {
     }
 
     boolean setProfitTargetGp(Long value) {
-        return setProfitTargetGp(value, 0L, 0L);
+        return setProfitTargetGp(value, 0, 0);
     }
 
     /**
@@ -179,46 +193,46 @@ class Session {
      * counts from now, as does the same value once the aim is already reached; an unchanged,
      * unreached value keeps its count.
      */
-    boolean setProfitTargetGp(Long value, long sessionNet, long activeMillis) {
-        Long next = value == null || value <= 0L ? null : value;
+    boolean setProfitTargetGp(Long value, long net, long activeMillis) {
+        Long next = value == null || value <= 0 ? null : value;
         if (Objects.equals(next, profitTargetGp)) {
-            return next != null && profitTargetProgress(sessionNet) >= next
-                    && rebaseProfitTarget(sessionNet, activeMillis);
+            return next != null && profitTargetProgress(net) >= next
+                    && rebaseProfitTarget(net, activeMillis);
         }
         profitTargetGp = next;
-        rebaseProfitTarget(sessionNet, activeMillis);
+        rebaseProfitTarget(net, activeMillis);
         return true;
     }
 
     /** The run's Net when the aim was set; 0 with none and on older saves. */
     long getProfitTargetSetNet() {
-        return profitTargetSetNet == null || profitTargetSetNet < 0L ? 0L : profitTargetSetNet;
+        return profitTargetSetNet == null || profitTargetSetNet < 0 ? 0L : profitTargetSetNet;
     }
 
     /** What the Net aim has counted so far; sessionNet is the run's total. */
-    long profitTargetProgress(long sessionNet) {
-        return sessionStartAt != null ? metrics(rowsSince(sessionStartAt), 0L).net
-                : sessionNet - getProfitTargetSetNet();
+    long profitTargetProgress(long net) {
+        return sessionStartAt != null ? metrics(rowsSince(sessionStartAt), 0).net
+                : net - getProfitTargetSetNet();
     }
 
     /**
      * Re-bases the set Net aim's count on the given net, keeping its value (owner live 2026-10-14):
      * Reset counts the aim from now whether or not it was reached.
      */
-    boolean rebaseProfitTarget(long sessionNet, long activeMillis) {
-        profitTargetSetNet = profitTargetGp == null ? null : sessionNet;
+    boolean rebaseProfitTarget(long net, long activeMillis) {
+        profitTargetSetNet = profitTargetGp == null ? null : net;
         profitTargetSetActiveMillis = profitTargetGp == null ? null : activeMillis;
         return profitTargetGp != null;
     }
 
     /** Active Time the Net aim has run for; the whole run on older saves. */
-    long profitTargetActiveMillis(long elapsedMillis) {
-        return nonNeg(elapsedMillis - (profitTargetSetActiveMillis == null ? 0L : profitTargetSetActiveMillis));
+    long profitTargetActiveMillis(long elapsed) {
+        return nonNeg(elapsed - (profitTargetSetActiveMillis == null ? 0L : profitTargetSetActiveMillis));
     }
 
     /** The actual Active-Time target this instance ran with; null when none was set. */
     Long getActiveTimeTargetMillis() {
-        return activeTimeTargetMillis != null && activeTimeTargetMillis > 0L ? activeTimeTargetMillis : null;
+        return activeTimeTargetMillis != null && activeTimeTargetMillis > 0 ? activeTimeTargetMillis : null;
     }
 
     /**
@@ -227,7 +241,7 @@ class Session {
      * unchanged value keeps the running count; a cleared one forgets it.
      */
     boolean setActiveTimeTargetMillis(Long value, long now) {
-        Long next = value == null || value <= 0L ? null : value;
+        Long next = value == null || value <= 0 ? null : value;
         if (Objects.equals(next, activeTimeTargetMillis)) {
             // Re-saving the same aim keeps a running window; a completed one starts over
             // (owner live 2026-10-13: Edit > Save after completion must begin again).
@@ -246,13 +260,13 @@ class Session {
 
     /** The Active Time a set target counts from; 0 with none and on older saves. */
     long getActiveTimeTargetSetMillis() {
-        return activeTimeTargetSetMillis == null || activeTimeTargetSetMillis < 0L ? 0L : activeTimeTargetSetMillis;
+        return activeTimeTargetSetMillis == null || activeTimeTargetSetMillis < 0 ? 0L : activeTimeTargetSetMillis;
     }
 
     /** The window a set target has counted so far; frozen while the timer is paused. */
-    long getActiveTimeTargetWindowMillis(long elapsedMillis) {
-        long at = activeTimeTargetPauseMillis != null ? activeTimeTargetPauseMillis : max(0L, elapsedMillis);
-        return max(0L, at - getActiveTimeTargetSetMillis());
+    long getActiveTimeTargetWindowMillis(long elapsed) {
+        long at = activeTimeTargetPauseMillis != null ? activeTimeTargetPauseMillis : nonNeg(elapsed);
+        return nonNeg(at - getActiveTimeTargetSetMillis());
     }
 
     /** True while the timer's own pause holds; the run keeps tracking (owner live 2026-10-14). */
@@ -274,7 +288,7 @@ class Session {
     boolean resumeTimeTarget(long now) {
         if (activeTimeTargetMillis == null || activeTimeTargetPauseMillis == null) return false;
         activeTimeTargetSetMillis = getActiveTimeTargetSetMillis()
-                        + max(0L, getElapsedMillis(now) - activeTimeTargetPauseMillis);
+                        + nonNeg(getElapsedMillis(now) - activeTimeTargetPauseMillis);
         activeTimeTargetPauseMillis = null;
         return true;
     }
@@ -303,7 +317,7 @@ class Session {
     }
 
     void pause(long now, PauseReason reason) {
-        if (!paused && endedAtEpochMillis == 0L) {
+        if (!paused && endedAtEpochMillis == 0) {
             paused = true;
             pausedAtEpochMillis = now;
             pauseReason = reason == null ? MANUAL : reason;
@@ -311,9 +325,9 @@ class Session {
     }
 
     void resume(long now) {
-        if (paused && endedAtEpochMillis == 0L) {
+        if (paused && endedAtEpochMillis == 0) {
             totalPausedMillis = safeAdd(totalPausedMillis, nonNeg(now - pausedAtEpochMillis));
-            pausedAtEpochMillis = 0L;
+            pausedAtEpochMillis = 0;
             paused = false;
         }
         pauseReason = NONE;
@@ -329,21 +343,21 @@ class Session {
         if (paused) totalPausedMillis = safeAdd(totalPausedMillis, nonNeg(endedAtEpochMillis - pausedAtEpochMillis));
         totalPausedMillis = safeAdd(totalPausedMillis, nonNeg(now - endedAtEpochMillis));
         paused = false;
-        pausedAtEpochMillis = 0L;
+        pausedAtEpochMillis = 0;
         pauseReason = NONE;
-        endedAtEpochMillis = 0L;
+        endedAtEpochMillis = 0;
         saveStamp++;
     }
 
     void close(long now) {
-        if (endedAtEpochMillis != 0L) return;
+        if (endedAtEpochMillis != 0) return;
         saveStamp++;
         endedAtEpochMillis = max(now, startedAtEpochMillis);
     }
 
-    boolean correctTransaction(String transactionId, Correction correction, long now, String reason) {
-        Transaction transaction = findTransaction(transactionId);
-        return transaction != null && correct(singletonList(transaction), correction == null ? AUTO : correction, now,
+    boolean correctTransaction(String id, Correction decision, long now, String reason) {
+        var transaction = findTransaction(id);
+        return transaction != null && correct(singletonList(transaction), decision == null ? AUTO : decision, now,
                         reason);
     }
 
@@ -352,14 +366,14 @@ class Session {
      * {@code quantity} of one item, voiding the row once it spends nothing. Automatic evidence, not
      * an owner correction, so nothing is logged; the change is announced like every other change.
      */
-    void settleEstimate(Transaction estimate, int itemId, long quantity, String explanation) {
-        if (estimate == null || itemId <= 0 || quantity <= 0L) return;
-        Correction previous = estimate.getCorrection();
-        List<Flow> previousFlows = estimate.getFlows();
-        estimate.takeQuantity(itemId, false, quantity);
+    void settleEstimate(Transaction estimate, int id, long quantity, String reason) {
+        if (estimate == null || id <= 0 || quantity <= 0) return;
+        var previous = estimate.getCorrection();
+        var previousFlows = estimate.getFlows();
+        estimate.takeQuantity(id, false, quantity);
         estimate.confidence = Confidence.CONFIRMED;
-        if (!estimate.spends()) estimate.applyCorrection(IGNORE, SafeMath.now(), explanation);
-        estimate.setExplanation(explanation);
+        if (!estimate.spends()) estimate.applyCorrection(IGNORE, now(), reason);
+        estimate.setExplanation(reason);
         changed(estimate, previous, previousFlows);
     }
 
@@ -367,12 +381,12 @@ class Session {
      * Applies one decision to the still-unresolved transactions and stores one correction record,
      * so a single undo restores the complete operation.
      */
-    int correctAll(List<String> transactionIds, Correction correction, long now, String reason) {
-        Correction next = correction == null ? AUTO : correction;
-        if (empty(transactionIds) || next == AUTO) return 0;
+    int correctAll(List<String> ids, Correction decision, long now, String reason) {
+        var next = decision == null ? AUTO : decision;
+        if (empty(ids) || next == AUTO) return 0;
         var targets = new ArrayList<Transaction>();
-        for (String transactionId : new LinkedHashSet<>(transactionIds)) {
-            Transaction transaction = findTransaction(transactionId);
+        for (String id : new LinkedHashSet<>(ids)) {
+            var transaction = findTransaction(id);
             if (ReviewRules.needsOwnerDecision(transaction)) targets.add(transaction);
         }
         return correct(targets, next, now, nonBlank(reason, msg("bulk-review"))) ? targets.size() : 0;
@@ -384,7 +398,7 @@ class Session {
      */
     boolean correct(List<Transaction> targets, Correction next, long now, String reason) {
         var changes = new ArrayList<Change>();
-        for (Transaction transaction : targets) {
+        for (var transaction : targets) {
             if (!canChangeOwnedValue(transaction, transaction.getCorrection(), transaction.getFlows(), next,
                     transaction.getFlows())) {
                 // The item's known coverage is reserved or already realized; leave the rows
@@ -393,8 +407,8 @@ class Session {
             }
             changes.add(new Change(transaction.getId(), transaction.getCorrection(), next, null, null));
         }
-        for (Transaction transaction : targets) {
-            Correction previous = transaction.getCorrection();
+        for (var transaction : targets) {
+            var previous = transaction.getCorrection();
             transaction.applyCorrection(next, now, reason);
             changed(transaction, previous, transaction.getFlows());
         }
@@ -407,27 +421,27 @@ class Session {
      * removed from counted gain (not Used). Full give-away on a single-item row IGNORE-corrects.
      * Shares the correction undo stack.
      */
-    boolean splitItem(String transactionId, int itemId, long keepQuantity, long now, String optionalNote) {
-        Transaction transaction = findTransaction(transactionId);
-        if (transaction == null || itemId <= 0) return false;
-        long totalGain = transaction.quantity(itemId, true);
-        if (totalGain <= 0L) return false;
+    boolean splitItem(String identifier, int id, long keepQuantity, long now, String note) {
+        var transaction = findTransaction(identifier);
+        if (transaction == null || id <= 0) return false;
+        long totalGain = transaction.quantity(id, true);
+        if (totalGain <= 0) return false;
         long keep = nonNeg(min(keepQuantity, totalGain));
         if (keep == totalGain) return false;
-        String reason = ItemSplits.reason(keep, totalGain, optionalNote);
-        Correction previous = transaction.getCorrection();
-        var flowSnapshot = new ArrayList<Flow>(transaction.getFlows());
+        String reason = ItemSplits.reason(keep, totalGain, note);
+        var previous = transaction.getCorrection();
+        var flowSnapshot = new ArrayList<>(transaction.getFlows());
         String explanationSnapshot = transaction.getExplanation();
-        boolean ignore = keep <= 0L && onlyGainItem(transaction, itemId);
+        boolean ignore = keep <= 0 && onlyGainItem(transaction, id);
         if (!canChangeOwnedValue(transaction, previous, flowSnapshot, ignore ? IGNORE : previous, null)) {
             // The known coverage this split would shrink is reserved or already realized.
             return false;
         }
         if (ignore) transaction.applyCorrection(IGNORE, now, reason);
-        else transaction.takeQuantity(itemId, true, totalGain - keep);
+        else transaction.takeQuantity(id, true, totalGain - keep);
         transaction.stampSplit(reason, now);
         changed(transaction, previous, flowSnapshot);
-        log(now, reason, new Change(transactionId, previous, transaction.getCorrection(), flowSnapshot,
+        log(now, reason, new Change(identifier, previous, transaction.getCorrection(), flowSnapshot,
                         explanationSnapshot));
         return true;
     }
@@ -440,18 +454,18 @@ class Session {
         if (correctionHistory.isEmpty()) return false;
         CorrectionRecord last = null;
         for (int index = correctionHistory.size() - 1; index >= 0; index--) {
-            CorrectionRecord candidate = correctionHistory.get(index);
+            var candidate = correctionHistory.get(index);
             if (candidate != null && !candidate.isUndone()) {
                 last = candidate;
                 break;
             }
         }
         if (last == null) return false;
-        List<Change> changes = last.getChanges();
+        var changes = last.getChanges();
         if (changes.isEmpty()) return false;
         var targets = new ArrayList<Transaction>(changes.size());
         for (Change change : changes) {
-            Transaction transaction = findTransaction(change.getTransactionId());
+            var transaction = findTransaction(change.getTransactionId());
             if (transaction == null) {
                 // Fail closed: never partially undo a batch after retention or deletion.
                 return false;
@@ -460,19 +474,19 @@ class Session {
         }
         // Validate the whole restore before any canonical mutation.
         for (int index = 0; index < changes.size(); index++) {
-            Change change = changes.get(index);
-            Transaction transaction = targets.get(index);
-            List<Flow> nextFlows = change.hasFlowSnapshot() ? change.getFlowSnapshot() : transaction.getFlows();
+            var change = changes.get(index);
+            var transaction = targets.get(index);
+            var next = change.hasFlowSnapshot() ? change.getFlowSnapshot() : transaction.getFlows();
             if (!canChangeOwnedValue(transaction, transaction.getCorrection(), transaction.getFlows(),
-                    change.getPreviousCorrection(), nextFlows)) {
+                    change.getPreviousCorrection(), next)) {
                 return false;
             }
         }
         for (int index = changes.size() - 1; index >= 0; index--) {
-            Change change = changes.get(index);
-            Transaction transaction = targets.get(index);
-            Correction previous = transaction.getCorrection();
-            List<Flow> previousFlows = transaction.getFlows();
+            var change = changes.get(index);
+            var transaction = targets.get(index);
+            var previous = transaction.getCorrection();
+            var previousFlows = transaction.getFlows();
             if (change.hasFlowSnapshot()) transaction.replaceFlows(change.getFlowSnapshot());
             if (change.explanationSnapshot != null)
                 transaction.setExplanation(change.explanationSnapshot);
@@ -485,12 +499,12 @@ class Session {
     }
 
     /** Restore metadata from the retained decision timeline without adding save fields. */
-    String previousReason(String transactionId, CorrectionRecord undone) {
+    String previousReason(String id, CorrectionRecord undone) {
         for (int index = correctionHistory.indexOf(undone) - 1; index >= 0; index--) {
-            CorrectionRecord record = correctionHistory.get(index);
+            var record = correctionHistory.get(index);
             if (record == null || record.isUndone()) continue;
             for (Change change : record.getChanges()) {
-                if (transactionId.equals(change.getTransactionId()) && (!change.hasFlowSnapshot()
+                if (id.equals(change.getTransactionId()) && (!change.hasFlowSnapshot()
                                 || change.getPreviousCorrection() != change.newCorrection
                                 || ItemSplits.isSplitReason(record.getReason())))
                     return record.getReason();
@@ -499,13 +513,13 @@ class Session {
         return "";
     }
 
-    static boolean onlyGainItem(Transaction transaction, int itemId) {
+    static boolean onlyGainItem(Transaction transaction, int id) {
         if (transaction == null) return false;
         boolean sawTarget = false;
         for (Flow flow : transaction.getFlows()) {
-            if (flow.quantityDelta == 0L) continue;
-            if (flow.itemId != itemId) return false;
-            if (flow.quantityDelta > 0L) sawTarget = true;
+            if (flow.quantityDelta == 0) continue;
+            if (flow.itemId != id) return false;
+            if (flow.quantityDelta > 0) sawTarget = true;
         }
         return sawTarget;
     }
@@ -515,13 +529,13 @@ class Session {
      * spends nothing, so the drop and its pickup never show as a loss and a gain. Returns how many
      * the row still held to give back.
      */
-    long pickUp(String dropId, int itemId, long quantity, long now) {
-        Transaction drop = findTransaction(dropId);
-        if (drop == null || !drop.isCounted() || drop.getCorrection() != AUTO) return 0L;
-        long taken = min(quantity, drop.quantity(itemId, false));
-        if (taken <= 0L) return 0L;
-        var flowSnapshot = new ArrayList<Flow>(drop.getFlows());
-        drop.takeQuantity(itemId, false, taken);
+    long pickUp(String dropId, int id, long quantity, long now) {
+        var drop = findTransaction(dropId);
+        if (drop == null || !drop.isCounted() || drop.getCorrection() != AUTO) return 0;
+        long taken = min(quantity, drop.quantity(id, false));
+        if (taken <= 0) return 0;
+        var flowSnapshot = new ArrayList<>(drop.getFlows());
+        drop.takeQuantity(id, false, taken);
         if (!drop.spends()) drop.applyCorrection(IGNORE, now, "Picked back up");
         changed(drop, AUTO, flowSnapshot);
         return taken;
@@ -537,7 +551,7 @@ class Session {
 
     Transaction undoTransaction() {
         if (transactions.isEmpty()) return null;
-        Transaction removed = transactions.get(transactions.size() - 1);
+        var removed = transactions.get(transactions.size() - 1);
         if (ownedValueObserver != null && !ownedValueObserver.canRemove(removed)) {
             // Known coverage was already reserved/realized downstream; leave it untouched.
             return null;
@@ -553,9 +567,9 @@ class Session {
 
     Transaction restoreUndo() {
         for (int index = undoHistory.size() - 1; index >= 0; index--) {
-            UndoRecord record = undoHistory.get(index);
+            var record = undoHistory.get(index);
             if (record == null || record.restored || record.transaction == null) continue;
-            Transaction restored = record.transaction;
+            var restored = record.transaction;
             if (ownedValueObserver != null && !ownedValueObserver.canAdd(restored)) {
                 // Restoring would re-add known coverage after a later realization; refuse it.
                 return null;
@@ -573,10 +587,10 @@ class Session {
         return null;
     }
 
-    Transaction findTransaction(String transactionId) {
-        if (empty(transactionId)) return null;
-        for (Transaction transaction : transactions) {
-            if (transactionId.equals(transaction.getId())) return transaction;
+    Transaction findTransaction(String id) {
+        if (empty(id)) return null;
+        for (var transaction : transactions) {
+            if (id.equals(transaction.getId())) return transaction;
         }
         return null;
     }
@@ -589,23 +603,23 @@ class Session {
         return id;
     }
 
-    void attachToEncounter(String transactionId, String encounterId, boolean asPkSupplyCost) {
-        Transaction transaction = findTransaction(transactionId);
-        if (transaction == null || empty(encounterId) || !PkTally.isEncounter(encounterId)) return;
+    void attachToEncounter(String id, String encounter, boolean pkSupply) {
+        var transaction = findTransaction(id);
+        if (transaction == null || empty(encounter) || !PkTally.isEncounter(encounter)) return;
         saveStamp++;
-        transaction.assignEncounter(encounterId, asPkSupplyCost);
+        transaction.assignEncounter(encounter, pkSupply);
         notifyChanged();
     }
 
-    void attachRecentCosts(String encounterId, long now, long lookbackMillis) {
-        long cutoff = nonNeg(now - max(0L, lookbackMillis));
+    void attachRecentCosts(String encounter, long now, long lookbackMillis) {
+        long cutoff = nonNeg(now - nonNeg(lookbackMillis));
         for (int index = transactions.size() - 1; index >= 0; index--) {
-            Transaction transaction = transactions.get(index);
+            var transaction = transactions.get(index);
             if (transaction.timestampEpochMillis < cutoff) break;
             if (!transaction.getEncounterId().isEmpty()) continue;
-            if (transaction.revenue == 0L && transaction.costs > 0L
+            if (transaction.revenue == 0 && transaction.costs > 0
                     && transaction.autoType() == TransactionType.CONSUMPTION) {
-                attachToEncounter(transaction.getId(), encounterId, true);
+                attachToEncounter(transaction.getId(), encounter, true);
             }
         }
     }
@@ -617,10 +631,10 @@ class Session {
         pk().compact(transaction, transactions);
         if (transaction.getType() == TransactionType.TRANSFER) return;
         if (transaction.isCounted()) {
-            Amounts amounts = transaction(transaction);
-            retainedRevenue = safeAdd(retainedRevenue, amounts.revenue);
-            retainedCosts = safeAdd(retainedCosts, amounts.costs);
-            Accounting.CostSplit split = costSplit(transaction);
+            var money = transaction(transaction);
+            retainedRevenue = safeAdd(retainedRevenue, money.revenue);
+            retainedCosts = safeAdd(retainedCosts, money.costs);
+            var split = costSplit(transaction);
             if (!split.available) retainedCostSplitComplete = false;
             else retainedSuppliesCosts = safeAdd(retainedSuppliesCosts, split.supplies);
         }
@@ -642,26 +656,24 @@ class Session {
 
     @AllArgsConstructor
     static class MoneyFold {
-        long revenue;
-        long costs;
-        long supplies;
+        long revenue, costs, supplies;
         boolean costSplitAvailable = true;
 
         Amounts add(Transaction transaction) {
-            Amounts amounts = transaction(transaction);
-            if (!amounts.available || !amounts.included) return amounts;
-            revenue = safeAdd(revenue, amounts.revenue);
-            costs = safeAdd(costs, amounts.costs);
-            Accounting.CostSplit split = costSplit(transaction);
+            var money = transaction(transaction);
+            if (!money.available || !money.included) return money;
+            revenue = safeAdd(revenue, money.revenue);
+            costs = safeAdd(costs, money.costs);
+            var split = costSplit(transaction);
             if (!split.available) costSplitAvailable = false;
             else supplies = safeAdd(supplies, split.supplies);
-            return amounts;
+            return money;
         }
     }
 
     Metrics metrics(long now) {
         return metrics(new MoneyFold(retainedRevenue, retainedCosts, retainedSuppliesCosts,
-                        compactedTransactionCount == 0L || retainedCostSplitComplete), transactions,
+                        compactedTransactionCount == 0 || retainedCostSplitComplete), transactions,
                 getElapsedMillis(now));
     }
 
@@ -670,10 +682,7 @@ class Session {
      * row's time, so fixes to older rows stay out; rows compacted past the row limit drop out.
      */
     List<Transaction> rowsSince(long at) {
-        var rows = new ArrayList<Transaction>();
-        for (Transaction row : transactions)
-            if (row != null && row.timestampEpochMillis >= at) rows.add(row);
-        return rows;
+        return matching(transactions, row -> row != null && row.timestampEpochMillis >= at);
     }
 
     /** The money in these rows alone, over the given Active Time. */
@@ -682,15 +691,15 @@ class Session {
     }
 
     Metrics metrics(MoneyFold money, List<Transaction> rows, long elapsed) {
-        for (Transaction transaction : rows) {
+        for (var transaction : rows) {
             if (transaction == null) continue;
             money.add(transaction);
         }
         if (money.supplies > money.costs) money.costSplitAvailable = false;
         long net = safeSubtract(money.revenue, money.costs);
         return new Metrics(getActivityHint(), paused, elapsed, money.revenue, money.costs, net, hourly(net, elapsed),
-                money.costSplitAvailable ? money.supplies : 0L,
-                money.costSplitAvailable ? safeSubtract(money.costs, money.supplies) : 0L, money.costSplitAvailable);
+                money.costSplitAvailable ? money.supplies : 0,
+                money.costSplitAvailable ? safeSubtract(money.costs, money.supplies) : 0, money.costSplitAvailable);
     }
 
     /**
@@ -699,10 +708,7 @@ class Session {
      */
     @AllArgsConstructor
     static class CompactedContribution {
-        long rows;
-        long revenue;
-        long costs;
-        long suppliesCosts;
+        long rows, revenue, costs, suppliesCosts;
         boolean costSplitAvailable;
 
         long getNet() {
@@ -712,7 +718,7 @@ class Session {
 
     CompactedContribution compactedContribution() {
         return new CompactedContribution(compactedTransactionCount, retainedRevenue, retainedCosts,
-                retainedSuppliesCosts, compactedTransactionCount == 0L || retainedCostSplitComplete);
+                retainedSuppliesCosts, compactedTransactionCount == 0 || retainedCostSplitComplete);
     }
 
     long compactedRevenue() {
@@ -723,25 +729,26 @@ class Session {
         return retainedCosts;
     }
 
-    static long hourly(long value, long elapsedMillis) {
-        if (elapsedMillis <= 0L) return 0L;
+    static long hourly(long value, long elapsed) {
+        if (elapsed <= 0) return 0;
         // Math.round saturates at the long range by itself.
-        return round(value * (3_600_000.0d / elapsedMillis));
+        return round(value * (3_600_000.0d / elapsed));
     }
 
     long getElapsedMillis(long now) {
-        long endpoint = endedAtEpochMillis == 0L ? now : endedAtEpochMillis;
-        long activePaused = paused ? nonNeg(endpoint - pausedAtEpochMillis) : 0L;
+        if (endedAtEpochMillis != 0 && savedActiveMillis != null && savedActiveMillis >= 0)
+            return savedActiveMillis;
+        long endpoint = endedAtEpochMillis == 0 ? now : endedAtEpochMillis;
+        long activePaused = paused ? nonNeg(endpoint - pausedAtEpochMillis) : 0;
         return nonNeg(endpoint - startedAtEpochMillis - totalPausedMillis - activePaused);
     }
 
     static String normalizeName(String value) {
-        if (blank(value)) return DURABLE_OWNER_NAME;
-        return value.trim();
+        return nonBlank(value, DURABLE_OWNER_NAME);
     }
 
     String getId() {
-        if (empty(id)) id = UUID.randomUUID().toString();
+        if (empty(id)) id = uuid();
         return id;
     }
 
@@ -755,7 +762,7 @@ class Session {
 
     void notifyChanged() {
         saveStamp++;
-        Runnable listener = changeListener;
+        var listener = changeListener;
         if (listener != null) listener.run();
     }
 
@@ -768,18 +775,18 @@ class Session {
     }
 
     boolean isClosed() {
-        return endedAtEpochMillis != 0L;
+        return endedAtEpochMillis != 0;
     }
 
     Long getProfitTargetGp() {
-        return profitTargetGp != null && profitTargetGp > 0L ? profitTargetGp : null;
+        return profitTargetGp != null && profitTargetGp > 0 ? profitTargetGp : null;
     }
 
     /** A loaded session is cleaned once: no null rows or flows reach any reader. */
     void sanitize() {
         if (transactions == null) transactions = new ArrayList<>();
-        transactions.removeIf(java.util.Objects::isNull);
-        for (Transaction transaction : transactions) transaction.sanitize();
+        transactions.removeIf(Objects::isNull);
+        for (var transaction : transactions) transaction.sanitize();
     }
 
     List<Transaction> getTransactions() {
@@ -798,7 +805,7 @@ class Session {
     int compactBefore(long cutoffEpochMillis, Predicate<Transaction> keep) {
         if (transactions.isEmpty()) return 0;
         var folded = new ArrayList<Transaction>();
-        for (Transaction transaction : transactions) {
+        for (var transaction : transactions) {
             if (transaction == null) continue;
             if (transaction.timestampEpochMillis >= cutoffEpochMillis) continue;
             if (keep != null && keep.test(transaction)) continue;
@@ -807,7 +814,7 @@ class Session {
         if (folded.isEmpty()) return 0;
         saveStamp++;
         var foldedIds = new HashSet<String>();
-        for (Transaction transaction : folded) {
+        for (var transaction : folded) {
             foldedIds.add(transaction.getId());
             transactions.remove(transaction);
             compactTransaction(transaction);
@@ -833,7 +840,7 @@ enum PauseReason {
 }
 
 /** A transaction removed through the undo action, kept so the latest one can be restored. */
-class UndoRecord {
+class UndoRecord extends SaveCopies {
     Transaction transaction;
     boolean restored;
 
@@ -850,36 +857,30 @@ class UndoRecord {
 class Metrics {
     String activityHint;
     boolean paused;
-    long elapsedMillis;
-    long revenue;
-    long costs;
-    long net;
-    long profitPerHour;
-    long suppliesCosts;
-    long otherCosts;
+    long elapsedMillis, revenue, costs, net, profitPerHour, suppliesCosts, otherCosts;
     boolean costSplitAvailable;
 
     static Metrics none() {
         return new Metrics("General", false, 0L, 0L, 0L, 0L, 0L);
     }
 
-    Metrics(String activityHint, boolean paused, long elapsedMillis, long revenue, long costs, long net,
-            long profitPerHour) {
-        this(activityHint, paused, elapsedMillis, revenue, costs, net, profitPerHour, 0L, 0L, false);
+    Metrics(String activityHint, boolean paused, long elapsed, long income, long cost, long net,
+            long rate) {
+        this(activityHint, paused, elapsed, income, cost, net, rate, 0, 0, false);
     }
 
-    Metrics(String activityHint, boolean paused, long elapsedMillis, long revenue, long costs, long net,
-            long profitPerHour, long suppliesCosts, long otherCosts, boolean costSplitAvailable) {
+    Metrics(String activityHint, boolean paused, long elapsed, long income, long cost, long net,
+            long rate, long suppliesCosts, long otherCosts, boolean costSplitAvailable) {
         this.activityHint = activityHint;
         this.paused = paused;
-        this.elapsedMillis = elapsedMillis;
-        this.revenue = revenue;
-        this.costs = costs;
+        elapsedMillis = elapsed;
+        revenue = income;
+        costs = cost;
         this.net = net;
-        this.profitPerHour = profitPerHour;
+        profitPerHour = rate;
         this.suppliesCosts = suppliesCosts;
         this.otherCosts = otherCosts;
-        this.costSplitAvailable = costSplitAvailable && safeAdd(suppliesCosts, otherCosts) == costs;
+        this.costSplitAvailable = costSplitAvailable && safeAdd(suppliesCosts, otherCosts) == cost;
     }
 }
 
@@ -906,13 +907,13 @@ class SessionArchive {
         lastSweepDay = utcDay(now);
     }
 
-    void adoptFrom(SessionArchive staged) {
-        lastSweepDay = staged.lastSweepDay;
+    void adoptFrom(SessionArchive draft) {
+        lastSweepDay = draft.lastSweepDay;
     }
 
     /** The configured receipt retention in days; 0 keeps receipts forever. */
     int retentionDays() {
-        Retention period = engine.config.receiptRetentionDays();
+        var period = engine.config.receiptRetentionDays();
         return period == null ? Retention.DAYS_90.days : period.days;
     }
 
@@ -921,7 +922,7 @@ class SessionArchive {
     }
 
     void trimHistory() {
-        int maxHistory = Math.max(1, engine.config.maxHistorySessions());
+        int maxHistory = max(1, engine.config.maxHistorySessions());
         if (engine.history.size() > maxHistory) {
             engine.history.subList(maxHistory, engine.history.size()).clear();
             engine.bumpRevision();
@@ -945,29 +946,29 @@ class SessionArchive {
         }
         // Rows still needed individually: an unresolved claim's audit row and the settlement that
         // carries a claim id keep their detail until the claim resolves (section L).
-        Set<String> pendingClaimIds = engine.pendingClaimIds();
-        Predicate<Transaction> keep = transaction -> isPendingClaimRow(transaction, pendingClaimIds)
+        var claimIds = engine.pendingClaimIds();
+        Predicate<Transaction> keep = transaction -> isPendingClaimRow(transaction, claimIds)
                                 || (!transaction.sourceClaimId().isEmpty()
-                                        && pendingClaimIds.contains(transaction.sourceClaimId()));
-        int compactedReceipts = 0;
-        for (Session session : engine.uniqueSessions()) {
+                                        && claimIds.contains(transaction.sourceClaimId()));
+        int compacted = 0;
+        for (var session : engine.uniqueSessions()) {
             if (session == null || session.getTransactions().isEmpty()) continue;
-            compactedReceipts = SafeMath.safeAddCount(compactedReceipts, session.compactBefore(cutoff, keep));
+            compacted = safeAddCount(compacted, session.compactBefore(cutoff, keep));
         }
-        if (compactedReceipts > 0) engine.bumpRevision();
-        return compactedReceipts;
+        if (compacted > 0) engine.bumpRevision();
+        return compacted;
     }
 
     /**
      * A multi-key audit row owns claims named {@code auditId#n}; retain its base row while any
      * derived claim remains unresolved so provenance survives receipt compaction.
      */
-    static boolean isPendingClaimRow(Transaction transaction, Set<String> pendingClaimIds) {
-        if (transaction == null || empty(pendingClaimIds)) return false;
-        String transactionId = transaction.getId();
-        if (pendingClaimIds.contains(transactionId)) return true;
-        String derivedPrefix = transactionId + "#";
-        for (String claimId : pendingClaimIds) {
+    static boolean isPendingClaimRow(Transaction transaction, Set<String> claimIds) {
+        if (transaction == null || empty(claimIds)) return false;
+        String id = transaction.getId();
+        if (claimIds.contains(id)) return true;
+        String derivedPrefix = id + "#";
+        for (String claimId : claimIds) {
             if (claimId != null && claimId.startsWith(derivedPrefix)) return true;
         }
         return false;
@@ -978,28 +979,28 @@ class SessionArchive {
      * tick of a run only marks the day, since a restore already swept.
      */
     int maintainRetention(long now) {
-        LocalDate today = utcDay(now);
+        var today = utcDay(now);
         if (lastSweepDay != null && !today.isAfter(lastSweepDay)) return 0;
         boolean first = lastSweepDay == null;
         lastSweepDay = today;
         return first ? 0 : compactOlderThan(retentionDays(), now);
     }
 
-    Session historySession(String sessionId) {
-        if (empty(sessionId)) return null;
-        for (Session session : engine.history) {
-            if (sessionId.equals(session.getId())) return session;
+    Session historySession(String id) {
+        if (empty(id)) return null;
+        for (var session : engine.history) {
+            if (id.equals(session.getId())) return session;
         }
         return null;
     }
 
-    Metrics historyMetrics(String sessionId, long now) {
-        Session session = historySession(sessionId);
+    Metrics historyMetrics(String id, long now) {
+        var session = historySession(id);
         return session == null ? null : session.metrics(now);
     }
 
-    boolean deleteHistory(String sessionId) {
-        Session session = historySession(sessionId);
+    boolean deleteHistory(String id) {
+        var session = historySession(id);
         if (session == null) return false;
         engine.history.remove(session);
         engine.bumpRevision();

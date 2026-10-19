@@ -1,6 +1,5 @@
 package com.gpmanager;
 
-import java.lang.reflect.Field;
 import java.lang.reflect.Proxy;
 import java.util.ArrayList;
 import java.util.List;
@@ -9,6 +8,7 @@ import net.runelite.api.Client;
 import net.runelite.api.events.ChatMessage;
 import org.junit.Test;
 
+import static com.gpmanager.GpManagerPluginProbe.set;
 import static org.junit.Assert.assertEquals;
 
 /**
@@ -125,10 +125,4 @@ public class InstanceFeeTest
         return message;
     }
 
-    private static void set(Object target, String name, Object value) throws Exception
-    {
-        Field field = GpManagerPlugin.class.getDeclaredField(name);
-        field.setAccessible(true);
-        field.set(target, value);
-    }
 }

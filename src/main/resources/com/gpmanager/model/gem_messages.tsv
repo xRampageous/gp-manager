@@ -1,0 +1,5 @@
+# pattern, name group, quantity group (0 = one), explicit deposit
+gem-thieved	1	0	true
+gem-vyre-batch	1	2	true
+gem-vyre-single	1	0	true
+gem-mined	1	0	false

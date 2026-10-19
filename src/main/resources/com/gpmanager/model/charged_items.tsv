@@ -62,6 +62,7 @@ SUFFERING	Ring of suffering	true	SUFFERING	SUPPLIES	40	-	-	-	1*2550=RING_OF_RECO
 #   load is neutral and only Checks measure the throws (OSRS Wiki transcript, owner 2026-10-12).
 TONALZTICS	Tonalztics of Ralos	true	CHARGES	FIRE	1	weapon-charges-check 2 3	-	-	1*28924=SUNFIRESPLINTER	-	-	28919=TONALZTICS_OF_RALOS_UNCHARGED,28922=TONALZTICS_OF_RALOS_CHARGED
 # The water and earth tomes: a page gives 20 charges; the page names the tome, and a bare
+DIZANAS	Dizana's quiver	true	CHARGES	FIRE	1	quiver-check 1 0	-	-	1*28924=SUNFIRESPLINTER	-	dizana's quiver (l);dizana's quiver (uncharged);dizana's quiver (l) (uncharged)	28947=DIZANAS_QUIVER_UNCHARGED,28949=DIZANAS_QUIVER_UNCHARGED_TROUVER,28951=DIZANAS_QUIVER_CHARGED,28953=DIZANAS_QUIVER_CHARGED_TROUVER
 #   "your tome" line resolves through the clicked item (owner 2026-10-12).
 TOME_OF_WATER	Tome of Water	true	TOME	CAST	20	tome-check 1 2	-	-	1*25578=SOAKED_PAGE	-	-	25574=TOME_OF_WATER,25576=TOME_OF_WATER_UNCHARGED
 TOME_OF_EARTH	Tome of Earth	true	TOME	CAST	20	tome-check 1 2	-	-	1*30068=SOILED_PAGE	-	-	30064=TOME_OF_EARTH,30066=TOME_OF_EARTH_UNCHARGED

@@ -44,7 +44,7 @@ GP Manager is a passive accounting ledger. It may read ordinary RuneLite events 
 
 The audit allows `MouseEvent` only in the plugin's own Swing component source directory (`src/main/java/com/gpmanager/ui/kit/`). Java declarations share `com.gpmanager`. These handlers respond to the user operating sidebar components; every other prohibited pattern still applies. `KeyEvent` has no allowlist exception.
 
-This policy keeps the plugin limited to passive local accounting and adds a build-time check against prohibited capability classes. The current product has no Party transport or carried-value risk estimator.
+This policy keeps the plugin limited to passive local accounting and adds a build-time check against prohibited capability classes. The current product has no Party transport. Its own-character Risk figure is passive inventory/equipment bookkeeping; all gameplay-warning and opponent-data prohibitions above remain binding.
 
 
 ## Simulation isolation

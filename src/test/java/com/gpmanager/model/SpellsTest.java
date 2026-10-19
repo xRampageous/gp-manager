@@ -68,11 +68,22 @@ public class SpellsTest
     }
 
     @Test
+    public void aRunePickupCannotTurnAnIncompleteAncientCastIntoAWaterSpell()
+    {
+        // Owner 1.5.3: these are the retained rune spends beside Death/Chaos rune pickups.
+        assertNull("not eight Water Bolts", Spells.spellFor(List.of(
+            rune("Chaos rune", 8), rune("Water rune", 8))));
+        assertNull("not two Water Blasts", Spells.spellFor(List.of(
+            rune("Death rune", 2), rune("Water rune", 4))));
+    }
+
+    @Test
     public void theTableIsWellFormed()
     {
         Set<String> names = new HashSet<>();
-        for (String[] spell : Spells.TABLE)
+        for (String[] recipe : GameData.rows("spell_recipes"))
         {
+            String[] spell = {recipe[0], Spells.ICONS.get(recipe[0]), recipe[1]};
             assertEquals(Arrays.toString(spell), 3, spell.length);
             assertTrue("unique " + spell[0], names.add(spell[0]));
             assertTrue(Integer.parseInt(spell[1]) > 0);

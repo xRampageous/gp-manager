@@ -62,7 +62,43 @@ public final class SidebarPreview
 
     private static void run(File out) throws IOException
     {
+        CategoryToggleTest.previews(out);
+        savedSessions(out);
         HudPreview.write(out);
+        for (int width : new int[]{213, 225, 300})
+            paintComponent(GeStatusPresentationTest.preview(width), new File(out, "ge-status-" + width + ".png"));
+        Engine pickups = PresentationLifecycleTest.engine();
+        long at = SafeMath.now() - 60_000L;
+        pickups.startCustom("Greater Nechryael", at);
+        pickups.getActiveSession().addTransaction(RecentSupplyAndPickupTest.item(TransactionType.GAIN, null,
+            565, "Blood rune", 200L, 344, at + 1L), 2000, false);
+        pickups.getActiveSession().addTransaction(RecentSupplyAndPickupTest.item(TransactionType.LOOT, null,
+            1359, "Rune axe", 10L, 7060, at + 2L), 2000, false);
+        pickups.getActiveSession().addTransaction(RecentSupplyAndPickupTest.item(TransactionType.LOOT, null,
+            565, "Blood rune", 120L, 344, at + 3L), 2000, false);
+        liveShot(out, "f6-live-combined-blood-pickups.png", pickups, PvpState.NONE);
+        for (String title : new String[]{"Wilderness Agility Course", "Chambers of Xeric: Challenge Mode"}) {
+            Engine activity = PresentationLifecycleTest.engine();
+            activity.ensureSession(at);
+            activity.getActiveSession().setActivityHint(title, at);
+            SidebarPanel panel = panel(activity, PvpState.NONE);
+            paint(panel,new File(out,"header-"+title.substring(0,title.indexOf(' ')).toLowerCase()+".png"));
+            if (title.equals("Wilderness Agility Course")) {
+                activity.getActiveSession().pause(SafeMath.now(), PauseReason.IDLE);
+                liveShot(out, "header-wilderness-away.png", activity, PvpState.NONE);
+                activity.resume(SafeMath.now(), PauseReason.IDLE);
+                liveShot(out, "header-wilderness-calibrating.png", activity, PvpState.NONE);
+            }
+        }
+        Engine loading = PresentationLifecycleTest.engine();
+        loading.startCustom("Previous account", at);
+        SidebarPanel switching = panel(loading, PvpState.NONE);
+        SidebarPanelProbe.refresh(switching);
+        switching.suspend();
+        paint(switching, new File(out, "profile-loading.png"));
+        directHeaders(out, at);
+        retainedTargetDrafts(out);
+        statusAndRateControls(out);
         normalNegative(out);
         fullPositive(out);
         emptyWaiting(out);
@@ -97,6 +133,129 @@ public final class SidebarPreview
     }
 
     // ---- Live --------------------------------------------------------------------------------
+
+    private static void savedSessions(File out) throws IOException {
+        JsonCodec.bind(new com.google.gson.Gson());
+        long now = SafeMath.now();
+        Engine engine = PresentationLifecycleTest.engine();
+        engine.ensureSession(now - 3_600_000L);
+        TargetFreshStartTest.coins(engine, now - 3_600_000L + 5L, 500_000L);
+        engine.newLiveSession(now - 60_000L);
+        TargetFreshStartTest.coins(engine, now - 59_995L, 25_000L);
+        SidebarPanel prompt = panel(engine, PvpState.NONE);
+        prompt.grindActions.saveSessionPrompt();
+        paint(prompt, new File(out, "saved-session-prompt.png"));
+        String id = engine.saveLiveSession(engine.getActiveSession(), engine.getActiveSession().sessionStartAt, now);
+        engine.showWholeRun();
+        SidebarPanel list = panel(engine, PvpState.NONE);
+        list.shell.show(Shell.GRINDS);
+        paint(list, new File(out, "saved-sessions-grinds.png"));
+        SidebarPanel detail = panel(engine, PvpState.NONE);
+        detail.grindsDetailId = id;
+        detail.shell.show(Shell.GRINDS);
+        paint(detail, new File(out, "saved-session-detail.png"));
+        SidebarPanel ledger = panel(engine, PvpState.NONE);
+        ledger.grindActions.openLedger(id);
+        paint(ledger, new File(out, "saved-session-ledger.png"));
+    }
+
+    private static void statusAndRateControls(File out) throws IOException
+    {
+        long now = SafeMath.now();
+        long hour = 3_600_000L;
+        Engine engine = PresentationLifecycleTest.engine();
+        engine.ensureSession(now - hour);
+        engine.getActiveSession().setActivityHint("Wilderness Agility Course", now - hour);
+        TargetFreshStartTest.coins(engine, now - hour + 5L, 500_000L);
+        SidebarPanel controls = panel(engine, PvpState.NONE);
+        new GrindsController(controls).newSession();
+        paint(controls, new File(out, "session-controls.png"));
+        for (int width : new int[]{213, 225, 300}) {
+            SidebarPanel sized = panel(engine, PvpState.NONE);
+            new GrindsController(sized).newSession();
+            java.awt.Window frame = SwingUtilities.getWindowAncestor(sized);
+            frame.setSize(width, frame.getHeight());
+            frame.validate();
+            paint(sized, new File(out, "session-controls-" + width + ".png"));
+        }
+        SidebarPanel restarted = panel(engine, PvpState.NONE);
+        java.util.function.LongSupplier savedClock = SafeMath.clock;
+        try {
+            SafeMath.clock = () -> now - hour / 2L;
+            new GrindsController(restarted).newSession();
+            ShellProbe.pressSheet(restarted.shell, "Restart GP/h");
+        } finally { SafeMath.clock = savedClock; }
+        TargetFreshStartTest.coins(engine, now - hour / 2L + 5L, 50_000L);
+        paint(restarted, new File(out, "rate-restarted-keeps-net.png"));
+        for (int seconds : new int[]{60, 72, 120}) {
+            Engine retained = PresentationLifecycleTest.engine();
+            retained.ensureSession(now - hour);
+            TargetFreshStartTest.coins(retained, now - hour + 5L, 566_329L);
+            retained.restartRate(now - seconds * 1_000L);
+            liveShot(out, "rate-retained-net-" + seconds + "s.png", retained, PvpState.NONE);
+        }
+        engine.pauseForLifecycle(now);
+        liveShot(out, "status-logged-out.png", engine, PvpState.NONE);
+        SidebarPanel reconnecting = panel(engine, PvpState.NONE);
+        reconnecting.bindHopping(() -> true);
+        paint(reconnecting, new File(out, "status-reconnecting.png"));
+        Engine resuming = PresentationLifecycleTest.engine();
+        resuming.autoStartAtEpochMillis = now + 3_000L;
+        liveShot(out, "status-resuming.png", resuming, PvpState.NONE);
+        SidebarPanel deletion = panel(engine, PvpState.NONE);
+        new GrindsController(deletion).factoryReset();
+        paint(deletion, new File(out, "delete-profile-choices.png"));
+    }
+
+    private static void retainedTargetDrafts(File out) throws IOException
+    {
+        Engine engine = PresentationLifecycleTest.engine();
+        engine.ensureSession(SafeMath.now() - 60_000L);
+        for (int i = 0; i < 8; i++) engine.saveGrind("Saved route " + i, null, null, false);
+        SidebarPanel panel = panel(engine, PvpState.NONE);
+        GrindsController controls = new GrindsController(panel);
+        controls.newGrind();
+        ShellProbe.pressSheet(panel.shell, "›");
+        PolishInteractionTest.field(panel.shell, "nameField").setText("Wilderness route");
+        PolishInteractionTest.field(panel.shell, "netField").setText("lots");
+        PolishInteractionTest.field(panel.shell, "timeField").setText("1h 30m");
+        ShellProbe.pressSheet(panel.shell, "Start");
+        paint(panel, new File(out, "polish-start-invalid.png"));
+        // paint disposes its frame; each shot needs a fresh realized panel.
+        panel = panel(engine, PvpState.NONE);
+        controls = new GrindsController(panel);
+        controls.openTargets();
+        PolishInteractionTest.field(panel.shell, "netField").setText("2m");
+        PolishInteractionTest.field(panel.shell, "timeField").setText("3h");
+        PolishInteractionTest.field(panel.shell, "milestoneField").setText("many");
+        ShellProbe.pressSheet(panel.shell, "Save");
+        paint(panel, new File(out, "polish-target-invalid.png"));
+    }
+
+    private static void directHeaders(File out, long at) throws IOException
+    {
+        Engine engine = PresentationLifecycleTest.engine();
+        String name = "Wilderness Agility Course & a long northern expedition";
+        engine.startCustom(name, at);
+        String id = engine.getActiveSession().getId();
+        engine.getActiveSession().addTransaction(booked(at + 1L, "Blood rune", 565, 200, 344, 68_800L), 2_000, false);
+        engine.saveGrind("Barrows", null, null, false).archived = true;
+        SidebarPanel grinds = panel(engine, PvpState.NONE);
+        grinds.shell.show(Shell.GRINDS);
+        grinds.grinds.archived.doClick();
+        paint(grinds, new File(out, "direct-grinds-long-name.png"));
+        engine.finishCustom(at + 10_000L);
+        SidebarPanel ledger = panel(engine, PvpState.NONE);
+        ledger.ledgerEntry = new LedgerData.Entry(LedgerData.Scope.HISTORY, id, name);
+        ledger.shell.show(Shell.LEDGER);
+        paint(ledger, new File(out, "direct-ledger-long-scope.png"));
+        Engine review = PresentationLifecycleTest.engine();
+        review.startCustom("Zulrah", at);
+        review.getActiveSession().addTransaction(new Transaction(at + 1L, TransactionType.UNCERTAIN, Context.GENERIC,
+            "", "Zulrah", false, java.util.List.of(new Flow(995, "Coins", -500L, 1, -500L)), Confidence.UNCERTAIN,
+            "Unconfirmed movement.", null), 2_000, false);
+        liveShot(out, "direct-live-review.png", review, PvpState.NONE);
+    }
 
     /** A. Normal / negative: negative Net, GP/h, breakdown, one Recent row, no target, no review. */
     private static void normalNegative(File out) throws IOException
@@ -798,6 +957,8 @@ public final class SidebarPreview
         // A second pass after layout, as the client's next tick does: fitted text sees its width.
         SidebarPanelProbe.refresh(panel);
         panel.validate();
+        DirectHeaderControlsTest.resize(panel.ledger.scope);
+        DirectHeaderControlsTest.resize(panel.grinds.runningName);
         ShellProbe.scrollCurrentToTop(panel.shell());
         BufferedImage image = new BufferedImage(panel.getWidth(), panel.getHeight(), BufferedImage.TYPE_INT_RGB);
         Graphics2D g = image.createGraphics();

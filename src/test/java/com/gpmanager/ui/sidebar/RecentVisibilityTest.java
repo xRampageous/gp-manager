@@ -60,7 +60,7 @@ public class RecentVisibilityTest
     }
 
     @Test
-    public void aFinishedTradeCanBeHiddenButAnOpenOfferAndASpellCannot()
+    public void aFinishedTradeAndASpellCanBeHiddenButAnOpenOfferCannot()
     {
         // Owner 2026-10-08: a sold Fire rune row had no "Hide from recent".
         LivePage page = new LivePage(new LivePage.Actions()
@@ -73,15 +73,67 @@ public class RecentVisibilityTest
         assertFalse("an offer still on the exchange stays listed",
             hides(page, recent(554, "Fire rune", true, true)));
         assertFalse("a spell's runes are no single item", hides(page, recent(554, "Fire Strike", false, false)));
+        assertTrue("the spell has its own hide action",
+            has(page, recent(-21, "Fire Strike", false, false), "Hide spell from recent"));
+        LiveSnapshot.Recent generic = recent(560, "Cast", false, false);
+        generic.actionLabel = "Cast";
+        assertTrue("an unnamed spell can be hidden too", has(page, generic, "Hide spell from recent"));
         assertTrue(hides(page, new LiveSnapshot.Recent(385, "Shark", null, 900L, false, false, null, 1, "r", "c",
             "", 1L, false, false, true, null, false, 0L, false, "", false, false, null)));
     }
 
     @Test
+    public void aHiddenSpellUsesTheExistingListAndLeavesTheLedgerAndNetIntact()
+    {
+        ConfigManager manager = IsolatedConfigManager.create(null);
+        GpManagerConfig config = manager.getConfig(GpManagerConfig.class);
+        Engine engine = PresentationLifecycleTest.engine();
+        long now = 1_700_000_000_000L;
+        engine.startCustom("Nechryael", now);
+        Transaction cast = Tx.of(now, TransactionType.CONSUMPTION, Context.GENERIC, "", true,
+            List.of(new Flow(562, "Chaos rune", -4L, 100, -400L),
+                new Flow(560, "Death rune", -2L, 100, -200L), new Flow(555, "Water rune", -4L, 4, -16L)));
+        cast.setActionKind(ActionKind.CAST);
+        engine.getActiveSession().addTransaction(cast, 2_000, false);
+        RecentFilter filter = new RecentFilter()
+        {
+            public boolean isFlowIncluded(Flow flow) { return true; }
+            public boolean showRecent(String name, long quantity, boolean charge)
+            {
+                return LootPresentationFilterService.listState("", config.hiddenRecentItems(), name, quantity)
+                    != LootPresentationFilterService.HIDDEN;
+            }
+            public String version() { return config.hiddenRecentItems(); }
+        };
+        LiveContext context = new LiveContext(false, filter, 0L, PvpState.NONE, "", false, "", false);
+        LiveSnapshot before = LiveSnapshot.capture(engine, now + 600L, context);
+        LiveSnapshot.Recent spell = before.recent.get(0);
+        assertEquals("Ice Burst", spell.name);
+        LivePage page = new LivePage(new LivePage.Actions()
+        {
+            public void togglePause() { }
+            public void editTarget() { }
+            public void openLedger(LedgerData.Entry entry) { }
+            public void hideRecent(String name, boolean charge)
+            {
+                assertFalse("a spell is not a charge family", charge);
+                manager.setConfiguration(GpManagerConfig.GROUP, "hiddenRecentItems", name);
+            }
+        }, id -> null);
+        page.rowOf(spell).menu.stream().filter(menu -> "Hide spell from recent".equals(menu.label))
+            .findFirst().orElseThrow(AssertionError::new).action.run();
+        assertTrue(LiveSnapshot.capture(engine, now + 1_200L, context).recent.isEmpty());
+        assertEquals(before.net, LiveSnapshot.capture(engine, now + 1_200L, context).net);
+        assertNotNull(LedgerData.capture(engine, now + 1_200L, LivePage.entryFor(spell)).detail);
+        manager.setConfiguration(GpManagerConfig.GROUP, "hiddenRecentItems", "");
+        assertEquals("removing the saved name restores the spell", 1,
+            LiveSnapshot.capture(engine, now + 1_800L, context).recent.size());
+    }
+
+    @Test
     public void anOrdinarySupplyNeverOffersTheChargeHide()
     {
-        // Owner live 2026-10-12: buried bones offered "Hide charge from recent"; it is a supply,
-        // not a charge.
+        // The older charge label must not return for an ordinary resource.
         Transaction bones = Tx.of(1_000L, TransactionType.CONSUMPTION, Context.GENERIC, "Buried", true,
             List.of(new Flow(526, "Bones", -1L, 90, -90L)));
         LiveContext context = new LiveContext(false, null, 0L, PvpState.NONE, "", false, "", false);
@@ -156,10 +208,10 @@ public class RecentVisibilityTest
             }
         }, id -> null);
         assertTrue("a charge row keeps both options",
-            has(page, spend, "Hide item from recent") && has(page, spend, "Hide charge from recent"));
-        assertFalse("a gain is not a charge", has(page, gain, "Hide charge from recent"));
+            has(page, spend, "Hide item from recent") && has(page, spend, "Hide supply from recent"));
+        assertFalse("a gain is not a charge", has(page, gain, "Hide supply from recent"));
 
-        page.rowOf(spend).menu.stream().filter(menu -> "Hide charge from recent".equals(menu.label))
+        page.rowOf(spend).menu.stream().filter(menu -> "Hide supply from recent".equals(menu.label))
             .findFirst().orElseThrow(AssertionError::new).action.run();
         assertEquals("Burning amulet*", manager.getConfig(GpManagerConfig.class).hiddenRecentCharges());
         assertTrue("the item itself was not hidden",
@@ -210,7 +262,7 @@ public class RecentVisibilityTest
             public void openLedger(LedgerData.Entry entry) { }
         }, id -> null);
         assertTrue("the charge menu is offered on it",
-            has(page, visible.get(0), "Hide charge from recent"));
+            has(page, visible.get(0), "Hide supply from recent"));
     }
 
     private static boolean has(LivePage page, LiveSnapshot.Recent row, String label)

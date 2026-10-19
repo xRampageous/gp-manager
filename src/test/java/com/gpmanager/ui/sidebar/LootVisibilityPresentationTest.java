@@ -1,10 +1,9 @@
 package com.gpmanager;
 
 import java.util.Collections;
-import java.util.concurrent.atomic.AtomicReference;
-import javax.swing.SwingUtilities;
 import org.junit.Test;
 
+import static com.gpmanager.SwingTestSupport.onEdt;
 import static org.junit.Assert.assertEquals;
 import static org.junit.Assert.assertFalse;
 import static org.junit.Assert.assertNotNull;
@@ -161,25 +160,4 @@ public class LootVisibilityPresentationTest
             Confidence.LIKELY, "Test sample.", null);
     }
 
-    private static <T> T onEdt(java.util.concurrent.Callable<T> callable) throws Exception
-    {
-        AtomicReference<T> result = new AtomicReference<>();
-        AtomicReference<Exception> failure = new AtomicReference<>();
-        SwingUtilities.invokeAndWait(() ->
-        {
-            try
-            {
-                result.set(callable.call());
-            }
-            catch (Exception ex)
-            {
-                failure.set(ex);
-            }
-        });
-        if (failure.get() != null)
-        {
-            throw failure.get();
-        }
-        return result.get();
-    }
 }

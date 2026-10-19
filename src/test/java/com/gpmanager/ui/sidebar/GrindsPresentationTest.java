@@ -8,15 +8,14 @@ import java.nio.file.attribute.FileTime;
 import java.util.ArrayList;
 import java.util.Collections;
 import java.util.List;
-import java.util.concurrent.atomic.AtomicReference;
 import javax.swing.JButton;
 import javax.swing.JLabel;
-import javax.swing.SwingUtilities;
 import net.runelite.client.util.Filepath;
 import org.junit.Rule;
 import org.junit.Test;
 import org.junit.rules.TemporaryFolder;
 
+import static com.gpmanager.SwingTestSupport.onEdt;
 import static org.junit.Assert.assertEquals;
 import static org.junit.Assert.assertFalse;
 import static org.junit.Assert.assertNotEquals;
@@ -28,6 +27,28 @@ import static org.junit.Assert.assertTrue;
 public class GrindsPresentationTest
 {
     @Rule public TemporaryFolder temporary = new TemporaryFolder();
+
+    @Test
+    public void aLargeLossCannotWrapTheRequiredTargetRateToZero()
+    {
+        assertEquals(Long.MAX_VALUE, GrindsData.requiredAverage(Long.MAX_VALUE, Long.MIN_VALUE, 3_600_000L));
+        assertEquals(0L, GrindsData.requiredAverage(100L, 101L, 3_600_000L));
+        assertEquals(0L, GrindsData.requiredAverage(100L, 0L, 0L));
+    }
+
+    @Test
+    public void oversizedTimeInputsAreRejectedWithoutChangingTheExistingTarget()
+    {
+        for (String text : new String[] {"153722867280913", "153722867280913m",
+            "2562047788016h", "2500000000000h 10000000000000m", "9".repeat(400) + "h"})
+        {
+            assertEquals(text, GrindsData.INVALID, GrindsData.parseTime(text));
+            assertEquals(text, Long.valueOf(3_600_000L), GrindsData.applyTime(text, 3_600_000L));
+        }
+        assertEquals(60_000L, GrindsData.parseTime("0.5"));
+        assertEquals(30_000L, GrindsData.parseTime("0.5m"));
+        assertEquals(1_800_000L, GrindsData.parseTime("0.5h"));
+    }
 
     @Test
     public void friendlyTargetParsingNormalisesExactValues() throws Exception
@@ -324,6 +345,23 @@ public class GrindsPresentationTest
     }
 
     /** Owner 1.5.0: a Grind's row compares by its average GP/h over finished runs. */
+    @Test
+    public void myGrindsUseTheCanonicalRateWithoutOverflowingLargeSignedTotals()
+    {
+        for (long value : new long[] {3_000_000_000_000L, -3_000_000_000_000L})
+        {
+            Engine engine = PresentationLifecycleTest.engine();
+            long now = 1_800_000_000_000L;
+            engine.startGrind("Long history", null, null, null, now);
+            engine.getActiveSession().addTransaction(booked(now + 1_000L, "Dragon bones", 536,
+                value > 0L ? 1500 : -1500, 2_000_000_000, value), 2_000, false);
+            engine.finishCustom(now + 3_600_000L);
+            GrindsData.MyGrind row = GrindsData.capture(engine, now + 3_600_000L, false, null).myGrinds.get(0);
+            assertEquals(value, row.rate);
+            assertEquals(Session.hourly(value, 3_600_000L), row.rate);
+        }
+    }
+
     @Test
     public void myGrindsShowTheAverageRateOfFinishedRuns() throws Exception
     {
@@ -718,7 +756,7 @@ public class GrindsPresentationTest
         List<String> headerButtons = onEdt(() -> buttonTexts(panel.grinds.pageBar()));
         assertTrue("the Grinds header carries the controls: " + headerButtons,
             headerButtons.contains("Start Grind") && !headerButtons.contains("+ Add Grind")
-                && headerButtons.contains("\u00b7\u00b7\u00b7"));
+                && headerButtons.contains("Archived"));
         assertFalse("the controls left the scrolling body",
             onEdt(() -> buttonTexts(panel.grinds.body())).contains("Start Grind"));
         javax.swing.border.Border border = onEdt(() -> panel.shell().bar.getBorder());
@@ -729,34 +767,11 @@ public class GrindsPresentationTest
     /** Controls left, actions right: the one page-toolbar band both headers use. */
     private static boolean bandShape(Component pageBar)
     {
-        if (!(pageBar instanceof Container))
-        {
-            return false;
-        }
-        for (Component child : ((Container) pageBar).getComponents())
-        {
-            if (!(child instanceof Container))
-            {
-                continue;
-            }
-            Container row = (Container) child;
-            if (!(row.getLayout() instanceof java.awt.BorderLayout))
-            {
-                continue;
-            }
-            java.awt.BorderLayout layout = (java.awt.BorderLayout) row.getLayout();
-            Component left = layout.getLayoutComponent(java.awt.BorderLayout.CENTER);
-            Component right = layout.getLayoutComponent(java.awt.BorderLayout.EAST);
-            if (left instanceof Container && right instanceof Container
-                && ((Container) left).getLayout() instanceof java.awt.FlowLayout
-                && ((Container) right).getLayout() instanceof java.awt.FlowLayout
-                && ((Container) left).getComponentCount() >= 1
-                && ((Container) right).getComponentCount() >= 1)
-            {
-                return true;
-            }
-        }
-        return false;
+        if (!(pageBar instanceof Container) || !(((Container) pageBar).getLayout() instanceof java.awt.BorderLayout)) return false;
+        java.awt.BorderLayout layout = (java.awt.BorderLayout) ((Container) pageBar).getLayout();
+        Component left = layout.getLayoutComponent(java.awt.BorderLayout.CENTER);
+        Component right = layout.getLayoutComponent(java.awt.BorderLayout.EAST);
+        return left != null && right instanceof Container && ((Container) right).getComponentCount() >= 1;
     }
 
     private static boolean clickText(java.awt.Component root, String text)
@@ -791,8 +806,8 @@ public class GrindsPresentationTest
             SidebarPanelProbe.refresh(panel);
             return null;
         });
-        assertTrue("the gear beside the tabs holds the profile data actions",
-            anyAccessibleContains(panel, "Profile data"));
+        assertTrue("the gear beside the tabs holds GP Manager actions",
+            anyAccessibleContains(panel, "GP Manager actions"));
         java.util.List<String> gear = new java.util.ArrayList<>();
         for (java.awt.Component item : onEdt(() -> SidebarPanelProbe.dataMenu(panel)).getComponents())
         {
@@ -801,7 +816,7 @@ public class GrindsPresentationTest
                 gear.add(((javax.swing.JMenuItem) item).getText());
             }
         }
-        assertEquals(java.util.Arrays.asList("Getting started", "Back up profile", "Copy data folder path", "Report a bug",
+        assertEquals(java.util.Arrays.asList("Copy Live summary", "Getting started", "Back up profile", "Copy data folder path", "Report a bug",
             "Changelog", "Reset free-play…", "Delete Profile…"), gear);
         assertTrue("no standalone Search page", java.util.Arrays.stream(ShellProbe.tabLabels(panel.shell()))
             .noneMatch(label -> label.equalsIgnoreCase("Search") || label.equalsIgnoreCase("Tools")));
@@ -985,27 +1000,6 @@ public class GrindsPresentationTest
         return false;
     }
 
-    private static <T> T onEdt(java.util.concurrent.Callable<T> callable) throws Exception
-    {
-        AtomicReference<T> result = new AtomicReference<>();
-        AtomicReference<Exception> failure = new AtomicReference<>();
-        SwingUtilities.invokeAndWait(() ->
-        {
-            try
-            {
-                result.set(callable.call());
-            }
-            catch (Exception ex)
-            {
-                failure.set(ex);
-            }
-        });
-        if (failure.get() != null)
-        {
-            throw failure.get();
-        }
-        return result.get();
-    }
 
     private static Transaction booked(long at, String name, int itemId, long quantity, int unitPrice, long value)
     {

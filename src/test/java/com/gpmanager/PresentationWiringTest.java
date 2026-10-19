@@ -6,6 +6,7 @@ import java.util.Collections;
 import javax.swing.SwingUtilities;
 import org.junit.Test;
 
+import static com.gpmanager.GpManagerPluginProbe.set;
 import static org.junit.Assert.*;
 
 /** Plugin presentation wiring against the concrete sidebar and its read models. */
@@ -103,10 +104,4 @@ public class PresentationWiringTest
         return field.get(target);
     }
 
-    private static void set(Object target, String name, Object value) throws Exception
-    {
-        Field field = GpManagerPlugin.class.getDeclaredField(name);
-        field.setAccessible(true);
-        field.set(target, value);
-    }
 }

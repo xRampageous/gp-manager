@@ -96,7 +96,7 @@ public final class GeneralProfitSimulation
             SimulationSupport.snapshot(379, 3L, 892, 90L, 555, 45L),
             start + 600L);
         SimulationSupport.equal(TransactionType.CONSUMPTION, supplies.getType(), "supply transaction type");
-        SimulationSupport.equal(875L, supplies.getCosts(), "supply costs");
+        SimulationSupport.equal(875L, engine.getMetrics(start + 2_400L).costs, "all settled supply costs");
 
         Map<Integer, Long> loot = new LinkedHashMap<>();
         loot.put(526, 1L);

@@ -8,6 +8,16 @@ import static org.junit.Assert.assertEquals;
 public class FmtCompactTest
 {
     @Test
+    public void exactSignedAmountsKeepOneSignAndEveryDigitAtLongBounds()
+    {
+        assertEquals("−9,223,372,036,854,775,808", Fmt.exactSigned(Long.MIN_VALUE));
+        assertEquals("+9,223,372,036,854,775,807", Fmt.exactSigned(Long.MAX_VALUE));
+        assertEquals("0", Fmt.exactSigned(0L));
+        assertEquals("−1,234", Fmt.exactSigned(-1_234L));
+        assertEquals("+1,234", Fmt.exactSigned(1_234L));
+    }
+
+    @Test
     public void amountsAreCutOffNeverRoundedUp()
     {
         assertEquals("999", Fmt.compact(999L));

@@ -22,7 +22,7 @@ def pluginMainClass = devTools ? 'com.gpmanager.DevLauncher' : 'com.gpmanager.Gp
 
 group = 'com.gpmanager'
 // Plugin metadata and build version must agree; development identity is generated below.
-version = '1.5.2'
+version = '1.6.0'
 
 
 
@@ -81,6 +81,7 @@ tasks.withType(JavaCompile).configureEach {
 
 test {
     useJUnit()
+    maxParallelForks = 2
     failOnNoDiscoveredTests = true
     // Forward local gp.* switches (goldens, fuzz seeds, perf multiplier) to the test JVM.
     System.properties.each { k, v -> if (k.toString().startsWith('gp.')) systemProperty k.toString(), v.toString() }

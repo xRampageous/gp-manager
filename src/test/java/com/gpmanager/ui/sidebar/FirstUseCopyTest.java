@@ -5,7 +5,7 @@ import javax.swing.SwingUtilities;
 import org.junit.Test;
 
 import static org.junit.Assert.assertEquals;
-import static org.junit.Assert.assertTrue;
+import static org.junit.Assert.assertNotNull;
 
 /** Owner 2026-10-01 (F13): the empty Live card names what starts tracking, per mode. */
 public class FirstUseCopyTest
@@ -16,14 +16,14 @@ public class FirstUseCopyTest
         SidebarPanel automatic = panel(new GpManagerConfig() {});
         refresh(automatic);
         assertEquals("Tracking starts with your first gameplay", automatic.live.recent.emptyText);
-        assertTrue("the Grind action is offered in free play", automatic.live.startGrind.isVisible());
+        assertNotNull("starting remains available on Grinds", DirectHeaderControlsTest.find(automatic.grinds.bar, "Start Grind"));
 
         SidebarPanel manual = panel(new GpManagerConfig()
         {
             @Override public boolean autoStartSession() { return false; }
         });
         refresh(manual);
-        assertEquals("Press Grind to start tracking", manual.live.recent.emptyText);
+        assertEquals("Open Grinds to start tracking", manual.live.recent.emptyText);
 
         GpManagerConfig namedConfig = new GpManagerConfig() {};
         Engine namedEngine = new Engine(deltas -> Collections.emptyList(), new TransactionClassifier(),

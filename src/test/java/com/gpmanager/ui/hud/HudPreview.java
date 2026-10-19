@@ -26,7 +26,17 @@ public final class HudPreview
     public static void write(File out) throws IOException
     {
         long now = SafeMath.now();
+        compactRows(out, now);
         emptyAndFiltered(out, now);
+        Engine free = HudBuilderTest.engine();
+        free.ensureSession(now - 61_000L);
+        free.getActiveSession().addTransaction(receipt(now - 1_000L, TransactionType.LOOT,
+            flow(995, "Coins", 100_000L, 1)), 2_000, false);
+        free.setMilestone(100_000L);
+        GpManagerConfig milestoneConfig = HudBuilderTest.config(false, 4);
+        HudBuilder milestone = new HudBuilder(milestoneConfig, HudPreview::icon);
+        milestone.update(LiveSnapshot.capture(free, now, null), f -> true, now);
+        canvas(out, "hud-milestone.png", milestone, milestoneConfig, 520, 160);
         GpManagerConfig config = new GpManagerConfig()
         {
             @Override
@@ -111,6 +121,27 @@ public final class HudPreview
         HudBuilder timedBuilder = new HudBuilder(config, HudPreview::icon);
         timedBuilder.update(LiveSnapshot.capture(timed, now, null), f -> true, now);
         canvas(out, "hud-time-warning.png", timedBuilder, config, 520, 160);
+    }
+
+    private static void compactRows(File out, long now) throws IOException
+    {
+        for (int mode : new int[]{0, 1, 2})
+            for (int width : new int[]{120, 213, 225, 300})
+            {
+                GpManagerConfig config = new GpManagerConfig()
+                {
+                    @Override public boolean hudCompactItems() { return mode > 0; }
+                    @Override public boolean hudSemiCompactValues() { return mode == 2; }
+                    @Override public boolean hudHideWhenIdle() { return false; }
+                    @Override public boolean reducedMotion() { return true; }
+                    @Override public int hudMaxWidth() { return width; }
+                };
+                HudBuilder builder = new HudBuilder(config, HudPreview::icon);
+                builder.tray.booked(receipt(now, TransactionType.LOOT, flow(1201, "Rune kiteshield", 1, 31_799)), now, false);
+                builder.tray.booked(receipt(now, TransactionType.LOOT, flow(560, "Death rune", 20_000, 10_000)), now, false);
+                builder.update(HudBuilderTest.grind(200_031_799L, null), item -> true, now + 1000);
+                canvas(out, "hud-" + (mode == 2 ? "semi-compact" : mode == 1 ? "compact" : "named") + "-" + width + ".png", builder, config, 400, 180);
+            }
     }
 
     private static void emptyAndFiltered(File out, long now) throws IOException

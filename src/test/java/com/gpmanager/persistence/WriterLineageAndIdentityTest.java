@@ -178,18 +178,23 @@ public class WriterLineageAndIdentityTest
     }
 
     /**
-     * A save serializes the engine's state while holding the engine's lock, so no live record is
-     * read after it is released; the writer then commits that JSON without serializing again.
+     * A save copies under the engine lock, then serializes once on the writer without that lock.
      */
     @Test
     public void saveSnapshotIsCopiedUnderTheEngineLock() throws Exception
     {
         Path root = temporary.newFolder().toPath();
-        Engine engine = new Engine(
-            deltas -> Collections.emptyList(),
-            new TransactionClassifier(),
-            new GpManagerConfig() {});
-        java.util.List<Boolean> locked = new java.util.ArrayList<>();
+        java.util.List<Boolean> copiedLocked = new java.util.concurrent.CopyOnWriteArrayList<>();
+        Engine engine = new Engine(deltas -> Collections.emptyList(), new TransactionClassifier(), new GpManagerConfig() {})
+        {
+            @Override SavedState savedState()
+            {
+                copiedLocked.add(Thread.holdsLock(this));
+                return super.savedState();
+            }
+        };
+        java.util.List<Boolean> locked = new java.util.concurrent.CopyOnWriteArrayList<>();
+        java.util.List<Thread> encodingThreads = new java.util.concurrent.CopyOnWriteArrayList<>();
         Gson recording = new com.google.gson.GsonBuilder().registerTypeAdapterFactory(new com.google.gson.TypeAdapterFactory()
         {
             @Override
@@ -207,6 +212,7 @@ public class WriterLineageAndIdentityTest
                     public void write(com.google.gson.stream.JsonWriter out, T value) throws java.io.IOException
                     {
                         locked.add(Thread.holdsLock(engine));
+                        encodingThreads.add(Thread.currentThread());
                         delegate.write(out, value);
                     }
 
@@ -227,12 +233,18 @@ public class WriterLineageAndIdentityTest
             assertTrue(coordinator.switchIdentity(new TrackingIdentity("rsprofile.alice", TrackingIdentity.ACCOUNT_HASH_INVALID), true, true));
             engine.ensureSession(1_000L);
             locked.clear();
+            copiedLocked.clear();
+            encodingThreads.clear();
+            Thread caller = Thread.currentThread();
             assertTrue(coordinator.saveNow());
-            assertEquals("one serialization per save, under the engine lock",
-                Collections.singletonList(true), locked);
+            assertEquals("copy under the engine lock", Collections.singletonList(true), copiedLocked);
+            assertEquals("one serialization per save, without the engine lock",
+                Collections.singletonList(false), locked);
+            assertEquals(1, encodingThreads.size());
+            assertFalse("encoding is off the capture thread", caller == encodingThreads.get(0));
             String disk = SessionRepository.readText(repository.bound.state);
             SavedState reread = new Gson().fromJson(disk, SavedState.class);
-            assertEquals("the file is exactly what the old detached copy wrote", new Gson().toJson(reread), disk);
+            assertEquals("the file retains the captured schema and values", new Gson().toJson(reread), disk);
         }
         finally
         {

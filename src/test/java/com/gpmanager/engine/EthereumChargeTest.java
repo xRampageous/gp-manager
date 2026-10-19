@@ -2,7 +2,6 @@ package com.gpmanager;
 
 import java.lang.reflect.Proxy;
 import java.util.ArrayList;
-import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 import net.runelite.api.ItemComposition;
@@ -14,6 +13,7 @@ import net.runelite.api.gameval.ItemID;
 import net.runelite.api.widgets.Widget;
 import org.junit.Test;
 
+import static com.gpmanager.EngineTestFixtures.mapOf;
 import static org.junit.Assert.assertEquals;
 import static org.junit.Assert.assertFalse;
 import static org.junit.Assert.assertNotNull;
@@ -256,15 +256,6 @@ public class EthereumChargeTest
         return new ContainerSnapshot(quantities);
     }
 
-    private static Map<Integer, Long> mapOf(Object... values)
-    {
-        Map<Integer, Long> result = new HashMap<>();
-        for (int index = 0; index + 1 < values.length; index += 2)
-        {
-            result.put((Integer) values[index], (Long) values[index + 1]);
-        }
-        return result;
-    }
 
     private static Transaction settle(Engine engine, ContainerSnapshot next, long firstTick)
     {

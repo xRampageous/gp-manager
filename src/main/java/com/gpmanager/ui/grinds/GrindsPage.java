@@ -1,7 +1,12 @@
 package com.gpmanager;
 
+
+import net.runelite.client.util.LinkBrowser;
+import java.awt.datatransfer.StringSelection;
+
 import static com.gpmanager.Fmt.*;
 import static com.gpmanager.GameData.msg;
+import static com.gpmanager.GameData.pattern;
 import static com.gpmanager.Kit.*;
 import static com.gpmanager.Kit.Tone.*;
 import static com.gpmanager.Phrases.*;
@@ -20,6 +25,8 @@ import java.util.*;
 import java.util.List;
 import javax.swing.*;
 import lombok.*;
+import static java.util.Collections.singletonList;
+import static java.util.Locale.ROOT;
 
 /**
  * Grinds = management (SIDEBAR_SPEC.md §3): the Running line linking to Live, the My Grinds table
@@ -31,51 +38,48 @@ class GrindsPage implements Shell.Page {
         /** Shows Live. */
         void back();
 
-        void openLedger(String sessionId);
+        void openLedger(String id);
 
         void endGrind();
 
-        void startGrind(String grindId, String nameOverride);
+        void startGrind(String id, String nameOverride);
 
         void openTargets();
 
         /** Opens the Start Grind sheet. */
         void newGrind();
 
-        void editSavedGrind(String grindId);
+        void editSavedGrind(String id);
 
-        void favoriteSavedGrind(String grindId, boolean favorite);
+        void favoriteSavedGrind(String id, boolean favorite);
 
-        void archiveSavedGrind(String grindId, boolean archived);
+        void archiveSavedGrind(String id, boolean archived);
 
-        void deleteSavedGrind(String grindId);
+        void deleteSavedGrind(String id);
 
-        void startAgain(String sessionId);
+        void startAgain(String id);
 
-        void openDetail(String sessionId);
+        void openDetail(String id);
 
-        void deleteHistorical(String sessionId);
+        void deleteHistorical(String id);
+
+        default void copySummary(String id) {}
 
         /** A past Free play run becomes Free play again (owner 1.5.2). */
-        void restoreFreePlay(String sessionId);
+        void restoreFreePlay(String id);
 
-        /** The Grinds ⋯ menu: backups and recovery. */
-        void openDataMenu(JComponent anchor);
+        void showArchived(boolean show);
 
         void refresh();
     }
 
     Actions actions;
-    JPanel body = stack(PANEL, GAP);
-    JPanel bar = new JPanel(new BorderLayout(4, 0));
-    JPanel list = stack(PANEL, GAP);
-    JPanel detail = stack(PANEL, GAP);
-    JPanel running = new JPanel(new BorderLayout(GAP, 0));
-    JLabel runningName = label("", bold(), TEXT);
-    JLabel runningNet = label("", numbers(11.5f), TEXT);
+    JPanel body = stack(PANEL, GAP), bar = new JPanel(new BorderLayout(4, 0)), list = stack(PANEL, GAP);
+    JPanel detail = stack(PANEL, GAP), running = new JPanel(new BorderLayout(GAP, 0));
+    JLabel runningName = label("", bold(), TEXT), runningNet = label("", numbers(11.5f), TEXT);
     Table mine = new Table("MY GRINDS");
     JPanel selectedPanel = stack(CARD, 0);
-    Table recent = new Table("RECENT GRINDS");
+    Table recent = new Table("RECENT GRINDS"), savedSessions = new Table("SAVED SESSIONS");
 
     /** The current Free play and past ones Reset free-play kept (owner 1.5.2). */
     Table freePlay = new Table("FREE PLAY");
@@ -86,38 +90,37 @@ class GrindsPage implements Shell.Page {
     Hero hero = new Hero();
     GrindsData data;
     String selectedId;
+    JCheckBox archived = new JCheckBox("Archived");
 
     GrindsPage(Actions actions) {
         this.actions = actions;
         JButton start = button("Start Grind", true, actions::newGrind);
-        JButton more = button("\u00b7\u00b7\u00b7", false, () -> {});
-        more.setToolTipText("Grinds options");
-        more.getAccessibleContext().setAccessibleName("Grinds options");
-        more.addActionListener(e -> actions.openDataMenu(more));
+        focus(archived);
+        archived.setOpaque(false);
+        archived.setFont(small());
+        archived.setForeground(LABEL);
+        archived.setToolTipText("Include archived Grinds");
+        archived.addActionListener(e -> actions.showArchived(archived.isSelected()));
         // Owner 2026-10-01: the same toolbar band as the Ledger; the controls live in the header.
-        Kit.headerBand(bar, new JComponent[] {start}, new JComponent[] {more});
+        headerBand(bar, start, archived);
         running.setBackground(CARD);
         pad(running, 2, 6, 2, 2);
-        runningName.setText("● ");
-        runningName.setForeground(TEXT);
-        running.add(runningName, BorderLayout.WEST);
-        runningNet.setHorizontalAlignment(JLabel.RIGHT);
-        running.add(runningNet, BorderLayout.CENTER);
-        var runningButtons = new JPanel(new FlowLayout(FlowLayout.RIGHT, 2, 0));
-        runningButtons.setOpaque(false);
-        JButton live = button("Live ›", false, actions::back);
-        live.setToolTipText("Open Live");
+        Hero.clickable(runningName, "Open Live", actions::back);
+        onResize(runningName, this::runningTitle);
+        running.add(runningName, BorderLayout.NORTH);
+        var facts = transparent(new BorderLayout(GAP, 0));
+        facts.add(runningNet, BorderLayout.CENTER);
         JButton end = button("End", false, actions::endGrind);
         end.setForeground(LOSS.color);
         end.setToolTipText(msg("end-grind"));
-        runningButtons.add(live);
-        runningButtons.add(end);
-        running.add(runningButtons, BorderLayout.EAST);
+        facts.add(end, BorderLayout.EAST);
+        running.add(facts, BorderLayout.CENTER);
         mine.setEmptyText(msg("saved-grinds"));
         recent.setEmptyText(msg("finished-grinds")).setFill(true);
         pad(selectedPanel, 0, 0, 4, 0);
         // Owner 2026-09-28: My Grinds and Recent grinds first; All time closes the page.
-        for (JComponent part : new JComponent[] {running, mine, selectedPanel, recent, freePlay, allTime})
+        savedSessions.setEmptyText("Save a Live session to keep it here.");
+        for (var part : new JComponent[] {running, mine, selectedPanel, recent, savedSessions, freePlay, allTime})
             list.add(part);
         pad(body, 0, GAP, GAP, 0);
         body.add(list);
@@ -156,7 +159,8 @@ class GrindsPage implements Shell.Page {
     void applyRunning(GrindsData data) {
         running.setVisible(data.hasActive);
         if (!data.hasActive) return;
-        runningName.setText(msg("text-2") + data.activeName.replace("<", "&lt;") + "</html>");
+        runningTitle();
+        runningName.setToolTipText("Open Live · " + data.activeName);
         runningNet.setText(signed(data.activeNet));
         runningNet.setForeground(sign(data.activeNet).color);
         running.setToolTipText(rateLine(data.activeRateEstablished, data.activeGpPerHour) + " · "
@@ -165,62 +169,67 @@ class GrindsPage implements Shell.Page {
         runningNet.setToolTipText(exactSigned(data.activeNet) + " gp");
     }
 
+    void runningTitle() {
+        if (data != null && data.hasActive) runningName.setText(fitShrinking(runningName,
+                        "● " + data.activeName, bold(), runningName.getWidth() > 0 ? runningName.getWidth() : 201));
+    }
+
     /** Every retained session, Free play included; bests are finished Grinds only. */
-    void applyAllTime(GrindsData.AllTime allTime) {
-        var tip = new StringBuilder("<html>All time · ").append(allTime.grinds)
-                        .append(allTime.grinds == 1 ? " Grind" : " Grinds").append("<br>Net ")
-                        .append(exactSigned(allTime.net)).append(" gp<br>Active ")
-                        .append(duration(allTime.activeMillis));
-        if (allTime.splitAvailable) {
-            tip.append("<br>Supplies ").append(signed(-allTime.supplies)).append(" · Losses ")
-                    .append(signed(-allTime.losses));
+    void applyAllTime(GrindsData.AllTime overall) {
+        var tip = new StringBuilder("<html>All time · ").append(overall.grinds)
+                        .append(overall.grinds == 1 ? " Grind" : " Grinds").append("<br>Net ")
+                        .append(exactSigned(overall.net)).append(" gp<br>Active ")
+                        .append(duration(overall.activeMillis));
+        if (overall.splitAvailable) {
+            tip.append("<br>Supplies ").append(signed(-overall.supplies)).append(" · Losses ")
+                    .append(signed(-overall.losses));
         }
-        if (allTime.bestRateName != null) {
-            tip.append("<br>Best GP/h ").append(allTime.bestRateName).append(" · ").append(rate(allTime.bestRate));
+        if (overall.bestRateName != null) {
+            tip.append("<br>Best GP/h ").append(overall.bestRateName).append(" · ").append(rate(overall.bestRate));
         }
-        String best = allTime.bestNetName == null ? ""
-                        : "Best · " + allTime.bestNetName + " " + signed(allTime.bestNet);
-        this.allTime.removeAll();
-        JLabel title = label("ALL TIME · " + allTime.grinds, small(), LABEL);
+        String best = overall.bestNetName == null ? ""
+                        : "Best · " + overall.bestNetName + " " + signed(overall.bestNet);
+        allTime.removeAll();
+        var title = label("ALL TIME · " + overall.grinds, small(), LABEL);
         pad(title, 3, 6, 3, 6);
-        this.allTime.add(title);
-        this.allTime.add(Hero.strip(List.of(new Cell("NET", signed(allTime.net), sign(allTime.net),
-                                        exactSigned(allTime.net) + " gp", null), new Cell("GP/H",
-                                        allTime.gpPerHour == null ? "—" : rate(allTime.gpPerHour), PLAIN, null, null),
-                                new Cell("ACTIVE", durationShort(allTime.activeMillis), PLAIN,
-                                        duration(allTime.activeMillis), null))));
+        allTime.add(title);
+        allTime.add(Hero.strip(List.of(new Cell("NET", signed(overall.net), sign(overall.net),
+                                        exactSigned(overall.net) + " gp", null), new Cell("GP/H",
+                                        overall.gpPerHour == null ? "—" : rate(overall.gpPerHour), PLAIN, null, null),
+                                new Cell("ACTIVE", durationShort(overall.activeMillis), PLAIN,
+                                        duration(overall.activeMillis), null))));
         if (!best.isEmpty()) {
-            JLabel bestLine = label(best, small(), sign(allTime.bestNet).color);
+            var bestLine = label(best, small(), sign(overall.bestNet).color);
             pad(bestLine, 3, 6, 4, 6);
-            this.allTime.add(bestLine);
+            allTime.add(bestLine);
         }
-        this.allTime.setToolTipText(tip.append("</html>").toString());
-        for (Component child : this.allTime.getComponents()) {
+        allTime.setToolTipText(tip.append("</html>").toString());
+        for (var child : allTime.getComponents()) {
             if (child instanceof JComponent && ((JComponent) child).getToolTipText() == null) {
-                ((JComponent) child).setToolTipText(this.allTime.getToolTipText());
+                ((JComponent) child).setToolTipText(allTime.getToolTipText());
             }
         }
-        this.allTime.revalidate();
+        allTime.revalidate();
     }
 
     void applyMine(GrindsData data) {
         var rows = new ArrayList<Row>();
         MyGrind selected = null;
-        for (MyGrind grind : data.myGrinds) {
-            SavedGrind def = grind.definition;
+        for (var plan : data.myGrinds) {
+            var def = plan.definition;
             String id = def.getGrindId();
             boolean isSelected = id.equals(selectedId);
-            if (isSelected) selected = grind;
-            String runs = grind.linkedCount + (grind.linkedCount == 1 ? " run" : " runs");
+            if (isSelected) selected = plan;
+            String runs = plan.linkedCount + (plan.linkedCount == 1 ? " run" : " runs");
             // Owner 1.5.0: the average rate sits in the wide middle column, the last run's Net on
             // the right (a rate with "/h" overflowed the value column).
-            rows.add(new Row(id, null, (def.favorite ? "★ " : "") + def.getName(), grind.linkedCount == 0 ? "NEW"
-                                    : grind.hasRate ? rate(grind.rate) + "/h" : runs,
-                            grind.hasLast ? signed(grind.lastNet) : "—", grind.hasLast ? sign(grind.lastNet) : DIM,
+            rows.add(new Row(id, null, (def.favorite ? "★ " : "") + def.getName(), plan.linkedCount == 0 ? "NEW"
+                                    : plan.hasRate ? rate(plan.rate) + "/h" : runs,
+                            plan.hasLast ? signed(plan.lastNet) : "—", plan.hasLast ? sign(plan.lastNet) : DIM,
                             def.getName() + " · " + runs + " · " + targetsLine(
                                             def.getNetTargetGp(), def.getActiveTimeTargetMillis()),
-                            grind.hasLast ? "Last run " + exactSigned(grind.lastNet) + " gp" : "", isSelected,
-                            () -> select(isSelected ? null : id), grindMenu(grind)));
+                            plan.hasLast ? "Last run " + exactSigned(plan.lastNet) + " gp" : "", isSelected,
+                            () -> select(isSelected ? null : id), grindMenu(plan)));
         }
         mine.countedTitle("MY GRINDS", rows);
         if (selected == null) selectedId = null;
@@ -235,19 +244,18 @@ class GrindsPage implements Shell.Page {
         }
     }
 
-    void applySelected(MyGrind grind) {
+    void applySelected(MyGrind plan) {
         selectedPanel.removeAll();
-        selectedPanel.setVisible(grind != null);
-        if (grind == null) return;
-        SavedGrind def = grind.definition;
+        selectedPanel.setVisible(plan != null);
+        if (plan == null) return;
+        var def = plan.definition;
         var facts = new KeyValue(null);
         // The row already shows the last run's Net and the average GP/h (owner 1.5.2: no repeats).
-        facts.put("Last run", grind.hasLast ? when(grind.lastStartedAt, SafeMath.now()) : "—", grind.hasLast ? PLAIN : DIM);
-        facts.put("Best", grind.hasBest ? signed(grind.bestNet) : "—", grind.hasBest ? sign(grind.bestNet) : DIM);
+        facts.put("Last run", plan.hasLast ? when(plan.lastStartedAt, now()) : "—", plan.hasLast ? PLAIN : DIM);
+        facts.put("Best", plan.hasBest ? signed(plan.bestNet) : "—", plan.hasBest ? sign(plan.bestNet) : DIM);
         facts.put("Target", targetsLine(def.getNetTargetGp(), def.getActiveTimeTargetMillis()), PLAIN);
         selectedPanel.add(facts);
-        var buttons = new JPanel(new FlowLayout(FlowLayout.LEFT, 4, 2));
-        buttons.setOpaque(false);
+        var buttons = transparent(new FlowLayout(FlowLayout.LEFT, 4, 2));
         // Owner 2026-10-01 (F14): the selected saved Grind starts right here, beside its menu.
         JButton start = button("Start", true, () -> actions.startGrind(def.getGrindId(), null));
         start.setToolTipText("Start " + def.getName());
@@ -255,13 +263,13 @@ class GrindsPage implements Shell.Page {
         buttons.add(button("Edit", false, () -> actions.editSavedGrind(def.getGrindId())));
         JButton more = button("···", false, () -> {});
         more.setToolTipText("More for this Grind");
-        more.addActionListener(e -> popup(grindMenu(grind)).show(more, 0, more.getHeight()));
+        more.addActionListener(e -> popup(grindMenu(plan)).show(more, 0, more.getHeight()));
         buttons.add(more);
         selectedPanel.add(buttons);
     }
 
-    List<Menu> grindMenu(MyGrind grind) {
-        SavedGrind def = grind.definition;
+    List<Menu> grindMenu(MyGrind plan) {
+        var def = plan.definition;
         String id = def.getGrindId();
         return Arrays.asList(new Menu("Start", () -> actions.startGrind(id, null)),
                 new Menu("Edit…", () -> actions.editSavedGrind(id)), new Menu(
@@ -272,41 +280,44 @@ class GrindsPage implements Shell.Page {
     }
 
     void applyRecent(GrindsData data) {
-        long now = SafeMath.now();
+        long now = now();
         var rows = new ArrayList<Row>();
         var free = new ArrayList<Row>();
-        for (Recent run : data.recent) {
+        var saved = new ArrayList<Row>();
+        for (var run : data.recent) {
             String id = run.sessionId;
             // Free play runs list apart: the current one opens Live; a past one can be restored.
             boolean current = run.freePlay && id.equals(data.activeSessionId);
-            ZoneId zone = data.profileZone == null ? ZoneId.systemDefault() : data.profileZone;
+            var zone = data.profileZone == null ? ZoneId.systemDefault() : data.profileZone;
             String when = dayLabel(Instant.ofEpochMilli(run.startedAt).atZone(zone).toLocalDate(), now, zone);
-            (run.freePlay ? free : rows).add(new Row(id, null, run.name,
+            (id.startsWith("saved:") ? saved : run.freePlay ? free : rows).add(new Row(id, null, run.name,
                                     current ? nonBlank(data.milestone, "Now") : when, valueText(run.net), sign(run.net),
                                     run.name + " · " + contextLine(run, now, data.profileZone),
                                     exactSigned(run.net) + " gp", false,
                                     current ? actions::back : () -> actions.openDetail(id), current ? Arrays.asList(
-                                                    new Menu("Open in Ledger", () -> actions.openLedger(id)))
+                                                    new Menu("Open in Ledger", () -> actions.openLedger(id)),
+                                                    new Menu("Copy summary", () -> actions.copySummary(id)))
                                             : Arrays.asList(new Menu("Open in Ledger", () -> actions.openLedger(id)),
+                                                    new Menu("Copy summary", () -> actions.copySummary(id)),
                                                     run.freePlay
                                                             ? new Menu("Restore\u2026", () -> actions.restoreFreePlay(id))
                                                             : new Menu("Start again", () -> actions.startAgain(id)),
                                                     new Menu("Delete\u2026", () -> actions.deleteHistorical(id)))));
         }
         recent.countedTitle("RECENT GRINDS", rows);
+        savedSessions.countedTitle("SAVED SESSIONS", saved);
         freePlay.countedTitle("FREE PLAY", free);
         freePlay.setVisible(!free.isEmpty());
     }
 
     // ---- detail -------------------------------------------------------------------------------
     void buildDetail(GrindsData data) {
-        GrindsData.Detail detail = data.detail;
+        var detail = data.detail;
         this.detail.removeAll();
         JButton back = button("‹ Grinds", false, () -> actions.openDetail(null));
-        var top = new JPanel(new BorderLayout());
-        top.setOpaque(false);
+        var top = transparent(new BorderLayout());
         top.add(back, BorderLayout.WEST);
-        top.add(label(when(detail.startedAt, SafeMath.now()).toUpperCase(Locale.ROOT), small(), LABEL),
+        top.add(label(when(detail.startedAt, now()).toUpperCase(ROOT), small(), LABEL),
                 BorderLayout.EAST);
         pad(top, 0, 0, 0, 6);
         this.detail.add(top);
@@ -319,25 +330,24 @@ class GrindsPage implements Shell.Page {
         hero.rate.setToolTipText(detail.rateEstablished ? msg("gp-h") : null);
         var strip = Hero.money(detail.revenue, detail.supplies, detail.losses, detail.revenue - detail.net,
                         detail.splitAvailable, null);
-        hero.strips(Collections.singletonList(strip));
+        hero.strips(singletonList(strip));
         this.detail.add(hero);
         // Only targets the run had: an empty "No Net target" line said nothing (owner 1.5.2).
-        var outcome = new KeyValue("HIGHLIGHTS");
+        var result = new KeyValue("HIGHLIGHTS");
         boolean targeted = detail.netTargetGp != null || detail.activeTimeTargetMillis != null;
-        if (detail.netTargetGp != null) outcome.put("Target", detail.netOutcome(), PLAIN);
-        if (detail.activeTimeTargetMillis != null) outcome.put("Time", detail.timeOutcome(), PLAIN);
+        if (detail.netTargetGp != null) result.put("Target", detail.netOutcome(), PLAIN);
+        if (detail.activeTimeTargetMillis != null) result.put("Time", detail.timeOutcome(), PLAIN);
         if (data.activePace != null && data.activePace.present && data.activePace.available
                 && detail.sessionId.equals(data.activeSessionId)) {
             // A time target's countdown is already the Time row (owner 1.5.2: no repeat).
             boolean timed = detail.activeTimeTargetMillis != null;
-            if (!timed) outcome.put("Pace", data.activePace.line, DIM);
+            if (!timed) result.put("Pace", data.activePace.line, DIM);
             // Owner 2026-10-01 (F10): a combined target also shows its required average.
-            if (data.activePace.second != null) outcome.put(timed ? "Pace" : "", data.activePace.second, DIM);
+            if (data.activePace.second != null) result.put(timed ? "Pace" : "", data.activePace.second, DIM);
         }
-        if (targeted) this.detail.add(outcome);
+        if (targeted) this.detail.add(result);
         if (detail.compacted) this.detail.add(note(msg("summary-detailed"), LABEL));
-        var buttons = new JPanel(new FlowLayout(FlowLayout.LEFT, 4, 2));
-        buttons.setOpaque(false);
+        var buttons = transparent(new FlowLayout(FlowLayout.LEFT, 4, 2));
         // A Free play run is restored, never started again as a Grind (owner 1.5.2).
         boolean free = data.recent.stream().anyMatch(run -> run.freePlay && run.sessionId.equals(detail.sessionId));
         if (!free) buttons.add(button("Start again", true, () -> actions.startAgain(detail.sessionId)));
@@ -355,30 +365,30 @@ class GrindsPage implements Shell.Page {
 
     /** A row's right-click menu, shown as a ⋯ popup. */
     static JPopupMenu popup(List<Menu> items) {
-        return Kit.menuOf(items);
+        return menuOf(items);
     }
 
     // ---- text ---------------------------------------------------------------------------------
     /** Date and duration context: Today/Yesterday/date plus Active Time, never internal ids. */
     static String contextLine(Recent recent, long now, ZoneId zone) {
-        ZoneId z = zone == null ? ZoneId.systemDefault() : zone;
+        var z = zone == null ? ZoneId.systemDefault() : zone;
         return dayLabel(Instant.ofEpochMilli(recent.startedAt).atZone(z).toLocalDate(), now, z) + " · "
                 + durationShort(recent.activeMillis);
     }
 
     /** Understandable signed money: explicit "0 GP" for zero, never a bare 0. */
     static String valueText(long net) {
-        return net == 0L ? "0 GP" : signed(net);
+        return net == 0 ? "0 GP" : signed(net);
     }
 
     static String rateLine(boolean established, long gpPerHour) {
         return established ? rate(gpPerHour) + "/h" : "—  GP/h";
     }
 
-    static String targetsLine(Long netTargetGp, Long activeTimeTargetMillis) {
+    static String targetsLine(Long profitTarget, Long activeTarget) {
         var parts = new ArrayList<String>();
-        if (netTargetGp != null) parts.add(targetNet(netTargetGp) + " Net");
-        if (activeTimeTargetMillis != null) parts.add(targetTime(activeTimeTargetMillis));
+        if (profitTarget != null) parts.add(targetNet(profitTarget) + " Net");
+        if (activeTarget != null) parts.add(targetTime(activeTarget));
         return parts.isEmpty() ? "No targets" : String.join(" · ", parts);
     }
 }
@@ -396,10 +406,10 @@ class GrindsController implements GrindsPage.Actions {
 
     GrindsController(SidebarPanel panel) {
         this.panel = panel;
-        this.engine = panel.engine;
-        this.shell = panel.shell();
-        this.repository = panel.repository;
-        this.persistence = panel.persistence;
+        engine = panel.engine;
+        shell = panel.shell();
+        repository = panel.repository;
+        persistence = panel.persistence;
     }
 
     void mutate(Runnable domain) {
@@ -416,45 +426,94 @@ class GrindsController implements GrindsPage.Actions {
         refresh();
     }
 
-    public void openLedger(String sessionId) {
-        Session active = engine.getActiveSession();
-        if (active != null && active.getId().equals(sessionId)) {
+    public void openLedger(String id) {
+        var active = engine.getActiveSession();
+        if (active != null && active.getId().equals(id)) {
             openEntry(Entry.current());
         } else {
-            Session historical = sessionId == null ? null : engine.historySession(sessionId);
-            openEntry(new Entry(LedgerData.Scope.HISTORY, sessionId, historical == null ? null : historical.getName()));
+            var history = id == null ? null : engine.historySession(id);
+            openEntry(new Entry(LedgerData.Scope.HISTORY, id, history == null ? null : history.getName()));
         }
     }
 
     public void endGrind() {
-        Session ending = engine.getActiveSession();
+        var ending = engine.getActiveSession();
         if (ending == null || !engine.isCustomActive()) return;
-        String endedId = ending.getId();
-        String endedName = ending.getName();
-        // Ending is a deliberate menu pick and keeps history, so it needs no second confirmation.
+        String endedId = ending.getId(), endedName = ending.getName();
+        Object owner = panel.ownerToken;
         mutate(() -> {
-                    if (!engine.finishCustom(SafeMath.now())) return;
-                    Metrics ended = engine.historyMetrics(endedId, SafeMath.now());
-                    // Owner 2026-10-01 (F14): the ended run stays one click from its recap.
-                    shell.notify(endedName + " ended", ended == null ? "" : signed(ended.net), false, "View recap",
-                            () -> {
-                                panel.grindsDetailId = endedId;
-                                shell.show(Shell.GRINDS);
-                                refresh();
-                            });
+                    if (engine.getActiveSession() != ending || !engine.finishCustom(now())) return;
+                    var ended = engine.historyMetrics(endedId, now());
+                    Runnable recap = () -> {
+                        if (panel.suspended || panel.ownerToken != owner) return;
+                        shell.notify(endedName + " ended", ended == null ? "" : signed(ended.net), false, "View recap",
+                                () -> {
+                                    panel.grindsDetailId = endedId;
+                                    shell.show(Shell.GRINDS);
+                                    refresh();
+                                });
+                    };
+                    if (SwingUtilities.isEventDispatchThread()) recap.run();
+                    else SwingUtilities.invokeLater(recap);
                 });
     }
 
-    /** The Live clock: a new session, in a Grind too; the run keeps everything (owner 1.5.2). */
+    /** The Live clock offers restart, new-session and original-time controls. */
     public void newSession() {
-        shell.confirm("New session?", msg("new-session"), "New session",
-                () -> mutate(() -> engine.newLiveSession(SafeMath.now())));
+        var content = stack(CARD, 4);
+        var help = note("Restart keeps Net.", LABEL, 110);
+        help.setToolTipText("<html>" + msg("new-session").replace(". ", ".<br>") + "</html>");
+        content.add(help);
+        var keep = new JCheckBox("Keep previous clock", true);
+        keep.setOpaque(false);
+        keep.setFont(small());
+        keep.setForeground(TEXT);
+        focus(keep);
+        keep.setToolTipText("Freeze this clock for Restore time; leave unchecked to keep any older backup.");
+        content.add(keep);
+        var pair = transparent(new GridLayout(1, 2, 4, 0));
+        var compact = BorderFactory.createCompoundBorder(BorderFactory.createLineBorder(LINE),
+                BorderFactory.createEmptyBorder(3, 4, 3, 4));
+        JButton fresh = button("New session", false, () -> {
+            shell.closeSheet();
+            mutate(() -> engine.newLiveSession(now()));
+        });
+        fresh.setBorder(compact);
+        fresh.setToolTipText(msg("session-new-tip"));
+        pair.add(fresh);
+        JButton restore = button("Restore time", false, () -> {
+            shell.closeSheet();
+            mutate(() -> engine.restoreRate(now()));
+        });
+        restore.setBorder(compact);
+        restore.setToolTipText(msg("session-restore-tip"));
+        pair.add(restore);
+        content.add(pair);
+        shell.sheet("Session controls", null, content,
+                new Shell.Choice("Restart GP/h", true, () -> mutate(() -> engine.restartRate(now(), keep.isSelected()))));
+    }
+
+    void saveSessionPrompt() {
+        var source = engine.getActiveSession();
+        if (source == null) return;
+        Long start = source.sessionStartAt;
+        shell.sheet("Save session?", msg("save-session"), null,
+                new Shell.Choice("Save session", true, () -> mutate(() -> {
+                            if (engine.saveLiveSession(source, start, now()) != null) {
+                                engine.showWholeRun();
+                                shell.tell("Session saved", "Grinds › Saved sessions", false);
+                            }
+                        })),
+                new Shell.Choice("Continue without saving", false, () -> mutate(() -> {
+                            if (engine.getActiveSession() == source && Objects.equals(start, source.sessionStartAt))
+                                engine.showWholeRun();
+                        })));
     }
 
     /** Reset free-play from the gear menu: the run so far moves to Grinds history (owner 1.5.2). */
     void startFreePlayOver() {
         shell.confirm("Reset free-play?", msg("free-play-over"), "Reset", () -> {
-                    mutate(() -> engine.startFreePlayOver(SafeMath.now()));
+                    mutate(() -> engine.startFreePlayOver(now()));
                     shell.show(Shell.LIVE);
                     shell.tell("Free play reset", "The old run is in Grinds.", false);
                 });
@@ -462,38 +521,38 @@ class GrindsController implements GrindsPage.Actions {
 
     /** A short getting-started guide; its words live in text.tsv (owner 2026-10-16). */
     void guide() {
-        JPanel content = stack(CARD, 4);
+        var content = stack(CARD, 4);
         for (String part : msg("guide").split(" \\| ")) {
-            JLabel line = note(part, TEXT, SHEET_TEXT);
+            var line = note(part, TEXT, SHEET_TEXT);
             line.setBorder(null);
             content.add(line);
         }
         shell.sheet("Getting started", null, content);
     }
 
-    public void startGrind(String grindId, String nameOverride) {
-        SavedGrind definition = grindId == null ? null : engine.savedGrind(grindId);
-        String name = nameOverride != null && !nameOverride.trim().isEmpty() ? nameOverride.trim()
+    public void startGrind(String id, String nameOverride) {
+        var definition = id == null ? null : engine.savedGrind(id);
+        String name = !blank(nameOverride) ? nameOverride.trim()
                         : definition == null ? "" : definition.getName();
         Long net = definition == null ? null : definition.getNetTargetGp();
         Long time = definition == null ? null : definition.getActiveTimeTargetMillis();
-        if (definition != null) grindId = definition.getGrindId();
-        if (grindId != null && engine.isCustomActive() && engine.getActiveSession() != null
-                && grindId.equals(engine.getActiveSession().getGrindId())) {
+        if (definition != null) id = definition.getGrindId();
+        if (id != null && engine.isCustomActive() && engine.getActiveSession() != null
+                && id.equals(engine.getActiveSession().getGrindId())) {
             shell.show(Shell.LIVE);
             refresh();
             return;
         }
-        startGrind(name, grindId, net, time);
+        startGrind(name, id, net, time);
     }
 
     /**
      * Start a Grind through the switch guard and show it on Live, saying Free play is kept (owner
      * 1.5.0: a fresh Grind's empty Live read as lost data).
      */
-    void startGrind(String name, String grindId, Long net, Long time) {
+    void startGrind(String name, String id, Long net, Long time) {
         whenSwitchAllowed(name, () -> {
-                    mutate(() -> engine.startGrind(name, grindId, net, time, SafeMath.now()));
+                    mutate(() -> engine.startGrind(name, id, net, time, now()));
                     panel.grindsDetailId = null;
                     shell.show(Shell.LIVE);
                     shell.tell(name + " started", msg("free-play-kept"), false);
@@ -501,24 +560,24 @@ class GrindsController implements GrindsPage.Actions {
     }
 
     public void openTargets() {
-        Session active = engine.getActiveSession();
+        var active = engine.getActiveSession();
         if (active == null) return;
-        JPanel form = grindForm(null, active.getProfitTargetGp(), active.getActiveTimeTargetMillis());
+        var form = grindForm(null, active.getProfitTargetGp(), active.getActiveTimeTargetMillis());
         // Free play's milestone counts all of Free play; a target counts fresh (owner 1.5.2).
-        boolean freePlay = !engine.isCustomActive();
-        if (freePlay) {
+        boolean general = !engine.isCustomActive();
+        if (general) {
             form.add(label("Milestone · all of Free play", small(), LABEL));
             picks(form, inline(form, "milestoneField", "Net",
                             active.milestoneGp == null ? "" : targetNet(active.milestoneGp)), "100m", "500m", "1b",
                     "2b", "5b", "Clear=");
         }
-        targetSheet("Targets", null, form, "Save", this::openTargets, (name, net, time) -> {
-                    Long netTarget = GrindsData.applyNet(net, active.getProfitTargetGp());
-                    Long timeTarget = GrindsData.applyTime(time, active.getActiveTimeTargetMillis());
+        targetSheet("Set a Target", form, "Save", (name, net, time) -> {
+                    Long target = GrindsData.applyNet(net, active.getProfitTargetGp());
+                    Long duration = GrindsData.applyTime(time, active.getActiveTimeTargetMillis());
                     Long milestone = GrindsData.applyNet(field(form, "milestoneField"), active.milestoneGp);
                     mutate(() -> {
-                                engine.saveTargets(netTarget, timeTarget, SafeMath.now());
-                                if (freePlay) engine.setMilestone(milestone);
+                                engine.saveTargets(target, duration, now());
+                                if (general) engine.setMilestone(milestone);
                             });
                 });
     }
@@ -529,45 +588,38 @@ class GrindsController implements GrindsPage.Actions {
      * Grind. Owner 2026-10-01 (F22): the list is bounded to five rows with paging.
      */
     public void newGrind() {
-        Session active = engine.getActiveSession();
+        var active = engine.getActiveSession();
         String doing = active == null || engine.isCustomActive() ? "" : active.getActivityHint();
         if (ActivityDetector.GENERAL.equalsIgnoreCase(doing)) doing = "";
-        SavedGrind playing = engine.grindNamed(doing);
+        var playing = engine.grindNamed(doing);
         var saved = new ArrayList<>(engine.getSavedGrinds(false));
-        saved.sort(Comparator.comparing((SavedGrind grind) -> grind != playing)
+        saved.sort(Comparator.comparing((SavedGrind definition) -> definition != playing)
                         .thenComparing(grind -> !grind.favorite));
-        JPanel content = stack(CARD, 2);
+        var content = stack(CARD, 2);
         new Paged(saved.size(), (box, page) -> {
-                            int from = Math.min(page * CHOICE_ROWS, saved.size());
-                            for (SavedGrind grind : saved.subList(from, Math.min(from + CHOICE_ROWS, saved.size()))) {
-                                JButton start = button((grind.favorite ? "\u2605 " : "") + grind.getName()
-                                                        + (grind == playing ? " \u00b7 now" : ""), false, () -> {
+                            int from = min(page * CHOICE_ROWS, saved.size());
+                            for (var plan : saved.subList(from, min(from + CHOICE_ROWS, saved.size()))) {
+                                JButton start = button((plan.favorite ? "\u2605 " : "") + plan.getName()
+                                                        + (plan == playing ? " \u00b7 now" : ""), false, () -> {
                                                     shell.closeSheet();
-                                                    startGrind(grind.getGrindId(), null);
+                                                    startGrind(plan.getGrindId(), null);
                                                 });
                                 start.setHorizontalAlignment(SwingConstants.LEFT);
-                                start.setMaximumSize(new java.awt.Dimension(Integer.MAX_VALUE, 22));
+                                start.setMaximumSize(new Dimension(Integer.MAX_VALUE, 22));
                                 box.add(start);
                             }
                         }).build(content);
         if (!saved.isEmpty()) content.add(label("Or a new one", small(), LABEL));
         // What you are doing now names a new Grind, unless it already is one (listed first).
-        JPanel form = grindForm(playing == null ? doing : "", null, null);
-        content.add(form);
-        shell.sheet("Start Grind", null, content, new Shell.Choice("Start", true, () -> {
-                            String name = field(form, "nameField");
-                            String net = field(form, "netField");
-                            String time = field(form, "timeField");
+        var form = grindForm(playing == null ? doing : "", null, null);
+        form.add(content, 0);
+        targetSheet("Start Grind", form, "Start", (name, net, time) -> {
                             if (name.isEmpty()) return;
-                            if (!GrindsData.inputsValid(net, time)) {
-                                shell.tell("Targets not saved", msg("use-number"), true);
-                                return;
-                            }
-                            SavedGrind known = engine.grindNamed(name);
+                            var known = engine.grindNamed(name);
                             startGrind(known == null ? name : known.getName(),
                                     known == null ? null : known.getGrindId(), GrindsData.applyNet(net, null),
                                     GrindsData.applyTime(time, null));
-                        }));
+                        });
     }
 
     /** Choice rows a bounded sheet list shows at once (owner 2026-10-01, F22). */
@@ -585,16 +637,14 @@ class GrindsController implements GrindsPage.Actions {
         JPanel box = stack(CARD, 2);
         int total;
         RowFill fill;
-        int[] page = {0};
-        JButton prev = button("\u2039", false, () -> turn(-1));
-        JButton next = button("\u203a", false, () -> turn(1));
+        int page;
+        JButton prev = button("\u2039", false, () -> turn(-1)), next = button("\u203a", false, () -> turn(1));
         JLabel range = label("", small(), LABEL);
-        JPanel bar = new JPanel(new java.awt.FlowLayout(java.awt.FlowLayout.LEFT, 4, 0));
+        JPanel bar = transparent(new FlowLayout(FlowLayout.LEFT, 4, 0));
 
         Paged(int total, RowFill fill) {
             this.total = total;
             this.fill = fill;
-            bar.setOpaque(false);
             bar.add(prev);
             bar.add(next);
             bar.add(range);
@@ -609,118 +659,112 @@ class GrindsController implements GrindsPage.Actions {
         }
 
         void turn(int delta) {
-            page[0] = Kit.clampPage(page[0] + delta, pages());
+            page = clampPage(page + delta, pages());
             redraw();
         }
 
         int pages() {
-            return Kit.pageCount(total, CHOICE_ROWS);
+            return pageCount(total, CHOICE_ROWS);
         }
 
         void redraw() {
             box.removeAll();
-            fill.fill(box, page[0]);
-            int from = page[0] * CHOICE_ROWS;
-            Kit.applyPager(range, prev, next, page[0], pages(), total == 0 ? "" : (from + 1) + "\u2013"
-                                    + Math.min(total, from + CHOICE_ROWS) + " of " + total);
+            fill.fill(box, page);
+            int from = page * CHOICE_ROWS;
+            applyPager(range, prev, next, page, pages(), total == 0 ? "" : (from + 1) + "\u2013"
+                                    + min(total, from + CHOICE_ROWS) + " of " + total);
             box.revalidate();
         }
     }
 
     /** Name and targets; a running run of this Grind follows the change (owner 1.5.0). */
-    public void editSavedGrind(String grindId) {
-        SavedGrind definition = engine.savedGrind(grindId);
+    public void editSavedGrind(String id) {
+        var definition = engine.savedGrind(id);
         if (definition == null) return;
-        targetSheet("Edit " + definition.getName(), null, grindForm(definition.getName(), definition.getNetTargetGp(),
-                        definition.getActiveTimeTargetMillis()), "Save", () -> editSavedGrind(grindId),
+        targetSheet("Edit " + definition.getName(), grindForm(definition.getName(), definition.getNetTargetGp(),
+                        definition.getActiveTimeTargetMillis()), "Save",
                 (name, net, time) -> {
-                    Long netTarget = GrindsData.applyNet(net, definition.getNetTargetGp());
-                    Long timeTarget = GrindsData.applyTime(time, definition.getActiveTimeTargetMillis());
-                    mutate(() -> engine.updateSavedGrind(grindId, name, netTarget, timeTarget, definition.favorite));
+                    Long target = GrindsData.applyNet(net, definition.getNetTargetGp());
+                    Long duration = GrindsData.applyTime(time, definition.getActiveTimeTargetMillis());
+                    mutate(() -> engine.updateSavedGrind(id, name, target, duration, definition.favorite));
                 });
     }
 
-    public void favoriteSavedGrind(String grindId, boolean favorite) {
-        SavedGrind definition = engine.savedGrind(grindId);
+    public void favoriteSavedGrind(String id, boolean favorite) {
+        var definition = engine.savedGrind(id);
         if (definition == null) return;
-        mutate(() -> engine.updateSavedGrind(grindId, definition.getName(), definition.getNetTargetGp(),
+        mutate(() -> engine.updateSavedGrind(id, definition.getName(), definition.getNetTargetGp(),
                                 definition.getActiveTimeTargetMillis(), favorite));
     }
 
-    public void archiveSavedGrind(String grindId, boolean archived) {
+    public void archiveSavedGrind(String id, boolean archived) {
         if (!archived) {
-            mutate(() -> engine.archiveGrind(grindId, false));
+            mutate(() -> engine.archiveGrind(id, false));
             return;
         }
         shell.confirm("Archive Grind", msg("hides-my"), "Archive",
-                () -> mutate(() -> engine.archiveGrind(grindId, true)));
+                () -> mutate(() -> engine.archiveGrind(id, true)));
     }
 
-    public void deleteSavedGrind(String grindId) {
-        SavedGrind definition = engine.savedGrind(grindId);
+    public void deleteSavedGrind(String id) {
+        var definition = engine.savedGrind(id);
         if (definition == null) return;
         shell.confirm("Delete " + definition.getName(), msg("removes-my"), "Delete",
-                () -> mutate(() -> engine.deleteSavedGrind(grindId)));
+                () -> mutate(() -> engine.deleteSavedGrind(id)));
     }
 
     /** Starts the run's Grind with its current setup; an older one-off run becomes a Grind. */
-    public void startAgain(String sessionId) {
-        Session active = engine.getActiveSession();
-        Session session = empty(sessionId) || active != null && sessionId.equals(active.getId()) ? active
-                        : engine.historySession(sessionId);
+    public void startAgain(String id) {
+        var active = engine.getActiveSession();
+        Session session = empty(id) || active != null && id.equals(active.getId()) ? active
+                        : engine.historySession(id);
         if (session == null) return;
-        SavedGrind grind = engine.savedGrind(session.getGrindId());
-        if (grind == null) grind = engine.grindNamed(session.getName());
-        if (grind != null) {
-            startGrind(grind.getGrindId(), null);
+        var plan = engine.savedGrind(session.getGrindId());
+        if (plan == null) plan = engine.grindNamed(session.getName());
+        if (plan != null) {
+            startGrind(plan.getGrindId(), null);
         } else {
             startGrind(session.getName(), null, session.getProfitTargetGp(), session.getActiveTimeTargetMillis());
         }
     }
 
-    public void openDetail(String sessionId) {
-        panel.grindsDetailId = sessionId;
+    public void openDetail(String id) {
+        panel.grindsDetailId = id;
         refresh();
     }
 
-    public void restoreFreePlay(String sessionId) {
+    public void restoreFreePlay(String id) {
         shell.confirm("Restore this Free play?", msg("restore-free-play"), "Restore", () -> {
-                    mutate(() -> engine.restoreFreePlay(sessionId, SafeMath.now()));
+                    mutate(() -> engine.restoreFreePlay(id, now()));
                     panel.grindsDetailId = null;
                     shell.show(Shell.LIVE);
                     shell.tell("Free play restored", "The other run is under Grinds \u203a FREE PLAY.", false);
                 });
     }
 
-    public void deleteHistorical(String sessionId) {
-        Session session = engine.historySession(sessionId);
+    public void deleteHistorical(String id) {
+        var session = engine.historySession(id);
         if (session == null) return;
-        shell.confirm("Delete " + session.getName(), msg("removes-run"), "Delete for good", () -> {
+        shell.confirm("Delete " + session.getName(), msg("removes-run"), "Delete", () -> {
                     panel.grindsDetailId = null;
-                    mutate(() -> engine.deleteHistory(sessionId));
+                    mutate(() -> engine.deleteHistory(id));
                 });
     }
 
-    /** The Grinds page's own menu: only what changes that page. */
-    public void openDataMenu(JComponent anchor) {
-        var menu = new JPopupMenu();
-        JCheckBoxMenuItem archived = new JCheckBoxMenuItem("Show archived", panel.grindsShowArchived);
-        archived.addActionListener(e -> {
-                    panel.grindsShowArchived = archived.isSelected();
-                    refresh();
-                });
-        menu.add(archived);
-        menu.show(anchor, 0, anchor.getHeight() + 2);
+    public void showArchived(boolean show) {
+        panel.grindsShowArchived = show;
+        refresh();
     }
 
     /** The gear menu beside the tabs: profile-wide data actions, from any page. */
     JPopupMenu dataMenu() {
         var menu = new JPopupMenu();
+        menu.add(item("Copy Live summary", engine.getActiveSession() != null, () -> copySummary(null)));
         menu.add(item("Getting started", this::guide));
         menu.add(item("Back up profile", persistence != null, () -> backUpProfile()));
         menu.add(item(msg("copy-data"), () -> copyDataPath()));
-        menu.add(item("Report a bug", () -> net.runelite.client.util.LinkBrowser.browse(msg("bug-report"))));
-        menu.add(item("Changelog", () -> net.runelite.client.util.LinkBrowser.browse(msg("changelog"))));
+        menu.add(item("Report a bug", () -> LinkBrowser.browse(msg("bug-report"))));
+        menu.add(item("Changelog", () -> LinkBrowser.browse(msg("changelog"))));
         menu.addSeparator();
         menu.add(item("Reset free-play\u2026", !engine.isCustomActive(), this::startFreePlayOver));
         menu.add(item(msg("factory-reset"), persistence != null, () -> factoryReset()));
@@ -733,7 +777,7 @@ class GrindsController implements GrindsPage.Actions {
 
     /** Name (when given) and the two targets, each with its quick picks. */
     static JPanel grindForm(String name, Long net, Long time) {
-        JPanel form = stack(CARD, 2);
+        var form = stack(CARD, 2);
         if (name != null) inline(form, "nameField", "Name", name);
         long bond = bondPrice.getAsLong();
         picks(form, inline(form, "netField", "Net", net == null ? "" : targetNet(net)), "5m",
@@ -745,11 +789,10 @@ class GrindsController implements GrindsPage.Actions {
 
     /** A label beside its field (owner 1.5.0: a short, sleek target sheet). */
     static JTextField inline(JPanel form, String key, String label, String value) {
-        JTextField field = new JTextField(value);
-        JLabel name = label(label, small(), LABEL);
+        var field = new JTextField(value);
+        var name = label(label, small(), LABEL);
         name.setPreferredSize(new Dimension(34, name.getPreferredSize().height));
-        JPanel line = new JPanel(new BorderLayout());
-        line.setOpaque(false);
+        var line = transparent(new BorderLayout());
         line.add(name, BorderLayout.WEST);
         line.add(field);
         form.add(line);
@@ -762,8 +805,7 @@ class GrindsController implements GrindsPage.Actions {
      * pick matching the field is lit, so the sheet shows the current target at a glance.
      */
     static void picks(JPanel form, JTextField field, String... picks) {
-        JPanel row = new JPanel(new GridLayout(1, 0));
-        row.setOpaque(false);
+        var row = transparent(new GridLayout(1, 0));
         pad(row, 0, 0, 2, 0);
         Map<JButton, String> values = new LinkedHashMap<>();
         Runnable light = () -> values.forEach((chip, value) -> chip.setForeground(
@@ -775,7 +817,7 @@ class GrindsController implements GrindsPage.Actions {
                                 field.setText(value);
                                 light.run();
                             });
-            chip.setBorder(BorderFactory.createEmptyBorder(1, 0, 1, 0));
+            pad(chip, 1, 0, 1, 0);
             chip.setContentAreaFilled(false);
             values.put(chip, value);
             row.add(chip);
@@ -795,19 +837,17 @@ class GrindsController implements GrindsPage.Actions {
     }
 
     /**
-     * A name-and-targets sheet; malformed targets never become a silent clear: say so and reopen
-     * it.
+     * Malformed targets keep the same draft and saved-picker page open for correction.
      */
-    void targetSheet(String title, String detail, JPanel form, String action, Runnable reopen, TargetSave save) {
-        shell.sheet(title, detail, form, new Shell.Choice(action, true, () -> {
-                            String net = field(form, "netField");
-                            String time = field(form, "timeField");
+    void targetSheet(String title, JPanel form, String action, TargetSave save) {
+        shell.sheet(title, null, form, new Shell.Choice(action, true, () -> {
+                            String net = field(form, "netField"), time = field(form, "timeField");
                             if (GrindsData.inputsValid(net, time) && GrindsData.parseNet(field(form, "milestoneField"))
                                             != GrindsData.INVALID) {
                                 save.save(field(form, "nameField"), net, time);
                             } else {
                                 shell.tell("Targets not saved", msg("use-number"), true);
-                                reopen.run();
+                                targetSheet(title, form, action, save);
                             }
                         }));
     }
@@ -818,48 +858,91 @@ class GrindsController implements GrindsPage.Actions {
             start.run();
             return;
         }
-        LiveSnapshot now = panel.lastSnapshot;
+        var now = panel.lastSnapshot;
         String running = engine.getActiveSession().getName() + (now == null ? ""
                                 : " (" + signed(now.net) + ", " + clock(now.elapsedMillis) + ")");
         // The engine never replaces a running Grind silently: Switch ends it first, then starts.
         shell.confirm("Switch Grind", "End " + running + " and start " + nextName + "?", "Switch", () -> {
-                    mutate(() -> engine.finishCustom(SafeMath.now()));
+                    mutate(() -> engine.finishCustom(now()));
                     start.run();
                 });
     }
 
-    /** Puts a path on the system clipboard. */
-    static void copyPath(String path) {
-        java.awt.datatransfer.StringSelection selection = new java.awt.datatransfer.StringSelection(path);
-        java.awt.Toolkit.getDefaultToolkit().getSystemClipboard().setContents(selection, selection);
+    /** Copies the selected view's exact figures without writing or mutating its session. */
+    public void copySummary(String id) {
+        String text;
+        long now = now();
+        synchronized (engine) {
+            if (id == null) {
+                var live = LiveSnapshot.capture(engine, now, null);
+                if (!live.hasSession) return;
+                text = summary(live.freePlay ? "Free play" : live.ownerLabel, live.net, live.gains, live.costs,
+                        live.supplies, live.loss, live.costSplitAvailable, live.elapsedMillis);
+                if (live.marketResult != 0)
+                    text += String.format(ROOT, msg("summary-market"), exactSigned(live.marketResult));
+            } else {
+                var session = engine.historySession(id);
+                if (session == null) return;
+                var money = engine.savedSession(id) != null ? session.metrics(now)
+                        : engine.summary().run(engine, session, now).metrics;
+                text = summary(session.getName(), money.net, money.revenue, money.costs, money.suppliesCosts,
+                        money.otherCosts, money.costSplitAvailable, money.elapsedMillis);
+            }
+        }
+        try {
+            copyText(text);
+            shell.tell("Summary copied", "Ready to paste.", false);
+        } catch (RuntimeException failed) {
+            shell.failed("Copy failed", failed);
+        }
+    }
+
+    static String summary(String name, long net, long income, long cost, long supplies, long lost,
+            boolean split, long elapsed) {
+        return String.format(ROOT, msg("session-summary"), name, exactSigned(net), clock(elapsed),
+                RateReadiness.isEstablished(elapsed) ? exact(Session.hourly(net, elapsed)) : "Calculating…",
+                exact(income), exact(cost)) + (split ? String.format(ROOT, msg("summary-costs"),
+                        exact(supplies), exact(lost)) : "");
+    }
+
+    /** Puts text on the local system clipboard. */
+    void copyText(String text) {
+        var selection = new StringSelection(text);
+        Toolkit.getDefaultToolkit().getSystemClipboard().setContents(selection, selection);
     }
 
     /**
      * Disk work runs on the persistence worker, never Swing's thread, so RuneLite stays responsive;
-     * its result comes back on Swing's thread (Codex review 1.2).
+     * its result comes back on Swing's thread only while the completed account/lifecycle still owns
+     * the UI. Reset may advance its own lifecycle generation during the work.
      */
     <T> void off(java.util.concurrent.Callable<T> work, java.util.function.Consumer<T> done, String failed) {
-        java.util.concurrent.ExecutorService worker = persistence.lifecycleExecutor();
+        var worker = persistence.lifecycleExecutor();
         if (worker == null) return;
-        // Bound to the account it was confirmed on: holding the persistence lock, no account switch
-        // can
-        // land mid-job, and a switch before it starts refuses it (Codex follow-up 1.2).
-        TrackingIdentity owner = persistence.activeIdentity;
+        long request = persistence.lifecycleRequest.get();
+        var owner = persistence.activeIdentity;
         worker.execute(() -> {
                     try {
-                        T result;
                         persistence.busy = true;
+                        Runnable presentation;
+                        long completed;
                         synchronized (persistence) {
-                            if (!java.util.Objects.equals(owner, persistence.activeIdentity)) {
-                                SwingUtilities.invokeLater(() -> shell.tell("Account changed", msg("nothing-changed"),
-                                                        true));
-                                return;
+                            if (request != persistence.lifecycleRequest.get()
+                                            || !Objects.equals(owner, persistence.activeIdentity)) return;
+                            try {
+                                T result = work.call();
+                                presentation = () -> done.accept(result);
+                            } catch (Exception ex) {
+                                presentation = () -> shell.failed(failed, ex);
                             }
-                            result = work.call();
+                            // Reset legitimately advances the generation; pin its finished result.
+                            completed = persistence.lifecycleRequest.get();
                         }
-                        SwingUtilities.invokeLater(() -> done.accept(result));
-                    } catch (Exception ex) {
-                        SwingUtilities.invokeLater(() -> shell.failed(failed, ex));
+                        Runnable ready = presentation;
+                        SwingUtilities.invokeLater(() -> {
+                                    if (!persistence.lifecycleShutdown && completed == persistence.lifecycleRequest.get()
+                                                    && Objects.equals(owner, persistence.activeIdentity)) ready.run();
+                                });
                     } finally {
                         persistence.busy = false;
                     }
@@ -867,14 +950,14 @@ class GrindsController implements GrindsPage.Actions {
     }
 
     void backUpProfile() {
-        off(() -> persistence.writeBackup(SafeMath.now()), backup -> shell.tell(
+        off(() -> persistence.writeBackup(now()), backup -> shell.tell(
                                 "Profile backed up", String.valueOf(backup.getFileName()), false), "Backup failed");
     }
 
     void copyDataPath() {
         if (repository == null) return;
         String path = String.valueOf(repository.dataDir());
-        copyPath(path);
+        copyText(path);
         shell.tell(msg("data-folder"), path, false);
     }
 
@@ -890,18 +973,18 @@ class GrindsController implements GrindsPage.Actions {
 
     /** The direct delete: one confirmation already happened in the sheet. */
     void resetNow(boolean backUp) {
-        off(() -> backUp ? persistence.factoryReset(SafeMath.now()) : persistence.factoryReset(SafeMath.now(), false),
+        off(() -> backUp ? persistence.factoryReset(now()) : persistence.factoryReset(now(), false),
                 this::reset, "Delete failed");
     }
 
-    void reset(Persistence.ResetOutcome outcome) {
+    void reset(Persistence.ResetOutcome result) {
         // The profile was replaced: HUD+ must not keep the old trip's loot or moments.
-        if (outcome.isApplied()) panel.resetProfile();
-        if (outcome.isApplied()) {
+        if (result.isApplied()) panel.resetProfile();
+        if (result.isApplied()) {
             // The safety copy is one click from its folder (owner 2026-10-16).
             shell.notify("Profile reset", msg("fresh-profile"), false, "Copy folder path", this::copyDataPath);
         } else {
-            shell.tell("Reset refused", outcome.getDetail(), true);
+            shell.tell("Reset refused", result.getDetail(), true);
         }
     }
 }
@@ -914,20 +997,20 @@ class GrindsController implements GrindsPage.Actions {
 @AllArgsConstructor
 class GrindsData {
     /** A target field that did not parse: it never mutates and never means "clear". */
-    static final long INVALID = -1L;
+    static final long INVALID = -1;
 
     /**
      * Friendly Net-target parsing: 5m, 5M, 5000k, 5,000,000. Blank is 0 (no target); malformed is
      * {@link #INVALID}.
      */
     static long parseNet(String raw) {
-        if (blank(raw)) return 0L;
+        if (blank(raw)) return 0;
         // Strict whole-string form: digits with optional decimals and one k/m/b suffix. Anything
         // else is malformed and must never be treated as "clear".
-        String text = Phrases.lower(raw).replace(",", "").replace("_", "").replace(" ", "");
-        if (!text.matches("\\d+(?:\\.\\d+)?[kmb]?")) return INVALID;
+        String text = lower(raw).replace(",", "").replace("_", "").replace(" ", "");
+        if (!pattern("target-net").matcher(text).matches()) return INVALID;
         long value = parseGp(text);
-        return value > 0L ? value : INVALID;
+        return value > 0 ? value : INVALID;
     }
 
     /**
@@ -935,24 +1018,27 @@ class GrindsData {
      * malformed is {@link #INVALID}.
      */
     static long parseTime(String raw) {
-        if (blank(raw)) return 0L;
-        String text = Phrases.lower(raw).replace(",", "").replace("_", "").trim();
-        if (text.matches("\\d+(?:\\.\\d+)?")) {
-            long minutes = round(Double.parseDouble(text));
-            return minutes > 0L ? minutes * 60_000L : INVALID;
-        }
-        // Strict whole-string form: optional "Nh" then optional "Mm" and nothing else.
-        java.util.regex.Matcher matcher = java.util.regex.Pattern.compile(
-                                "^(?:(\\d+(?:\\.\\d+)?)\\s*h)?\\s*(?:(\\d+(?:\\.\\d+)?)\\s*m)?$").matcher(text);
-        if (!matcher.matches() || (matcher.group(1) == null && matcher.group(2) == null)) {
+        if (blank(raw)) return 0;
+        String text = lower(raw).replace(",", "").replace("_", "").trim();
+        try {
+            if (pattern("target-minutes").matcher(text).matches()) {
+                long minutes = round(Double.parseDouble(text));
+                return minutes > 0 ? multiplyExact(minutes, 60_000L) : INVALID;
+            }
+            // Strict whole-string form: optional "Nh" then optional "Mm" and nothing else.
+            var matcher = pattern("target-time").matcher(text);
+            if (!matcher.matches() || (matcher.group(1) == null && matcher.group(2) == null)) {
+                return INVALID;
+            }
+            long total = 0;
+            if (matcher.group(1) != null)
+                total = addExact(total, round(Double.parseDouble(matcher.group(1)) * 3_600_000d));
+            if (matcher.group(2) != null)
+                total = addExact(total, round(Double.parseDouble(matcher.group(2)) * 60_000d));
+            return total > 0 && total < Long.MAX_VALUE ? total : INVALID;
+        } catch (ArithmeticException overflow) {
             return INVALID;
         }
-        long total = 0L;
-        if (matcher.group(1) != null)
-            total += round(Double.parseDouble(matcher.group(1)) * 3_600_000d);
-        if (matcher.group(2) != null)
-            total += round(Double.parseDouble(matcher.group(2)) * 60_000d);
-        return total > 0L ? total : INVALID;
     }
 
     /** Applies a Net input to an existing target: INVALID keeps the existing value untouched. */
@@ -966,7 +1052,7 @@ class GrindsData {
     }
 
     static Long apply(long parsed, Long existing) {
-        return parsed == INVALID ? existing : parsed == 0L ? null : (Long) parsed;
+        return parsed == INVALID ? existing : parsed == 0 ? null : (Long) parsed;
     }
 
     /** True when both fields are safe to apply (valid or deliberately blank). */
@@ -981,8 +1067,7 @@ class GrindsData {
         boolean present;
 
         boolean available;
-        String line;
-        String second;
+        String line, second;
 
         /** No target at all: there is no Pace question to answer, so no row renders. */
         static Pace none() {
@@ -995,40 +1080,39 @@ class GrindsData {
      * both plus the required average. Unavailable evidence reads "Calculating…" instead of a
      * fabricated precision; estimates stay visually muted.
      */
-    static Pace pace(Long netTargetGp, Long timeTargetMillis, long net, boolean rateEstablished, long gpPerHour,
+    static Pace pace(Long profitTarget, Long targetMillis, long net, boolean rateEstablished, long rate,
             long activeMillis) {
-        if (netTargetGp == null && timeTargetMillis == null) return Pace.none();
+        if (profitTarget == null && targetMillis == null) return Pace.none();
         if (!rateEstablished) return new Pace(true, false, "Calculating\u2026", null);
-        if (netTargetGp != null && timeTargetMillis == null) {
-            if (net >= netTargetGp) return new Pace(true, true, "Target reached", null);
-            if (gpPerHour <= 0L) {
+        if (profitTarget != null && targetMillis == null) {
+            if (net >= profitTarget) return new Pace(true, true, "Target reached", null);
+            if (rate <= 0) {
                 // The rate is established and genuinely non-positive: an ETA would be fabricated.
                 return new Pace(true, true, "Not earning at this rate", null);
             }
-            long minutes = nonNeg(round((netTargetGp - net) * 60d / gpPerHour));
+            long minutes = nonNeg(round(safeSubtract(profitTarget, net) * 60d / rate));
             return new Pace(true, true, "~" + durationMinutes(minutes) + " remaining", null);
         }
         // A time target counts down; a projected Net only repeated GP/h (owner 1.5.2).
-        long remaining = nonNeg(timeTargetMillis - activeMillis);
-        String left = durationMinutes(remaining / 60_000L) + " left";
-        if (netTargetGp == null) {
-            return new Pace(true, true, remaining <= 0L ? "Time target reached" : left, null);
+        long remaining = nonNeg(targetMillis - activeMillis);
+        String left = durationMinutes(remaining / 60_000) + " left";
+        if (profitTarget == null) {
+            return new Pace(true, true, remaining <= 0 ? "Time target reached" : left, null);
         }
-        if (remaining <= 0L) {
+        if (remaining <= 0) {
             return new Pace(true, true, "Time target reached", "Required average was "
-                            + compact(requiredAverage(netTargetGp, net, activeMillis)) + "/h");
+                            + compact(requiredAverage(profitTarget, net, activeMillis)) + "/h");
         }
-        long required = requiredAverage(netTargetGp, net, timeTargetMillis);
+        long required = requiredAverage(profitTarget, net, targetMillis);
         return new Pace(true, true, left, "Required average " + compact(required) + "/h");
     }
 
     static long requiredAverage(long target, long net, long byMillis) {
-        if (byMillis <= 0L) return 0L;
-        return round(nonNeg(target - net) * 3_600_000d / byMillis);
+        return Session.hourly(nonNeg(safeSubtract(target, net)), byMillis);
     }
 
     static String durationMinutes(long minutes) {
-        return minutes < 90L ? minutes + "m" : (minutes / 60L) + "h " + (minutes % 60L) + "m";
+        return minutes < 90 ? minutes + "m" : (minutes / 60) + "h " + (minutes % 60) + "m";
     }
 
     /** One reusable definition plus its derived Last/Best subset from linked canonical history. */
@@ -1037,8 +1121,7 @@ class GrindsData {
         SavedState.SavedGrind definition;
         int linkedCount;
         boolean hasLast;
-        long lastNet;
-        long lastStartedAt;
+        long lastNet, lastStartedAt;
         boolean hasBest;
         long bestNet;
 
@@ -1051,11 +1134,8 @@ class GrindsData {
     /** One recent canonical instance, rendered with Grind language. */
     @AllArgsConstructor
     static class Recent {
-        String sessionId;
-        String name;
-        long startedAt;
-        long net;
-        long activeMillis;
+        String sessionId, name;
+        long startedAt, net, activeMillis;
 
         /** A Free play run (current or reset), listed under FREE PLAY (owner 1.5.2). */
         boolean freePlay;
@@ -1064,25 +1144,18 @@ class GrindsData {
     /** One instance's detail: financial summary, targets and target outcome. */
     @AllArgsConstructor
     static class Detail {
-        String sessionId;
-        String name;
-        long startedAt;
-        long net;
+        String sessionId, name;
+        long startedAt, net;
         /** What the Net aim counted when this ran (the run's Net minus its set baseline). */
-        long targetProgress;
-        long revenue;
-        long supplies;
-        long losses;
+        long targetProgress, revenue, supplies, losses;
         boolean splitAvailable;
         long activeMillis;
         /** The Active Time window the run's time target counts from (set moment to now/end). */
         long targetWindowMillis;
         boolean rateEstablished;
         long gpPerHour;
-        Long netTargetGp;
-        Long activeTimeTargetMillis;
-        boolean closed;
-        boolean compacted;
+        Long netTargetGp, activeTimeTargetMillis;
+        boolean closed, compacted;
 
         /** Factual target outcome wording; never "Failed". */
         String netOutcome() {
@@ -1095,14 +1168,11 @@ class GrindsData {
     }
 
     boolean hasActive;
-    String activeName;
-    String activeSessionId;
-    long activeNet;
-    long activeGpPerHour;
+    String activeName, activeSessionId;
+    long activeNet, activeGpPerHour;
     boolean activeRateEstablished;
     long activeMillis;
-    Long activeNetTarget;
-    Long activeTimeTarget;
+    Long activeNetTarget, activeTimeTarget;
     Pace activePace;
     List<MyGrind> myGrinds;
     List<Recent> recent;
@@ -1117,13 +1187,11 @@ class GrindsData {
     /** The All time card: every retained session (Free play included) from canonical metrics. */
     @AllArgsConstructor
     static class AllTime {
-        long net;
-        long activeMillis;
+        long net, activeMillis;
         Long gpPerHour;
         int grinds;
         boolean splitAvailable;
-        long supplies;
-        long losses;
+        long supplies, losses;
         String bestNetName;
         long bestNet;
         String bestRateName;
@@ -1131,104 +1199,106 @@ class GrindsData {
     }
 
     static AllTime allTime(Engine engine, long now) {
-        MoneySnapshot summary = engine.summary();
-        long net = 0L, active = 0L, supplies = 0L, losses = 0L, bestNet = 0L, bestRate = 0L;
+        var summary = engine.summary();
+        long net = 0, active = 0, supplies = 0, lost = 0, best = 0, bestRate = 0;
         var grinds = new HashSet<String>();
         boolean split = true;
-        String bestNetName = null;
-        String bestRateName = null;
+        String bestNetName = null, rateName = null;
         var seen = new HashSet<String>();
-        var sessions = new ArrayList<Session>(engine.getHistory());
+        var sessions = new ArrayList<>(engine.getHistory());
         sessions.add(engine.getActiveSession());
         sessions.add(engine.getGeneralSession());
-        for (Session session : sessions) {
+        for (var session : sessions) {
             if (session == null || !seen.add(session.getId())) continue;
             var run = summary.run(engine, session, now);
-            Metrics metrics = run.metrics;
+            var metrics = run.metrics;
             net = safeAdd(net, metrics.net);
             active = safeAdd(active, metrics.elapsedMillis);
             split &= metrics.costSplitAvailable;
             supplies = safeAdd(supplies, metrics.suppliesCosts);
-            losses = safeAdd(losses, metrics.otherCosts);
+            lost = safeAdd(lost, metrics.otherCosts);
             if (session.grind) {
                 // Runs of one saved Grind count once; an unsaved Grind is its own name.
                 grinds.add(session.isLinked() ? session.getGrindId() : "name:" + session.getName());
             }
             if (!session.isClosed()) continue;
-            if (bestNetName == null || run.net() > bestNet) {
+            if (bestNetName == null || run.net() > best) {
                 bestNetName = session.getName();
-                bestNet = run.net();
+                best = run.net();
             }
-            if (run.gpPerHour != null && (bestRateName == null || run.gpPerHour > bestRate)) {
-                bestRateName = session.getName();
+            if (run.gpPerHour != null && (rateName == null || run.gpPerHour > bestRate)) {
+                rateName = session.getName();
                 bestRate = run.gpPerHour;
             }
         }
         return new AllTime(net, active, RateReadiness.isEstablished(active) ? Session.hourly(net, active) : null,
-                grinds.size(), split, supplies, losses, bestNetName, bestNet, bestRateName, bestRate);
+                grinds.size(), split, supplies, lost, bestNetName, best, rateName, bestRate);
     }
 
-    static GrindsData capture(Engine engine, long now, boolean includeArchived, String detailSessionId) {
-        MoneySnapshot summary = engine.summary();
-        Session active = engine.getActiveSession();
+    static GrindsData capture(Engine engine, long now, boolean includeArchived, String detailId) {
+        var summary = engine.summary();
+        var active = engine.getActiveSession();
         boolean custom = engine.isCustomActive();
-        long net = 0L;
-        long rate = 0L;
+        long net = 0, rate = 0;
         boolean rateEstablished = false;
-        long activeMillis = 0L;
-        Long netTarget = null;
-        Long timeTarget = null;
-        String activeName = "";
-        String activeSessionId = "";
+        long elapsed = 0;
+        Long target = null, duration = null;
+        String activeName = "", activeSessionId = "";
         if (active != null) {
-            Metrics metrics = summary.metrics(engine.getActiveSession(), now);
+            var metrics = summary.metrics(engine.getActiveSession(), now);
             net = metrics.net;
             rate = metrics.profitPerHour;
             rateEstablished = RateReadiness.isEstablished(metrics.elapsedMillis);
-            activeMillis = metrics.elapsedMillis;
-            netTarget = active.getProfitTargetGp();
-            timeTarget = active.getActiveTimeTargetMillis();
+            elapsed = metrics.elapsedMillis;
+            target = active.getProfitTargetGp();
+            duration = active.getActiveTimeTargetMillis();
             activeName = active.getName();
             activeSessionId = active.getId();
         }
         // The Active Time target's own window counts from when it was set (owner live 2026-10-13);
         // the displayed Active Time above stays the run's total.
-        long targetWindowMillis = active == null ? 0L : active.getActiveTimeTargetWindowMillis(activeMillis);
-        Pace pace = pace(netTarget, timeTarget, active == null ? net : active.profitTargetProgress(net),
+        long targetWindowMillis = active == null ? 0 : active.getActiveTimeTargetWindowMillis(elapsed);
+        Pace pace = pace(target, duration, active == null ? net : active.profitTargetProgress(net),
                         rateEstablished, rate, targetWindowMillis);
-        var myGrinds = new ArrayList<MyGrind>();
-        for (SavedState.SavedGrind definition : engine.getSavedGrinds(includeArchived)) {
-            MoneySnapshot.Rollup rollup = summary.rollups.get(definition.getGrindId());
-            myGrinds.add(new MyGrind(definition, rollup.count, rollup.has, rollup.last, rollup.at, rollup.has,
-                            rollup.best, rollup.millis > 0L ? rollup.total * 3_600_000L / rollup.millis : 0L,
+        var plans = new ArrayList<MyGrind>();
+        for (var definition : engine.getSavedGrinds(includeArchived)) {
+            var rollup = summary.rollups.get(definition.getGrindId());
+            plans.add(new MyGrind(definition, rollup.count, rollup.has, rollup.last, rollup.at, rollup.has,
+                            rollup.best, Session.hourly(rollup.total, rollup.millis),
                             RateReadiness.isEstablished(rollup.millis)));
         }
-        myGrinds.sort(Comparator.comparing((MyGrind grind) -> !grind.definition.favorite)
+        plans.sort(Comparator.comparing((MyGrind plan) -> !plan.definition.favorite)
                         .thenComparing(grind -> -grind.lastStartedAt).thenComparing(
                                 grind -> grind.definition.getName(), String.CASE_INSENSITIVE_ORDER)
                         .thenComparing(grind -> grind.definition.getGrindId()));
         var recent = new ArrayList<Recent>();
-        var runs = new ArrayList<Session>(engine.getHistory());
+        var runs = new ArrayList<>(engine.getHistory());
         // The current Free play heads FREE PLAY; a running Grind pauses it, so it waits then.
         if (!custom && engine.getGeneralSession() != null) runs.add(engine.getGeneralSession());
-        for (Session session : runs) {
+        for (var session : runs) {
             if (session == null) continue;
-            Metrics metrics = summary.run(engine, session, now).metrics;
+            var metrics = summary.run(engine, session, now).metrics;
             recent.add(new Recent(session.getId(),
                             session.isClosed() || session.grind ? session.getName() : "Free play",
                             session.startedAtEpochMillis, metrics.net, metrics.elapsedMillis, !session.grind));
         }
         recent.sort(Comparator.comparingLong((Recent item) -> item.startedAt).reversed()
                         .thenComparing(item -> item.sessionId));
+        for (var saved : engine.savedSessions) {
+            var money = saved.session.metrics(now);
+            recent.add(new Recent(saved.id, saved.session.getName(), saved.session.endedAtEpochMillis,
+                    money.net, money.elapsedMillis, false));
+        }
         Detail detail = null;
-        if (detailSessionId != null && !detailSessionId.isEmpty()) {
-            Session selected = active != null && detailSessionId.equals(active.getId()) ? active
-                            : engine.historySession(detailSessionId);
+        if (!empty(detailId)) {
+            Session selected = active != null && detailId.equals(active.getId()) ? active
+                            : engine.historySession(detailId);
             if (selected != null) {
-                boolean liveDetail = active != null && detailSessionId.equals(active.getId());
-                Metrics metrics = liveDetail ? summary.metrics(engine.getActiveSession(), now)
+                boolean liveDetail = active != null && detailId.equals(active.getId());
+                Metrics metrics = engine.savedSession(detailId) != null ? selected.metrics(now)
+                                : liveDetail ? summary.metrics(engine.getActiveSession(), now)
                                 : summary.run(engine, selected, now).metrics;
-                detail = new Detail(selected.getId(), selected.getName(), selected.startedAtEpochMillis, metrics.net,
+                detail = new Detail(detailId, selected.getName(), selected.startedAtEpochMillis, metrics.net,
                                 selected.profitTargetProgress(metrics.net), metrics.revenue,
                                 metrics.costSplitAvailable ? metrics.suppliesCosts : -1L,
                                 metrics.costSplitAvailable ? metrics.otherCosts : -1L, metrics.costSplitAvailable,
@@ -1236,21 +1306,21 @@ class GrindsData {
                                 RateReadiness.isEstablished(metrics.elapsedMillis),
                                 Session.hourly(metrics.net, metrics.elapsedMillis), selected.getProfitTargetGp(),
                                 selected.getActiveTimeTargetMillis(), selected.isClosed(),
-                                selected.compactedRevenue() != 0L || selected.compactedCosts() != 0L);
+                                selected.compactedRevenue() != 0 || selected.compactedCosts() != 0);
             }
         }
-        ZoneId profileZone = engine.timeZone();
+        var profileZone = engine.timeZone();
         return new GrindsData(active != null && custom, activeName, activeSessionId, net, rate, rateEstablished,
-                activeMillis, netTarget, timeTarget, pace, myGrinds, recent,
+                elapsed, target, duration, pace, plans, recent,
                 milestoneText(engine.getGeneralSession(), now), profileZone, detail, allTime(engine, now));
     }
 
     /** "1B \u00b7 42%" or "1B \u2713" for Free play's milestone; empty with none. */
-    static String milestoneText(Session freePlay, long now) {
-        Long gp = freePlay == null ? null : freePlay.milestoneGp;
+    static String milestoneText(Session general, long now) {
+        Long gp = general == null ? null : general.milestoneGp;
         if (gp == null) return "";
-        long net = freePlay.metrics(now).net;
-        return compact(gp) + " \u00b7 " + (net >= gp ? "\u2713" : percent(Math.max(0d, (double) net / gp)));
+        long net = general.metrics(now).net;
+        return compact(gp) + " \u00b7 " + (net >= gp ? "\u2713" : percent(max(0d, (double) net / gp)));
     }
 }
 
@@ -1283,18 +1353,18 @@ class GrindHistory {
     }
 
     /** Factual target wording; never "Failed". Shared with the Grinds detail. */
-    static String netOutcome(Long netTargetGp, long net, boolean closed) {
-        if (netTargetGp == null) return "No Net target";
-        if (net >= netTargetGp) return "Reached " + compact(netTargetGp) + " Net";
-        return closed ? msg("ended-before") + signed(netTargetGp - net) + " remaining"
-                : msg("reached") + signed(netTargetGp - net) + " remaining";
+    static String netOutcome(Long profitTarget, long net, boolean closed) {
+        if (profitTarget == null) return "No Net target";
+        if (net >= profitTarget) return "Reached " + compact(profitTarget) + " Net";
+        return closed ? msg("ended-before") + signed(profitTarget - net) + " remaining"
+                : msg("reached") + signed(profitTarget - net) + " remaining";
     }
 
     /** Factual Active-Time target wording; never "Failed". Shared with the Grinds detail. */
-    static String timeOutcome(Long activeTimeTargetMillis, long activeMillis) {
-        if (activeTimeTargetMillis == null) return msg("active-time-target-2");
-        if (activeMillis >= activeTimeTargetMillis) return msg("time-target");
-        return duration(activeTimeTargetMillis - activeMillis) + msg("active-time-remaining");
+    static String timeOutcome(Long activeTarget, long activeMillis) {
+        if (activeTarget == null) return msg("active-time-target-2");
+        if (activeMillis >= activeTarget) return msg("time-target");
+        return duration(activeTarget - activeMillis) + msg("active-time-remaining");
     }
 
     /** Full-session rate: Net over canonical Active Time; zero Active Time has no rate. */
@@ -1311,12 +1381,12 @@ class GrindHistory {
  */
 class RateReadiness {
     /** Minimum Active Time before a computed rate is presentation-trustworthy. */
-    static final long MIN_ACTIVE_MILLIS = 60_000L;
+    static final long MIN_ACTIVE_MILLIS = 60_000;
 
     /**
      * GP/h is Net over canonical Active Time; it is shown once that Active Time reaches the floor.
      *
-     * @param activeMillis canonical Active Time of the Grind
+     * @param activeMillis Active Time of the displayed rate window
      */
     static boolean isEstablished(long activeMillis) {
         return activeMillis >= MIN_ACTIVE_MILLIS;

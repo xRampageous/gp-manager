@@ -191,6 +191,44 @@ public class TableTest
     }
 
     @Test
+    public void changedMenuLabelsReplaceStaleCommandsWithoutChangingThePage()
+    {
+        int[] picked = {0};
+        Table table = new Table("GRINDS").setRowsPerPage(1);
+        List<Table.Row> initial = rows(2);
+        initial.get(1).menu = Collections.singletonList(new Table.Menu("Archive", () -> picked[0] = 1));
+        table.setRows(initial);
+        table.showPage(1);
+        List<Table.Row> changed = rows(2);
+        changed.get(1).menu = Collections.singletonList(new Table.Menu("Unarchive", () -> picked[0] = 2));
+        table.setRows(changed);
+        assertEquals(1, table.page);
+        javax.swing.JMenuItem command = (javax.swing.JMenuItem) ((JPanel) table.body.getComponent(0))
+            .getComponentPopupMenu().getComponent(0);
+        assertEquals("Unarchive", command.getText());
+        command.doClick();
+        assertEquals(2, picked[0]);
+    }
+
+    @Test
+    public void equivalentMenuLabelsKeepTheDrawnRowAndAddedOrRemovedMenusRefreshIt()
+    {
+        Table table = new Table("GRINDS");
+        List<Table.Row> initial = rows(1);
+        initial.get(0).menu = Collections.singletonList(new Table.Menu("Archive", () -> {}));
+        table.setRows(initial);
+        java.awt.Component first = table.body.getComponent(0);
+        List<Table.Row> same = rows(1);
+        same.get(0).menu = Collections.singletonList(new Table.Menu("Archive", () -> {}));
+        table.setRows(same);
+        assertTrue("unchanged commands keep hover/menu stability", first == table.body.getComponent(0));
+        table.setRows(rows(1));
+        assertTrue("the old menu disappears", ((JPanel) table.body.getComponent(0)).getComponentPopupMenu() == null);
+        table.setRows(same);
+        assertNotNull(((JPanel) table.body.getComponent(0)).getComponentPopupMenu());
+    }
+
+    @Test
     public void toneFollowsCategory()
     {
         assertEquals(Kit.Tone.GAIN, Kit.Tone.of(Contribution.Category.GAIN));

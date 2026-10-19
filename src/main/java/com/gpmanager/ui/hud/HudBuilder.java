@@ -1,5 +1,11 @@
 package com.gpmanager;
 
+import static java.awt.Color.*;
+
+import static com.gpmanager.Phrases.*;
+
+import static com.gpmanager.GameData.*;
+
 import java.util.List;
 import static com.gpmanager.Fmt.*;
 import static com.gpmanager.Kit.*;
@@ -33,14 +39,14 @@ class HudBuilder {
     static final Color GOLD = new Color(255, 200, 40);
 
     /** The tray slides open and shut over this long; the chip fades out over it. */
-    static final long FADE_MILLIS = 300L;
+    static final long FADE_MILLIS = 300;
 
-    /** The chip beside Net shows each booking's change this long, independent of the tray. */
-    static final long CHIP_MILLIS = 4_000L;
+    /** The chip beside Net shows one game tick's booked change this long, independent of the tray. */
+    static final long CHIP_MILLIS = 4_000;
 
     /** Item sprites by id and stack size, so coins show their pile rather than one coin. */
     interface Icons {
-        BufferedImage of(int itemId, int quantity);
+        BufferedImage of(int id, int quantity);
     }
 
     /** Counts at which stack sprites (coins) change; bucketing keeps the sprite cache small. */
@@ -61,8 +67,7 @@ class HudBuilder {
     /** The streak before, so a merged mixed streak measures from where it first began. */
     String prevKey;
 
-    long prevBase;
-    long lastNet;
+    long prevBase, lastNet;
 
     volatile String interaction = "";
     volatile HudFrame current = HudFrame.HIDDEN;
@@ -83,7 +88,7 @@ class HudBuilder {
         tray.clear();
         sessionOwner = "";
         lineColor = DIM.color;
-        trayOpenedAt = 0L;
+        trayOpenedAt = 0;
         baseKey = null;
         current = HudFrame.HIDDEN;
     }
@@ -120,9 +125,9 @@ class HudBuilder {
             if (!sessionOwner.isEmpty()) tray.clear();
             sessionOwner = owner;
             baseKey = null;
-            trayOpenedAt = 0L;
+            trayOpenedAt = 0;
         }
-        boolean grind = snapshot.hasSession && !snapshot.freePlay;
+        boolean plan = snapshot.hasSession && !snapshot.freePlay;
         // A new streak measures its Net from the last tick before its first event; the whole run's
         // Net, so a target starting Live fresh mid-streak never moves it (owner 1.5.2).
         long runNet = snapshot.net + snapshot.netBase;
@@ -136,15 +141,15 @@ class HudBuilder {
         }
         lastNet = runNet;
         // Nothing booked yet reads as a dash, never a zero (the sidebar's first-run rule).
-        boolean booked = snapshot.hasSession && (snapshot.fresh || snapshot.gains != 0L || snapshot.costs != 0L
-                                || snapshot.marketResult != 0L || !snapshot.recent.isEmpty());
+        boolean booked = snapshot.hasSession && (snapshot.fresh || snapshot.gains != 0 || snapshot.costs != 0
+                                || snapshot.marketResult != 0 || !snapshot.recent.isEmpty());
         tray.keepMillis(config.streakEndSeconds() * 1_000L);
         // "Hide when not tracking": nothing to track, logged out or paused hides HUD+; Free play
         // shows
         // once something is booked (observed, unbooked tray activity does not count).
         boolean live = snapshot.hasSession && !snapshot.loggedOut && !snapshot.paused && !snapshot.idle;
         boolean shown = config.showHud() && (!config.hudHideWhenIdle()
-                                || live && (grind || booked || tray.hasBooked()));
+                                || live && (plan || booked || tray.hasBooked()));
         if (!shown) {
             current = HudFrame.HIDDEN;
             return current;
@@ -154,21 +159,19 @@ class HudBuilder {
                                         : snapshot.pvpPossible ? Gem.PVP : Gem.LIVE;
         String target = "";
         double progress = -1d;
-        boolean targetWarning = false;
-        boolean targetDone = false;
+        boolean targetWarning = false, targetDone = false;
         if (snapshot.goal != null) {
-            LiveSnapshot.Goal goal = snapshot.goal;
+            var goal = snapshot.goal;
             // Owner live 2026-10-13: the target rides the progress bar's end, not the money row,
             // so "/ 200k" never stretches HUD+ wide. A time target shows its live countdown
             // there and warns in its final seconds. A Net aim's label counts down what is left
             // while the bar fills (owner live 2026-10-14); its own timer's countdown replaces the
             // label only in the final seconds it warns for, and a paused timer never warns.
-            long left = max(0L, goal.target - goal.current);
-            long remaining = goal.time ? left : goal.timeRemainingMillis;
+            long left = nonNeg(goal.target - goal.current), remaining = goal.time ? left : goal.timeRemainingMillis;
             int warnSeconds = config.hudTargetWarningSeconds();
-            targetWarning = warnSeconds > 0 && !goal.timerPaused && remaining > 0L && remaining <= warnSeconds * 1000L;
+            targetWarning = warnSeconds > 0 && !goal.timerPaused && remaining > 0 && remaining <= warnSeconds * 1000L;
             target = goal.time || targetWarning ? durationCount(remaining) : compact(left);
-            progress = !goal.time && goal.current <= 0L ? 0d : max(0d, min(1d, goal.fraction));
+            progress = !goal.time && goal.current <= 0 ? 0d : max(0d, min(1d, goal.fraction));
             targetDone = goal.reached;
         }
         String rate = !snapshot.hasSession ? "—" : LivePage.rateText(snapshot.rateEstablished, snapshot.gpPerHour);
@@ -176,7 +179,7 @@ class HudBuilder {
         // Owner 2026-10-03: hidden loot never opens or holds the tray open; an open tray's footer
         // counts it.
         var listed = new ArrayList<Entry>();
-        long shownAt = 0L;
+        long shownAt = 0;
         int hidden = 0;
         for (Entry entry : tray.entries()) {
             if (visible.test(flowOf(entry))) {
@@ -187,11 +190,15 @@ class HudBuilder {
             }
         }
         boolean open = !listed.isEmpty() && (always || now - shownAt < stayMillis() + FADE_MILLIS);
-        trayOpenedAt = !open ? 0L : trayOpenedAt == 0L ? now : trayOpenedAt;
+        trayOpenedAt = !open ? 0 : trayOpenedAt == 0 ? now : trayOpenedAt;
         var rows = new ArrayList<Row>();
-        // The chip beside Net is the newest item's change; the tray row keeps the running total.
-        long chipUntil = tray.lastDeltaAt() == 0L ? 0L : tray.lastDeltaAt() + CHIP_MILLIS;
-        long trip = now < chipUntil ? tray.lastDelta() : 0L;
+        // The chip totals the newest booking tick; tray rows retain their running quantities.
+        long chipUntil = tray.lastDeltaAt() == 0 ? 0 : tray.lastDeltaAt() + CHIP_MILLIS;
+        long trip = now < chipUntil ? tray.lastDelta() : 0;
+        listed.sort(Comparator.comparingLong((Entry entry) -> entry.touched).reversed()
+                .thenComparing(entry -> !(entry.gold || filter != null
+                        && filter.highlight(entry.name, entry.quantity) != null))
+                .thenComparing(Comparator.comparingLong((Entry entry) -> SafeMath.abs(entry.value)).reversed()));
         // A big drop keeps its row however much cheaper loot follows it; "+N more" takes the rest.
         int plain = config.hudTrayRows();
         for (Entry entry : listed) if (entry.gold) plain--;
@@ -204,11 +211,19 @@ class HudBuilder {
         if (open && hidden > 0)
             footer = (footer.isEmpty() ? "" : footer + " · ") + "+" + hidden + " hidden";
         String context = contextLine(snapshot);
+        if (snapshot.reviewCount == 0 && snapshot.reclaimItems == 0 && snapshot.milestoneUntil > 0
+                && snapshot.milestone != null) {
+            long left = snapshot.milestoneUntil - now;
+            if (left <= 0) context = "";
+            else if (!config.reducedMotion() && left < 1_000)
+                lineColor = new Color(lineColor.getRed(), lineColor.getGreen(), lineColor.getBlue(),
+                        (int) (255 * left / 1_000));
+        }
         current = new HudFrame(true, gem, title(snapshot, now),
                         snapshot.hasSession ? timer(snapshot.elapsedMillis) : "", booked ? signed(snapshot.net) : "—",
                         booked ? tone(snapshot.net) : DIM.color, target, progress, targetWarning, targetDone,
-                        trip != 0L ? signed(trip) : "", tone(trip), chipUntil, rate, context, lineColor,
-                        trayLabel(snapshot, now), rows, footer, tray.tripId(), always ? 0L : shownAt + stayMillis(),
+                        trip != 0 ? signed(trip) : "", tone(trip), chipUntil, rate, context, lineColor,
+                        trayLabel(snapshot, now), rows, footer, tray.tripId(), always ? 0 : shownAt + stayMillis(),
                         trayOpenedAt, now);
         return current;
     }
@@ -219,7 +234,7 @@ class HudBuilder {
      * live 2026-10-14).
      */
     String title(LiveSnapshot snapshot, long now) {
-        Map.Entry<String, Integer> streak = tray.streak(now);
+        var streak = tray.streak(now);
         if (streak != null && snapshot.hasSession && !interaction.isEmpty())
             return "KC: " + streak.getValue();
         return "";
@@ -236,8 +251,12 @@ class HudBuilder {
             return "(!) " + snapshot.reviewCount
                     + (snapshot.reviewCount == 1 ? " item needs review" : " items need review");
         }
-        if (snapshot.reclaimItems > 0L) {
-            return "Reclaim waiting · " + snapshot.reclaimItems + (snapshot.reclaimItems == 1L ? " item" : " items");
+        if (snapshot.reclaimItems > 0) {
+            return "Reclaim waiting · " + snapshot.reclaimItems + (snapshot.reclaimItems == 1 ? " item" : " items");
+        }
+        if (snapshot.milestoneReached() || snapshot.milestone != null && snapshot.milestoneUntil > 0) {
+            lineColor = GAIN.color;
+            return "Milestone reached · " + compact(snapshot.milestone);
         }
         if (snapshot.calibrating) return "Calibrating\u2026";
         return "";
@@ -256,17 +275,32 @@ class HudBuilder {
 
     Row row(Entry entry) {
         // "(u)" is the game's own short form for uncharged, as in "Craw's bow (u)" (owner 1.2).
-        return new Row(icon(entry), entry.name.replace(" (uncharged)", " (u)")
-                        + (entry.itemId == 995 ? "" : " " + times(entry.quantity)), entry.state.tag, value(entry),
-                color(entry), entry.gold, entry.born,
-                filter == null ? null : filter.highlight(entry.name, entry.quantity));
+        var icon = icon(entry);
+        Color highlight = filter == null ? null : filter.highlight(entry.name, entry.quantity);
+        String name = entry.name.replace(" (uncharged)", " (u)")
+                + (entry.itemId == 995 ? "" : " " + times(entry.quantity));
+        String value = value(entry), narrow = null;
+        if (config.hudCompactItems() && icon != null) {
+            name = "";
+            String quantity = "×" + compact(entry.quantity);
+            boolean priced = !value.isEmpty() && !value.equals("?");
+            value = (priced ? rate(entry.value) : value) + (value.isEmpty() ? "" : " ") + quantity;
+            if (priced && config.hudSemiCompactValues() && SafeMath.abs(entry.value) < 10_000_000) {
+                narrow = value;
+                value = (entry.value < 0 ? exactSigned(entry.value) : exact(entry.value)) + " " + quantity;
+            }
+        }
+        var row = new Row(icon, name, entry.state.tag, value, name.isEmpty() && highlight != null ? highlight : color(entry),
+                entry.gold, entry.born, highlight);
+        row.narrow = narrow;
+        return row;
     }
 
     static String value(Entry entry) {
         // A clue drop is worth nothing until its casket opens: no value, never "?" (owner
         // 2026-10-09).
-        return entry.value == 0L && entry.unitPrice == 0L
-                ? entry.worthless || GameData.pattern("clue").matcher(entry.name).matches() ? "" : "?"
+        return entry.value == 0 && entry.unitPrice == 0
+                ? entry.worthless || pattern("clue").matcher(entry.name).matches() ? "" : "?"
                 : counted(entry) || entry.state == State.TRADED ? signed(entry.value) : compact(entry.value);
     }
 
@@ -279,7 +313,7 @@ class HudBuilder {
      * The tray heading; a kill streak adds its Net per kill (owner 1.1: the hover panel is gone).
      */
     String trayLabel(LiveSnapshot snapshot, long now) {
-        Map.Entry<String, Integer> streak = tray.streak(now);
+        var streak = tray.streak(now);
         return streak == null || streak.getValue() < 2 || !snapshot.hasSession ? tray.label() : tray.label()
                         + " \u00b7 " + signed((snapshot.net + snapshot.netBase - streakBase) / streak.getValue())
                         + "/kill";
@@ -297,17 +331,15 @@ class HudBuilder {
         return 1;
     }
 
-    String timer(long millis) {
-        if (config.hudTimer() == GpManagerConfig.HudTimer.Full) return clock(millis);
-        long total = nonNeg(millis) / 1000L;
-        long hours = total / 3600L;
-        long minutes = total % 3600L / 60L;
-        return hours > 0L ? String.format(ROOT, "%dh%02dm", hours, minutes)
-                : String.format(ROOT, "%dm%02ds", minutes, total % 60L);
+    String timer(long ms) {
+        if (config.hudTimer() == GpManagerConfig.HudTimer.Full) return clock(ms);
+        long total = nonNeg(ms) / 1000, hours = total / 3600, minutes = total % 3600 / 60;
+        return hours > 0 ? String.format(ROOT, "%dh%02dm", hours, minutes)
+                : String.format(ROOT, "%dm%02ds", minutes, total % 60);
     }
 
     static Color tone(long value) {
-        return Tone.sign(value).color;
+        return sign(value).color;
     }
 }
 
@@ -317,8 +349,8 @@ class HudBuilder {
  */
 @RequiredArgsConstructor
 class HudFrame {
-    static final HudFrame HIDDEN = new HudFrame(false, Gem.OFF, "", "", "", Color.WHITE, "", -1d, false, false, "",
-                    Color.WHITE, 0L, "", "", Color.WHITE, "", emptyList(), "", 0, 0L, 0L, 0L);
+    static final HudFrame HIDDEN = new HudFrame(false, Gem.OFF, "", "", "", WHITE, "", -1d, false, false, "",
+                    WHITE, 0L, "", "", WHITE, "", emptyList(), "", 0, 0L, 0L, 0L);
 
     /** Tracking state dot: live, paused, away, not tracking, PvP. */
     enum Gem {
@@ -329,9 +361,9 @@ class HudFrame {
     @RequiredArgsConstructor
     static class Row {
         final BufferedImage icon;
-        final String name;
-        final String tag;
-        final String value;
+        final String name, tag, value;
+        /** Short form when optional full figures exceed the HUD width. */
+        String narrow;
         final Color color;
         final boolean gold;
 
@@ -344,9 +376,7 @@ class HudFrame {
 
     final boolean visible;
     final Gem gem;
-    final String title;
-    final String timer;
-    final String net;
+    final String title, timer, net;
     final Color netColor;
 
     /**
@@ -415,35 +445,28 @@ class HudOverlay extends Overlay {
     /** HUD+ fits its content between these; the Max width setting lowers the top. */
     static final int MIN_WIDTH = 72;
 
-    static final int MAX_WIDTH = 320;
-    static final int ICON = 20;
-    int rowHeight = ICON;
-    int indent = ICON + 4;
-    static final Color TEAL = new Color(0, 200, 180);
-    static final Color CORAL = new Color(255, 127, 80);
+    static final int MAX_WIDTH = 320, ICON = 20;
+    int rowHeight = ICON, indent = ICON + 4;
+    static final Color TEAL = new Color(0, 200, 180), CORAL = new Color(255, 127, 80);
     static final Color GOLD_ROW = new Color(255, 200, 40, 50);
-    static final long FADE_IN_MILLIS = 350L;
+    static final long FADE_IN_MILLIS = 350;
 
     /** Cadence of the final-seconds countdown blink (owner live 2026-10-13). */
-    static final long WARNING_BLINK_MILLIS = 500L;
+    static final long WARNING_BLINK_MILLIS = 500;
     HudBuilder builder;
     GpManagerConfig config;
     TextSize fontSize;
-    Font body;
-    Font bold;
-    Font big;
+    Font body, bold, big;
     int opacity = -1;
     Color background;
-    int widthTrip = Integer.MIN_VALUE;
-    int grownWidth;
+    int widthTrip = Integer.MIN_VALUE, grownWidth;
 
     /** The snapshot the layout below was measured for, and that layout. */
     HudFrame measured;
 
     int measuredKey;
     Dimension size;
-    int restHeight;
-    int trayHeight;
+    int restHeight, trayHeight;
     boolean compact;
 
     /**
@@ -452,18 +475,16 @@ class HudOverlay extends Overlay {
      */
     boolean rateUp;
 
-    int[] moneyX = new int[4];
-    int[] moneyY = new int[4];
+    int[] moneyX = new int[4], moneyY = new int[4];
     int moneyHeight;
 
     /** Wall clock minus the snapshot's clock, fixed when a snapshot is first painted. */
     HudFrame clocked;
 
     long clockOffset;
-    String title = "";
-    String context = "";
+    String title = "", context = "";
     String[] names = {};
-    java.awt.image.BufferedImage[] sprites = {};
+    BufferedImage[] sprites = {};
 
     HudOverlay(HudBuilder builder, GpManagerConfig config) {
         this.builder = builder;
@@ -472,19 +493,19 @@ class HudOverlay extends Overlay {
     }
 
     public Dimension render(Graphics2D g) {
-        HudFrame frame = builder.current();
+        var frame = builder.current();
         if (!frame.visible) return null;
         fonts();
-        FontMetrics fb = g.getFontMetrics(body);
-        FontMetrics fh = g.getFontMetrics(bold);
-        FontMetrics fg = g.getFontMetrics(big);
+        var fb = g.getFontMetrics(body);
+        var fh = g.getFontMetrics(bold);
+        var fg = g.getFontMetrics(big);
         int key = fontSize.ordinal() * 1_000 + config.hudMaxWidth();
         if (frame != measured || key != measuredKey) {
             measure(frame, fb, fh, fg);
             measured = frame;
             measuredKey = key;
         }
-        long wall = SafeMath.now();
+        long wall = now();
         if (frame != clocked) {
             clocked = frame;
             clockOffset = wall - frame.builtAt;
@@ -496,7 +517,7 @@ class HudOverlay extends Overlay {
         // Bitmap faces and item sprites stay sharp without smoothing; restored afterwards.
         Object textHint = g.getRenderingHint(RenderingHints.KEY_TEXT_ANTIALIASING);
         Object imageHint = g.getRenderingHint(RenderingHints.KEY_INTERPOLATION);
-        Composite plain = g.getComposite();
+        var plain = g.getComposite();
         Shape clip = g.getClip();
         g.setRenderingHint(RenderingHints.KEY_TEXT_ANTIALIASING, RenderingHints.VALUE_TEXT_ANTIALIAS_OFF);
         g.setRenderingHint(RenderingHints.KEY_INTERPOLATION, RenderingHints.VALUE_INTERPOLATION_NEAREST_NEIGHBOR);
@@ -520,7 +541,7 @@ class HudOverlay extends Overlay {
         if (!hasTray(frame)) return 0f;
         if (!motion) return 1f;
         float opening = ease((now - frame.openedAt) / (float) HudBuilder.FADE_MILLIS);
-        return frame.foldAt == 0L ? opening : min(opening, ease((frame.foldAt + HudBuilder.FADE_MILLIS - now)
+        return frame.foldAt == 0 ? opening : min(opening, ease((frame.foldAt + HudBuilder.FADE_MILLIS - now)
                                         / (float) HudBuilder.FADE_MILLIS));
     }
 
@@ -535,20 +556,19 @@ class HudOverlay extends Overlay {
 
     void paint(Graphics2D g, HudFrame frame, FontMetrics fb, FontMetrics fh, FontMetrics fg, Composite plain, long now,
             float open) {
-        int width = size.width;
-        int right = width - PAD;
+        int width = size.width, right = width - PAD;
         boolean motion = !config.reducedMotion();
         g.setColor(background);
         g.fillRect(0, 0, width, size.height);
         int y = PAD;
         g.setColor(gemColor(frame.gem, motion, now));
         g.fillOval(PAD, y + fh.getHeight() / 2 - 3, 7, 7);
-        Color rateColor = frame.rate.endsWith("/h") ? Color.WHITE : LABEL;
+        Color rateColor = frame.rate.endsWith("/h") ? WHITE : LABEL;
         // The timer keeps the left; the kill count owns the right, with the rate under it on the
         // money row (owner live 2026-10-14) — the timer never jumps sides.
         String head = rateUp ? frame.rate : title;
         text(g, body, frame.timer, PAD + 11, y + fh.getAscent(), LABEL);
-        text(g, body, head, right - width(fb, head), y + fh.getAscent(), rateUp ? rateColor : Color.WHITE);
+        text(g, body, head, right - width(fb, head), y + fh.getAscent(), rateUp ? rateColor : WHITE);
         if (compact) return;
         y += fh.getHeight() + 1;
         // The chip keeps its own few seconds and fades on its own, whatever the tray is doing.
@@ -568,15 +588,15 @@ class HudOverlay extends Overlay {
             int barY = y + (labelRoom == 0 ? 0 : (fb.getHeight() - 3) / 2);
             g.setColor(LINE);
             g.fillRect(PAD, barY, width - PAD * 2 - labelRoom, 3);
-            g.setColor(frame.targetDone ? Tone.GAIN.color : frame.targetWarning ? Tone.LOSS.color : ACCENT);
+            g.setColor(frame.targetDone ? Tone.GAIN.color : frame.targetWarning ? LOSS.color : ACCENT);
             g.fillRect(PAD, barY, (int) round((width - PAD * 2 - labelRoom) * frame.progress), 3);
             if (labelRoom > 0) {
                 // The final-seconds warning blinks unless reduced motion, then stays solid
                 // (owner live 2026-10-13).
                 Color targetColor = LABEL;
                 if (frame.targetWarning) {
-                    boolean dim = !config.reducedMotion() && (now / WARNING_BLINK_MILLIS) % 2L == 0L;
-                    targetColor = dim ? LABEL : Tone.LOSS.color;
+                    boolean dim = !config.reducedMotion() && (now / WARNING_BLINK_MILLIS) % 2 == 0;
+                    targetColor = dim ? LABEL : LOSS.color;
                 }
                 text(g, body, frame.target, right - width(fb, frame.target), y + fb.getAscent(), targetColor);
             }
@@ -603,10 +623,12 @@ class HudOverlay extends Overlay {
             // Sprites are fitted once per snapshot: shrunk smoothly, never blown up, centred.
             if (sprites[i] != null) g.drawImage(sprites[i], PAD, y, null);
             int textY = y + (rowHeight + fb.getAscent()) / 2 - 1;
-            int valueX = right - width(fb, row.value);
-            text(g, body, names[i], PAD + indent, textY, row.highlight == null ? Color.WHITE : row.highlight);
-            text(g, body, row.value, valueX, textY, row.color);
-            text(g, body, row.tag, valueX - 4 - width(fb, row.tag), textY, LABEL);
+            String value = row.narrow != null && right(fb, row) > width - PAD * 2 - indent ? row.narrow : row.value;
+            int valueX = row.name.isEmpty() ? PAD + indent : right - width(fb, value);
+            text(g, body, names[i], PAD + indent, textY, row.highlight == null ? WHITE : row.highlight);
+            text(g, body, value, valueX, textY, row.color);
+            text(g, body, row.tag, row.name.isEmpty() ? valueX + width(fb, value) + 4
+                            : valueX - 4 - width(fb, row.tag), textY, LABEL);
             y += rowHeight;
         }
         fade(g, plain, open);
@@ -662,13 +684,13 @@ class HudOverlay extends Overlay {
         }
         context = fit(fb, frame.context, inner);
         names = new String[rows];
-        sprites = new java.awt.image.BufferedImage[rows];
+        sprites = new BufferedImage[rows];
         for (int i = 0; i < rows; i++) {
             Row row = frame.rows.get(i);
             // Owner 1.2: a long name shortens before its count, so the "×2" always shows.
             String count = row.name.substring(max(0, row.name.lastIndexOf(" ×")));
             if (!count.startsWith(" ×")) count = "";
-            names[i] = fit(fb, row.name.substring(0, row.name.length() - count.length()),
+            names[i] = row.name.isEmpty() ? "" : fit(fb, row.name.substring(0, row.name.length() - count.length()),
                                     inner - indent - 8 - right(fb, row) - width(fb, count)) + count;
             sprites[i] = row.icon == null ? null : fitIcon(row.icon, ICON);
         }
@@ -683,16 +705,14 @@ class HudOverlay extends Overlay {
     /** Net leads; a new change or rate that cannot share its line wraps below it. */
     int moneyLayout(HudFrame frame, FontMetrics fb, FontMetrics fg, int inner) {
         String[] values = {frame.net, "", frame.trip, rateUp ? "" : frame.rate};
-        int x = steady(fg, frame.net);
-        int y = 0;
+        int x = steady(fg, frame.net), y = 0;
         for (int i = 1; i < values.length; i++) {
             if (values[i].isEmpty()) {
                 moneyX[i] = x;
                 moneyY[i] = y;
                 continue;
             }
-            int gap = values[i].isEmpty() || i == 1 ? 0 : i == 2 ? 6 : 8;
-            int width = steady(fb, values[i]);
+            int gap = values[i].isEmpty() || i == 1 ? 0 : i == 2 ? 6 : 8, width = steady(fb, values[i]);
             if (x + gap + width > inner) {
                 x = 0;
                 y += fg.getHeight();
@@ -723,9 +743,7 @@ class HudOverlay extends Overlay {
     /** The text, or its longest start that fits {@code room} pixels followed by "…". */
     static String fit(FontMetrics metrics, String value, int room) {
         if (width(metrics, value) <= room) return value;
-        int budget = room - metrics.stringWidth("…");
-        int low = 0;
-        int high = value.length();
+        int budget = room - metrics.stringWidth("…"), low = 0, high = value.length();
         while (low < high) {
             int middle = (low + high + 1) >>> 1;
             if (width(metrics, value.substring(0, middle)) <= budget) low = middle;
@@ -735,11 +753,10 @@ class HudOverlay extends Overlay {
     }
 
     void fonts() {
-        TextSize wanted = config.hudTextSize();
+        var wanted = config.hudTextSize();
         if (wanted != fontSize) {
             fontSize = wanted;
-            Font small = FontManager.getRunescapeSmallFont();
-            Font regular = FontManager.getRunescapeFont();
+            Font small = FontManager.getRunescapeSmallFont(), regular = FontManager.getRunescapeFont();
             Font heavy = FontManager.getRunescapeBoldFont();
             // RuneLite's pixel fonts only render cleanly at their own size, so sizes pick fonts
             // rather than scale them: Small, Normal, and Large (the bold face throughout).
@@ -774,10 +791,9 @@ class HudOverlay extends Overlay {
             case AWAY:
                 return motion ? new Color(255, 127, 80, 110 + (int) (100 * abs(sin(now / 400d)))) : CORAL.darker();
             case PVP:
-                return Tone.LOSS.color;
-            case OFF:
+                return LOSS.color;
             default:
-                return Kit.OFF;
+                return OFF;
         }
     }
 
@@ -788,11 +804,11 @@ class HudOverlay extends Overlay {
 
     /** Text with the one-pixel shadow every RuneLite overlay uses. */
     static void text(Graphics2D g, Font font, String value, int x, int y, Color color) {
-        if (Phrases.empty(value)) return;
+        if (empty(value)) return;
         // RuneLite's font has no true minus sign (U+2212); a hyphen reads the same.
         String shown = value.replace('−', '-');
         g.setFont(font);
-        g.setColor(Color.BLACK);
+        g.setColor(BLACK);
         g.drawString(shown, x + 1, y + 1);
         g.setColor(color);
         g.drawString(shown, x, y);
@@ -811,7 +827,7 @@ class HudTray {
      * A single drop worth this much lights its row gold and raises a moment, unless Ground Items
      * sets it.
      */
-    static final long BIG_DROP = 10_000_000L;
+    static final long BIG_DROP = 10_000_000;
 
     long big = BIG_DROP;
 
@@ -830,8 +846,7 @@ class HudTray {
         final String name;
         final State state;
         final long unitPrice;
-        long quantity;
-        long value;
+        long quantity, value;
         boolean gold;
         long born;
 
@@ -862,10 +877,8 @@ class HudTray {
 
     Set<String> prevNpcs = new LinkedHashSet<>();
     String prevSource = "";
-    int prevKills;
-    int prevTrip;
-    long prevEventAt;
-    long lastEventAt;
+    int prevKills, prevTrip;
+    long prevEventAt, lastEventAt;
 
     /** When an item last arrived: the tray opens on items only, never on a kill or an attack. */
     /**
@@ -880,11 +893,16 @@ class HudTray {
 
     long lastDeltaAt;
 
+    long lastBatch = Long.MIN_VALUE;
+
     /** A booking settled; mirror its visible item flows onto the tray. */
     synchronized void booked(Transaction transaction, long now, boolean xy) {
+        booked(transaction, now, xy, now);
+    }
+
+    synchronized void booked(Transaction transaction, long now, boolean xy, long batch) {
         if (transaction == null) return;
-        if (!transaction.isCounted() || transaction.getType() == TransactionType.TRANSFER
-                || transaction.getCorrection() == Correction.TRANSFER || transaction.getType() == UNCERTAIN
+        if (!transaction.isCounted() || transaction.isTransfer() || transaction.getType() == UNCERTAIN
                 // Owner 2026-09-28: eating and drinking stay off HUD+ (a sip's "(3)" is no drop).
                 || transaction.getActionKind() == ActionKind.EAT || transaction.getActionKind() == ActionKind.DRINK
                 || ActionReader.isDoseStep(transaction.getFlows())) {
@@ -902,44 +920,43 @@ class HudTray {
         boolean reclaim = (transaction.getActivityName() + " " + transaction.getNote()).toLowerCase(ROOT)
                         .contains("reclaim");
         // Only deaths, drops and destroys ride the tray as lost; other item use is routine.
-        String dropped = Phrases.has(transaction.getNote(), "Dropped", "Destroyed") ? transaction.getNote() : "";
+        String drop = Phrases.has(transaction.getNote(), "Dropped", "Destroyed") ? transaction.getNote() : "";
         boolean lost = transaction.autoType() == PK_DEATH_LOSS || transaction.getContext() == Context.PK_DEATH
-                        || !dropped.isEmpty();
+                        || !drop.isEmpty();
         // Owner 2026-10-09: opening caskets or impling jars is one row per container with its
         // total, so
         // a stack opened never floods the tray; a big drop still gets its own gold row.
         Flow container = opened(transaction.getFlows());
         if (container != null && !market && !lost) {
             event(now, xy, "Opened", null);
-            long net = 0L;
-            long count = 0L;
+            beginBatch(batch, now);
+            long net = 0, count = 0;
             for (Flow flow : transaction.getFlows()) {
-                net += flow.valueDelta;
+                net = safeAdd(net, flow.valueDelta);
                 if (flow.isCost() && flow.itemId == container.itemId) count -= flow.quantityDelta;
                 if (flow.isGain() && flow.valueDelta >= big) {
                     add(flow.itemId, flow.itemName, State.RECEIVED, flow.unitPrice, flow.quantityDelta, flow.valueDelta,
-                                            now, 0L).gold = true;
+                                            lastDeltaAt, 0).gold = true;
                 }
             }
-            add(container.itemId, container.itemName, State.RECEIVED, 0L, count, net, now, 0L);
-            lastDelta = net;
-            lastDeltaAt = now;
+            add(container.itemId, container.itemName, State.RECEIVED, 0, count, net, lastDeltaAt, 0);
+            lastDelta = safeAdd(lastDelta, net);
             return;
         }
         boolean any = false;
-        long delta = 0L;
+        long delta = 0;
         // Owner 2026-10-09: a trade rides the tray as its item, bought or sold, with the coins it
         // took
         // or brought when it is the one item; its coins never get a row of their own.
-        long coins = 0L;
+        long coins = 0;
         int items = 0;
         for (Flow flow : transaction.getFlows()) {
             if (flow.itemId == 995) coins += flow.valueDelta;
             else items++;
         }
         for (Flow flow : transaction.getFlows()) {
-            if (flow.quantityDelta == 0L || market && flow.itemId == 995) continue;
-            boolean gain = flow.quantityDelta > 0L;
+            if (flow.quantityDelta == 0 || market && flow.itemId == 995) continue;
+            boolean gain = flow.quantityDelta > 0;
             // Routine rune/ammo/charge use never rides the tray, but a pickup is a drop
             // like any other (owner 2026-09-29).
             if (!gain && !market && routine(flow.itemName)) continue;
@@ -947,48 +964,54 @@ class HudTray {
             if (!any) {
                 // A drop or a GE or player trade joins the running trip; on an empty tray it reads
                 // "Dropped", "Traded" (owners 2026-09-28, 2026-10-09) or "Exchanged" for a shop.
-                event(now, xy, claimed ? "Claimed" : market || !dropped.isEmpty() ? null
+                event(now, xy, claimed ? "Claimed" : market || !drop.isEmpty() ? null
                                         : lost ? "Lost" : verb(transaction, flow.itemName, now), null);
-                if ((market || !dropped.isEmpty()) && entries.isEmpty())
-                    label = market ? (Semantics.shopExchange(transaction) ? "Exchanged" : "Traded") : dropped;
+                if ((market || !drop.isEmpty()) && entries.isEmpty())
+                    label = market ? (Semantics.shopExchange(transaction) ? "Exchanged" : "Traded") : drop;
                 any = true;
+                if (!market) beginBatch(batch, now);
             }
             int id = flow.itemId;
             long quantity = abs(flow.quantityDelta);
             State state = market ? State.TRADED : !gain ? State.LOST : reclaim ? State.RECOVERED
                                             : claimed ? State.CLAIMED : State.RECEIVED;
-            long born = 0L;
+            long born = 0;
             if (state == State.RECEIVED || state == State.CLAIMED) {
                 // A claim turns its pending row into Claimed in place, keeping its first-seen
                 // identity.
                 Entry pending = entries.get(key(State.PENDING, id));
-                if (pending != null && take(State.PENDING, id, quantity) > 0L) {
+                if (pending != null && take(State.PENDING, id, quantity) > 0) {
                     state = State.CLAIMED;
                     born = pending.born;
                 }
             }
             Entry entry = add(id, flow.itemName, state, flow.unitPrice, quantity, !market ? flow.valueDelta
-                                    : items == 1 && coins != 0L ? abs(coins) : abs(flow.valueDelta), now, born);
+                                    : items == 1 && coins != 0 ? abs(coins) : abs(flow.valueDelta), market ? now : lastDeltaAt, born);
             entry.worthless |= flow.getPriceSource() == PriceSource.NO_VALUE;
-            delta += state == State.TRADED ? 0L : flow.valueDelta;
+            delta = safeAdd(delta, state == State.TRADED ? 0 : flow.valueDelta);
             if (gain && state != State.TRADED && flow.valueDelta >= big) {
                 entry.gold = true;
             }
         }
-        if (any && delta != 0L) {
-            lastDelta = delta;
-            lastDeltaAt = now;
-        }
+        if (any) lastDelta = safeAdd(lastDelta, delta);
+    }
+
+    /** One tick is one chip, even when its receipts arrive at different milliseconds. */
+    void beginBatch(long batch, long now) {
+        if (batch == lastBatch) return;
+        lastBatch = batch;
+        lastDelta = 0;
+        lastDeltaAt = now;
     }
 
     /**
      * A reward window reported loot it is holding; nothing is counted until it settles. Ground loot
      * never comes here: the tray lists what was received, so a pickup appears once, in place.
      */
-    synchronized void observed(int itemId, String name, long quantity, long unitPrice, long now, boolean xy) {
-        if (quantity <= 0L) return;
+    synchronized void observed(int id, String name, long quantity, long price, long now, boolean xy) {
+        if (quantity <= 0) return;
         event(now, xy, null, null);
-        add(itemId, name, State.PENDING, unitPrice, quantity, unitPrice * quantity, now, 0L);
+        add(id, name, State.PENDING, price, quantity, price * quantity, now, 0);
     }
 
     /**
@@ -1004,10 +1027,9 @@ class HudTray {
                 // The new target's first kill refreshes the tray to its own streak; loot already
                 // booked before any kill stays (owner 2026-10-01).
                 boolean back = has(prevNpcs, name) && now - prevEventAt < quietMillis();
-                var rows = new LinkedHashMap<String, Entry>(entries);
-                var previous = new LinkedHashSet<String>(npcs);
-                int had = kills;
-                int trip = tripId;
+                var rows = new LinkedHashMap<>(entries);
+                var previous = new LinkedHashSet<>(npcs);
+                int had = kills, trip = tripId;
                 long last = lastEventAt;
                 String from = source;
                 restart(xy);
@@ -1048,7 +1070,7 @@ class HudTray {
     /** The streak's NPCs: "Guard", "Guard & Man", "Guard, Man +1"; empty before a kill. */
     synchronized String names() {
         var list = new ArrayList<String>();
-        for (String npc : npcs) list.add(Fmt.activity(npc));
+        for (String npc : npcs) list.add(activity(npc));
         int n = list.size();
         return n == 0 ? "" : n == 1 ? list.get(0) : n == 2 ? list.get(0) + " & " + list.get(1)
                                 : list.get(0) + ", " + list.get(1) + " +" + (n - 2);
@@ -1069,21 +1091,22 @@ class HudTray {
         npcs.clear();
         prevNpcs = new LinkedHashSet<>();
         kills = 0;
-        lastEventAt = 0L;
-        lastDelta = 0L;
-        lastDeltaAt = 0L;
+        lastEventAt = 0;
+        lastDelta = 0;
+        lastDeltaAt = 0;
+        lastBatch = Long.MIN_VALUE;
         label = "Looted";
     }
 
     /** Newest arrivals first; a row keeps its place while its quantity grows. */
     synchronized List<Entry> entries() {
-        var list = new ArrayList<Entry>(entries.values());
+        var list = new ArrayList<>(entries.values());
         // Owner 1.2: the row that last grew leads, so the newest loot is always on top.
         list.sort((a, b) -> a.touched != b.touched ? Long.compare(b.touched, a.touched) : Long.compare(b.born, a.born));
         return list;
     }
 
-    /** The newest booking's counted change, e.g. +23 for one more item; 0 before any. */
+    /** The newest game tick's counted tray changes; 0 before any. */
     synchronized long lastDelta() {
         return lastDelta;
     }
@@ -1116,7 +1139,7 @@ class HudTray {
      * rows keep for the whole session. Folding only hides the tray; it never ends a streak.
      */
     void event(long now, boolean xy, String kind, String npc) {
-        if (lastEventAt > 0L && now - lastEventAt >= quietMillis() || kind != null && !kind.equals(label)
+        if (lastEventAt > 0 && now - lastEventAt >= quietMillis() || kind != null && !kind.equals(label)
                 || npc != null && !npcs.isEmpty() && !has(npcs, npc)) {
             restart(xy);
         }
@@ -1136,7 +1159,7 @@ class HudTray {
         source = "";
         npcs.clear();
         kills = 0;
-        lastEventAt = 0L;
+        lastEventAt = 0;
     }
 
     /** Identity of the streak the per-kill line measures: a new streak, or its first kill. */
@@ -1147,47 +1170,47 @@ class HudTray {
     /**
      * A streak goes quiet after three of its own kill intervals: at least a minute, at most five.
      */
-    volatile long keepMillis = 60_000L;
+    volatile long keepMillis = 60_000;
 
     /** Owner-set streak window: the tray ends a streak this long after its last kill. */
-    synchronized void keepMillis(long millis) {
-        keepMillis = max(10_000L, min(3_600_000L, millis));
+    synchronized void keepMillis(long ms) {
+        keepMillis = max(10_000, min(3_600_000, ms));
     }
 
     long quietMillis() {
         return keepMillis;
     }
 
-    long take(State from, int itemId, long quantity) {
-        Entry source = entries.get(key(from, itemId));
-        if (source == null) return 0L;
+    long take(State from, int id, long quantity) {
+        Entry source = entries.get(key(from, id));
+        if (source == null) return 0;
         long moved = min(quantity, source.quantity);
         source.quantity -= moved;
         source.value = source.unitPrice * source.quantity;
-        if (source.quantity <= 0L) entries.remove(key(from, itemId));
+        if (source.quantity <= 0) entries.remove(key(from, id));
         return moved;
     }
 
     void merge(Collection<Entry> rows) {
         for (Entry row : rows) {
-            Entry entry = add(row.itemId, row.name, row.state, row.unitPrice, row.quantity, row.value, 0L, row.born);
+            Entry entry = add(row.itemId, row.name, row.state, row.unitPrice, row.quantity, row.value, 0, row.born);
             entry.gold |= row.gold;
             entry.worthless |= row.worthless;
         }
     }
 
-    Entry add(int itemId, String name, State state, long unitPrice, long quantity, long value, long now, long born) {
-        Entry entry = entries.computeIfAbsent(key(state, itemId), ignored -> new Entry(itemId,
-                                        name == null ? "Unknown item" : name, state, unitPrice));
-        if (entry.born == 0L) entry.born = born != 0L ? born : now;
+    Entry add(int id, String name, State state, long price, long quantity, long value, long now, long born) {
+        Entry entry = entries.computeIfAbsent(key(state, id), ignored -> new Entry(id,
+                                        name == null ? "Unknown item" : name, state, price));
+        if (entry.born == 0) entry.born = born != 0 ? born : now;
         entry.touched = now;
-        entry.quantity += quantity;
-        entry.value += value;
+        entry.quantity = safeAdd(entry.quantity, quantity);
+        entry.value = safeAdd(entry.value, value);
         return entry;
     }
 
-    static String key(State state, int itemId) {
-        return state.name() + ":" + itemId;
+    static String key(State state, int id) {
+        return state.name() + ":" + id;
     }
 
     /**
@@ -1195,7 +1218,7 @@ class HudTray {
      * A caught impling spends an empty "Impling jar", which is no opening.
      */
     static Flow opened(List<Flow> flows) {
-        return ActionReader.all(flows, -1, name -> GameData.pattern("clue").matcher(name).matches()
+        return ActionReader.all(flows, -1, name -> pattern("clue").matcher(name).matches()
                                                 || name.endsWith(" impling jar"))
                         && ActionReader.all(flows, 1, name -> true)
                 ? flows.stream().filter(Flow::isCost).findFirst().get() : null;
@@ -1205,14 +1228,14 @@ class HudTray {
     static boolean routine(String name) {
         // Runes, arrows, bolts, darts, javelins, throwing weapons and Zulrah's scales (d18
         // "routine").
-        return GameData.pattern("routine").matcher(Phrases.lower(name)).matches();
+        return pattern("routine").matcher(lower(name)).matches();
     }
 
-    static final List<String[]> VERBS = GameData.rows("tray_verbs");
+    static final List<String[]> VERBS = rows("tray_verbs");
     static final Set<String> MINIONS = new HashSet<>();
 
     static {
-        GameData.rows("boss_spawns").forEach(row -> MINIONS.add(row[0]));
+        rows("boss_spawns").forEach(row -> MINIONS.add(row[0]));
     }
 
     /**
@@ -1220,7 +1243,7 @@ class HudTray {
      * own.
      */
     static boolean minion(String npc) {
-        return npc != null && MINIONS.contains(Phrases.lower(npc));
+        return npc != null && MINIONS.contains(lower(npc));
     }
 
     /** The newest skilling XP's tray verb ("Mined") and when it arrived. */
@@ -1244,7 +1267,7 @@ class HudTray {
     String verb(Transaction transaction, String item, long now) {
         String kind = transaction.getContext() == Context.PRODUCTION ? labelFor(transaction.getNote()) : "Looted";
         if ("Looted".equals(kind) && (transaction.getType() == TransactionType.GAIN || transaction.getType() == PROCESSING)
-                && now - xpAt < 6_000L) {
+                && now - xpAt < 6_000) {
             kind = xpVerb;
         }
         if ("Looted".equals(kind)) kind = labelFor(transaction.getActivityName());
@@ -1253,7 +1276,7 @@ class HudTray {
     }
 
     static String labelFor(String activity) {
-        String lower = Phrases.lower(activity);
+        String lower = lower(activity);
         for (String[] row : VERBS) {
             if (lower.contains(row[0])) return row[1];
         }

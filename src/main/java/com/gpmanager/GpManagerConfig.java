@@ -8,8 +8,8 @@ import net.runelite.client.config.*;
 public interface GpManagerConfig extends Config {
     String GROUP = "gpmanager";
 
-    // Sections in SIDEBAR_SPEC.md §6b order; defaults are the product. Timing and limit knobs are
-    // fixed (owner, 2026-09-26): the hidden ones below stay only so tests can tune them.
+    // Sections in SIDEBAR_SPEC.md §6b order; defaults are the product. Internal timing/limit knobs
+    // stay hidden test seams; visible row counts are display preferences (owner, 2026-10-19).
     // Owner 2026-09-28: Tracking, Accounting, Loot display, then HUD+ and History collapsed. Key
     // names never change, so saved settings carry over whatever section shows them.
     @ConfigSection(name = "Tracking", description = "When and how tracking runs", position = 0)
@@ -35,7 +35,7 @@ public interface GpManagerConfig extends Config {
 
     @ConfigItem(
             keyName = "lootPresentationFilter", name = "Display loot filter", description =
-                    "Hide Ground Items-hidden gains on the tray, Live lists and Ledger; the tray mirrors display filters and Ledger costs stay visible. Totals stay unchanged",
+                    "Hide Ground Items-hidden gains on Live and Ledger; the tray mirrors display filters. Ledger costs stay visible; totals stay unchanged",
             position = 0, section = lootSection)
     default LootFilter lootPresentationFilter() {
         return LootFilter.FOLLOW_GROUND_ITEMS;
@@ -58,7 +58,7 @@ public interface GpManagerConfig extends Config {
 
     @ConfigItem(
             keyName = "alwaysShowItems", name = "Always show items", description =
-                    "Comma-separated names always shown on the tray and Live, even when Ground Items hides them or they are under the minimum value. Hidden Recent items still wins",
+                    "Comma-separated names shown on the tray and Live regardless of Ground Items or minimum value. Hidden Recent items takes precedence",
             position = 3, section = lootSection)
     default String alwaysShowItems() {
         return "";
@@ -66,18 +66,27 @@ public interface GpManagerConfig extends Config {
 
     @ConfigItem(
             keyName = "hiddenRecentItems", name = "Hidden Recent items",
-            description = "Comma-separated names hidden from Recent. Net is unchanged", position = 4,
+            description = "Item/spell names separated by commas, hidden from Recent only", position = 4,
             section = lootSection)
     default String hiddenRecentItems() {
         return "";
     }
 
+    /** Keep the original key so existing charge/dose hide preferences survive the broader label. */
     @ConfigItem(
-            keyName = "hiddenRecentCharges", name = "Hidden Recent charges", description =
-                    "Comma-separated names whose charge spends are hidden from Recent; their other rows stay. Net and the Ledger are unchanged",
+            keyName = "hiddenRecentCharges", name = "Hidden Recent supplies", description =
+                    "Name patterns separated by commas: hide supply spends from Recent only; gains, Net and Ledger stay unchanged",
             position = 5, section = lootSection)
     default String hiddenRecentCharges() {
         return "";
+    }
+
+    @Range(min = 1, max = 30)
+    @ConfigItem(keyName = "recentRows", name = "Recent rows",
+            description = "Visible Recent rows. Does not change bookings or category tables",
+            position = 6, section = lootSection)
+    default int recentRows() {
+        return 15;
     }
 
     enum TextSize {
@@ -144,7 +153,7 @@ public interface GpManagerConfig extends Config {
 
     @ConfigItem(
             keyName = "hudHideWhenIdle", name = "Hide when not tracking", description =
-                    "Hide HUD+ when nothing is tracking, and in Free play until something is booked", position = 1,
+                    "Hide HUD+ while stopped, or until Free play books an entry", position = 1,
             section = hudLiveSection)
     default boolean hudHideWhenIdle() {
         return true;
@@ -176,7 +185,7 @@ public interface GpManagerConfig extends Config {
 
     @ConfigItem(
             keyName = "hudTimer", name = "Timer",
-            description = "Compact (39m52s) or full (0:39:52); counts tracked active time", position = 2,
+            description = "Counts tracked active time: compact 39m52s or full 0:39:52", position = 2,
             section = hudLiveSection)
     default HudTimer hudTimer() {
         return HudTimer.Compact;
@@ -206,6 +215,22 @@ public interface GpManagerConfig extends Config {
     }
 
     @ConfigItem(
+            keyName = "hudCompactItems", name = "Compact item rows",
+            description = "Show icon, compact value and quantity; missing icons keep names",
+            position = 13, section = hudLiveSection)
+    default boolean hudCompactItems() {
+        return false;
+    }
+
+    @ConfigItem(
+            keyName = "hudSemiCompactValues", name = "Full values below 10M",
+            description = "With Compact item rows, show full values below 10M; shorten only if needed to fit",
+            position = 14, section = hudLiveSection)
+    default boolean hudSemiCompactValues() {
+        return false;
+    }
+
+    @ConfigItem(
             keyName = "hudTrayKeeps", name = "Tray keeps rows for",
             description = "Keep this streak's items, or the whole session's", position = 6, section = hudLiveSection)
     default HudTrayKeeps hudTrayKeeps() {
@@ -231,7 +256,7 @@ public interface GpManagerConfig extends Config {
     @Range(min = 0, max = 300)
     @ConfigItem(
             keyName = "hudTargetWarningSeconds", name = "Target countdown warning",
-            description = "Flash the HUD target countdown in its final seconds (solid with Reduced motion); 0 turns it off",
+            description = "Flash the final countdown seconds; Reduced motion stays solid. 0 disables",
             position = 12, section = hudLiveSection)
     default int hudTargetWarningSeconds() {
         return 10;
@@ -239,7 +264,7 @@ public interface GpManagerConfig extends Config {
 
     @ConfigItem(
             keyName = "autoStartSession", name = "Automatic tracking",
-            description = "Start Free play when gameplay is seen, or at the first login when Start tracking on login is on",
+            description = "Start Free play on gameplay, or on login when Start tracking on login is enabled",
             position = 0, section = generalSection)
     default boolean autoStartSession() {
         return true;
@@ -247,7 +272,7 @@ public interface GpManagerConfig extends Config {
 
     @ConfigItem(
             keyName = "autoStartOnLogin", name = "Start tracking on login",
-            description = "Start or resume tracking at the first login of a RuneLite session instead of waiting for the first action",
+            description = "Start or resume tracking at each RuneLite session's first login",
             position = 1, section = generalSection)
     default boolean autoStartOnLogin() {
         return true;
@@ -329,7 +354,7 @@ public interface GpManagerConfig extends Config {
 
     @ConfigItem(
             keyName = "ironmanAlch", name = "Ironman: value at high alch", description =
-                    "On an ironman account, value items at their high alchemy price (coins you can make) instead of the Grand Exchange",
+                    "Use high alch prices instead of GE for ironmen",
             position = 4, section = accountingSection)
     default boolean ironmanAlch() {
         return false;

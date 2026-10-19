@@ -1,10 +1,10 @@
 package com.gpmanager;
 
-import java.lang.reflect.Field;
 import java.util.*;
 import net.runelite.api.ChatMessageType;
 import net.runelite.api.events.ChatMessage;
 import org.junit.Test;
+import static com.gpmanager.GpManagerPluginProbe.set;
 import static org.junit.Assert.*;
 
 /** Real settlement/callback boundaries missed by the isolated accounting helpers. */
@@ -616,12 +616,6 @@ public class PkChestAndReclaimSettlementTest
         return message;
     }
 
-    private static void set(Object target, String name, Object value) throws Exception
-    {
-        Field field = GpManagerPlugin.class.getDeclaredField(name);
-        field.setAccessible(true);
-        field.set(target, value);
-    }
 
     /** Revenue of the receipts carrying a kill's id. */
     private static long pkRevenue(Engine engine)

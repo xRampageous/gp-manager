@@ -2,6 +2,7 @@ package com.gpmanager;
 
 import com.google.gson.Gson;
 import java.util.ArrayList;
+import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 
@@ -57,6 +58,17 @@ public final class EngineTestFixtures
             JsonCodec.bind(new Gson());
         }
         return new Engine(valuator(), new TransactionClassifier(), config);
+    }
+
+    /** A fresh inventory map, retaining the existing paired-value fixture contract. */
+    public static Map<Integer, Long> mapOf(Object... values)
+    {
+        Map<Integer, Long> result = new HashMap<>();
+        for (int index = 0; index + 1 < values.length; index += 2)
+        {
+            result.put((Integer) values[index], (Long) values[index + 1]);
+        }
+        return result;
     }
 
 }

@@ -17,11 +17,12 @@ import static org.junit.Assert.assertEquals;
 public class ContainerExtrasTest
 {
     @Test
-    public void dizanasQuiverAmmoCountsAsCarried()
+    public void dizanasQuiverAmmoCountsAsCarried() throws Exception
     {
-        ContainerSnapshot held = capture(Map.of(InventoryID.WORN, items(ItemID.DIZANAS_QUIVER_INFINITE, 1),
-            InventoryID.DIZANAS_QUIVER_AMMO, items(ItemID.DRAGON_ARROW, 250)), 0);
-        assertEquals(250L, held.quantityOf(ItemID.DRAGON_ARROW));
+        QuiverSupportTest.Harness harness = new QuiverSupportTest.Harness();
+        harness.equipQuiver();
+        harness.ammo = 250;
+        assertEquals(250L, harness.capture().quantityOf(ItemID.DRAGON_ARROW));
     }
 
     @Test

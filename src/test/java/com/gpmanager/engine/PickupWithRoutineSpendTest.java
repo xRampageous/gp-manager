@@ -12,13 +12,14 @@ import static org.junit.Assert.assertTrue;
 
 /**
  * Owner report 2026-09-28: 50 Chaos runes picked up in the same settle as one thrown Steel dart went
- * to an uncounted Review. A pickup with only a routine rune/ammo spend is a counted gain net of it.
+ * to an uncounted Review. The pickup and routine spend have their own receipts; Net includes both.
  */
 public class PickupWithRoutineSpendTest
 {
     private static final long T0 = 1_700_000_000_000L;
     private static final int POUCH = 22538;
     private static final Map<Integer, String> NAMES = new HashMap<>();
+    private static Engine lastEngine;
 
     static
     {
@@ -46,7 +47,13 @@ public class PickupWithRoutineSpendTest
         assertNotNull(settled);
         assertEquals(TransactionType.GAIN, settled.getType());
         assertTrue("counted, never an uncounted Review", settled.isCounted());
-        assertEquals("Net is the runes less the dart", 50L * 90L - 4L, settled.getNet());
+        assertEquals("the pickup owns only the runes", 50L * 90L, settled.getNet());
+        assertEquals("session Net still subtracts the dart", 50L * 90L - 4L,
+            lastEngine.getMetrics(T0 + 3_000L).net);
+        Transaction shot = lastEngine.getActiveSession().getTransactions().stream()
+            .filter(row -> row.getActionKind() == ActionKind.FIRE).findFirst().orElseThrow(AssertionError::new);
+        assertEquals(4L, shot.getCosts());
+        assertEquals(CostKind.SUPPLIES, CostKind.of(shot, shot.getFlows().get(0)));
     }
 
     @Test
@@ -60,7 +67,7 @@ public class PickupWithRoutineSpendTest
     /** Baseline {first: firstQty}, then {gainId: gainQty, first: firstAfter}. */
     private static Transaction settleFrom(int first, long firstQty, int gainId, long gainQty, int after, long afterQty)
     {
-        Engine engine = engine();
+        Engine engine = lastEngine = engine();
         engine.startCustom("Nechryael", T0);
         Map<Integer, Long> held = new HashMap<>();
         held.put(first, firstQty);

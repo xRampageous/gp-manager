@@ -1,8 +1,10 @@
 package com.gpmanager;
 
+
+import static com.gpmanager.GameData.*;
+
 import static com.gpmanager.ActionKind.*;
 import static com.gpmanager.Correction.*;
-import static com.gpmanager.GameData.msg;
 import static com.gpmanager.Phrases.*;
 import static com.gpmanager.PriceSource.*;
 import static com.gpmanager.SafeMath.*;
@@ -13,28 +15,27 @@ import static java.util.Collections.*;
 import java.util.*;
 import lombok.*;
 import com.gpmanager.ActionReader.PartialUse;
+import static com.gpmanager.SafeMath.abs;
+import static java.util.Locale.ROOT;
 
 /**
  * Canonical durable financial fact: stable id, timestamp, type/context, booked item flows, the
  * automatic counted state, confidence, correction and split state, and optional links to a PvP
  * encounter or the pending claim it settled. Booked values are never repriced.
  */
-class Transaction {
+class Transaction extends SaveCopies {
     String id;
     long timestampEpochMillis;
     TransactionType type;
     Context context;
-    String note;
-    String activityName;
+    String note, activityName;
     boolean counted;
     List<Flow> flows;
-    long revenue;
-    long costs;
+    long revenue, costs;
     Confidence confidence;
     String explanation;
     Correction correction;
-    String correctionReason;
-    String encounterId;
+    String correctionReason, encounterId;
 
     /**
      * Dropped or fired, its pickup window still open: picking it up shrinks this row, so it leaves
@@ -64,6 +65,9 @@ class Transaction {
      */
     String observedActionLabel;
 
+    /** Spell observed at execution, independently of a subsequently queued menu command. */
+    String observedSpellName;
+
     /** Transient icon hint for an estimated charge cast: the weapon's item id; never saved. */
     transient int castItemId;
 
@@ -71,27 +75,27 @@ class Transaction {
         // Gson
     }
 
-    Transaction(long timestampEpochMillis, TransactionType type, Context context, String note, String activityName,
-            boolean counted, List<Flow> flows, Confidence confidence, String explanation, String encounterId) {
-        id = UUID.randomUUID().toString();
-        this.timestampEpochMillis = timestampEpochMillis;
+    Transaction(long timestamp, TransactionType type, Context context, String note, String activity,
+            boolean counted, List<Flow> flows, Confidence confidence, String reason, String encounter) {
+        id = uuid();
+        timestampEpochMillis = timestamp;
         this.type = type;
         this.context = context;
         this.note = orEmpty(note);
-        this.activityName = normalizeActivity(activityName);
+        activityName = normalizeActivity(activity);
         this.counted = counted;
         this.flows = flows == null ? new ArrayList<>() : new ArrayList<>(flows);
         this.confidence = confidence == null ? Confidence.UNCERTAIN : confidence;
-        this.explanation = orEmpty(explanation);
-        correction = Correction.AUTO;
+        explanation = orEmpty(reason);
+        correction = AUTO;
         correctionReason = "";
-        this.encounterId = encounterId;
+        encounterId = encounter;
         recalculate();
     }
 
     void recalculate() {
-        revenue = 0L;
-        costs = 0L;
+        revenue = 0;
+        costs = 0;
         for (Flow flow : flows) {
             if (flow.valueDelta > 0) revenue = safeAdd(revenue, flow.valueDelta);
             else if (flow.valueDelta < 0) costs = safeAdd(costs, abs(flow.valueDelta));
@@ -103,7 +107,7 @@ class Transaction {
     }
 
     void applyCorrection(Correction newCorrection, long now, String reason) {
-        correction = newCorrection == null ? Correction.AUTO : newCorrection;
+        correction = newCorrection == null ? AUTO : newCorrection;
         correctionReason = normalizeReason(reason);
     }
 
@@ -111,29 +115,28 @@ class Transaction {
      * Takes {@code amount} of one item's gains (newest flow first) or costs (oldest first) out of
      * the flows, each remainder keeping its own unit value, and returns the quantity left.
      */
-    long takeQuantity(int itemId, boolean gains, long amount) {
-        var ordered = new ArrayList<Flow>(getFlows());
-        if (gains) reverse(ordered);
+    long takeQuantity(int id, boolean income, long amount) {
+        var ordered = new ArrayList<>(getFlows());
+        if (income) reverse(ordered);
         var next = new ArrayList<Flow>();
         for (Flow flow : ordered) {
-            long magnitude = abs(flow.quantityDelta);
-            long take = flow.itemId == itemId && (gains ? flow.isGain() : flow.isCost())
-                            ? Math.min(nonNeg(amount), magnitude) : 0L;
+            long size = abs(flow.quantityDelta);
+            long take = flow.itemId == id && (income ? flow.isGain() : flow.isCost())
+                            ? min(nonNeg(amount), size) : 0;
             amount -= take;
-            long left = magnitude - take;
-            if (take <= 0L) {
+            long left = size - take;
+            if (take <= 0) {
                 next.add(flow);
-            } else if (left > 0L) {
-                long unit = flow.unitPrice;
-                long signed = gains ? left : -left;
-                next.add(new Flow(itemId, flow.itemName, signed, flow.unitPrice,
-                                unit == 0L ? flow.valueDelta / magnitude * left : signed * unit, flow.getPriceSource(),
+            } else if (left > 0) {
+                long unit = flow.unitPrice, signed = income ? left : -left;
+                next.add(new Flow(id, flow.itemName, signed, flow.unitPrice,
+                                unit == 0 ? flow.valueDelta / size * left : signed * unit, flow.getPriceSource(),
                                 flow.getPriceCapturedAtEpochMillis()));
             }
         }
-        if (gains) reverse(next);
+        if (income) reverse(next);
         replaceFlows(next);
-        return quantity(itemId, gains);
+        return quantity(id, income);
     }
 
     /** True while any flow still spends an item; a blowpipe shot keeps its scales after a dart. */
@@ -144,8 +147,8 @@ class Transaction {
         return false;
     }
 
-    void replaceFlows(List<Flow> nextFlows) {
-        flows = nextFlows == null ? new ArrayList<>() : new ArrayList<>(nextFlows);
+    void replaceFlows(List<Flow> next) {
+        flows = next == null ? new ArrayList<>() : new ArrayList<>(next);
         recalculate();
     }
 
@@ -175,19 +178,19 @@ class Transaction {
     }
 
     /** Total gained ({@code gains}) or lost quantity of one item across the remaining flows. */
-    long quantity(int itemId, boolean gains) {
-        long total = 0L;
+    long quantity(int id, boolean income) {
+        long total = 0;
         for (Flow flow : flows) {
-            if (flow.itemId == itemId && (gains ? flow.isGain() : flow.isCost())) {
+            if (flow.itemId == id && (income ? flow.isGain() : flow.isCost())) {
                 total = safeAdd(total, abs(flow.quantityDelta));
             }
         }
         return total;
     }
 
-    void assignEncounter(String newEncounterId, boolean asPkSupplyCost) {
+    void assignEncounter(String newEncounterId, boolean pkSupply) {
         encounterId = newEncounterId;
-        if (asPkSupplyCost && autoType() == CONSUMPTION) {
+        if (pkSupply && autoType() == CONSUMPTION) {
             type = PK_SUPPLY_COST;
             activityName = "PKing";
             confidence = Confidence.LIKELY;
@@ -200,7 +203,7 @@ class Transaction {
     }
 
     String getId() {
-        if (empty(id)) id = UUID.randomUUID().toString();
+        if (empty(id)) id = uuid();
         return id;
     }
 
@@ -218,7 +221,6 @@ class Transaction {
                 return TransactionType.TRANSFER;
             case IGNORE:
                 return ADJUSTMENT;
-            case AUTO:
             default:
                 return autoType();
         }
@@ -235,16 +237,15 @@ class Transaction {
     /** Presentation-only audit-row note update; accounting fields are untouched. */
     String getActivityName() {
         if (!blank(activityName)) return activityName.trim();
-        String safeNote = getNote();
-        String prefix = "Loot from ";
+        String safeNote = getNote(), prefix = "Loot from ";
         return safeNote.startsWith(prefix) && safeNote.length() > prefix.length()
                 ? safeNote.substring(prefix.length()).trim() : "General";
     }
 
     boolean isCounted() {
-        Correction safeCorrection = getCorrection();
-        return safeCorrection == Correction.REVENUE || safeCorrection == Correction.COST
-                || (safeCorrection == Correction.AUTO && counted);
+        var safeCorrection = getCorrection();
+        return safeCorrection == REVENUE || safeCorrection == COST
+                || (safeCorrection == AUTO && counted);
     }
 
     /** Raw automatic counted flag, before any correction makes the row count. */
@@ -259,7 +260,7 @@ class Transaction {
     /** A loaded row is cleaned once (no missing or null flows), so readers never re-check. */
     void sanitize() {
         if (flows == null) flows = new ArrayList<>();
-        flows.removeIf(java.util.Objects::isNull);
+        flows.removeIf(Objects::isNull);
     }
 
     long autoNet() {
@@ -267,31 +268,16 @@ class Transaction {
     }
 
     long getRevenue() {
-        switch (getCorrection()) {
-            case REVENUE:
-                return gross();
-            case COST:
-            case TRANSFER:
-            case IGNORE:
-                return 0L;
-            case AUTO:
-            default:
-                return revenue;
-        }
+        return correctedAmount(REVENUE, revenue);
     }
 
     long getCosts() {
-        switch (getCorrection()) {
-            case COST:
-                return gross();
-            case REVENUE:
-            case TRANSFER:
-            case IGNORE:
-                return 0L;
-            case AUTO:
-            default:
-                return costs;
-        }
+        return correctedAmount(COST, costs);
+    }
+
+    long correctedAmount(Correction forced, long automatic) {
+        var current = getCorrection();
+        return current == AUTO ? automatic : current == forced ? gross() : 0;
     }
 
     long getNet() {
@@ -303,17 +289,16 @@ class Transaction {
      * count).
      */
     long netUnder(Correction hypothetical) {
-        switch (hypothetical == null ? Correction.AUTO : hypothetical) {
+        switch (hypothetical == null ? AUTO : hypothetical) {
             case REVENUE:
                 return gross();
             case COST:
-                return safeSubtract(0L, gross());
+                return safeSubtract(0, gross());
             case TRANSFER:
             case IGNORE:
-                return 0L;
-            case AUTO:
+                return 0;
             default:
-                return counted ? safeSubtract(revenue, costs) : 0L;
+                return counted ? safeSubtract(revenue, costs) : 0;
         }
     }
 
@@ -326,7 +311,12 @@ class Transaction {
     }
 
     Correction getCorrection() {
-        return correction == null ? Correction.AUTO : correction;
+        return correction == null ? AUTO : correction;
+    }
+
+    /** Automatic transfers and an owner's Transfer correction share one neutral projection. */
+    boolean isTransfer() {
+        return getType() == TransactionType.TRANSFER || getCorrection() == Correction.TRANSFER;
     }
 
     String correctionReason() {
@@ -345,8 +335,8 @@ class Transaction {
      * Links this settlement to the claim it resolved; set once, in the same revision the claim is
      * removed.
      */
-    void setSourceClaimId(String claimId) {
-        sourceClaimId = nonBlank(claimId, null);
+    void setSourceClaimId(String id) {
+        sourceClaimId = nonBlank(id, null);
     }
 
     /** Observed action behind this change, or null when no honest verb was evidenced. */
@@ -365,16 +355,19 @@ class Transaction {
     }
 
     /**
-     * A Cast's name for presentation: the captured spell, else (autocast never clicks one) the
-     * spell its exact runes pay for; "" otherwise. Never stored.
+     * Execution identity wins. Older receipts retain their rune/menu fallback; "" when neither
+     * identifies a spell. The derived name is never stored.
      */
     String spellName() {
         return memo(7, () -> {
+                    String observed = getActionKind() == CAST && Spells.ICONS.containsKey(observedSpellName)
+                            ? observedSpellName : null;
+                    if (observed != null) return observed;
                     // Runes that identify a spell win over a click queued behind an autocast (owner
                     // 2026-09-28);
                     // otherwise the clicked name stands (a staff-covered or non-combat spell).
                     String spell = getActionKind() == CAST ? Spells.spellFor(getFlows()) : null;
-                    ActionLabel label = actionLabel();
+                    var label = actionLabel();
                     return spell != null ? spell : label == null ? "" : label.value();
                 });
     }
@@ -390,9 +383,11 @@ class Transaction {
     <T> T memo(int slot, java.util.function.Supplier<T> build) {
         Object[] cache = memo;
         if (cache == null || cache[0] != flows || cache[1] != correction || cache[2] != type
-                || cache[3] != (Boolean) counted || cache[4] != actionKind || cache[5] != observedActionLabel) {
+                || cache[3] != (Boolean) counted || cache[4] != actionKind || cache[5] != observedActionLabel
+                || cache[11] != observedSpellName) {
             cache = new Object[] {
-                        flows, correction, type, counted, actionKind, observedActionLabel, null, null, null, null, null
+                        flows, correction, type, counted, actionKind, observedActionLabel, null, null, null, null, null,
+                        observedSpellName
                     };
             memo = cache;
         }
@@ -413,15 +408,15 @@ class Transaction {
      */
     String labelWire() {
         if (empty(observedActionLabel)) return null;
-        if (getActionKind() != CAST && getActionKind() != ActionKind.DRINK) return null;
-        ActionLabel normalized = ActionLabel.of(observedActionLabel);
+        if (getActionKind() != CAST && getActionKind() != DRINK) return null;
+        var normalized = ActionLabel.of(observedActionLabel);
         return normalized == null ? null : normalized.value();
     }
 
     static String normalizeReason(String value) {
         if (blank(value)) return "Manual correction";
-        String trimmed = value.trim();
-        return trimmed.length() > 200 ? trimmed.substring(0, 200) : trimmed;
+        String text = value.trim();
+        return text.length() > 200 ? text.substring(0, 200) : text;
     }
 }
 
@@ -440,31 +435,29 @@ enum TransactionType {
  * timeline — never Party settlement, never fake Used eats.
  */
 class ItemSplits {
-    static final String SPLIT_SHARE_MARK = "Split share";
-    static final String SPLIT_KEEP_PREFIX = "Split keep ";
+    static final String SPLIT_SHARE_MARK = "Split share", SPLIT_KEEP_PREFIX = "Split keep ";
 
-    static String reason(long keepQuantity, long totalQuantity, String optionalNote) {
-        long total = nonNeg(totalQuantity);
-        long keep = nonNeg(min(keepQuantity, total));
+    static String reason(long keepQuantity, long quantity, String note) {
+        long total = nonNeg(quantity), keep = nonNeg(min(keepQuantity, total));
         var sb = new StringBuilder(SPLIT_KEEP_PREFIX).append(keep).append('/').append(total).append(" · ")
                         .append(SPLIT_SHARE_MARK);
-        if (optionalNote != null) {
-            String trimmed = optionalNote.trim();
-            if (!trimmed.isEmpty())
-                sb.append(" · ").append(trimmed.length() > 80 ? trimmed.substring(0, 80) : trimmed);
+        if (note != null) {
+            String text = note.trim();
+            if (!text.isEmpty())
+                sb.append(" · ").append(text.length() > 80 ? text.substring(0, 80) : text);
         }
         String value = sb.toString();
         return value.length() > 200 ? value.substring(0, 200) : value;
     }
 
-    static final java.util.Map<String, Boolean> SPLIT_TEXT = new java.util.concurrent.ConcurrentHashMap<>();
+    static final Map<String, Boolean> SPLIT_TEXT = new java.util.concurrent.ConcurrentHashMap<>();
 
     static boolean isSplitReason(String reasonOrExplanation) {
-        if (Phrases.empty(reasonOrExplanation)) return false;
+        if (empty(reasonOrExplanation)) return false;
         // Receipt texts are shared strings read on every tick: decide each distinct text once.
         if (SPLIT_TEXT.size() > 10_000) SPLIT_TEXT.clear();
-        return SPLIT_TEXT.computeIfAbsent(reasonOrExplanation, text -> Phrases.has(
-                                text.toLowerCase(java.util.Locale.ROOT), "split keep", "split share"));
+        return SPLIT_TEXT.computeIfAbsent(reasonOrExplanation, text -> has(
+                                text.toLowerCase(ROOT), "split keep", "split share"));
     }
 }
 
@@ -494,13 +487,13 @@ class ReviewRules {
      * separately surface unknown pricing or provenance as review hints.
      */
     static boolean needsOwnerDecision(Transaction transaction) {
-        return transaction != null && transaction.getCorrection() == Correction.AUTO
+        return transaction != null && transaction.getCorrection() == AUTO
                 && transaction.getConfidence() == Confidence.UNCERTAIN;
     }
 }
 
 /** One undoable owner decision: the before/after state of every row it changed. */
-class CorrectionRecord {
+class CorrectionRecord extends SaveCopies {
     String reason;
     List<Change> changes;
 
@@ -530,9 +523,9 @@ class CorrectionRecord {
     }
 
     /** True when any change in this record targets one of the given transaction ids. */
-    boolean touchesAny(Set<String> transactionIds) {
+    boolean touchesAny(Set<String> ids) {
         for (Change change : getChanges()) {
-            if (transactionIds.contains(change.getTransactionId())) return true;
+            if (ids.contains(change.getTransactionId())) return true;
         }
         return false;
     }
@@ -543,10 +536,9 @@ class CorrectionRecord {
      */
     @NoArgsConstructor
     @AllArgsConstructor
-    static class Change {
+    static class Change extends SaveCopies {
         String transactionId;
-        Correction previousCorrection;
-        Correction newCorrection;
+        Correction previousCorrection, newCorrection;
         List<Flow> flowSnapshot;
         String explanationSnapshot;
 
@@ -555,7 +547,7 @@ class CorrectionRecord {
         }
 
         Correction getPreviousCorrection() {
-            return previousCorrection == null ? Correction.AUTO : previousCorrection;
+            return previousCorrection == null ? AUTO : previousCorrection;
         }
 
         List<Flow> getFlowSnapshot() {
@@ -568,8 +560,8 @@ class CorrectionRecord {
     }
 }
 
-@EqualsAndHashCode(exclude = "priceCapturedAtEpochMillis")
-class Flow {
+@EqualsAndHashCode(exclude = "priceCapturedAtEpochMillis", callSuper = false)
+class Flow extends SaveCopies {
     int itemId;
     String itemName;
     long quantityDelta;
@@ -584,23 +576,23 @@ class Flow {
         // Gson
     }
 
-    Flow(int itemId, String itemName, long quantityDelta, int unitPrice, long valueDelta) {
-        this(itemId, itemName, quantityDelta, unitPrice, valueDelta, UNKNOWN);
+    Flow(int id, String name, long delta, int price, long value) {
+        this(id, name, delta, price, value, UNKNOWN);
     }
 
-    Flow(int itemId, String itemName, long quantityDelta, int unitPrice, long valueDelta, PriceSource priceSource) {
-        this(itemId, itemName, quantityDelta, unitPrice, valueDelta, priceSource, 0L);
+    Flow(int id, String name, long delta, int price, long value, PriceSource source) {
+        this(id, name, delta, price, value, source, 0);
     }
 
-    Flow(int itemId, String itemName, long quantityDelta, int unitPrice, long valueDelta, PriceSource priceSource,
-            long priceCapturedAtEpochMillis) {
-        this.itemId = itemId;
-        this.itemName = itemName;
-        this.quantityDelta = quantityDelta;
-        this.unitPrice = unitPrice;
-        this.valueDelta = valueDelta;
-        this.priceSource = priceSource == null ? UNKNOWN : priceSource;
-        this.priceCapturedAtEpochMillis = priceCapturedAtEpochMillis;
+    Flow(int id, String name, long delta, int price, long value, PriceSource source,
+            long capturedAt) {
+        itemId = id;
+        itemName = name;
+        quantityDelta = delta;
+        unitPrice = price;
+        valueDelta = value;
+        priceSource = source == null ? UNKNOWN : source;
+        priceCapturedAtEpochMillis = capturedAt;
     }
 
     PriceSource getPriceSource() {
@@ -608,26 +600,26 @@ class Flow {
     }
 
     long getPriceCapturedAtEpochMillis() {
-        return SafeMath.nonNeg(priceCapturedAtEpochMillis);
+        return nonNeg(priceCapturedAtEpochMillis);
     }
 
     /** {@code magnitude} units of this flow, signed like it, valued at {@code unit} each. */
-    Flow part(long magnitude, long unit, PriceSource source) {
-        long sign = quantityDelta < 0L ? -1L : 1L;
-        return new Flow(itemId, itemName, sign * magnitude, SafeMath.toInt(unit),
-                sign * SafeMath.safeMultiply(magnitude, unit), source, getPriceCapturedAtEpochMillis());
+    Flow part(long size, long unit, PriceSource source) {
+        long sign = quantityDelta < 0 ? -1L : 1L;
+        return new Flow(itemId, itemName, sign * size, toInt(unit),
+                sign * safeMultiply(size, unit), source, getPriceCapturedAtEpochMillis());
     }
 
-    Flow part(long magnitude) {
-        return part(magnitude, unitPrice, getPriceSource());
+    Flow part(long size) {
+        return part(size, unitPrice, getPriceSource());
     }
 
     /**
      * What remains once {@code claimed} units leave at the unit price; null when nothing remains.
      */
     Flow rest(long claimed) {
-        long left = SafeMath.abs(quantityDelta) - claimed;
-        return claimed <= 0L ? this : left <= 0L ? null : new Flow(itemId, itemName, quantityDelta < 0L ? -left : left,
+        long left = abs(quantityDelta) - claimed;
+        return claimed <= 0 ? this : left <= 0 ? null : new Flow(itemId, itemName, quantityDelta < 0 ? -left : left,
                                 unitPrice, valueDelta - part(claimed).valueDelta, priceSource,
                                 priceCapturedAtEpochMillis);
     }
@@ -675,11 +667,11 @@ class ActionLabel {
      * <p>Used for both the direct spellbook click and the selected spell widget that RuneLite still
      * exposes during the following widget-target interaction.
      */
-    static ActionLabel fromSpellMenu(String menuOption, int widgetId, int spellbookGroupId, String widgetText,
+    static ActionLabel fromSpellMenu(String menuOption, int widget, int spellbookGroupId, String widgetText,
             String widgetName) {
         String option = clean(menuOption);
-        if (!option.toLowerCase(java.util.Locale.ROOT).startsWith("cast")
-                || ((widgetId >>> 16) & 0xffff) != (spellbookGroupId & 0xffff)) {
+        if (!option.toLowerCase(ROOT).startsWith("cast")
+                || ((widget >>> 16) & 0xffff) != (spellbookGroupId & 0xffff)) {
             return null;
         }
         String text = useful(clean(widgetText));
@@ -761,7 +753,7 @@ enum ActionKind {
     FEE;
 
     /** The constant's name, lowercased with hyphens: the wire name saved on every row. */
-    String wireName = name().toLowerCase(Locale.ROOT).replace('_', '-');
+    String wireName = name().toLowerCase(ROOT).replace('_', '-');
 
     /** Stable persisted identifier. */
     String wireName() {
@@ -769,16 +761,16 @@ enum ActionKind {
     }
 
     static ActionKind fromWireName(String value) {
-        return Phrases.blank(value) ? null : BY_WIRE.get(Phrases.lower(value));
+        return blank(value) ? null : BY_WIRE.get(lower(value));
     }
 
     /** Wire and constant names, lowercased, read on every getActionKind() (a hot path). */
     static final Map<String, ActionKind> BY_WIRE = new HashMap<>();
 
     static {
-        for (ActionKind kind : values()) {
+        for (var kind : values()) {
             BY_WIRE.put(kind.wireName, kind);
-            BY_WIRE.put(kind.name().toLowerCase(Locale.ROOT), kind);
+            BY_WIRE.put(kind.name().toLowerCase(ROOT), kind);
         }
     }
 }
@@ -789,17 +781,10 @@ enum ActionKind {
  * combination rune may cover elementals; when two spells could fit, it stays a plain Cast.
  */
 class Spells {
-    /** Icons and recipes retain their original joined row shape for existing readers. */
-    static final Map<String, String> ICONS = GameData.byName("spells");
-
-    static final List<String[]> TABLE = GameData.cachedRows("spell_recipes").stream()
-                    .map(a -> new String[] {a[0], ICONS.get(a[0]), a[1]}).collect(java.util.stream.Collectors.toList());
-    static final Map<String, String> COMBINATIONS = new HashMap<>();
+    static final Map<Integer, String> CAST_ANIMATIONS = byId("cast_animations");
+    static final Map<String, String> ICONS = byName("spells"), COMBINATIONS = byName("combination_runes");
     static final String ELEMENTS = " air water earth fire ";
 
-    static {
-        for (String[] row : GameData.rows("combination_runes")) COMBINATIONS.put(row[0], row[1]);
-    }
 
     /**
      * The spell these rune costs pay for (a whole number of casts), or null. When staff-covered
@@ -814,24 +799,24 @@ class Spells {
     static final Map<String, String> BY_LOWER = new HashMap<>();
 
     static {
-        for (String name : ICONS.keySet()) BY_LOWER.put(name.toLowerCase(Locale.ROOT), name);
+        for (String name : ICONS.keySet()) BY_LOWER.put(name.toLowerCase(ROOT), name);
     }
 
     /** The item ids a spell makes (an alch's coins, Bones to Peaches' fruit); empty for others. */
     static Set<Integer> product(String name) {
-        for (String[] row : GameData.cachedRows("spells")) {
+        for (String[] row : cachedRows("spells")) {
             if (row[0].equals(name) && row.length > 2) {
                 var ids = new HashSet<Integer>();
                 for (String id : row[2].split(",")) ids.add(Integer.parseInt(id));
                 return ids;
             }
         }
-        return Collections.emptySet();
+        return emptySet();
     }
 
     /** The spell a name spells out, ignoring case (a "Bones to peaches" tablet), else null. */
     static String named(String name) {
-        return name == null ? null : BY_LOWER.get(name.toLowerCase(Locale.ROOT).trim());
+        return name == null ? null : BY_LOWER.get(name.toLowerCase(ROOT).trim());
     }
 
     static int icon(String name) {
@@ -846,40 +831,43 @@ class Spells {
     static final Map<String, Map<String, Long>> RECIPES = new LinkedHashMap<>();
 
     static {
-        for (String[] row : GameData.cachedRows("spell_recipes")) {
+        for (String[] row : cachedRows("spell_recipes")) {
             var recipe = new HashMap<String, Long>();
             for (String part : row[1].split(" ")) {
                 int colon = part.indexOf(':');
                 recipe.put(part.substring(colon + 1), Long.parseLong(part.substring(0, colon)));
             }
-            RECIPES.put(row[0], Collections.unmodifiableMap(recipe));
+            RECIPES.put(row[0], unmodifiableMap(recipe));
         }
     }
 
     static String spellFor(List<Flow> flows) {
-        String fitting = null;
-        String full = null;
-        int fits = 0;
-        int fulls = 0;
-        for (String[] spell : TABLE) {
-            int fit = fit(RECIPES.get(spell[0]), flows);
+        String fitting = null, full = null;
+        int fits = 0, fulls = 0;
+        for (var spell : RECIPES.entrySet()) {
+            int fit = fit(spell.getValue(), flows);
             if (fit > 0) {
                 fits++;
-                fitting = spell[0];
+                fitting = spell.getKey();
             }
             if (fit > 1) {
                 fulls++;
-                full = spell[0];
+                full = spell.getKey();
             }
         }
         return fits == 1 ? fitting : fulls == 1 ? full : null;
     }
 
+    static boolean elemental(String name) {
+        String resource = lower(name).replace(" rune", "");
+        return ELEMENTS.contains(" " + resource + " ") || COMBINATIONS.containsKey(resource);
+    }
+
     static int fit(Map<String, Long> recipe, List<Flow> flows) {
         var paid = new HashMap<String, Long>();
         for (Flow flow : flows) {
-            String name = flow.itemName.toLowerCase(Locale.ROOT);
-            if (!name.endsWith(" rune") || flow.quantityDelta >= 0L) return 0;
+            String name = flow.itemName.toLowerCase(ROOT);
+            if (!name.endsWith(" rune") || flow.quantityDelta >= 0) return 0;
             String rune = name.substring(0, name.length() - 5);
             boolean used = false;
             for (String element : COMBINATIONS.getOrDefault(rune, rune).split(" ")) {
@@ -892,20 +880,20 @@ class Spells {
             }
             if (!used) return 0;
         }
-        long casts = 0L;
-        for (Map.Entry<String, Long> rune : recipe.entrySet()) {
-            if (!ELEMENTS.contains(" " + rune.getKey() + " ")) {
-                long got = paid.getOrDefault(rune.getKey(), 0L);
-                if (got == 0L || got % rune.getValue() != 0L || casts != 0L && got / rune.getValue() != casts) return 0;
-                casts = got / rune.getValue();
+        long casts = 0;
+        for (var resource : recipe.entrySet()) {
+            if (!ELEMENTS.contains(" " + resource.getKey() + " ")) {
+                long got = paid.getOrDefault(resource.getKey(), 0L);
+                if (got == 0 || got % resource.getValue() != 0 || casts != 0 && got / resource.getValue() != casts) return 0;
+                casts = got / resource.getValue();
             }
         }
         boolean full = true;
-        for (Map.Entry<String, Long> rune : recipe.entrySet()) {
+        for (var rune : recipe.entrySet()) {
             long got = paid.getOrDefault(rune.getKey(), 0L);
-            // A rune the spell never uses, or more of an elemental than its casts need, is another
-            // spell.
-            if (got > casts * rune.getValue()) return 0;
+            // An elemental is paid in full or supplied for free. A partial amount can be a rune
+            // pickup netting against a different spell's spend; it cannot prove this spell.
+            if (got != 0 && got != casts * rune.getValue()) return 0;
             full &= got == casts * rune.getValue();
         }
         return paid.keySet().stream().allMatch(recipe::containsKey) ? full ? 2 : 1 : 0;
@@ -920,15 +908,15 @@ class Accounting {
     }
 
     static Amounts amounts(Transaction transaction) {
-        if (transaction.getType() == TransactionType.TRANSFER || transaction.getCorrection() == Correction.TRANSFER) {
+        if (transaction.isTransfer()) {
             return Amounts.transfer();
         }
         if (!transaction.isCounted()) return Amounts.excluded();
-        List<Flow> flows = transaction.getFlows();
-        if (Phrases.empty(flows)) {
+        var flows = transaction.getFlows();
+        if (empty(flows)) {
             return Amounts.included(transaction.getRevenue(), transaction.getCosts());
         }
-        long gross = 0L;
+        long gross = 0;
         boolean included = false;
         for (Flow flow : flows) {
             if (flow == null) continue;
@@ -938,22 +926,17 @@ class Accounting {
         if (!included) return Amounts.excluded();
         switch (transaction.getCorrection()) {
             case REVENUE:
-                return Amounts.included(gross, 0L);
+                return Amounts.included(gross, 0);
             case COST:
-                return Amounts.included(0L, gross);
-            case IGNORE:
-                return Amounts.excluded();
-            case TRANSFER:
-                return Amounts.transfer();
-            case AUTO:
+                return Amounts.included(0, gross);
             default:
                 long[] steps = cachedSteps(transaction);
-                long step = 0L;
+                long step = 0;
                 for (int i = 0; i < flows.size(); i++) {
-                    if (flows.get(i) != null && flows.get(i).valueDelta > 0L)
+                    if (flows.get(i) != null && flows.get(i).valueDelta > 0)
                         step = safeAdd(step, steps[i]);
                 }
-                step = Math.min(step, Math.min(transaction.getRevenue(), transaction.getCosts()));
+                step = min(step, min(transaction.getRevenue(), transaction.getCosts()));
                 return Amounts.included(safeSubtract(transaction.getRevenue(), step),
                         safeSubtract(transaction.getCosts(), step));
         }
@@ -970,11 +953,11 @@ class Accounting {
     }
 
     static long[] steps(Transaction transaction) {
-        List<Flow> flows = transaction.getFlows();
+        var flows = transaction.getFlows();
         long[] steps = new long[flows.size()];
-        for (PartialUse pair : consumePairs(transaction)) {
+        for (var pair : consumePairs(transaction)) {
             long left = flows.get(pair.remainderIndex).valueDelta;
-            if (left > 0L && safeAdd(flows.get(pair.lossIndex).valueDelta, left) <= 0L) {
+            if (left > 0 && safeAdd(flows.get(pair.lossIndex).valueDelta, left) <= 0) {
                 steps[pair.lossIndex] = left;
                 steps[pair.remainderIndex] = left;
             }
@@ -984,17 +967,17 @@ class Accounting {
 
     /** One consume gate for accounting and item presentation; transfers/decants keep raw quotes. */
     static List<PartialUse> consumePairs(Transaction transaction) {
-        List<Flow> flows = transaction.getFlows();
-        ActionKind action = transaction.getActionKind();
+        var flows = transaction.getFlows();
+        var action = transaction.getActionKind();
         // Cheapest facts first: this runs for every flow of every receipt on each refresh (release
         // pass).
-        if (!transaction.isCounted() || transaction.getCorrection() != Correction.AUTO
-                || transaction.getType() != TransactionType.CONSUMPTION
-                        && transaction.getType() != TransactionType.PK_SUPPLY_COST || action != null
-                        && action != ActionKind.DRINK && action != ActionKind.EAT && action != ActionKind.SUPPLIES
-                || ActionReader.isDecant(flows)) return java.util.Collections.emptyList();
-        var pairs = new java.util.ArrayList<PartialUse>();
-        for (PartialUse pair : ActionReader.partialUses(flows)) {
+        if (!transaction.isCounted() || transaction.getCorrection() != AUTO
+                || transaction.getType() != CONSUMPTION
+                        && transaction.getType() != PK_SUPPLY_COST || action != null
+                        && action != DRINK && action != EAT && action != ActionKind.SUPPLIES
+                || ActionReader.isDecant(flows)) return emptyList();
+        var pairs = new ArrayList<PartialUse>();
+        for (var pair : ActionReader.partialUses(flows)) {
             if (flows.get(pair.lossIndex).getPriceSource()
                     == flows.get(pair.remainderIndex).getPriceSource()) pairs.add(pair);
         }
@@ -1004,33 +987,26 @@ class Accounting {
     /** Returns the additive accounting contribution of a single item-flow row. */
     static Amounts flow(Transaction transaction, Flow flow) {
         if (transaction == null || flow == null) return Amounts.unavailable();
-        if (transaction.getType() == TransactionType.TRANSFER || transaction.getCorrection() == Correction.TRANSFER) {
+        if (transaction.isTransfer()) {
             return Amounts.transfer();
         }
-        if (!transaction.isCounted() || transaction.getCorrection() == Correction.IGNORE) {
+        if (!transaction.isCounted()) {
             return Amounts.excluded();
         }
-        long value = flow.valueDelta;
-        long autoRevenue = value > 0L ? value : 0L;
-        long autoCosts = value < 0L ? abs(value) : 0L;
+        long value = flow.valueDelta, autoRevenue = value > 0 ? value : 0, autoCosts = value < 0 ? abs(value) : 0;
         switch (transaction.getCorrection()) {
             case REVENUE:
-                return Amounts.included(abs(value), 0L);
+                return Amounts.included(abs(value), 0);
             case COST:
-                return Amounts.included(0L, abs(value));
-            case IGNORE:
-                return Amounts.excluded();
-            case TRANSFER:
-                return Amounts.transfer();
-            case AUTO:
+                return Amounts.included(0, abs(value));
             default:
-                List<Flow> flows = transaction.getFlows();
-                long step = 0L;
+                var flows = transaction.getFlows();
+                long step = 0;
                 for (int i = 0; i < flows.size(); i++) {
                     if (flows.get(i) == flow) step = cachedSteps(transaction)[i];
                 }
-                return Amounts.included(safeSubtract(autoRevenue, value > 0L ? step : 0L),
-                        safeSubtract(autoCosts, value < 0L ? step : 0L));
+                return Amounts.included(safeSubtract(autoRevenue, value > 0 ? step : 0),
+                        safeSubtract(autoCosts, value < 0 ? step : 0));
         }
     }
 
@@ -1040,24 +1016,23 @@ class Accounting {
     }
 
     static CostSplit split(Transaction transaction) {
-        Amounts total = transaction(transaction);
+        var total = transaction(transaction);
         if (!total.available) return new CostSplit(0L, 0L, false);
-        if (!total.included || total.costs <= 0L) return new CostSplit(0L, 0L, true);
+        if (!total.included || total.costs <= 0) return new CostSplit(0L, 0L, true);
         if (transaction.getFlows().isEmpty()) return new CostSplit(0L, 0L, false);
-        long supplies = 0L;
-        long other = 0L;
+        long supplies = 0, other = 0;
         for (Flow flow : transaction.getFlows()) {
             if (flow == null) continue;
-            Amounts amounts = flow(transaction, flow);
-            if (!amounts.available) return new CostSplit(0L, 0L, false);
-            if (!amounts.included || amounts.costs <= 0L) continue;
+            var money = flow(transaction, flow);
+            if (!money.available) return new CostSplit(0L, 0L, false);
+            if (!money.included || money.costs <= 0) continue;
             switch (CostKind.of(transaction, flow)) {
                 case SUPPLIES:
-                    supplies = safeAdd(supplies, amounts.costs);
+                    supplies = safeAdd(supplies, money.costs);
                     break;
                 case LOSS:
                 case MARKET:
-                    other = safeAdd(other, amounts.costs);
+                    other = safeAdd(other, money.costs);
                     break;
                 default:
                     return new CostSplit(0L, 0L, false);
@@ -1073,21 +1048,18 @@ class Accounting {
      * gross legs from ordinary categories without re-deriving economics.
      */
     static MarketFold marketFold(List<Transaction> transactions) {
-        long revenue = 0L;
-        long costs = 0L;
-        long supplies = 0L;
-        long other = 0L;
+        long income = 0, cost = 0, supplies = 0, other = 0;
         boolean splitAvailable = true;
-        int counted = 0;
+        int included = 0;
         if (transactions == null) return new MarketFold(0L, 0L, 0L, 0L, true, 0);
-        for (Transaction transaction : transactions) {
-            if (transaction == null || transaction.autoType() != TransactionType.TRADE) continue;
-            Amounts amounts = transaction(transaction);
-            if (!amounts.included) continue;
-            counted++;
-            revenue = safeAdd(revenue, amounts.revenue);
-            costs = safeAdd(costs, amounts.costs);
-            CostSplit split = costSplit(transaction);
+        for (var transaction : transactions) {
+            if (transaction == null || transaction.autoType() != TRADE) continue;
+            var money = transaction(transaction);
+            if (!money.included) continue;
+            included++;
+            income = safeAdd(income, money.revenue);
+            cost = safeAdd(cost, money.costs);
+            var split = costSplit(transaction);
             if (!split.available) {
                 splitAvailable = false;
                 continue;
@@ -1095,16 +1067,13 @@ class Accounting {
             supplies = safeAdd(supplies, split.supplies);
             other = safeAdd(other, split.other);
         }
-        return new MarketFold(revenue, costs, splitAvailable ? supplies : 0L, splitAvailable ? other : 0L,
-                splitAvailable, counted);
+        return new MarketFold(income, cost, splitAvailable ? supplies : 0, splitAvailable ? other : 0,
+                splitAvailable, included);
     }
 
     @AllArgsConstructor
     static class MarketFold {
-        long revenue;
-        long costs;
-        long supplies;
-        long other;
+        long revenue, costs, supplies, other;
         boolean splitAvailable;
 
         /** Counted Market-context transactions behind this fold. */
@@ -1117,14 +1086,11 @@ class Accounting {
 
     @AllArgsConstructor
     static class Amounts {
-        boolean available;
-        boolean included;
-        boolean transfer;
-        long revenue;
-        long costs;
+        boolean available, included, transfer;
+        long revenue, costs;
 
-        static Amounts included(long revenue, long costs) {
-            return new Amounts(true, true, false, revenue, costs);
+        static Amounts included(long income, long cost) {
+            return new Amounts(true, true, false, income, cost);
         }
 
         static Amounts excluded() {
@@ -1146,8 +1112,7 @@ class Accounting {
 
     @AllArgsConstructor
     static class CostSplit {
-        long supplies;
-        long other;
+        long supplies, other;
         boolean available;
     }
 }
@@ -1183,13 +1148,13 @@ enum CostKind {
         if (transaction == null || flow == null || transaction.getActionKind() == ActionKind.DEFERRED_CLAIM) {
             return NONE;
         }
-        Accounting.Amounts effective = Accounting.flow(transaction, flow);
-        if (!effective.available || !effective.included || effective.costs <= 0L) return NONE;
+        var effective = Accounting.flow(transaction, flow);
+        if (!effective.available || !effective.included || effective.costs <= 0) return NONE;
         if (flow.itemId == GE_TAX_ITEM_ID || transaction.autoType() == PK_DEATH_LOSS) {
             return LOSS;
         }
         if (transaction.autoType() == TRADE) return MARKET;
-        TransactionType type = transaction.autoType();
+        var type = transaction.autoType();
         // Supplies are consumables the player used (eat / drink / cast / fire / charges /
         // processing
         // inputs), which the engine evidences with an action kind or a supply-shaped type. A plain
