@@ -3230,7 +3230,6 @@ class LedgerPage implements Shell.Page {
     // ── overview ─────────────────────────────────────────────────────────────────────────────
     void overview(LedgerData data) {
         var focus = data.entry.table;
-        income.setEmpty(focus == KILL ? msg("ke") : "No entries");
         if (focus == null || focus == GAINS || focus == KILL) {
             fill(income, raid ? "LOOT" : focus == KILL ? "KILLS" : "GAINS", data.income.groups, data.income.total, GAIN);
             body.add(income);

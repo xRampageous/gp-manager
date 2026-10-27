@@ -4392,7 +4392,7 @@ class LedgerData {
         var links = new HashMap<String, Set<String>>();
         var groups = new LinkedHashMap<String, Group>();
         for (var row : transactions) {
-            if (needsReview(row)) continue;
+            if (needsReview(row) || row.correction() == Correction.TRANSFER) continue;
             String source = row.claimId().split("#", 2)[0];
             String kill = seeds.getOrDefault(row.id(), seeds.get(source));
             if (kill == null) continue;

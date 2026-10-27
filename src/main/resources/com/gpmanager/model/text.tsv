@@ -396,7 +396,6 @@ run-total-target	Everything since Free play or this Grind began; a target never 
 restore-free-play	It becomes your Free play again, and the current one moves under FREE PLAY so you can swap back. Nothing is deleted.
 session-new-tip	Start Net, Recent and Active Time at zero; every booking stays in the run and Ledger.
 kn	Retained, linked loot only.
-ke	No retained PK loot
 ku	Unknown key contents
 kt	Recorded PK loot this Grind.
 session-restore-tip	Resume the frozen saved time, or the original run time if none was saved; keep displayed Net and bookings.

@@ -36,6 +36,10 @@ public class KillViewTest {
         var second=engine.session().addEncounter(true,2000);loot(engine,second,11212,400,2000);
         engine.session().addTransaction(Tx.of(2500,TransactionType.LOOT,Context.LOOT,"PvM loot",true,
                 List.of(new Flow(4151,"Abyssal whip",1,9000,9000))),2000,false);
+        var death=engine.session().addEncounter(false,1500);
+        var deathRow=Tx.of(1500,TransactionType.PK_DEATH_LOSS,Context.PK_DEATH,"Death",true,
+                List.of(new Flow(10004,"Lost",-1,500000,-500000,PriceSource.GRAND_EXCHANGE)));
+        engine.session().addTransaction(deathRow,2000,false);engine.session().attachToEncounter(deathRow.id(),death,false);
         return engine;
     }
     @Test public void heroAddsClickableKillsAndLeavesBestKillNonClickable()throws Exception{
@@ -63,6 +67,25 @@ public class KillViewTest {
         assertEquals(9700,engine.metrics(NOW).income);assertEquals(before,new Gson().toJson(engine.exportState()));
         var detail=LedgerData.capture(engine,NOW,category(kills()).withSelection(null,null,first.id));
         assertEquals(2,detail.detail.entries.size());
+    }
+    @Test public void aRecordedPvpDeathNeverAppearsInKills(){
+        var engine=populated();
+        var death=engine.session().transactions().stream().filter(t->t.original()==TransactionType.PK_DEATH_LOSS).findFirst().orElseThrow();
+        var data=LedgerData.capture(engine,NOW,category(kills()));
+        assertEquals(2,data.income.groups.size());assertEquals(700,data.income.total);
+        assertTrue(data.income.groups.stream().flatMap(group->group.entries.stream())
+                .noneMatch(entry->entry.transaction.equals(death.id())));
+    }
+    @Test public void transferCorrectionRemovesTheReceiptFromKillsButNotTheRestOfGains(){
+        var engine=populated();
+        var corrected=engine.session().transactions().stream().filter(t->t.original()==TransactionType.PK_LOOT).findFirst().orElseThrow();
+        engine.correctTransaction(corrected.id(),Correction.TRANSFER,"Owner choice");
+        var kills=LedgerData.capture(engine,NOW,category(kills()));
+        assertEquals(2,kills.income.groups.size());assertEquals(600,kills.income.total);
+        assertTrue(kills.income.groups.stream().flatMap(group->group.entries.stream())
+                .noneMatch(entry->entry.transaction.equals(corrected.id())));
+        assertEquals(9600,engine.metrics(NOW).income);
+        assertEquals(9600,LedgerData.capture(engine,NOW,category(Semantics.Table.GAINS)).income.total);
     }
     @Test public void keyContentsJoinTheirKillAfterClaimWithoutCountingTheKeyAsIncome(){
         var engine=StoredChargeFixture.engine();var encounter=engine.session().addEncounter(true,1000);
@@ -104,13 +127,13 @@ public class KillViewTest {
             var panel=SavedSessionTest.panel(engine);panel.bindPvp(()->new PvpState(true,false,false,0));
             SidebarPanelProbe.refresh(panel);open(panel,"KILLS");SidebarPanelProbe.refresh(panel);
             var page=focused(panel);assertTrue(page.data.income.groups.isEmpty());
-            assertEquals("No retained PK loot",page.income.emptyText);assertEquals(0,engine.metrics(NOW).net);
+            assertEquals(0,engine.metrics(NOW).net);
             assertTrue(hasText(page.body,"Retained, linked loot only."));
             loot(engine,encounter,526,100,1100);engine.session().compactBefore(NOW,null);
             SidebarPanelProbe.refresh(panel);if(panel.category==null||panel.category.table!=kills())open(panel,"KILLS");
             SidebarPanelProbe.refresh(panel);var compacted=focused(panel);
             assertTrue(compacted.data.income.groups.isEmpty());assertTrue(hasText(compacted.body,"Retained, linked loot only."));
-            assertEquals("No retained PK loot",compacted.income.emptyText);assertEquals(1,engine.session().pk().kills);
+            assertEquals(1,engine.session().pk().kills);
             assertEquals(100,engine.metrics(NOW).net);return null;
         });
     }

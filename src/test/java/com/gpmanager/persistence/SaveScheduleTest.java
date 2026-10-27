@@ -36,6 +36,20 @@ public class SaveScheduleTest {
         assertTrue(GpManagerPlugin.saveDue(500,engine.revision(),engine.revision()));
     }
 
+    @Test public void writerReturnsTrueForCoveredAndFalseForStaleGeneration() throws Exception {
+        Path directory=temporary.newFolder().toPath();
+        SessionRepository repository=new SessionRepository(new Gson(),FilepathTestSupport.root(directory),false);
+        var writer=new OrderedPersistenceWriter(repository,rejecting());
+        long gen=repository.generation;
+        writer.merged.set(new OrderedPersistenceWriter.PendingWrite(new WriteIntent(null,gen,0L,named("Pending",9L),null)));
+        assertTrue("a newer same-generation snapshot covers the request",
+                writer.submit(new WriteIntent(null,gen,0L,named("Covered",2L),null)));
+        writer.merged.set(new OrderedPersistenceWriter.PendingWrite(new WriteIntent(null,gen+1,0L,named("NewerScope",1L),null)));
+        assertFalse("a lower generation cannot replace a newer pending scope",
+                writer.submit(new WriteIntent(null,gen,0L,named("StaleScope",1L),null)));
+        writer.shutdown(Duration.ZERO);
+    }
+
     @Test public void writerRefusesStoppedConflictedAndRejectedWork() throws Exception {
         Path directory=temporary.newFolder().toPath();
         SessionRepository repository=new SessionRepository(new Gson(),FilepathTestSupport.root(directory),false);
@@ -54,7 +68,15 @@ public class SaveScheduleTest {
         }finally{
             writer.shutdown(Duration.ofSeconds(5));executor.shutdown();
         }
-        var rejecting=new AbstractExecutorService(){
+        var rejecting=rejecting();
+        var rejected=new OrderedPersistenceWriter(repository,rejecting);
+        assertFalse(rejected.submit(new WriteIntent(null,repository.generation,0L,named("Rejected",5L),null)));
+        assertFalse(rejected.flush(Duration.ofMillis(50)));
+        rejected.shutdown(Duration.ZERO);
+    }
+
+    static AbstractExecutorService rejecting(){
+        return new AbstractExecutorService(){
             public void execute(Runnable command){throw new RejectedExecutionException();}
             public void shutdown(){}
             public List<Runnable> shutdownNow(){return List.of();}
@@ -62,9 +84,5 @@ public class SaveScheduleTest {
             public boolean isTerminated(){return false;}
             public boolean awaitTermination(long timeout,TimeUnit unit){return true;}
         };
-        var rejected=new OrderedPersistenceWriter(repository,rejecting);
-        assertFalse(rejected.submit(new WriteIntent(null,repository.generation,0L,named("Rejected",5L),null)));
-        assertFalse(rejected.flush(Duration.ofMillis(50)));
-        rejected.shutdown(Duration.ZERO);
     }
 }
