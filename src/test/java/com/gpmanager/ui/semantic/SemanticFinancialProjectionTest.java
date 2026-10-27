@@ -35,21 +35,21 @@ public class SemanticFinancialProjectionTest
         Semantics.Result result = capture(first, second);
         assertEquals("repeated compatible casts are one living group", 1, result.groups.size());
         Semantics.Group group = result.groups.get(0);
-        assertEquals("Ice Barrage", group.primaryName);
+        assertEquals("Ice Barrage", group.name);
         assertEquals(-360L, group.value);
-        assertEquals(2, group.receiptCount);
-        assertEquals(T0 + 2_000L, group.latestActivityAt);
+        assertEquals(2, group.count);
+        assertEquals(T0 + 2_000L, group.at);
         assertTrue(group.actionGroup());
-        assertEquals("3 rune types", group.contextLine);
+        assertEquals("3 rune types", group.context);
         assertEquals(1, Semantics.summarize(result.groups).entries);
         assertEquals(2, Semantics.summarize(result.groups).receipts);
-        assertEquals(-360L, Semantics.summarize(result.groups).costs);
+        assertEquals(-360L, Semantics.summarize(result.groups).cost);
 
         Transaction third = exactCast(T0 + 3_000L, "Blood Barrage", 1, 1, 1);
         Semantics.Result bubbled = capture(first, second, third);
         assertEquals("a newer compatible-free receipt bubbles to the top", 2, bubbled.groups.size());
-        assertEquals("Blood Barrage", bubbled.groups.get(0).primaryName);
-        assertEquals("Ice Barrage", bubbled.groups.get(1).primaryName);
+        assertEquals("Blood Barrage", bubbled.groups.get(0).name);
+        assertEquals("Ice Barrage", bubbled.groups.get(1).name);
     }
 
     @Test
@@ -60,10 +60,10 @@ public class SemanticFinancialProjectionTest
             exactCast(T0 + 2_000L, "Blood Barrage", 1, 1, 1));
 
         assertEquals(2, result.groups.size());
-        assertTrue(result.groups.stream().anyMatch(group -> "Ice Barrage".equals(group.primaryName)));
-        assertTrue(result.groups.stream().anyMatch(group -> "Blood Barrage".equals(group.primaryName)));
+        assertTrue(result.groups.stream().anyMatch(group -> "Ice Barrage".equals(group.name)));
+        assertTrue(result.groups.stream().anyMatch(group -> "Blood Barrage".equals(group.name)));
         assertFalse("different exact names never share a group id",
-            result.groups.get(0).semanticGroupId.equals(result.groups.get(1).semanticGroupId));
+            result.groups.get(0).id.equals(result.groups.get(1).id));
     }
 
     @Test
@@ -76,8 +76,8 @@ public class SemanticFinancialProjectionTest
         assertEquals("2/4/6 and 4/8/12 share the same scale-normalised composition",
             1, scaled.groups.size());
         Semantics.Group group = scaled.groups.get(0);
-        assertEquals("Cast", group.primaryName);
-        assertEquals(2, group.receiptCount);
+        assertEquals("Cast", group.name);
+        assertEquals(2, group.count);
         assertEquals(-1_740L, group.value);
 
         Semantics.Result different = capture(
@@ -94,16 +94,16 @@ public class SemanticFinancialProjectionTest
             genericCast(T0 + 2_000L, 1, 1, 1));
 
         Semantics.Group generic = result.groups.stream()
-            .filter(group -> "Cast".equals(group.primaryName)).findFirst().orElseThrow(AssertionError::new);
+            .filter(group -> "Cast".equals(group.name)).findFirst().orElseThrow(AssertionError::new);
         Semantics.Group exact = result.groups.stream()
-            .filter(group -> "Ice Barrage".equals(group.primaryName)).findFirst().orElseThrow(AssertionError::new);
+            .filter(group -> "Ice Barrage".equals(group.name)).findFirst().orElseThrow(AssertionError::new);
 
         assertFalse("the generic group must not carry the proven spell name",
-            generic.searchTerms.contains("Ice Barrage"));
+            generic.terms.contains("Ice Barrage"));
         assertFalse("the generic group must not match the exact spell name",
             generic.matchesText("Ice Barrage"));
         assertFalse("exact never merges with generic",
-            exact.semanticGroupId.equals(generic.semanticGroupId));
+            exact.id.equals(generic.id));
         assertTrue("search metadata reaches the exact group", exact.matchesText("Ice Barrage"));
         assertTrue("search metadata reaches underlying resources of the exact group",
             exact.matchesText("Death rune"));
@@ -119,7 +119,7 @@ public class SemanticFinancialProjectionTest
                 new Flow(NATURE, "Nature rune", -1L, 100, -100L, PriceSource.GRAND_EXCHANGE),
                 new Flow(995, "Coins", 120L, 1, 120L, PriceSource.FACE_VALUE)),
             Confidence.CONFIRMED, "High alchemy", null);
-        alchemy.setActionKind(ActionKind.CAST);
+        alchemy.setAction(ActionKind.CAST);
 
         Semantics.Result result = capture(alchemy);
         assertEquals("a mixed action never collapses into one cost composite", 2, result.groups.size());
@@ -129,12 +129,12 @@ public class SemanticFinancialProjectionTest
         Semantics.Group gain = result.groups.stream()
             .filter(group -> group.table == Semantics.Table.GAINS)
             .findFirst().orElseThrow(AssertionError::new);
-        assertEquals("Nature rune", cost.primaryName);
+        assertEquals("Nature rune", cost.name);
         assertEquals(-100L, cost.value);
-        assertEquals("Coins", gain.primaryName);
+        assertEquals("Coins", gain.name);
         assertEquals(120L, gain.value);
         assertEquals("the additive parts reconcile to the canonical Net",
-            alchemy.getNet(), cost.value + gain.value);
+            alchemy.net(), cost.value + gain.value);
         assertFalse("no action composite was invented",
             result.groups.stream().anyMatch(Semantics.Group::actionGroup));
     }
@@ -150,20 +150,20 @@ public class SemanticFinancialProjectionTest
             capture(estimate, exactCast(T0 + 2_000L, "Ice Barrage", 1, 1, 1));
         Semantics.Group charge = named(result.groups, "Trident of the Seas");
         assertNotNull(charge);
-        assertTrue("an estimated charge cast is charge use", charge.chargeUse);
+        assertTrue("an estimated charge cast is charge use", charge.charge);
         assertEquals(Semantics.Table.COSTS_SUPPLIES, charge.table);
-        assertEquals("Cast", charge.actionLabel);
+        assertEquals("Cast", charge.label);
 
         Semantics.Group spell = named(result.groups, "Ice Barrage");
         assertNotNull(spell);
-        assertFalse("an ordinary spell is a supply, never a charge", spell.chargeUse);
+        assertFalse("an ordinary spell is a supply, never a charge", spell.charge);
 
         Semantics.Group measured = named(capture(measuredCharge(
             T0 + 3_000L, ActionKind.CAST, "Trident of the swamp",
             new Flow(DEATH, "Death rune", -1L, 100, -100L, PriceSource.GRAND_EXCHANGE))).groups,
             "Death rune");
         assertNotNull(measured);
-        assertTrue("a measured charge spend is charge use", measured.chargeUse);
+        assertTrue("a measured charge spend is charge use", measured.charge);
     }
 
     @Test
@@ -174,9 +174,9 @@ public class SemanticFinancialProjectionTest
 
         Semantics.Group charge = named(capture(estimate).groups, "Scythe of vitur");
         assertNotNull(charge);
-        assertTrue("a scythe estimate is charge use", charge.chargeUse);
+        assertTrue("a scythe estimate is charge use", charge.charge);
         assertEquals("a charge row wears what it spent (owner live 2026-10-13)",
-            BLOOD, charge.itemId);
+            BLOOD, charge.item);
     }
 
     @Test
@@ -190,9 +190,9 @@ public class SemanticFinancialProjectionTest
 
         Semantics.Group charge = named(capture(estimate).groups, "Sailors' amulet");
         assertNotNull(charge);
-        assertTrue("an amulet teleport is charge use", charge.chargeUse);
+        assertTrue("an amulet teleport is charge use", charge.charge);
         assertEquals("a multi-component charge wears the weapon (owner live 2026-10-14)",
-            ItemID.SAILORS_AMULET, charge.itemId);
+            ItemID.SAILORS_AMULET, charge.item);
     }
 
     @Test
@@ -203,15 +203,15 @@ public class SemanticFinancialProjectionTest
             "Recovered Junior Jim", "General", true,
             Collections.singletonList(new Flow(995, "Coins", -4_500L, 1, -4_500L, PriceSource.FACE_VALUE)),
             Confidence.CONFIRMED, "Recovered Junior Jim", null);
-        fee.setActionKind(ActionKind.FEE);
+        fee.setAction(ActionKind.FEE);
 
         Semantics.Group row = named(capture(fee).groups, "Recovered Junior Jim");
         assertNotNull(row);
-        assertEquals("the coins flow supplies the icon", 995, row.itemId);
+        assertEquals("the coins flow supplies the icon", 995, row.item);
         assertEquals("no quantity is stated", -1L, row.quantity);
         assertEquals(-4_500L, row.value);
         assertEquals(Semantics.Table.COSTS_SUPPLIES, row.table);
-        assertFalse("never a charge row", row.chargeUse);
+        assertFalse("never a charge row", row.charge);
     }
 
     @Test
@@ -222,12 +222,12 @@ public class SemanticFinancialProjectionTest
 
         Semantics.Group tear = named(capture(estimate).groups, "Demon tear");
         assertNotNull(tear);
-        assertEquals("Eye of Ayak", tear.usedBy);
-        assertTrue("the eye's cast estimate rides the Charges chip", tear.chargeUse);
+        assertEquals("Eye of Ayak", tear.uses);
+        assertTrue("the eye's cast estimate rides the Charges chip", tear.charge);
         for (Semantics.Group group : capture(estimate).groups)
         {
             assertFalse("the staff is never a row of its own",
-                "Eye of Ayak".equals(group.primaryName));
+                "Eye of Ayak".equals(group.name));
         }
     }
 
@@ -243,7 +243,7 @@ public class SemanticFinancialProjectionTest
         {
             Semantics.Group fury = named(capture(receipt).groups, "Blood fury");
             assertNotNull(fury);
-            assertTrue("it rides the Charges chip", fury.chargeUse);
+            assertTrue("it rides the Charges chip", fury.charge);
             assertNull("never a Blood shard row", named(capture(receipt).groups, "Blood shard"));
         }
     }
@@ -259,7 +259,7 @@ public class SemanticFinancialProjectionTest
         assertEquals("the open composes; the pickups stay one neutral claim row",
             2, result.groups.size());
         Semantics.Group open = result.groups.get(0);
-        assertEquals("Coin pouch", open.primaryName);
+        assertEquals("Coin pouch", open.name);
         assertEquals("the count is the claim spend", 1L, open.quantity);
         assertEquals(-1, open.claim);
         assertEquals("the net is the action's gain", 300L, open.value);
@@ -284,7 +284,7 @@ public class SemanticFinancialProjectionTest
         assertEquals("the claim spend and its loot are one action row", 1,
             result.groups.size());
         Semantics.Group row = result.groups.get(0);
-        assertEquals("Crystal key", row.primaryName);
+        assertEquals("Crystal key", row.name);
         assertEquals(-1, row.claim);
         assertEquals(1L, row.quantity);
         assertEquals("the net is the loot", 2_000L, row.value);
@@ -301,23 +301,23 @@ public class SemanticFinancialProjectionTest
         Semantics.Result result = capture(blowpipe);
         assertEquals(2, result.groups.size());
         assertFalse("the equipment is never a financial row",
-            result.groups.stream().anyMatch(group -> "Toxic blowpipe".equals(group.primaryName)));
+            result.groups.stream().anyMatch(group -> "Toxic blowpipe".equals(group.name)));
 
         Semantics.Group scales = named(result.groups, "Zulrah's scales");
         Semantics.Group darts = named(result.groups, "Dragon dart");
         assertNotNull(scales);
         assertNotNull(darts);
-        assertEquals("Toxic blowpipe", scales.usedBy);
-        assertEquals("Used by Toxic blowpipe", scales.contextLine);
+        assertEquals("Toxic blowpipe", scales.uses);
+        assertEquals("Used by Toxic blowpipe", scales.context);
         assertEquals(-110L, scales.value);
         assertEquals(1L, scales.quantity);
         assertEquals(-200L, darts.value);
         assertEquals(2L, darts.quantity);
-        assertEquals("owner 1.1: darts are Supplies like any ammo", "", darts.usedBy);
-        assertFalse(darts.chargeUse);
-        assertTrue("the scales stay on the Charges chip", scales.chargeUse);
+        assertEquals("owner 1.1: darts are Supplies like any ammo", "", darts.uses);
+        assertFalse(darts.charge);
+        assertTrue("the scales stay on the Charges chip", scales.charge);
         assertEquals("no component carries the whole parent Net",
-            blowpipe.getNet(), scales.value + darts.value);
+            blowpipe.net(), scales.value + darts.value);
         assertEquals("the resources are supply costs",
             Semantics.Table.COSTS_SUPPLIES, scales.table);
     }
@@ -335,13 +335,13 @@ public class SemanticFinancialProjectionTest
         long total = 0L;
         for (Semantics.Group group : result.groups)
         {
-            assertFalse("Trident of the swamp".equals(group.primaryName));
-            assertEquals("Trident of the swamp", group.usedBy);
-            assertEquals("Used by Trident of the swamp", group.contextLine);
+            assertFalse("Trident of the swamp".equals(group.name));
+            assertEquals("Trident of the swamp", group.uses);
+            assertEquals("Used by Trident of the swamp", group.context);
             total += group.value;
         }
         assertEquals("the booked resources reconcile to the measured spend",
-            trident.getNet(), total);
+            trident.net(), total);
         assertEquals(3, Semantics.summarize(result.groups).entries);
         assertEquals(1, Semantics.summarize(result.groups).receipts);
     }
@@ -357,10 +357,10 @@ public class SemanticFinancialProjectionTest
         Semantics.Result result = capture(first, second);
         assertEquals("repeated matching resource use is one living row", 1, result.groups.size());
         Semantics.Group group = result.groups.get(0);
-        assertEquals("Zulrah's scales", group.primaryName);
+        assertEquals("Zulrah's scales", group.name);
         assertEquals(-220L, group.value);
-        assertEquals(2, group.receiptCount);
-        assertEquals(T0 + 2_000L, group.latestActivityAt);
+        assertEquals(2, group.count);
+        assertEquals(T0 + 2_000L, group.at);
     }
 
     @Test
@@ -371,7 +371,7 @@ public class SemanticFinancialProjectionTest
             Collections.singletonList(
                 new Flow(385, "Shark", -1L, 0, 0L, PriceSource.UNPRICED)),
             Confidence.CONFIRMED, "Exact food fixture", null);
-        unpriced.setActionKind(ActionKind.EAT);
+        unpriced.setAction(ActionKind.EAT);
 
         Semantics.Result result = capture(unpriced);
         assertEquals(1, result.groups.size());
@@ -379,7 +379,7 @@ public class SemanticFinancialProjectionTest
         assertEquals(Semantics.Table.COSTS_SUPPLIES, group.table);
         assertEquals(Semantics.Coverage.INCOMPLETE, group.coverage);
         assertFalse("an unpriced financial row is not a review decision",
-            group.reviewRequired);
+            group.review);
         assertEquals(0L, group.value);
         assertTrue(group.incomplete());
     }
@@ -395,10 +395,10 @@ public class SemanticFinancialProjectionTest
 
         Semantics.Result result = capture(review, normal);
         Semantics.Group reviewGroup = result.groups.stream()
-            .filter(group -> group.reviewRequired).findFirst().orElseThrow(AssertionError::new);
-        assertEquals("Unknown rune", reviewGroup.primaryName);
+            .filter(group -> group.review).findFirst().orElseThrow(AssertionError::new);
+        assertEquals("Unknown rune", reviewGroup.name);
         assertEquals("the review row is not counted as a financial entry", 1, Semantics.summarize(result.groups).entries);
-        assertEquals("review-required value never reaches the financial totals", -950L, Semantics.summarize(result.groups).costs);
+        assertEquals("review-required value never reaches the financial totals", -950L, Semantics.summarize(result.groups).cost);
         assertEquals("one counted financial receipt is represented", 1, Semantics.summarize(result.groups).receipts);
     }
 
@@ -433,8 +433,8 @@ public class SemanticFinancialProjectionTest
 
     private static Transaction activity(Transaction transaction, String name)
     {
-        return new Transaction(transaction.timestampEpochMillis, transaction.getType(),
-            Context.GENERIC, "", name, true, transaction.getFlows(), Confidence.CONFIRMED,
+        return new Transaction(transaction.timestamp, transaction.type(),
+            Context.GENERIC, "", name, true, transaction.flows(), Confidence.CONFIRMED,
             "Exact fixture", null);
     }
 
@@ -447,13 +447,13 @@ public class SemanticFinancialProjectionTest
         Transaction transaction = new Transaction(at, TransactionType.CONSUMPTION,
             Context.GENERIC, "", "General", true, flows, Confidence.CONFIRMED,
             "Exact fixture", null);
-        transaction.setActionKind(ActionKind.SUPPLIES);
+        transaction.setAction(ActionKind.SUPPLIES);
         return transaction;
     }
 
     private static Semantics.Result capture(Transaction... transactions)
     {
-        return Semantics.capture(Arrays.asList(transactions), Collections.emptyList(),
+        return SemanticProbe.capture(Arrays.asList(transactions), Collections.emptyList(),
             "", null);
     }
 
@@ -462,7 +462,7 @@ public class SemanticFinancialProjectionTest
     {
         for (Semantics.Group group : groups)
         {
-            if (name.equals(group.primaryName))
+            if (name.equals(group.name))
             {
                 return group;
             }
@@ -490,7 +490,7 @@ public class SemanticFinancialProjectionTest
                 rune(BLOOD, "Blood rune", -1L),
                 rune(WATER, "Water rune", -1L)),
             Confidence.CONFIRMED, "Exact fixture", null);
-        transaction.setActionKind(ActionKind.CAST);
+        transaction.setAction(ActionKind.CAST);
         return transaction;
     }
 
@@ -502,7 +502,7 @@ public class SemanticFinancialProjectionTest
                 rune(CHAOS, "Chaos rune", -chaosQty),
                 rune(WATER, "Water rune", -waterQty)),
             Confidence.CONFIRMED, "Exact fixture", null);
-        transaction.setActionKind(ActionKind.CAST);
+        transaction.setAction(ActionKind.CAST);
         return transaction;
     }
 
@@ -518,7 +518,7 @@ public class SemanticFinancialProjectionTest
             Context.GENERIC, "Measured charge spend \u00b7 " + weapon, "Vorkath", true,
             Arrays.asList(flows), Confidence.CONFIRMED,
             "Measured Check difference for " + weapon + ".", null);
-        transaction.setActionKind(kind);
+        transaction.setAction(kind);
         return transaction;
     }
 
@@ -527,7 +527,7 @@ public class SemanticFinancialProjectionTest
         Transaction transaction = new Transaction(at, TransactionType.CONSUMPTION,
             Context.GENERIC, "Estimated charge use \u00b7 " + weapon, "Vorkath", true,
             Arrays.asList(flows), Confidence.LIKELY, "Estimated", null);
-        transaction.setActionKind(ActionKind.CAST);
+        transaction.setAction(ActionKind.CAST);
         return transaction;
     }
 

@@ -39,11 +39,11 @@ public class AccountingDepthTest
             Context.GENERIC, "GE sell tax", "GE", true,
             Collections.singletonList(new Flow(CostKind.GE_TAX_ITEM_ID, "GE sell tax", -1L, 160,
                 -160L, PriceSource.GRAND_EXCHANGE)));
-        assertEquals(CostKind.LOSS, CostKind.of(legacyTax, legacyTax.getFlows().get(0)));
+        assertEquals(CostKind.LOSS, CostKind.of(legacyTax, legacyTax.flows().get(0)));
 
         Session session = new Session("Legacy", 0L, SessionMode.GENERAL);
         session.addTransaction(legacyTax, 100, false);
-        assertEquals(160L, session.metrics(1_000L).costs);
+        assertEquals(160L, session.metrics(1_000L).cost);
     }
 
     @Test

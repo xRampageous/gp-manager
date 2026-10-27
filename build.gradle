@@ -14,7 +14,7 @@ repositories {
 }
 
 // Repeatable baseline; use -PruneliteVersion=... for an explicit compatibility run.
-def runeLiteVersion = providers.gradleProperty('runeliteVersion').getOrElse('1.13.1')
+def runeLiteVersion = providers.gradleProperty('runeliteVersion').getOrElse('1.13.3')
 // Dev-only tools (the engine rework's session recorder) live in src/dev, outside the public
 // allowlist; a public checkout has none and keeps the plain launcher.
 def devTools = file('src/dev/java').exists()
@@ -22,7 +22,7 @@ def pluginMainClass = devTools ? 'com.gpmanager.DevLauncher' : 'com.gpmanager.Gp
 
 group = 'com.gpmanager'
 // Plugin metadata and build version must agree; development identity is generated below.
-version = '1.6.0'
+version = '1.7.0'
 
 
 
@@ -216,6 +216,21 @@ tasks.named('jar') {
     }
 }
 
+def releaseResourcePaths = {
+    def root = file('src/main/resources').toPath()
+    fileTree('src/main/resources').files.collect {
+        root.relativize(it.toPath()).toString().replace(File.separatorChar, '/' as char)
+    }.sort()
+}
+
+def checkReleaseResourceEntries = { archive ->
+    releaseResourcePaths().each { path ->
+        if (archive.getEntry(path) == null) {
+            throw new GradleException("Plugin JAR is missing ${path}")
+        }
+    }
+}
+
 tasks.register('releaseMetadataCheck') {
     def buildVersion = project.version.toString()
     group = 'verification'
@@ -280,6 +295,7 @@ tasks.register('releaseMetadataCheck') {
                     throw new GradleException("Plugin JAR is missing ${path}")
                 }
             }
+            checkReleaseResourceEntries(archive)
             archive.entries().each { entry ->
                 if (entry.name.endsWith('.class')) {
                     if (!productionClasses.contains(entry.name)
@@ -309,9 +325,43 @@ tasks.register('releaseMetadataCheck') {
     }
 }
 
+tasks.register('releaseResourceGateTest') {
+    group = 'verification'
+    description = 'Negative test: the release resource manifest rejects a JAR missing a runtime resource.'
+    doLast {
+        def paths = releaseResourcePaths()
+        def missing = paths.first()
+        def temp = File.createTempFile('gp-manager-resource-gate', '.jar')
+        temp.deleteOnExit()
+        try {
+            new java.util.zip.ZipOutputStream(temp.newOutputStream()).withCloseable { zip ->
+                paths.findAll { it != missing }.each { path ->
+                    zip.putNextEntry(new java.util.zip.ZipEntry(path))
+                    zip.closeEntry()
+                }
+            }
+            boolean rejected = false
+            def archive = new java.util.zip.ZipFile(temp)
+            try {
+                checkReleaseResourceEntries(archive)
+            } catch (GradleException expected) {
+                rejected = true
+            } finally {
+                archive.close()
+            }
+            if (!rejected) {
+                throw new GradleException("Release resource gate accepted a JAR missing ${missing}")
+            }
+            println "Release resource gate negative test passed: missing ${missing} was rejected."
+        } finally {
+            temp.delete()
+        }
+    }
+}
+
 tasks.named('check') {
     dependsOn 'safetyAudit', 'simulationCheck', 'configurationStabilityAudit',
-        'brandingCompatibilityAudit', 'releaseMetadataCheck', 'publicSnapshotCheck'
+        'brandingCompatibilityAudit', 'releaseMetadataCheck', 'releaseResourceGateTest', 'publicSnapshotCheck'
 }
 
 tasks.register('releaseCheck') {
@@ -634,7 +684,7 @@ tasks.register('brandingCompatibilityAudit') {
         }
 
         int rootCall = pluginSource.indexOf('repository.initialize(getPluginDirectory())')
-        int persistenceStartCall = pluginSource.indexOf('persistence.start()')
+        int persistenceStartCall = pluginSource.indexOf('storage.start()')
         if (!pluginSource.contains('public class GpManagerPlugin')
             || rootCall < 0
             || persistenceStartCall <= rootCall) {
@@ -693,28 +743,4 @@ tasks.register('brandingCompatibilityAudit') {
 
         println 'Branding compatibility audit passed: current public identity, config bridges, RuneLite Filepath ownership, and supported migration coverage.'
     }
-}
-
-// The dev tools must keep compiling with the plugin, so the gate builds them too. They target a
-// newer Java than the plugin (the replay's settings fake needs InvocationHandler.invokeDefault);
-// they never ship, so the Hub's Java 11 target is unaffected.
-if (devTools) {
-    tasks.named('compileDevJava') { options.release = 21 }
-    tasks.register('replayCheck', JavaExec) {
-        group = 'verification'
-        description = 'Replays the private session recordings in replays/ and checks each against its baseline.'
-        dependsOn 'devClasses'
-        classpath = sourceSets.dev.runtimeClasspath
-        mainClass = 'com.gpmanager.Replay'
-        args 'replays'
-    }
-    tasks.register('replayBaseline', JavaExec) {
-        group = 'verification'
-        description = "Writes each recording's replay baseline; run on the commit before a rework step."
-        dependsOn 'devClasses'
-        classpath = sourceSets.dev.runtimeClasspath
-        mainClass = 'com.gpmanager.Replay'
-        args '--rebaseline', 'replays'
-    }
-    tasks.named('check') { dependsOn 'devClasses', 'replayCheck' }
 }

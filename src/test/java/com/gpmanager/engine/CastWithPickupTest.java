@@ -61,12 +61,12 @@ public class CastWithPickupTest
                 booked.add(settled);
             }
         }
-        Transaction cast = booked.stream().filter(t -> t.getActionKind() == ActionKind.CAST).findFirst().orElse(null);
+        Transaction cast = booked.stream().filter(t -> t.action() == ActionKind.CAST).findFirst().orElse(null);
         assertNotNull("the runes book as a Cast: " + booked, cast);
         assertEquals("Ice Barrage", cast.spellName());
-        assertEquals(3, cast.getFlows().size());
+        assertEquals(3, cast.flows().size());
         assertTrue("the pickup keeps only its gain", booked.stream().anyMatch(t -> t != cast
-            && t.getFlows().size() == 1 && t.getFlows().get(0).itemId == 1359 && t.isCounted()));
+            && t.flows().size() == 1 && t.flows().get(0).item == 1359 && t.counts()));
     }
 
     @Test
@@ -76,14 +76,14 @@ public class CastWithPickupTest
             "", "Nechryael", true, Arrays.asList(new Flow(560, "Death rune", -4L, 187, -748L),
                 new Flow(565, "Blood rune", -2L, 341, -682L), new Flow(555, "Water rune", -6L, 5, -30L)),
             Confidence.CONFIRMED, "fixture", null);
-        barrage.setActionKind(ActionKind.CAST);
+        barrage.setAction(ActionKind.CAST);
         barrage.setActionLabel(ActionLabel.of("Ice Burst"));
         assertEquals("Ice Barrage", barrage.spellName());
 
         Transaction alch = new Transaction(T0, TransactionType.CONSUMPTION, Context.GENERIC,
             "", "Magic", true, Arrays.asList(new Flow(561, "Nature rune", -1L, 100, -100L),
                 new Flow(554, "Fire rune", -5L, 5, -25L)), Confidence.CONFIRMED, "fixture", null);
-        alch.setActionKind(ActionKind.CAST);
+        alch.setAction(ActionKind.CAST);
         alch.setActionLabel(ActionLabel.of("High Level Alchemy"));
         assertEquals("a spell outside the combat table keeps its click", "High Level Alchemy", alch.spellName());
     }
@@ -98,15 +98,15 @@ public class CastWithPickupTest
         engine.noteConsume(2434, 10, false, ActionKind.DRINK, null);
         List<Transaction> booked = settle(engine, Map.of(562, 96L, 560, 98L, 555, 96L, 139, 1L));
         assertEquals("the drink and cast are separate", 2, booked.size());
-        Transaction cast = booked.stream().filter(t -> t.getActionKind() == ActionKind.CAST)
+        Transaction cast = booked.stream().filter(t -> t.action() == ActionKind.CAST)
             .findFirst().orElseThrow(AssertionError::new);
-        Transaction drink = booked.stream().filter(t -> t.getActionKind() == ActionKind.DRINK)
+        Transaction drink = booked.stream().filter(t -> t.action() == ActionKind.DRINK)
             .findFirst().orElseThrow(AssertionError::new);
         assertEquals("Ice Burst", cast.spellName());
-        assertEquals(3, cast.getFlows().size());
-        assertEquals(2, drink.getFlows().size());
+        assertEquals(3, cast.flows().size());
+        assertEquals(2, drink.flows().size());
         assertEquals("no costs are lost or counted twice", -1_100L,
-            booked.stream().mapToLong(Transaction::getNet).sum());
+            booked.stream().mapToLong(Transaction::net).sum());
         assertSupplies(booked);
     }
 
@@ -120,12 +120,12 @@ public class CastWithPickupTest
         engine.markLoot(Map.of(1359, 1L), 30, "Loot from Greater Nechryael", "Greater Nechryael");
         List<Transaction> booked = settle(engine, Map.of(562, 96L, 560, 98L, 555, 96L, 808, 97L, 1359, 1L));
         assertEquals(3, booked.size());
-        assertEquals(1L, booked.stream().filter(t -> t.getActionKind() == ActionKind.CAST).count());
-        assertEquals(1L, booked.stream().filter(t -> t.getActionKind() == ActionKind.FIRE).count());
-        Transaction loot = booked.stream().filter(t -> t.getType() == TransactionType.LOOT)
+        assertEquals(1L, booked.stream().filter(t -> t.action() == ActionKind.CAST).count());
+        assertEquals(1L, booked.stream().filter(t -> t.action() == ActionKind.FIRE).count());
+        Transaction loot = booked.stream().filter(t -> t.type() == TransactionType.LOOT)
             .findFirst().orElseThrow(AssertionError::new);
-        assertEquals("loot owns no supply legs", 1, loot.getFlows().size());
-        assertEquals(6_190L, booked.stream().mapToLong(Transaction::getNet).sum());
+        assertEquals("loot owns no supply legs", 1, loot.flows().size());
+        assertEquals(6_190L, booked.stream().mapToLong(Transaction::net).sum());
         assertSupplies(booked);
     }
 
@@ -137,12 +137,12 @@ public class CastWithPickupTest
         engine.setBaseline(new ContainerSnapshot(new HashMap<>(Map.of(562, 100L, 560, 100L, 555, 100L))));
         List<Transaction> booked = settle(engine, Map.of(562, 146L, 560, 98L, 555, 96L));
         assertEquals(2, booked.size());
-        Transaction cast = booked.stream().filter(t -> t.getActionKind() == ActionKind.CAST)
+        Transaction cast = booked.stream().filter(t -> t.action() == ActionKind.CAST)
             .findFirst().orElseThrow(AssertionError::new);
         assertEquals("incomplete spell evidence stays generic", "", cast.spellName());
         assertEquals("measured gain, without invented missing rune costs", 46L, booked.stream()
-            .flatMap(t -> t.getFlows().stream()).filter(f -> f.itemId == 562).mapToLong(f -> f.quantityDelta).sum());
-        assertEquals(4_000L, booked.stream().mapToLong(Transaction::getNet).sum());
+            .flatMap(t -> t.flows().stream()).filter(f -> f.item == 562).mapToLong(f -> f.quantity).sum());
+        assertEquals(4_000L, booked.stream().mapToLong(Transaction::net).sum());
         assertSupplies(booked);
     }
 
@@ -156,7 +156,7 @@ public class CastWithPickupTest
         List<Transaction> booked = settle(engine, Map.of(561, 99L, 554, 95L, 808, 99L, 995, 6L));
         assertEquals("the dart was alched, never fired", 1, booked.size());
         assertEquals("High Level Alchemy", booked.get(0).spellName());
-        assertEquals(4, booked.get(0).getFlows().size());
+        assertEquals(4, booked.get(0).flows().size());
     }
 
     @Test
@@ -171,7 +171,7 @@ public class CastWithPickupTest
             else engine.noteDrop(560, 10);
             List<Transaction> booked = settle(engine, Map.of(562, 96L, 560, 98L, 555, 96L, 1359, 1L));
             assertTrue("stronger evidence prevents an automatic Cast", booked.stream()
-                .noneMatch(t -> t.getActionKind() == ActionKind.CAST || t.getActionKind() == ActionKind.FIRE));
+                .noneMatch(t -> t.action() == ActionKind.CAST || t.action() == ActionKind.FIRE));
         }
     }
 
@@ -184,7 +184,7 @@ public class CastWithPickupTest
         engine.setBaseline(new ContainerSnapshot(new HashMap<>(Map.of(555, 100L))));
         List<Transaction> booked = settle(engine, Map.of(555, 78L, 4698, 24L));
         assertEquals(1, booked.size());
-        assertTrue(booked.stream().noneMatch(t -> t.getActionKind() == ActionKind.CAST));
+        assertTrue(booked.stream().noneMatch(t -> t.action() == ActionKind.CAST));
     }
 
     private static List<Transaction> settle(Engine engine, Map<Integer, Long> after)
@@ -203,8 +203,8 @@ public class CastWithPickupTest
     private static void assertSupplies(List<Transaction> booked)
     {
         for (Transaction row : booked)
-            for (Flow flow : row.getFlows())
-                if (flow.isCost()) assertEquals("spent rune/ammo/dose is a supply", CostKind.SUPPLIES,
+            for (Flow flow : row.flows())
+                if (flow.cost()) assertEquals("spent rune/ammo/dose is a supply", CostKind.SUPPLIES,
                     CostKind.of(row, flow));
     }
 

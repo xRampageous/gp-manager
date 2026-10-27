@@ -44,24 +44,24 @@ public class CrossGrindSaleReceiptTest
         Fixture fixture = new Fixture();
         fixture.engine.startCustom("Grind A", T0);
         fixture.engine.setBaseline(new ContainerSnapshot(fixture.inventory));
-        String grindA = fixture.engine.getActiveSession().getId();
+        String grindA = fixture.engine.session().id();
         fixture.placeAndSell(0, SHARK, QTY, GROSS, T0 + 1_000L);
 
         fixture.engine.finishCustom(T0 + 5_000L);
         fixture.engine.startCustom("Grind B", T0 + 6_000L);
         fixture.engine.setBaseline(new ContainerSnapshot(fixture.inventory));
-        Session grindB = fixture.engine.getActiveSession();
+        Session grindB = fixture.engine.session();
         fixture.collectAlone(0, SHARK, RECEIVED, T0 + 10_000L);
 
         Transaction settlement = fixture.settlement();
         assertNotNull(settlement);
-        assertTrue("counted in the collecting Grind", settlement.isCounted());
-        assertTrue(grindB.getTransactions().contains(settlement));
-        assertFalse(ReviewRules.needsOwnerDecision(settlement));
-        assertEquals("Grind B pays exactly the proven tax", -TAX, fixture.engine.getMetrics(T0 + 11_000L).net);
+        assertTrue("counted in the collecting Grind", settlement.counts());
+        assertTrue(grindB.transactions().contains(settlement));
+        assertFalse(ReviewRules.needsReview(settlement));
+        assertEquals("Grind B pays exactly the proven tax", -TAX, fixture.engine.metrics(T0 + 11_000L).net);
 
         MarketRows.Row row = fixture.row(SHARK);
-        assertEquals("the row follows its settlement's session", grindB.getId(), row.scopeSessionId);
+        assertEquals("the row follows its settlement's session", grindB.id(), row.scopeSessionId);
         assertEquals("Grind A", row.listedDuring);
         List<String> lines = MarketText.humanLines(row, false);
         assertTrue("labelled with the listing Grind: " + lines, lines.contains("Listed during|Grind A"));
@@ -164,9 +164,9 @@ public class CrossGrindSaleReceiptTest
         Transaction settlement()
         {
             String id = row(SHARK).settlementId;
-            for (Transaction transaction : engine.getActiveSession().getTransactions())
+            for (Transaction transaction : engine.session().transactions())
             {
-                if (transaction.getId().equals(id))
+                if (transaction.id().equals(id))
                 {
                     return transaction;
                 }

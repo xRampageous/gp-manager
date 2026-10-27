@@ -47,9 +47,9 @@ public class HerbBoxTest
         Engine engine = new Engine(valuator, new TransactionClassifier(), CONFIG);
         engine.ensureSession(1_000L);
         engine.setBaseline(snapshot(1L, 0L));
-        assertEquals(TransactionType.GAIN, settle(engine, snapshot(1L, 1L), 1_600L).getType());
-        assertEquals("the last herb empties the box", TransactionType.GAIN, settle(engine, snapshot(0L, 2L), 6_000L).getType());
-        assertEquals(456L, engine.getMetrics(20_000L).net);
+        assertEquals(TransactionType.GAIN, settle(engine, snapshot(1L, 1L), 1_600L).type());
+        assertEquals("the last herb empties the box", TransactionType.GAIN, settle(engine, snapshot(0L, 2L), 6_000L).type());
+        assertEquals(456L, engine.metrics(20_000L).net);
         assertEquals(0, engine.getReviewRows(20_000L).size());
     }
 

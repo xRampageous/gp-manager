@@ -16,7 +16,7 @@ public class LiveStatusPillTest {
                 page.hero.setSize(width, 100);
                 for (String status : new String[]{"AWAY", "CALIBRATING", "PAUSED"}) {
                     snapshot.idle = status.equals("AWAY");
-                    snapshot.calibrating = status.equals("CALIBRATING");
+                    snapshot.warming = status.equals("CALIBRATING");
                     snapshot.paused = status.equals("PAUSED");
                     page.apply(snapshot);
                     page.hero.setSize(width, page.hero.getPreferredSize().height);
@@ -43,13 +43,13 @@ public class LiveStatusPillTest {
         onEdt(() -> {
             LivePage page = MilestoneTest.page();
             LiveSnapshot snapshot = TargetFreshStartTest.live(TargetFreshStartTest.engine(), 20L);
-            snapshot.calibrating = true;
+            snapshot.warming = true;
             page.apply(snapshot);
             assertEquals(Kit.Tone.GAIN.color, page.hero.word.getForeground());
             snapshot.idle = true;
             page.apply(snapshot);
             assertEquals(Kit.ACCENT, page.hero.word.getForeground());
-            snapshot.loggedOut = true;
+            snapshot.offline = true;
             page.apply(snapshot);
             assertEquals("Logged out", page.hero.word.getText());
             assertEquals(Kit.Tone.LOSS.color, page.hero.word.getForeground());
@@ -57,7 +57,7 @@ public class LiveStatusPillTest {
             page.apply(snapshot);
             assertEquals("Reconnecting", page.hero.word.getText());
             assertEquals(Kit.Tone.MARKET.color, page.hero.word.getForeground());
-            snapshot.loggedOut = false;
+            snapshot.offline = false;
             snapshot.hopping = false;
             snapshot.idle = false;
             snapshot.paused = true;
@@ -65,7 +65,7 @@ public class LiveStatusPillTest {
             assertEquals("Paused", page.hero.word.getText());
             assertEquals(Kit.Tone.REVIEW.color, page.hero.word.getForeground());
             snapshot.paused = false;
-            snapshot.calibrating = false;
+            snapshot.warming = false;
             page.apply(snapshot);
             assertFalse(page.hero.word.isVisible());
             assertEquals(Kit.LABEL, page.hero.word.getForeground());
@@ -77,8 +77,8 @@ public class LiveStatusPillTest {
         onEdt(() -> {
             LivePage page = MilestoneTest.page();
             LiveSnapshot snapshot = TargetFreshStartTest.live(TargetFreshStartTest.engine(), 20L);
-            snapshot.hasSession = false;
-            snapshot.resumeInSeconds = 3L;
+            snapshot.present = false;
+            snapshot.resumeSeconds = 3L;
             page.apply(snapshot);
             assertEquals("Resuming 3s", page.hero.word.getText());
             assertEquals(Kit.Tone.GAIN.color, page.hero.word.getForeground());
@@ -113,8 +113,8 @@ public class LiveStatusPillTest {
             LivePage page = MilestoneTest.page();
             Engine engine = TargetFreshStartTest.engine();
             LiveSnapshot snapshot = TargetFreshStartTest.live(engine, 20L);
-            snapshot.reviewCount = 2;
-            snapshot.pendingKeys = 1;
+            snapshot.reviews = 2;
+            snapshot.keys = 1;
             page.apply(snapshot);
             assertNull(page.pageBar());
             assertTrue(SwingUtilities.isDescendingFrom(page.counts, page.body()));
@@ -129,7 +129,7 @@ public class LiveStatusPillTest {
             LivePage page = MilestoneTest.page();
             LiveSnapshot snapshot = TargetFreshStartTest.live(TargetFreshStartTest.engine(),20L);
             page.apply(snapshot); assertFalse(page.hero.word.isVisible());
-            snapshot.loggedOut = true; page.apply(snapshot);
+            snapshot.offline = true; page.apply(snapshot);
             assertEquals("Logged out", page.hero.word.getText());
             assertNull(page.pageBar());
             snapshot.hopping = true; page.apply(snapshot);

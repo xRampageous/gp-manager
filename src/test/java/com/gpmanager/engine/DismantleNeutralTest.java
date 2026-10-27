@@ -62,30 +62,30 @@ public class DismantleNeutralTest
     public void revertingACrystalToolCostsOnlyItsShards()
     {
         Engine engine = settle(ItemID.CRYSTAL_HARPOON, HARPOON, PARTS);
-        List<Transaction> rows = engine.getActiveSession().getTransactions();
+        List<Transaction> rows = engine.session().transactions();
         assertEquals(rows.toString(), 1, rows.size());
         Transaction shards = rows.get(0);
-        assertEquals(TransactionType.CONSUMPTION, shards.autoType());
-        assertEquals("Dismantled Crystal harpoon", shards.getNote());
-        assertEquals(ItemID.PRIF_CRYSTAL_SHARD, shards.getFlows().get(0).itemId);
-        assertEquals(-120L, shards.getFlows().get(0).quantityDelta);
-        assertEquals(-240_000L, engine.getMetrics(1_010_000L).net);
+        assertEquals(TransactionType.CONSUMPTION, shards.original());
+        assertEquals("Dismantled Crystal harpoon", shards.note());
+        assertEquals(ItemID.PRIF_CRYSTAL_SHARD, shards.flows().get(0).item);
+        assertEquals(-120L, shards.flows().get(0).quantity);
+        assertEquals(-240_000L, engine.metrics(1_010_000L).net);
     }
 
     @Test
     public void withoutTheClickTheSameChangeStillNeedsReview()
     {
         Engine engine = settle(-1, HARPOON, PARTS);
-        assertTrue(engine.getActiveSession().getTransactions().stream().anyMatch(row -> row.autoType() == TransactionType.UNCERTAIN));
+        assertTrue(engine.session().transactions().stream().anyMatch(row -> row.original() == TransactionType.UNCERTAIN));
     }
 
     @Test
     public void dismantlingAGodswordBooksNothing()
     {
         Engine engine = settle(ItemID.AGS, Map.of(ItemID.AGS, 1L), Map.of(ItemID.GODWARS_GODSWORD_BLADE1_2_3, 1L, ItemID.GODWARS_GODSWORD_HILT_ARMADYL, 1L));
-        assertTrue(engine.getActiveSession().getTransactions().toString(),
-            engine.getActiveSession().getTransactions().isEmpty());
-        assertEquals(0L, engine.getMetrics(1_010_000L).net);
+        assertTrue(engine.session().transactions().toString(),
+            engine.session().transactions().isEmpty());
+        assertEquals(0L, engine.metrics(1_010_000L).net);
     }
 
     @Test
@@ -95,12 +95,12 @@ public class DismantleNeutralTest
         // the gain, so it settles like the same change without the click (Muse review 2026-10-12).
         Engine engine = settle(ItemID.WILD_CAVE_BRACELET_UNCHARGED,
             Map.of(ItemID.WILD_CAVE_BRACELET_UNCHARGED, 1L), Map.of(ItemID.WILD_CAVE_SHARD, 250L));
-        List<Transaction> rows = engine.getActiveSession().getTransactions();
+        List<Transaction> rows = engine.session().transactions();
         assertEquals(rows.toString(), 1, rows.size());
-        assertEquals(TransactionType.UNCERTAIN, rows.get(0).autoType());
-        assertFalse(rows.get(0).isCounted());
-        assertTrue(ReviewRules.needsOwnerDecision(rows.get(0)));
-        assertEquals(0L, engine.getMetrics(1_010_000L).net);
+        assertEquals(TransactionType.UNCERTAIN, rows.get(0).original());
+        assertFalse(rows.get(0).counts());
+        assertTrue(ReviewRules.needsReview(rows.get(0)));
+        assertEquals(0L, engine.metrics(1_010_000L).net);
     }
 
     @Test
@@ -115,6 +115,6 @@ public class DismantleNeutralTest
                     return true;
                 }
             });
-        assertEquals(250L * 250L - 40_000L, engine.getMetrics(1_010_000L).net);
+        assertEquals(250L * 250L - 40_000L, engine.metrics(1_010_000L).net);
     }
 }

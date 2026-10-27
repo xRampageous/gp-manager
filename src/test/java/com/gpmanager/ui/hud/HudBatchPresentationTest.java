@@ -137,7 +137,7 @@ public class HudBatchPresentationTest
         assertEquals(Long.MAX_VALUE, fixture.builder.tray.lastDelta());
         fixture.plugin.transactionBooked(receipt(NOW + 1, TransactionType.LOOT,
             new Flow(100, "Huge stack", 1, 1, 1, PriceSource.FACE_VALUE)), NOW + 1);
-        HudTray.Entry entry = fixture.builder.tray.entries().stream().filter(item -> item.itemId == 100).findFirst().orElseThrow();
+        HudTray.Entry entry = fixture.builder.tray.entries().stream().filter(item -> item.item == 100).findFirst().orElseThrow();
         assertEquals(Long.MAX_VALUE, entry.quantity);
         assertEquals(Long.MAX_VALUE, entry.value);
     }
@@ -176,7 +176,7 @@ public class HudBatchPresentationTest
                 @Override public boolean reducedMotion() { return true; }
             };
             HudBuilder builder = new HudBuilder(config, (id, quantity) -> new BufferedImage(16, 16, BufferedImage.TYPE_INT_ARGB));
-            builder.tray.booked(receipt(NOW, TransactionType.LOOT, flow(100, "Stacked loot", 20_000, 10_000)), NOW, false);
+            builder.tray.booked(receipt(NOW, TransactionType.LOOT, flow(100, "Stacked loot", 20_000, 10_000)), NOW, false, NOW);
             HudFrame frame = builder.update(grind(200_000_000L, null), item -> true, NOW + 1000);
             HudOverlay overlay = new HudOverlay(builder, config);
             java.awt.Graphics2D graphics = new BufferedImage(640, 300, BufferedImage.TYPE_INT_ARGB).createGraphics();
@@ -203,7 +203,7 @@ public class HudBatchPresentationTest
         };
         fixture.book(41, NOW, 1201, "Rune kiteshield", 1, 31_799);
         LiveSnapshot snapshot = grind(31_879L, null);
-        snapshot.reviewCount = 99;
+        snapshot.reviews = 99;
         fixture.builder.update(snapshot, item -> true, NOW + 1000);
         BufferedImage image = new BufferedImage(640, 300, BufferedImage.TYPE_INT_ARGB);
         java.awt.Graphics2D graphics = image.createGraphics();
@@ -247,7 +247,7 @@ public class HudBatchPresentationTest
             plugin.hud = builder;
             plugin.config = config;
             plugin.client = ReviewFixesTest.proxy(Client.class, Map.of("getTickCount", (IntSupplier) () -> tick[0]));
-            plugin.lootPresentationFilter = new LootPresentationFilterService(GroundItemsPrefs.disabled());
+            plugin.filter = new LootPresentationFilterService(GroundItemsPrefs.disabled());
         }
 
         void book(int gameTick, long at, int id, String name, long quantity, int price)

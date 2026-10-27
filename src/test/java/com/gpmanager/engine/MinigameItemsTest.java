@@ -98,34 +98,34 @@ public class MinigameItemsTest
         // Grants and strips arrive as separate settles; the priced fragment would book a gain or
         // a loss without the strip.
         Engine granted = settle(Map.of(), Map.of(FRAGMENT, 1L));
-        assertTrue(granted.getActiveSession().getTransactions().toString(),
-            granted.getActiveSession().getTransactions().isEmpty());
-        assertEquals(0L, granted.getMetrics(1_010_000L).net);
+        assertTrue(granted.session().transactions().toString(),
+            granted.session().transactions().isEmpty());
+        assertEquals(0L, granted.metrics(1_010_000L).net);
 
         Engine stripped = settle(Map.of(FRAGMENT, 1L), Map.of());
-        assertTrue(stripped.getActiveSession().getTransactions().toString(),
-            stripped.getActiveSession().getTransactions().isEmpty());
-        assertEquals(0L, stripped.getMetrics(1_010_000L).net);
+        assertTrue(stripped.session().transactions().toString(),
+            stripped.session().transactions().isEmpty());
+        assertEquals(0L, stripped.metrics(1_010_000L).net);
     }
 
     @Test
     public void aLoanerGrantMixedWithRealLootBooksOnlyTheLoot()
     {
         Engine engine = settle(Map.of(), Map.of(FRAGMENT, 1L, AGS, 1L));
-        List<Transaction> rows = engine.getActiveSession().getTransactions();
+        List<Transaction> rows = engine.session().transactions();
         assertEquals(rows.toString(), 1, rows.size());
-        assertTrue(rows.get(0).isCounted());
-        assertEquals(12_000_000L, engine.getMetrics(1_010_000L).net);
+        assertTrue(rows.get(0).counts());
+        assertEquals(12_000_000L, engine.metrics(1_010_000L).net);
     }
 
     @Test
     public void persistentRewardsStillBook()
     {
         Engine ticket = settle(Map.of(), Map.of(TICKET, 1L));
-        assertTrue(ticket.getActiveSession().getTransactions().stream().anyMatch(Transaction::isCounted));
+        assertTrue(ticket.session().transactions().stream().anyMatch(Transaction::counts));
 
         Engine torso = settle(Map.of(), Map.of(TORSO, 1L));
-        assertTrue(torso.getActiveSession().getTransactions().stream().anyMatch(Transaction::isCounted));
+        assertTrue(torso.session().transactions().stream().anyMatch(Transaction::counts));
     }
 
     @Test
@@ -134,32 +134,32 @@ public class MinigameItemsTest
         // -(4) + (3) in one settle: without the strip the dose-pair normalization could rewrite
         // the pair into real potion ids; stripped first, nothing books.
         Engine engine = settle(Map.of(SIP_FULL, 1L), Map.of(SIP_LEFT, 1L));
-        assertTrue(engine.getActiveSession().getTransactions().toString(),
-            engine.getActiveSession().getTransactions().isEmpty());
-        assertEquals(0L, engine.getMetrics(1_010_000L).net);
+        assertTrue(engine.session().transactions().toString(),
+            engine.session().transactions().isEmpty());
+        assertEquals(0L, engine.metrics(1_010_000L).net);
     }
 
     @Test
     public void aGuardianStoneGrantAndStripBothBookNothing()
     {
         Engine granted = settle(Map.of(), Map.of(STONE, 1L));
-        assertTrue(granted.getActiveSession().getTransactions().toString(),
-            granted.getActiveSession().getTransactions().isEmpty());
-        assertEquals(0L, granted.getMetrics(1_010_000L).net);
+        assertTrue(granted.session().transactions().toString(),
+            granted.session().transactions().isEmpty());
+        assertEquals(0L, granted.metrics(1_010_000L).net);
 
         Engine stripped = settle(Map.of(STONE, 1L), Map.of());
-        assertTrue(stripped.getActiveSession().getTransactions().toString(),
-            stripped.getActiveSession().getTransactions().isEmpty());
-        assertEquals(0L, stripped.getMetrics(1_010_000L).net);
+        assertTrue(stripped.session().transactions().toString(),
+            stripped.session().transactions().isEmpty());
+        assertEquals(0L, stripped.metrics(1_010_000L).net);
     }
 
     @Test
     public void aPortalTalismanLossBooksNothing()
     {
         Engine engine = settle(Map.of(PORTAL, 1L), Map.of());
-        assertTrue(engine.getActiveSession().getTransactions().toString(),
-            engine.getActiveSession().getTransactions().isEmpty());
-        assertEquals(0L, engine.getMetrics(1_010_000L).net);
+        assertTrue(engine.session().transactions().toString(),
+            engine.session().transactions().isEmpty());
+        assertEquals(0L, engine.metrics(1_010_000L).net);
     }
 
     @Test
@@ -168,10 +168,10 @@ public class MinigameItemsTest
         // The live GOTR shape: the essence leaves, a guardian stone and the runes arrive; the
         // strip leaves the runes as the one counted gain.
         Engine engine = settle(Map.of(ESSENCE, 24L), Map.of(WATER_RUNE, 106L, STONE, 24L));
-        List<Transaction> rows = engine.getActiveSession().getTransactions();
+        List<Transaction> rows = engine.session().transactions();
         assertEquals(rows.toString(), 1, rows.size());
-        assertTrue(rows.get(0).isCounted());
-        assertEquals(106L * 5L, engine.getMetrics(1_010_000L).net);
+        assertTrue(rows.get(0).counts());
+        assertEquals(106L * 5L, engine.metrics(1_010_000L).net);
     }
 
     @Test
@@ -181,14 +181,14 @@ public class MinigameItemsTest
         // the strip makes both sides invisible, like the other minigame supplies (owner
         // 2026-10-13 sweep).
         Engine granted = settle(Map.of(), Map.of(RAW_FISH, 1L, FISH, 1L, CRYSTAL_FISH, 1L));
-        assertTrue(granted.getActiveSession().getTransactions().toString(),
-            granted.getActiveSession().getTransactions().isEmpty());
-        assertEquals(0L, granted.getMetrics(1_010_000L).net);
+        assertTrue(granted.session().transactions().toString(),
+            granted.session().transactions().isEmpty());
+        assertEquals(0L, granted.metrics(1_010_000L).net);
 
         Engine stripped = settle(Map.of(RAW_FISH, 1L, FISH, 1L, CRYSTAL_FISH, 1L), Map.of());
-        assertTrue(stripped.getActiveSession().getTransactions().toString(),
-            stripped.getActiveSession().getTransactions().isEmpty());
-        assertEquals(0L, stripped.getMetrics(1_010_000L).net);
+        assertTrue(stripped.session().transactions().toString(),
+            stripped.session().transactions().isEmpty());
+        assertEquals(0L, stripped.metrics(1_010_000L).net);
     }
 
     @Test
@@ -198,14 +198,14 @@ public class MinigameItemsTest
         // digweed: the herbs book their cost at the refinery and the rewards book at the shop
         // (owner 2026-10-13).
         Engine granted = settle(Map.of(), Map.of(PASTE, 10L, BASE, 1L, DIGWEED, 1L));
-        assertTrue(granted.getActiveSession().getTransactions().toString(),
-            granted.getActiveSession().getTransactions().isEmpty());
-        assertEquals(0L, granted.getMetrics(1_010_000L).net);
+        assertTrue(granted.session().transactions().toString(),
+            granted.session().transactions().isEmpty());
+        assertEquals(0L, granted.metrics(1_010_000L).net);
 
         Engine stripped = settle(Map.of(PASTE, 10L, BASE, 1L, DIGWEED, 1L), Map.of());
-        assertTrue(stripped.getActiveSession().getTransactions().toString(),
-            stripped.getActiveSession().getTransactions().isEmpty());
-        assertEquals(0L, stripped.getMetrics(1_010_000L).net);
+        assertTrue(stripped.session().transactions().toString(),
+            stripped.session().transactions().isEmpty());
+        assertEquals(0L, stripped.metrics(1_010_000L).net);
     }
 
     @Test
@@ -215,14 +215,14 @@ public class MinigameItemsTest
         // salvage is an intermediate like the Mixology chain, so neither side of it books
         // (owner 2026-10-13).
         Engine granted = settle(Map.of(), Map.of(SALVAGE_SMALL, 1L, SALVAGE_MERCHANT, 1L));
-        assertTrue(granted.getActiveSession().getTransactions().toString(),
-            granted.getActiveSession().getTransactions().isEmpty());
-        assertEquals(0L, granted.getMetrics(1_010_000L).net);
+        assertTrue(granted.session().transactions().toString(),
+            granted.session().transactions().isEmpty());
+        assertEquals(0L, granted.metrics(1_010_000L).net);
 
         Engine stripped = settle(Map.of(SALVAGE_SMALL, 1L, SALVAGE_MERCHANT, 1L), Map.of());
-        assertTrue(stripped.getActiveSession().getTransactions().toString(),
-            stripped.getActiveSession().getTransactions().isEmpty());
-        assertEquals(0L, stripped.getMetrics(1_010_000L).net);
+        assertTrue(stripped.session().transactions().toString(),
+            stripped.session().transactions().isEmpty());
+        assertEquals(0L, stripped.metrics(1_010_000L).net);
     }
 
     @Test
@@ -231,10 +231,10 @@ public class MinigameItemsTest
         // The sort shape: the raw salvage leaves, the sorted drops arrive; the strip leaves the
         // counted gain as the only flow, where an unstripped pair would fail mixed.
         Engine engine = settle(Map.of(SALVAGE_SMALL, 4L), Map.of(WATER_RUNE, 10L));
-        List<Transaction> rows = engine.getActiveSession().getTransactions();
+        List<Transaction> rows = engine.session().transactions();
         assertEquals(rows.toString(), 1, rows.size());
-        assertTrue(rows.get(0).isCounted());
-        assertEquals(10L * 5L, engine.getMetrics(1_010_000L).net);
+        assertTrue(rows.get(0).counts());
+        assertEquals(10L * 5L, engine.metrics(1_010_000L).net);
     }
 
     @Test
@@ -244,14 +244,14 @@ public class MinigameItemsTest
         // through the cargo hold and handed in - neither the grant nor the deposit is ownership
         // (owner 2026-10-13).
         Engine granted = settle(Map.of(), Map.of(CARGO, 2L));
-        assertTrue(granted.getActiveSession().getTransactions().toString(),
-            granted.getActiveSession().getTransactions().isEmpty());
-        assertEquals(0L, granted.getMetrics(1_010_000L).net);
+        assertTrue(granted.session().transactions().toString(),
+            granted.session().transactions().isEmpty());
+        assertEquals(0L, granted.metrics(1_010_000L).net);
 
         Engine deposited = settle(Map.of(CARGO, 2L), Map.of());
-        assertTrue(deposited.getActiveSession().getTransactions().toString(),
-            deposited.getActiveSession().getTransactions().isEmpty());
-        assertEquals(0L, deposited.getMetrics(1_010_000L).net);
+        assertTrue(deposited.session().transactions().toString(),
+            deposited.session().transactions().isEmpty());
+        assertEquals(0L, deposited.metrics(1_010_000L).net);
     }
 
     @Test
@@ -260,10 +260,10 @@ public class MinigameItemsTest
         // The hand-in shape is mixed (parts out, coins in); the strip leaves the coin gain as the
         // only flow, where unstripped parts would fail the settle as uncertain (owner 2026-10-13).
         Engine engine = settle(Map.of(PART, 5L), Map.of(COINS, 25_000L));
-        List<Transaction> rows = engine.getActiveSession().getTransactions();
+        List<Transaction> rows = engine.session().transactions();
         assertEquals(rows.toString(), 1, rows.size());
-        assertTrue(rows.get(0).isCounted());
-        assertEquals(25_000L, engine.getMetrics(1_010_000L).net);
+        assertTrue(rows.get(0).counts());
+        assertEquals(25_000L, engine.metrics(1_010_000L).net);
     }
 
     @Test
@@ -272,10 +272,10 @@ public class MinigameItemsTest
         // A sealed crate's one-shot drink is only the wrapper: sampling it keeps the real effects
         // counted - here the loot it grants - and the bottle itself never books (owner 2026-10-13).
         Engine engine = settle(Map.of(DRINK, 1L), Map.of(WATER_RUNE, 15L));
-        List<Transaction> rows = engine.getActiveSession().getTransactions();
+        List<Transaction> rows = engine.session().transactions();
         assertEquals(rows.toString(), 1, rows.size());
-        assertTrue(rows.get(0).isCounted());
-        assertEquals(15L * 5L, engine.getMetrics(1_010_000L).net);
+        assertTrue(rows.get(0).counts());
+        assertEquals(15L * 5L, engine.metrics(1_010_000L).net);
     }
 
     @Test
@@ -285,14 +285,14 @@ public class MinigameItemsTest
         // reading them is never ownership; the facility's build costs still book (owner 1.3.4
         // review).
         Engine granted = settle(Map.of(), Map.of(SCHEMATIC, 1L, SCHEMATIC_KEY, 1L));
-        assertTrue(granted.getActiveSession().getTransactions().toString(),
-            granted.getActiveSession().getTransactions().isEmpty());
-        assertEquals(0L, granted.getMetrics(1_010_000L).net);
+        assertTrue(granted.session().transactions().toString(),
+            granted.session().transactions().isEmpty());
+        assertEquals(0L, granted.metrics(1_010_000L).net);
 
         Engine read = settle(Map.of(SCHEMATIC, 1L, SCHEMATIC_KEY, 1L), Map.of());
-        assertTrue(read.getActiveSession().getTransactions().toString(),
-            read.getActiveSession().getTransactions().isEmpty());
-        assertEquals(0L, read.getMetrics(1_010_000L).net);
+        assertTrue(read.session().transactions().toString(),
+            read.session().transactions().isEmpty());
+        assertEquals(0L, read.metrics(1_010_000L).net);
     }
 
     @Test
@@ -302,14 +302,14 @@ public class MinigameItemsTest
         // the carrier is the boat, not a purchase, so only the empty bottle's use books
         // (owner 1.3.4 review).
         Engine bottled = settle(Map.of(BOTTLE_EMPTY, 1L), Map.of(BOTTLE_FULL, 1L));
-        List<Transaction> rows = bottled.getActiveSession().getTransactions();
+        List<Transaction> rows = bottled.session().transactions();
         assertEquals(rows.toString(), 1, rows.size());
-        assertTrue(rows.get(0).isCounted());
-        assertEquals(-500L, bottled.getMetrics(1_010_000L).net);
+        assertTrue(rows.get(0).counts());
+        assertEquals(-500L, bottled.metrics(1_010_000L).net);
 
         Engine released = settle(Map.of(BOTTLE_FULL, 1L), Map.of());
-        assertTrue(released.getActiveSession().getTransactions().toString(),
-            released.getActiveSession().getTransactions().isEmpty());
-        assertEquals(0L, released.getMetrics(1_010_000L).net);
+        assertTrue(released.session().transactions().toString(),
+            released.session().transactions().isEmpty());
+        assertEquals(0L, released.metrics(1_010_000L).net);
     }
 }

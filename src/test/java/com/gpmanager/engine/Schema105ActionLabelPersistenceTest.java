@@ -51,12 +51,12 @@ public class Schema105ActionLabelPersistenceTest
             json.contains("\"observedActionLabel\":\"Ice Burst\""));
 
         SavedState loaded = new Gson().fromJson(json, SavedState.class);
-        Transaction restored = loaded.getActiveSession().getTransactions().get(0);
+        Transaction restored = loaded.currentSession().transactions().get(0);
         assertNotNull(restored.actionLabel());
         assertEquals("Ice Burst", restored.actionLabel().value());
-        assertEquals("the reloaded receipt keeps its money", labelled.getNet(), restored.getNet());
+        assertEquals("the reloaded receipt keeps its money", labelled.net(), restored.net());
         assertNull("an unlabelled receipt stays generic",
-            loaded.getActiveSession().getTransactions().get(1).actionLabel());
+            loaded.currentSession().transactions().get(1).actionLabel());
     }
 
     @Test
@@ -90,9 +90,9 @@ public class Schema105ActionLabelPersistenceTest
         Engine engine = engine();
         engine.startCustom("Vorkath", T0);
         Transaction transaction = cast(null, T0 + 100L);
-        engine.getActiveSession().addTransaction(transaction, 100, false);
+        engine.session().addTransaction(transaction, 100, false);
         String before = fingerprint(transaction);
-        long netBefore = engine.getMetrics(T0 + 200L).net;
+        long netBefore = engine.metrics(T0 + 200L).net;
 
         transaction.setActionLabel(ActionLabel.of("Ice Burst"));
         assertEquals("setting a label never changes money", before, fingerprint(transaction));
@@ -100,7 +100,7 @@ public class Schema105ActionLabelPersistenceTest
         assertEquals("changing a label never changes money", before, fingerprint(transaction));
         transaction.setActionLabel(null);
         assertEquals("clearing a label never changes money", before, fingerprint(transaction));
-        assertEquals(netBefore, engine.getMetrics(T0 + 200L).net);
+        assertEquals(netBefore, engine.metrics(T0 + 200L).net);
 
         Transaction trade = trade();
         String tradeBefore = fingerprint(trade);
@@ -115,15 +115,15 @@ public class Schema105ActionLabelPersistenceTest
         Engine engine = engine();
         engine.startCustom("Vorkath", T0);
         Transaction cast = cast("Ice Burst", T0 + 100L);
-        engine.getActiveSession().addTransaction(cast, 100, false);
-        long net = engine.getMetrics(T0 + 200L).net;
+        engine.session().addTransaction(cast, 100, false);
+        long net = engine.metrics(T0 + 200L).net;
 
         engine.clearActionEvidence();
 
         assertNotNull("booked labels survive the presentation owner fence",
             cast.actionLabel());
         assertEquals("Ice Burst", cast.actionLabel().value());
-        assertEquals("the fence never touches money", net, engine.getMetrics(T0 + 200L).net);
+        assertEquals("the fence never touches money", net, engine.metrics(T0 + 200L).net);
     }
 
     @Test
@@ -148,44 +148,44 @@ public class Schema105ActionLabelPersistenceTest
         long now = System.currentTimeMillis();
         Engine source = engine();
         source.startCustom("Vorkath", now);
-        source.getActiveSession().addTransaction(cast("Ice Burst", now + 1_000L), 100, false);
-        source.getActiveSession().addTransaction(cast("Ice Burst", now + 2_000L), 100, false);
+        source.session().addTransaction(cast("Ice Burst", now + 1_000L), 100, false);
+        source.session().addTransaction(cast("Ice Burst", now + 2_000L), 100, false);
         // Runes that name no spell (a staff covered them) keep the click; runes that do name one win.
         Transaction smoke = genericCast(now + 3_000L);
         smoke.setActionLabel(ActionLabel.of("Smoke Barrage"));
-        source.getActiveSession().addTransaction(smoke, 100, false);
-        source.getActiveSession().addTransaction(genericCast(now + 4_000L), 100, false);
+        source.session().addTransaction(smoke, 100, false);
+        source.session().addTransaction(genericCast(now + 4_000L), 100, false);
         SavedState detached = source.savedState();
         assertEquals("detach keeps the bounded label", "Ice Burst",
-            detached.getActiveSession().getTransactions().get(0).actionLabel().value());
+            detached.currentSession().transactions().get(0).actionLabel().value());
 
         Engine restored = engine();
         restored.restore(detached, now + 5_000L);
-        Session session = restored.getActiveSession();
-        List<Transaction> restoredTransactions = session.getTransactions();
+        Session session = restored.session();
+        List<Transaction> restoredTransactions = session.transactions();
         assertEquals("Ice Burst", restoredTransactions.get(0).actionLabel().value());
 
-        Semantics.Result before = Semantics.capture(
-            restoredTransactions, null, session.getId(), null);
+        Semantics.Result before = SemanticProbe.capture(
+            restoredTransactions, null, session.id(), null);
         Semantics.Group burst = groupNamed(before.groups, "Ice Burst");
         assertNotNull(burst);
-        assertEquals(2, burst.receiptCount);
-        String stableGroupId = burst.semanticGroupId;
-        assertTrue("search terms survive restore", burst.searchTerms.contains("Ice Burst"));
+        assertEquals(2, burst.count);
+        String stableGroupId = burst.id;
+        assertTrue("search terms survive restore", burst.terms.contains("Ice Burst"));
 
         session.addTransaction(cast("Ice Burst", now + 6_000L), 100, false);
-        Semantics.Result after = Semantics.capture(
-            session.getTransactions(), null, session.getId(), null);
+        Semantics.Result after = SemanticProbe.capture(
+            session.transactions(), null, session.id(), null);
         Semantics.Group merged = groupNamed(after.groups, "Ice Burst");
         assertNotNull(merged);
-        assertEquals("a later exact cast merges into the restored group", 3, merged.receiptCount);
+        assertEquals("a later exact cast merges into the restored group", 3, merged.count);
         assertEquals("semantic identity stays stable for search and deep links",
-            stableGroupId, merged.semanticGroupId);
+            stableGroupId, merged.id);
         assertNotNull("Smoke Barrage stays separate",
             groupNamed(after.groups, "Smoke Barrage"));
         Semantics.Group generic = groupNamed(after.groups, "Cast");
         assertNotNull("the old generic Cast stays generic", generic);
-        assertNotEquals(merged.semanticGroupId, generic.semanticGroupId);
+        assertNotEquals(merged.id, generic.id);
     }
 
     @Test
@@ -204,10 +204,10 @@ public class Schema105ActionLabelPersistenceTest
 
         SavedState reloaded = new SessionRepository(new Gson(), FilepathTestSupport.root(directory), false).load();
         assertEquals(110, reloaded.schemaVersion);
-        Transaction restored = reloaded.getActiveSession().getTransactions().get(0);
-        assertEquals(labelled.getId(), restored.getId());
-        assertEquals(labelled.getFlows().size(), restored.getFlows().size());
-        assertEquals(labelled.getNet(), restored.getNet());
+        Transaction restored = reloaded.currentSession().transactions().get(0);
+        assertEquals(labelled.id(), restored.id());
+        assertEquals(labelled.flows().size(), restored.flows().size());
+        assertEquals(labelled.net(), restored.net());
         assertEquals("Ice Burst", restored.actionLabel().value());
         assertTrue("backup rotation does not strip the field",
             Files.readString(directory.resolve("sessions.backup.json")).contains("Ice Burst"));
@@ -219,15 +219,15 @@ public class Schema105ActionLabelPersistenceTest
         long old = T0 - 400L * 24L * 60L * 60L * 1_000L;
         Engine engine = engine();
         engine.startCustom("Old Grind", old);
-        engine.getActiveSession().addTransaction(cast("Ice Burst", old + 1_000L), 100, false);
-        String sessionId = engine.getActiveSession().getId();
+        engine.session().addTransaction(cast("Ice Burst", old + 1_000L), 100, false);
+        String sessionId = engine.session().id();
         engine.finishCustom(old + 2_000L);
         engine.compactOlderThan(1, T0);
 
         Session compacted = engine.historySession(sessionId);
         assertNotNull(compacted);
         assertTrue("the receipt detail is compacted away",
-            compacted.getTransactions().isEmpty());
+            compacted.transactions().isEmpty());
         assertTrue(compacted.compactedTransactionCount > 0);
         String json = new Gson().toJson(engine.savedState());
         assertFalse("a compacted receipt takes its action name with it",
@@ -265,7 +265,7 @@ public class Schema105ActionLabelPersistenceTest
         String json = new Gson().toJson(stateWith(source))
             .replace("\"observedActionLabel\":\"Ice Burst\"", "\"observedActionLabel\":" + rawJsonValue);
         SavedState loaded = new Gson().fromJson(json, SavedState.class);
-        return loaded.getActiveSession().getTransactions().get(0);
+        return loaded.currentSession().transactions().get(0);
     }
 
     private static Transaction cast(String label, long at)
@@ -276,7 +276,7 @@ public class Schema105ActionLabelPersistenceTest
                 new Flow(562, "Chaos rune", -4L, 106, -424L, PriceSource.GRAND_EXCHANGE),
                 new Flow(555, "Water rune", -4L, 5, -20L, PriceSource.GRAND_EXCHANGE)),
             Confidence.CONFIRMED, "Exact fixture", null);
-        transaction.setActionKind(ActionKind.CAST);
+        transaction.setAction(ActionKind.CAST);
         if (label != null)
         {
             transaction.setActionLabel(ActionLabel.of(label));
@@ -292,7 +292,7 @@ public class Schema105ActionLabelPersistenceTest
                 new Flow(560, "Death rune", -2L, 188, -376L, PriceSource.GRAND_EXCHANGE),
                 new Flow(561, "Nature rune", -1L, 100, -100L, PriceSource.GRAND_EXCHANGE)),
             Confidence.CONFIRMED, "Exact fixture", null);
-        transaction.setActionKind(ActionKind.CAST);
+        transaction.setAction(ActionKind.CAST);
         return transaction;
     }
 
@@ -303,7 +303,7 @@ public class Schema105ActionLabelPersistenceTest
             Collections.singletonList(new Flow(385, "Shark", -1L, 950, -950L,
                 PriceSource.GRAND_EXCHANGE)),
             Confidence.CONFIRMED, "Food", null);
-        transaction.setActionKind(ActionKind.EAT);
+        transaction.setAction(ActionKind.EAT);
         if (label != null)
         {
             transaction.setActionLabel(ActionLabel.of(label));
@@ -323,11 +323,11 @@ public class Schema105ActionLabelPersistenceTest
 
     private static String fingerprint(Transaction transaction)
     {
-        return transaction.getNet() + "|" + transaction.getRevenue() + "|" + transaction.getCosts()
-            + "|" + transaction.isCounted() + "|" + transaction.getType() + "|"
-            + transaction.getContext() + "|" + transaction.getCorrection() + "|"
-            + transaction.getActionKind() + "|"
-            + new Gson().toJson(transaction.getFlows());
+        return transaction.net() + "|" + transaction.revenue() + "|" + transaction.costs()
+            + "|" + transaction.counts() + "|" + transaction.type() + "|"
+            + transaction.context() + "|" + transaction.correction() + "|"
+            + transaction.action() + "|"
+            + new Gson().toJson(transaction.flows());
     }
 
     private static String repeat(String text, int times)
@@ -345,7 +345,7 @@ public class Schema105ActionLabelPersistenceTest
     {
         for (Semantics.Group group : groups)
         {
-            if (name.equals(group.primaryName))
+            if (name.equals(group.name))
             {
                 return group;
             }

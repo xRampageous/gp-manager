@@ -22,16 +22,16 @@ public class ContainerExtrasTest
         QuiverSupportTest.Harness harness = new QuiverSupportTest.Harness();
         harness.equipQuiver();
         harness.ammo = 250;
-        assertEquals(250L, harness.capture().quantityOf(ItemID.DRAGON_ARROW));
+        assertEquals(250L, harness.capture().quantity(ItemID.DRAGON_ARROW));
     }
 
     @Test
     public void aCarriedAshSanctifierHoldsDeathRunesTenChargesEach()
     {
         ContainerSnapshot held = capture(Map.of(InventoryID.INV, items(ItemID.ASH_SANCTIFIER, 1, ItemID.DEATHRUNE, 40)), 125);
-        assertEquals("40 loose runes and 125 charges = 12 more runes", 52L, held.quantityOf(ItemID.DEATHRUNE));
+        assertEquals("40 loose runes and 125 charges = 12 more runes", 52L, held.quantity(ItemID.DEATHRUNE));
         ContainerSnapshot banked = capture(Map.of(InventoryID.INV, items(ItemID.DEATHRUNE, 40)), 125);
-        assertEquals("a banked sanctifier's charges are not carried", 40L, banked.quantityOf(ItemID.DEATHRUNE));
+        assertEquals("a banked sanctifier's charges are not carried", 40L, banked.quantity(ItemID.DEATHRUNE));
     }
 
     private static Item[] items(int... idQuantity)

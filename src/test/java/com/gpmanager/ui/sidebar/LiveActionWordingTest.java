@@ -26,14 +26,14 @@ public class LiveActionWordingTest
         Transaction generic = cast(now + 2L, "",
             rune("Death rune", 560, -1L, -100L), rune("Chaos rune", 562, -1L, -50L),
             rune("Water rune", 555, -1L, -30L));
-        engine.getActiveSession().addTransaction(exact, 2_000, false);
-        engine.getActiveSession().addTransaction(generic, 2_000, false);
+        engine.session().addTransaction(exact, 2_000, false);
+        engine.session().addTransaction(generic, 2_000, false);
 
         LiveSnapshot snapshot = LiveSnapshot.capture(engine, now + 10L, LiveContext.NONE);
         LiveSnapshot.Recent exactRow = snapshot.recent.stream()
-            .filter(row -> row.receiptId.equals(exact.getId())).findFirst().orElseThrow(AssertionError::new);
+            .filter(row -> row.receiptId.equals(exact.id())).findFirst().orElseThrow(AssertionError::new);
         LiveSnapshot.Recent genericRow = snapshot.recent.stream()
-            .filter(row -> row.receiptId.equals(generic.getId())).findFirst().orElseThrow(AssertionError::new);
+            .filter(row -> row.receiptId.equals(generic.id())).findFirst().orElseThrow(AssertionError::new);
         assertEquals("Ice Burst", exactRow.name);
         assertEquals("Cast", LivePage.metaOf(exactRow));
         assertEquals("Cast", genericRow.name);
@@ -42,16 +42,16 @@ public class LiveActionWordingTest
         LedgerData.Entry deepLink = LivePage.entryFor(exactRow);
         assertEquals("deep link has no hidden action-name search", "", deepLink.search);
         assertEquals("an exact Cast links to Costs/Supplies",
-            LedgerData.CostView.SUPPLIES, exactRow.ledgerCostView);
+            LedgerData.CostView.SUPPLIES, exactRow.cost);
         LedgerData linked = LedgerData.capture(engine, now + 10L, deepLink);
         assertNotNull("the stable receipt opens its semantic group", linked.detail);
-        assertTrue(linked.detail.group.containsContribution(exactRow.contributionId));
+        assertTrue(linked.detail.group.containsContribution(exactRow.id));
 
         LedgerData searched = LedgerData.capture(engine, now + 10L,
             new LedgerData.Entry(LedgerData.Scope.CURRENT_GRIND, null, null,
                 LedgerData.CostView.SUPPLIES, "Ice Burst", null, null, null, null));
-        assertEquals("exact action text search keeps the whole group", 1, searched.costs.entries);
-        assertEquals("Ice Burst", searched.costs.groups.get(0).primaryName);
+        assertEquals("exact action text search keeps the whole group", 1, searched.cost.entries);
+        assertEquals("Ice Burst", searched.cost.groups.get(0).name);
     }
 
     @Test
@@ -114,10 +114,10 @@ public class LiveActionWordingTest
             blowpipeRows.size());
         LiveSnapshot.Recent darts = blowpipeRows.stream().filter(row -> "Dragon dart".equals(row.name))
             .findFirst().orElseThrow(AssertionError::new);
-        assertEquals(LedgerData.CostView.SUPPLIES, darts.ledgerCostView);
+        assertEquals(LedgerData.CostView.SUPPLIES, darts.cost);
         LiveSnapshot.Recent scales = blowpipeRows.stream().filter(row -> "Zulrah's scales".equals(row.name))
             .findFirst().orElseThrow(AssertionError::new);
-        assertEquals(LedgerData.CostView.CHARGES, scales.ledgerCostView);
+        assertEquals(LedgerData.CostView.CHARGES, scales.cost);
 
         Transaction trident = action(10L, ActionKind.CAST,
             rune("Death rune", 560, -1L, -100L), rune("Chaos rune", 562, -1L, -50L),
@@ -126,7 +126,7 @@ public class LiveActionWordingTest
         List<LiveSnapshot.Recent> tridentRows = recents(trident);
         assertFalse("charge use is listed now (owner 1.3.4)", tridentRows.isEmpty());
         assertTrue("every trident row is a Ledger charge row",
-            tridentRows.stream().allMatch(row -> row.ledgerCostView == LedgerData.CostView.CHARGES));
+            tridentRows.stream().allMatch(row -> row.cost == LedgerData.CostView.CHARGES));
     }
 
     private static List<LiveSnapshot.Recent> recents(Transaction transaction)
@@ -158,7 +158,7 @@ public class LiveActionWordingTest
         List<LiveSnapshot.Recent> rows = LiveProbe.recent(casts, LiveContext.NONE);
         assertEquals("one row for the spell", 1, rows.size());
         assertEquals("Ice Barrage", rows.get(0).name);
-        assertEquals("the spellbook icon", -328, rows.get(0).itemId);
+        assertEquals("the spellbook icon", -328, rows.get(0).item);
     }
 
     /** Owner 2026-09-28: a whole potion drunk dose by dose is one Recent row, not one per sip. */
@@ -188,7 +188,7 @@ public class LiveActionWordingTest
     private static Transaction action(long at, ActionKind kind, Flow... flows)
     {
         Transaction transaction = transaction(at, flows);
-        transaction.setActionKind(kind);
+        transaction.setAction(kind);
         return transaction;
     }
 

@@ -36,15 +36,15 @@ public class AgilityBagRewardTest
         // The pack shows only the extra manta ray and the ticket.
         var published = new java.util.ArrayList<Transaction>();
         engine.settle(new ContainerSnapshot(Map.of(MANTA, 1L, TICKET, 1L)), T0 + 2_000L, published::add);
-        List<Transaction> rows = engine.getActiveSession().getTransactions();
-        Transaction bag = rows.stream().filter(row -> msg("bag-reward").equals(row.getNote())).findFirst().orElseThrow();
-        assertEquals(TransactionType.LOOT, bag.getType());
+        List<Transaction> rows = engine.session().transactions();
+        Transaction bag = rows.stream().filter(row -> msg("bag-reward").equals(row.note())).findFirst().orElseThrow();
+        assertEquals(TransactionType.LOOT, bag.type());
         assertTrue("HUD+'s tray hears about it like any other booking", published.contains(bag));
-        assertEquals(2, bag.getFlows().size());
+        assertEquals(2, bag.flows().size());
         assertEquals(3L, quantity(bag, ANGLERFISH));
         assertEquals(1L, quantity(bag, MED_HELM));
         assertEquals("the pack's manta ray is not counted twice", 0L, quantity(bag, MANTA));
-        assertEquals("every item, ticket included, is counted once", 600L, engine.getMetrics(T0 + 3_000L).net);
+        assertEquals("every item, ticket included, is counted once", 600L, engine.metrics(T0 + 3_000L).net);
     }
 
     @Test
@@ -53,8 +53,8 @@ public class AgilityBagRewardTest
         Engine engine = ReviewFixesTest.engine();
         engine.noteBagReward(Map.of(MANTA, 3L, MED_HELM, 1L), T0 + 1_000L);
         engine.settle(new ContainerSnapshot(Map.of(MANTA, 3L, MED_HELM, 1L, TICKET, 1L)), T0 + 2_000L, ignored -> { });
-        assertTrue(engine.getActiveSession().getTransactions().stream().noneMatch(row -> msg("bag-reward").equals(row.getNote())));
-        assertEquals(500L, engine.getMetrics(T0 + 3_000L).net);
+        assertTrue(engine.session().transactions().stream().noneMatch(row -> msg("bag-reward").equals(row.note())));
+        assertEquals(500L, engine.metrics(T0 + 3_000L).net);
     }
 
     /** The bag's dispenser additions never follow a factory reset (or another account) into risk. */
@@ -64,9 +64,9 @@ public class AgilityBagRewardTest
         Engine engine = ReviewFixesTest.engine();
         engine.noteBagReward(Map.of(ANGLERFISH, 3L), T0 + 1_000L);
         engine.settle(new ContainerSnapshot(Map.of(TICKET, 1L)), T0 + 2_000L, ignored -> { });
-        assertEquals(Long.valueOf(3L), engine.bagAdded.get(ANGLERFISH));
+        assertEquals(Long.valueOf(3L), engine.bag.get(ANGLERFISH));
         engine.resetData(T0 + 3_000L);
-        assertTrue(engine.bagAdded.isEmpty());
+        assertTrue(engine.bag.isEmpty());
     }
 
     static String msg(String key)
@@ -76,6 +76,6 @@ public class AgilityBagRewardTest
 
     static long quantity(Transaction row, int itemId)
     {
-        return row.getFlows().stream().filter(flow -> flow.itemId == itemId).mapToLong(flow -> flow.quantityDelta).sum();
+        return row.flows().stream().filter(flow -> flow.item == itemId).mapToLong(flow -> flow.quantity).sum();
     }
 }

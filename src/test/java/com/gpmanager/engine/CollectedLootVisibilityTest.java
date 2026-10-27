@@ -24,16 +24,16 @@ public class CollectedLootVisibilityTest
         engine.ensureSession(1000);
         engine.setBaseline(ContainerSnapshot.empty());
         engine.markLoot(Collections.singletonMap(526, 2L), 20, "Loot from Chicken", "Chicken");
-        assertEquals(0, engine.getMetrics(1600).net);
+        assertEquals(0, engine.metrics(1600).net);
         ContainerSnapshot picked = new ContainerSnapshot(Collections.singletonMap(526, 1L));
         engine.markDirty();
         engine.processIfDirty(picked, 2200, null);
         engine.processIfDirty(picked, 2800, null);
-        assertEquals(500, engine.getMetrics(2800).net);
+        assertEquals(500, engine.metrics(2800).net);
         engine.bankOpened(6);
         engine.markDirty();
         engine.processIfDirty(ContainerSnapshot.empty(), 3400, null);
         engine.processIfDirty(ContainerSnapshot.empty(), 4000, null);
-        assertEquals(500, engine.getMetrics(4000).net);
+        assertEquals(500, engine.metrics(4000).net);
     }
 }

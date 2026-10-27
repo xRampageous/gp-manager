@@ -77,9 +77,9 @@ public class VyreWellFillTest
         fill(engine);
         Transaction row = deposit(engine);
         assertNotNull(row);
-        assertEquals(0L, engine.getMetrics(T0 + 10_000L).net);
+        assertEquals(0L, engine.metrics(T0 + 10_000L).net);
         assertTrue("nothing counted for a refundable deposit",
-            engine.getActiveSession().getTransactions().stream().noneMatch(Transaction::isCounted));
+            engine.session().transactions().stream().noneMatch(Transaction::counts));
     }
 
     @Test
@@ -88,7 +88,27 @@ public class VyreWellFillTest
         Engine engine = engine();
         Transaction row = deposit(engine);
         assertNotNull(row);
-        assertEquals(-(10L * 100L + 2_000L * 100L), engine.getMetrics(T0 + 10_000L).net);
+        assertEquals(-(10L * 100L + 2_000L * 100L), engine.metrics(T0 + 10_000L).net);
+    }
+
+    @Test
+    public void playerCopiesOfTheWellLineCannotOpenANeutralWindow() throws Exception
+    {
+        for (ChatMessageType type : new ChatMessageType[] {
+            ChatMessageType.PUBLICCHAT, ChatMessageType.CLAN_CHAT, ChatMessageType.PRIVATECHAT})
+        {
+            Engine engine = engine();
+            GpManagerPlugin plugin = new GpManagerPluginProbe();
+            set(plugin, "config", CONFIG);
+            set(plugin, "engine", engine);
+            ChatMessage message = new ChatMessage();
+            message.setType(type);
+            message.setMessage("You fill the well with 10 charges.");
+            plugin.onChatMessage(message);
+            assertTrue(engine.session().transactions().isEmpty());
+            assertNotNull(deposit(engine));
+            assertEquals(type.toString(), -201_000L, engine.metrics(T0 + 10_000L).net);
+        }
     }
 
     @Test
@@ -98,9 +118,9 @@ public class VyreWellFillTest
         empty(engine);
         Transaction row = refund(engine);
         assertNotNull(row);
-        assertEquals(0L, engine.getMetrics(T0 + 10_000L).net);
+        assertEquals(0L, engine.metrics(T0 + 10_000L).net);
         assertTrue("storage coming back is never income",
-            engine.getActiveSession().getTransactions().stream().noneMatch(Transaction::isCounted));
+            engine.session().transactions().stream().noneMatch(Transaction::counts));
     }
 
     @Test
@@ -109,7 +129,7 @@ public class VyreWellFillTest
         Engine engine = engine();
         Transaction row = refund(engine);
         assertNotNull(row);
-        assertEquals(10L * 100L + 2_000L * 100L, engine.getMetrics(T0 + 10_000L).net);
+        assertEquals(10L * 100L + 2_000L * 100L, engine.metrics(T0 + 10_000L).net);
     }
 
     private static void empty(Engine engine) throws Exception
@@ -117,7 +137,7 @@ public class VyreWellFillTest
         GpManagerPlugin plugin = new GpManagerPluginProbe();
         set(plugin, "config", CONFIG);
         set(plugin, "engine", engine);
-        set(plugin, "interactionContextTracker", GpManagerPluginProbe.tracker(null, engine, CONFIG));
+        set(plugin, "targets", GpManagerPluginProbe.tracker(null, engine, CONFIG));
         set(plugin, "charges", new ChargeIntake(null, null, CONFIG, engine, null));
         plugin.onMenuOptionClicked(wellClick("Empty"));
     }

@@ -109,7 +109,7 @@ public class RetentionCompactionSoakTest
         t = System.nanoTime();
         SavedState loadedFull = uncompacted.load();
         line("uncompacted_load_ms=" + ms(t));
-        assertEquals(truth.sessions, loadedFull.getHistory().size());
+        assertEquals(truth.sessions, loadedFull.history().size());
         line("uncompacted_dir_bytes=" + dirSize(uncompactedDir));
 
         // Every shipping window compacts the same fixture and reconciles exactly.
@@ -148,32 +148,32 @@ public class RetentionCompactionSoakTest
         int retained = 0;
         long compacted = 0L;
         int kept = 0;
-        for (Session session : engine.getHistory())
+        for (Session session : engine.history())
         {
-            long[] money = truth.sessionMoney.get(session.getName());
-            assertNotNull(session.getName(), money);
+            long[] money = truth.sessionMoney.get(session.name());
+            assertNotNull(session.name(), money);
             Metrics metrics = session.metrics(NOW);
-            assertEquals(session.getName() + " revenue " + days + "d", money[0], metrics.revenue);
-            assertEquals(session.getName() + " costs " + days + "d", money[1], metrics.costs);
-            assertEquals(session.getName() + " net " + days + "d", money[2], metrics.net);
-            assertEquals(session.getName() + " elapsed", money[3], metrics.elapsedMillis);
-            long[] pk = truth.sessionPk.get(session.getName());
+            assertEquals(session.name() + " revenue " + days + "d", money[0], metrics.income);
+            assertEquals(session.name() + " costs " + days + "d", money[1], metrics.cost);
+            assertEquals(session.name() + " net " + days + "d", money[2], metrics.net);
+            assertEquals(session.name() + " elapsed", money[3], metrics.elapsed);
+            long[] pk = truth.sessionPk.get(session.name());
             if (pk != null)
             {
                 assertEquals(pk[0], session.pk().kills);
                 assertEquals(pk[1], session.pk().deaths);
-                assertEquals(session.getName() + " best kill", pk[2], session.bestKill());
+                assertEquals(session.name() + " best kill", pk[2], session.bestKill());
             }
-            for (Transaction row : session.getTransactions())
+            for (Transaction row : session.transactions())
             {
                 retained++;
-                if (row.getId().equals(PENDING_CLAIM_ROW))
+                if (row.id().equals(PENDING_CLAIM_ROW))
                 {
                     kept++;
                     continue;
                 }
-                assertTrue(days + "d window retained an older row at " + row.timestampEpochMillis,
-                    row.timestampEpochMillis >= cutoff);
+                assertTrue(days + "d window retained an older row at " + row.timestamp,
+                    row.timestamp >= cutoff || ReviewRules.needsReview(row));
             }
             compacted += session.compactedTransactionCount;
         }
@@ -191,14 +191,14 @@ public class RetentionCompactionSoakTest
     {
         // PvP facts live on each session and survive receipt compaction and reload.
         AllTime pvp = new AllTime();
-        pvp.addPvp(engine.uniqueSessions());
+        pvp.addPvp(engine.sessions());
         assertEquals(truth.kills, pvp.kills);
         assertEquals(truth.deaths, pvp.deaths);
         assertEquals("best kill survives compaction", truth.bestKill, pvp.bestKill);
         Engine reloaded = engine(Retention.DAYS_90);
         reloaded.restore(copy(GSON.toJson(engine.savedState())), NOW);
         AllTime afterReload = new AllTime();
-        afterReload.addPvp(reloaded.uniqueSessions());
+        afterReload.addPvp(reloaded.sessions());
         assertEquals(pvp.toString(), afterReload.toString());
     }
 
@@ -232,27 +232,27 @@ public class RetentionCompactionSoakTest
 
     private void verifyPendingClaim(Engine engine, Truth truth, String when)
     {
-        List<SavedState.PendingClaim> claims = engine.getPendingClaims();
+        List<SavedState.PendingClaim> claims = engine.pendingClaims();
         assertEquals("the unresolved claim is neither lost nor duplicated " + when, 1, claims.size());
-        assertEquals(PENDING_CLAIM_ROW, claims.get(0).getClaimId());
+        assertEquals(PENDING_CLAIM_ROW, claims.get(0).claimId());
         Session owner = null;
         Transaction audit = null;
         int settledRows = 0;
-        for (Session session : engine.getHistory())
+        for (Session session : engine.history())
         {
-            for (Transaction row : session.getTransactions())
+            for (Transaction row : session.transactions())
             {
-                if (row.getId().equals(PENDING_CLAIM_ROW))
+                if (row.id().equals(PENDING_CLAIM_ROW))
                 {
                     owner = session;
                     audit = row;
                 }
-                if (row.sourceClaimId().equals(SETTLED_CLAIM_ID)) settledRows++;
+                if (row.claimId().equals(SETTLED_CLAIM_ID)) settledRows++;
             }
         }
         assertNotNull("the unresolved claim's audit row stays individually inspectable " + when, audit);
-        assertEquals("Day 3", owner.getName());
-        assertEquals("the audit row is not counted twice", 0L, audit.getNet());
+        assertEquals("Day 3", owner.name());
+        assertEquals("the audit row is not counted twice", 0L, audit.net());
         assertEquals("the settled claim was dropped on restore, its settlement booked once",
             0, settledRows == 0 ? 0 : settledRows - 1);
         assertEquals(truth.sessionMoney.get("Day 3")[2], owner.metrics(NOW).net);
@@ -272,19 +272,19 @@ public class RetentionCompactionSoakTest
             Metrics metrics = session.metrics(NOW);
             assertEquals(truth.sessionMoney.get(name)[2], metrics.net);
             Session.CompactedContribution compacted = session.compactedContribution();
-            long revenue = compacted.revenue;
-            long costs = compacted.costs;
-            for (Transaction row : session.getTransactions())
+            long revenue = compacted.income;
+            long costs = compacted.cost;
+            for (Transaction row : session.transactions())
             {
                 Accounting.Amounts amounts = Accounting.transaction(row);
                 if (amounts.available && amounts.included)
                 {
-                    revenue += amounts.revenue;
-                    costs += amounts.costs;
+                    revenue += amounts.income;
+                    costs += amounts.cost;
                 }
             }
-            assertEquals(name + ": retained + compacted revenue", metrics.revenue, revenue);
-            assertEquals(name + ": retained + compacted costs", metrics.costs, costs);
+            assertEquals(name + ": retained + compacted revenue", metrics.income, revenue);
+            assertEquals(name + ": retained + compacted costs", metrics.cost, costs);
         }
     }
 
@@ -344,14 +344,14 @@ public class RetentionCompactionSoakTest
     {
         StringBuilder sb = new StringBuilder();
         AllTime pvp = new AllTime();
-        pvp.addPvp(engine.uniqueSessions());
+        pvp.addPvp(engine.sessions());
         sb.append(pvp.kills).append('|').append(pvp.bestKill).append('|');
-        sb.append(engine.getHistory().size()).append('|').append(engine.getPendingClaims().size()).append('|');
-        for (Session session : engine.getHistory())
+        sb.append(engine.history().size()).append('|').append(engine.pendingClaims().size()).append('|');
+        for (Session session : engine.history())
         {
             Metrics metrics = session.metrics(NOW);
-            sb.append(session.getId()).append(':').append(metrics.revenue).append(':').append(metrics.costs)
-                .append(':').append(session.getTransactions().size()).append(':').append(session.compactedTransactionCount)
+            sb.append(session.id()).append(':').append(metrics.income).append(':').append(metrics.cost)
+                .append(':').append(session.transactions().size()).append(':').append(session.compactedTransactionCount)
                 .append(':').append(session.pk().encounters()).append(':').append(session.bestKill()).append(';');
         }
         return sb.toString();
@@ -379,9 +379,9 @@ public class RetentionCompactionSoakTest
                     "Woodcutting", true, Confidence.CONFIRMED,
                     new Flow(LOGS, "Logs", logsQuantity, 39, logsQuantity * 39L));
                 session.addTransaction(loot, 100_000, false);
-                if (i == 1) splitTarget = loot.getId();
-                if (i == 2) ignoreTarget = loot.getId();
-                session.recordAction("Woodcutting", loot.timestampEpochMillis);
+                if (i == 1) splitTarget = loot.id();
+                if (i == 2) ignoreTarget = loot.id();
+                session.recordAction("Woodcutting", loot.timestamp);
             }
             session.addTransaction(row(start + 8 * 60_000L, TransactionType.CONSUMPTION, Context.GENERIC,
                 "Woodcutting", true, Confidence.CONFIRMED,
@@ -392,15 +392,15 @@ public class RetentionCompactionSoakTest
             session.addTransaction(row(start + 10 * 60_000L, TransactionType.LOOT, Context.LOOT,
                 "Woodcutting", true, Confidence.LIKELY,
                 new Flow(UNPRICED, "Abyssal whip", 1L, 0, 0L)), 100_000, false);
-            if (day % 3 == 0) assertTrue(session.correctTransaction(ignoreTarget, Correction.IGNORE, start + 11 * 60_000L, "Not mine"));
-            if (day % 3 == 1) assertTrue(session.correctTransaction(ignoreTarget, Correction.COST, start + 11 * 60_000L, "Bought"));
-            if (day % 3 == 2) assertTrue(session.splitItem(splitTarget, LOGS, logsQuantity / 2, start + 11 * 60_000L, "half"));
+            if (day % 3 == 0) assertTrue(session.correctTransaction(ignoreTarget, Correction.IGNORE, "Not mine"));
+            if (day % 3 == 1) assertTrue(session.correctTransaction(ignoreTarget, Correction.COST, "Bought"));
+            if (day % 3 == 2) assertTrue(session.splitItem(splitTarget, LOGS, logsQuantity / 2, "half"));
             if (day == 3)
             {
                 Transaction audit = row(start + 13 * 60_000L, TransactionType.ADJUSTMENT, Context.PK_LOOT,
                     "Loot key audit", false, Confidence.CONFIRMED,
                     new Flow(KEY, "Loot key", 1L, 0, 0L));
-                PENDING_CLAIM_ROW = audit.getId();
+                PENDING_CLAIM_ROW = audit.id();
                 session.addTransaction(audit, 100_000, false);
             }
             if (day == 4)
@@ -418,13 +418,13 @@ public class RetentionCompactionSoakTest
                 Transaction loot = row(killAt + 1_000L, TransactionType.PK_LOOT, Context.PK_LOOT, "PKing", true,
                     Confidence.CONFIRMED, new Flow(COINS, "Coins", 50_000L + (DAYS - day) * 10L, 1, 50_000L + (DAYS - day) * 10L));
                 session.addTransaction(loot, 100_000, false);
-                session.attachToEncounter(loot.getId(), kill, false);
+                session.attachToEncounter(loot.id(), kill, false);
                 long deathAt = start + 12L * 3_600_000L;
                 String death = session.addEncounter(false, deathAt);
                 Transaction loss = row(deathAt + 1_000L, TransactionType.PK_DEATH_LOSS, Context.PK_DEATH, "PKing", true,
                     Confidence.CONFIRMED, new Flow(SHARK, "Shark", -(80L + day % 7), 385, -(80L + day % 7) * 385L));
                 session.addTransaction(loss, 100_000, false);
-                session.attachToEncounter(loss.getId(), death, false);
+                session.attachToEncounter(loss.id(), death, false);
             }
             session.close(pk ? start + 13L * 3_600_000L : start + 60 * 60_000L);
             sessions.add(session);
@@ -451,38 +451,38 @@ public class RetentionCompactionSoakTest
         for (Session session : sessions)
         {
             Metrics metrics = session.metrics(NOW);
-            truth.sessionMoney.put(session.getName(), new long[] {metrics.revenue, metrics.costs, metrics.net, metrics.elapsedMillis});
+            truth.sessionMoney.put(session.name(), new long[] {metrics.income, metrics.cost, metrics.net, metrics.elapsed});
             long compactedRevenue = 0L;
             long compactedCosts = 0L;
             long cutoff = NOW - Retention.DAYS_90.getDays() * DAY;
-            for (Transaction row : session.getTransactions())
+            for (Transaction row : session.transactions())
             {
-                if (row.timestampEpochMillis >= cutoff
-                    || row.getId().equals(PENDING_CLAIM_ROW)
-                    || SETTLED_CLAIM_ID.equals(row.sourceClaimId())
-                    || row.getType() == TransactionType.TRANSFER
-                    || !row.isCounted())
+                if (row.timestamp >= cutoff
+                    || row.id().equals(PENDING_CLAIM_ROW)
+                    || SETTLED_CLAIM_ID.equals(row.claimId())
+                    || row.type() == TransactionType.TRANSFER
+                    || !row.counts())
                 {
                     continue;
                 }
-                compactedRevenue += row.getRevenue();
-                compactedCosts += row.getCosts();
+                compactedRevenue += row.revenue();
+                compactedCosts += row.costs();
             }
-            truth.sessionCompactedMoney.put(session.getName(),
+            truth.sessionCompactedMoney.put(session.name(),
                 new long[] {compactedRevenue, compactedCosts});
             truth.net += metrics.net;
-            truth.activeMillis += metrics.elapsedMillis;
-            truth.transactions += session.getTransactions().size();
-            for (Transaction row : session.getTransactions())
+            truth.activeMillis += metrics.elapsed;
+            truth.transactions += session.transactions().size();
+            for (Transaction row : session.transactions())
             {
-                if (!row.isCounted()) continue;
-                String day = LocalDate.ofEpochDay(Math.floorDiv(row.timestampEpochMillis, DAY)).toString();
-                truth.dayNet.merge(day, row.getNet(), Long::sum);
+                if (!row.counts()) continue;
+                String day = LocalDate.ofEpochDay(Math.floorDiv(row.timestamp, DAY)).toString();
+                truth.dayNet.merge(day, row.net(), Long::sum);
             }
-            if (session.getName().startsWith("PK trip"))
+            if (session.name().startsWith("PK trip"))
             {
                 PkTally pk = session.pk();
-                truth.sessionPk.put(session.getName(), new long[] {pk.kills, pk.deaths, session.bestKill()});
+                truth.sessionPk.put(session.name(), new long[] {pk.kills, pk.deaths, session.bestKill()});
                 truth.kills += pk.kills;
                 truth.deaths += pk.deaths;
                 truth.bestKill = Math.max(truth.bestKill, session.bestKill());
@@ -527,9 +527,9 @@ public class RetentionCompactionSoakTest
 
     private static Session session(Engine engine, String name)
     {
-        for (Session session : engine.getHistory())
+        for (Session session : engine.history())
         {
-            if (session.getName().equals(name)) return session;
+            if (session.name().equals(name)) return session;
         }
         throw new AssertionError("no session " + name);
     }

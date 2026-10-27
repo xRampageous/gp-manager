@@ -17,7 +17,7 @@ public class ShellNavigationTest
     {
         SidebarPanel panel = onEdt(() -> new SidebarPanel(PresentationLifecycleTest.engine(),
             PresentationLifecycleTest.config(), null, null, null));
-        Shell shell = panel.shell();
+        Shell shell = panel.shell;
         assertEquals(3, ShellProbe.tabLabels(shell).length);
         assertEquals("live", shell.currentPage());
         assertEquals(List.of("Live", "Ledger", "Grinds"), List.of(ShellProbe.tabLabels(shell)));
@@ -34,7 +34,7 @@ public class ShellNavigationTest
     {
         SidebarPanel panel = onEdt(() -> new SidebarPanel(PresentationLifecycleTest.engine(),
             PresentationLifecycleTest.config(), null, null, null));
-        panel.shell().show(Shell.LEDGER);
+        panel.shell.show(Shell.LEDGER);
         java.util.List<String> labels = new java.util.ArrayList<>();
         collectLabels(panel, labels);
         assertFalse("no placeholder copy remains on Ledger", labels.contains("Ledger recovery pending R2"));
@@ -45,7 +45,7 @@ public class ShellNavigationTest
     {
         SidebarPanel panel = onEdt(() -> new SidebarPanel(PresentationLifecycleTest.engine(),
             PresentationLifecycleTest.config(), null, null, null));
-        Shell shell = panel.shell();
+        Shell shell = panel.shell;
         onEdt(() ->
         {
             shell.notify("Exported Vorkath", "vorkath.csv", false, null, null);
@@ -93,7 +93,7 @@ public class ShellNavigationTest
     {
         SidebarPanel panel = onEdt(() -> new SidebarPanel(PresentationLifecycleTest.engine(),
             PresentationLifecycleTest.config(), null, null, null));
-        Shell shell = panel.shell();
+        Shell shell = panel.shell;
 
         shell.show(Shell.LEDGER);
         assertEquals("ledger", shell.currentPage());

@@ -37,8 +37,8 @@ public class InstanceFeeTest
         GpManagerPlugin plugin = plugin(engine);
         plugin.onChatMessage(spam("Payment has been taken from your coffer: 15,325 Coins."));
         plugin.onChatMessage(spam("Payment has been taken from your bank: 9,675 x Coins"));
-        assertEquals(25_000L, engine.getMetrics(2_000L).costs);
-        assertEquals(2, engine.getActiveSession().getTransactions().size());
+        assertEquals(25_000L, engine.metrics(2_000L).cost);
+        assertEquals(2, engine.session().transactions().size());
     }
 
     @Test
@@ -49,7 +49,7 @@ public class InstanceFeeTest
         plugin.onChatMessage(spam("Payment has been taken from your coffer: 15,325 Coins."));
         tick++;
         plugin.onChatMessage(spam("Payment has been taken from your bank: 9,675 x Coins"));
-        assertEquals(15_325L, engine.getMetrics(2_000L).costs);
+        assertEquals(15_325L, engine.metrics(2_000L).cost);
     }
 
     @Test
@@ -58,8 +58,8 @@ public class InstanceFeeTest
         Engine engine = engine();
         GpManagerPlugin plugin = plugin(engine);
         plugin.onChatMessage(spam("Payment has been taken from your coffer: 12,500 Coins."));
-        assertEquals(12_500L, engine.getMetrics(2_000L).costs);
-        assertEquals(1, engine.getActiveSession().getTransactions().size());
+        assertEquals(12_500L, engine.metrics(2_000L).cost);
+        assertEquals(1, engine.session().transactions().size());
     }
 
     @Test
@@ -68,10 +68,10 @@ public class InstanceFeeTest
         Engine engine = engine();
         GpManagerPlugin plugin = plugin(engine);
         plugin.onChatMessage(spam("Payment has been taken from your bank: 12,500 Coins."));
-        assertEquals(12_500L, engine.getMetrics(2_000L).costs);
-        assertEquals(1, engine.getActiveSession().getTransactions().size());
+        assertEquals(12_500L, engine.metrics(2_000L).cost);
+        assertEquals(1, engine.session().transactions().size());
         assertEquals("Instance fee (bank)",
-            engine.getActiveSession().getTransactions().get(0).getNote());
+            engine.session().transactions().get(0).note());
     }
 
     @Test
@@ -80,8 +80,8 @@ public class InstanceFeeTest
         Engine engine = engine();
         GpManagerPlugin plugin = plugin(engine);
         plugin.onChatMessage(gameMessage("Payment has been taken from your bank: 12,500 Coins."));
-        assertEquals(0L, engine.getMetrics(2_000L).costs);
-        assertEquals(0, engine.getActiveSession().getTransactions().size());
+        assertEquals(0L, engine.metrics(2_000L).cost);
+        assertEquals(0, engine.session().transactions().size());
     }
 
     private Engine engine()

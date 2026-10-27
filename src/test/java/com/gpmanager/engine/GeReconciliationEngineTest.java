@@ -66,7 +66,7 @@ public class GeReconciliationEngineTest
         OfferSlots.Transition handle(OfferSlots.Transition t)
         {
             if (t == null) return null;
-            engine.noteGeOffer(t, name(t.current.itemId), now);
+            engine.noteGeOffer(t, name(t.current.item), now);
             // Test scaffolding only: production arms MARKET from proven GE interactions, never
             // from passive offer transitions (see GpManagerPluginGeEvidenceTest).
             engine.markContext(Context.MARKET, 10, "Grand Exchange offer");
@@ -89,29 +89,29 @@ public class GeReconciliationEngineTest
         List<Transaction> counted()
         {
             List<Transaction> out = new ArrayList<>();
-            for (Transaction t : engine.getActiveSession().getTransactions())
+            for (Transaction t : engine.session().transactions())
             {
-                if (t != null && t.isCounted()) out.add(t);
+                if (t != null && t.counts()) out.add(t);
             }
             return out;
         }
 
         long net()
         {
-            return engine.getMetrics(now).net;
+            return engine.metrics(now).net;
         }
 
         /** Fill progress custody holds as evidence; the engine never books it by itself. */
         long filled()
         {
             long total = 0L;
-            for (GeOffer record : engine.geCustody.records()) total += record.getFilledQty();
+            for (GeOffer record : engine.exchange.records()) total += record.getFilledQty();
             return total;
         }
 
         GeOffer record(int itemId)
         {
-            for (GeOffer record : engine.geCustody.records())
+            for (GeOffer record : engine.exchange.records())
             {
                 if (record.itemId == itemId) return record;
             }
@@ -160,7 +160,7 @@ public class GeReconciliationEngineTest
 
     private static long flow(Transaction t, int itemId)
     {
-        for (Flow f : t.getFlows()) if (f.itemId == itemId) return f.valueDelta;
+        for (Flow f : t.flows()) if (f.item == itemId) return f.value;
         return 0L;
     }
 
@@ -187,8 +187,8 @@ public class GeReconciliationEngineTest
 
         Transaction collect = h.geInventory(with(h.inventory, LOGS, 10L));
         assertNotNull(collect);
-        assertEquals(TransactionType.TRADE, collect.getType());
-        assertTrue(collect.isCounted());
+        assertEquals(TransactionType.TRADE, collect.type());
+        assertTrue(collect.counts());
         assertEquals(480L, flow(collect, LOGS));
         assertFalse(new com.google.gson.Gson().toJson(collect).contains("geOfferProvenance"));
         assertEquals(1, h.counted().size());
@@ -215,7 +215,7 @@ public class GeReconciliationEngineTest
         h.inventory = with(h.inventory, SHARK, 10L);
         h.engine.setBaseline(new ContainerSnapshot(h.inventory));
         Transaction placed = h.geInventory(with(h.inventory, SHARK, 0L));
-        assertEquals(TransactionType.TRADE, placed.getType());
+        assertEquals(TransactionType.TRADE, placed.type());
         assertEquals(-8_000L, flow(placed, SHARK));
         h.offer(2, SELLING, SHARK, 10, 0, 800, 0);
         h.offer(2, SOLD, SHARK, 10, 10, 800, 7_840);
@@ -226,7 +226,7 @@ public class GeReconciliationEngineTest
         // shortfall against the counted item loss is the realized result, booked exactly once.
         Transaction collect = h.geInventory(with(h.inventory, COINS, 107_840L));
         assertNotNull(collect);
-        assertTrue(collect.isCounted());
+        assertTrue(collect.counts());
         assertEquals(7_840L, flow(collect, COINS));
         assertEquals(-160L, h.net());
         assertEquals(2, h.counted().size());
@@ -238,10 +238,10 @@ public class GeReconciliationEngineTest
     {
         for (Transaction transaction : h.counted())
         {
-            for (Flow itemFlow : transaction.getFlows())
+            for (Flow itemFlow : transaction.flows())
             {
                 assertTrue("no synthetic GE tax flow may be booked",
-                    itemFlow.itemId != CostKind.GE_TAX_ITEM_ID);
+                    itemFlow.item != CostKind.GE_TAX_ITEM_ID);
             }
         }
     }
@@ -259,7 +259,7 @@ public class GeReconciliationEngineTest
         assertEquals(10L, h.filled());
         assertEquals(1, h.counted().size());
         Transaction collect = h.geInventory(with(h.inventory, COINS, 100_480L));
-        assertTrue(collect.isCounted());
+        assertTrue(collect.counts());
         assertEquals(480L, flow(collect, COINS));
         assertEquals("below the tax floor nothing is guessed", 0L, h.net());
         assertEquals(2, h.counted().size());
@@ -270,13 +270,13 @@ public class GeReconciliationEngineTest
     {
         Harness h = new Harness();
         Transaction placed = h.geInventory(with(h.inventory, COINS, 99_520L));
-        assertTrue("coins into a buy offer are a counted trade until refunded", placed.isCounted());
+        assertTrue("coins into a buy offer are a counted trade until refunded", placed.counts());
         h.offer(4, BUYING, LOGS, 10, 0, 48, 0);
         OfferSlots.Transition cancel = h.offer(4, CANCELLED_BUY, LOGS, 10, 0, 48, 0);
         assertNotNull(cancel);
         assertEquals(0L, h.filled());
         Transaction refund = h.geInventory(with(h.inventory, COINS, 100_000L));
-        assertTrue(refund.isCounted());
+        assertTrue(refund.counts());
         assertEquals("placement and refund cancel out; nothing is double booked", 0L, h.net());
     }
 
@@ -310,7 +310,7 @@ public class GeReconciliationEngineTest
         h.engine.markDirty();
         h.engine.processIfDirty(new ContainerSnapshot(h.inventory), h.now, null);
         Transaction withdrawal = h.engine.processIfDirty(new ContainerSnapshot(h.inventory), h.now + 600L, null);
-        assertTrue("a later bank withdrawal is a transfer, not a gain", withdrawal == null || !withdrawal.isCounted());
+        assertTrue("a later bank withdrawal is a transfer, not a gain", withdrawal == null || !withdrawal.counts());
         assertTrue(h.counted().isEmpty());
     }
 

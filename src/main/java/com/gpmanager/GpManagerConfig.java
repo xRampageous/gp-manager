@@ -89,6 +89,15 @@ public interface GpManagerConfig extends Config {
         return 15;
     }
 
+    enum PvpView { Auto, Always }
+
+    @ConfigItem(keyName = "pvpView", name = "PvP hero view",
+            description = "Auto: dangerous PvP zones. Always: show recorded stats anywhere. Risk stays zone-specific",
+            position = 7, section = lootSection)
+    default PvpView pvpView() {
+        return PvpView.Auto;
+    }
+
     enum TextSize {
         Small, Normal, Large
     }
@@ -278,22 +287,6 @@ public interface GpManagerConfig extends Config {
         return true;
     }
 
-    @ConfigItem(
-            keyName = "includeEquipment", name = "Include equipment",
-            description = "Combine equipment with inventory so gear swaps remain neutral", position = 0,
-            section = accountingSection)
-    default boolean includeEquipment() {
-        return true;
-    }
-
-    @ConfigItem(
-            keyName = "includeRunePouch", name = "Include rune pouch",
-            description = "Count rune pouch runes, so casting from it is a cost", position = 1,
-            section = accountingSection)
-    default boolean includeRunePouch() {
-        return true;
-    }
-
     @ConfigItem(keyName = "stabilizationTicks", name = "", description = "", hidden = true)
     default int stabilizationTicks() {
         return 2;
@@ -304,16 +297,9 @@ public interface GpManagerConfig extends Config {
         return false;
     }
 
-    @ConfigItem(
-            keyName = "persistHistory", name = "Save history",
-            description = "Save sessions locally between RuneLite launches", position = 0, section = grindsSection)
-    default boolean persistHistory() {
-        return true;
-    }
-
     @ConfigItem(keyName = "maxHistorySessions", name = "", description = "", hidden = true)
     default int maxHistorySessions() {
-        return 2_000;
+        return 2000;
     }
 
     @ConfigItem(
@@ -325,7 +311,7 @@ public interface GpManagerConfig extends Config {
 
     @ConfigItem(keyName = "maxTransactionsPerSession", name = "", description = "", hidden = true)
     default int maxTransactionsPerSession() {
-        return 2_000;
+        return 2000;
     }
 
     @ConfigItem(

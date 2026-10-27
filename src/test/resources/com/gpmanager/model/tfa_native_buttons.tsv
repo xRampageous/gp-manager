@@ -1,0 +1,6 @@
+# Pinned RuneLite1.13.3 TfaChests constants and read-only cached interface973 actions.
+# Cache archive SHA256: 5a07e449ff3a45750bd1113cd73d350d21bcf66a8b8b84e8e535dfafe7599b88
+# widget id<TAB>gameval field<TAB>action<TAB>operation<TAB>MenuAction
+63766533	BANK	Bank-all	6	CC_OP_LOW_PRIORITY
+63766535	INVENTORY	Take-all	1	CC_OP
+63766537	DISCARD	Discard-all	6	CC_OP_LOW_PRIORITY

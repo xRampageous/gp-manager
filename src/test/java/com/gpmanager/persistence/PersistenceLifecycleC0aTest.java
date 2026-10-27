@@ -45,7 +45,7 @@ public class PersistenceLifecycleC0aTest
         @Override
         public boolean save(WriteIntent intent)
         {
-            if (intent.scopeGeneration == failingGeneration)
+            if (intent.generation == failingGeneration)
             {
                 failingGeneration = -1L;
                 entered.countDown();
@@ -106,7 +106,7 @@ public class PersistenceLifecycleC0aTest
         try
         {
             writer.submit(new WriteIntent(null,
-                repository.scopeGeneration,
+                repository.generation,
                 0L,
                 state("pending", 1L), null));
             assertTrue(entered.await(5, TimeUnit.SECONDS));
@@ -121,7 +121,7 @@ public class PersistenceLifecycleC0aTest
 
             release.countDown();
             assertTrue(writer.flush(Duration.ofSeconds(5)));
-            assertEquals("pending", repository.load().getActiveSession().getName());
+            assertEquals("pending", repository.load().currentSession().name());
         }
         finally
         {
@@ -169,7 +169,7 @@ public class PersistenceLifecycleC0aTest
             coordinator.start();
             caller.execute(() ->
             {
-                coordinator.switchIdentityAsync(ALICE, true);
+                coordinator.switchIdentityAsync(ALICE);
                 requestReturned.countDown();
             });
             assertTrue(requestReturned.await(1, TimeUnit.SECONDS));
@@ -177,13 +177,13 @@ public class PersistenceLifecycleC0aTest
 
             release.countDown();
             assertTrue(String.valueOf(PersistenceProbe.identityBlockReason(coordinator)),
-                coordinator.switchIdentity(ALICE, true, true));
+                coordinator.switchIdentity(ALICE, true));
             assertEquals(ALICE, coordinator.getActiveIdentity());
         }
         finally
         {
             release.countDown();
-            coordinator.shutdown(false);
+            coordinator.shutdown();
             caller.shutdown();
         }
     }
@@ -228,10 +228,10 @@ public class PersistenceLifecycleC0aTest
         try
         {
             coordinator.start();
-            assertTrue(coordinator.switchIdentity(ALICE, true, true));
+            assertTrue(coordinator.switchIdentity(ALICE, true));
 
             gateLoad.set(true);
-            coordinator.switchIdentityAsync(bob, true);
+            coordinator.switchIdentityAsync(bob);
             assertTrue(entered.await(5, TimeUnit.SECONDS));
 
             CountDownLatch requestReturned = new CountDownLatch(1);
@@ -245,12 +245,12 @@ public class PersistenceLifecycleC0aTest
 
             release.countDown();
             assertTrue(String.valueOf(PersistenceProbe.identityBlockReason(coordinator)),
-                coordinator.switchIdentity(bob, true, true));
+                coordinator.switchIdentity(bob, true));
         }
         finally
         {
             release.countDown();
-            coordinator.shutdown(false);
+            coordinator.shutdown();
             caller.shutdown();
         }
     }
@@ -304,19 +304,19 @@ public class PersistenceLifecycleC0aTest
         CountDownLatch shutdownReturned = new CountDownLatch(1);
         try
         {
-            assertTrue(coordinator.switchIdentity(ALICE, true, true));
+            assertTrue(coordinator.switchIdentity(ALICE, true));
             engine.ensureSession(1_000L);
-            engine.getGeneralSession().rename("Alice");
+            engine.freePlay().rename("Alice");
             assertTrue(coordinator.saveNow());
 
             gateLoad.set(true);
-            coordinator.switchIdentityAsync(bob, true);
+            coordinator.switchIdentityAsync(bob);
             assertTrue(entered.await(5, TimeUnit.SECONDS));
 
             engine.pauseForLifecycle(2_000L);
             caller.execute(() ->
             {
-                coordinator.shutdown(true);
+                coordinator.shutdown();
                 shutdownReturned.countDown();
             });
             assertTrue("shutdown must not wait for the identity restore",
@@ -328,13 +328,13 @@ public class PersistenceLifecycleC0aTest
             assertTrue(writer.flush(Duration.ofSeconds(10)));
             assertEquals(ALICE, coordinator.getActiveIdentity());
             assertTrue(repository.isBound());
-            assertTrue(repository.load().getActiveSession().paused);
-            assertEquals("Alice", repository.load().getActiveSession().getName());
+            assertTrue(repository.load().currentSession().paused);
+            assertEquals("Alice", repository.load().currentSession().name());
         }
         finally
         {
             release.countDown();
-            coordinator.shutdown(false);
+            coordinator.shutdown();
             caller.shutdown();
         }
     }
@@ -352,21 +352,21 @@ public class PersistenceLifecycleC0aTest
         TrackingIdentity bob = new TrackingIdentity("rsprofile.bob", TrackingIdentity.ACCOUNT_HASH_INVALID);
         try
         {
-            assertTrue(coordinator.switchIdentity(ALICE, true, true));
+            assertTrue(coordinator.switchIdentity(ALICE, true));
             engine.ensureSession(1_000L);
-            engine.getGeneralSession().rename("Alice");
+            engine.freePlay().rename("Alice");
             assertTrue(coordinator.saveNow());
 
-            assertTrue(coordinator.switchIdentity(bob, true, true));
+            assertTrue(coordinator.switchIdentity(bob, true));
             engine.ensureSession(2_000L);
-            engine.getGeneralSession().rename("Bob");
+            engine.freePlay().rename("Bob");
             assertTrue(coordinator.saveNow());
 
-            assertTrue(coordinator.switchIdentity(ALICE, true, true));
+            assertTrue(coordinator.switchIdentity(ALICE, true));
             assertEquals(ALICE, coordinator.getActiveIdentity());
-            assertEquals("Alice", engine.getGeneralSession().getName());
-            assertTrue(coordinator.switchIdentity(bob, true, true));
-            assertEquals("Bob", engine.getGeneralSession().getName());
+            assertEquals("Alice", engine.freePlay().name());
+            assertTrue(coordinator.switchIdentity(bob, true));
+            assertEquals("Bob", engine.freePlay().name());
         }
         finally
         {
@@ -389,30 +389,30 @@ public class PersistenceLifecycleC0aTest
         TrackingIdentity bob = new TrackingIdentity("rsprofile.bob", TrackingIdentity.ACCOUNT_HASH_INVALID);
         try
         {
-            assertTrue(coordinator.switchIdentity(ALICE, true, true));
+            assertTrue(coordinator.switchIdentity(ALICE, true));
             engine.ensureSession(1_000L);
-            engine.getGeneralSession().rename("Alice");
+            engine.freePlay().rename("Alice");
             assertTrue(coordinator.saveNow());
-            long aliceGeneration = repository.scopeGeneration;
-            engine.getGeneralSession().rename("failing old save");
+            long aliceGeneration = repository.generation;
+            engine.freePlay().rename("failing old save");
             repository.failNextSaveForGeneration(aliceGeneration);
             coordinator.scheduleSave();
             assertTrue(entered.await(5, TimeUnit.SECONDS));
 
-            coordinator.onHashInvalidated(false);
-            assertTrue(coordinator.switchIdentity(bob, true, true));
+            PersistenceProbe.unbindWithoutSave(coordinator);
+            assertTrue(coordinator.switchIdentity(bob, true));
             engine.ensureSession(2_000L);
-            engine.getGeneralSession().rename("Bob");
-            SaveStatus bobStatus = writer.getStatus();
+            engine.freePlay().rename("Bob");
+            SaveStatus bobStatus = writer.status();
             Path bobPrimary = FilepathTestSupport.path(repository.dataDir().joinSegment("sessions.json"));
 
             release.countDown();
             assertTrue(writer.flush(Duration.ofSeconds(10)));
-            assertEquals(bobStatus.state, writer.getStatus().state);
-            assertSame("the stale completion leaves Bob's status alone", bobStatus, writer.getStatus());
+            assertEquals(bobStatus.state, writer.status().state);
+            assertSame("the stale completion leaves Bob's status alone", bobStatus, writer.status());
             assertEquals(bob, coordinator.getActiveIdentity());
             assertFalse("old-owner failure must not create Bob's file", Files.exists(bobPrimary));
-            assertEquals("Bob", engine.getGeneralSession().getName());
+            assertEquals("Bob", engine.freePlay().name());
         }
         finally
         {

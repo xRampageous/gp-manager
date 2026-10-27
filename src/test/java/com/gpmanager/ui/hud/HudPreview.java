@@ -30,7 +30,7 @@ public final class HudPreview
         emptyAndFiltered(out, now);
         Engine free = HudBuilderTest.engine();
         free.ensureSession(now - 61_000L);
-        free.getActiveSession().addTransaction(receipt(now - 1_000L, TransactionType.LOOT,
+        free.session().addTransaction(receipt(now - 1_000L, TransactionType.LOOT,
             flow(995, "Coins", 100_000L, 1)), 2_000, false);
         free.setMilestone(100_000L);
         GpManagerConfig milestoneConfig = HudBuilderTest.config(false, 4);
@@ -54,10 +54,10 @@ public final class HudPreview
             return flows;
         }, new TransactionClassifier(), config);
         engine.startCustom("Vorkath", now - 2_400_000L);
-        engine.getActiveSession().setProfitTargetGp(5_000_000L);
+        engine.session().setNetTarget(5_000_000L, 0, 0);
 
         HudBuilder builder = new HudBuilder(config, HudPreview::icon);
-        HudTray tray = builder.tray();
+        HudTray tray = builder.tray;
         builder.update(LiveSnapshot.capture(engine, now - 3_000L, null), f -> true, now - 3_000L);
         add(engine, tray, now - 1_500L, flow(22124, "Superior dragon bones", 2L, 21_920));
         add(engine, tray, now - 1_000L, flow(11286, "Draconic visage", 1L, 3_425_000));
@@ -66,7 +66,7 @@ public final class HudPreview
         canvas(out, "hud-grind.png", builder, config, 520, 260);
 
         // The same loot with no target: no bar, no label (owner live 2026-10-13).
-        engine.getActiveSession().setProfitTargetGp(null);
+        engine.session().setNetTarget(null, 0, 0);
         builder.update(LiveSnapshot.capture(engine, now + 1L, null), f -> true, now + 1L);
         canvas(out, "hud-loot.png", builder, config, 520, 260);
 
@@ -79,7 +79,7 @@ public final class HudPreview
         }, new TransactionClassifier(), config);
         raid.startCustom("Theatre of Blood", now - 2_100_000L);
         HudBuilder raidBuilder = new HudBuilder(config, HudPreview::icon);
-        HudTray raidTray = raidBuilder.tray();
+        HudTray raidTray = raidBuilder.tray;
         raidBuilder.update(LiveSnapshot.capture(raid, now - 1_200L, null), f -> true, now - 1_200L);
         for (int i = 0; i < 15; i++)
         {
@@ -114,10 +114,10 @@ public final class HudPreview
             return flows;
         }, new TransactionClassifier(), config);
         timed.startCustom("Vorkath", now - 61_000L);
-        timed.getActiveSession().addTransaction(receipt(now - 500L, TransactionType.LOOT,
+        timed.session().addTransaction(receipt(now - 500L, TransactionType.LOOT,
             flow(536, "Dragon bones", 2L, 3_930)), 2_000, false);
-        timed.getActiveSession().setActiveTimeTargetMillis(60_000L, now);
-        timed.getActiveSession().activeTimeTargetSetMillis = 9_000L;
+        timed.session().setTimeTarget(60_000L, now);
+        timed.session().activeTimeTargetSetMillis = 9_000L;
         HudBuilder timedBuilder = new HudBuilder(config, HudPreview::icon);
         timedBuilder.update(LiveSnapshot.capture(timed, now, null), f -> true, now);
         canvas(out, "hud-time-warning.png", timedBuilder, config, 520, 160);
@@ -137,8 +137,8 @@ public final class HudPreview
                     @Override public int hudMaxWidth() { return width; }
                 };
                 HudBuilder builder = new HudBuilder(config, HudPreview::icon);
-                builder.tray.booked(receipt(now, TransactionType.LOOT, flow(1201, "Rune kiteshield", 1, 31_799)), now, false);
-                builder.tray.booked(receipt(now, TransactionType.LOOT, flow(560, "Death rune", 20_000, 10_000)), now, false);
+                builder.tray.booked(receipt(now, TransactionType.LOOT, flow(1201, "Rune kiteshield", 1, 31_799)), now, false, now);
+                builder.tray.booked(receipt(now, TransactionType.LOOT, flow(560, "Death rune", 20_000, 10_000)), now, false, now);
                 builder.update(HudBuilderTest.grind(200_031_799L, null), item -> true, now + 1000);
                 canvas(out, "hud-" + (mode == 2 ? "semi-compact" : mode == 1 ? "compact" : "named") + "-" + width + ".png", builder, config, 400, 180);
             }
@@ -158,8 +158,8 @@ public final class HudPreview
         HudBuilder builder = new HudBuilder(config, HudPreview::icon);
         builder.update(LiveSnapshot.capture(engine, now, null), f -> true, now);
         shot(out, "hud-empty.png", builder, config);
-        builder.tray().booked(receipt(now, TransactionType.LOOT, flow(526, "Bones", 1L, 41)), now, false);
-        engine.getActiveSession().addTransaction(receipt(now, TransactionType.LOOT, flow(526, "Bones", 1L, 41)), 2_000, false);
+        builder.tray.booked(receipt(now, TransactionType.LOOT, flow(526, "Bones", 1L, 41)), now, false, now);
+        engine.session().addTransaction(receipt(now, TransactionType.LOOT, flow(526, "Bones", 1L, 41)), 2_000, false);
         builder.update(LiveSnapshot.capture(engine, now + 10L, null), f -> false, now + 10L);
         shot(out, "hud-filtered.png", builder, config);
         shot(out, "hud-narrow.png", builder, new GpManagerConfig()
@@ -200,8 +200,8 @@ public final class HudPreview
 
     private static void add(Engine engine, HudTray tray, long at, Flow item)
     {
-        engine.getActiveSession().addTransaction(receipt(at, TransactionType.LOOT, item), 2_000, false);
-        tray.booked(receipt(at, TransactionType.LOOT, item), at, false);
+        engine.session().addTransaction(receipt(at, TransactionType.LOOT, item), 2_000, false);
+        tray.booked(receipt(at, TransactionType.LOOT, item), at, false, at);
     }
 
     /** A stand-in sprite: RuneLite's item images are 36 x 32. */

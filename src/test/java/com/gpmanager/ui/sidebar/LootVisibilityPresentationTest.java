@@ -21,11 +21,11 @@ public class LootVisibilityPresentationTest
         Engine engine = PresentationLifecycleTest.engine();
         long now = System.currentTimeMillis();
         engine.startCustom("Vorkath", now);
-        engine.getActiveSession().addTransaction(
+        engine.session().addTransaction(
             transaction(now + 1_000L, "Cheap bones", 1, TransactionType.GAIN, 2, 100, 200L), 2_000, false);
-        engine.getActiveSession().addTransaction(
+        engine.session().addTransaction(
             transaction(now + 2_000L, "Valuable hide", 2, TransactionType.GAIN, 1, 5_000, 5_000L), 2_000, false);
-        long net = engine.getMetrics(now + 3_000L).net;
+        long net = engine.metrics(now + 3_000L).net;
 
         LiveSnapshot unfiltered = LiveSnapshot.capture(engine, now + 3_000L, LiveContext.NONE);
         assertEquals("both gains are visible with no minimum", 2, unfiltered.recent.size());
@@ -35,9 +35,9 @@ public class LootVisibilityPresentationTest
         assertEquals("the cheap gain is hidden from presentation", 1, filtered.recent.size());
         assertEquals("Valuable hide", filtered.recent.get(0).name);
         assertEquals("canonical net is untouched by presentation filtering", net,
-            engine.getMetrics(now + 3_000L).net);
+            engine.metrics(now + 3_000L).net);
         assertEquals("the hidden receipt is still canonical session truth",
-            2, engine.getActiveSession().getTransactions().size());
+            2, engine.session().transactions().size());
     }
 
     @Test
@@ -46,10 +46,10 @@ public class LootVisibilityPresentationTest
         Engine engine = PresentationLifecycleTest.engine();
         long now = System.currentTimeMillis();
         engine.startCustom("Vorkath", now);
-        engine.getActiveSession().addTransaction(
+        engine.session().addTransaction(
             transaction(now + 1_000L, "Prayer potion(4)", 3, TransactionType.CONSUMPTION, -2, 9_800, -19_600L), 2_000, false);
         // Unit price 0: the price is unknown, so the minimum cannot judge it.
-        engine.getActiveSession().addTransaction(
+        engine.session().addTransaction(
             transaction(now + 2_000L, "Unidentified mineral", 8, TransactionType.GAIN, 8, 0, 0L), 2_000, false);
 
         LiveContext minimum = new LiveContext(false, null, 1_000_000L, PvpState.NONE, "", false, "", false);
@@ -64,7 +64,7 @@ public class LootVisibilityPresentationTest
             }
         }
         assertNotNull("the unpriced gain stays visible", mineral);
-        assertTrue("the unpriced row keeps its unknown marker", mineral.unpriced);
+        assertTrue("the unpriced row keeps its unknown marker", mineral.unknown);
     }
 
     @Test
@@ -73,16 +73,16 @@ public class LootVisibilityPresentationTest
         Engine engine = PresentationLifecycleTest.engine();
         long now = System.currentTimeMillis();
         engine.startCustom("Vorkath", now);
-        engine.getActiveSession().addTransaction(
+        engine.session().addTransaction(
             transaction(now + 1_000L, "Vial", 1, TransactionType.GAIN, 3, 1, 3L), 2_000, false);
-        engine.getActiveSession().addTransaction(
+        engine.session().addTransaction(
             transaction(now + 2_000L, "Dragon bones", 1, TransactionType.GAIN, 2, 3_200, 6_400L), 2_000, false);
-        long net = engine.getMetrics(now + 3_000L).net;
+        long net = engine.metrics(now + 3_000L).net;
 
         SidebarPanel panel = onEdt(() ->
         {
             SidebarPanel created = new SidebarPanel(engine, PresentationLifecycleTest.config(), null, null, null);
-            created.bindFilter(flow -> !"Vial".equals(flow.itemName));
+            created.bindFilter(flow -> !"Vial".equals(flow.name));
             SidebarPanelProbe.refresh(created);
             return created;
         });
@@ -91,7 +91,7 @@ public class LootVisibilityPresentationTest
         assertEquals("the filtered item is not rendered", 1, snapshot.recent.size());
         assertEquals("Dragon bones", snapshot.recent.get(0).name);
         assertEquals("the booked net is unchanged by the presentation filter", net, snapshot.net);
-        assertTrue("the hidden receipt stays canonical", engine.getActiveSession().getTransactions().size() == 2);
+        assertTrue("the hidden receipt stays canonical", engine.session().transactions().size() == 2);
     }
 
     @Test
@@ -114,7 +114,7 @@ public class LootVisibilityPresentationTest
         Engine engine = PresentationLifecycleTest.engine();
         long now = System.currentTimeMillis();
         engine.startCustom("Vorkath", now);
-        engine.getActiveSession().addTransaction(
+        engine.session().addTransaction(
             transaction(now + 1_000L, "Cheap bones", 1, TransactionType.GAIN, 2, 100, 200L), 2_000, false);
 
         SidebarPanel panel = onEdt(() -> new SidebarPanel(engine, minimumConfig("500"), null, null, null));

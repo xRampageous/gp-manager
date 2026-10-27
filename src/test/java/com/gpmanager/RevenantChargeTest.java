@@ -17,11 +17,11 @@ public class RevenantChargeTest
     {
         ChargeCheck bow = ChargeCheck.parse("Your bow has 198 charges left powering it.");
         assertNotNull("the owner's live line must parse", bow);
-        assertTrue(bow.bookable);
-        assertEquals(Long.valueOf(198L), bow.componentCounts.get(ItemID.WILD_CAVE_SHARD));
-        assertEquals(Long.valueOf(1L), ChargeCheck.parse("Your sceptre has 1 charge left powering it.").componentCounts
+        assertTrue(bow.supported);
+        assertEquals(Long.valueOf(198L), bow.counts.get(ItemID.WILD_CAVE_SHARD));
+        assertEquals(Long.valueOf(1L), ChargeCheck.parse("Your sceptre has 1 charge left powering it.").counts
             .get(ItemID.WILD_CAVE_SHARD));
-        assertEquals(Long.valueOf(1_250L), ChargeCheck.parse("Your chainmace has 1,250 charges left powering it.").componentCounts
+        assertEquals(Long.valueOf(1_250L), ChargeCheck.parse("Your chainmace has 1,250 charges left powering it.").counts
             .get(ItemID.WILD_CAVE_SHARD));
     }
 
@@ -34,7 +34,7 @@ public class RevenantChargeTest
         ChargeIntake intake = new ChargeIntake(client, null, HudBuilderTest.config(true, 4), engine, null);
         intake.startCheck(ChargeCheck.ChargedItem.WEBWEAVER, "worn:webweaver", 10, 2);
         assertTrue(intake.observeCheck("Your bow has 198 charges left powering it.", 1_000L));
-        MeasuredChargeReadTracker.Baseline read = engine.measuredChargeReadTracker.baselines.get("worn:webweaver");
+        MeasuredChargeReadTracker.Baseline read = engine.checks.baseline.get("worn:webweaver");
         assertNotNull("a Check of the Webweaver bow is kept for that bow", read);
         assertEquals(ChargeCheck.ChargedItem.WEBWEAVER, read.getRead().variant);
     }

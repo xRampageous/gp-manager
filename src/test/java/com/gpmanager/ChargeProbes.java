@@ -21,7 +21,7 @@ final class ChargeProbes
         long total = 0L;
         for (ChargeEstimateJournal.Receipt receipt : journal.receipts(sessionId, targetIdentity, itemId))
         {
-            total = SafeMath.safeAdd(total, Math.max(0L, receipt.remainingQuantity));
+            total = SafeMath.sum(total, Math.max(0L, receipt.remaining));
         }
         return total;
     }

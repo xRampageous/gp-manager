@@ -29,7 +29,7 @@ public final class ChargeLoadTransferEvidenceTest
         LoadTarget partition = evidence.loadTarget(Arrays.asList(scales, darts));
 
         assertTrue(partition.remaining.isEmpty());
-        assertEquals(Arrays.asList(scales, darts), partition.ambiguousCandidates);
+        assertEquals(Arrays.asList(scales, darts), partition.unknown);
     }
 
     @Test
@@ -44,7 +44,7 @@ public final class ChargeLoadTransferEvidenceTest
         LoadTarget partition = evidence.loadTarget(Arrays.asList(first, second));
 
         assertTrue(partition.remaining.isEmpty());
-        assertEquals(Arrays.asList(first, second), partition.ambiguousCandidates);
+        assertEquals(Arrays.asList(first, second), partition.unknown);
     }
 
     @Test
@@ -59,8 +59,8 @@ public final class ChargeLoadTransferEvidenceTest
         LoadTarget firstPartition = evidence.loadTarget(Collections.singletonList(first));
         LoadTarget secondPartition = evidence.loadTarget(Collections.singletonList(second));
 
-        assertEquals(Collections.singletonList(first), firstPartition.ambiguousCandidates);
-        assertEquals(Collections.singletonList(second), secondPartition.ambiguousCandidates);
+        assertEquals(Collections.singletonList(first), firstPartition.unknown);
+        assertEquals(Collections.singletonList(second), secondPartition.unknown);
     }
 
     @Test
@@ -95,9 +95,9 @@ public final class ChargeLoadTransferEvidenceTest
             "Death rune",
             null,
             2));
-        evidence.inbox.tick(evidence.inbox.now + 1);
-        evidence.inbox.tick(evidence.inbox.now + 1);
-        assertNull("the stale load intent is gone", evidence.inbox.peek(Inbox.LOAD_TARGET));
+        evidence.events.tick(evidence.events.now + 1);
+        evidence.events.tick(evidence.events.now + 1);
+        assertNull("the stale load intent is gone", evidence.events.peek(Inbox.LOAD_TARGET));
     }
 
 }

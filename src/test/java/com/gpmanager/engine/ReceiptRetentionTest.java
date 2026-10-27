@@ -59,12 +59,12 @@ public class ReceiptRetentionTest
         engine.restore(new SavedState(null, null, Arrays.asList(boundary, old, old, active)), now);
 
         assertEquals(2, engine.compactOlderThan(30, now));
-        assertEquals("a row exactly at the cutoff is retained", 1, boundary.getTransactions().size());
-        assertTrue(old.getTransactions().isEmpty());
+        assertEquals("a row exactly at the cutoff is retained", 1, boundary.transactions().size());
+        assertTrue(old.transactions().isEmpty());
         assertEquals(1L, old.compactedTransactionCount);
-        assertEquals(200L, old.metrics(now).revenue);
-        assertEquals("only the active owner's overdue row folds", 1, active.getTransactions().size());
-        assertEquals(350L, active.metrics(now).revenue);
+        assertEquals(200L, old.metrics(now).income);
+        assertEquals("only the active owner's overdue row folds", 1, active.transactions().size());
+        assertEquals(350L, active.metrics(now).income);
         assertEquals(0, engine.compactOlderThan(30, now));
         assertEquals(0, engine.compactOlderThan(0, now));
     }
@@ -80,15 +80,15 @@ public class ReceiptRetentionTest
 
         SavedState state = new SavedState(null, null, Collections.singletonList(session));
         state.setPendingClaims(Collections.singletonList(new SavedState.PendingClaim(
-            audit.getId() + "#2", net.runelite.api.gameval.ItemID.WILDY_LOOT_KEY1, 1L,
-            audit.timestampEpochMillis)));
+            audit.id() + "#2", net.runelite.api.gameval.ItemID.WILDY_LOOT_KEY1, 1L,
+            audit.timestamp)));
 
         Engine engine = engine();
         engine.restore(state, now);
 
         assertEquals("a multi-key claim protects the shared origin audit row", 1,
-            session.getTransactions().size());
-        assertTrue(engine.getPendingClaims().get(0).getClaimId().endsWith("#2"));
+            session.transactions().size());
+        assertTrue(engine.pendingClaims().get(0).claimId().endsWith("#2"));
         assertEquals(0, engine.compactOlderThan(90, now));
     }
 
@@ -102,7 +102,7 @@ public class ReceiptRetentionTest
         session.addTransaction(receipt(now - 200L * DAY + 61_000L, 250L), 10, false);
         session.addTransaction(receipt(now - 200L * DAY + 62_500L, -40L), 10, false);
         String encounter = session.addEncounter(true, now - 200L * DAY + 62_000L);
-        session.attachToEncounter(session.getTransactions().get(1).getId(), encounter, false);
+        session.attachToEncounter(session.transactions().get(1).id(), encounter, false);
         session.close(now - 200L * DAY + 120_000L);
 
         Metrics before = session.metrics(now);
@@ -113,17 +113,17 @@ public class ReceiptRetentionTest
         assertEquals("current-schema restore already compacted the overdue rows", 0,
             engine.compactOlderThan(90, now));
 
-        assertTrue(session.getTransactions().isEmpty());
+        assertTrue(session.transactions().isEmpty());
         assertEquals(3L, session.compactedTransactionCount);
-        assertEquals("Favourite trip", session.getName());
+        assertEquals("Favourite trip", session.name());
         assertEquals("compacted receipts keep the kill count", 1, session.pk().kills);
 
         Metrics after = session.metrics(now);
-        assertEquals(before.revenue, after.revenue);
-        assertEquals(before.costs, after.costs);
+        assertEquals(before.income, after.income);
+        assertEquals(before.cost, after.cost);
         assertEquals(before.net, after.net);
-        assertEquals(350L, after.revenue);
-        assertEquals(40L, after.costs);
+        assertEquals(350L, after.income);
+        assertEquals(40L, after.cost);
         assertEquals(250L, bestKillBefore);
         assertEquals(bestKillBefore, session.bestKill());
     }
@@ -138,9 +138,9 @@ public class ReceiptRetentionTest
         Engine engine = engine();
         engine.restore(current, now);
 
-        assertTrue(overdue.getTransactions().isEmpty());
+        assertTrue(overdue.transactions().isEmpty());
         assertEquals(1L, overdue.compactedTransactionCount);
-        assertEquals(750L, overdue.metrics(now).revenue);
+        assertEquals(750L, overdue.metrics(now).income);
         assertEquals("the restore counts as today's sweep", 0, engine.maintainRetention(now + 1_000L));
     }
 

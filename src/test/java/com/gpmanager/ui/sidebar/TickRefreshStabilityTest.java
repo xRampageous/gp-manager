@@ -26,7 +26,7 @@ public class TickRefreshStabilityTest
         Engine engine = PresentationLifecycleTest.engine();
         long now = System.currentTimeMillis();
         engine.startCustom("Vorkath", now);
-        engine.getActiveSession().addTransaction(gain(now + 1_000L, "Dragon bones", 536, 3_200L), 2_000, false);
+        engine.session().addTransaction(gain(now + 1_000L, "Dragon bones", 536, 3_200L), 2_000, false);
         SidebarPanel panel = onEdt(() ->
         {
             SidebarPanel created = new SidebarPanel(engine, PresentationLifecycleTest.config(), null, null, null);
@@ -47,7 +47,7 @@ public class TickRefreshStabilityTest
             assertSame("tick " + index + " kept the same component", before.get(index), afterTicks.get(index));
         }
 
-        engine.getActiveSession().addTransaction(gain(now + 2_000L, "Rune platebody", 1127, 38_000L), 2_000, false);
+        engine.session().addTransaction(gain(now + 2_000L, "Rune platebody", 1127, 38_000L), 2_000, false);
         panel.tick();
         flushEdt();
         List<Component> afterBooking = onEdt(() -> children(SidebarPanelProbe.livePage(panel).body()));
@@ -60,7 +60,7 @@ public class TickRefreshStabilityTest
         Engine engine = PresentationLifecycleTest.engine();
         long now = System.currentTimeMillis();
         engine.startCustom("Vorkath", now);
-        engine.getActiveSession().addTransaction(gain(now + 1_000L, "Dragon bones", 536, 3_200L), 2_000, false);
+        engine.session().addTransaction(gain(now + 1_000L, "Dragon bones", 536, 3_200L), 2_000, false);
         SidebarPanel panel = onEdt(() ->
         {
             SidebarPanel created = new SidebarPanel(engine, PresentationLifecycleTest.config(), null, null, null);
@@ -78,7 +78,7 @@ public class TickRefreshStabilityTest
         List<Component> afterTicks = onEdt(() -> children(SidebarPanelProbe.ledgerPage(panel).body()));
         assertEquals("ticks never rebuild the open Ledger", before, afterTicks);
 
-        engine.getActiveSession().addTransaction(gain(now + 2_000L, "Rune platebody", 1127, 38_000L), 2_000, false);
+        engine.session().addTransaction(gain(now + 2_000L, "Rune platebody", 1127, 38_000L), 2_000, false);
         panel.tick();
         flushEdt();
         List<Component> afterBooking = onEdt(() -> children(SidebarPanelProbe.ledgerPage(panel).body()));

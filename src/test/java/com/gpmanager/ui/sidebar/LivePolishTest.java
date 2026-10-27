@@ -21,11 +21,11 @@ public class LivePolishTest {
             LiveSnapshot snapshot = target(true, false);
             page.apply(snapshot);
             for (int room : new int[]{1, 8, 20}) {
-                page.target.setSize(14 + page.targetTopActions.getPreferredSize().width + room, 100);
+                page.target.setSize(14 + page.top.getPreferredSize().width + room, 100);
                 page.apply(snapshot);
-                assertEquals("TARGET", page.targetTitle.getToolTipText());
-                assertFalse("a narrow title keeps an ellipsis", page.targetTitle.getText().isEmpty());
-                assertTrue(page.targetTitle.getFont().getSize2D() >= 10f);
+                assertEquals("TARGET", page.heading.getToolTipText());
+                assertFalse("a narrow title keeps an ellipsis", page.heading.getText().isEmpty());
+                assertTrue(page.heading.getFont().getSize2D() >= 10f);
             }
             return null;
         });
@@ -37,14 +37,14 @@ public class LivePolishTest {
                 LivePage page = MilestoneTest.page();
                 LiveSnapshot snapshot = target(time, reached);
                 page.apply(snapshot);
-                String tooltip = page.targetTitle.getToolTipText();
-                int controls = page.targetTopActions.isVisible() ? page.targetTopActions.getPreferredSize().width : 0;
+                String tooltip = page.heading.getToolTipText();
+                int controls = page.top.isVisible() ? page.top.getPreferredSize().width : 0;
                 for (int width : new int[]{213, 225, 300, controls + 15}) {
                     page.target.setSize(width, 100);
                     page.apply(snapshot);
-                    assertEquals(tooltip, page.targetTitle.getToolTipText());
-                    assertFalse(page.targetTitle.getText().isEmpty());
-                    assertTrue(page.targetTitle.getFont().getSize2D() >= 10f);
+                    assertEquals(tooltip, page.heading.getToolTipText());
+                    assertFalse(page.heading.getText().isEmpty());
+                    assertTrue(page.heading.getFont().getSize2D() >= 10f);
                 }
             }
             return null;
@@ -61,23 +61,23 @@ public class LivePolishTest {
             SidebarPanelProbe.refresh(panel);
             LivePage page = panel.live;
             LiveSnapshot old = live(engine, 30L);
-            old.pvpPossible = true;
+            old.possible = true;
             old.risk = 75_000L;
-            old.reviewCount = 2;
-            old.pendingKeys = 1;
+            old.reviews = 2;
+            old.keys = 1;
             page.apply(old);
             assertTrue(visible(page.risk, panel));
-            assertTrue(visible(page.runTotal, panel));
-            String owner = engine.getActiveSession().getId();
-            long net = engine.getMetrics(30L).net;
+            assertTrue(visible(page.total, panel));
+            String owner = engine.session().id();
+            long net = engine.metrics(30L).net;
 
             panel.suspend();
 
-            for (Component detail : new Component[]{page.hero, page.runTotal, page.risk,
+            for (Component detail : new Component[]{page.hero, page.total, page.risk,
                     page.hero.icons, page.counts, page.target, page.recent, page.offers})
                 assertFalse("no old owner detail is visible: " + detail.getClass().getSimpleName(), visible(detail, panel));
-            assertEquals(owner, engine.getActiveSession().getId());
-            assertEquals(net, engine.getMetrics(30L).net);
+            assertEquals(owner, engine.session().id());
+            assertEquals(net, engine.metrics(30L).net);
 
             engine.restoreProfile("second-owner", new SavedState(), 40L);
             engine.startCustom("Zulrah", 41L);
@@ -87,10 +87,10 @@ public class LivePolishTest {
             assertTrue(visible(page.hero, panel));
             assertEquals("Zulrah", page.hero.name.getText());
             assertFalse(visible(page.risk, panel));
-            assertFalse(visible(page.runTotal, panel));
+            assertFalse(visible(page.total, panel));
             assertFalse(visible(page.target, panel));
             assertEquals(0, page.counts.getComponentCount());
-            assertEquals(700L, engine.getMetrics(43L).net);
+            assertEquals(700L, engine.metrics(43L).net);
             assertNull("Live has no duplicate Grind controls", page.pageBar());
             return null;
         });
@@ -112,7 +112,7 @@ public class LivePolishTest {
             assertTrue(panel.live.recent.rows.isEmpty());
             assertFalse(visible(panel.live.target, panel));
             assertTrue(visible(panel.live.recent, panel));
-            assertEquals(0L, engine.getMetrics(21L).net);
+            assertEquals(0L, engine.metrics(21L).net);
             return null;
         });
     }
@@ -123,7 +123,7 @@ public class LivePolishTest {
             var rows = new ArrayList<Table.Row>();
             for (int i = 0; i < 20; i++) rows.add(TableRows.row("row-" + i, "Item " + i, "1", "+1", Kit.Tone.GAIN));
             for (Table table : new Table[]{page.recent, page.offers}) {
-                table.setRowsPerPage(5).setRows(rows);
+                table.setPageSize(5).setRows(rows);
                 table.next.doClick();
                 assertEquals(1, table.page);
             }
@@ -142,7 +142,7 @@ public class LivePolishTest {
             SidebarPanel panel = new SidebarPanel(engine, PresentationLifecycleTest.config(), null, null, null);
             panel.shell.show(Shell.GRINDS);
             SidebarPanelProbe.refresh(panel);
-            assertTrue(visible(panel.grinds.running, panel));
+            assertTrue(visible(panel.plans.running, panel));
             panel.suspend();
             for (String tab : new String[]{Shell.GRINDS, Shell.LEDGER, Shell.LIVE}) {
                 panel.shell.show(tab);
@@ -156,11 +156,11 @@ public class LivePolishTest {
             panel.resume();
             assertTrue(visible(panel.live.hero, panel));
             panel.shell.show(Shell.GRINDS);
-            assertFalse("Grinds waits for its new snapshot", visible(panel.grinds.body, panel));
+            assertFalse("Grinds waits for its new snapshot", visible(panel.plans.body, panel));
             SidebarPanelProbe.refresh(panel);
-            assertTrue(visible(panel.grinds.running, panel));
-            assertTrue(panel.grinds.runningName.getText().contains("Zulrah"));
-            assertFalse(panel.grinds.runningName.getText().contains("Old owner"));
+            assertTrue(visible(panel.plans.running, panel));
+            assertTrue(panel.plans.caption.getText().contains("Zulrah"));
+            assertFalse(panel.plans.caption.getText().contains("Old owner"));
             return null;
         });
     }

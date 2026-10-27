@@ -52,10 +52,10 @@ public class ChargeUnloadTest
             }
         }
         assertNotNull(result);
-        assertEquals("the refund is a transfer, not income", TransactionType.TRANSFER, result.getType());
-        assertFalse(result.isCounted());
-        assertEquals("nothing books to the session", 0L, engine.getMetrics(T0 + 2_400L).net);
-        assertEquals(0L, engine.getMetrics(T0 + 2_400L).costs);
+        assertEquals("the refund is a transfer, not income", TransactionType.TRANSFER, result.type());
+        assertFalse(result.counts());
+        assertEquals("nothing books to the session", 0L, engine.metrics(T0 + 2_400L).net);
+        assertEquals(0L, engine.metrics(T0 + 2_400L).cost);
     }
 
     @Test
@@ -108,8 +108,8 @@ public class ChargeUnloadTest
             }
         }
         assertNotNull(result);
-        assertEquals("a slow confirm is still a transfer, not income", TransactionType.TRANSFER, result.getType());
-        assertEquals(0L, engine.getMetrics(now).net);
+        assertEquals("a slow confirm is still a transfer, not income", TransactionType.TRANSFER, result.type());
+        assertEquals(0L, engine.metrics(now).net);
     }
 
     @Test

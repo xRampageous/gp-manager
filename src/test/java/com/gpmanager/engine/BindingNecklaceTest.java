@@ -44,9 +44,9 @@ public class BindingNecklaceTest
     public void theCrumbleBooksOneCountedLoss()
     {
         Engine engine = settle(Map.of(NECKLACE, 1L), Map.of());
-        List<Transaction> rows = engine.getActiveSession().getTransactions();
+        List<Transaction> rows = engine.session().transactions();
         assertEquals(rows.toString(), 1, rows.size());
-        assertTrue(rows.get(0).isCounted());
-        assertEquals(-620L, engine.getMetrics(1_010_000L).net);
+        assertTrue(rows.get(0).counts());
+        assertEquals(-620L, engine.metrics(1_010_000L).net);
     }
 }

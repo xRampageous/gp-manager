@@ -116,10 +116,10 @@ public class ChargeSpendBookingTest
             1_200L, null);
 
         assertNotNull(transaction);
-        assertEquals(TransactionType.CONSUMPTION, transaction.getType());
-        assertTrue(transaction.isCounted());
-        assertEquals(ActionKind.FIRE, transaction.getActionKind());
-        assertEquals(-308L, transaction.getNet());
+        assertEquals(TransactionType.CONSUMPTION, transaction.type());
+        assertTrue(transaction.counts());
+        assertEquals(ActionKind.FIRE, transaction.action());
+        assertEquals(-308L, transaction.net());
     }
 
     @Test

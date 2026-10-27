@@ -34,10 +34,10 @@ public class BigDropLineTest
     {
         HudTray tray = new HudTray();
         tray.big = 1_000_000L;
-        tray.booked(receipt(1_000L, TransactionType.LOOT, flow(4151, "Abyssal whip", 1L, 1_500_000)), 1_000L, false);
+        tray.booked(receipt(1_000L, TransactionType.LOOT, flow(4151, "Abyssal whip", 1L, 1_500_000)), 1_000L, false, 1_000L);
         assertTrue(tray.entries().get(0).gold);
         tray.big = HudTray.BIG_DROP;
-        tray.booked(receipt(2_000L, TransactionType.LOOT, flow(11840, "Dragon boots", 1L, 1_500_000)), 2_000L, false);
+        tray.booked(receipt(2_000L, TransactionType.LOOT, flow(11840, "Dragon boots", 1L, 1_500_000)), 2_000L, false, 2_000L);
         assertFalse(tray.entries().get(0).gold);
     }
 }

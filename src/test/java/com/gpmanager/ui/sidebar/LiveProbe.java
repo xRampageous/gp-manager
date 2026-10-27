@@ -14,7 +14,7 @@ public final class LiveProbe
     public static List<LiveSnapshot.Recent> recent(List<Transaction> transactions, LiveContext ctx)
     {
         LiveContext context = ctx == null ? LiveContext.NONE : ctx;
-        return LiveSnapshot.recentRows(Semantics.capture(transactions, Collections.emptyList(),
+        return LiveSnapshot.recentRows(SemanticProbe.capture(transactions, Collections.emptyList(),
             "", context::flowVisible), Collections.emptyMap(), context.filter);
     }
 

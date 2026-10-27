@@ -30,7 +30,7 @@ public class DevMarkerPresentationTest
         JLabel badge = onEdt(() -> SidebarPanelProbe.buildBadge(panel));
         assertNotNull("development builds must identify themselves", badge);
         assertEquals("DEV \u00b7 1.2.0 \u00b7 01:24Z", badge.getText());
-        assertNotNull(ShellProbe.badge(panel.shell()));
+        assertNotNull(ShellProbe.badge(panel.shell));
         assertTrue("full identity belongs in the tooltip",
             badge.getToolTipText().contains("Version: 1.2.0-dev"));
         assertTrue(badge.getToolTipText().contains("Schema: 105"));
@@ -54,7 +54,7 @@ public class DevMarkerPresentationTest
         });
 
         assertNull("release builds must not claim to be development", SidebarPanelProbe.buildBadge(panel));
-        assertNull(ShellProbe.badge(panel.shell()));
+        assertNull(ShellProbe.badge(panel.shell));
     }
 
     @Test
@@ -80,13 +80,13 @@ public class DevMarkerPresentationTest
         Engine engine = PresentationLifecycleTest.engine();
         long now = System.currentTimeMillis();
         engine.startCustom("Vorkath", now);
-        engine.getActiveSession().addTransaction(new Transaction(
+        engine.session().addTransaction(new Transaction(
             now + 1L, TransactionType.CONSUMPTION,
             Context.GENERIC, "", "Vorkath", true,
             java.util.Arrays.asList(new Flow(385, "Shark", -1L, 950, -950L)),
             Confidence.CONFIRMED, "Exact cost fixture", null), 2_000, false);
-        long net = engine.getMetrics(now + 2L).net;
-        int receipts = engine.getActiveSession().getTransactions().size();
+        long net = engine.metrics(now + 2L).net;
+        int receipts = engine.session().transactions().size();
 
         SidebarPanel panel = onEdt(() -> new SidebarPanel(engine, PresentationLifecycleTest.config(), null, null, null));
         onEdt(() ->
@@ -98,8 +98,8 @@ public class DevMarkerPresentationTest
         });
 
         assertNotNull(SidebarPanelProbe.buildBadge(panel));
-        assertEquals("the build marker is presentation only", net, engine.getMetrics(now + 2L).net);
-        assertEquals(receipts, engine.getActiveSession().getTransactions().size());
+        assertEquals("the build marker is presentation only", net, engine.metrics(now + 2L).net);
+        assertEquals(receipts, engine.session().transactions().size());
     }
 
     private static <T> T onEdt(java.util.concurrent.Callable<T> callable) throws Exception

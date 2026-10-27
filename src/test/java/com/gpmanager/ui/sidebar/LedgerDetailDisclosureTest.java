@@ -29,20 +29,20 @@ public class LedgerDetailDisclosureTest
     {
         Engine engine = session();
         Transaction first = iceBurst(T0 + 1_000L);
-        engine.getActiveSession().addTransaction(first, 2_000, false);
-        engine.getActiveSession().addTransaction(iceBurst(T0 + 2_000L), 2_000, false);
-        engine.getActiveSession().addTransaction(iceBurst(T0 + 3_000L), 2_000, false);
+        engine.session().addTransaction(first, 2_000, false);
+        engine.session().addTransaction(iceBurst(T0 + 2_000L), 2_000, false);
+        engine.session().addTransaction(iceBurst(T0 + 3_000L), 2_000, false);
         // A Shark group whose transaction also carries an unrelated coin gain.
         Transaction mixed = new Transaction(T0 + 4_000L, TransactionType.CONSUMPTION,
             Context.GENERIC, "", "Vorkath", true, Arrays.asList(
                 new Flow(SHARK, "Shark", -1L, 950, -950L, PriceSource.GRAND_EXCHANGE),
                 new Flow(995, "Coins", 500L, 1, 500L, PriceSource.FACE_VALUE)),
             Confidence.CONFIRMED, "Loot and food", null);
-        mixed.setActionKind(ActionKind.EAT);
-        engine.getActiveSession().addTransaction(mixed, 2_000, false);
+        mixed.setAction(ActionKind.EAT);
+        engine.session().addTransaction(mixed, 2_000, false);
 
         LedgerData data = capture(engine, T0 + 10_000L,
-            entry(LedgerData.CostView.SUPPLIES, first.getId()));
+            entry(LedgerData.CostView.SUPPLIES, first.id()));
         assertNotNull(data.detail);
         assertEquals("the action total reconciles", -2_460L, data.detail.group.value);
         LedgerPage page = onEdt(() ->
@@ -54,7 +54,7 @@ public class LedgerDetailDisclosureTest
 
         List<String> cards = onEdt(() -> LedgerPageProbe.receiptCardTransactionIds(page));
         assertEquals("one row per canonical transaction, not per contribution", 3, cards.size());
-        assertTrue(cards.contains(first.getId()));
+        assertTrue(cards.contains(first.id()));
         List<String> cardTexts = onEdt(() -> TableRows.of(page.body(), "ENTRIES"));
         assertEquals(3, cardTexts.size());
         assertTrue("each row keeps the selected action total: " + cardTexts,
@@ -82,8 +82,8 @@ public class LedgerDetailDisclosureTest
 
         // Single-resource group: the row shows the group's contribution, never the transaction net.
         LedgerData sharkData = capture(engine, T0 + 10_000L,
-            entry(LedgerData.CostView.SUPPLIES, mixed.getId()));
-        Semantics.Group shark = groupNamed(sharkData.costs.groups, "Shark");
+            entry(LedgerData.CostView.SUPPLIES, mixed.id()));
+        Semantics.Group shark = groupNamed(sharkData.cost.groups, "Shark");
         assertNotNull(shark);
         List<LedgerData.Card> sharkCards = LedgerData.cards(shark);
         assertEquals(1, sharkCards.size());
@@ -95,12 +95,12 @@ public class LedgerDetailDisclosureTest
     public void anUnpricedChildMakesItsReceiptRowIncomplete()
     {
         Engine engine = session();
-        engine.getActiveSession().addTransaction(unpricedDeathBurst(T0 + 1_000L), 2_000, false);
-        engine.getActiveSession().addTransaction(unpricedDeathBurst(T0 + 2_000L), 2_000, false);
+        engine.session().addTransaction(unpricedDeathBurst(T0 + 1_000L), 2_000, false);
+        engine.session().addTransaction(unpricedDeathBurst(T0 + 2_000L), 2_000, false);
         LedgerData data = capture(engine, T0 + 10_000L,
             entry(LedgerData.CostView.SUPPLIES, null));
         // Its runes are Ice Burst's exact cost, so the row reads as the spell (owner 2026-09-28).
-        Semantics.Group group = groupNamed(data.costs.groups, "Ice Burst");
+        Semantics.Group group = groupNamed(data.cost.groups, "Ice Burst");
         assertNotNull(group);
         assertTrue(group.incomplete());
         for (LedgerData.Card card : LedgerData.cards(group))
@@ -114,29 +114,29 @@ public class LedgerDetailDisclosureTest
     public void measuredContextsNeverShareAGroup()
     {
         Engine engine = session();
-        engine.getActiveSession().addTransaction(measuredLead(T0 + 1_000L, "Measured charge spend · Toxic blowpipe"), 2_000, false);
-        engine.getActiveSession().addTransaction(measuredLead(T0 + 2_000L, "Measured charge spend · Trident of the swamp"), 2_000, false);
+        engine.session().addTransaction(measuredLead(T0 + 1_000L, "Measured charge spend · Toxic blowpipe"), 2_000, false);
+        engine.session().addTransaction(measuredLead(T0 + 2_000L, "Measured charge spend · Trident of the swamp"), 2_000, false);
         LedgerData data = capture(engine, T0 + 10_000L,
             entry(LedgerData.CostView.CHARGES, null));
         // Owner 2026-09-28: measured charge use has its own Charges chip, apart from Supplies.
         assertEquals(2, data.costCounts[LedgerData.CostView.CHARGES.ordinal()]);
-        assertEquals(2, data.costs.groups.size());
+        assertEquals(2, data.cost.groups.size());
         assertTrue("Supplies leaves charge use to Charges", capture(engine, T0 + 10_000L,
-            entry(LedgerData.CostView.SUPPLIES, null)).costs.groups.stream().allMatch(group -> group.usedBy.isEmpty()));
+            entry(LedgerData.CostView.SUPPLIES, null)).cost.groups.stream().allMatch(group -> group.uses.isEmpty()));
 
         Semantics.Group blowpipe = null;
-        for (Semantics.Group group : data.costs.groups)
+        for (Semantics.Group group : data.cost.groups)
         {
-            if ("Zulrah's scales".equals(group.primaryName) && "Toxic blowpipe".equals(group.usedBy))
+            if ("Zulrah's scales".equals(group.name) && "Toxic blowpipe".equals(group.uses))
             {
                 blowpipe = group;
             }
         }
         assertNotNull(blowpipe);
         assertEquals("a different measured context never joins this group", 1, LedgerData.cards(blowpipe).size());
-        for (Semantics.Receipt receipt : blowpipe.receipts)
+        for (Semantics.Receipt receipt : blowpipe.entries)
         {
-            assertEquals("Toxic blowpipe", receipt.usedBy);
+            assertEquals("Toxic blowpipe", receipt.uses);
         }
     }
 
@@ -145,9 +145,9 @@ public class LedgerDetailDisclosureTest
     {
         Engine engine = session();
         Transaction first = iceBurst(T0 + 1_000L);
-        engine.getActiveSession().addTransaction(first, 2_000, false);
+        engine.session().addTransaction(first, 2_000, false);
         LedgerData data = capture(engine, T0 + 2_000L,
-            entry(LedgerData.CostView.SUPPLIES, first.getId()));
+            entry(LedgerData.CostView.SUPPLIES, first.id()));
         LedgerPage page = onEdt(() ->
         {
             LedgerPage created = new LedgerPage(new NoopActions(), id -> null);
@@ -157,9 +157,9 @@ public class LedgerDetailDisclosureTest
         assertEquals("EXACT", onEdt(() -> LedgerPageProbe.drill(page)));
 
         // A compatible new receipt keeps the open detail anchored and updates its totals.
-        engine.getActiveSession().addTransaction(iceBurst(T0 + 3_000L), 2_000, false);
+        engine.session().addTransaction(iceBurst(T0 + 3_000L), 2_000, false);
         LedgerData updated = capture(engine, T0 + 4_000L,
-            entry(LedgerData.CostView.SUPPLIES, first.getId()));
+            entry(LedgerData.CostView.SUPPLIES, first.id()));
         assertNotNull("the open group detail survives new compatible activity", updated.detail);
         onEdt(() ->
         {
@@ -171,9 +171,9 @@ public class LedgerDetailDisclosureTest
         assertEquals("the open receipt list grows with the compatible arrival", 2,
             onEdt(() -> LedgerPageProbe.receiptCardTransactionIds(page)).size());
         Semantics.Group group = updated.detail.group;
-        assertEquals(2, group.receiptCount);
+        assertEquals(2, group.count);
         assertEquals(-1_640L, group.value);
-        assertTrue(updated.detail.group.containsTransaction(first.getId()));
+        assertTrue(updated.detail.group.containsTransaction(first.id()));
 
         // The owner fence clears every presentation transient.
         onEdt(() ->
@@ -195,9 +195,9 @@ public class LedgerDetailDisclosureTest
         Transaction hit = engine.bookEstimatedCharge("worn:scythe", "Scythe of vitur", ActionKind.SUPPLIES,
             List.of(new Flow(565, "Blood rune", -2L, 333, -666L, PriceSource.GRAND_EXCHANGE)), T0 + 1_000L);
         assertNotNull(hit);
-        LedgerData data = capture(engine, T0 + 10_000L, entry(LedgerData.CostView.CHARGES, hit.getId()));
+        LedgerData data = capture(engine, T0 + 10_000L, entry(LedgerData.CostView.CHARGES, hit.id()));
         assertNotNull(data.detail);
-        assertTrue("a charged weapon's row", data.detail.group.chargeUse);
+        assertTrue("a charged weapon's row", data.detail.group.charge);
         LedgerPage page = onEdt(() ->
         {
             LedgerPage created = new LedgerPage(new NoopActions(), id -> null);
@@ -235,7 +235,7 @@ public class LedgerDetailDisclosureTest
     {
         for (Semantics.Group group : groups)
         {
-            if (name.equals(group.primaryName))
+            if (name.equals(group.name))
             {
                 return group;
             }
@@ -250,7 +250,7 @@ public class LedgerDetailDisclosureTest
                 new Flow(DEATH, "Death rune", -2L, 188, -376L, PriceSource.GRAND_EXCHANGE),
                 new Flow(WATER, "Water rune", -4L, 5, -20L, PriceSource.GRAND_EXCHANGE)),
             Confidence.CONFIRMED, "Exact fixture", null);
-        transaction.setActionKind(ActionKind.CAST);
+        transaction.setAction(ActionKind.CAST);
         transaction.setActionLabel(ActionLabel.of("Ice Burst"));
         return transaction;
     }
@@ -263,7 +263,7 @@ public class LedgerDetailDisclosureTest
                 new Flow(DEATH, "Death rune", -2L, 0, 0L, PriceSource.UNPRICED),
                 new Flow(WATER, "Water rune", -4L, 5, -20L, PriceSource.GRAND_EXCHANGE)),
             Confidence.CONFIRMED, "Exact fixture", null);
-        transaction.setActionKind(ActionKind.CAST);
+        transaction.setAction(ActionKind.CAST);
         transaction.setActionLabel(ActionLabel.of("Cast"));
         return transaction;
     }
@@ -274,7 +274,7 @@ public class LedgerDetailDisclosureTest
             Context.GENERIC, note, "Vorkath", true, Arrays.asList(
                 new Flow(12934, "Zulrah's scales", -1L, 110, -110L, PriceSource.GRAND_EXCHANGE)),
             Confidence.CONFIRMED, "Measured Check difference.", null);
-        transaction.setActionKind(ActionKind.FIRE);
+        transaction.setAction(ActionKind.FIRE);
         return transaction;
     }
 
@@ -282,14 +282,14 @@ public class LedgerDetailDisclosureTest
     public void estimatedChargeCastsLandInTheChargesChip()
     {
         Engine engine = session();
-        engine.getActiveSession().addTransaction(estimatedCharge(T0 + 1_000L), 2_000, false);
+        engine.session().addTransaction(estimatedCharge(T0 + 1_000L), 2_000, false);
         LedgerData charges = capture(engine, T0 + 2_000L,
             entry(LedgerData.CostView.CHARGES, null));
         assertEquals(1, charges.costCounts[LedgerData.CostView.CHARGES.ordinal()]);
-        assertEquals(1, charges.costs.groups.size());
-        assertEquals("Trident of the Seas", charges.costs.groups.get(0).primaryName);
+        assertEquals(1, charges.cost.groups.size());
+        assertEquals("Trident of the Seas", charges.cost.groups.get(0).name);
         assertTrue("Supplies keeps only non-charge costs", capture(engine, T0 + 2_000L,
-            entry(LedgerData.CostView.SUPPLIES, null)).costs.groups.isEmpty());
+            entry(LedgerData.CostView.SUPPLIES, null)).cost.groups.isEmpty());
     }
 
     /** Owner 2026-10-01 (F11): a Charges receipt names its confidence and its captured price. */
@@ -298,11 +298,11 @@ public class LedgerDetailDisclosureTest
     {
         Engine engine = session();
         Transaction estimate = singleRuneEstimate(T0 + 1_000L);
-        engine.getActiveSession().addTransaction(estimate, 2_000, false);
+        engine.session().addTransaction(estimate, 2_000, false);
         Transaction measured = measuredLead(T0 + 2_000L, "Measured charge spend \u00b7 Toxic blowpipe");
-        engine.getActiveSession().addTransaction(measured, 2_000, false);
+        engine.session().addTransaction(measured, 2_000, false);
 
-        LedgerPage estimatePage = receiptPage(engine, estimate.getId());
+        LedgerPage estimatePage = receiptPage(engine, estimate.id());
         List<String> estimateLabels = onEdt(() -> labels(estimatePage.body()));
         assertTrue("the estimate discloses its confidence: " + estimateLabels,
             estimateLabels.stream().anyMatch(label -> label.contains(
@@ -311,7 +311,7 @@ public class LedgerDetailDisclosureTest
             estimateLabels.contains("100 gp each \u00b7 RuneLite market"));
         assertTrue("the price row is labelled", estimateLabels.contains("Price"));
 
-        LedgerPage measuredPage = receiptPage(engine, measured.getId());
+        LedgerPage measuredPage = receiptPage(engine, measured.id());
         List<String> measuredLabels = onEdt(() -> labels(measuredPage.body()));
         assertTrue("the measured spend says where it came from: " + measuredLabels,
             measuredLabels.stream().anyMatch(label -> label.contains(
@@ -327,7 +327,7 @@ public class LedgerDetailDisclosureTest
             Arrays.asList(
                 new Flow(DEATH, "Death rune", -1L, 100, -100L, PriceSource.GRAND_EXCHANGE)),
             Confidence.LIKELY, "Estimated", null);
-        transaction.setActionKind(ActionKind.CAST);
+        transaction.setAction(ActionKind.CAST);
         return transaction;
     }
 
@@ -352,7 +352,7 @@ public class LedgerDetailDisclosureTest
                 new Flow(DEATH, "Death rune", -1L, 100, -100L, PriceSource.GRAND_EXCHANGE),
                 new Flow(CHAOS, "Chaos rune", -1L, 50, -50L, PriceSource.GRAND_EXCHANGE)),
             Confidence.LIKELY, "Estimated", null);
-        transaction.setActionKind(ActionKind.CAST);
+        transaction.setAction(ActionKind.CAST);
         return transaction;
     }
 

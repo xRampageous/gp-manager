@@ -1,0 +1,14 @@
+# Pinned RuneLite1.13.3 named widgets + decoded read-only cached interfaces, 2026-10-25.
+# kind group inventory nestedClass field widget option operation MenuAction
+0	539	581	RaidsRewards	BANK	35323910	Bank-all	6	CC_OP_LOW_PRIORITY
+0	539	581	RaidsRewards	INVENTORY	35323912	Take-all	1	CC_OP
+0	539	581	RaidsRewards	DISCARD	35323914	Discard-all	6	CC_OP_LOW_PRIORITY
+1	23	612	TobChests	BANK	1507334	Bank-all	6	CC_OP_LOW_PRIORITY
+1	23	612	TobChests	INVENTORY	1507336	Take-all	1	CC_OP
+1	23	612	TobChests	DISCARD	1507338	Discard-all	6	CC_OP_LOW_PRIORITY
+2	771	811	ToaChests	BANK	50528260	Bank-all	6	CC_OP_LOW_PRIORITY
+2	771	811	ToaChests	INVENTORY	50528262	Take-all	1	CC_OP
+2	771	811	ToaChests	DISCARD	50528264	Discard-all	6	CC_OP_LOW_PRIORITY
+3	973	1029	TfaChests	BANK	63766533	Bank-all	6	CC_OP_LOW_PRIORITY
+3	973	1029	TfaChests	INVENTORY	63766535	Take-all	1	CC_OP
+3	973	1029	TfaChests	DISCARD	63766537	Discard-all	6	CC_OP_LOW_PRIORITY

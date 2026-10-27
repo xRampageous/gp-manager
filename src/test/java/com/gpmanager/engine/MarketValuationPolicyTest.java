@@ -48,14 +48,14 @@ public class MarketValuationPolicyTest
         Flow flow = service.value(Collections.singletonMap(560, 200L), T0 + 5L).get(0);
 
         assertEquals(184, flow.unitPrice);
-        assertEquals(36_800L, flow.valueDelta);
-        assertEquals(PriceSource.GRAND_EXCHANGE, flow.getPriceSource());
-        assertEquals("RuneLite market", flow.getPriceSource().toString());
+        assertEquals(36_800L, flow.value);
+        assertEquals(PriceSource.GRAND_EXCHANGE, flow.source());
+        assertEquals("RuneLite market", flow.source().toString());
         assertEquals("the explicit active route is requested", Collections.singletonList(true),
             seam.activeFlags);
         assertEquals(Collections.singletonList(560), seam.asked);
         assertEquals("capture time is the GP Manager observation time", T0 + 5L,
-            flow.getPriceCapturedAtEpochMillis());
+            flow.pricedAt());
     }
 
     @Test
@@ -69,8 +69,8 @@ public class MarketValuationPolicyTest
         seam.quote = 190;
         Flow later = service.value(Collections.singletonMap(560, 2L), T0 + 1L).get(0);
 
-        assertEquals(200L, first.valueDelta);
-        assertEquals(380L, later.valueDelta);
+        assertEquals(200L, first.value);
+        assertEquals(380L, later.value);
         assertEquals("the already-booked flow keeps its frozen unit price", 100, first.unitPrice);
         assertEquals(190, later.unitPrice);
     }
@@ -85,8 +85,8 @@ public class MarketValuationPolicyTest
 
         Flow flow = service.value(Collections.singletonMap(560, 2L), T0).get(0);
 
-        assertEquals(300L, flow.valueDelta);
-        assertEquals(PriceSource.MANUAL_OVERRIDE, flow.getPriceSource());
+        assertEquals(300L, flow.value);
+        assertEquals(PriceSource.MANUAL_OVERRIDE, flow.source());
         assertTrue("manual override never queries the automatic market", seam.asked.isEmpty());
     }
 
@@ -101,11 +101,11 @@ public class MarketValuationPolicyTest
         Flow platinum = service.value(Collections.singletonMap(ItemID.PLATINUM, 2L)).get(0);
 
         assertEquals(1, coins.unitPrice);
-        assertEquals(PriceSource.FACE_VALUE, coins.getPriceSource());
-        assertEquals(7L, coins.valueDelta);
+        assertEquals(PriceSource.FACE_VALUE, coins.source());
+        assertEquals(7L, coins.value);
         assertEquals(1_000, platinum.unitPrice);
-        assertEquals(PriceSource.FACE_VALUE, platinum.getPriceSource());
-        assertEquals(2_000L, platinum.valueDelta);
+        assertEquals(PriceSource.FACE_VALUE, platinum.source());
+        assertEquals(2_000L, platinum.value);
         assertTrue("face value is deterministic and never a market observation", seam.asked.isEmpty());
     }
 
@@ -118,8 +118,8 @@ public class MarketValuationPolicyTest
 
         Flow flow = service.value(Collections.singletonMap(ItemID.KONAR_KEY, 1L), T0).get(0);
 
-        assertEquals(PriceSource.DEFERRED_CLAIM, flow.getPriceSource());
-        assertEquals(0L, flow.valueDelta);
+        assertEquals(PriceSource.DEFERRED_CLAIM, flow.source());
+        assertEquals(0L, flow.value);
     }
 
     @Test
@@ -132,8 +132,8 @@ public class MarketValuationPolicyTest
         Flow ordinary = service.value(Collections.singletonMap(560, 1L)).get(0);
 
         assertEquals("a convenience mapping is not economic evidence",
-            PriceSource.UNPRICED, minerals.getPriceSource());
-        assertEquals(0L, minerals.valueDelta);
+            PriceSource.UNPRICED, minerals.source());
+        assertEquals(0L, minerals.value);
         assertEquals(5_000, ordinary.unitPrice);
     }
 
@@ -144,23 +144,29 @@ public class MarketValuationPolicyTest
         seam.quote = 0;
         Valuation service = service(new GpManagerConfig() {}, seam, NORMAL);
         assertEquals(PriceSource.UNPRICED,
-            service.value(Collections.singletonMap(560, 1L)).get(0).getPriceSource());
+            service.value(Collections.singletonMap(560, 1L)).get(0).source());
 
         seam.quote = -5;
         assertEquals(PriceSource.UNPRICED,
-            service.value(Collections.singletonMap(560, 1L)).get(0).getPriceSource());
+            service.value(Collections.singletonMap(560, 1L)).get(0).source());
     }
 
     @Test
-    public void beyondMaxCashQuoteStaysUnpricedInsteadOfClamping()
+    public void beyondMaxCashQuoteBooksItsWholeValue()
     {
-        assertEquals("an in-range quote is preserved", 184, Valuation.unitPriceOf(184L));
-        assertEquals("the last representable quote is preserved",
-            Integer.MAX_VALUE, Valuation.unitPriceOf(Integer.MAX_VALUE));
-        assertEquals("a beyond-max-cash quote is not representable and stays unpriced",
-            0, Valuation.unitPriceOf(Integer.MAX_VALUE + 1L));
-        assertEquals(0, Valuation.unitPriceOf(0L));
-        assertEquals(0, Valuation.unitPriceOf(-5L));
+        // Since Beyond max cash (30 September 2026) the G.E. trades above 2,147,483,647; the
+        // Obligator was about 3.27B when this was written.
+        Seam seam = new Seam();
+        seam.quote = 3_274_989_430L;
+        Valuation service = service(new GpManagerConfig() {}, seam, NORMAL);
+        Flow flow = service.value(Collections.singletonMap(ItemID.OBLIGATOR_UNCHARGED, 1L), T0 + 5L).get(0);
+        assertEquals(PriceSource.GRAND_EXCHANGE, flow.source());
+        assertEquals(3_274_989_430L, flow.unitPrice);
+        assertEquals(3_274_989_430L, flow.value);
+        assertEquals("never clamped, never Review", 6_549_978_860L,
+            service.value(Collections.singletonMap(ItemID.OBLIGATOR_UNCHARGED, 2L), T0 + 5L).get(0).value);
+        assertEquals("an override above max cash is kept whole", Long.valueOf(3_500_000_000L),
+            ItemRuleParser.parsePriceOverrides("34715=3500000000").get(ItemID.OBLIGATOR));
     }
 
     @Test
@@ -176,7 +182,7 @@ public class MarketValuationPolicyTest
     @Test
     public void sourceCommentDescribesTheActiveRouteDecision()
     {
-        String source = read("src/main/java/com/gpmanager/model/GameData.java");
+        String source = read("src/main/java/com/gpmanager/model/Transaction.java");
         assertTrue("the comment names GP Manager's own active market route",
             source.contains("active market route"));
         assertTrue("the comment states the user preference is ignored",
@@ -199,12 +205,12 @@ public class MarketValuationPolicyTest
 
         Flow component = service.valueComponent(12934, -4L, T0 + 9L);
 
-        assertEquals(PriceSource.GRAND_EXCHANGE, component.getPriceSource());
-        assertEquals(-400L, component.valueDelta);
+        assertEquals(PriceSource.GRAND_EXCHANGE, component.source());
+        assertEquals(-400L, component.value);
         assertEquals("charge components also request the explicit active route",
             Collections.singletonList(true), seam.activeFlags);
         assertEquals("component capture time remains the observation time", T0 + 9L,
-            component.getPriceCapturedAtEpochMillis());
+            component.pricedAt());
     }
 
     @Test
@@ -216,8 +222,8 @@ public class MarketValuationPolicyTest
 
         Flow component = service.valueComponent(12934, -4L, T0);
 
-        assertEquals(PriceSource.MANUAL_OVERRIDE, component.getPriceSource());
-        assertEquals(-1_000L, component.valueDelta);
+        assertEquals(PriceSource.MANUAL_OVERRIDE, component.source());
+        assertEquals(-1_000L, component.value);
         assertTrue(seam.asked.isEmpty());
     }
 
@@ -270,23 +276,23 @@ public class MarketValuationPolicyTest
             {
                 int id = component.getItemId();
                 Flow valued = service.valueComponent(id, component.getQuantityDelta(), T0 + 600L);
-                int unit = valued.unitPrice;
+                long unit = valued.unitPrice;
                 assertTrue(family[2] + " component " + id + " must be priceable", unit > 0);
-                int perItem = ChargeCheck.unitsPerItem(delta.getVariant(), id);
+                int perItem = delta.getVariant().units;
                 if (perItem > 1)
                 {
                     unit = Math.max(1, unit / perItem);
                 }
                 long value = component.getQuantityDelta() * unit;
                 losses.add(new Flow(id, "Item " + id, component.getQuantityDelta(), unit, value,
-                    valued.getPriceSource(), T0 + 600L));
+                    valued.source(), T0 + 600L));
                 assertFalse(family[2] + " component " + id + " must not be mapping-blocked",
                     Valuation.hasUnsupportedMapping(
                         net.runelite.client.game.ItemMapping.map(id)));
             }
 
             Transaction result = engine.bookChargeSpend(delta, family[2], losses, T0 + 600L, null);
-            assertTrue(family[2] + " books its measured spend", result != null && result.getNet() < 0L);
+            assertTrue(family[2] + " books its measured spend", result != null && result.net() < 0L);
         }
     }
 
@@ -314,7 +320,7 @@ public class MarketValuationPolicyTest
         assertEquals("pre-existing stock is UNKNOWN coverage, never zero",
             MarketRows.Coverage.FULLY_UNKNOWN, row.coverage);
         assertEquals("unknown liquidation never becomes automatic Net", 0L,
-            market.engine.getMetrics(market.now).net);
+            market.engine.metrics(market.now).net);
     }
 
     @Test
@@ -343,7 +349,7 @@ public class MarketValuationPolicyTest
         MarketRows.Row row = market.engine.marketRows().get(0);
         assertEquals("editing an override never reprices the frozen reference", 1_500L,
             MarketFacts.basisValueGp(MarketFacts.record(market.engine, row)));
-        assertEquals(0L, market.engine.getMetrics(market.now).net);
+        assertEquals(0L, market.engine.metrics(market.now).net);
     }
 
     @Test
@@ -365,7 +371,7 @@ public class MarketValuationPolicyTest
         assertEquals("the asset value is the exact spend", 36_000L,
             row.trackedBasisConsumedGp);
         assertEquals("a NEW BUY is Net-neutral", 0L, row.realizedResultGp);
-        assertEquals(0L, market.engine.getMetrics(market.now).net);
+        assertEquals(0L, market.engine.metrics(market.now).net);
         assertEquals("the acquired quantity becomes known coverage", 200L,
             EngineProbe.knownCoverageQty(market.engine, RUNE));
         assertEquals(36_000L, EngineProbe.knownCoverageBasisGp(market.engine, RUNE));
@@ -383,13 +389,13 @@ public class MarketValuationPolicyTest
         Transaction fee = engine.bookDeathFee(1_000L, "Grave fee", T0 + 1L);
 
         assertNotNull(fee);
-        assertEquals(TransactionType.CONSUMPTION, fee.getType());
-        assertTrue(fee.isCounted());
-        Flow flow = fee.getFlows().get(0);
-        assertEquals(ItemID.COINS, flow.itemId);
-        assertEquals(PriceSource.FACE_VALUE, flow.getPriceSource());
-        assertEquals(-1_000L, flow.valueDelta);
-        assertEquals(-1_000L, engine.getMetrics(T0 + 1L).net);
+        assertEquals(TransactionType.CONSUMPTION, fee.type());
+        assertTrue(fee.counts());
+        Flow flow = fee.flows().get(0);
+        assertEquals(ItemID.COINS, flow.item);
+        assertEquals(PriceSource.FACE_VALUE, flow.source());
+        assertEquals(-1_000L, flow.value);
+        assertEquals(-1_000L, engine.metrics(T0 + 1L).net);
     }
 
     @Test
@@ -399,7 +405,7 @@ public class MarketValuationPolicyTest
             read("src/main/java/com/gpmanager/engine/Engine.java")
                 .contains("Av.GRAND_EXCHANGE"));
         assertFalse("charge intake no longer prices components itself",
-            read("src/main/java/com/gpmanager/ChargeIntake.java").contains("getItemPrice("));
+            read("src/main/java/com/gpmanager/GpManagerPlugin.java").contains("getItemPrice("));
     }
 
     @Test
@@ -410,7 +416,7 @@ public class MarketValuationPolicyTest
         Valuation service = service(new GpManagerConfig() {}, seam, NORMAL);
         Engine engine = new Engine(service, new TransactionClassifier(), config());
         engine.ensureSession(T0);
-        Session session = engine.getActiveSession();
+        Session session = engine.session();
 
         // An older receipt frozen under the previous explicit route: unit 184, no capture time.
         session.addTransaction(new Transaction(T0 + 1L, TransactionType.GAIN,
@@ -424,10 +430,10 @@ public class MarketValuationPolicyTest
             Context.GENERIC, "", "New drop", true, Collections.singletonList(newFlow),
             Confidence.CONFIRMED, "", null), 100, false);
 
-        assertEquals(184, session.getTransactions().get(0).getFlows().get(0).unitPrice);
-        assertEquals(190, session.getTransactions().get(1).getFlows().get(0).unitPrice);
+        assertEquals(184, session.transactions().get(0).flows().get(0).unitPrice);
+        assertEquals(190, session.transactions().get(1).flows().get(0).unitPrice);
         assertEquals("both frozen bookings sum honestly", 36_800L + 38_000L,
-            engine.getMetrics(T0 + 3L).revenue);
+            engine.metrics(T0 + 3L).income);
     }
 
     @Test
@@ -448,7 +454,7 @@ public class MarketValuationPolicyTest
     {
         final List<Boolean> activeFlags = new ArrayList<>();
         final List<Integer> asked = new ArrayList<>();
-        int quote = 100;
+        long quote = 100;
         boolean failIfAsked;
     }
 
@@ -548,7 +554,7 @@ public class MarketValuationPolicyTest
             if (transition != null)
             {
                 engine.noteGeOffer(transition,
-                    name(transition.current.itemId), now);
+                    name(transition.current.item), now);
             }
         }
 

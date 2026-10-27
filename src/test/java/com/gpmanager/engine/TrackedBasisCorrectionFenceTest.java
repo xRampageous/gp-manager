@@ -41,7 +41,7 @@ public class TrackedBasisCorrectionFenceTest
         String gainId = h.gain(LOGS, 5L, 775L, h.now - 60_000L);
         assertEquals(5L, EngineProbe.knownCoverageQty(h.engine, LOGS));
 
-        assertTrue(h.engine.correctTransaction(gainId, Correction.IGNORE, h.now, "test"));
+        assertTrue(h.engine.correctTransaction(gainId, Correction.IGNORE, "test"));
 
         assertEquals("the exact delta leaves the pool empty", 0L, EngineProbe.knownCoverageQty(h.engine, LOGS));
         assertEquals(0L, EngineProbe.knownCoverageBasisGp(h.engine, LOGS));
@@ -53,9 +53,9 @@ public class TrackedBasisCorrectionFenceTest
     {
         Harness h = new Harness(159);
         String gainId = h.gain(LOGS, 5L, 775L, h.now - 60_000L);
-        h.engine.correctTransaction(gainId, Correction.IGNORE, h.now, "test");
+        h.engine.correctTransaction(gainId, Correction.IGNORE, "test");
 
-        assertTrue(h.engine.undoCorrection(h.now));
+        assertTrue(h.engine.undoCorrection());
 
         assertEquals(5L, EngineProbe.knownCoverageQty(h.engine, LOGS));
         assertEquals(775L, EngineProbe.knownCoverageBasisGp(h.engine, LOGS));
@@ -74,10 +74,10 @@ public class TrackedBasisCorrectionFenceTest
         assertEquals(5L, EngineProbe.reservedQty(h.engine, LOGS));
 
         assertFalse("an open reservation freezes basis-affecting corrections",
-            h.engine.correctTransaction(gainId, Correction.IGNORE, h.now, "test"));
+            h.engine.correctTransaction(gainId, Correction.IGNORE, "test"));
 
         assertEquals("the canonical acquisition is untouched", Correction.AUTO,
-            h.transaction(gainId).getCorrection());
+            h.transaction(gainId).correction());
         assertEquals("the reservation is untouched", 5L, EngineProbe.reservedQty(h.engine, LOGS));
         assertEquals(775L, EngineProbe.reservedBasisGp(h.engine, LOGS));
         assertEquals(775L, h.net());
@@ -92,14 +92,14 @@ public class TrackedBasisCorrectionFenceTest
         h.engine.setBaseline(new ContainerSnapshot(h.inventory));
         h.offer(0, SELLING, LOGS, 5, 0, 159, 0);
         h.settle(with(h.inventory, LOGS, 0L));
-        assertFalse(h.engine.correctTransaction(gainId, Correction.IGNORE, h.now, "test"));
+        assertFalse(h.engine.correctTransaction(gainId, Correction.IGNORE, "test"));
 
         h.offer(0, CANCELLED_SELL, LOGS, 5, 0, 159, 0);
         h.settle(with(h.inventory, LOGS, 5L));
 
         assertEquals("the exact reservation is restored", 5L, EngineProbe.knownCoverageQty(h.engine, LOGS));
         assertTrue("the temporary freeze clears after a zero-realization cancel",
-            h.engine.correctTransaction(gainId, Correction.IGNORE, h.now, "test"));
+            h.engine.correctTransaction(gainId, Correction.IGNORE, "test"));
         assertEquals(0L, EngineProbe.knownCoverageQty(h.engine, LOGS));
     }
 
@@ -112,9 +112,9 @@ public class TrackedBasisCorrectionFenceTest
         assertEquals(790L, h.net());
 
         assertFalse("realized known coverage cannot be changed retroactively",
-            h.engine.correctTransaction(gainId, Correction.IGNORE, h.now, "test"));
+            h.engine.correctTransaction(gainId, Correction.IGNORE, "test"));
 
-        assertEquals(Correction.AUTO, h.transaction(gainId).getCorrection());
+        assertEquals(Correction.AUTO, h.transaction(gainId).correction());
         assertEquals("the realized sale is untouched", 790L, h.net());
         assertEquals(0L, EngineProbe.availableQty(h.engine, LOGS));
         assertEquals(0L, EngineProbe.reservedQty(h.engine, LOGS));
@@ -129,11 +129,11 @@ public class TrackedBasisCorrectionFenceTest
         assertEquals(600L, EngineProbe.knownCoverageBasisGp(h.engine, LOGS));
 
         assertFalse("a shrink split after a permanent sink cannot be reflected exactly",
-            h.engine.splitItem(gainId, LOGS, 5L, h.now, "test"));
+            h.engine.splitItem(gainId, LOGS, 5L, "test"));
 
         assertEquals(6L, EngineProbe.knownCoverageQty(h.engine, LOGS));
         assertEquals(600L, EngineProbe.knownCoverageBasisGp(h.engine, LOGS));
-        assertEquals(1_000L, h.transaction(gainId).getRevenue());
+        assertEquals(1_000L, h.transaction(gainId).revenue());
     }
 
     @Test
@@ -142,19 +142,17 @@ public class TrackedBasisCorrectionFenceTest
         Harness h = new Harness(100);
         h.gain(LOGS, 10L, 1_000L, h.now - 60_000L);
         h.sink(LOGS, 4L, h.now - 30_000L);
-        Transaction sink = h.engine.getActiveSession().getTransactions().get(1);
+        Transaction sink = h.engine.session().transactions().get(1);
 
-        assertFalse(h.engine.correctTransaction(sink.getId(), Correction.TRANSFER,
-            h.now, "bank deposit"));
-        assertFalse(h.engine.correctTransaction(sink.getId(), Correction.IGNORE,
-            h.now, "not spent"));
+        assertFalse(h.engine.correctTransaction(sink.id(), Correction.TRANSFER, "bank deposit"));
+        assertFalse(h.engine.correctTransaction(sink.id(), Correction.IGNORE, "not spent"));
         assertNull(h.engine.undoTransaction());
-        assertEquals(Correction.AUTO, sink.getCorrection());
+        assertEquals(Correction.AUTO, sink.correction());
         assertEquals(6L, EngineProbe.knownCoverageQty(h.engine, LOGS));
         assertEquals(600L, EngineProbe.knownCoverageBasisGp(h.engine, LOGS));
 
         assertTrue("Result attribution may change without reversing physical depletion",
-            h.engine.correctTransaction(sink.getId(), Correction.COST, h.now, "cost"));
+            h.engine.correctTransaction(sink.id(), Correction.COST, "cost"));
         assertEquals(6L, EngineProbe.knownCoverageQty(h.engine, LOGS));
     }
 
@@ -167,16 +165,14 @@ public class TrackedBasisCorrectionFenceTest
             TransactionType.UNCERTAIN, Context.GENERIC, "", "Review", false,
             Collections.singletonList(new Flow(LOGS, "Logs", -4L, 100, -400L,
                 PriceSource.GRAND_EXCHANGE)), Confidence.UNCERTAIN, "", null);
-        h.engine.getActiveSession().addTransaction(uncounted, 500, false);
+        h.engine.session().addTransaction(uncounted, 500, false);
 
-        assertTrue(h.engine.correctTransaction(uncounted.getId(), Correction.COST,
-            h.now, "spent"));
-        assertEquals(Correction.COST, uncounted.getCorrection());
+        assertTrue(h.engine.correctTransaction(uncounted.id(), Correction.COST, "spent"));
+        assertEquals(Correction.COST, uncounted.correction());
         assertEquals(6L, EngineProbe.knownCoverageQty(h.engine, LOGS));
         assertEquals(600L, EngineProbe.knownCoverageBasisGp(h.engine, LOGS));
         assertFalse("the counted sink cannot later be undone without exact reversal",
-            h.engine.correctTransaction(uncounted.getId(), Correction.IGNORE,
-                h.now, "actually transfer"));
+            h.engine.correctTransaction(uncounted.id(), Correction.IGNORE, "actually transfer"));
     }
 
     @Test
@@ -188,12 +184,11 @@ public class TrackedBasisCorrectionFenceTest
             TransactionType.UNCERTAIN, Context.GENERIC, "", "Review", false,
             Collections.singletonList(new Flow(LOGS, "Logs", -4L, 100, -400L,
                 PriceSource.GRAND_EXCHANGE)), Confidence.UNCERTAIN, "", null);
-        h.engine.getActiveSession().addTransaction(review, 500, false);
+        h.engine.session().addTransaction(review, 500, false);
         h.gain(LOGS, 5L, 1_000L, h.now - 10_000L);
 
-        assertFalse(h.engine.correctTransaction(review.getId(), Correction.COST,
-            h.now, "late decision"));
-        assertEquals(Correction.AUTO, review.getCorrection());
+        assertFalse(h.engine.correctTransaction(review.id(), Correction.COST, "late decision"));
+        assertEquals(Correction.AUTO, review.correction());
         assertEquals(15L, EngineProbe.knownCoverageQty(h.engine, LOGS));
         assertEquals(2_000L, EngineProbe.knownCoverageBasisGp(h.engine, LOGS));
     }
@@ -204,14 +199,14 @@ public class TrackedBasisCorrectionFenceTest
     {
         Harness h = new Harness(159);
         String gainId = h.gain(LOGS, 5L, 775L, h.now - 60_000L);
-        assertTrue(h.engine.correctTransaction(gainId, Correction.IGNORE, h.now, "test"));
+        assertTrue(h.engine.correctTransaction(gainId, Correction.IGNORE, "test"));
         assertEquals(0L, EngineProbe.knownCoverageQty(h.engine, LOGS));
 
         h.sell(0, LOGS, 5L, 159, 790L);
         assertEquals("unknown liquidation stays Net-neutral", 0L, h.net());
 
         assertFalse("undoing would re-add basis after a later sale",
-            h.engine.undoCorrection(h.now));
+            h.engine.undoCorrection());
         assertEquals(0L, EngineProbe.knownCoverageQty(h.engine, LOGS));
         assertEquals(0L, h.net());
     }
@@ -225,12 +220,12 @@ public class TrackedBasisCorrectionFenceTest
         MarketRows.Row before = h.rows().get(0);
         assertEquals(15L, before.realizedResultGp);
         assertEquals("after-tax cash", 790L, before.observedSettlementGp);
-        GeOffer record = h.engine.geCustody.records().get(0);
+        GeOffer record = h.engine.exchange.records().get(0);
 
         Transaction settlement = h.transaction(before.settlementId);
         assertNotNull(settlement);
         assertTrue("financial attribution corrections stay available",
-            h.engine.correctTransaction(settlement.getId(), Correction.COST, h.now, "test"));
+            h.engine.correctTransaction(settlement.id(), Correction.COST, "test"));
 
         assertEquals("physical basis consumption is unchanged", 775L,
             record.getConsumedTrackedBasisGp());
@@ -251,12 +246,12 @@ public class TrackedBasisCorrectionFenceTest
 
         Engine migrated = engine(new int[] {159});
         migrated.restore(legacy, h.now + 1_000L);
-        Transaction gain = migrated.getActiveSession().findTransaction(gainId);
+        Transaction gain = migrated.session().findTransaction(gainId);
         assertNotNull(gain);
 
         assertFalse("pre-106 coverage is unknown and cannot be changed retroactively",
-            migrated.correctTransaction(gainId, Correction.IGNORE, h.now + 2_000L, "test"));
-        assertEquals(Correction.AUTO, gain.getCorrection());
+            migrated.correctTransaction(gainId, Correction.IGNORE, "test"));
+        assertEquals(Correction.AUTO, gain.correction());
     }
 
     // ---- harness ----------------------------------------------------------------------------
@@ -285,13 +280,13 @@ public class TrackedBasisCorrectionFenceTest
                 Collections.singletonList(new Flow(item, name(item), qty,
                     (int) (qty > 0L ? value / qty : 0L), value, PriceSource.GRAND_EXCHANGE)),
                 Confidence.CONFIRMED, "", null);
-            engine.getActiveSession().addTransaction(transaction, 500, false);
-            return transaction.getId();
+            engine.session().addTransaction(transaction, 500, false);
+            return transaction.id();
         }
 
         void sink(int item, long qty, long at)
         {
-            engine.getActiveSession().addTransaction(new Transaction(at,
+            engine.session().addTransaction(new Transaction(at,
                 TransactionType.CONSUMPTION, Context.GENERIC, "", "Used", true,
                 Collections.singletonList(new Flow(item, name(item), -qty, 100, -qty * 100L,
                     PriceSource.GRAND_EXCHANGE)),
@@ -318,7 +313,7 @@ public class TrackedBasisCorrectionFenceTest
                 new OfferSlots.Snapshot(slot, state, item, total, traded, price, spent)).orElse(null);
             if (transition != null)
             {
-                engine.noteGeOffer(transition, name(transition.current.itemId), now);
+                engine.noteGeOffer(transition, name(transition.current.item), now);
             }
         }
 
@@ -343,12 +338,12 @@ public class TrackedBasisCorrectionFenceTest
 
         Transaction transaction(String id)
         {
-            return engine.getActiveSession().findTransaction(id);
+            return engine.session().findTransaction(id);
         }
 
         long net()
         {
-            return engine.getMetrics(now).net;
+            return engine.metrics(now).net;
         }
 
         List<MarketRows.Row> rows()

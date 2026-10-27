@@ -30,8 +30,8 @@ public class GrindsAllTimeCardTest
 
         GrindsData.AllTime card = GrindsData.allTime(engine, HOUR);
         assertEquals("Free play counts toward all-time Net", 6_200_000L, card.net);
-        assertEquals("two runs of Vorkath are one Grind", 2, card.grinds);
-        assertEquals("open Free play never becomes a best", "Flipping", card.bestNetName);
+        assertEquals("two runs of Vorkath are one Grind", 2, card.plans);
+        assertEquals("open Free play never becomes a best", "Flipping", card.bestName);
         assertEquals(5_000_000L, card.bestNet);
     }
 
@@ -44,8 +44,8 @@ public class GrindsAllTimeCardTest
             });
         GrindsData.AllTime card = GrindsData.allTime(engine, HOUR);
         assertEquals(0L, card.net);
-        assertNull(card.bestNetName);
-        assertNull(card.gpPerHour);
+        assertNull(card.bestName);
+        assertNull(card.rate);
     }
 
     private static Session session(String name, long gain, boolean grind)

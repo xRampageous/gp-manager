@@ -72,20 +72,20 @@ public class ReviewFollowupTest {
     @Test public void anIdentityBoundaryMustClearPendingBagEvidenceImmediately() {
         Engine e = ReviewFixesTest.engine();
         ReviewFixesTest.Plugin p = ReviewFixesTest.plugin(e, new int[] {11});
-        p.geOfferLedger = new OfferSlots();
-        p.interactionContextTracker = new InteractionContextTracker(p.client, e, ReviewFixesTest.CONFIG);
+        p.offers = new OfferSlots();
+        p.targets = new InteractionContextTracker(p.client, e, ReviewFixesTest.CONFIG);
         ReviewFixesTest.take(p).item = ReviewFixesTest.BONES;
         ReviewFixesTest.take(p).at = 10;
         ReviewFixesTest.bag(p).at = 10;
         ReviewFixesTest.bag(p).qty = 3;
-        p.engine.inbox.put(Inbox.FEE, -1, 5_964L, 10, null);
-        p.engine.inbox.add(Inbox.CHEST, -1, 1, 10, null).x = InventoryID.RAIDS_REWARDS;
-        p.engine.inbox.add(Inbox.KIT_SNAPSHOT, InventoryID.TACKLE_BOX, 1, Integer.MAX_VALUE, null).data = new Item[0];
+        p.engine.events.put(Inbox.FEE, -1, 5_964L, 10, null);
+        p.engine.events.add(Inbox.CHEST, -1, 1, 10, null).x = InventoryID.RAIDS_REWARDS;
+        p.engine.events.add(Inbox.KIT_SNAPSHOT, InventoryID.TACKLE_BOX, 1, Integer.MAX_VALUE, null).data = new Item[0];
         p.beginOwnerSwitch(); // The async bind may finish before the next GameTick sees !nh().
         assertEquals("old-account bag evidence must be cleared at the boundary, not a later tick", 0L, ReviewFixesTest.qty(p, Inbox.BAG_GAIN));
         assertEquals("a waiting reclaim fee never reaches the next account (Codex research 1.2)", 0L, ReviewFixesTest.qty(p, Inbox.FEE));
-        assertEquals("nor a chest Bank-all window", null, p.engine.inbox.peek(Inbox.CHEST));
-        assertTrue("nor the last account's kit contents", p.engine.inbox.peek(Inbox.KIT_SNAPSHOT) == null);
+        assertEquals("nor a chest Bank-all window", null, p.engine.events.peek(Inbox.CHEST));
+        assertTrue("nor the last account's kit contents", p.engine.events.peek(Inbox.KIT_SNAPSHOT) == null);
     }
 
     @Test public void resetAndItsSafetyCopyMustStayWithTheAccountThatWasConfirmed() throws Exception {
@@ -107,14 +107,14 @@ public class ReviewFollowupTest {
                 backupFinished.countDown();
                 return result;
             }
-            @Override synchronized ResetOutcome factoryReset(long now) {
+            @Override synchronized ResetOutcome factoryReset(long now, boolean backup) {
                 resetOwner.set(account());
-                return super.factoryReset(now);
+                return super.factoryReset(now, true);
             }
         };
         c.start();
         try {
-            assertTrue(c.switchIdentity(alice, true, true));
+            assertTrue(c.switchIdentity(alice, true));
             e.ensureSession(System.currentTimeMillis());
             SwingUtilities.invokeAndWait(() -> {
                 SidebarPanel p = new SidebarPanel(e, ReviewFixesTest.CONFIG, null, repository, c);
@@ -124,13 +124,13 @@ public class ReviewFollowupTest {
                     assertTrue("Alice's backup completed", backupFinished.await(5, TimeUnit.SECONDS));
                     // A profile switch finishes while the backup's EDT callback is queued.
                     current.set(bob);
-                    assertTrue(c.switchIdentity(bob, false, true));
+                    assertTrue(c.switchIdentity(bob, true));
                     long now = System.currentTimeMillis();
                     e.ensureSession(now);
-                    e.getActiveSession().addTransaction(new Transaction(now, TransactionType.GAIN, Context.GENERIC, "", "", true,
+                    e.session().addTransaction(new Transaction(now, TransactionType.GAIN, Context.GENERIC, "", "", true,
                         Collections.singletonList(new Flow(526, "Bones", 2L, 100, 200L)),
                         Confidence.CONFIRMED, "fixture", null), 2_000, false);
-                    assertEquals("Bob has unrelated history before the callback", 200L, e.getMetrics(now).net);
+                    assertEquals("Bob has unrelated history before the callback", 200L, e.metrics(now).net);
                 } catch (InterruptedException ex) {
                     throw new AssertionError(ex);
                 }
@@ -138,9 +138,9 @@ public class ReviewFollowupTest {
             PersistenceProbe.drain(c, 2);
             assertEquals("the safety backup was Alice's", alice.rsProfileKey, backedUpOwner.get());
             assertEquals("Alice's confirmation must not erase Bob; reset target was " + resetOwner.get(),
-                200L, e.getMetrics(System.currentTimeMillis()).net);
+                200L, e.metrics(System.currentTimeMillis()).net);
         } finally {
-            c.shutdown(false);
+            c.shutdown();
         }
     }
 }

@@ -23,27 +23,27 @@ public class NeutralZoneTrackerTest
     public void insideEveryTickThenExactlyOneLeaveSignal()
     {
         NeutralZoneTracker tracker = new NeutralZoneTracker();
-        assertEquals(NeutralZoneTracker.Signal.NONE, tracker.onRegion(12127));
-        assertEquals(NeutralZoneTracker.Signal.ENTERED, tracker.onRegion(7512));
-        assertEquals(NeutralZoneTracker.Signal.INSIDE, tracker.onRegion(7512));
+        assertEquals(NeutralZoneTracker.Signal.NONE, tracker.onRegion(12127, false));
+        assertEquals(NeutralZoneTracker.Signal.ENTERED, tracker.onRegion(7512, false));
+        assertEquals(NeutralZoneTracker.Signal.INSIDE, tracker.onRegion(7512, false));
         assertTrue(tracker.isInside());
-        assertEquals(NeutralZoneTracker.Signal.LEFT, tracker.onRegion(12127));
+        assertEquals(NeutralZoneTracker.Signal.LEFT, tracker.onRegion(12127, false));
         assertFalse(tracker.isInside());
-        assertEquals(NeutralZoneTracker.Signal.NONE, tracker.onRegion(12127));
+        assertEquals(NeutralZoneTracker.Signal.NONE, tracker.onRegion(12127, false));
     }
 
     @Test
     public void unknownRegionDuringLoadingKeepsStateWithoutSignalling()
     {
         NeutralZoneTracker tracker = new NeutralZoneTracker();
-        tracker.onRegion(7768);
-        assertEquals(NeutralZoneTracker.Signal.NONE, tracker.onRegion(0));
+        tracker.onRegion(7768, false);
+        assertEquals(NeutralZoneTracker.Signal.NONE, tracker.onRegion(0, false));
         assertTrue(tracker.isInside());
-        assertEquals(NeutralZoneTracker.Signal.LEFT, tracker.onRegion(12127));
-        tracker.onRegion(7768);
+        assertEquals(NeutralZoneTracker.Signal.LEFT, tracker.onRegion(12127, false));
+        tracker.onRegion(7768, false);
         tracker.reset();
         assertFalse(tracker.isInside());
-        assertEquals(NeutralZoneTracker.Signal.NONE, tracker.onRegion(12127));
+        assertEquals(NeutralZoneTracker.Signal.NONE, tracker.onRegion(12127, false));
     }
 
     @Test
@@ -64,38 +64,38 @@ public class NeutralZoneTrackerTest
 
         // Entering the instance: the tick marks the zone, then the gear vanishes.
         NeutralZoneTracker tracker = new NeutralZoneTracker();
-        assertEquals(NeutralZoneTracker.Signal.ENTERED, tracker.onRegion(7512));
+        assertEquals(NeutralZoneTracker.Signal.ENTERED, tracker.onRegion(7512, false));
         engine.beginNeutralZone();
         engine.markTransfer("Neutral zone instance", config.stabilizationTicks() + 4);
         engine.markDirty();
         Transaction stored = settle(engine, ContainerSnapshot.empty(), 1_600L);
-        assertEquals(TransactionType.TRANSFER, stored.getType());
-        assertFalse(stored.isCounted());
-        assertEquals("Neutral zone instance", stored.getNote());
-        assertTrue(stored.getExplanation().startsWith("Ownership-neutral transfer: Neutral zone"));
+        assertEquals(TransactionType.TRANSFER, stored.type());
+        assertFalse(stored.counts());
+        assertEquals("Neutral zone instance", stored.note());
+        assertTrue(stored.explanation().startsWith("Ownership-neutral transfer: Neutral zone"));
 
         // Leaving: one closing window, then the gear comes back.
-        assertEquals(NeutralZoneTracker.Signal.LEFT, tracker.onRegion(12127));
+        assertEquals(NeutralZoneTracker.Signal.LEFT, tracker.onRegion(12127, false));
         engine.endNeutralZone(20);
         engine.markDirty();
         java.util.Map<Integer, Long> lobbyItems = new java.util.HashMap<>(gear);
         lobbyItems.put(526, 1L); // reward chest item arriving beside the restored gear
         Transaction loot = settle(engine, new ContainerSnapshot(lobbyItems), 4_000L);
-        assertEquals(TransactionType.GAIN, loot.getType());
-        assertTrue("unmatched lobby chest loot remains counted", loot.isCounted());
-        assertEquals(526, loot.getFlows().get(0).itemId);
-        assertEquals(100_000L, engine.getMetrics(8_000L).net);
+        assertEquals(TransactionType.GAIN, loot.type());
+        assertTrue("unmatched lobby chest loot remains counted", loot.counts());
+        assertEquals(526, loot.flows().get(0).item);
+        assertEquals(100_000L, engine.metrics(8_000L).net);
 
         Transaction restored = null;
-        for (Transaction row : engine.getActiveSession().getTransactions())
+        for (Transaction row : engine.session().transactions())
         {
-            if ("Neutral zone exit restore".equals(row.getNote()))
+            if ("Neutral zone exit restore".equals(row.note()))
             {
                 restored = row;
             }
         }
-        assertTrue("restored gear remains an uncounted audit row", restored != null && !restored.isCounted());
-        assertEquals(2, restored.getFlows().size());
+        assertTrue("restored gear remains an uncounted audit row", restored != null && !restored.counts());
+        assertEquals(2, restored.flows().size());
     }
 
     @Test
@@ -124,7 +124,7 @@ public class NeutralZoneTrackerTest
         firstBatchItems.put(385, 2L);
         Transaction firstStore = settle(
             engine, new ContainerSnapshot(firstBatchItems), 1_600L);
-        assertFalse(firstStore.isCounted());
+        assertFalse(firstStore.counts());
 
         // Equipment and inventory callbacks can report separate stable removals.
         engine.markTransfer("Neutral zone instance", config.stabilizationTicks() + 4);
@@ -133,7 +133,7 @@ public class NeutralZoneTrackerTest
         secondBatchItems.put(385, 2L);
         Transaction secondStore = settle(
             engine, new ContainerSnapshot(secondBatchItems), 3_400L);
-        assertFalse(secondStore.isCounted());
+        assertFalse(secondStore.counts());
 
         // The bounded capture expires even though the tracker continues to mark
         // every in-zone sample as TRANSFER. A later supply loss cannot join the
@@ -146,7 +146,7 @@ public class NeutralZoneTrackerTest
         afterSupplyUse.put(385, 1L);
         Transaction supplyUse = settle(
             engine, new ContainerSnapshot(afterSupplyUse), 5_800L);
-        assertFalse(supplyUse.isCounted());
+        assertFalse(supplyUse.counts());
 
         engine.endNeutralZone(20);
         engine.markDirty();
@@ -158,28 +158,28 @@ public class NeutralZoneTrackerTest
         Transaction gain = settle(
             engine, new ContainerSnapshot(restoredPlusLoot), 7_600L);
 
-        assertEquals(TransactionType.GAIN, gain.getType());
-        assertTrue("same-id excess and unrelated reward remain counted", gain.isCounted());
-        assertEquals(3, gain.getFlows().size());
-        assertEquals(1L, gain.getFlows().stream().filter(flow -> flow.itemId == 4151)
-            .findFirst().get().quantityDelta);
-        assertEquals(1L, gain.getFlows().stream().filter(flow -> flow.itemId == 526)
-            .findFirst().get().quantityDelta);
-        assertEquals(1L, gain.getFlows().stream().filter(flow -> flow.itemId == 385)
-            .findFirst().get().quantityDelta);
+        assertEquals(TransactionType.GAIN, gain.type());
+        assertTrue("same-id excess and unrelated reward remain counted", gain.counts());
+        assertEquals(3, gain.flows().size());
+        assertEquals(1L, gain.flows().stream().filter(flow -> flow.item == 4151)
+            .findFirst().get().quantity);
+        assertEquals(1L, gain.flows().stream().filter(flow -> flow.item == 526)
+            .findFirst().get().quantity);
+        assertEquals(1L, gain.flows().stream().filter(flow -> flow.item == 385)
+            .findFirst().get().quantity);
 
         Transaction restored = null;
-        for (Transaction row : engine.getActiveSession().getTransactions())
+        for (Transaction row : engine.session().transactions())
         {
-            if ("Neutral zone exit restore".equals(row.getNote()))
+            if ("Neutral zone exit restore".equals(row.note()))
             {
                 restored = row;
             }
         }
         assertTrue("both separately removed items remain an uncounted restore row",
-            restored != null && !restored.isCounted());
-        assertEquals(2, restored.getFlows().size());
-        assertEquals(300_000L, engine.getMetrics(11_000L).net);
+            restored != null && !restored.counts());
+        assertEquals(2, restored.flows().size());
+        assertEquals(300_000L, engine.metrics(11_000L).net);
     }
 
     private static Transaction settle(Engine engine, ContainerSnapshot snapshot, long firstTick)

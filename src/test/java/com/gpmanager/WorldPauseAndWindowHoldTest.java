@@ -25,33 +25,33 @@ public class WorldPauseAndWindowHoldTest
     {
         Engine engine = engine();
         engine.pauseForWorld(T0 + 1_000L);
-        assertTrue("a separate-economy world pauses the session", engine.getActiveSession().paused);
-        assertEquals(PauseReason.WORLD, engine.getActiveSession().getPauseReason());
+        assertTrue("a separate-economy world pauses the session", engine.session().paused);
+        assertEquals(PauseReason.WORLD, engine.session().pauseReason());
         assertFalse("nothing resumes while still there",
                 engine.resume(T0 + 1_500L, PauseReason.WORLD, PauseReason.IDLE));
-        engine.separateWorld = false;
+        engine.separate = false;
         assertTrue(engine.resume(T0 + 2_000L, PauseReason.WORLD));
-        assertFalse("leaving resumes like a relog", engine.getActiveSession().paused);
+        assertFalse("leaving resumes like a relog", engine.session().paused);
     }
 
     @Test
     public void anIdlePauseCarriedOntoTheWorldStaysPaused()
     {
         Engine engine = engine();
-        engine.getActiveSession().pause(T0 + 1_000L, PauseReason.IDLE);
+        engine.session().pause(T0 + 1_000L, PauseReason.IDLE);
         engine.pauseForWorld(T0 + 2_000L);
         assertFalse("gameplay there never lifts the idle pause",
                 engine.resume(T0 + 3_000L, PauseReason.LIFECYCLE, PauseReason.IDLE, PauseReason.RECOVERY));
-        assertTrue(engine.getActiveSession().paused);
+        assertTrue(engine.session().paused);
     }
 
     @Test
     public void aWorldPauseNeverTouchesAManualOne()
     {
         Engine engine = engine();
-        engine.getActiveSession().pause(T0 + 1_000L, PauseReason.MANUAL);
+        engine.session().pause(T0 + 1_000L, PauseReason.MANUAL);
         engine.pauseForWorld(T0 + 2_000L);
-        assertEquals("the manual pause stands", PauseReason.MANUAL, engine.getActiveSession().getPauseReason());
+        assertEquals("the manual pause stands", PauseReason.MANUAL, engine.session().pauseReason());
         assertFalse("a world resume cannot lift a manual pause", engine.resume(T0 + 3_000L, PauseReason.WORLD));
     }
 
@@ -64,8 +64,8 @@ public class WorldPauseAndWindowHoldTest
         assertTrue("a Leagues world is a separate economy", p.onUnsupportedWorld());
         // The fixture wires no valuation, pvp or activity: reaching them would throw.
         p.onGameTick(null);
-        assertTrue(engine.separateWorld);
-        assertEquals(PauseReason.WORLD, engine.getActiveSession().getPauseReason());
+        assertTrue(engine.separate);
+        assertEquals(PauseReason.WORLD, engine.session().pauseReason());
         p.client = clientOn(WorldType.MEMBERS);
         assertFalse("a members world tracks", p.onUnsupportedWorld());
     }

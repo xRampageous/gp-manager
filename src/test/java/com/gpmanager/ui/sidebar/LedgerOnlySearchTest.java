@@ -17,7 +17,7 @@ public class LedgerOnlySearchTest {
             for(var category:CategoryToggleTest.CATEGORIES) {
                 open(panel,category.label);var page=focused(panel);
                 page.toggleSearch();page.actions.searchChanged("Item 39");SidebarPanelProbe.refresh(panel);
-                assertFalse(page.searchOpen);assertEquals("",page.data.entry.search);
+                assertFalse(page.searching);assertEquals("",page.data.entry.search);
                 assertNull(page.search.getParent());assertNull(CategoryToggleTest.find(panel.live.body));
                 assertNull(CategoryToggleTest.table(page,category).picker);
                 assertEquals(before,new Gson().toJson(panel.engine.exportState()));
@@ -29,16 +29,16 @@ public class LedgerOnlySearchTest {
         onEdt(()->{
             var panel=CategoryToggleTest.panel();String before=new Gson().toJson(panel.engine.exportState());
             panel.shell.show(Shell.LEDGER);SidebarPanelProbe.refresh(panel);var page=panel.ledger;
-            int all=page.data.gains.groups.size();var find=CategoryToggleTest.find(page);
-            find.doClick();SidebarPanelProbe.refresh(panel);assertTrue(page.searchOpen);
+            int all=page.data.income.groups.size();var find=CategoryToggleTest.find(page);
+            find.doClick();SidebarPanelProbe.refresh(panel);assertTrue(page.searching);
             page.search.setText("Item 39");SidebarPanelProbe.refresh(panel);
-            assertEquals(1,page.data.gains.groups.size());assertEquals("Item 39",panel.ledgerSearch);
+            assertEquals(1,page.data.income.groups.size());assertEquals("Item 39",panel.ledgerSearch);
             panel.shell.show(Shell.LIVE);SidebarPanelProbe.refresh(panel);open(panel,"GAINS");
-            assertNull(CategoryToggleTest.find(panel.live.body));assertEquals("",panel.liveEntry.search);
+            assertNull(CategoryToggleTest.find(panel.live.body));assertEquals("",panel.category.search);
             panel.shell.show(Shell.LEDGER);SidebarPanelProbe.refresh(panel);
-            assertEquals("Item 39",page.search.getText());assertEquals(1,page.data.gains.groups.size());
-            find.doClick();SidebarPanelProbe.refresh(panel);assertFalse(page.searchOpen);
-            assertEquals("",page.data.entry.search);assertEquals(all,page.data.gains.groups.size());
+            assertEquals("Item 39",page.search.getText());assertEquals(1,page.data.income.groups.size());
+            find.doClick();SidebarPanelProbe.refresh(panel);assertFalse(page.searching);
+            assertEquals("",page.data.entry.search);assertEquals(all,page.data.income.groups.size());
             assertEquals(before,new Gson().toJson(panel.engine.exportState()));return null;
         });
     }

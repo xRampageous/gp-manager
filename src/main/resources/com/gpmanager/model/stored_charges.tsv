@@ -1,0 +1,10 @@
+# Carried items that hold their charges as component items (OSRS Wiki, checked 2026-10-25). While carried, the
+# charge varbit counts as those items, so charging and uncharging net to zero and each spent charge is a cost.
+# Every id is written number=GAMEVAL_NAME; StoredChargesTest checks each one against RuneLite's constants.
+# Recipe arithmetic is source-backed; new-item native counter freshness remains unverified.
+# item, charge varbit, charges per set, then quantity / item pairs for one set.
+25781=ASH_SANCTIFIER	16137=CHARGES_ASH_SANCTIFIER_QUANTITY	10	1	560=DEATHRUNE
+34715=OBLIGATOR	16323=CHARGES_OBLIGATOR_QUANTITY	10	1	34669=ASCENSION_SHARDS	20	561=NATURERUNE	20	560=DEATHRUNE
+34723=ARCHIVISTS_FOLIO	16322=CHARGES_ARCHIVISTS_FOLIO_QUANTITY	5	1	34669=ASCENSION_SHARDS
+34725=ZORYAS_TOME	16324=CHARGES_ZORYAS_TOME_QUANTITY	1	3	9075=ASTRALRUNE	2	561=NATURERUNE
+33104=COWBELL_AMULET	20097=CHARGES_COWBELL_AMULET_QUANTITY	1	1	556=AIRRUNE

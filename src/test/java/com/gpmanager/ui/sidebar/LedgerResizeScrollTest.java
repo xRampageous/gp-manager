@@ -23,7 +23,7 @@ public class LedgerResizeScrollTest
         engine.startCustom("Vorkath", now);
         for (int i = 0; i < 30; i++)
         {
-            engine.getActiveSession().addTransaction(Tx.of(now + i, TransactionType.LOOT, Context.GENERIC, "", true,
+            engine.session().addTransaction(Tx.of(now + i, TransactionType.LOOT, Context.GENERIC, "", true,
                 Collections.singletonList(new Flow(536 + i * 2, "Item " + i, 1, 2_000 + i, 2_000L + i))), 2_000, false);
         }
         SidebarPanel[] holder = new SidebarPanel[1];
@@ -32,7 +32,7 @@ public class LedgerResizeScrollTest
         {
             holder[0] = new SidebarPanel(engine, PresentationLifecycleTest.config(), null, null, null);
             holder[0].active = true;
-            holder[0].shell().show(Shell.LEDGER);
+            holder[0].shell.show(Shell.LEDGER);
             holder[0].refreshNow();
             frame[0] = new JFrame();
             frame[0].add(holder[0]);
@@ -41,7 +41,7 @@ public class LedgerResizeScrollTest
             frame[0].validate();
         });
         for (int i = 0; i < 5; i++) SwingUtilities.invokeAndWait(() -> { });
-        JScrollPane scroll = holder[0].shell().scrolls.get(Shell.LEDGER);
+        JScrollPane scroll = holder[0].shell.scrolls.get(Shell.LEDGER);
         // The client's layout sets the sidebar's bounds directly; nothing lays the pane out again.
         SwingUtilities.invokeAndWait(() -> scroll.setSize(scroll.getWidth(), 100));
         for (int i = 0; i < 3; i++) SwingUtilities.invokeAndWait(() -> { });

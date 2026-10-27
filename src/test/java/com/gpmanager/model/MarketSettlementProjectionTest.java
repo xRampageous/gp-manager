@@ -40,7 +40,7 @@ public class MarketSettlementProjectionTest
 
         assertEquals(MarketRows.Lifecycle.EXECUTED_UNSETTLED, row.lifecycle);
         assertEquals(0L, row.realizedResultGp);
-        assertFalse(row.isRealizedIncluded());
+        assertFalse(row.realized());
     }
 
     @Test
@@ -55,7 +55,7 @@ public class MarketSettlementProjectionTest
         assertEquals(69L, row.observedSettlementGp);
         assertEquals(-1L, row.settlementAdjustmentGp);
         assertEquals(9L, row.realizedResultGp);
-        assertTrue(row.isRealizedIncluded());
+        assertTrue(row.realized());
     }
 
     @Test
@@ -120,8 +120,8 @@ public class MarketSettlementProjectionTest
         record.setOfferState("SOLD");
         record.setSettlementId("compacted-receipt");
         MarketRows.Row row = MarketRows.rows(Collections.singletonList(record), id -> null, null).get(0);
-        assertTrue(row.isRealizedIncluded());
+        assertTrue(row.realized());
         assertFalse("its money is already in the retained totals; nothing to decide",
-            Semantics.marketUnit(row, Collections.emptyList()).reviewRequired);
+            Semantics.marketUnit(row, Collections.emptyList()).review);
     }
 }

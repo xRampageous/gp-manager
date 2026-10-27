@@ -29,8 +29,8 @@ public class StackedLedgerTablesTest
     public void threeStackedTablesReplaceTheGlobalTabStrip() throws Exception
     {
         Engine engine = session();
-        engine.getActiveSession().addTransaction(gain(T0 + 1_000L, "Dragon bones", 536, 1L, 3_200, 3_200L), 2_000, false);
-        engine.getActiveSession().addTransaction(food(T0 + 2_000L, "Shark", SHARK, 950L), 2_000, false);
+        engine.session().addTransaction(gain(T0 + 1_000L, "Dragon bones", 536, 1L, 3_200, 3_200L), 2_000, false);
+        engine.session().addTransaction(food(T0 + 2_000L, "Shark", SHARK, 950L), 2_000, false);
         LedgerData data = capture(engine, T0 + 3_000L, LedgerData.Entry.current());
         LedgerPage page = onEdt(() ->
         {
@@ -55,22 +55,22 @@ public class StackedLedgerTablesTest
     public void searchKeepsWholeGroupsAndFindsDistinctSpellsWithoutMerging()
     {
         Engine engine = session();
-        engine.getActiveSession().addTransaction(exactCast(T0 + 1_000L, "Ice Burst", 1, 1, 1), 2_000, false);
-        engine.getActiveSession().addTransaction(exactCast(T0 + 2_000L, "Blood Barrage", 1, 1, 1), 2_000, false);
+        engine.session().addTransaction(exactCast(T0 + 1_000L, "Ice Burst", 1, 1, 1), 2_000, false);
+        engine.session().addTransaction(exactCast(T0 + 2_000L, "Blood Barrage", 1, 1, 1), 2_000, false);
 
         LedgerData data = capture(engine, T0 + 3_000L, new LedgerData.Entry(
             LedgerData.Scope.CURRENT_GRIND, null, null, LedgerData.CostView.SUPPLIES,
             "Death rune", null, null, null, null));
 
-        assertEquals("search reaches the underlying rune of both spells", 2, data.costs.entries);
-        Semantics.Group burst = groupNamed(data.costs.groups, "Ice Burst");
-        Semantics.Group blood = groupNamed(data.costs.groups, "Blood Barrage");
+        assertEquals("search reaches the underlying rune of both spells", 2, data.cost.entries);
+        Semantics.Group burst = groupNamed(data.cost.groups, "Ice Burst");
+        Semantics.Group blood = groupNamed(data.cost.groups, "Blood Barrage");
         assertNotNull(burst);
         assertNotNull(blood);
         assertEquals("a matched group keeps its full total, not the Death-rune portion",
             -180L, burst.value);
         assertEquals(-180L, blood.value);
-        assertFalse("the two spells never merge", burst.semanticGroupId.equals(blood.semanticGroupId));
+        assertFalse("the two spells never merge", burst.id.equals(blood.id));
     }
 
     @Test
@@ -79,26 +79,26 @@ public class StackedLedgerTablesTest
         Engine engine = session();
         for (int i = 0; i < 25; i++)
         {
-            engine.getActiveSession().addTransaction(gain(T0 + i * 1_000L, "Item " + i, 2_000 + i, 1L, 100, 100L), 2_000, false);
+            engine.session().addTransaction(gain(T0 + i * 1_000L, "Item " + i, 2_000 + i, 1L, 100, 100L), 2_000, false);
         }
         for (int i = 0; i < 25; i++)
         {
-            engine.getActiveSession().addTransaction(food(T0 + 50_000L + i * 1_000L, "Food " + i,
+            engine.session().addTransaction(food(T0 + 50_000L + i * 1_000L, "Food " + i,
                 3_000 + i, 10L), 2_000, false);
         }
         LedgerData data = capture(engine, T0 + 100_000L, new LedgerData.Entry(
             LedgerData.Scope.CURRENT_GRIND, null, null, LedgerData.CostView.SUPPLIES,
             "", null, null, null, null));
-        assertEquals("gains carry every row; the page table pages them", 25, data.gains.groups.size());
-        assertEquals("costs carry every row", 25, data.costs.groups.size());
+        assertEquals("gains carry every row; the page table pages them", 25, data.income.groups.size());
+        assertEquals("costs carry every row", 25, data.cost.groups.size());
 
-        engine.getActiveSession().addTransaction(gain(T0 + 200_000L, "Newest", 9_999, 1L, 100, 100L), 2_000, false);
+        engine.session().addTransaction(gain(T0 + 200_000L, "Newest", 9_999, 1L, 100, 100L), 2_000, false);
         LedgerData later = capture(engine, T0 + 300_000L, new LedgerData.Entry(
             LedgerData.Scope.CURRENT_GRIND, null, null, LedgerData.CostView.SUPPLIES,
             "", null, null, null, null));
-        assertEquals(26, later.gains.groups.size());
+        assertEquals(26, later.income.groups.size());
         assertTrue("the new receipt is present in the whole-filter set",
-            later.gains.groups.stream().anyMatch(group -> "Newest".equals(group.primaryName)));
+            later.income.groups.stream().anyMatch(group -> "Newest".equals(group.name)));
     }
 
     @Test
@@ -106,28 +106,28 @@ public class StackedLedgerTablesTest
     {
         Engine engine = session();
         Transaction oldest = gain(T0 + 1_000L, "Oldest gain", 1_111, 1L, 100, 100L);
-        engine.getActiveSession().addTransaction(oldest, 2_000, false);
+        engine.session().addTransaction(oldest, 2_000, false);
         for (int i = 0; i < 25; i++)
         {
-            engine.getActiveSession().addTransaction(gain(T0 + 2_000L + i * 1_000L, "Item " + i,
+            engine.session().addTransaction(gain(T0 + 2_000L + i * 1_000L, "Item " + i,
                 2_000 + i, 1L, 100, 100L), 2_000, false);
         }
         LedgerData anchored = capture(engine, T0 + 50_000L, new LedgerData.Entry(
             LedgerData.Scope.CURRENT_GRIND, null, null, LedgerData.CostView.SUPPLIES,
-            "", oldest.getId(), null, null, null));
+            "", oldest.id(), null, null, null));
         assertNotNull("the selected receipt resolves its detail", anchored.detail);
         assertTrue("the detail is the selected row's group",
-            anchored.detail.group.containsTransaction(oldest.getId()));
+            anchored.detail.group.containsTransaction(oldest.id()));
         for (int i = 0; i < 5; i++)
         {
-            engine.getActiveSession().addTransaction(gain(T0 + 100_000L + i * 1_000L, "Newer " + i,
+            engine.session().addTransaction(gain(T0 + 100_000L + i * 1_000L, "Newer " + i,
                 5_000 + i, 1L, 100, 100L), 2_000, false);
         }
         LedgerData stillAnchored = capture(engine, T0 + 200_000L, new LedgerData.Entry(
             LedgerData.Scope.CURRENT_GRIND, null, null, LedgerData.CostView.SUPPLIES,
-            "", oldest.getId(), null, null, null));
+            "", oldest.id(), null, null, null));
         assertNotNull("the open detail stays anchored, not silently reset", stillAnchored.detail);
-        assertTrue(stillAnchored.detail.group.containsTransaction(oldest.getId()));
+        assertTrue(stillAnchored.detail.group.containsTransaction(oldest.id()));
         assertEquals("selection never smuggles a search string", "", stillAnchored.entry.search);
     }
 
@@ -135,23 +135,23 @@ public class StackedLedgerTablesTest
     public void totalsReconcileAndCountUniqueReceipts()
     {
         Engine engine = session();
-        engine.getActiveSession().addTransaction(gain(T0 + 1_000L, "Dragon bones", 536, 1L, 3_200, 3_200L), 2_000, false);
-        engine.getActiveSession().addTransaction(food(T0 + 2_000L, "Shark", SHARK, 950L), 2_000, false);
+        engine.session().addTransaction(gain(T0 + 1_000L, "Dragon bones", 536, 1L, 3_200, 3_200L), 2_000, false);
+        engine.session().addTransaction(food(T0 + 2_000L, "Shark", SHARK, 950L), 2_000, false);
         // A mixed alchemy-shaped receipt contributes one Gain and one Cost entry from one receipt.
         Transaction alchemy = new Transaction(T0 + 3_000L, TransactionType.CONSUMPTION,
             Context.GENERIC, "", "Vorkath", true, Arrays.asList(
                 new Flow(561, "Nature rune", -1L, 100, -100L, PriceSource.GRAND_EXCHANGE),
                 new Flow(995, "Coins", 120L, 1, 120L, PriceSource.FACE_VALUE)),
             Confidence.CONFIRMED, "High alchemy", null);
-        alchemy.setActionKind(ActionKind.CAST);
-        engine.getActiveSession().addTransaction(alchemy, 2_000, false);
+        alchemy.setAction(ActionKind.CAST);
+        engine.session().addTransaction(alchemy, 2_000, false);
 
         LedgerData data = capture(engine, T0 + 4_000L, LedgerData.Entry.current());
-        long net = engine.getMetrics(T0 + 4_000L).net;
+        long net = engine.metrics(T0 + 4_000L).net;
         assertEquals("Total Net is canonical, not a page sum", net, data.net);
         assertEquals("complete detail reconciles the equation",
-            net, data.total.gains + data.total.costs + data.total.market);
-        assertTrue(data.reconciled);
+            net, data.total.income + data.total.cost + data.total.market);
+        assertTrue(data.balanced);
         assertEquals("entries count the semantic financial groups", 4, data.total.entries);
         assertEquals("receipts are unique, not per-group", 3, data.total.receipts);
     }
@@ -165,15 +165,15 @@ public class StackedLedgerTablesTest
             java.util.Collections.singletonList(new Flow(SHARK, "Shark", -1L, 0, 0L,
                 PriceSource.UNPRICED)),
             Confidence.CONFIRMED, "Unpriced food", null);
-        unpriced.setActionKind(ActionKind.EAT);
-        engine.getActiveSession().addTransaction(unpriced, 2_000, false);
+        unpriced.setAction(ActionKind.EAT);
+        engine.session().addTransaction(unpriced, 2_000, false);
 
         LedgerData data = capture(engine, T0 + 2_000L, LedgerData.Entry.current());
-        assertEquals("the unpriced supply belongs to Costs/Supplies", 1, data.costs.entries);
+        assertEquals("the unpriced supply belongs to Costs/Supplies", 1, data.cost.entries);
         assertTrue("the unpriced supply stays incomplete at the group level",
-                data.costs.groups.get(0).incomplete());
-        assertEquals(0L, data.total.costs);
-        assertEquals("an unpriced supply is not a review decision", 0, data.review.scopeCount);
+                data.cost.groups.get(0).incomplete());
+        assertEquals(0L, data.total.cost);
+        assertEquals("an unpriced supply is not a review decision", 0, data.review.total);
     }
 
     @Test
@@ -184,17 +184,17 @@ public class StackedLedgerTablesTest
             Context.GENERIC, "", "Vorkath", true,
             java.util.Collections.singletonList(new Flow(777, "Unknown rune", -1L, 0, 0L)),
             Confidence.UNCERTAIN, "Awaiting a decision", null);
-        engine.getActiveSession().addTransaction(uncertain, 2_000, false);
+        engine.session().addTransaction(uncertain, 2_000, false);
         Transaction corrected = gain(T0 + 2_000L, "Willow logs", 1519, 1L, 100, 120L);
-        corrected.applyCorrection(Correction.IGNORE, T0 + 3_000L, "excluded");
-        engine.getActiveSession().addTransaction(corrected, 2_000, false);
+        corrected.applyCorrection(Correction.IGNORE, "excluded");
+        engine.session().addTransaction(corrected, 2_000, false);
 
         LedgerData data = capture(engine, T0 + 4_000L, LedgerData.Entry.current());
-        assertEquals("only genuine review decisions are listed", 1, data.review.scopeCount);
-        assertEquals(uncertain.getId(), data.review.rows.get(0).transactionId);
+        assertEquals("only genuine review decisions are listed", 1, data.review.total);
+        assertEquals(uncertain.id(), data.review.rows.get(0).transaction);
         assertEquals("corrected receipts keep an exact audit page", 1, data.corrected.size());
-        assertEquals(corrected.getId(), data.corrected.get(0).transactionId);
-        assertTrue("review rows never inflate the financial tables", data.gains.entries == 0);
+        assertEquals(corrected.id(), data.corrected.get(0).transaction);
+        assertTrue("review rows never inflate the financial tables", data.income.entries == 0);
     }
 
     @Test
@@ -203,7 +203,7 @@ public class StackedLedgerTablesTest
         Engine engine = session();
         for (int i = 0; i < 6; i++)
         {
-            engine.getActiveSession().addTransaction(gain(T0 + 1_000L + i * 1_000L, "Item " + i,
+            engine.session().addTransaction(gain(T0 + 1_000L + i * 1_000L, "Item " + i,
                 2_000 + i, 1L, 100, 100L), 2_000, false);
         }
         LedgerData data = capture(engine, T0 + 10_000L, LedgerData.Entry.current());
@@ -237,19 +237,19 @@ public class StackedLedgerTablesTest
         Engine engine = PresentationLifecycleTest.engine();
         long old = T0 - 400L * 24L * 60L * 60L * 1_000L;
         engine.startCustom("Old Grind", old);
-        engine.getActiveSession().addTransaction(gain(old + 1_000L, "Old bones", 536, 1L, 3_200, 3_200L), 2_000, false);
-        String sessionId = engine.getActiveSession().getId();
+        engine.session().addTransaction(gain(old + 1_000L, "Old bones", 536, 1L, 3_200, 3_200L), 2_000, false);
+        String sessionId = engine.session().id();
         engine.finishCustom(old + 2_000L);
-        long compactedNet = engine.historySession(sessionId).compactedContribution().getNet();
+        long compactedNet = engine.historySession(sessionId).compactedContribution().net();
         assertTrue(compactedNet == 0L);
         engine.compactOlderThan(1, T0);
 
         LedgerData data = capture(engine, T0, new LedgerData.Entry(
             LedgerData.Scope.HISTORY, sessionId, "Old Grind"));
         assertTrue("the compacted scope is honest", data.compacted);
-        assertFalse("row detail is unavailable", data.detailedHistoryAvailable);
+        assertFalse("row detail is unavailable", data.detailed);
         assertEquals("canonical Net is preserved", 3_200L, data.net);
-        assertEquals("no item rows are fabricated", 0, data.gains.entries);
+        assertEquals("no item rows are fabricated", 0, data.income.entries);
     }
 
     // ── fixtures ───────────────────────────────────────────────────────────────────────────────
@@ -271,7 +271,7 @@ public class StackedLedgerTablesTest
     {
         for (Semantics.Group group : groups)
         {
-            if (name.equals(group.primaryName))
+            if (name.equals(group.name))
             {
                 return group;
             }
@@ -287,7 +287,7 @@ public class StackedLedgerTablesTest
                 new Flow(CHAOS, "Chaos rune", -chaosQty, 50, -chaosQty * 50L),
                 new Flow(WATER, "Water rune", -waterQty, 30, -waterQty * 30L)),
             Confidence.CONFIRMED, "Exact fixture", null);
-        transaction.setActionKind(ActionKind.CAST);
+        transaction.setAction(ActionKind.CAST);
         transaction.setActionLabel(ActionLabel.of(name));
         return transaction;
     }
@@ -306,7 +306,7 @@ public class StackedLedgerTablesTest
             Context.GENERIC, "", "Vorkath", true,
             java.util.Collections.singletonList(new Flow(itemId, name, -1L, (int) value, -value,
                 PriceSource.GRAND_EXCHANGE)), Confidence.CONFIRMED, "Test food", null);
-        transaction.setActionKind(ActionKind.EAT);
+        transaction.setAction(ActionKind.EAT);
         return transaction;
     }
 

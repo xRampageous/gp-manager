@@ -23,6 +23,7 @@ public class RewardChestBankAllTest
         expected.put(InterfaceID.RAIDS_REWARDS, InventoryID.RAIDS_REWARDS);
         expected.put(InterfaceID.TOB_CHESTS, InventoryID.TOB_CHESTS);
         expected.put(InterfaceID.TOA_CHESTS, InventoryID.TOA_CHESTS);
+        expected.put(InterfaceID.TFA_CHESTS, InventoryID.TFA_CHESTS);
         expected.put(InterfaceID.COLOSSEUM_REWARD_CHEST_2, InventoryID.COLOSSEUM_REWARDS);
         expected.put(InterfaceID.PMOON_REWARD, InventoryID.PMOON_REWARDINV);
         expected.put(InterfaceID.WILDY_LOOT_CHEST, InventoryID.LOOT_INV_ACCESS);
@@ -56,27 +57,34 @@ public class RewardChestBankAllTest
         GpManagerPlugin plugin = new GpManagerPlugin();
         plugin.engine = engine;
         plugin.client = client;
-        plugin.snapshotFactory = new ContainerSnapshotFactory(client, null);
+        plugin.containers = new ContainerSnapshotFactory(client, null);
 
         plugin.bankAll(InterfaceID.RAIDS_REWARDS);
-        assertEquals("the click alone books nothing", 0L, engine.baseline.quantityOf(ItemID.TWISTED_BOW));
+        assertEquals("the click alone books nothing", 0L, engine.baseline.quantity(ItemID.TWISTED_BOW));
         plugin.chestChanged(InventoryID.RAIDS_REWARDS, rewards);
-        assertEquals("a refused Bank-all moves nothing", 0L, engine.baseline.quantityOf(ItemID.TWISTED_BOW));
+        assertEquals("a refused Bank-all moves nothing", 0L, engine.baseline.quantity(ItemID.TWISTED_BOW));
 
         chest[0] = new Item[]{new Item(ItemID.DRAGON_ARROW, 20)};
         tick[0]++;
         plugin.chestChanged(InventoryID.RAIDS_REWARDS, rewards);
-        assertEquals("the bow reads as picked up", -1L, engine.baseline.quantityOf(ItemID.TWISTED_BOW));
-        assertEquals("only the arrows that left", -30L, engine.baseline.quantityOf(ItemID.DRAGON_ARROW));
+        assertEquals("the bow was received", 1L, received(engine, ItemID.TWISTED_BOW));
+        assertEquals("only the arrows that left", 30L, received(engine, ItemID.DRAGON_ARROW));
+        assertEquals("the real inventory baseline stays untouched", 0L, engine.baseline.quantity(ItemID.TWISTED_BOW));
+        assertEquals(3_100L, engine.metrics(ReviewFixesTest.T0).net);
 
         tick[0] += 6;
         plugin.bankAll(InterfaceID.RAIDS_REWARDS);
         plugin.chestChanged(InventoryID.RAIDS_REWARDS, rewards);
-        assertEquals("a repeated click books nothing again", -1L, engine.baseline.quantityOf(ItemID.TWISTED_BOW));
-        assertEquals(-30L, engine.baseline.quantityOf(ItemID.DRAGON_ARROW));
+        assertEquals("a repeated click books nothing again", 1L, received(engine, ItemID.TWISTED_BOW));
+        assertEquals(30L, received(engine, ItemID.DRAGON_ARROW));
 
         chest[0] = new Item[0];
         plugin.chestChanged(InventoryID.BANK, rewards);
-        assertEquals("another container is not the chest", -30L, engine.baseline.quantityOf(ItemID.DRAGON_ARROW));
+        assertEquals("another container is not the chest", 30L, received(engine, ItemID.DRAGON_ARROW));
+    }
+
+    static long received(Engine engine, int item) {
+        return engine.session().transactions().stream().flatMap(row -> row.flows().stream())
+            .filter(flow -> flow.item == item).mapToLong(flow -> flow.quantity).sum();
     }
 }

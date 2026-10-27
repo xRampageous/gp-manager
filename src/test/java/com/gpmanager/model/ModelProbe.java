@@ -14,13 +14,13 @@ public final class ModelProbe
     public static Valuation valuation(GpManagerConfig config, java.util.function.IntFunction<net.runelite.api.ItemComposition> compositions,
         java.util.function.IntUnaryOperator prices)
     {
-        return new Valuation(config, compositions, (id, active) -> prices.applyAsInt(id));
+        return new Valuation(config, compositions, (id, active) -> prices.applyAsInt(id), id -> false, Valuation.Economy.NORMAL);
     }
 
     public static Valuation valuation(GpManagerConfig config, java.util.function.IntFunction<net.runelite.api.ItemComposition> compositions,
         Valuation.MarketQuote quotes)
     {
-        return new Valuation(config, compositions, quotes);
+        return new Valuation(config, compositions, quotes, id -> false, Valuation.Economy.NORMAL);
     }
 
     /** The session's corrections that have not been undone, oldest first. */

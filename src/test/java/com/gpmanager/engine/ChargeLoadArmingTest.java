@@ -108,10 +108,10 @@ public class ChargeLoadArmingTest
         Widget scales = item(ItemID.SNAKEBOSS_SCALE, SCALES_SLOT);
         intake(selecting(scales), engine).armLoad(
             click(MenuAction.WIDGET_TARGET_ON_WIDGET, "Use", blowpipe), "");
-        assertEquals(ChargeCheck.ChargedItem.BLOWPIPE, (engine.inbox.peek(Inbox.LOAD_TARGET) == null ? null : engine.inbox.peek(Inbox.LOAD_TARGET).variant));
+        assertEquals(ChargeCheck.ChargedItem.BLOWPIPE, (engine.events.peek(Inbox.LOAD_TARGET) == null ? null : engine.events.peek(Inbox.LOAD_TARGET).variant));
         assertEquals("the item in hand is the source", ItemID.SNAKEBOSS_SCALE,
-            engine.inbox.item(Inbox.LOAD_TARGET));
-        assertEquals("the weapon's own slot", BLOWPIPE_IDENTITY, (engine.inbox.peek(Inbox.LOAD_TARGET) == null ? null : engine.inbox.peek(Inbox.LOAD_TARGET).id));
+            engine.events.item(Inbox.LOAD_TARGET));
+        assertEquals("the weapon's own slot", BLOWPIPE_IDENTITY, (engine.events.peek(Inbox.LOAD_TARGET) == null ? null : engine.events.peek(Inbox.LOAD_TARGET).id));
     }
 
     @Test
@@ -122,10 +122,10 @@ public class ChargeLoadArmingTest
         Widget scales = item(ItemID.SNAKEBOSS_SCALE, SCALES_SLOT);
         intake(selecting(blowpipe), engine).armLoad(
             click(MenuAction.WIDGET_TARGET_ON_WIDGET, "Use", scales), "");
-        assertEquals(ChargeCheck.ChargedItem.BLOWPIPE, (engine.inbox.peek(Inbox.LOAD_TARGET) == null ? null : engine.inbox.peek(Inbox.LOAD_TARGET).variant));
-        assertEquals(ItemID.SNAKEBOSS_SCALE, engine.inbox.item(Inbox.LOAD_TARGET));
+        assertEquals(ChargeCheck.ChargedItem.BLOWPIPE, (engine.events.peek(Inbox.LOAD_TARGET) == null ? null : engine.events.peek(Inbox.LOAD_TARGET).variant));
+        assertEquals(ItemID.SNAKEBOSS_SCALE, engine.events.item(Inbox.LOAD_TARGET));
         assertEquals("the identity follows the weapon, not the clicked scales", BLOWPIPE_IDENTITY,
-            (engine.inbox.peek(Inbox.LOAD_TARGET) == null ? null : engine.inbox.peek(Inbox.LOAD_TARGET).id));
+            (engine.events.peek(Inbox.LOAD_TARGET) == null ? null : engine.events.peek(Inbox.LOAD_TARGET).id));
     }
 
     @Test
@@ -135,10 +135,10 @@ public class ChargeLoadArmingTest
         Widget blowpipe = item(ItemID.TOXIC_BLOWPIPE_LOADED, BLOWPIPE_SLOT);
         intake(selecting(item(ItemID.BIG_BONES, 2)), engine).armLoad(
             click(MenuAction.WIDGET_TARGET_ON_WIDGET, "Use", blowpipe), "");
-        assertNull((engine.inbox.peek(Inbox.LOAD_TARGET) == null ? null : engine.inbox.peek(Inbox.LOAD_TARGET).variant));
+        assertNull((engine.events.peek(Inbox.LOAD_TARGET) == null ? null : engine.events.peek(Inbox.LOAD_TARGET).variant));
         intake(selecting(item(ItemID.SNAKEBOSS_SCALE, SCALES_SLOT)), engine).armLoad(
             click(MenuAction.CC_OP, "Check", blowpipe), "");
-        assertNull("only a use-on click arms a load", (engine.inbox.peek(Inbox.LOAD_TARGET) == null ? null : engine.inbox.peek(Inbox.LOAD_TARGET).variant));
+        assertNull("only a use-on click arms a load", (engine.events.peek(Inbox.LOAD_TARGET) == null ? null : engine.events.peek(Inbox.LOAD_TARGET).variant));
     }
 
     @Test
@@ -149,11 +149,11 @@ public class ChargeLoadArmingTest
         ChargeIntake intake = intake(selecting(null), engine);
         Widget trident = item(ItemID.TOTS_CHARGED, 0);
         intake.onMenuOptionClicked(click(MenuAction.CC_OP, "uncharge", trident), "uncharge", "trident of the seas");
-        assertEquals(ChargeCheck.ChargedItem.TRIDENT_SEAS, (intake.engine.inbox.peek(Inbox.UNCHARGE) == null ? null : intake.engine.inbox.peek(Inbox.UNCHARGE).variant));
+        assertEquals(ChargeCheck.ChargedItem.TRIDENT_SEAS, (intake.engine.events.peek(Inbox.UNCHARGE) == null ? null : intake.engine.events.peek(Inbox.UNCHARGE).variant));
         intake.onMenuOptionClicked(click(MenuAction.WIDGET_CONTINUE, "continue", null), "continue", "");
-        assertEquals("answering the prompt keeps watching", ChargeCheck.ChargedItem.TRIDENT_SEAS, (intake.engine.inbox.peek(Inbox.UNCHARGE) == null ? null : intake.engine.inbox.peek(Inbox.UNCHARGE).variant));
+        assertEquals("answering the prompt keeps watching", ChargeCheck.ChargedItem.TRIDENT_SEAS, (intake.engine.events.peek(Inbox.UNCHARGE) == null ? null : intake.engine.events.peek(Inbox.UNCHARGE).variant));
         intake.onMenuOptionClicked(click(MenuAction.WALK, "walk here", null), "walk here", "");
-        assertNull("walking away ends it, so later runes stay loot", (intake.engine.inbox.peek(Inbox.UNCHARGE) == null ? null : intake.engine.inbox.peek(Inbox.UNCHARGE).variant));
+        assertNull("walking away ends it, so later runes stay loot", (intake.engine.events.peek(Inbox.UNCHARGE) == null ? null : intake.engine.events.peek(Inbox.UNCHARGE).variant));
     }
 
     @Test
@@ -174,9 +174,9 @@ public class ChargeLoadArmingTest
         };
         intake.armLoad(click(MenuAction.WIDGET_TARGET_ON_WIDGET, "Use", ring), "");
         assertEquals(ChargeCheck.ChargedItem.SUFFERING,
-            (engine.inbox.peek(Inbox.LOAD_TARGET) == null ? null : engine.inbox.peek(Inbox.LOAD_TARGET).variant));
+            (engine.events.peek(Inbox.LOAD_TARGET) == null ? null : engine.events.peek(Inbox.LOAD_TARGET).variant));
         assertEquals("the noted id canonicalises to the ring of recoil",
-            ItemID.RING_OF_RECOIL, engine.inbox.item(Inbox.LOAD_TARGET));
+            ItemID.RING_OF_RECOIL, engine.events.item(Inbox.LOAD_TARGET));
     }
 
     /** A lookup that canonicalises the noted recoil the way RuneLite's ItemManager does. */

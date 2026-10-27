@@ -20,7 +20,7 @@ public class GameplayIngestionTest
         Client client = (Client) Proxy.newProxyInstance(Client.class.getClassLoader(), new Class<?>[] {Client.class},
             (proxy, method, args) -> "getGameState".equals(method.getName()) ? state[0] : null);
         set(plugin, "client", client);
-        set(plugin, "persistence", new Persistence(null, null, null, null, null)
+        set(plugin, "storage", new Persistence(null, null, null, null, null)
         {
             @Override public synchronized boolean isTrackingReady() { return ready[0]; }
         });

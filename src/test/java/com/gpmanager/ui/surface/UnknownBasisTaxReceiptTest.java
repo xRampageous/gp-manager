@@ -65,7 +65,7 @@ public class UnknownBasisTaxReceiptTest
         LedgerData data = captureWithGroup(market, groupIdOf(market));
         Semantics.Receipt receipt = receiptOfItem(data, VIAL);
         assertNotNull(receipt);
-        String rowText = LedgerPageProbe.marketReceiptRowText(receipt, data.capturedAt);
+        String rowText = LedgerPageProbe.marketReceiptRowText(receipt, data.at);
         assertTrue(rowText.startsWith("Vial of blood  " + Fmt.times(4L) + "|Sold \u00b7 Result \u2014"));
         assertTrue(rowText.endsWith("|+33,128 gp"));
 
@@ -89,9 +89,9 @@ public class UnknownBasisTaxReceiptTest
         assertEquals(-676L, data.net);
         assertEquals("the Ledger market total carries the tax", -676L, data.market.total);
         assertEquals(-676L, data.total.market);
-        assertEquals("no Gains contribution is invented", 0L, data.total.gains);
-        assertEquals("no Supplies/Losses contribution is invented", 0L, data.total.costs);
-        assertTrue("gains + costs + market == net", data.reconciled);
+        assertEquals("no Gains contribution is invented", 0L, data.total.income);
+        assertEquals("no Supplies/Losses contribution is invented", 0L, data.total.cost);
+        assertTrue("gains + costs + market == net", data.balanced);
         Semantics.Group group = null;
         for (Semantics.Group candidate : data.market.groups)
         {
@@ -103,15 +103,15 @@ public class UnknownBasisTaxReceiptTest
         assertNotNull(group);
         assertEquals(-676L, group.value);
         assertEquals(Semantics.Coverage.COMPLETE, group.coverage);
-        assertFalse("a proven tax is not a review row", group.reviewRequired);
+        assertFalse("a proven tax is not a review row", group.review);
 
         LiveSnapshot live = LiveSnapshot.capture(market.engine, market.now + 1_000L, null);
-        assertEquals(-676L, live.marketResult);
+        assertEquals(-676L, live.market);
         assertEquals(-676L, live.net);
-        assertEquals(0L, live.gains);
+        assertEquals(0L, live.income);
         assertEquals(0L, live.loss);
         assertEquals(0L, live.supplies);
-        assertEquals(0L, live.costs);
+        assertEquals(0L, live.cost);
     }
 
     @Test
@@ -144,8 +144,7 @@ public class UnknownBasisTaxReceiptTest
         market.sellUnknown(0, VIAL, 4L, 8_536, 33_804, 33_128);
         String settlementId = market.row(VIAL).settlementId;
 
-        assertTrue(market.engine.correctTransaction(settlementId, Correction.IGNORE,
-            market.now + 5_000L, "test"));
+        assertTrue(market.engine.correctTransaction(settlementId, Correction.IGNORE, "test"));
         MarketRows.Row corrected = market.row(VIAL);
         List<String> correctedLines = MarketText.humanLines(corrected, true);
         assertFalse("the GE tax row disappears while corrected",
@@ -153,7 +152,7 @@ public class UnknownBasisTaxReceiptTest
         assertEquals(Fmt.exactSigned(0L) + " gp \u00b7 corrected",
             LedgerPageProbe.netContributionText(corrected, true));
 
-        assertTrue(market.engine.undoCorrection(market.now + 6_000L));
+        assertTrue(market.engine.undoCorrection());
         MarketRows.Row undone = market.row(VIAL);
         assertTrue(MarketText.humanLines(undone, false)
             .contains("GE tax|" + Fmt.exactSigned(-676L) + " gp"));
@@ -203,7 +202,7 @@ public class UnknownBasisTaxReceiptTest
         assertTrue(lines.contains("Result|\u2014"));
         assertEquals("0 \u00b7 not counted", LedgerPageProbe.netContributionText(row, false));
 
-        Semantics.Result projection = Semantics.capture(
+        Semantics.Result projection = SemanticProbe.capture(
             Collections.singletonList(settlement), Collections.singletonList(row), "session-a", null);
         assertEquals("the historical tax evidence never enters the market total",
             0L, Semantics.summarize(projection.groups).market);
@@ -213,7 +212,7 @@ public class UnknownBasisTaxReceiptTest
 
     private static void gain(Engine engine, int item, long quantity, long value, long at)
     {
-        engine.getActiveSession().addTransaction(new Transaction(at,
+        engine.session().addTransaction(new Transaction(at,
             TransactionType.GAIN, Context.GENERIC, "", "Loot", true,
             Collections.singletonList(new Flow(item, name(item), quantity,
                 (int) (quantity > 0L ? value / quantity : 0L), value,
@@ -241,7 +240,7 @@ public class UnknownBasisTaxReceiptTest
         {
             if (group.market)
             {
-                return group.semanticGroupId;
+                return group.id;
             }
         }
         throw new AssertionError("no market group");
@@ -258,9 +257,9 @@ public class UnknownBasisTaxReceiptTest
 
     private static Semantics.Receipt receiptOfItem(LedgerData data, int itemId)
     {
-        for (Semantics.Receipt receipt : data.detail.receipts)
+        for (Semantics.Receipt receipt : data.detail.entries)
         {
-            if (receipt.itemId == itemId)
+            if (receipt.item == itemId)
             {
                 return receipt;
             }
@@ -275,8 +274,8 @@ public class UnknownBasisTaxReceiptTest
         assertNotNull(receipt);
         LedgerData data = LedgerData.capture(market.engine, market.now + 1_000L,
             new LedgerData.Entry(LedgerData.Scope.CURRENT_GRIND, null, null,
-                LedgerData.CostView.SUPPLIES, "", receipt.transactionId,
-                receipt.contributionId, grouped.detail.group.semanticGroupId, null));
+                LedgerData.CostView.SUPPLIES, "", receipt.transaction,
+                receipt.id, grouped.detail.group.id, null));
         assertNotNull(data.detail);
         assertNotNull(data.detail.exact);
         return onEdt(() ->

@@ -38,7 +38,7 @@ public class LedgerOverviewModesTest
         Engine engine = session();
         for (int i = 0; i < 5; i++)
         {
-            engine.getActiveSession().addTransaction(gain(T0 + 1_000L + i * 1_000L, "Item " + i,
+            engine.session().addTransaction(gain(T0 + 1_000L + i * 1_000L, "Item " + i,
                 2_000 + i, 1L, 100, 100L), 2_000, false);
         }
         LedgerHarness harness = new LedgerHarness(engine, T0 + 50_000L, entry());
@@ -50,8 +50,8 @@ public class LedgerOverviewModesTest
         assertTrue(overview.stream().anyMatch(label -> label.startsWith("TRADE \u00b7")));
         assertFalse(onEdt(() -> detailOpen(page)));
 
-        String groupId = harness.data().gains.groups.get(0).semanticGroupId;
-        String groupName = harness.data().gains.groups.get(0).primaryName;
+        String groupId = harness.data().income.groups.get(0).id;
+        String groupName = harness.data().income.groups.get(0).name;
         onEdt(() ->
         {
             harness.auz(groupId);
@@ -77,7 +77,7 @@ public class LedgerOverviewModesTest
     public void aRefreshKeepsTheOpenSearchFieldAttached() throws Exception
     {
         Engine engine = session();
-        engine.getActiveSession().addTransaction(gain(T0 + 1_000L, "Item", 2_000, 1L, 100, 100L), 2_000, false);
+        engine.session().addTransaction(gain(T0 + 1_000L, "Item", 2_000, 1L, 100, 100L), 2_000, false);
         LedgerHarness harness = new LedgerHarness(engine, T0 + 50_000L, entry());
         LedgerPage page = onEdt(() -> harness.attach(new LedgerPage(harness, id -> null)));
         onEdt(() ->
@@ -118,10 +118,10 @@ public class LedgerOverviewModesTest
         Engine engine = session();
         for (int i = 0; i < 15; i++)
         {
-            engine.getActiveSession().addTransaction(food(T0 + 1_000L + i * 1_000L, "Food " + i,
+            engine.session().addTransaction(food(T0 + 1_000L + i * 1_000L, "Food " + i,
                 3_000 + i, 50L), 2_000, false);
         }
-        engine.getActiveSession().addTransaction(gain(T0 + 90_000L, "Bones", 536, 1L, 3_200, 3_200L), 2_000, false);
+        engine.session().addTransaction(gain(T0 + 90_000L, "Bones", 536, 1L, 3_200, 3_200L), 2_000, false);
         LedgerHarness harness = new LedgerHarness(engine, T0 + 100_000L, entry());
         LedgerPage page = onEdt(() -> harness.attach(new LedgerPage(harness, id -> null)));
 
@@ -129,10 +129,10 @@ public class LedgerOverviewModesTest
         assertEquals("2/3", onEdt(() -> LedgerPageProbe.overviewPageLabel(page, LedgerPageProbe.FinancialTable.COSTS)));
         List<String> paged = onEdt(() -> LedgerPageProbe.overviewRows(page, LedgerPageProbe.FinancialTable.COSTS));
         assertEquals("the page holds five rows", 5, paged.size());
-        String firstRowOfPage = harness.data().costs.groups.get(5).primaryName;
+        String firstRowOfPage = harness.data().cost.groups.get(5).name;
         assertEquals("the page starts where the pager says", firstRowOfPage, paged.get(0));
 
-        String groupId = harness.data().gains.groups.get(0).semanticGroupId;
+        String groupId = harness.data().income.groups.get(0).id;
         onEdt(() ->
         {
             harness.auz(groupId);
@@ -150,7 +150,7 @@ public class LedgerOverviewModesTest
             harness.costViewChanged(LedgerData.CostView.LOSS);
             return null;
         });
-        assertEquals(LedgerData.CostView.LOSS, onEdt(() -> LedgerPageProbe.data(page).entry.costView));
+        assertEquals(LedgerData.CostView.LOSS, onEdt(() -> LedgerPageProbe.data(page).entry.view));
         onEdt(() ->
         {
             harness.auz(groupId);
@@ -158,7 +158,7 @@ public class LedgerOverviewModesTest
         });
         assertTrue(onEdt(() -> clickButton(page.body(), "\u2039 Ledger")));
         assertEquals("Back restores the exact prior subfilter", LedgerData.CostView.LOSS,
-            onEdt(() -> LedgerPageProbe.data(page).entry.costView));
+            onEdt(() -> LedgerPageProbe.data(page).entry.view));
     }
 
     @Test
@@ -167,14 +167,14 @@ public class LedgerOverviewModesTest
         Engine engine = session();
         for (int i = 0; i < 6; i++)
         {
-            engine.getActiveSession().addTransaction(gain(T0 + 1_000L + i * 1_000L, "Item " + i,
+            engine.session().addTransaction(gain(T0 + 1_000L + i * 1_000L, "Item " + i,
                 2_000 + i, 1L, 100, 100L), 2_000, false);
-            engine.getActiveSession().addTransaction(food(T0 + 10_000L + i * 1_000L, "Food " + i,
+            engine.session().addTransaction(food(T0 + 10_000L + i * 1_000L, "Food " + i,
                 3_000 + i, 50L), 2_000, false);
         }
         for (int i = 0; i < 12; i++)
         {
-            engine.getActiveSession().addTransaction(iceBurst(T0 + 30_000L + i * 1_000L), 2_000, false);
+            engine.session().addTransaction(iceBurst(T0 + 30_000L + i * 1_000L), 2_000, false);
         }
         LedgerHarness harness = new LedgerHarness(engine, T0 + 90_000L, entry());
         LedgerPage page = onEdt(() -> harness.attach(new LedgerPage(harness, id -> null)));
@@ -186,11 +186,11 @@ public class LedgerOverviewModesTest
             onEdt(() -> LedgerPageProbe.overviewRows(page, LedgerPageProbe.FinancialTable.COSTS)).size());
 
         String groupId = null;
-        for (Semantics.Group group : harness.data().costs.groups)
+        for (Semantics.Group group : harness.data().cost.groups)
         {
-            if ("Ice Burst".equals(group.primaryName))
+            if ("Ice Burst".equals(group.name))
             {
-                groupId = group.semanticGroupId;
+                groupId = group.id;
             }
         }
         assertNotNull(groupId);
@@ -251,7 +251,7 @@ public class LedgerOverviewModesTest
     public void emptyMarketKeepsItsHeader() throws Exception
     {
         Engine engine = session();
-        engine.getActiveSession().addTransaction(gain(T0 + 1_000L, "Bones", 536, 1L, 3_200, 3_200L), 2_000, false);
+        engine.session().addTransaction(gain(T0 + 1_000L, "Bones", 536, 1L, 3_200, 3_200L), 2_000, false);
         LedgerHarness harness = new LedgerHarness(engine, T0 + 50_000L, entry());
         LedgerPage page = onEdt(() -> harness.attach(new LedgerPage(harness, id -> null)));
 
@@ -270,7 +270,7 @@ public class LedgerOverviewModesTest
                 new Flow(6529, "Tokkul", -1_942L, 10, -19_420L),
                 new Flow(560, "Death rune", 5L, 201, 1_005L)),
             Confidence.CONFIRMED, "Trade inventory movement observed.", null);
-        engine.getActiveSession().addTransaction(trade, 2_000, false);
+        engine.session().addTransaction(trade, 2_000, false);
         LedgerHarness harness = new LedgerHarness(engine, T0 + 50_000L, entry());
         LedgerPage page = onEdt(() -> harness.attach(new LedgerPage(harness, id -> null)));
 
@@ -284,24 +284,24 @@ public class LedgerOverviewModesTest
     public void theRecentTokkulRowOpensBothShopEntries() throws Exception
     {
         Engine engine = session();
-        engine.getActiveSession().addTransaction(
+        engine.session().addTransaction(
             shopTrade(T0 + 1_000L, "buy 5 death rune", 560, 5L, 1_942L), 2_000, false);
-        engine.getActiveSession().addTransaction(
+        engine.session().addTransaction(
             shopTrade(T0 + 2_000L, "buy 50 chaos rune", 562, 50L, 1_350L), 2_000, false);
 
         LiveSnapshot snapshot = LiveSnapshot.capture(engine, T0 + 50_000L, LiveContext.NONE);
         LiveSnapshot.Recent row = snapshot.recent.stream()
             .filter(candidate -> "Tokkul".equals(candidate.name))
             .findFirst().orElseThrow(AssertionError::new);
-        assertEquals("both shop spends coalesce into one Recent row", 2, row.receipts);
+        assertEquals("both shop spends coalesce into one Recent row", 2, row.entries);
 
         LedgerHarness harness = new LedgerHarness(engine, T0 + 50_000L, LivePage.entryFor(row));
         LedgerPage page = onEdt(() -> harness.attach(new LedgerPage(harness, id -> null)));
         LedgerData data = harness.data();
         assertNotNull("the Recent row opens its group", data.detail);
         assertEquals("the click lands on the tokkul side, not one rune",
-            "Tokkul", data.detail.group.primaryName);
-        assertEquals("the drill shows both entries", 2, data.detail.receipts.size());
+            "Tokkul", data.detail.group.name);
+        assertEquals("the drill shows both entries", 2, data.detail.entries.size());
         List<String> entries =
             onEdt(() -> TableRows.names(TableRows.tables(page.body(), "ENTRIES").get(0)));
         assertTrue("entry rows name the bought runes: " + entries,
@@ -321,7 +321,7 @@ public class LedgerOverviewModesTest
     public void reviewAndCorrectedFollowCounts() throws Exception
     {
         Engine quiet = session();
-        quiet.getActiveSession().addTransaction(gain(T0 + 1_000L, "Bones", 536, 1L, 3_200, 3_200L), 2_000, false);
+        quiet.session().addTransaction(gain(T0 + 1_000L, "Bones", 536, 1L, 3_200, 3_200L), 2_000, false);
         LedgerHarness quietHarness = new LedgerHarness(quiet, T0 + 50_000L, entry());
         LedgerPage quietPage = onEdt(() ->
             quietHarness.attach(new LedgerPage(quietHarness, id -> null)));
@@ -343,10 +343,10 @@ public class LedgerOverviewModesTest
             Context.GENERIC, "", "Vorkath", true,
             java.util.Collections.singletonList(new Flow(777, "Unknown rune", -1L, 0, 0L)),
             Confidence.UNCERTAIN, "Awaiting a decision", null);
-        engine.getActiveSession().addTransaction(uncertain, 2_000, false);
+        engine.session().addTransaction(uncertain, 2_000, false);
         Transaction corrected = gain(T0 + 2_000L, "Willow logs", 1519, 1L, 100, 120L);
-        corrected.applyCorrection(Correction.IGNORE, T0 + 3_000L, "excluded");
-        engine.getActiveSession().addTransaction(corrected, 2_000, false);
+        corrected.applyCorrection(Correction.IGNORE, "excluded");
+        engine.session().addTransaction(corrected, 2_000, false);
         LedgerHarness harness = new LedgerHarness(engine, T0 + 50_000L, entry());
         LedgerPage page = onEdt(() -> harness.attach(new LedgerPage(harness, id -> null)));
         assertTrue("a nonzero Review count shows its table",
@@ -366,7 +366,7 @@ public class LedgerOverviewModesTest
         Engine engine = session();
         for (int i = 0; i < 7; i++)
         {
-            engine.getActiveSession().addTransaction(gain(T0 + 1_000L + i * 1_000L, "Item " + i,
+            engine.session().addTransaction(gain(T0 + 1_000L + i * 1_000L, "Item " + i,
                 2_000 + i, 1L, 100, 100L), 2_000, false);
         }
         LedgerHarness harness = new LedgerHarness(engine, T0 + 50_000L, entry());
@@ -381,13 +381,13 @@ public class LedgerOverviewModesTest
     public void profileFenceClearsOverviewAndDetailState() throws Exception
     {
         Engine engine = session();
-        engine.getActiveSession().addTransaction(gain(T0 + 1_000L, "Bones", 536, 1L, 3_200, 3_200L), 2_000, false);
+        engine.session().addTransaction(gain(T0 + 1_000L, "Bones", 536, 1L, 3_200, 3_200L), 2_000, false);
         LedgerHarness harness = new LedgerHarness(engine, T0 + 50_000L, entry());
         LedgerPage page = onEdt(() -> harness.attach(new LedgerPage(harness, id -> null)));
         onEdt(() ->
         {
             LedgerPageProbe.toggleCorrected(page);
-            harness.auz(harness.data().gains.groups.get(0).semanticGroupId);
+            harness.auz(harness.data().income.groups.get(0).id);
             return null;
         });
         assertTrue(onEdt(() -> detailOpen(page)));
@@ -442,7 +442,7 @@ public class LedgerOverviewModesTest
             Context.GENERIC, "", "Vorkath", true,
             java.util.Collections.singletonList(new Flow(itemId, name, -1L, (int) value, -value,
                 PriceSource.GRAND_EXCHANGE)), Confidence.CONFIRMED, "Test food", null);
-        transaction.setActionKind(ActionKind.EAT);
+        transaction.setAction(ActionKind.EAT);
         return transaction;
     }
 
@@ -454,7 +454,7 @@ public class LedgerOverviewModesTest
                 new Flow(560, "Death rune", -2L, 188, -376L, PriceSource.GRAND_EXCHANGE),
                 new Flow(555, "Water rune", -4L, 5, -20L, PriceSource.GRAND_EXCHANGE)),
             Confidence.CONFIRMED, "Exact fixture", null);
-        transaction.setActionKind(ActionKind.CAST);
+        transaction.setAction(ActionKind.CAST);
         transaction.setActionLabel(ActionLabel.of("Ice Burst"));
         return transaction;
     }
@@ -545,7 +545,7 @@ public class LedgerOverviewModesTest
                 new OfferSlots.Snapshot(slot, state, item, total, traded, price, spent)).orElse(null);
             if (transition != null)
             {
-                engine.noteGeOffer(transition, marketName(transition.current.itemId),
+                engine.noteGeOffer(transition, marketName(transition.current.item),
                     now);
             }
         }

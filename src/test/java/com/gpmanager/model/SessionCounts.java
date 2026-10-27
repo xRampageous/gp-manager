@@ -7,7 +7,7 @@ final class SessionCounts {
 
     private static int count(Session session, boolean transfers) {
         int count = 0;
-        for (Transaction transaction : session.getTransactions()) {
+        for (Transaction transaction : session.transactions()) {
             if (transaction == null) { continue; }
             Accounting.Amounts amounts = Accounting.transaction(transaction);
             if (amounts.transfer ? transfers : !transfers && amounts.available && amounts.included) {

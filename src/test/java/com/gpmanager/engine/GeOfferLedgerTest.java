@@ -75,7 +75,7 @@ public class GeOfferLedgerTest
 
         OfferSlots.Transition progress = ledger.observe(
             snapshot(3, GrandExchangeOfferState.BUYING, 4151, 10, 5, 2_000_000, 9_950_000)).get();
-        assertEquals(2, progress.previous.quantityTraded);
+        assertEquals(2, progress.previous.traded);
     }
 
     @Test

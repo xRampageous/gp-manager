@@ -17,7 +17,7 @@ public class SidebarSheetTest
     {
         Engine engine = PresentationLifecycleTest.engine();
         SidebarPanel panel = onEdt(() -> new SidebarPanel(engine, PresentationLifecycleTest.config(), null, null, null));
-        Shell shell = panel.shell();
+        Shell shell = panel.shell;
         GrindsController grinds = new GrindsController(panel);
         onEdt(() ->
         {
@@ -26,8 +26,8 @@ public class SidebarSheetTest
             ShellProbe.pressSheet(shell, "Start");
             return null;
         });
-        assertTrue("a blank name starts nothing", engine.getSavedGrinds(true).isEmpty());
-        assertFalse(engine.isCustomActive());
+        assertTrue("a blank name starts nothing", engine.plans(true).isEmpty());
+        assertFalse(engine.customActive());
 
         onEdt(() ->
         {
@@ -36,11 +36,11 @@ public class SidebarSheetTest
             ShellProbe.pressSheet(shell, "Start");
             return null;
         });
-        assertTrue(engine.isCustomActive());
-        assertEquals(1, engine.getSavedGrinds(true).size());
-        SavedState.SavedGrind saved = engine.getSavedGrinds(true).get(0);
-        assertEquals("the name is trimmed", "Vorkath", saved.getName());
-        assertEquals("the run is that Grind", saved.getGrindId(), engine.getActiveSession().getGrindId());
+        assertTrue(engine.customActive());
+        assertEquals(1, engine.plans(true).size());
+        SavedState.SavedGrind saved = engine.plans(true).get(0);
+        assertEquals("the name is trimmed", "Vorkath", saved.name());
+        assertEquals("the run is that Grind", saved.id(), engine.session().grindId());
         assertEquals("starting shows it on Live", Shell.LIVE, onEdt(shell::currentPage));
         engine.finishCustom(System.currentTimeMillis());
 
@@ -57,8 +57,8 @@ public class SidebarSheetTest
             ShellProbe.pressSheet(shell, "Vorkath \u00b7 now");
             return null;
         });
-        assertTrue(engine.isCustomActive());
-        assertEquals(saved.getGrindId(), engine.getActiveSession().getGrindId());
+        assertTrue(engine.customActive());
+        assertEquals(saved.id(), engine.session().grindId());
 
         onEdt(() ->
         {
@@ -73,8 +73,8 @@ public class SidebarSheetTest
             ShellProbe.pressSheet(shell, "Switch");
             return null;
         });
-        assertEquals("Zulrah", engine.getActiveSession().getName());
-        assertEquals("Zulrah is remembered too", 2, engine.getSavedGrinds(true).size());
+        assertEquals("Zulrah", engine.session().name());
+        assertEquals("Zulrah is remembered too", 2, engine.plans(true).size());
     }
 
     @Test
@@ -83,7 +83,7 @@ public class SidebarSheetTest
         Engine engine = PresentationLifecycleTest.engine();
         engine.startCustom("Vorkath", System.currentTimeMillis());
         SidebarPanel panel = onEdt(() -> new SidebarPanel(engine, PresentationLifecycleTest.config(), null, null, null));
-        Shell shell = panel.shell();
+        Shell shell = panel.shell;
         boolean[] ran = {false};
         onEdt(() ->
         {
@@ -99,7 +99,7 @@ public class SidebarSheetTest
             return null;
         });
         assertTrue("the named button runs it", ran[0]);
-        assertTrue(engine.isCustomActive());
+        assertTrue(engine.customActive());
     }
 
     /** A rename from the Live hero name is a change like any other: the revision advances, so it is saved. */
@@ -109,8 +109,8 @@ public class SidebarSheetTest
         Engine engine = PresentationLifecycleTest.engine();
         engine.startCustom("Vorkath", System.currentTimeMillis());
         SidebarPanel panel = onEdt(() -> new SidebarPanel(engine, PresentationLifecycleTest.config(), null, null, null));
-        Shell shell = panel.shell();
-        long before = engine.getRevision();
+        Shell shell = panel.shell;
+        long before = engine.revision();
         onEdt(() ->
         {
             panel.new LiveActions().renameGrind();
@@ -118,8 +118,8 @@ public class SidebarSheetTest
             ShellProbe.pressSheet(shell, "OK");
             return null;
         });
-        assertEquals("Zulrah", engine.getActiveSession().getName());
-        assertTrue("the rename is saved", engine.getRevision() > before);
+        assertEquals("Zulrah", engine.session().name());
+        assertTrue("the rename is saved", engine.revision() > before);
     }
 
     /** End on Grinds ends at once; there is no second confirmation. */
@@ -129,13 +129,13 @@ public class SidebarSheetTest
         Engine engine = PresentationLifecycleTest.engine();
         engine.startCustom("Vorkath", System.currentTimeMillis());
         SidebarPanel panel = onEdt(() -> new SidebarPanel(engine, PresentationLifecycleTest.config(), null, null, null));
-        Shell shell = panel.shell();
+        Shell shell = panel.shell;
         onEdt(() ->
         {
             new GrindsController(panel).endGrind();
             return null;
         });
-        assertFalse("End ends it", engine.isCustomActive());
+        assertFalse("End ends it", engine.customActive());
         assertEquals("no confirm sheet opens", "", ShellProbe.sheetTitle(shell));
     }
 
@@ -167,7 +167,7 @@ public class SidebarSheetTest
         Engine engine = PresentationLifecycleTest.engine();
         long now = System.currentTimeMillis();
         engine.startCustom("Vorkath", now);
-        engine.getActiveSession().addTransaction(new Transaction(now + 1_000L, TransactionType.LOOT,
+        engine.session().addTransaction(new Transaction(now + 1_000L, TransactionType.LOOT,
             Context.LOOT, "", "Vorkath", true, java.util.Collections.singletonList(
                 new Flow(536, "Dragon bones", 1L, 2_000, 2_000L)), Confidence.CONFIRMED, "fixture", null), 2_000, false);
         SidebarPanel panel = onEdt(() -> new SidebarPanel(engine, PresentationLifecycleTest.config(), null, null, null));
@@ -179,14 +179,14 @@ public class SidebarSheetTest
             ledger.undoLast();
             return null;
         });
-        assertEquals("undone", 0L, engine.getActiveSession().metrics(now + 5_000L).net);
+        assertEquals("undone", 0L, engine.session().metrics(now + 5_000L).net);
         onEdt(() ->
         {
             ledger.pinMenuTarget();
             ledger.restoreUndo();
             return null;
         });
-        assertEquals("restored", 2_000L, engine.getActiveSession().metrics(now + 5_000L).net);
+        assertEquals("restored", 2_000L, engine.session().metrics(now + 5_000L).net);
     }
 
     @Test
@@ -195,7 +195,7 @@ public class SidebarSheetTest
         Engine engine = PresentationLifecycleTest.engine();
         engine.startCustom("Vorkath", System.currentTimeMillis());
         SidebarPanel panel = onEdt(() -> new SidebarPanel(engine, PresentationLifecycleTest.config(), null, null, null));
-        Shell shell = panel.shell();
+        Shell shell = panel.shell;
         GrindsController grinds = new GrindsController(panel);
         onEdt(() ->
         {
@@ -206,14 +206,14 @@ public class SidebarSheetTest
         });
         assertEquals("the form stays open to fix", "Set a Target", ShellProbe.sheetTitle(shell));
         assertTrue(ShellProbe.noticeText(shell).startsWith("Targets not saved"));
-        assertNull("nothing is cleared or guessed", engine.getActiveSession().getProfitTargetGp());
+        assertNull("nothing is cleared or guessed", engine.session().targetGp());
         onEdt(() ->
         {
             ShellProbe.typeSheet(shell, "5m");
             ShellProbe.pressSheet(shell, "Save");
             return null;
         });
-        assertEquals(Long.valueOf(5_000_000L), engine.getActiveSession().getProfitTargetGp());
+        assertEquals(Long.valueOf(5_000_000L), engine.session().targetGp());
     }
 
     /** The time field is pre-filled in a form its own parser reads back unchanged. */
@@ -223,11 +223,11 @@ public class SidebarSheetTest
         Engine engine = PresentationLifecycleTest.engine();
         engine.startCustom("Vorkath", System.currentTimeMillis());
         SidebarPanel panel = onEdt(() -> new SidebarPanel(engine, PresentationLifecycleTest.config(), null, null, null));
-        Shell shell = panel.shell();
+        Shell shell = panel.shell;
         GrindsController grinds = new GrindsController(panel);
         for (long target : new long[]{30L * 60_000L, 90L * 60_000L, 26L * 3_600_000L + 30L * 60_000L})
         {
-            engine.getActiveSession().setActiveTimeTargetMillis(target, System.currentTimeMillis());
+            engine.session().setTimeTarget(target, System.currentTimeMillis());
             onEdt(() ->
             {
                 grinds.openTargets();
@@ -235,7 +235,7 @@ public class SidebarSheetTest
                 return null;
             });
             assertEquals("Save without changes closes the form", "", ShellProbe.sheetTitle(shell));
-            assertEquals(Long.valueOf(target), engine.getActiveSession().getActiveTimeTargetMillis());
+            assertEquals(Long.valueOf(target), engine.session().timeTargetMillis());
         }
     }
 
@@ -244,7 +244,7 @@ public class SidebarSheetTest
     {
         SidebarPanel panel = onEdt(() -> new SidebarPanel(PresentationLifecycleTest.engine(),
             PresentationLifecycleTest.config(), null, null, null));
-        Shell shell = panel.shell();
+        Shell shell = panel.shell;
         onEdt(() ->
         {
             new GrindsController(panel).newGrind();

@@ -89,9 +89,9 @@ public class MarketEconomyGateTest
             int itemId = 2_000 + i;
             Flow flow = service.value(Collections.singletonMap(itemId, 1L), T0 + i).get(0);
             assertEquals("special economies keep unknown honest, never zero truth",
-                PriceSource.UNPRICED, flow.getPriceSource());
-            assertEquals(0L, flow.valueDelta);
-            engine.getActiveSession().addTransaction(new Transaction(T0 + i,
+                PriceSource.UNPRICED, flow.source());
+            assertEquals(0L, flow.value);
+            engine.session().addTransaction(new Transaction(T0 + i,
                 TransactionType.GAIN, Context.GENERIC, "", "Item " + itemId, true,
                 Collections.singletonList(flow), Confidence.CONFIRMED, "", null), 200, false);
         }
@@ -99,9 +99,9 @@ public class MarketEconomyGateTest
         assertTrue("the gate never queried the automatic market", seam.asked.isEmpty());
         assertEquals("100 unpriced flows are not 100 Review decisions",
             0, engine.getReviewRows(T0 + 200L).size());
-        assertEquals(0L, engine.getMetrics(T0 + 200L).net);
+        assertEquals(0L, engine.metrics(T0 + 200L).net);
 
-        assertEquals(0, LiveSnapshot.capture(engine, T0 + 200L, null).reviewCount);
+        assertEquals(0, LiveSnapshot.capture(engine, T0 + 200L, null).reviews);
     }
 
     @Test
@@ -119,16 +119,16 @@ public class MarketEconomyGateTest
             Valuation.Economy.UNSUPPORTED_SPECIAL);
 
         Flow overridden = service.value(Collections.singletonMap(560, 2L), T0).get(0);
-        assertEquals(PriceSource.MANUAL_OVERRIDE, overridden.getPriceSource());
-        assertEquals(300L, overridden.valueDelta);
+        assertEquals(PriceSource.MANUAL_OVERRIDE, overridden.source());
+        assertEquals(300L, overridden.value);
 
         Flow coins = service.value(Collections.singletonMap(995, 5L), T0).get(0);
-        assertEquals(PriceSource.FACE_VALUE, coins.getPriceSource());
-        assertEquals(5L, coins.valueDelta);
+        assertEquals(PriceSource.FACE_VALUE, coins.source());
+        assertEquals(5L, coins.value);
 
         Flow ordinary = service.value(Collections.singletonMap(561, 1L), T0).get(0);
-        assertEquals(PriceSource.UNPRICED, ordinary.getPriceSource());
-        assertEquals("unknown on a special world is not zero truth", 0L, ordinary.valueDelta);
+        assertEquals(PriceSource.UNPRICED, ordinary.source());
+        assertEquals("unknown on a special world is not zero truth", 0L, ordinary.value);
         assertFalse(service.automaticMarketQuotesAvailable());
     }
 
@@ -140,12 +140,12 @@ public class MarketEconomyGateTest
         Engine engine = new Engine(service, new TransactionClassifier(), config());
         engine.ensureSession(T0);
         assertEquals(PriceSource.UNPRICED,
-            service.value(Collections.singletonMap(560, 1L), T0).get(0).getPriceSource());
+            service.value(Collections.singletonMap(560, 1L), T0).get(0).source());
 
-        service.setEconomyState(Valuation.Economy.NORMAL);
+        service.setEconomy(Valuation.Economy.NORMAL);
         assertTrue(service.automaticMarketQuotesAvailable());
         assertEquals(PriceSource.GRAND_EXCHANGE,
-            service.value(Collections.singletonMap(560, 1L), T0).get(0).getPriceSource());
+            service.value(Collections.singletonMap(560, 1L), T0).get(0).source());
     }
 
     // ── plugin lifecycle seam ──────────────────────────────────────────────────────────────────

@@ -38,8 +38,8 @@ public class SnapshotDetachCostTest
         }
 
         Engine engine = new Engine(deltas -> Collections.emptyList(), new TransactionClassifier(), new GpManagerConfig() {});
-        engine.generalSession = session;
-        engine.activeSession = session;
+        engine.general = session;
+        engine.current = session;
         SessionRepository repository = new SessionRepository(gson,
             FilepathTestSupport.root(java.nio.file.Files.createTempDirectory("gp-capture-cost")), false);
         Persistence persistence = new Persistence(null, null, repository, new OrderedPersistenceWriter(repository, null), engine);
@@ -47,7 +47,7 @@ public class SnapshotDetachCostTest
         for (int i = 0; i < 8; i++)
         {
             long started = System.nanoTime();
-            WriteIntent captured = persistence.currentIntent();
+            WriteIntent captured = persistence.currentIntent(false);
             long elapsed = System.nanoTime() - started;
             org.junit.Assert.assertNull("capture leaves JSON encoding to the writer", captured.json);
             org.junit.Assert.assertEquals(txs.size(), captured.state.generalSession.transactions.size());

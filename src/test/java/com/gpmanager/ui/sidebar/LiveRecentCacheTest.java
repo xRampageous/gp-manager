@@ -18,7 +18,7 @@ public class LiveRecentCacheTest
         Engine engine = PresentationLifecycleTest.engine();
         long now = 1_700_000_000_000L;
         engine.startCustom("Vorkath", now);
-        engine.getActiveSession().addTransaction(Tx.of(now, TransactionType.LOOT, Context.GENERIC, "", true,
+        engine.session().addTransaction(Tx.of(now, TransactionType.LOOT, Context.GENERIC, "", true,
             Collections.singletonList(new Flow(536, "Dragon bones", 1, 2_000, 2_000L))), 2_000, false);
 
         boolean[] hideBones = {false};
@@ -27,7 +27,7 @@ public class LiveRecentCacheTest
         {
             public boolean isFlowIncluded(Flow flow)
             {
-                return !(hideBones[0] && flow.itemId == 536);
+                return !(hideBones[0] && flow.item == 536);
             }
 
             public String version()
@@ -41,7 +41,7 @@ public class LiveRecentCacheTest
         assertSame("an unchanged tick reuses the list", first.recent, tick.recent);
         assertEquals(1, tick.recent.size());
 
-        engine.getActiveSession().addTransaction(Tx.of(now + 2_000L, TransactionType.LOOT, Context.GENERIC,
+        engine.session().addTransaction(Tx.of(now + 2_000L, TransactionType.LOOT, Context.GENERIC,
             "", true, Collections.singletonList(new Flow(385, "Shark", 1, 900, 900L))), 2_000, false);
         LiveSnapshot booked = LiveSnapshot.capture(engine, now + 2_200L, context);
         assertNotSame("a booking rebuilds it", tick.recent, booked.recent);
@@ -58,10 +58,10 @@ public class LiveRecentCacheTest
         engine.noteGeOffer(ledger.observe(new OfferSlots.Snapshot(0,
             GrandExchangeOfferState.BUYING, 385, 10, 0, 900, 0)).get(), "Shark", now + 3_000L);
         LiveSnapshot placed = LiveSnapshot.capture(engine, now + 3_100L, context);
-        long revision = engine.getRevision();
+        long revision = engine.revision();
         engine.noteGeOffer(ledger.observe(new OfferSlots.Snapshot(0,
             GrandExchangeOfferState.BUYING, 385, 10, 4, 900, 3_600)).get(), "Shark", now + 3_500L);
-        assertEquals("GE progress alone books nothing", revision, engine.getRevision());
+        assertEquals("GE progress alone books nothing", revision, engine.revision());
         LiveSnapshot progressed = LiveSnapshot.capture(engine, now + 3_600L, context);
         assertTrue("the Market row change is seen", placed.recent != progressed.recent);
     }

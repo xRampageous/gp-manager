@@ -52,10 +52,10 @@ public class AtesTeleportInterfaceTest
             ChargeLoadAnyItemTest.click(MenuAction.CC_OP, "kastori",
                 ChargeLoadAnyItemTest.widget(0, InterfaceID.PendantOfAtes.TELEPORT_AUBURN, -1)),
             "kastori", "");
-        List<Transaction> rows = h.engine.getActiveSession().getTransactions();
+        List<Transaction> rows = h.engine.session().transactions();
         assertEquals(rows.toString(), 1, rows.size());
         assertEquals(1L, rows.get(0).quantity(TEAR, false));
-        assertEquals(ActionKind.SUPPLIES, rows.get(0).getActionKind());
+        assertEquals(ActionKind.SUPPLIES, rows.get(0).action());
     }
 
     @Test
@@ -66,7 +66,7 @@ public class AtesTeleportInterfaceTest
             ChargeLoadAnyItemTest.click(MenuAction.CC_OP, "nemus",
                 ChargeLoadAnyItemTest.widget(0, InterfaceID.PendantOfAtes.TELEPORT_TLATI, -1)),
             "nemus", "");
-        assertEquals(1, h.engine.getActiveSession().getTransactions().size());
+        assertEquals(1, h.engine.session().transactions().size());
     }
 
     @Test
@@ -77,7 +77,7 @@ public class AtesTeleportInterfaceTest
             ChargeLoadAnyItemTest.click(MenuAction.CC_OP, "kastori",
                 ChargeLoadAnyItemTest.widget(0, InterfaceID.PendantOfAtes.TELEPORT_TLATI, -1)),
             "kastori", "");
-        assertEquals(0, h.engine.getActiveSession().getTransactions().size());
+        assertEquals(0, h.engine.session().transactions().size());
     }
 
     @Test
@@ -89,7 +89,7 @@ public class AtesTeleportInterfaceTest
             ChargeLoadAnyItemTest.click(MenuAction.CC_OP, "close",
                 ChargeLoadAnyItemTest.widget(0, InterfaceID.PendantOfAtes.CLOSE, -1)),
             "close", "");
-        assertEquals(0, h.engine.getActiveSession().getTransactions().size());
+        assertEquals(0, h.engine.session().transactions().size());
     }
 
     @Test
@@ -100,7 +100,7 @@ public class AtesTeleportInterfaceTest
             ChargeLoadAnyItemTest.click(MenuAction.CC_OP, "darkfrost",
                 ChargeLoadAnyItemTest.widget(PENDANT, InterfaceID.Inventory.ITEMS, 0)),
             "darkfrost", "");
-        List<Transaction> rows = h.engine.getActiveSession().getTransactions();
+        List<Transaction> rows = h.engine.session().transactions();
         assertEquals(rows.toString(), 1, rows.size());
         assertEquals(1L, rows.get(0).quantity(TEAR, false));
     }
@@ -116,7 +116,7 @@ public class AtesTeleportInterfaceTest
             ChargeLoadAnyItemTest.click(MenuAction.CC_OP_LOW_PRIORITY, "nemus retreat",
                 ChargeLoadAnyItemTest.widget(-1, InterfaceID.Wornitems.UNIVERSE, -1)),
             "nemus retreat", "pendant of ates");
-        List<Transaction> rows = h.engine.getActiveSession().getTransactions();
+        List<Transaction> rows = h.engine.session().transactions();
         assertEquals(rows.toString(), 1, rows.size());
         assertEquals(1L, rows.get(0).quantity(TEAR, false));
     }
@@ -130,7 +130,7 @@ public class AtesTeleportInterfaceTest
             ChargeLoadAnyItemTest.click(MenuAction.CC_OP_LOW_PRIORITY, "the fisher's flute",
                 ChargeLoadAnyItemTest.widget(-1, InterfaceID.Wornitems.UNIVERSE, -1)),
             "the fisher's flute", "kharedst's memoirs");
-        assertEquals(0, h.engine.getActiveSession().getTransactions().size());
+        assertEquals(0, h.engine.session().transactions().size());
     }
 
     @Test
@@ -174,13 +174,13 @@ public class AtesTeleportInterfaceTest
             ChargeLoadAnyItemTest.click(MenuAction.CC_OP_LOW_PRIORITY, "nemus retreat",
                 ChargeLoadAnyItemTest.widget(-1, InterfaceID.Wornitems.UNIVERSE, -1)),
             "nemus retreat", "pendant of ates");
-        List<Transaction> rows = h.engine.getActiveSession().getTransactions();
+        List<Transaction> rows = h.engine.session().transactions();
         assertEquals(1, rows.size());
         assertEquals(1L, rows.get(0).quantity(TEAR, false));
         h.intake.refusedTeleport(System.currentTimeMillis());
-        assertEquals("the refused click is not a use", Correction.IGNORE, rows.get(0).getCorrection());
+        assertEquals("the refused click is not a use", Correction.IGNORE, rows.get(0).correction());
         assertEquals(0L, rows.get(0).quantity(TEAR, false));
-        assertEquals(0L, h.engine.getMetrics(System.currentTimeMillis() + 1_000L).costs);
+        assertEquals(0L, h.engine.metrics(System.currentTimeMillis() + 1_000L).cost);
     }
 
     @Test
@@ -195,14 +195,14 @@ public class AtesTeleportInterfaceTest
                     ChargeLoadAnyItemTest.widget(-1, InterfaceID.Wornitems.UNIVERSE, -1)),
                 option, "pendant of ates");
         }
-        List<Transaction> rows = h.engine.getActiveSession().getTransactions();
+        List<Transaction> rows = h.engine.session().transactions();
         assertEquals(2, rows.size());
         h.intake.refusedTeleport(System.currentTimeMillis());
         assertEquals("an earlier successful click stays", Correction.AUTO,
-            rows.get(0).getCorrection());
+            rows.get(0).correction());
         assertEquals(1L, rows.get(0).quantity(TEAR, false));
-        assertEquals(Correction.IGNORE, rows.get(1).getCorrection());
-        assertEquals(1_000L, h.engine.getMetrics(System.currentTimeMillis() + 1_000L).costs);
+        assertEquals(Correction.IGNORE, rows.get(1).correction());
+        assertEquals(1_000L, h.engine.metrics(System.currentTimeMillis() + 1_000L).cost);
     }
 
     @Test
@@ -223,7 +223,7 @@ public class AtesTeleportInterfaceTest
                     ChargeLoadAnyItemTest.click(MenuAction.CC_OP_LOW_PRIORITY, "nemus retreat",
                         ChargeLoadAnyItemTest.widget(-1, InterfaceID.Wornitems.UNIVERSE, -1)),
                     "nemus retreat", "pendant of ates");
-                List<Transaction> rows = h.engine.getActiveSession().getTransactions();
+                List<Transaction> rows = h.engine.session().transactions();
                 assertEquals(apostrophe, 1, rows.size());
 
                 GpManagerPlugin plugin = new GpManagerPluginProbe();
@@ -237,7 +237,7 @@ public class AtesTeleportInterfaceTest
                 plugin.onChatMessage(refusal);
 
                 assertEquals(type + " " + apostrophe, Correction.IGNORE,
-                    rows.get(0).getCorrection());
+                    rows.get(0).correction());
                 assertEquals(0L, rows.get(0).quantity(TEAR, false));
             }
         }
@@ -249,7 +249,7 @@ public class AtesTeleportInterfaceTest
         Harness none = new Harness(emptyContainer(), emptyContainer());
         none.intake.refusedTeleport(System.currentTimeMillis());
         assertEquals("no click, nothing to drop", 0,
-            none.engine.getActiveSession().getTransactions().size());
+            none.engine.session().transactions().size());
 
         Harness h = new Harness(
             container(EquipmentInventorySlot.AMULET.getSlotIdx(), PENDANT), emptyContainer());
@@ -257,12 +257,38 @@ public class AtesTeleportInterfaceTest
             ChargeLoadAnyItemTest.click(MenuAction.CC_OP_LOW_PRIORITY, "kastori",
                 ChargeLoadAnyItemTest.widget(-1, InterfaceID.Wornitems.UNIVERSE, -1)),
             "kastori", "pendant of ates");
-        List<Transaction> rows = h.engine.getActiveSession().getTransactions();
+        List<Transaction> rows = h.engine.session().transactions();
         assertEquals(1, rows.size());
         h.intake.refusedTeleport(System.currentTimeMillis() + 4_000L);
         assertEquals("a refusal outside the window is not a cancel", Correction.AUTO,
-            rows.get(0).getCorrection());
+            rows.get(0).correction());
         assertEquals(1L, rows.get(0).quantity(TEAR, false));
+    }
+
+    @Test
+    public void playerCopiesOfTheRefusalCannotForfeitTheEstimate() throws Exception
+    {
+        for (ChatMessageType type : new ChatMessageType[] {
+            ChatMessageType.PUBLICCHAT, ChatMessageType.CLAN_CHAT, ChatMessageType.PRIVATECHAT})
+        {
+            Harness h = new Harness(emptyContainer(), container(0, PENDANT));
+            h.intake.onMenuOptionClicked(
+                ChargeLoadAnyItemTest.click(MenuAction.CC_OP, "kastori",
+                    ChargeLoadAnyItemTest.widget(0, InterfaceID.PendantOfAtes.TELEPORT_AUBURN, -1)),
+                "kastori", "");
+            Transaction row = h.engine.session().transactions().get(0);
+            GpManagerPlugin plugin = new GpManagerPluginProbe();
+            set(plugin, "config", CONFIG);
+            set(plugin, "engine", h.engine);
+            set(plugin, "charges", h.intake);
+            ChatMessage message = new ChatMessage();
+            message.setType(type);
+            message.setMessage("The pendant doesn't respond as you appear to already be at that location.");
+            plugin.onChatMessage(message);
+            assertEquals(type.toString(), Correction.AUTO, row.correction());
+            assertEquals(1L, row.quantity(TEAR, false));
+            assertEquals(1, h.engine.session().transactions().size());
+        }
     }
 
 

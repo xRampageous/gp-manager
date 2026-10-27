@@ -20,20 +20,20 @@ public class RatePaceConsistencyTest
         Engine engine = PresentationLifecycleTest.engine();
         long now = System.currentTimeMillis();
         engine.startCustom("Vorkath", now - 19_000L);
-        engine.getActiveSession().addTransaction(consumed(now - 10_000L, "Prayer potion(4)", 3, -1, 100, -100L), 2_000, false);
+        engine.session().addTransaction(consumed(now - 10_000L, "Prayer potion(4)", 3, -1, 100, -100L), 2_000, false);
 
         LiveSnapshot live = LiveSnapshot.capture(engine, now, LiveContext.NONE);
-        assertTrue("nineteen seconds is not a trustworthy rate window", live.elapsedMillis < RateReadiness.MIN_ACTIVE_MILLIS);
-        assertFalse("Live must not claim an established rate", live.rateEstablished);
-        assertEquals("Calculating…", LivePage.rateText(live.rateEstablished, live.gpPerHour));
+        assertTrue("nineteen seconds is not a trustworthy rate window", live.elapsed < RateReadiness.MIN_ACTIVE_MILLIS);
+        assertFalse("Live must not claim an established rate", live.ready);
+        assertEquals("Calculating…", LivePage.rateText(live.ready, live.rate));
 
         GrindsData grinds =
             GrindsData.capture(engine, now, false, null);
-        assertFalse("Grinds must agree with Live", grinds.activeRateEstablished);
+        assertFalse("Grinds must agree with Live", grinds.ready);
         assertEquals("—  GP/h", GrindsPage.rateLine(
-            grinds.activeRateEstablished, grinds.activeGpPerHour));
+            grinds.ready, grinds.rate));
         assertEquals("both surfaces agree exactly",
-            live.rateEstablished, grinds.activeRateEstablished);
+            live.ready, grinds.ready);
     }
 
     @Test
@@ -43,19 +43,19 @@ public class RatePaceConsistencyTest
         long now = System.currentTimeMillis();
         engine.startCustom("Vorkath", now - 5 * 60_000L);
         // Balanced receipts: a real booked net of zero, with a mature Active-Time window.
-        engine.getActiveSession().addTransaction(gain(now - 4 * 60_000L, 100L), 2_000, false);
-        engine.getActiveSession().addTransaction(consumed(now - 3 * 60_000L, "Prayer potion(4)", 3, -1, 100, -100L), 2_000, false);
+        engine.session().addTransaction(gain(now - 4 * 60_000L, 100L), 2_000, false);
+        engine.session().addTransaction(consumed(now - 3 * 60_000L, "Prayer potion(4)", 3, -1, 100, -100L), 2_000, false);
 
         LiveSnapshot live = LiveSnapshot.capture(engine, now, LiveContext.NONE);
-        assertTrue("five minutes is a mature window", live.elapsedMillis >= RateReadiness.MIN_ACTIVE_MILLIS);
-        assertTrue("the canonical rolling rate is available", live.rateEstablished);
-        assertEquals("0/h", LivePage.rateText(live.rateEstablished, live.gpPerHour));
+        assertTrue("five minutes is a mature window", live.elapsed >= RateReadiness.MIN_ACTIVE_MILLIS);
+        assertTrue("the canonical rolling rate is available", live.ready);
+        assertEquals("0/h", LivePage.rateText(live.ready, live.rate));
 
         GrindsData grinds =
             GrindsData.capture(engine, now, false, null);
-        assertTrue(grinds.activeRateEstablished);
+        assertTrue(grinds.ready);
         assertEquals("0/h", GrindsPage.rateLine(
-            grinds.activeRateEstablished, grinds.activeGpPerHour));
+            grinds.ready, grinds.rate));
     }
 
     @Test
@@ -147,13 +147,13 @@ public class RatePaceConsistencyTest
         Engine engine = PresentationLifecycleTest.engine();
         long now = System.currentTimeMillis();
         engine.startCustom("Vorkath", now - 5 * 60_000L);
-        engine.getActiveSession().addTransaction(gain(now - 4 * 60_000L, 1_000L), 2_000, false);
-        long net = engine.getMetrics(now).net;
-        long revision = engine.getRevision();
+        engine.session().addTransaction(gain(now - 4 * 60_000L, 1_000L), 2_000, false);
+        long net = engine.metrics(now).net;
+        long revision = engine.revision();
         GrindsData.capture(engine, now, false, null);
         GrindsData.pace(1_000_000L, 3L * 3_600_000L, net, true, -1L, 300_000L);
-        assertEquals("estimates never book", net, engine.getMetrics(now).net);
-        assertEquals("estimates never revise", revision, engine.getRevision());
+        assertEquals("estimates never book", net, engine.metrics(now).net);
+        assertEquals("estimates never revise", revision, engine.revision());
     }
 
     @Test
@@ -162,15 +162,15 @@ public class RatePaceConsistencyTest
         Engine engine = PresentationLifecycleTest.engine();
         long now = System.currentTimeMillis();
         engine.startCustom("Vorkath", now - 20_000L);
-        long net = engine.getMetrics(now).net;
-        long revision = engine.getRevision();
+        long net = engine.metrics(now).net;
+        long revision = engine.revision();
         for (int i = 0; i < 5; i++)
         {
             LiveSnapshot.capture(engine, now, LiveContext.NONE);
             GrindsData.capture(engine, now, false, null);
         }
-        assertEquals("derivation never books", net, engine.getMetrics(now).net);
-        assertEquals("derivation never revises", revision, engine.getRevision());
+        assertEquals("derivation never books", net, engine.metrics(now).net);
+        assertEquals("derivation never revises", revision, engine.revision());
     }
 
     private static Transaction gain(long at, long value)

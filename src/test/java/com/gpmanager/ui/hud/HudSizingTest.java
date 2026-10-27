@@ -39,9 +39,9 @@ public class HudSizingTest
         GpManagerConfig config = config(true, 4);
         HudBuilder builder = new HudBuilder(config, null);
         HudOverlay overlay = new HudOverlay(builder, config);
-        builder.tray().booked(receipt(NOW, TransactionType.LOOT, flow(21817, "Bracelet of ethereum (uncharged)", 2L, 90_000)), NOW, false);
-        builder.tray().booked(receipt(NOW + 1L, TransactionType.LOOT, flow(1, "An extraordinarily long item name that "
-            + "would never fit any sensible overlay", 3L, 10)), NOW + 1L, false);
+        builder.tray.booked(receipt(NOW, TransactionType.LOOT, flow(21817, "Bracelet of ethereum (uncharged)", 2L, 90_000)), NOW, false, NOW);
+        builder.tray.booked(receipt(NOW + 1L, TransactionType.LOOT, flow(1, "An extraordinarily long item name that "
+            + "would never fit any sensible overlay", 3L, 10)), NOW + 1L, false, NOW + 1L);
         builder.update(grind(46L, null), f -> true, NOW + 10L);
         overlay.render(G);
         assertTrue(overlay.names[0], overlay.names[0].endsWith("… ×3"));
@@ -71,8 +71,8 @@ public class HudSizingTest
         assertTrue("short content leaves room below the ceiling", resting.width < config.hudMaxWidth());
         assertTrue(resting.width >= HudOverlay.MIN_WIDTH);
 
-        builder.tray().booked(receipt(NOW, TransactionType.LOOT, flow(1, "An extraordinarily long item name that "
-            + "would never fit any sensible overlay", 1L, 10)), NOW, false);
+        builder.tray.booked(receipt(NOW, TransactionType.LOOT, flow(1, "An extraordinarily long item name that "
+            + "would never fit any sensible overlay", 1L, 10)), NOW, false, NOW);
         builder.update(grind(46L, null), f -> true, NOW + 10L);
         assertEquals("long rows stop at Max width and shorten instead", config.hudMaxWidth(), overlay.render(G).width);
     }
@@ -154,8 +154,8 @@ public class HudSizingTest
                 public boolean reducedMotion() { return true; }
             };
             HudBuilder builder = new HudBuilder(config, null);
-            builder.tray().booked(receipt(NOW, TransactionType.LOOT,
-                flow(1, "Whip", 1L, 1_500_000)), NOW, false);
+            builder.tray.booked(receipt(NOW, TransactionType.LOOT,
+                flow(1, "Whip", 1L, 1_500_000)), NOW, false, NOW);
             builder.update(grind(123_400_000L, null), f -> false, NOW + 10L);
             HudOverlay overlay = new HudOverlay(builder, config);
             Dimension rendered = overlay.render(G);
@@ -179,7 +179,7 @@ public class HudSizingTest
             HudBuilder builder = new HudBuilder(config, null);
             builder.update(grind(1_000L, null), f -> true, NOW - 1L);
             builder.interaction("Goblin", true);
-            builder.tray().kill("Goblin", NOW - 1L, false);
+            builder.tray.kill("Goblin", NOW - 1L, false);
             builder.update(grind(1_000L, null), f -> true, NOW);
             HudOverlay overlay = new HudOverlay(builder, config);
             overlay.render(G);

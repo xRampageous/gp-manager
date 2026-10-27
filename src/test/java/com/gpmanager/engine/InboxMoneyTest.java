@@ -20,7 +20,7 @@ public class InboxMoneyTest
         var release = new CountDownLatch(1);
         try
         {
-            persistence.runLifecycle(() -> false, false, "test bind", persist ->
+            persistence.runLifecycle(false, "test bind", () ->
             {
                 entered.countDown();
                 try
@@ -34,19 +34,19 @@ public class InboxMoneyTest
                 return true;
             });
             assertTrue(entered.await(3, TimeUnit.SECONDS));
-            long generation = persistence.lifecycleRequest.get();
-            persistence.onLogout(false);
+            long generation = persistence.request.get();
+            persistence.onLogout();
             release.countDown();
-            persistence.lifecycleExecutor.shutdown();
-            assertTrue(persistence.lifecycleExecutor.awaitTermination(3, TimeUnit.SECONDS));
-            assertEquals(generation + 1, persistence.lifecycleRequest.get());
-            assertFalse(persistence.lifecyclePending);
+            persistence.worker.shutdown();
+            assertTrue(persistence.worker.awaitTermination(3, TimeUnit.SECONDS));
+            assertEquals(generation + 1, persistence.request.get());
+            assertFalse(persistence.loading);
             assertFalse(persistence.consumeReady());
         }
         finally
         {
             release.countDown();
-            persistence.lifecycleExecutor.shutdownNow();
+            persistence.worker.shutdownNow();
         }
     }
 
@@ -54,14 +54,14 @@ public class InboxMoneyTest
     public void ownerFenceRetainsDurableGraveContinuityAndClearsTheInteraction()
     {
         Engine engine = engine();
-        engine.deathReclaim.onPvmDeath(Map.of(BONES, 2L));
-        engine.deathReclaim.reclaimTicks = 10;
-        engine.neutralZoneStoredItems.put(BONES, 1L);
-        engine.inbox.owner(1001L);
-        assertTrue(engine.deathReclaim.isAwaitingReclaim());
-        assertEquals(Long.valueOf(2L), engine.deathReclaim.carriedAtDeath.get(BONES));
-        assertEquals(0, engine.deathReclaim.reclaimTicks);
-        assertTrue(engine.neutralZoneStoredItems.isEmpty());
+        engine.death.onPvmDeath(Map.of(BONES, 2L));
+        engine.death.ticks = 10;
+        engine.stored.put(BONES, 1L);
+        engine.events.owner(1001L);
+        assertTrue(engine.death.isAwaitingReclaim());
+        assertEquals(Long.valueOf(2L), engine.death.held.get(BONES));
+        assertEquals(0, engine.death.ticks);
+        assertTrue(engine.stored.isEmpty());
     }
 
     @Test
@@ -71,16 +71,16 @@ public class InboxMoneyTest
         Persistence persistence = new Persistence(null, null, null, null, engine);
         persistence.activeIdentity = new TrackingIdentity("A", 1);
         persistence.fence();
-        Observation fee = engine.inbox.add(Inbox.FEE, -1, 500L, 10, "Reclaim fee (bank)");
+        Observation fee = engine.events.add(Inbox.FEE, -1, 500L, 10, "Reclaim fee (bank)");
         persistence.activeIdentity = new TrackingIdentity("B", 2);
         persistence.fence();
         persistence.activeIdentity = new TrackingIdentity("A", 1);
         persistence.fence();
-        assertEquals(3L, persistence.lifecycleRequest.get());
-        assertEquals(1003L, engine.inbox.owner);
-        engine.inbox.open.add(fee);
+        assertEquals(3L, persistence.request.get());
+        assertEquals(1003L, engine.events.owner);
+        engine.events.open.add(fee);
         engine.fee(fee, T0);
-        assertEquals(0L, engine.getMetrics(T0).costs);
+        assertEquals(0L, engine.metrics(T0).cost);
     }
 
     @Test
@@ -97,16 +97,16 @@ public class InboxMoneyTest
         click.y = 10;
         plugin.onItemDespawned(new ItemDespawned(ReviewFollowupTest.tile(10, 10), ReviewFollowupTest.bones()));
         assertEquals(2L, qty(plugin, Inbox.BAG_GAIN));
-        assertFalse(engine.inbox.has(Inbox.PRIVATE_LOOT, BONES));
+        assertFalse(engine.events.has(Inbox.PRIVATE_LOOT, BONES));
         plugin.onItemDespawned(new ItemDespawned(ReviewFollowupTest.tile(10, 10), ReviewFollowupTest.bones()));
         tick[0]++;
         plugin.bagSettle();
         engine.processIfDirty(ContainerSnapshot.empty(), T0 + 600, null);
         engine.processIfDirty(ContainerSnapshot.empty(), T0 + 1200, null);
-        assertEquals(200L, engine.getMetrics(T0 + 1200).revenue);
+        assertEquals(200L, engine.metrics(T0 + 1200).income);
         plugin.bagSettle();
         engine.processIfDirty(ContainerSnapshot.empty(), T0 + 1800, null);
-        assertEquals(200L, engine.getMetrics(T0 + 1800).revenue);
+        assertEquals(200L, engine.metrics(T0 + 1800).income);
     }
 
     @Test
@@ -115,11 +115,11 @@ public class InboxMoneyTest
         Engine engine = engine();
         engine.loot(Map.of(BONES, 1L), 50, "first", "Guard", Context.LOOT, "one");
         engine.loot(Map.of(BONES, 1L), 50, "second", "Goblin", Context.LOOT, "two");
-        assertEquals(1L, engine.inbox.reserve(Inbox.PRIVATE_LOOT, BONES, 1L, Inbox.LOOT_RESERVE));
+        assertEquals(1L, engine.events.reserve(Inbox.PRIVATE_LOOT, BONES, 1L, Inbox.LOOT_RESERVE));
         LootMatch source = engine.consumeQueuedLoot(List.of(new Flow(BONES, "Bones", 1L, 100, 100L)));
         assertEquals("first", source.note);
-        assertEquals("one", source.encounterId);
-        assertEquals(1L, engine.inbox.peek(Inbox.PRIVATE_LOOT).qty);
+        assertEquals("one", source.fight);
+        assertEquals(1L, engine.events.peek(Inbox.PRIVATE_LOOT).qty);
     }
 
     @Test
@@ -128,7 +128,7 @@ public class InboxMoneyTest
         Engine engine = engine();
         engine.markLoot(Map.of(BONES, 1L), 6, "Loot from Guard", "Guard");
         engine.consumeQueuedLoot(List.of(new Flow(BONES, "Bones", 1L, 100, 100L)));
-        assertFalse(engine.inbox.has(Inbox.PRIVATE_LOOT, BONES));
-        assertEquals(0L, engine.inbox.reserve(Inbox.PRIVATE_LOOT, BONES, 1L, Inbox.LOOT_RESERVE));
+        assertFalse(engine.events.has(Inbox.PRIVATE_LOOT, BONES));
+        assertEquals(0L, engine.events.reserve(Inbox.PRIVATE_LOOT, BONES, 1L, Inbox.LOOT_RESERVE));
     }
 }

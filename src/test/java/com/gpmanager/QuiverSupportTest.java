@@ -27,20 +27,20 @@ public class QuiverSupportTest {
             Harness h = new Harness();
             h.worn.put(EquipmentInventorySlot.CAPE.getSlotIdx(), new Item(id, 1));
             h.ammo = 250;
-            assertEquals(250L, h.capture().quantityOf(ItemID.DRAGON_ARROW));
+            assertEquals(250L, h.capture().quantity(ItemID.DRAGON_ARROW));
             h.worn.clear(); h.inventory.put(id, 1L);
-            assertEquals("unequipping retains ownership", 250L, h.capture().quantityOf(ItemID.DRAGON_ARROW));
+            assertEquals("unequipping retains ownership", 250L, h.capture().quantity(ItemID.DRAGON_ARROW));
         }
     }
 
     @Test public void staleVarpsAndDuplicateQuiversNeverAddUnownedOrDuplicateAmmo() throws Exception {
         Harness h = new Harness(); h.ammo = 250;
-        assertEquals(0L, h.capture().quantityOf(ItemID.DRAGON_ARROW));
+        assertEquals(0L, h.capture().quantity(ItemID.DRAGON_ARROW));
         h.equipQuiver(); h.inventory.put(ItemID.DIZANAS_QUIVER_INFINITE, 1L);
-        assertEquals(250L, h.capture().quantityOf(ItemID.DRAGON_ARROW));
-        assertEquals(0L, h.factory.capture(false, false).quantityOf(ItemID.DRAGON_ARROW));
+        assertEquals(250L, h.capture().quantity(ItemID.DRAGON_ARROW));
+        assertEquals(0L, h.factory.capture(false, false).quantity(ItemID.DRAGON_ARROW));
         h.ammo = -1;
-        assertEquals(0L, h.capture().quantityOf(ItemID.DRAGON_ARROW));
+        assertEquals(0L, h.capture().quantity(ItemID.DRAGON_ARROW));
     }
 
     @Test public void loadingAndUnequippingAreNeutralAndFiringBooksOnlyTheSpentArrow() throws Exception {
@@ -52,7 +52,7 @@ public class QuiverSupportTest {
         assertEquals(0L, h.net());
         h.ammo = 14; h.settle();
         assertEquals(-20L, h.net());
-        assertEquals(ActionKind.FIRE, h.rows().get(0).getActionKind());
+        assertEquals(ActionKind.FIRE, h.rows().get(0).action());
     }
 
     @Test public void quiverVarpEventsMarkTheSnapshotDirty() throws Exception {
@@ -72,8 +72,8 @@ public class QuiverSupportTest {
         assertEquals(-20L, h.net());
         h.check(9);
         assertEquals("the Check replaces, rather than duplicates, the observed use", -20L, h.net());
-        assertTrue(h.rows().stream().filter(t -> t.getNet() != 0).allMatch(t ->
-            t.getFlows().stream().allMatch(f -> CostKind.of(t, f) == CostKind.SUPPLIES)));
+        assertTrue(h.rows().stream().filter(t -> t.net() != 0).allMatch(t ->
+            t.flows().stream().allMatch(f -> CostKind.of(t, f) == CostKind.SUPPLIES)));
     }
 
     @Test public void twoChargeTicksAndLaterCheckAreStillOneMeasuredCost() throws Exception {
@@ -103,14 +103,14 @@ public class QuiverSupportTest {
             "Dizana's quiver (l) has <col=ff0000>1,000</col> charges remaining. It is 25% blessed.",
             "Dizana's quiver has 0 charges remaining."}) {
             ChargeCheck read = ChargeCheck.parse(message);
-            assertNotNull(message, read); assertTrue(message, read.bookable);
-            assertTrue(read.componentCounts.containsKey(ItemID.SUNFIRESPLINTER));
+            assertNotNull(message, read); assertTrue(message, read.supported);
+            assertTrue(read.counts.containsKey(ItemID.SUNFIRESPLINTER));
         }
     }
 
     @Test public void loadingSmallAmountsDoesNotSpendAndOtherOwnersPrimeAgain() throws Exception {
         Harness h=new Harness(); h.equipQuiver(); h.check(10); h.progress(100);
-        ChargeCheck.ChargedItem variant=ChargeCheck.supportedForId(ItemID.DIZANAS_QUIVER_CHARGED);
+        ChargeCheck.ChargedItem variant=ChargeCheck.supported(ItemID.DIZANAS_QUIVER_CHARGED);
         h.engine.markChargeLoad(variant,ItemID.SUNFIRESPLINTER,"Sunfire splinter",
             h.charges.heldIdentity(variant,EquipmentInventorySlot.CAPE),10);
         h.progress(101); assertEquals(0L,h.net());
@@ -164,8 +164,8 @@ public class QuiverSupportTest {
             charges = new ChargeIntake(client, lookup, CONFIG, engine, valuation);
             plugin = new GpManagerPluginProbe();
             for (Object[] field : new Object[][] {{"client",client},{"engine",engine},{"config",CONFIG},
-                {"charges",charges},{"lookup",lookup},{"snapshotFactory",factory},
-                {"interactionContextTracker",GpManagerPluginProbe.tracker(client,engine,CONFIG)}}) {
+                {"charges",charges},{"lookup",lookup},{"containers",factory},
+                {"targets",GpManagerPluginProbe.tracker(client,engine,CONFIG)}}) {
                 java.lang.reflect.Field f = GpManagerPlugin.class.getDeclaredField((String)field[0]);
                 f.setAccessible(true); f.set(plugin,field[1]);
             }
@@ -175,14 +175,14 @@ public class QuiverSupportTest {
         void settle() {
             for (int i=0;i<2;i++) { tick++; engine.processIfDirty(capture(),T0+tick*600L,null); }
         }
-        long net() { return engine.getMetrics(T0+60_000L).net; }
-        List<Transaction> rows() { return engine.getActiveSession().getTransactions(); }
+        long net() { return engine.metrics(T0+60_000L).net; }
+        List<Transaction> rows() { return engine.session().transactions(); }
         void progress(int n) {
             VarbitChanged event=new VarbitChanged(); event.setVarbitId(VarbitID.CHARGES_DIZANAS_QUIVER_BLESSING);
             event.setVarpId(-1); event.setValue(n); plugin.onVarbitChanged(event);
         }
         void check(int n) {
-            ChargeCheck.ChargedItem variant=ChargeCheck.supportedForId(ItemID.DIZANAS_QUIVER_CHARGED);
+            ChargeCheck.ChargedItem variant=ChargeCheck.supported(ItemID.DIZANAS_QUIVER_CHARGED);
             assertNotNull("quiver family is supported",variant);
             String identity=charges.heldIdentity(variant,EquipmentInventorySlot.CAPE);
             charges.startCheck(variant,identity,tick,5);

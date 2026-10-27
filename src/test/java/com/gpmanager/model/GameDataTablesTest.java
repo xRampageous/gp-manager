@@ -25,6 +25,25 @@ public class GameDataTablesTest
 {
     private static final int MAX_ID = 65_536;
 
+    @Test
+    public void sailingCannonballsKeepEveryOriginalGamevalId()
+    {
+        Set<Integer> expected = Set.of(ItemID.BRONZE_CANNONBALL, ItemID.IRON_CANNONBALL,
+            ItemID.MITHRIL_CANNONBALL, ItemID.ADAMANT_CANNONBALL, ItemID.RUNE_CANNONBALL,
+            ItemID.DRAGON_CANNONBALL, ItemID.BRONZE_CHAINSHOT_CANNONBALL, ItemID.IRON_CHAINSHOT_CANNONBALL,
+            ItemID.STEEL_CHAINSHOT_CANNONBALL, ItemID.MITHRIL_CHAINSHOT_CANNONBALL,
+            ItemID.ADAMANT_CHAINSHOT_CANNONBALL, ItemID.RUNE_CHAINSHOT_CANNONBALL,
+            ItemID.DRAGON_CHAINSHOT_CANNONBALL, ItemID.BRONZE_INCENDIARY_CANNONBALL,
+            ItemID.IRON_INCENDIARY_CANNONBALL, ItemID.STEEL_INCENDIARY_CANNONBALL,
+            ItemID.MITHRIL_INCENDIARY_CANNONBALL, ItemID.ADAMANT_INCENDIARY_CANNONBALL,
+            ItemID.RUNE_INCENDIARY_CANNONBALL, ItemID.DRAGON_INCENDIARY_CANNONBALL);
+        assertEquals(expected, GameData.byId("sail_cannonballs").keySet());
+        for (int id : expected) assertTrue(Engine.cannonball(id));
+        assertTrue(Engine.cannonball(ItemID.MCANNONBALL));
+        assertTrue(Engine.cannonball(ItemID.GRANITE_CANNONBALL));
+        assertFalse(Engine.cannonball(ItemID.ASCENSION_BOLTS));
+    }
+
     static final Set<Integer> GE_TAX_EXEMPT = new HashSet<>(Arrays.asList(
         ItemID.OSRS_BOND, ItemID.BOUGHT_OSRS_BOND, ItemID.OSRS_BOND_UNTRADEABLE,
         ItemID.BRONZE_ARROW, ItemID.IRON_ARROW, ItemID.STEEL_ARROW, ItemID.BRONZE_DART, ItemID.IRON_DART,
@@ -60,7 +79,8 @@ public class GameDataTablesTest
         // 2026-10-14: the tool and staff upgrades pair their swaps (the infernal tools, echo boots
         // and slayer's staff (e)); a crystal tool's revert is the dismantle rule instead.
         ItemID.INFERNAL_AXE, ItemID.INFERNAL_PICKAXE, ItemID.INFERNAL_HARPOON,
-        ItemID.ECHO_BOOTS, ItemID.SLAYER_STAFF_ENCHANTED));
+        ItemID.ECHO_BOOTS, ItemID.SLAYER_STAFF_ENCHANTED,
+        ItemID.OBLIGATOR, ItemID.ZORYAS_TOME));
     static {
         for (int id = 11774; id <= 11784; id++) CURRENCY_PROXIES.add(id);
         for (int id = 25266; id <= 25276; id++) CURRENCY_PROXIES.add(id);
@@ -164,7 +184,7 @@ public class GameDataTablesTest
             + "|5% of items worth 100,000 or more (2.5% ironman)|true");
 
     static final List<String> REWARD_SOURCES = Arrays.asList(
-        "chambers of xeric", "theatre of blood", "tombs of amascut", "barrows", "gauntlet", "tempoross",
+        "chambers of xeric", "theatre of blood", "tombs of amascut", "fractured archive", "barrows", "gauntlet", "tempoross",
         "wintertodt", "fishing trawler", "drift net", "colosseum", "lunar chest",
         "loot chest", "wilderness loot", "clue", "casket", "reward", "bounty hunter", "crates", "bird house",
         "birdhouse", "herbiboar", "giants' foundry", "giants foundry");
@@ -222,7 +242,7 @@ public class GameDataTablesTest
     {
         for (int region = -1; region < MAX_ID; region++)
         {
-            assertEquals("lms " + region, LMS_REGIONS.contains(region), MinigameRegionHints.isLmsRegion(region));
+            assertEquals("lms " + region, LMS_REGIONS.contains(region), MinigameRegionHints.lmsRegion(region));
             assertEquals("neutral " + region, NEUTRAL_ZONE_REGIONS.contains(region),
                 MinigameRegionHints.isNeutralZoneRegion(region));
         }
@@ -237,7 +257,7 @@ public class GameDataTablesTest
             BossRetrievalCatalogue.Service service = BossRetrievalCatalogue.serviceFor("Claim", f[2]);
             assertNotNull(f[2], service);
             assertEquals(row, service.key + "|" + service.activity + "|" + service.interactable + "|"
-                + service.expectedFee + "|" + service.note + "|" + service.ambiguousTarget);
+                + service.fee + "|" + service.note + "|" + service.ambiguous);
         }
         assertTrue(BossRetrievalCatalogue.serviceFor("Claim", "Gravestone of Zezima") != null);
         assertEquals(null, BossRetrievalCatalogue.serviceFor("Claim", "Banker"));
@@ -289,7 +309,7 @@ public class GameDataTablesTest
                 }
             }
         }
-        assertEquals(50 + 9 + 35 + 8 + 782, named);
+        assertEquals(50 + 22 + 35 + 8 + 1031 + 171, named);
     }
 
     /** Every msg key the plugin uses has its text, and text.tsv holds nothing the code no longer uses. */
@@ -347,7 +367,8 @@ public class GameDataTablesTest
     public void menuAndChatTableHasOnlyUsedKeysAndSupportedActions()
     {
         assertEquals(Set.of("widget", "spend.raw", "spend.norm", "use", "fuel", "fire", "altar",
-            "bones", "cast", "offering", "spared", "spend.chat", "gather.exclude"), ActionSignals.RULES.keySet());
+            "bones", "cast", "offering", "spared", "spend.chat", "gather.exclude",
+            "chest-disposition", "chest-action"), ActionSignals.RULES.keySet());
         Set<net.runelite.api.MenuAction> expected = Set.of(net.runelite.api.MenuAction.WIDGET_TARGET,
             net.runelite.api.MenuAction.WIDGET_TARGET_ON_NPC, net.runelite.api.MenuAction.WIDGET_TARGET_ON_PLAYER,
             net.runelite.api.MenuAction.WIDGET_TARGET_ON_WIDGET, net.runelite.api.MenuAction.WIDGET_TARGET_ON_GROUND_ITEM,
@@ -386,7 +407,7 @@ public class GameDataTablesTest
 
     /** d26 contains phrases rather than gameval ids; d13 continues to validate region ids. */
     @Test public void neutralTransferTableRowsAllCompileWithPhrasesAndNotes() {
-        List<String[]> rows = GameData.cachedRows("neutral_transfers");
+        List<String[]> rows = GameData.cached("neutral_transfers");
         assertEquals(25, rows.size());
         assertEquals(rows.stream().map(row -> row[0]).collect(java.util.stream.Collectors.toList()),
             new ArrayList<>(NeutralTransfers.RULES.keySet()));

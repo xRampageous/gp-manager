@@ -38,28 +38,28 @@ public class RateClockRestoreTest {
             SidebarPanel panel = RateRestartTest.panel(engine);
             panel.active = true;
             panel.refreshNow();
-            DirectHeaderControlsTest.click(panel.live.runTotal);
-            assertEquals("Save session?", panel.shell.sheetTitle);
+            DirectHeaderControlsTest.click(panel.live.total);
+            assertEquals("Save session?", panel.shell.heading);
             ShellProbe.pressSheet(panel.shell, save ? "Save session" : "Continue without saving");
             assertClock(engine, resetAt + 30_000L, resetAt + 30_000L, Session.hourly(566_829L, resetAt + 30_000L));
             assertClock(engine, resetAt + MINUTE, resetAt + MINUTE, Session.hourly(566_829L, resetAt + MINUTE));
             assertEquals(566_829L, live(engine, resetAt + MINUTE).net);
             assertEquals(566_829L, recentTotal(live(engine, resetAt + MINUTE)));
             assertEquals(566_829L, GrindsData.allTime(engine, resetAt + MINUTE).net);
-            assertEquals(save ? 1 : 0, engine.savedSessions.size());
-            assertTrue(engine.getHistory().isEmpty());
+            assertEquals(save ? 1 : 0, engine.saved.size());
+            assertTrue(engine.history().isEmpty());
             Gson gson = new Gson();
-            String savedBefore = gson.toJson(engine.savedSessions);
-            String receipts = gson.toJson(engine.getActiveSession().getTransactions());
+            String savedBefore = gson.toJson(engine.saved);
+            String receipts = gson.toJson(engine.session().transactions());
             if (save) {
-                Session copy = engine.savedSessions.get(0).session;
+                Session copy = engine.saved.get(0).session;
                 assertEquals(500L, copy.metrics(resetAt + MINUTE).net);
-                assertEquals(30_000L, copy.getElapsedMillis(resetAt + MINUTE));
+                assertEquals(30_000L, copy.elapsed(resetAt + MINUTE));
             }
             choose(engine, 17L * HOUR, "Restore time");
             assertClock(engine, 17L * HOUR, 16L * HOUR, Session.hourly(566_829L, 16L * HOUR));
-            assertEquals(savedBefore, gson.toJson(engine.savedSessions));
-            assertEquals(receipts, gson.toJson(engine.getActiveSession().getTransactions()));
+            assertEquals(savedBefore, gson.toJson(engine.saved));
+            assertEquals(receipts, gson.toJson(engine.session().transactions()));
             assertEquals(566_829L, GrindsData.allTime(engine, 17L * HOUR).net);
             return null;
         });
@@ -69,7 +69,7 @@ public class RateClockRestoreTest {
         onEdt(() -> {
             Engine engine = engine();
             coins(engine, 5L, 566_329L);
-            engine.newLiveSession(16L * HOUR);
+            engine.newLive(16L * HOUR);
             coins(engine, 16L * HOUR + 5L, 34_000L);
             LiveSnapshot before = live(engine, 17L * HOUR);
             assertEquals(34_000L, before.net);
@@ -78,11 +78,11 @@ public class RateClockRestoreTest {
             LiveSnapshot after = live(engine, 17L * HOUR);
             assertTrue(after.fresh);
             assertEquals(before.net, after.net);
-            assertEquals(before.runNet, after.runNet);
+            assertEquals(before.run, after.run);
             assertEquals(recentTotal(before), recentTotal(after));
             assertClock(engine, 17L * HOUR, 17L * HOUR, 2_000L);
-            assertEquals(600_329L, engine.getMetrics(17L * HOUR).net);
-            assertEquals(17L * HOUR, engine.getMetrics(17L * HOUR).elapsedMillis);
+            assertEquals(600_329L, engine.metrics(17L * HOUR).net);
+            assertEquals(17L * HOUR, engine.metrics(17L * HOUR).elapsed);
             return null;
         });
     }
@@ -117,14 +117,14 @@ public class RateClockRestoreTest {
             assertClock(engine, 17L * HOUR, 0L, 0L);
             choose(engine, 17L * HOUR, "Restore time");
             LiveSnapshot restored = live(engine, 18L * HOUR);
-            assertTrue(engine.getActiveSession().paused);
+            assertTrue(engine.session().paused);
             assertClock(engine, 18L * HOUR, 16L * HOUR, 2_125L);
             assertEquals(before.goal.current, restored.goal.current);
-            assertEquals(before.goal.timeRemainingMillis, restored.goal.timeRemainingMillis);
+            assertEquals(before.goal.remaining, restored.goal.remaining);
             assertEquals(before.milestone, restored.milestone);
             engine.togglePause(18L * HOUR);
             assertClock(engine, 19L * HOUR, 17L * HOUR, 2_000L);
-            assertEquals(34_000L, engine.getMetrics(19L * HOUR).net);
+            assertEquals(34_000L, engine.metrics(19L * HOUR).net);
             return null;
         });
     }
@@ -133,7 +133,7 @@ public class RateClockRestoreTest {
         onEdt(() -> {
             Engine engine = engine();
             coins(engine, 5L, 34_000L);
-            engine.newLiveSession(16L * HOUR);
+            engine.newLive(16L * HOUR);
             coins(engine, 16L * HOUR + 5L, 34_000L);
             engine.showWholeRun();
             engine.togglePause(17L * HOUR);
@@ -157,7 +157,7 @@ public class RateClockRestoreTest {
     @Test public void onlyTheExactOriginalStartPairMayReachBeforeTheReceiptWindow() throws Exception {
         onEdt(() -> {
             Engine engine = engine();
-            engine.newLiveSession(16L * HOUR);
+            engine.newLive(16L * HOUR);
             coins(engine, 16L * HOUR + 5L, 34_000L);
             JsonObject json = new Gson().toJsonTree(engine.exportState()).getAsJsonObject();
             JsonObject run = json.getAsJsonObject("generalSession");
@@ -189,8 +189,8 @@ public class RateClockRestoreTest {
             assertClock(engine, 17L * HOUR, HOUR, 34_000L);
             Engine idle = PresentationLifecycleTest.engine();
             choose(idle, 17L * HOUR, "Restore time");
-            assertNull(idle.getActiveSession());
-            assertTrue(idle.getHistory().isEmpty());
+            assertNull(idle.session());
+            assertTrue(idle.history().isEmpty());
             return null;
         });
     }
@@ -259,17 +259,17 @@ public class RateClockRestoreTest {
         new GrindsController(panel).newSession();
         assertTrue("Session controls offers " + choice, ShellProbe.sheetButtonTexts(panel.shell).contains(choice));
         ShellProbe.pressSheet(panel.shell, choice);
-        assertEquals("", panel.shell.sheetTitle);
+        assertEquals("", panel.shell.heading);
     }
 
     private static void assertClock(Engine engine, long at, long elapsed, long rate) {
         LiveSnapshot live = live(engine, at);
-        assertEquals("Live Active Time", elapsed, live.elapsedMillis);
-        if (elapsed >= MINUTE || elapsed == 0L) assertEquals(rate, live.gpPerHour);
-        assertEquals(elapsed >= MINUTE, live.rateEstablished);
+        assertEquals("Live Active Time", elapsed, live.elapsed);
+        if (elapsed >= MINUTE || elapsed == 0L) assertEquals(rate, live.rate);
+        assertEquals(elapsed >= MINUTE, live.ready);
         HudBuilder builder = new HudBuilder(HudBuilderTest.config(false, 4), null);
         HudFrame hud = builder.update(live, f -> true, at);
         assertEquals(builder.timer(elapsed), hud.timer);
-        assertEquals(LivePage.rateText(live.rateEstablished, rate), hud.rate);
+        assertEquals(LivePage.rateText(live.ready, rate), hud.rate);
     }
 }

@@ -52,12 +52,12 @@ public class SufferingCommittedLoadTest
         engine.markDirty();
         Transaction load = settle(engine, snapshot(ItemID.RING_OF_RECOIL, 25L), start + 600L);
 
-        assertEquals(TransactionType.CONSUMPTION, load.autoType());
-        assertTrue(load.isCounted());
-        assertEquals(GameData.msg("committed-load") + "Ring of suffering", load.getNote());
-        assertEquals(ActionKind.SUPPLIES, load.getActionKind());
-        assertEquals(-2_500L, load.getNet());
-        assertEquals(2_500L, engine.getMetrics(start + 2_400L).costs);
+        assertEquals(TransactionType.CONSUMPTION, load.original());
+        assertTrue(load.counts());
+        assertEquals(GameData.msg("committed-load") + "Ring of suffering", load.note());
+        assertEquals(ActionKind.SUPPLIES, load.action());
+        assertEquals(-2_500L, load.net());
+        assertEquals(2_500L, engine.metrics(start + 2_400L).cost);
     }
 
     @Test
@@ -73,8 +73,8 @@ public class SufferingCommittedLoadTest
             "Your ring currently has 5,097 recoil charges remaining. The recoil effect is currently disabled.",
             start);
 
-        assertTrue(engine.getActiveSession().getTransactions().isEmpty());
-        assertEquals(0L, engine.getMetrics(start).net);
+        assertTrue(engine.session().transactions().isEmpty());
+        assertEquals(0L, engine.metrics(start).net);
     }
 
     @Test
@@ -88,13 +88,13 @@ public class SufferingCommittedLoadTest
         ChargeIntake intent = new ChargeIntake(selecting(null), null, CONFIG, engine, null);
         intent.armCheck(click(MenuAction.CC_OP, "Uncharge", item(ItemID.NZONE_ZENYTE_RING_ENCHANTED_RECOIL, 0)),
             "uncharge", "Ring of suffering (ri)");
-        assertNotNull("the uncharge watch arms", engine.inbox.peek(Inbox.UNCHARGE));
+        assertNotNull("the uncharge watch arms", engine.events.peek(Inbox.UNCHARGE));
         engine.markDirty();
         settle(engine, snapshot(ItemID.ZENYTE_RING_ENCHANTED, 1L), start + 600L);
 
         assertTrue("the charge was booked at load; the uncharge adds nothing",
-            engine.getActiveSession().getTransactions().stream().noneMatch(Transaction::isCounted));
-        assertEquals(0L, engine.getMetrics(start + 2_400L).net);
+            engine.session().transactions().stream().noneMatch(Transaction::counts));
+        assertEquals(0L, engine.metrics(start + 2_400L).net);
     }
 
     @Test
@@ -108,19 +108,19 @@ public class SufferingCommittedLoadTest
         ChargeIntake intent = new ChargeIntake(selecting(null), null, CONFIG, engine, null);
         intent.armCheck(click(MenuAction.CC_OP, "Configure-Charges", item(ItemID.NZONE_ZENYTE_RING_ENCHANTED_RECOIL, 0)),
             "configure-charges", "Ring of suffering (ri)");
-        assertNull("no load arms without a use-on click", engine.inbox.peek(Inbox.LOAD_TARGET));
+        assertNull("no load arms without a use-on click", engine.events.peek(Inbox.LOAD_TARGET));
 
         // Bank-side charges are a documented blind spot: a recoil move without the use click is
         // never a charge load, and the recoils still book as the ordinary spend they are.
         engine.markDirty();
         settle(engine, snapshot(ItemID.RING_OF_RECOIL, 25L), start + 600L);
-        for (Transaction row : engine.getActiveSession().getTransactions())
+        for (Transaction row : engine.session().transactions())
         {
             assertFalse("a bank load cannot phantom-book as a charge load",
-                row.getNote() != null && row.getNote().startsWith(GameData.msg("committed-load")));
+                row.note() != null && row.note().startsWith(GameData.msg("committed-load")));
         }
         assertTrue("the recoils still book ordinarily",
-            engine.getActiveSession().getTransactions().stream().anyMatch(Transaction::isCounted));
+            engine.session().transactions().stream().anyMatch(Transaction::counts));
     }
 
     private static Engine engine()

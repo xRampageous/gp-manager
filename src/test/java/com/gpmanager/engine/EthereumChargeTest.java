@@ -50,7 +50,7 @@ public class EthereumChargeTest
             id -> id == ItemID.WILD_CAVE_BRACELET_UNCHARGED ? 40_000 : 0);
         Flow bracelet = valuation.valueComponent(ItemID.WILD_CAVE_BRACELET_CHARGED, 1L, 0L);
         assertEquals(40_000, bracelet.unitPrice);
-        assertSame(PriceSource.GRAND_EXCHANGE, bracelet.getPriceSource());
+        assertSame(PriceSource.GRAND_EXCHANGE, bracelet.source());
         assertEquals("the uncharged keeps its own quote",
             40_000, valuation.valueComponent(ItemID.WILD_CAVE_BRACELET_UNCHARGED, 1L, 0L).unitPrice);
     }
@@ -68,12 +68,12 @@ public class EthereumChargeTest
         engine.markDirty();
         Transaction load = settle(engine, snapshot(ItemID.WILD_CAVE_SHARD, 25L), start + 600L);
 
-        assertEquals(TransactionType.CONSUMPTION, load.autoType());
-        assertTrue(load.isCounted());
-        assertEquals(GameData.msg("committed-load") + "Bracelet of ethereum", load.getNote());
-        assertEquals(ActionKind.SUPPLIES, load.getActionKind());
-        assertEquals(-1_250L, load.getNet());
-        assertEquals(1_250L, engine.getMetrics(start + 2_400L).costs);
+        assertEquals(TransactionType.CONSUMPTION, load.original());
+        assertTrue(load.counts());
+        assertEquals(GameData.msg("committed-load") + "Bracelet of ethereum", load.note());
+        assertEquals(ActionKind.SUPPLIES, load.action());
+        assertEquals(-1_250L, load.net());
+        assertEquals(1_250L, engine.metrics(start + 2_400L).cost);
     }
 
     @Test
@@ -87,13 +87,13 @@ public class EthereumChargeTest
         ChargeIntake intent = new ChargeIntake(selecting(null), null, CONFIG, engine, null);
         intent.armCheck(click(MenuAction.CC_OP, "Uncharge", item(ItemID.WILD_CAVE_BRACELET_CHARGED, 0)),
             "uncharge", "Bracelet of ethereum");
-        assertNotNull("the uncharge watch arms", engine.inbox.peek(Inbox.UNCHARGE));
+        assertNotNull("the uncharge watch arms", engine.events.peek(Inbox.UNCHARGE));
         engine.markDirty();
         settle(engine, snapshot(ItemID.WILD_CAVE_BRACELET_UNCHARGED, 1L), start + 600L);
 
         assertTrue("the ether was booked at load; the uncharge adds nothing",
-            engine.getActiveSession().getTransactions().stream().noneMatch(Transaction::isCounted));
-        assertEquals(0L, engine.getMetrics(start + 2_400L).net);
+            engine.session().transactions().stream().noneMatch(Transaction::counts));
+        assertEquals(0L, engine.metrics(start + 2_400L).net);
     }
 
     @Test
@@ -107,14 +107,14 @@ public class EthereumChargeTest
         ChargeIntake intent = new ChargeIntake(selecting(null), null, CONFIG, engine, null);
         intent.armCheck(click(MenuAction.CC_OP, "Configure-Charges", item(ItemID.WILD_CAVE_BRACELET_CHARGED, 0)),
             "configure-charges", "Bracelet of ethereum");
-        assertNull("no load arms without a use-on click", engine.inbox.peek(Inbox.LOAD_TARGET));
+        assertNull("no load arms without a use-on click", engine.events.peek(Inbox.LOAD_TARGET));
 
         engine.markDirty();
         settle(engine, snapshot(ItemID.WILD_CAVE_SHARD, 25L), start + 600L);
-        for (Transaction row : engine.getActiveSession().getTransactions())
+        for (Transaction row : engine.session().transactions())
         {
             assertFalse("a bank load cannot phantom-book as a charge load",
-                row.getNote() != null && row.getNote().startsWith(GameData.msg("committed-load")));
+                row.note() != null && row.note().startsWith(GameData.msg("committed-load")));
         }
     }
 
@@ -127,18 +127,18 @@ public class EthereumChargeTest
         long start = 160_000L;
         engine.ensureSession(start);
         engine.setBaseline(snapshot(ItemID.WILD_CAVE_BRACELET_CHARGED, 1L));
-        engine.noteConsume(ItemID.WILD_CAVE_BRACELET_CHARGED, 8, false);
+        engine.noteConsume(ItemID.WILD_CAVE_BRACELET_CHARGED, 8, false, null, null);
         engine.markDirty();
 
         Transaction alchemy = settle(engine, snapshot(995, 45_000L), start + 600L);
 
         assertNotNull(alchemy);
-        assertTrue(alchemy.isCounted());
-        long braceletLeg = alchemy.getFlows().stream()
-            .filter(flow -> flow.itemId == ItemID.WILD_CAVE_BRACELET_CHARGED)
-            .mapToLong(flow -> flow.valueDelta).sum();
+        assertTrue(alchemy.counts());
+        long braceletLeg = alchemy.flows().stream()
+            .filter(flow -> flow.item == ItemID.WILD_CAVE_BRACELET_CHARGED)
+            .mapToLong(flow -> flow.value).sum();
         assertEquals("the bracelet leaves at its uncharged form's quote", -40_000L, braceletLeg);
-        assertEquals(5_000L, alchemy.getNet());
+        assertEquals(5_000L, alchemy.net());
     }
 
     @Test
@@ -163,11 +163,11 @@ public class EthereumChargeTest
         engine.markDirty();
         settle(engine, snapshot(mapOf(995, 59_750L, ItemID.WILD_CAVE_BRACELET_CHARGED, 1L)), start + 2_200L);
 
-        engine.noteConsume(ItemID.WILD_CAVE_BRACELET_CHARGED, 8, false);
+        engine.noteConsume(ItemID.WILD_CAVE_BRACELET_CHARGED, 8, false, null, null);
         engine.markDirty();
         settle(engine, snapshot(995, 104_750L), start + 3_000L);
 
-        assertEquals("45,000 - 40,000 - 250", 4_750L, engine.getMetrics(start + 5_000L).net);
+        assertEquals("45,000 - 40,000 - 250", 4_750L, engine.metrics(start + 5_000L).net);
     }
 
     @Test
@@ -184,17 +184,17 @@ public class EthereumChargeTest
             engine.processIfDirty(carried, start + tick * 600L, null);
         }
 
-        engine.markPvmDeath(1, carried.quantities);
+        engine.markPvmDeath(1, carried.items, Map.of(), engine.events.owner);
         engine.markDirty();
         Transaction wipe = settle(engine, ContainerSnapshot.empty(), start + 3_000L);
 
         assertNotNull(wipe);
-        assertEquals(TransactionType.TRANSFER, wipe.getType());
-        assertFalse(wipe.isCounted());
-        assertEquals(0L, engine.getMetrics(start + 6_000L).net);
-        for (Transaction row : engine.getActiveSession().getTransactions())
+        assertEquals(TransactionType.TRANSFER, wipe.type());
+        assertFalse(wipe.counts());
+        assertEquals(0L, engine.metrics(start + 6_000L).net);
+        for (Transaction row : engine.session().transactions())
         {
-            assertFalse(row.getNote() != null && row.getNote().startsWith(GameData.msg("committed-load")));
+            assertFalse(row.note() != null && row.note().startsWith(GameData.msg("committed-load")));
         }
     }
 

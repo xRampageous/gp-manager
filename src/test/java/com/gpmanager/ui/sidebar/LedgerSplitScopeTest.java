@@ -24,7 +24,7 @@ public class LedgerSplitScopeTest
             new Flow(536, "Dragon bones", 2L, 2_000, 4_000L),
             new Flow(1753, "Blue dragonhide", 1L, 2_000, 2_000L));
 
-        fixture.split(transaction.getId());
+        fixture.split(transaction.id());
 
         assertEquals("no prompt opens for a mixed receipt", "", ShellProbe.sheetTitle(fixture.shell()));
         assertTrue(ShellProbe.noticeText(fixture.shell()).startsWith("Not split"));
@@ -38,7 +38,7 @@ public class LedgerSplitScopeTest
         Fixture fixture = new Fixture();
         Transaction transaction = fixture.book(new Flow(536, "Dragon bones", 1L, 2_000, 2_000L));
 
-        fixture.split(transaction.getId());
+        fixture.split(transaction.id());
 
         assertEquals("", ShellProbe.sheetTitle(fixture.shell()));
         assertTrue(ShellProbe.noticeText(fixture.shell()).startsWith("Not split"));
@@ -53,7 +53,7 @@ public class LedgerSplitScopeTest
             new Flow(536, "Dragon bones", 1L, 2_000, 2_000L),
             new Flow(536, "Dragon bones", 1L, 2_000, 2_000L));
 
-        fixture.split(transaction.getId());
+        fixture.split(transaction.id());
         assertEquals("the prompt names the entry", "Split entry", ShellProbe.sheetTitle(fixture.shell()));
         fixture.type("1");
         fixture.press("OK");
@@ -67,13 +67,13 @@ public class LedgerSplitScopeTest
         Fixture fixture = new Fixture();
         Transaction transaction = fixture.book(new Flow(536, "Dragon bones", 2L, 2_000, 4_000L));
 
-        fixture.split(transaction.getId());
+        fixture.split(transaction.id());
         fixture.type("2");
         fixture.press("OK");
         assertTrue(ShellProbe.noticeText(fixture.shell()).startsWith("Not split"));
         assertEquals(2L, transaction.quantity(536, true));
 
-        fixture.split(transaction.getId());
+        fixture.split(transaction.id());
         fixture.type("0");
         fixture.press("OK");
         assertTrue(ShellProbe.noticeText(fixture.shell()).startsWith("Not split"));
@@ -85,16 +85,16 @@ public class LedgerSplitScopeTest
     {
         Fixture fixture = new Fixture();
         Transaction transaction = fixture.book(new Flow(536, "Dragon bones", 2L, 2_000, 4_000L));
-        String owner = fixture.engine.getActiveSession().getId();
+        String owner = fixture.engine.session().id();
 
-        fixture.split(transaction.getId());
+        fixture.split(transaction.id());
         fixture.closeAndStartAnotherRun();
         fixture.type("1");
         fixture.press("OK");
 
         assertTrue(ShellProbe.noticeText(fixture.shell()).startsWith("Not split"));
         assertEquals("the viewed receipt is untouched", 2L,
-            fixture.engine.historySession(owner).findTransaction(transaction.getId()).quantity(536, true));
+            fixture.engine.historySession(owner).findTransaction(transaction.id()).quantity(536, true));
     }
 
     @Test
@@ -103,7 +103,7 @@ public class LedgerSplitScopeTest
         Fixture fixture = new Fixture(new RefusingEngine());
         Transaction transaction = fixture.book(new Flow(536, "Dragon bones", 2L, 2_000, 4_000L));
 
-        fixture.split(transaction.getId());
+        fixture.split(transaction.id());
         fixture.type("1");
         fixture.press("OK");
 
@@ -117,10 +117,10 @@ public class LedgerSplitScopeTest
     {
         Fixture fixture = new Fixture();
         Transaction transaction = fixture.book(new Flow(536, "Dragon bones", 4L, 2_000, 8_000L));
-        long before = fixture.engine.getMetrics(NOW + 2_000L).net;
+        long before = fixture.engine.metrics(NOW + 2_000L).net;
         fixture.confirm = false;
 
-        fixture.split(transaction.getId());
+        fixture.split(transaction.id());
         fixture.type("1");
         fixture.press("OK");
 
@@ -131,12 +131,12 @@ public class LedgerSplitScopeTest
 
         onEdt(() ->
         {
-            fixture.controller.applySplit(transaction.getId(), fixture.pending, fixture.previewed.revision);
+            fixture.controller.applySplit(transaction.id(), fixture.pending, fixture.previewed.revision);
             return null;
         });
         assertEquals(1L, transaction.quantity(536, true));
         assertEquals("the result is what the preview said", fixture.previewed.afterNet,
-            fixture.engine.getMetrics(NOW + 2_000L).net);
+            fixture.engine.metrics(NOW + 2_000L).net);
     }
 
     @Test
@@ -145,14 +145,14 @@ public class LedgerSplitScopeTest
         Fixture fixture = new Fixture();
         Transaction transaction = fixture.book(new Flow(536, "Dragon bones", 4L, 2_000, 8_000L));
         fixture.confirm = false;
-        fixture.split(transaction.getId());
+        fixture.split(transaction.id());
         fixture.type("1");
         fixture.press("OK");
         fixture.book(new Flow(995, "Coins", 10L, 1, 10L));
 
         onEdt(() ->
         {
-            fixture.controller.applySplit(transaction.getId(), fixture.pending, fixture.previewed.revision);
+            fixture.controller.applySplit(transaction.id(), fixture.pending, fixture.previewed.revision);
             return null;
         });
         assertTrue(ShellProbe.noticeText(fixture.shell()).startsWith("Not split"));
@@ -182,14 +182,14 @@ public class LedgerSplitScopeTest
 
         Shell shell()
         {
-            return panel.shell();
+            return panel.shell;
         }
 
         Transaction book(Flow... flows)
         {
             Transaction transaction = new Transaction(NOW + 1_000L, TransactionType.LOOT, Context.LOOT, "", "Vorkath", true,
                 Arrays.asList(flows), Confidence.CONFIRMED, "fixture", null);
-            engine.getActiveSession().addTransaction(transaction, 2_000, false);
+            engine.session().addTransaction(transaction, 2_000, false);
             return transaction;
         }
 
@@ -216,7 +216,7 @@ public class LedgerSplitScopeTest
         {
             onEdt(() ->
             {
-                ShellProbe.typeSheet(panel.shell(), text);
+                ShellProbe.typeSheet(panel.shell, text);
                 return null;
             });
         }
@@ -225,7 +225,7 @@ public class LedgerSplitScopeTest
         {
             onEdt(() ->
             {
-                ShellProbe.pressSheet(panel.shell(), label);
+                ShellProbe.pressSheet(panel.shell, label);
                 return null;
             });
         }
@@ -247,7 +247,7 @@ public class LedgerSplitScopeTest
         }
 
         @Override
-        synchronized boolean splitItem(String transactionId, int itemId, long keepQuantity, long now,
+        synchronized boolean splitItem(String transactionId, int itemId, long keepQuantity,
             String optionalNote)
         {
             return false;

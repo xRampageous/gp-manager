@@ -28,15 +28,15 @@ public class ChargeCheckToCheckContractTest
         Engine engine = engine();
         ChargeOutcomeTest.none("first read seeds, never books",
             observe(engine, "Darts: Adamant dart x 1000. Scales: 100 (1.0%).", WEAPON_A, 1_000L));
-        assertTrue(engine.getActiveSession().getTransactions().isEmpty());
+        assertTrue(engine.session().transactions().isEmpty());
 
         ChargeDelta delta = observe(engine, "Darts: Adamant dart x 997. Scales: 96 (1.0%).", WEAPON_A, 2_000L);
         assertNotNull(delta);
         Transaction spend = book(engine, delta, "Toxic blowpipe", 2_000L);
-        assertEquals(TransactionType.CONSUMPTION, spend.getType());
-        assertTrue(spend.isCounted());
+        assertEquals(TransactionType.CONSUMPTION, spend.type());
+        assertTrue(spend.counts());
         assertSupplies(spend);
-        assertEquals(-4L * 2L - 3L * 100L, spend.getNet());
+        assertEquals(-4L * 2L - 3L * 100L, spend.net());
     }
 
     @Test
@@ -50,13 +50,13 @@ public class ChargeCheckToCheckContractTest
             ChargeDelta delta = observe(engine, "Your " + trident[0] + " has 1,990 charges.", WEAPON_A, 2_000L);
             assertNotNull(trident[1], delta);
             Transaction spend = book(engine, delta, trident[0], 2_000L);
-            assertEquals(trident[1], TransactionType.CONSUMPTION, spend.getType());
-            assertTrue(spend.getNet() < 0L);
+            assertEquals(trident[1], TransactionType.CONSUMPTION, spend.type());
+            assertTrue(spend.net() < 0L);
             assertSupplies(spend);
         }
         ChargeCheck seasE = ChargeCheck.parse("Your Trident of the seas (e) has 2,000 charges.");
         assertNotNull(seasE);
-        assertTrue(seasE.bookable);
+        assertTrue(seasE.supported);
         Engine engine = engine();
         ChargeOutcomeTest.none(engine.observeCheck(seasE, WEAPON_A, 1_000L));
         ChargeDelta delta = engine.observeCheck(
@@ -92,7 +92,7 @@ public class ChargeCheckToCheckContractTest
         ChargeDelta increase = observe(engine, "Your Trident of the seas has 1,500 charges.", WEAPON_A, 3_000L);
         assertEquals(ChargeDelta.CheckResult.LOAD, increase.result);
         assertTrue("a higher read has no negative spend", increase.getComponentDeltas().isEmpty());
-        assertTrue(engine.getActiveSession().getTransactions().isEmpty());
+        assertTrue(engine.session().transactions().isEmpty());
     }
 
     @Test
@@ -113,7 +113,7 @@ public class ChargeCheckToCheckContractTest
         }
         Transaction result = engine.bookChargeSpend(delta, "Trident of the swamp", partial, 2_000L, null);
         assertFalse("one unpriced component rejects the complete delta", result != null);
-        assertTrue(engine.getActiveSession().getTransactions().isEmpty());
+        assertTrue(engine.session().transactions().isEmpty());
     }
 
     @Test
@@ -173,10 +173,10 @@ public class ChargeCheckToCheckContractTest
 
         ChargeCheck one = ChargeCheck.parse("The pendant has 1 charge.");
         assertNotNull(one);
-        assertEquals(1L, (long) one.componentCounts.get(ItemID.FROZEN_TEAR));
+        assertEquals(1L, (long) one.counts.get(ItemID.FROZEN_TEAR));
         ChargeCheck none = ChargeCheck.parse("The pendant has no charges.");
         assertNotNull(none);
-        assertEquals(0L, (long) none.componentCounts.get(ItemID.FROZEN_TEAR));
+        assertEquals(0L, (long) none.counts.get(ItemID.FROZEN_TEAR));
     }
 
     @Test
@@ -189,14 +189,14 @@ public class ChargeCheckToCheckContractTest
             "Your tome has been charged with Burnt Pages. It currently holds 960 charges.", "149:5:0:3006:T", 2_000L);
         assertNotNull(tome);
         assertEquals(-40L, quantityDelta(tome, ItemID.WINT_BURNT_PAGE));
-        assertEquals(20, ChargeCheck.unitsPerItem(ChargeCheck.ChargedItem.TOME_OF_FIRE, ItemID.WINT_BURNT_PAGE));
+        assertEquals(20, ChargeCheck.ChargedItem.TOME_OF_FIRE.units);
 
         ChargeOutcomeTest.none(observe(engine, "Your crystal bow has 2,500 charges remaining.", "149:5:0:4212:C", 1_000L));
         ChargeDelta bow = observe(engine,
             "Your crystal bow has 2,400 charges remaining.", "149:5:0:4212:C", 2_000L);
         assertNotNull(bow);
         assertEquals(-100L, quantityDelta(bow, ItemID.PRIF_CRYSTAL_SHARD));
-        assertEquals(100, ChargeCheck.unitsPerItem(ChargeCheck.ChargedItem.CRYSTAL_BOW, ItemID.PRIF_CRYSTAL_SHARD));
+        assertEquals(100, ChargeCheck.ChargedItem.CRYSTAL_BOW.units);
 
         ChargeOutcomeTest.none(observe(engine, "Your bow of Faerdhinen has 1,000 charges remaining.", "149:5:0:25865:B", 1_000L));
         ChargeDelta bowfa = observe(engine,
@@ -227,7 +227,7 @@ public class ChargeCheckToCheckContractTest
             "Your Blade of Saeldor has 950 charges remaining.", target, 2_000L);
         assertNotNull(delta);
         assertEquals(-50L, quantityDelta(delta, ItemID.PRIF_CRYSTAL_SHARD));
-        assertEquals(100, ChargeCheck.unitsPerItem(ChargeCheck.ChargedItem.SAELDOR, ItemID.PRIF_CRYSTAL_SHARD));
+        assertEquals(100, ChargeCheck.ChargedItem.SAELDOR.units);
     }
 
     @Test
@@ -257,11 +257,11 @@ public class ChargeCheckToCheckContractTest
             ChargeCheck read = ChargeCheck.parse("Your " + lower + " has 1,000 charges remaining.");
             assertNotNull(piece[0], read);
             assertEquals(piece[0], ChargeCheck.ChargedItem.valueOf(piece[2]), read.variant);
-            assertFalse(piece[0], read.bookable);
+            assertFalse(piece[0], read.supported);
             ChargeOutcomeTest.none(engine.observeCheck(read, piece[1], 1_000L));
             ChargeOutcomeTest.none(engine.observeCheck(
                 ChargeCheck.parse("Your " + lower + " has 950 charges remaining."), piece[1], 2_000L));
-            assertTrue(piece[0], engine.getActiveSession().getTransactions().isEmpty());
+            assertTrue(piece[0], engine.session().transactions().isEmpty());
         }
     }
 
@@ -270,7 +270,7 @@ public class ChargeCheckToCheckContractTest
         ChargeCheck read = ChargeCheck.parse(chat);
         assertNotNull(chat, read);
         assertEquals(chat, expected, read.variant);
-        assertTrue(chat, read.bookable);
+        assertTrue(chat, read.supported);
     }
 
     @Test
@@ -296,7 +296,7 @@ public class ChargeCheckToCheckContractTest
             target, 2_000L);
         assertNotNull(delta);
         assertEquals("one tear is one charge", -6L, quantityDelta(delta, ItemID.DEMON_TEAR));
-        assertEquals(1, ChargeCheck.unitsPerItem(ChargeCheck.ChargedItem.EYE_OF_AYAK, ItemID.DEMON_TEAR));
+        assertEquals(1, ChargeCheck.ChargedItem.EYE_OF_AYAK.units);
     }
 
     @Test
@@ -325,7 +325,7 @@ public class ChargeCheckToCheckContractTest
         assertNotNull(delta);
         assertEquals("seven hits, healed or not, are seven charges", -7L,
             quantityDelta(delta, ItemID.BLOOD_SHARD));
-        assertEquals(10_000, ChargeCheck.unitsPerItem(ChargeCheck.ChargedItem.BLOOD_FURY, ItemID.BLOOD_SHARD));
+        assertEquals(10_000, ChargeCheck.ChargedItem.BLOOD_FURY.units);
     }
 
     private static ChargeDelta observe(Engine engine, String chat, String target, long now)
@@ -363,7 +363,7 @@ public class ChargeCheckToCheckContractTest
 
     private static void assertSupplies(Transaction spend)
     {
-        for (Flow flow : spend.getFlows())
+        for (Flow flow : spend.flows())
         {
             assertEquals("charge spend is Supplies, never Loss", CostKind.SUPPLIES, CostKind.of(spend, flow));
         }

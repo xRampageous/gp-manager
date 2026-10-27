@@ -20,27 +20,27 @@ public class StartFreePlayOverTest
     public void theOldRunMovesToHistoryWithEveryRow()
     {
         Engine engine = TargetFreshStartTest.engine();
-        Session before = engine.getGeneralSession();
+        Session before = engine.freePlay();
         coins(engine, 5L, 1_000L);
         coins(engine, 10L, 500L);
         engine.setMilestone(1_000_000_000L);
         before.pause(HOUR - 1L, PauseReason.MANUAL);
 
         assertTrue(engine.startFreePlayOver(HOUR));
-        Session kept = engine.getHistory().get(0);
+        Session kept = engine.history().get(0);
         assertSame("the run is kept, not deleted", before, kept);
-        assertEquals("Free play", kept.getName());
+        assertEquals("Free play", kept.name());
         assertTrue(kept.isClosed());
-        assertEquals(2, kept.getTransactions().size());
+        assertEquals(2, kept.transactions().size());
         assertEquals(1_500L, kept.metrics(HOUR).net);
 
-        Session fresh = engine.getGeneralSession();
+        Session fresh = engine.freePlay();
         assertNotSame(before, fresh);
-        assertSame(fresh, engine.getActiveSession());
-        assertTrue("the new Free play starts at zero", fresh.getTransactions().isEmpty());
+        assertSame(fresh, engine.session());
+        assertTrue("the new Free play starts at zero", fresh.transactions().isEmpty());
         assertEquals("the milestone counts the new run", Long.valueOf(1_000_000_000L), fresh.milestoneGp);
-        assertSame("a manual pause holds", PauseReason.MANUAL, fresh.getPauseReason());
-        assertEquals(0L, TargetFreshStartTest.live(engine, HOUR + 1L).runNet);
+        assertSame("a manual pause holds", PauseReason.MANUAL, fresh.pauseReason());
+        assertEquals(0L, TargetFreshStartTest.live(engine, HOUR + 1L).run);
     }
 
     /** Owner 1.5.2: Restore swaps a past Free play back in; the current one moves to history. */
@@ -48,46 +48,46 @@ public class StartFreePlayOverTest
     public void restoreSwapsAndSwapsBack()
     {
         Engine engine = TargetFreshStartTest.engine();
-        Session first = engine.getGeneralSession();
+        Session first = engine.freePlay();
         coins(engine, 5L, 1_000L);
         engine.setMilestone(1_000_000_000L);
-        long firstActive = first.getElapsedMillis(HOUR);
+        long firstActive = first.elapsed(HOUR);
         assertTrue(engine.startFreePlayOver(HOUR));
-        Session second = engine.getGeneralSession();
+        Session second = engine.freePlay();
         coins(engine, HOUR + 5L, 300L);
 
-        assertTrue(engine.restoreFreePlay(first.getId(), 2 * HOUR));
-        assertSame("the old run is Free play again", first, engine.getGeneralSession());
-        assertSame(first, engine.getActiveSession());
+        assertTrue(engine.restoreFreePlay(first.id(), 2 * HOUR));
+        assertSame("the old run is Free play again", first, engine.freePlay());
+        assertSame(first, engine.session());
         assertFalse(first.isClosed());
-        assertEquals("every row came back", 1, first.getTransactions().size());
-        assertEquals("its active time is unchanged", firstActive, first.getElapsedMillis(2 * HOUR));
-        assertEquals(1_000L, TargetFreshStartTest.live(engine, 2 * HOUR).runNet);
+        assertEquals("every row came back", 1, first.transactions().size());
+        assertEquals("its active time is unchanged", firstActive, first.elapsed(2 * HOUR));
+        assertEquals(1_000L, TargetFreshStartTest.live(engine, 2 * HOUR).run);
         assertEquals(Long.valueOf(1_000_000_000L), first.milestoneGp);
-        assertSame("the current run waits in history", second, engine.getHistory().get(0));
+        assertSame("the current run waits in history", second, engine.history().get(0));
         assertTrue(second.isClosed());
 
-        assertTrue("and swaps back", engine.restoreFreePlay(second.getId(), 3 * HOUR));
-        assertSame(second, engine.getGeneralSession());
-        assertEquals(300L, TargetFreshStartTest.live(engine, 3 * HOUR).runNet);
-        assertSame(first, engine.getHistory().get(0));
+        assertTrue("and swaps back", engine.restoreFreePlay(second.id(), 3 * HOUR));
+        assertSame(second, engine.freePlay());
+        assertEquals(300L, TargetFreshStartTest.live(engine, 3 * HOUR).run);
+        assertSame(first, engine.history().get(0));
     }
 
     @Test
     public void anEmptyCurrentRunIsDroppedAndGrindsCannotBeRestored()
     {
         Engine engine = TargetFreshStartTest.engine();
-        Session first = engine.getGeneralSession();
+        Session first = engine.freePlay();
         coins(engine, 5L, 1_000L);
         engine.startFreePlayOver(HOUR);
-        assertTrue(engine.restoreFreePlay(first.getId(), 2 * HOUR));
-        assertTrue("an empty Free play is not kept", engine.getHistory().isEmpty());
+        assertTrue(engine.restoreFreePlay(first.id(), 2 * HOUR));
+        assertTrue("an empty Free play is not kept", engine.history().isEmpty());
 
         engine.startCustom("Vorkath", 2 * HOUR);
-        assertFalse("not during a Grind", engine.restoreFreePlay(first.getId(), 3 * HOUR));
+        assertFalse("not during a Grind", engine.restoreFreePlay(first.id(), 3 * HOUR));
         engine.finishCustom(3 * HOUR);
-        Session grind = engine.getHistory().get(0);
-        assertFalse("a Grind run is not Free play", engine.restoreFreePlay(grind.getId(), 4 * HOUR));
+        Session grind = engine.history().get(0);
+        assertFalse("a Grind run is not Free play", engine.restoreFreePlay(grind.id(), 4 * HOUR));
     }
 
     @Test
@@ -99,9 +99,9 @@ public class StartFreePlayOverTest
         engine.startCustom("Vorkath", HOUR);
         engine.finishCustom(2 * HOUR);
         GrindsData data = GrindsData.capture(engine, 2 * HOUR, false, null);
-        long free = data.recent.stream().filter(run -> run.freePlay).count();
+        long free = data.recent.stream().filter(run -> run.general).count();
         assertEquals("the reset run and the current Free play", 2, free);
-        assertTrue(data.recent.stream().anyMatch(run -> !run.freePlay && "Vorkath".equals(run.name)));
+        assertTrue(data.recent.stream().anyMatch(run -> !run.general && "Vorkath".equals(run.name)));
     }
 
     /** Owner live 1.5.2: a past Free play's detail page offers Restore, never Start again. */
@@ -111,14 +111,14 @@ public class StartFreePlayOverTest
         Engine engine = PresentationLifecycleTest.engine();
         long now = System.currentTimeMillis();
         engine.ensureSession(now - HOUR);
-        Session old = engine.getGeneralSession();
+        Session old = engine.freePlay();
         coins(engine, now - 60_000L, 1_000L);
         engine.startFreePlayOver(now - 30_000L);
         SidebarPanel panel = MilestoneTest.onEdt(() -> new SidebarPanel(engine, PresentationLifecycleTest.config(), null, null, null));
         java.util.List<String> buttons = MilestoneTest.onEdt(() ->
         {
-            panel.shell().show(Shell.GRINDS);
-            new GrindsController(panel).openDetail(old.getId());
+            panel.shell.show(Shell.GRINDS);
+            new GrindsController(panel).openDetail(old.id());
             SidebarPanelProbe.refresh(panel);
             java.util.List<String> texts = new java.util.ArrayList<>();
             collect(panel, texts);

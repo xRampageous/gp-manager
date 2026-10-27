@@ -32,7 +32,7 @@ public class LootDisplayModesTest
         book(engine, T0 + 1_000L, new Flow(1420, "Iron mace", 1, 52, 52L));
         book(engine, T0 + 2_000L, new Flow(526, "Bones", 4, 90, 360L));
         book(engine, T0 + 3_000L, new Flow(5319, "Onion seed", 4, 3, 12L));
-        long net = engine.getMetrics(T0 + 4_000L).net;
+        long net = engine.metrics(T0 + 4_000L).net;
 
         assertEquals(List.of("Onion seed", "Bones", "Iron mace"),
             shown(engine, service, LootFilter.ALL_ITEMS));
@@ -40,7 +40,7 @@ public class LootDisplayModesTest
             shown(engine, service, LootFilter.FOLLOW_GROUND_ITEMS));
         assertEquals("Highlighted list only shows the highlighted list", List.of("Iron mace"),
             shown(engine, service, LootFilter.HIGHLIGHTED_LIST_ONLY));
-        assertEquals("no display mode changes Net", net, engine.getMetrics(T0 + 5_000L).net);
+        assertEquals("no display mode changes Net", net, engine.metrics(T0 + 5_000L).net);
         assertEquals(52L + 360L + 12L, net);
     }
 
@@ -55,8 +55,8 @@ public class LootDisplayModesTest
                 (id, active) -> 52, id -> false,
                 Valuation.economyFor(EnumSet.of(WorldType.MEMBERS, flag)));
             Flow drop = valuation.value(Collections.singletonMap(1420, 1L), T0).get(0);
-            assertEquals(flag + " prices drops", PriceSource.GRAND_EXCHANGE, drop.getPriceSource());
-            assertEquals(52L, drop.valueDelta);
+            assertEquals(flag + " prices drops", PriceSource.GRAND_EXCHANGE, drop.source());
+            assertEquals(52L, drop.value);
         }
     }
 
@@ -69,7 +69,7 @@ public class LootDisplayModesTest
         List<String> names = new ArrayList<>();
         for (LiveSnapshot.Recent row : snapshot.recent)
         {
-            assertFalse(mode + ": " + row.name + " keeps its price", row.unpriced);
+            assertFalse(mode + ": " + row.name + " keeps its price", row.unknown);
             assertTrue(mode + ": " + row.name + " shows a value", row.value > 0L);
             names.add(row.name);
         }
@@ -78,7 +78,7 @@ public class LootDisplayModesTest
 
     private static void book(Engine engine, long at, Flow flow)
     {
-        engine.getActiveSession().addTransaction(Tx.of(at, TransactionType.LOOT, Context.LOOT,
+        engine.session().addTransaction(Tx.of(at, TransactionType.LOOT, Context.LOOT,
             "Loot from Guard", true, Collections.singletonList(flow)), 2_000, false);
     }
 }

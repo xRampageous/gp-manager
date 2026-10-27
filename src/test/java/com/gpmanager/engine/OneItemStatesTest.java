@@ -48,7 +48,8 @@ public class OneItemStatesTest
             {ItemID.SLAYER_HERB_SACK_SILK_OPEN, ItemID.SLAYER_HERB_SACK_SILK},
             {ItemID.GEM_POUCH_OPEN, ItemID.GEM_POUCH}, {ItemID.GEM_SATCHEL_OPEN, ItemID.GEM_SATCHEL},
             {ItemID.GEM_TOTE_OPEN, ItemID.GEM_TOTE}, {ItemID.GEM_SACK_OPEN, ItemID.GEM_SACK},
-            {ItemID.NZONE_HERBBOX_OPENED, ItemID.NZONE_HERBBOX}};
+            {ItemID.NZONE_HERBBOX_OPENED, ItemID.NZONE_HERBBOX},
+            {ItemID.BOTTOMLESS_MILK_BUCKET_FILLED, ItemID.BOTTOMLESS_MILK_BUCKET}};
         Map<Integer, Integer> map = new HashMap<>();
         for (int[] pair : pairs)
         {

@@ -3,6 +3,7 @@ package com.gpmanager;
 import java.util.Arrays;
 import java.util.List;
 import org.junit.Test;
+import net.runelite.api.gameval.ItemID;
 
 import static org.junit.Assert.assertEquals;
 import static org.junit.Assert.assertFalse;
@@ -51,6 +52,60 @@ public class PvpRiskTest
         assertEquals("three darts kept, the cheap item lost", 497L * 1_200 + 100, PvpState.risk(darts, false, false));
     }
 
+    @Test public void chargedEthereumCannotUseAnyDefaultOrPrayerProtectionSlot() {
+        ethereumAlwaysLost(ItemID.WILD_CAVE_BRACELET_CHARGED);
+    }
+
+    @Test public void braceletExceptionTableUsesExactlyBothRuneLiteStates() throws Exception {
+        assertEquals(java.util.Set.of(ItemID.WILD_CAVE_BRACELET_CHARGED, ItemID.WILD_CAVE_BRACELET_UNCHARGED),
+            PvpState.ALWAYS_LOST);
+        for (String[] row : GameData.rows("death_always_lost"))
+            assertEquals(Integer.parseInt(row[0]), ItemID.class.getField(row[1]).getInt(null));
+    }
+
+    @Test public void unchargedEthereumCannotUseAnyDefaultOrPrayerProtectionSlot() {
+        ethereumAlwaysLost(ItemID.WILD_CAVE_BRACELET_UNCHARGED);
+    }
+
+    private static void ethereumAlwaysLost(int id) {
+        List<Flow> ordinary = Arrays.asList(held(1, 1, 40_000), held(2, 1, 30_000),
+            held(3, 1, 20_000), held(4, 1, 10_000));
+        List<Flow> with = new java.util.ArrayList<>(ordinary);
+        // ID determines eligibility, even if a definition/name is unavailable.
+        with.add(held(id, 1, 50_000));
+        for (boolean skull : new boolean[]{false, true}) for (boolean prayer : new boolean[]{false, true})
+            assertEquals("skull=" + skull + " prayer=" + prayer,
+                50_000 + PvpState.risk(ordinary, skull, prayer), PvpState.risk(with, skull, prayer));
+    }
+
+    @Test public void multipleEthereumUnitsRemainAtRiskWithoutConsumingSlots() {
+        assertEquals(150_000, PvpState.risk(Arrays.asList(
+            held(ItemID.WILD_CAVE_BRACELET_UNCHARGED, 3, 50_000), held(1, 1, 100)), false, true));
+    }
+
+    @Test public void onlyEthereumItemsRemainAtRiskEvenWithFourFreeProtectionSlots() {
+        assertEquals(90_000, PvpState.risk(Arrays.asList(
+            held(ItemID.WILD_CAVE_BRACELET_CHARGED, 1, 50_000),
+            held(ItemID.WILD_CAVE_BRACELET_UNCHARGED, 1, 40_000)), false, true));
+    }
+
+    @Test public void anOrdinaryBraceletStillUsesProtection() {
+        assertEquals(100, PvpState.risk(Arrays.asList(
+            new Flow(ItemID.ZENYTE_BRACELET, "Tormented bracelet", 1, 50_000, 50_000),
+            held(1, 1, 40_000), held(2, 1, 30_000), held(3, 1, 100)), false, false));
+    }
+
+    @Test public void nativeOctober23LoadoutProtectsGloryBodyAndChaps() {
+        List<Flow> gear = Arrays.asList(held(ItemID.WILD_CAVE_BRACELET_CHARGED, 1, 42_833),
+            held(1704, 1, 11_369), held(2503, 1, 7_335), held(2497, 1, 3_258),
+            held(24598, 1, 2_059), held(861, 1, 704), held(10499, 1, 600),
+            held(7946, 21, 140), held(21326, 1182, 119), held(19564, 1, 12), held(11941, 1, 6));
+        assertEquals(189_812, PvpState.risk(gear, false, false));
+        assertEquals("recorded active quotes plus remembered bag; native guide is a different valuation",
+            324_351, PvpState.risk(gear, false, false) + 134_539);
+        assertEquals("Risk is a read only projection", 42_833, gear.get(0).unitPrice);
+    }
+
     /** Owner 1.1: HUD+ stays short in the Wilderness; only Risk is shown (owner live 2026-10-13: no skull or Protect rows). */
     @Test
     public void riskLivesOnLiveAndHudPlusStaysClean() throws Exception
@@ -80,7 +135,7 @@ public class PvpRiskTest
         javax.swing.SwingUtilities.invokeAndWait(() -> page.apply(s));
         assertEquals("RISK 12.4M", page.risk.getText());
         assertTrue(page.risk.isVisible() && page.hero.under.isVisible());
-        assertFalse("no run total while Live shows the whole run", page.runTotal.isVisible());
+        assertFalse("no run total while Live shows the whole run", page.total.isVisible());
         assertFalse("skull and Protect are never shown (owner live 2026-10-13)",
             cells.toString().contains("SKULL") || cells.toString().contains("PROTECT"));
     }

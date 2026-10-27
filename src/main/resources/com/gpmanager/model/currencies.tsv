@@ -120,3 +120,6 @@
 20789	11986	1	Ring of wealth (i2)
 20790	11988	1	Ring of wealth (i1)
 12788	861	1	Magic shortbow (i)
+# Charged TFA equipment keeps its freely recoverable uncharged parent value; contents count separately.
+34715	34717	1	Obligator
+34725	34727	1	Zorya's tome

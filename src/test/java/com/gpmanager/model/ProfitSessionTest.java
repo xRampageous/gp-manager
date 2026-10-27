@@ -19,19 +19,19 @@ public class ProfitSessionTest
         Transaction transaction = Tx.of(1_100L, TransactionType.LOOT, Context.LOOT,
             "Loot", true, Collections.singletonList(new Flow(526, "Bones", 4L, 100, 400L)));
         session.addTransaction(transaction, 100, false);
-        assertTrue(session.correctTransaction(transaction.getId(), Correction.REVENUE, 1_200L, "First reason"));
-        assertTrue(session.correctTransaction(transaction.getId(), Correction.COST, 1_300L, "Second reason"));
+        assertTrue(session.correctTransaction(transaction.id(), Correction.REVENUE, "First reason"));
+        assertTrue(session.correctTransaction(transaction.id(), Correction.COST, "Second reason"));
         session = new Gson().fromJson(new Gson().toJson(session), Session.class);
-        assertTrue(session.undoCorrection(1_400L));
-        transaction = session.findTransaction(transaction.getId());
+        assertTrue(session.undoCorrection());
+        transaction = session.findTransaction(transaction.id());
         assertEquals("First reason", transaction.correctionReason());
-        assertTrue(session.splitItem(transaction.getId(), 526, 2L, 1_500L, "Sharing"));
-        assertTrue(session.undoCorrection(1_600L));
+        assertTrue(session.splitItem(transaction.id(), 526, 2L, "Sharing"));
+        assertTrue(session.undoCorrection());
         assertEquals("First reason", transaction.correctionReason());
         assertEquals(400L, session.metrics(1_600L).net);
-        assertTrue(session.undoCorrection(1_700L));
+        assertTrue(session.undoCorrection());
         assertEquals("", transaction.correctionReason());
-        assertEquals(Correction.AUTO, transaction.getCorrection());
+        assertEquals(Correction.AUTO, transaction.correction());
     }
 
 
@@ -42,14 +42,14 @@ public class ProfitSessionTest
         Transaction transaction = Tx.of(1_100L, TransactionType.LOOT, Context.LOOT,
             "Loot", true, Collections.singletonList(new Flow(526, "Bones", 1L, 100, 100L)));
         session.addTransaction(transaction, 100, false);
-        assertTrue(session.correctTransaction(transaction.getId(), Correction.REVENUE, 1_200L, "A"));
-        assertTrue(session.correctTransaction(transaction.getId(), Correction.REVENUE, 1_300L, "B"));
-        assertTrue(session.correctTransaction(transaction.getId(), Correction.COST, 1_400L, "C"));
+        assertTrue(session.correctTransaction(transaction.id(), Correction.REVENUE, "A"));
+        assertTrue(session.correctTransaction(transaction.id(), Correction.REVENUE, "B"));
+        assertTrue(session.correctTransaction(transaction.id(), Correction.COST, "C"));
         session = new Gson().fromJson(new Gson().toJson(session), Session.class);
-        assertTrue(session.undoCorrection(1_500L));
-        transaction = session.findTransaction(transaction.getId());
+        assertTrue(session.undoCorrection());
+        transaction = session.findTransaction(transaction.id());
         assertEquals("B", transaction.correctionReason());
-        assertTrue(session.undoCorrection(1_600L));
+        assertTrue(session.undoCorrection());
         assertEquals("A", transaction.correctionReason());
         assertEquals(100L, session.metrics(1_600L).net);
     }
@@ -61,9 +61,9 @@ public class ProfitSessionTest
         session.addTransaction(Tx.of(1L, TransactionType.LOOT, Context.LOOT, "loot", true,
             Collections.singletonList(new Flow(995, "Coins", 100, 1, 100))), 10, false);
         long net = session.metrics(2L).net;
-        assertTrue(session.setProfitTargetGp(1_000L));
+        assertTrue(session.setNetTarget(1_000L, 0, 0));
         assertEquals(net, session.metrics(2L).net);
-        session.setProfitTargetGp(null);
+        session.setNetTarget(null, 0, 0);
         assertEquals(net, session.metrics(2L).net);
     }
 
@@ -90,19 +90,19 @@ public class ProfitSessionTest
             "Supplies",
             true,
             Collections.singletonList(new Flow(2, "Food", -2, 100, -200)));
-        food.setActionKind(ActionKind.EAT);
+        food.setAction(ActionKind.EAT);
         session.addTransaction(food, 100, false);
 
         Metrics metrics = session.metrics(start + 3_600_000L);
 
-        assertEquals(1_000L, metrics.revenue);
-        assertEquals(200L, metrics.costs);
+        assertEquals(1_000L, metrics.income);
+        assertEquals(200L, metrics.cost);
         assertEquals(800L, metrics.net);
-        assertEquals(200L, metrics.suppliesCosts);
-        assertEquals(0L, metrics.otherCosts);
-        assertTrue(metrics.costSplitAvailable);
-        assertEquals(metrics.costs, metrics.suppliesCosts + metrics.otherCosts);
-        assertEquals(800L, metrics.profitPerHour);
+        assertEquals(200L, metrics.supplies);
+        assertEquals(0L, metrics.other);
+        assertTrue(metrics.split);
+        assertEquals(metrics.cost, metrics.supplies + metrics.other);
+        assertEquals(800L, metrics.rate);
         assertEquals(2, SessionCounts.counted(session));
     }
 
@@ -113,7 +113,7 @@ public class ProfitSessionTest
         session.pause(2_000L, PauseReason.MANUAL);
         session.resume(12_000L);
 
-        assertEquals(2_000L, session.getElapsedMillis(13_000L));
+        assertEquals(2_000L, session.elapsed(13_000L));
     }
 
     @Test
@@ -133,8 +133,8 @@ public class ProfitSessionTest
                 3, false);
         }
 
-        assertEquals(3, session.getTransactions().size());
-        assertTrue(session.getTransactions().get(0).timestampEpochMillis >= 2L);
+        assertEquals(3, session.transactions().size());
+        assertTrue(session.transactions().get(0).timestamp >= 2L);
         assertEquals(5L, session.metrics(5_000L).net);
         assertEquals("three rows held, two compacted", 3, SessionCounts.counted(session));
         assertEquals(2L, session.compactedTransactionCount);
@@ -148,7 +148,7 @@ public class ProfitSessionTest
             Context.GENERIC, "Review", false,
             Collections.singletonList(new Flow(1, "Loot", 1, 100, 100)));
         session.addTransaction(corrected, 1, false);
-        session.correctTransaction(corrected.getId(), Correction.REVENUE, 2L, "Manual correction");
+        session.correctTransaction(corrected.id(), Correction.REVENUE, "Manual correction");
         session.addTransaction(Tx.of(3L, TransactionType.CONSUMPTION,
             Context.GENERIC, "Cost", true,
             Collections.singletonList(new Flow(2, "Food", -1, 25, -25))), 1, false);
@@ -159,8 +159,8 @@ public class ProfitSessionTest
         com.google.gson.Gson gson = new com.google.gson.Gson();
         Session restored = gson.fromJson(gson.toJson(session), Session.class);
         assertEquals(75L, restored.metrics(5L).net);
-        assertEquals(100L, restored.compactedRevenue());
-        assertEquals(25L, restored.compactedCosts());
+        assertEquals(100L, restored.retainedRevenue);
+        assertEquals(25L, restored.retainedCosts);
         restored.undoTransaction();
         assertEquals(75L, restored.metrics(7L).net);
         restored.restoreUndo();
@@ -176,8 +176,7 @@ public class ProfitSessionTest
             Context.GENERIC, "Manual cost", true,
             Collections.singletonList(new Flow(1, "Item", 1, 50, 50L)));
         session.addTransaction(correctedGain, 1, false);
-        assertTrue(session.correctTransaction(correctedGain.getId(), Correction.COST,
-            2L, "Owner correction"));
+        assertTrue(session.correctTransaction(correctedGain.id(), Correction.COST, "Owner correction"));
         session.addTransaction(Tx.of(3L, TransactionType.LOOT,
             Context.LOOT, "Later gain", true,
             Collections.singletonList(new Flow(2, "Later item", 1, 1, 1L))), 1, false);
@@ -185,22 +184,22 @@ public class ProfitSessionTest
         com.google.gson.Gson gson = new com.google.gson.Gson();
         session = gson.fromJson(gson.toJson(session), Session.class);
         Metrics metrics = session.metrics(5L);
-        assertEquals(1L, metrics.revenue);
-        assertEquals(50L, metrics.costs);
-        assertEquals(0L, metrics.suppliesCosts);
-        assertEquals(50L, metrics.otherCosts);
-        assertTrue(metrics.costSplitAvailable);
+        assertEquals(1L, metrics.income);
+        assertEquals(50L, metrics.cost);
+        assertEquals(0L, metrics.supplies);
+        assertEquals(50L, metrics.other);
+        assertTrue(metrics.split);
 
         // The limit of one already folded the corrected row by its effective (corrected) contribution;
         // compacting the retained gain keeps the archive exact.
         assertEquals(1, session.compactBefore(10L, transaction -> false));
-        assertTrue(session.getTransactions().isEmpty());
+        assertTrue(session.transactions().isEmpty());
         Metrics compacted = session.metrics(5L);
-        assertEquals(1L, compacted.revenue);
-        assertEquals(50L, compacted.costs);
-        assertEquals(0L, compacted.suppliesCosts);
-        assertEquals(50L, compacted.otherCosts);
-        assertTrue(compacted.costSplitAvailable);
+        assertEquals(1L, compacted.income);
+        assertEquals(50L, compacted.cost);
+        assertEquals(0L, compacted.supplies);
+        assertEquals(50L, compacted.other);
+        assertTrue(compacted.split);
     }
 
     @Test
@@ -216,21 +215,21 @@ public class ProfitSessionTest
         session = gson.fromJson(gson.toJson(session), Session.class);
 
         Metrics metrics = session.metrics(20_000L);
-        assertEquals(675L, metrics.costs);
-        assertEquals(150L, metrics.suppliesCosts);
-        assertEquals(525L, metrics.otherCosts);
-        assertTrue(metrics.costSplitAvailable);
-        assertEquals(metrics.costs, metrics.suppliesCosts + metrics.otherCosts);
+        assertEquals(675L, metrics.cost);
+        assertEquals(150L, metrics.supplies);
+        assertEquals(525L, metrics.other);
+        assertTrue(metrics.split);
+        assertEquals(metrics.cost, metrics.supplies + metrics.other);
 
         // The limit of one already archived four rows; folding the retained one keeps the split exact.
-        assertEquals(1, session.getTransactions().size());
+        assertEquals(1, session.transactions().size());
         assertEquals(1, session.compactBefore(6L, transaction -> false));
-        assertEquals(0, session.getTransactions().size());
+        assertEquals(0, session.transactions().size());
         Metrics mixed = gson.fromJson(gson.toJson(session), Session.class).metrics(20_000L);
-        assertEquals(675L, mixed.costs);
-        assertEquals(150L, mixed.suppliesCosts);
-        assertEquals(525L, mixed.otherCosts);
-        assertTrue(mixed.costSplitAvailable);
+        assertEquals(675L, mixed.cost);
+        assertEquals(150L, mixed.supplies);
+        assertEquals(525L, mixed.other);
+        assertTrue(mixed.split);
     }
 
     private static Transaction cost(TransactionType type, String activity, int itemId, long value)
@@ -239,7 +238,7 @@ public class ProfitSessionTest
             activity, activity, true,
             Collections.singletonList(new Flow(itemId, activity, -1L,
                 (int) Math.abs(value), value)));
-        if (type == TransactionType.CONSUMPTION && "Food".equals(activity)) transaction.setActionKind(ActionKind.EAT);
+        if (type == TransactionType.CONSUMPTION && "Food".equals(activity)) transaction.setAction(ActionKind.EAT);
         return transaction;
     }
 
@@ -262,13 +261,13 @@ public class ProfitSessionTest
         Metrics atPause = session.metrics(2_000L);
         Metrics muchLater = session.metrics(62_000L);
 
-        assertEquals(atPause.elapsedMillis, muchLater.elapsedMillis);
-        assertEquals(atPause.profitPerHour, muchLater.profitPerHour);
+        assertEquals(atPause.elapsed, muchLater.elapsed);
+        assertEquals(atPause.rate, muchLater.rate);
 
         session.resume(62_000L);
         Metrics afterOneActiveSecond = session.metrics(63_000L);
-        assertEquals(3_000L, afterOneActiveSecond.elapsedMillis);
-        assertEquals(1_200_000L, afterOneActiveSecond.profitPerHour);
+        assertEquals(3_000L, afterOneActiveSecond.elapsed);
+        assertEquals(1_200_000L, afterOneActiveSecond.rate);
     }
 
     @Test
@@ -284,17 +283,17 @@ public class ProfitSessionTest
             Collections.singletonList(new Flow(1, "Item", -1, 500, -500)));
         session.addTransaction(transaction, 10, false);
 
-        session.correctTransaction(transaction.getId(), Correction.REVENUE, 2_000L, "Manual correction");
+        session.correctTransaction(transaction.id(), Correction.REVENUE, "Manual correction");
         assertEquals(500L, session.metrics(3_000L).net);
         assertEquals(1, ModelProbe.activeCorrections(session).size());
         assertEquals("Manual correction", transaction.correctionReason());
-        assertEquals("Manual correction", ModelProbe.activeCorrections(session).get(0).getReason());
+        assertEquals("Manual correction", ModelProbe.activeCorrections(session).get(0).reason());
 
-        session.correctTransaction(transaction.getId(), Correction.AUTO, 4_000L, "Rechecked against loot timeline");
+        session.correctTransaction(transaction.id(), Correction.AUTO, "Rechecked against loot timeline");
         assertEquals(-500L, session.metrics(5_000L).net);
         assertEquals(2, ModelProbe.activeCorrections(session).size());
         assertEquals("Rechecked against loot timeline", transaction.correctionReason());
-        assertEquals("Rechecked against loot timeline", ModelProbe.activeCorrections(session).get(1).getReason());
+        assertEquals("Rechecked against loot timeline", ModelProbe.activeCorrections(session).get(1).reason());
     }
 
     @Test
@@ -309,9 +308,9 @@ public class ProfitSessionTest
             true,
             Collections.singletonList(new Flow(1, "Item", -1, 500, -500)));
         session.addTransaction(transaction, 10, false);
-        session.correctTransaction(transaction.getId(), Correction.REVENUE, 2_000L, "Audit fix");
+        session.correctTransaction(transaction.id(), Correction.REVENUE, "Audit fix");
 
-        assertTrue(session.undoCorrection(3_000L));
+        assertTrue(session.undoCorrection());
         assertEquals(-500L, session.metrics(4_000L).net);
         assertEquals(0, ModelProbe.activeCorrections(session).size());
         assertEquals(1, session.correctionHistory.size());
@@ -321,7 +320,7 @@ public class ProfitSessionTest
         Session restored = new Gson().fromJson(new Gson().toJson(session), Session.class);
         assertEquals(1, restored.correctionHistory.size());
         assertTrue(restored.correctionHistory.get(0).isUndone());
-        assertFalse("an undone decision is never undone twice", restored.undoCorrection(5_000L));
+        assertFalse("an undone decision is never undone twice", restored.undoCorrection());
     }
 
     /** A saved split decision reloads and undoes back to the full gain. */
@@ -337,15 +336,15 @@ public class ProfitSessionTest
             true,
             Collections.singletonList(new Flow(1, "Item", 10, 100, 1_000)));
         session.addTransaction(transaction, 10, false);
-        assertTrue(session.splitItem(transaction.getId(), 1, 4, 2_000L, null));
+        assertTrue(session.splitItem(transaction.id(), 1, 4, null));
         assertEquals(400L, session.metrics(3_000L).net);
 
         Gson gson = new Gson();
         Session restored = gson.fromJson(gson.toJson(session), Session.class);
-        assertTrue(restored.undoCorrection(4_000L));
+        assertTrue(restored.undoCorrection());
         assertEquals("the saved flow snapshot restores the full gain", 1_000L,
             restored.metrics(5_000L).net);
-        assertEquals(10L, restored.findTransaction(transaction.getId()).quantity(1, true));
+        assertEquals(10L, restored.findTransaction(transaction.id()).quantity(1, true));
     }
 
     @Test
@@ -360,13 +359,13 @@ public class ProfitSessionTest
             true,
             Collections.singletonList(new Flow(1, "Item", -1, 500, -500)));
         session.addTransaction(transaction, 10, false);
-        session.correctTransaction(transaction.getId(), Correction.REVENUE, 2_000L, "First");
-        session.correctTransaction(transaction.getId(), Correction.IGNORE, 3_000L, "Second");
+        session.correctTransaction(transaction.id(), Correction.REVENUE, "First");
+        session.correctTransaction(transaction.id(), Correction.IGNORE, "Second");
 
-        assertTrue(session.undoCorrection(4_000L));
-        assertEquals(Correction.REVENUE, transaction.getCorrection());
-        assertTrue(session.undoCorrection(5_000L));
-        assertEquals(Correction.AUTO, transaction.getCorrection());
+        assertTrue(session.undoCorrection());
+        assertEquals(Correction.REVENUE, transaction.correction());
+        assertTrue(session.undoCorrection());
+        assertEquals(Correction.AUTO, transaction.correction());
         assertEquals(0, ModelProbe.activeCorrections(session).size());
         assertEquals(2, session.correctionHistory.size());
     }
@@ -386,7 +385,7 @@ public class ProfitSessionTest
         session.addTransaction(transaction, 10, false);
 
         Transaction removed = session.undoTransaction();
-        assertEquals(transaction.getId(), removed.getId());
+        assertEquals(transaction.id(), removed.id());
         assertEquals(1, session.undoHistory.size());
         assertSame("the removed row is kept whole for a restore", transaction,
             session.undoHistory.get(0).transaction);
@@ -408,8 +407,8 @@ public class ProfitSessionTest
         session.undoTransaction();
 
         Transaction restored = session.restoreUndo();
-        assertEquals(transaction.getId(), restored.getId());
-        assertEquals(1, session.getTransactions().size());
+        assertEquals(transaction.id(), restored.id());
+        assertEquals(1, session.transactions().size());
         assertTrue(session.undoHistory.get(0).restored);
         assertEquals(null, session.restoreUndo());
     }
@@ -441,9 +440,9 @@ public class ProfitSessionTest
         bounded.addTransaction(first, 1, false);
         bounded.undoTransaction();
         bounded.addTransaction(second, 1, false);
-        assertEquals(first.getId(), bounded.restoreUndo().getId());
-        assertEquals(1, bounded.getTransactions().size());
-        assertEquals(first.getId(), bounded.getTransactions().get(0).getId());
+        assertEquals(first.id(), bounded.restoreUndo().id());
+        assertEquals(1, bounded.transactions().size());
+        assertEquals(first.id(), bounded.transactions().get(0).id());
         // Restoring into a full ledger displaces the newer retained row. It
         // must remain in full-session totals through compaction.
         assertEquals(30L, bounded.metrics(54_000L).net);
@@ -477,13 +476,13 @@ public class ProfitSessionTest
             true,
             Collections.singletonList(new Flow(2, "Loot", 1, 1_000, 1_000)));
         session.addTransaction(loot, 10, false);
-        session.attachToEncounter(loot.getId(), encounter, false);
+        session.attachToEncounter(loot.id(), encounter, false);
 
         assertEquals(1, session.pk().kills);
         assertEquals(0, session.pk().deaths);
         assertEquals("loot less the attached food", 900L, session.bestKill());
-        assertEquals("PKing", session.getActivityHint());
-        assertEquals(TransactionType.PK_SUPPLY_COST, supply.autoType());
+        assertEquals("PKing", session.activityHint());
+        assertEquals(TransactionType.PK_SUPPLY_COST, supply.original());
     }
 
     @Test
@@ -499,14 +498,13 @@ public class ProfitSessionTest
         session.addTransaction(food, 2, false);
         session.addTransaction(loot, 2, false);
         String kill = session.addEncounter(true, 2_100L);
-        session.attachToEncounter(food.getId(), kill, true);
-        session.attachToEncounter(loot.getId(), kill, false);
+        session.attachToEncounter(food.id(), kill, true);
+        session.attachToEncounter(loot.id(), kill, false);
 
         assertEquals(900L, session.bestKill());
-        assertTrue(session.correctTransaction(loot.getId(), Correction.IGNORE,
-            3_000L, "Correction regression"));
+        assertTrue(session.correctTransaction(loot.id(), Correction.IGNORE, "Correction regression"));
         assertEquals("a losing kill is never the best", 0L, session.bestKill());
-        assertTrue(session.undoCorrection(4_000L));
+        assertTrue(session.undoCorrection());
         assertEquals(900L, session.bestKill());
 
         Transaction fillerOne = Tx.of(5_000L, TransactionType.ADJUSTMENT,
@@ -521,7 +519,7 @@ public class ProfitSessionTest
 
         Gson gson = new Gson();
         Session restored = gson.fromJson(gson.toJson(session), Session.class);
-        assertTrue(restored.metrics(7_000L).costSplitAvailable);
+        assertTrue(restored.metrics(7_000L).split);
         assertEquals(900L, restored.bestKill());
         assertEquals(1, restored.pk().kills);
     }
@@ -550,6 +548,6 @@ public class ProfitSessionTest
         session.close(1_000L);
 
         assertTrue(session.paused);
-        assertEquals(9L, session.getElapsedMillis(1_000L));
+        assertEquals(9L, session.elapsed(1_000L));
     }
 }

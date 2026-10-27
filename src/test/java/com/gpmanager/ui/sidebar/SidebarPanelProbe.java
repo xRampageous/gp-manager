@@ -64,7 +64,7 @@ public final class SidebarPanelProbe
 
     public static LiveSnapshot live(SidebarPanel p)
     {
-        return p.lastSnapshot;
+        return p.snapshot;
     }
 
     public static LivePage livePage(SidebarPanel p)
@@ -74,7 +74,7 @@ public final class SidebarPanelProbe
 
     public static void openGrindsDetail(SidebarPanel p, @javax.annotation.Nullable String sessionId)
     {
-        p.grindsDetailId = sessionId;
+        p.selection = sessionId;
         p.shell.show(Shell.GRINDS);
         p.refresh();
     }

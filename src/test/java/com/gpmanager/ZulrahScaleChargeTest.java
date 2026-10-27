@@ -21,9 +21,9 @@ public class ZulrahScaleChargeTest
     {
         ChargeCheck helm = ChargeCheck.parse("Scales: <col=007f00>11,000 (100.0%)</col>");
         assertNotNull(helm);
-        assertTrue(helm.bookable);
-        assertEquals(Long.valueOf(11_000L), helm.componentCounts.get(ItemID.SNAKEBOSS_SCALE));
-        assertEquals(Long.valueOf(4_200L), ChargeCheck.parse("Scales: 4,200").componentCounts.get(ItemID.SNAKEBOSS_SCALE));
+        assertTrue(helm.supported);
+        assertEquals(Long.valueOf(11_000L), helm.counts.get(ItemID.SNAKEBOSS_SCALE));
+        assertEquals(Long.valueOf(4_200L), ChargeCheck.parse("Scales: 4,200").counts.get(ItemID.SNAKEBOSS_SCALE));
     }
 
     @Test
@@ -33,7 +33,7 @@ public class ZulrahScaleChargeTest
         ChargeIntake intake = new ChargeIntake(client(), null, HudBuilderTest.config(true, 4), engine, null);
         intake.startCheck(ChargeCheck.ChargedItem.SERPENTINE_HELM, "worn:helm", 10, 2);
         assertTrue(intake.observeCheck("Scales: 11,000 (100.0%)", 1_000L));
-        MeasuredChargeReadTracker.Baseline read = engine.measuredChargeReadTracker.baselines.get("worn:helm");
+        MeasuredChargeReadTracker.Baseline read = engine.checks.baseline.get("worn:helm");
         assertNotNull("a Check of the helm is kept for that helm", read);
         assertEquals(ChargeCheck.ChargedItem.SERPENTINE_HELM, read.getRead().variant);
     }
@@ -44,7 +44,7 @@ public class ZulrahScaleChargeTest
         assertTrue(ChargeCheck.isLoadComponent(ChargeCheck.ChargedItem.TOXIC_STAFF, ItemID.SNAKEBOSS_SCALE, "Zulrah's scales"));
         assertTrue(ChargeCheck.isLoadComponent(ChargeCheck.ChargedItem.SERPENTINE_HELM, ItemID.SNAKEBOSS_SCALE, "Zulrah's scales"));
         assertEquals(ChargeCheck.ChargedItem.SERPENTINE_HELM, ChargeCheck.supportedForName("Tanzanite helm"));
-        assertEquals(ChargeCheck.ChargedItem.TOXIC_STAFF, ChargeCheck.supportedForId(ItemID.TOXIC_SOTD_CHARGED));
+        assertEquals(ChargeCheck.ChargedItem.TOXIC_STAFF, ChargeCheck.supported(ItemID.TOXIC_SOTD_CHARGED));
     }
 
     private static Client client()

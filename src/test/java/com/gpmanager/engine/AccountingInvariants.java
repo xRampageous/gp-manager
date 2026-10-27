@@ -13,6 +13,6 @@ final class AccountingInvariants
         {
             return true;
         }
-        return tx.getType() != TransactionType.TRANSFER || !tx.isCounted();
+        return tx.type() != TransactionType.TRANSFER || !tx.counts();
     }
 }

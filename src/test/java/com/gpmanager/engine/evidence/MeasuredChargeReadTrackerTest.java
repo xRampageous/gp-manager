@@ -29,20 +29,20 @@ public final class MeasuredChargeReadTrackerTest
         ChargeCheck seas = ChargeCheck.parse(
             "Your Trident of the seas has 2,000 charges.");
         assertNotNull(seas);
-        assertTrue(seas.bookable);
+        assertTrue(seas.supported);
         assertEquals(ChargeCheck.ChargedItem.TRIDENT_SEAS, seas.variant);
-        assertEquals(2_000L, seas.componentCounts.get(DEATH_RUNE).longValue());
-        assertEquals(2_000L, seas.componentCounts.get(CHAOS_RUNE).longValue());
-        assertEquals(10_000L, seas.componentCounts.get(FIRE_RUNE).longValue());
-        assertEquals(20_000L, seas.componentCounts.get(COINS).longValue());
+        assertEquals(2_000L, seas.counts.get(DEATH_RUNE).longValue());
+        assertEquals(2_000L, seas.counts.get(CHAOS_RUNE).longValue());
+        assertEquals(10_000L, seas.counts.get(FIRE_RUNE).longValue());
+        assertEquals(20_000L, seas.counts.get(COINS).longValue());
 
         ChargeCheck swamp = ChargeCheck.parse(
             "Your Trident of the swamp has one charge.");
         assertNotNull(swamp);
-        assertEquals(1L, swamp.componentCounts.get(DEATH_RUNE).longValue());
-        assertEquals(1L, swamp.componentCounts.get(CHAOS_RUNE).longValue());
-        assertEquals(5L, swamp.componentCounts.get(FIRE_RUNE).longValue());
-        assertEquals(1L, swamp.componentCounts.get(ZULRAH_SCALES).longValue());
+        assertEquals(1L, swamp.counts.get(DEATH_RUNE).longValue());
+        assertEquals(1L, swamp.counts.get(CHAOS_RUNE).longValue());
+        assertEquals(5L, swamp.counts.get(FIRE_RUNE).longValue());
+        assertEquals(1L, swamp.counts.get(ZULRAH_SCALES).longValue());
 
         ChargeCheck empty = ChargeCheck.parse(
             "Your Trident of the seas has no charges.");
@@ -55,23 +55,23 @@ public final class MeasuredChargeReadTrackerTest
         ChargeCheck swamp = ChargeCheck.parse(
             "Your Trident of the swamp (e) has 20,000 charges.");
         assertNotNull(swamp);
-        assertTrue(swamp.bookable);
+        assertTrue(swamp.supported);
         assertEquals(ChargeCheck.ChargedItem.TRIDENT_SWAMP_ENHANCED, swamp.variant);
-        assertEquals(100_000L, swamp.componentCounts.get(FIRE_RUNE).longValue());
+        assertEquals(100_000L, swamp.counts.get(FIRE_RUNE).longValue());
 
         ChargeCheck seas = ChargeCheck.parse(
             "Your Trident of the seas (e) has 20,000 charges.");
         assertNotNull(seas);
-        assertTrue(seas.bookable);
+        assertTrue(seas.supported);
         assertEquals(ChargeCheck.ChargedItem.TRIDENT_SEAS_ENHANCED, seas.variant);
-        assertEquals(20_000L, seas.componentCounts.get(DEATH_RUNE).longValue());
-        assertEquals(20_000L, seas.componentCounts.get(CHAOS_RUNE).longValue());
-        assertEquals(100_000L, seas.componentCounts.get(FIRE_RUNE).longValue());
-        assertEquals(200_000L, seas.componentCounts.get(COINS).longValue());
-        assertFalse(seas.componentCounts.containsKey(ZULRAH_SCALES));
+        assertEquals(20_000L, seas.counts.get(DEATH_RUNE).longValue());
+        assertEquals(20_000L, seas.counts.get(CHAOS_RUNE).longValue());
+        assertEquals(100_000L, seas.counts.get(FIRE_RUNE).longValue());
+        assertEquals(200_000L, seas.counts.get(COINS).longValue());
+        assertFalse(seas.counts.containsKey(ZULRAH_SCALES));
 
         assertEquals(ChargeCheck.ChargedItem.TRIDENT_SEAS,
-            ChargeCheck.supportedForId(ItemID.TOTS));
+            ChargeCheck.supported(ItemID.TOTS));
         assertEquals(ChargeCheck.ChargedItem.TRIDENT_SEAS,
             ChargeCheck.supportedForName("Trident of the seas (full)"));
     }
@@ -81,17 +81,17 @@ public final class MeasuredChargeReadTrackerTest
     public void wornAndOrnamentedChargeItemsKeepTheirExactVariantIdentity()
     {
         assertEquals(ChargeCheck.ChargedItem.BLOWPIPE,
-            ChargeCheck.supportedForId(ItemID.TOXIC_BLOWPIPE_LOADED_ORNAMENT));
+            ChargeCheck.supported(ItemID.TOXIC_BLOWPIPE_LOADED_ORNAMENT));
         assertEquals(ChargeCheck.ChargedItem.BLOWPIPE,
-            ChargeCheck.supportedForId(ItemID.TOXIC_BLOWPIPE));
+            ChargeCheck.supported(ItemID.TOXIC_BLOWPIPE));
         assertEquals(ChargeCheck.ChargedItem.TRIDENT_SEAS,
-            ChargeCheck.supportedForId(ItemID.TOTS_CHARGED_ORN));
+            ChargeCheck.supported(ItemID.TOTS_CHARGED_ORN));
         assertEquals(ChargeCheck.ChargedItem.TRIDENT_SEAS_ENHANCED,
-            ChargeCheck.supportedForId(ItemID.TOTS_I_CHARGED_ORN));
+            ChargeCheck.supported(ItemID.TOTS_I_CHARGED_ORN));
         assertEquals(ChargeCheck.ChargedItem.TRIDENT_SWAMP,
-            ChargeCheck.supportedForId(ItemID.TOXIC_TOTS_CHARGED_ORN));
+            ChargeCheck.supported(ItemID.TOXIC_TOTS_CHARGED_ORN));
         assertEquals(ChargeCheck.ChargedItem.TRIDENT_SWAMP_ENHANCED,
-            ChargeCheck.supportedForId(ItemID.TOXIC_TOTS_I_CHARGED_ORN));
+            ChargeCheck.supported(ItemID.TOXIC_TOTS_I_CHARGED_ORN));
     }
 
     @Test
@@ -117,7 +117,7 @@ public final class MeasuredChargeReadTrackerTest
     {
         int equipmentWidget = InterfaceID.Wornitems.UNIVERSE;
         MenuOptionClicked event = menuCheckViaWidget(ItemID.TOXIC_BLOWPIPE_LOADED, equipmentWidget, 3);
-        assertEquals(ItemID.TOXIC_BLOWPIPE_LOADED, ChargeIntake.weaponItemId(event));
+        assertEquals(ItemID.TOXIC_BLOWPIPE_LOADED, ChargeIntake.weaponId(event));
         assertEquals((equipmentWidget >>> 16) + ":3:" + ItemID.TOXIC_BLOWPIPE_LOADED
             + ":BLOWPIPE",
             ChargeIntake.clickedIdentity(event,
@@ -131,18 +131,18 @@ public final class MeasuredChargeReadTrackerTest
             "Darts: <col=007f00>Adamant dart x 16,383</col>. "
                 + "Scales: <col=007f00>1,234 (7.5%)</col>.");
         assertNotNull(read);
-        assertTrue(read.bookable);
-        assertEquals(ItemID.ADAMANT_DART, read.dartItemId);
-        assertEquals(1_234L, read.componentCounts.get(ZULRAH_SCALES).longValue());
-        assertEquals(16_383L, read.componentCounts.get(ItemID.ADAMANT_DART).longValue());
+        assertTrue(read.supported);
+        assertEquals(ItemID.ADAMANT_DART, read.dart);
+        assertEquals(1_234L, read.counts.get(ZULRAH_SCALES).longValue());
+        assertEquals(16_383L, read.counts.get(ItemID.ADAMANT_DART).longValue());
 
         ChargeCheck noDarts = ChargeCheck.parse(
             "Darts: None. Scales: 99 (0.6%).");
         assertNotNull(noDarts);
-        assertTrue(noDarts.bookable);
+        assertTrue(noDarts.supported);
         assertFalse(noDarts.hasDarts());
-        assertEquals(99L, noDarts.componentCounts.get(ZULRAH_SCALES).longValue());
-        assertFalse(noDarts.componentCounts.containsKey(ItemID.ADAMANT_DART));
+        assertEquals(99L, noDarts.counts.get(ZULRAH_SCALES).longValue());
+        assertFalse(noDarts.counts.containsKey(ItemID.ADAMANT_DART));
     }
 
     @Test
@@ -151,13 +151,13 @@ public final class MeasuredChargeReadTrackerTest
         ChargeCheck unknown = ChargeCheck.parse(
             "Darts: Exotic dart x 100. Scales: 90 (1.0%).");
         assertNotNull(unknown);
-        assertFalse(unknown.bookable);
-        assertTrue(unknown.componentCounts.isEmpty());
+        assertFalse(unknown.supported);
+        assertTrue(unknown.counts.isEmpty());
 
         MeasuredChargeReadTracker tracker = new MeasuredChargeReadTracker();
         ChargeOutcomeTest.none(observe(tracker, blowpipe("Adamant", 100, 100)));
         ChargeOutcomeTest.none(observe(tracker, unknown));
-        assertNull(tracker.baselines.get("single-target"));
+        assertNull(tracker.baseline.get("single-target"));
         ChargeOutcomeTest.none(observe(tracker, blowpipe("Adamant", 95, 98)));
     }
 
@@ -256,9 +256,9 @@ public final class MeasuredChargeReadTrackerTest
         tracker.observe(ChargeCheck.parse("Your Trident of the seas has 10 charges."), "trident", 1_000L);
         // Two blowpipes: the load could be either.
         tracker.noteLoad(ChargeCheck.ChargedItem.BLOWPIPE, null, 2_000L, ItemID.ADAMANT_DART, 5L);
-        assertNull(tracker.baselines.get("pipe"));
-        assertNull(tracker.baselines.get("spare pipe"));
-        assertNotNull(tracker.baselines.get("trident"));
+        assertNull(tracker.baseline.get("pipe"));
+        assertNull(tracker.baseline.get("spare pipe"));
+        assertNotNull(tracker.baseline.get("trident"));
     }
 
     @Test
@@ -267,7 +267,7 @@ public final class MeasuredChargeReadTrackerTest
         MeasuredChargeReadTracker tracker = new MeasuredChargeReadTracker();
         tracker.observe(blowpipe("Adamant", 100, 100), "pipe", 1_000L);
         tracker.noteLoad(ChargeCheck.ChargedItem.BLOWPIPE, null, 2_000L, ItemID.ADAMANT_DART, 5L);
-        assertNotNull(tracker.baselines.get("pipe"));
+        assertNotNull(tracker.baseline.get("pipe"));
         ChargeDelta delta = tracker.observe(blowpipe("Adamant", 100, 103), "pipe", 3_000L);
         assertEquals("5 loaded, 2 fired", -2L, quantityDelta(delta, ItemID.ADAMANT_DART));
     }
@@ -279,8 +279,8 @@ public final class MeasuredChargeReadTrackerTest
         tracker.observe(blowpipe("Adamant", 100, 100), "pipe", 1_000L);
         tracker.observe(ChargeCheck.parse("Your Trident of the seas has 10 charges."), "trident", 1_000L);
         tracker.resetVariant(ChargeCheck.ChargedItem.BLOWPIPE);
-        assertNull(tracker.baselines.get("pipe"));
-        assertNotNull(tracker.baselines.get("trident"));
+        assertNull(tracker.baseline.get("pipe"));
+        assertNotNull(tracker.baseline.get("trident"));
     }
 
     @Test
@@ -304,7 +304,7 @@ public final class MeasuredChargeReadTrackerTest
         assertEquals(1, switchDelta.getComponentDeltas().size());
         assertEquals(-10L, quantityDelta(switchDelta, ZULRAH_SCALES));
         assertTrue("a dart switch proves nothing about either dart", switchDelta.unchanged.isEmpty());
-        assertEquals(ItemID.RUNE_DART, tracker.baselines.get("single-target").getRead().dartItemId);
+        assertEquals(ItemID.RUNE_DART, tracker.baseline.get("single-target").getRead().dart);
         ChargeDelta afterSwitch = observe(tracker, blowpipe("Rune", 80, 97));
         assertNotNull(afterSwitch);
         assertEquals(-10L, quantityDelta(afterSwitch, ZULRAH_SCALES));
@@ -331,17 +331,17 @@ public final class MeasuredChargeReadTrackerTest
     public void checkTargetIdentityRecognizesChargedAndUnchargedItems()
     {
         assertEquals(ChargeCheck.ChargedItem.TRIDENT_SEAS,
-            ChargeCheck.supportedForId(11907));
+            ChargeCheck.supported(11907));
         assertEquals(ChargeCheck.ChargedItem.TRIDENT_SEAS,
-            ChargeCheck.supportedForId(11908));
+            ChargeCheck.supported(11908));
         assertEquals(ChargeCheck.ChargedItem.TRIDENT_SWAMP,
-            ChargeCheck.supportedForId(12899));
+            ChargeCheck.supported(12899));
         assertEquals(ChargeCheck.ChargedItem.TRIDENT_SWAMP_ENHANCED,
-            ChargeCheck.supportedForId(22294));
+            ChargeCheck.supported(22294));
         assertEquals(ChargeCheck.ChargedItem.TRIDENT_SEAS_ENHANCED,
-            ChargeCheck.supportedForId(22288));
+            ChargeCheck.supported(22288));
         assertEquals(ChargeCheck.ChargedItem.BLOWPIPE,
-            ChargeCheck.supportedForId(12926));
+            ChargeCheck.supported(12926));
     }
 
     @Test
@@ -393,12 +393,12 @@ public final class MeasuredChargeReadTrackerTest
         ChargeCheck malformed = ChargeCheck.parse(
             "Darts: Adamant dart x many. Scales: 100 (1.0%).");
         assertNotNull(malformed);
-        assertFalse(malformed.bookable);
+        assertFalse(malformed.supported);
 
         MeasuredChargeReadTracker tracker = new MeasuredChargeReadTracker();
         ChargeOutcomeTest.none(observe(tracker, trident("seas", "", 10)));
         ChargeOutcomeTest.none(observe(tracker, malformed));
-        assertNull(tracker.baselines.get("single-target"));
+        assertNull(tracker.baseline.get("single-target"));
     }
 
     private static ChargeDelta observe(

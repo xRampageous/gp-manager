@@ -39,7 +39,7 @@ public class MarketReceiptDetailTest
     {
         Market market = new Market();
         market.sell(0, CHAOS, 30L, 104, 3_120L, 3_060L);
-        LedgerPage page = openExactReceipt(market, receipt -> receipt.itemId == CHAOS);
+        LedgerPage page = openExactReceipt(market, receipt -> receipt.item == CHAOS);
         List<String> texts = LedgerPageProbe.detailTexts(page);
 
         assertTrue(texts.contains("Chaos rune  " + Fmt.times(30L)));
@@ -80,7 +80,7 @@ public class MarketReceiptDetailTest
         Market market = new Market();
         market.quote[0] = 121;
         market.sellUnknownGross(0, CHAOS, 100L, 122, 12_200L, 12_000L);
-        LedgerPage page = openExactReceipt(market, receipt -> receipt.itemId == CHAOS);
+        LedgerPage page = openExactReceipt(market, receipt -> receipt.item == CHAOS);
         List<String> texts = LedgerPageProbe.detailTexts(page);
 
         assertTrue(texts.contains("Received") && texts.contains("12,000 gp"));
@@ -101,7 +101,7 @@ public class MarketReceiptDetailTest
     {
         Market market = new Market();
         market.buy(0, CHAOS, 30L, 102, 3_060L);
-        LedgerPage page = openExactReceipt(market, receipt -> receipt.itemId == CHAOS);
+        LedgerPage page = openExactReceipt(market, receipt -> receipt.item == CHAOS);
         List<String> texts = LedgerPageProbe.detailTexts(page);
 
         assertTrue(texts.contains("Chaos rune  " + Fmt.times(30L)));
@@ -123,7 +123,7 @@ public class MarketReceiptDetailTest
     {
         Market market = new Market();
         market.sellPartial(0, CHAOS, 200L, 30L, 104, 3_120L, 3_060L);
-        LedgerPage page = openExactReceipt(market, receipt -> receipt.itemId == CHAOS);
+        LedgerPage page = openExactReceipt(market, receipt -> receipt.item == CHAOS);
         List<String> texts = LedgerPageProbe.detailTexts(page);
 
         assertTrue(texts.contains("Filled 30 / 200"));
@@ -218,7 +218,7 @@ public class MarketReceiptDetailTest
     {
         Market market = new Market();
         market.sell(0, CHAOS, 30L, 104, 3_121L, 3_061L);
-        LedgerPage page = openExactReceipt(market, receipt -> receipt.itemId == CHAOS);
+        LedgerPage page = openExactReceipt(market, receipt -> receipt.item == CHAOS);
         List<String> texts = LedgerPageProbe.detailTexts(page);
 
         assertTrue(texts.contains("Received") && texts.contains(Fmt.exact(3_061L) + " gp"));
@@ -250,11 +250,11 @@ public class MarketReceiptDetailTest
         assertEquals(MarketRows.Coverage.FULLY_UNKNOWN, row.coverage);
         assertTrue(MarketText.humanLines(row, false).contains("Received|180 gp"));
         assertTrue(MarketText.humanLines(row, false).contains("Result|\u2014"));
-        for (Semantics.Receipt receipt : data.detail.receipts)
+        for (Semantics.Receipt receipt : data.detail.entries)
         {
-            if (receipt.marketSettlement != null)
+            if (receipt.market != null)
             {
-                String text = LedgerPageProbe.marketReceiptRowText(receipt, data.capturedAt);
+                String text = LedgerPageProbe.marketReceiptRowText(receipt, data.at);
                 assertTrue(text.contains("Sold \u00b7 Result \u2014"));
                 assertTrue(text.endsWith("|+180 gp"));
                 return;
@@ -269,8 +269,7 @@ public class MarketReceiptDetailTest
         Market market = new Market();
         market.sellUnknown(0, CHAOS, 15L, 12, 180L);
         String settlementId = market.engine.marketRows().get(0).settlementId;
-        assertTrue(market.engine.correctTransaction(settlementId, Correction.REVENUE,
-            market.now, "owner decision"));
+        assertTrue(market.engine.correctTransaction(settlementId, Correction.REVENUE, "owner decision"));
 
         MarketRows.Row row = market.engine.marketRows().get(0);
         List<String> lines = MarketText.humanLines(row, true);
@@ -298,9 +297,9 @@ public class MarketReceiptDetailTest
         Market market = new Market();
         market.sell(0, CHAOS, 30L, 104, 3_120L, 3_060L);
         String settlementId = market.engine.marketRows().get(0).settlementId;
-        market.engine.correctTransaction(settlementId, Correction.IGNORE, market.now, "test");
+        market.engine.correctTransaction(settlementId, Correction.IGNORE, "test");
 
-        LedgerPage page = openExactReceipt(market, receipt -> receipt.itemId == CHAOS);
+        LedgerPage page = openExactReceipt(market, receipt -> receipt.item == CHAOS);
         List<String> texts = LedgerPageProbe.detailTexts(page);
 
         assertTrue("the corrected canonical result is shown",
@@ -321,7 +320,7 @@ public class MarketReceiptDetailTest
     {
         Market market = new Market();
         market.sell(0, CHAOS, 30L, 104, 3_120L, 3_060L);
-        LedgerPage page = openExactReceipt(market, receipt -> receipt.itemId == CHAOS);
+        LedgerPage page = openExactReceipt(market, receipt -> receipt.item == CHAOS);
         assertTrue(LedgerPageProbe.detailTooltips(page).contains(
             "Received is cash from selling owned items; the GE tax row and the Result affect Net."));
     }
@@ -331,7 +330,7 @@ public class MarketReceiptDetailTest
     {
         Market market = new Market();
         market.buy(0, CHAOS, 30L, 102, 3_060L);
-        LedgerPage page = openExactReceipt(market, receipt -> receipt.itemId == CHAOS);
+        LedgerPage page = openExactReceipt(market, receipt -> receipt.item == CHAOS);
         assertTrue(LedgerPageProbe.detailTooltips(page).contains(
             "Spent is cash used to acquire owned items; only Result affects Net."));
     }
@@ -342,17 +341,17 @@ public class MarketReceiptDetailTest
         Market market = new Market();
         market.sellAfterDelay(0, CHAOS, 30L, 104, 3_120L, 3_060L, 60 * 60_000L);
         LedgerData data = captureWithGroup(market, groupIdOf(market));
-        MarketRows.Row row = data.marketRow(data.detail.group.marketPresentationId);
+        MarketRows.Row row = data.marketRow(data.detail.group.marketId);
         assertNotNull(row);
         assertTrue("settlement time is retained by the read model", row.settlementAtEpochMillis > 0L);
         assertTrue("placement and settlement are materially apart",
             row.settlementAtEpochMillis - row.timestampEpochMillis >= 60 * 60_000L);
 
-        LedgerPage page = openExactReceipt(market, receipt -> receipt.itemId == CHAOS);
+        LedgerPage page = openExactReceipt(market, receipt -> receipt.item == CHAOS);
         String expected = "Sold \u00b7 " + Fmt.age(Math.max(0L,
-            data.capturedAt - row.settlementAtEpochMillis));
+            data.at - row.settlementAtEpochMillis));
         assertTrue(LedgerPageProbe.detailTexts(page).stream().anyMatch(text -> text.contains(expected)));
-        String placed = "Sold \u00b7 " + Fmt.age(Math.max(0L, data.capturedAt - row.timestampEpochMillis));
+        String placed = "Sold \u00b7 " + Fmt.age(Math.max(0L, data.at - row.timestampEpochMillis));
         assertFalse("placement age must not be labelled as the Sold age",
             LedgerPageProbe.detailTexts(page).stream().anyMatch(text -> text.contains(placed)));
     }
@@ -371,9 +370,9 @@ public class MarketReceiptDetailTest
         assertFalse("pending stays incomplete coverage",
             group.coverage == Semantics.Coverage.COMPLETE);
 
-        LedgerData grouped = captureWithGroup(market, group.semanticGroupId);
-        assertTrue("no settlement receipt exists before collection", grouped.detail.receipts.isEmpty());
-        MarketRows.Row row = grouped.marketRow(group.marketPresentationId);
+        LedgerData grouped = captureWithGroup(market, group.id);
+        assertTrue("no settlement receipt exists before collection", grouped.detail.entries.isEmpty());
+        MarketRows.Row row = grouped.marketRow(group.marketId);
         assertNotNull(row);
         assertEquals("the human Market block shows only the fill state",
             Collections.singletonList("Filled 0 / 200"), MarketText.humanLines(row, false));
@@ -387,7 +386,7 @@ public class MarketReceiptDetailTest
         Market market = new Market();
         market.quote[0] = 2_802;
         market.sell(0, CHAOS, 50L, 2_802, 133_450L, 130_800L);
-        LedgerPage page = openExactReceipt(market, receipt -> receipt.itemId == CHAOS);
+        LedgerPage page = openExactReceipt(market, receipt -> receipt.item == CHAOS);
 
         List<String> lines = MarketText.humanLines(
             market.engine.marketRows().get(0), false);
@@ -405,22 +404,22 @@ public class MarketReceiptDetailTest
     public void redundantSelectedGroupTotalIsHiddenForASingleReceiptGroup() throws Exception
     {
         Market market = new Market();
-        market.engine.getActiveSession().addTransaction(new Transaction(market.now - 5_000L,
+        market.engine.session().addTransaction(new Transaction(market.now - 5_000L,
             TransactionType.GAIN, Context.GENERIC, "", "Chaos rune", true,
             Collections.singletonList(new Flow(CHAOS, "Chaos rune", 1L, 105, 105L)),
             Confidence.CONFIRMED, "", null), 100, false);
         LedgerData base = LedgerData.capture(market.engine, market.now + 1_000L,
             LedgerData.Entry.current());
         Semantics.Group gain = null;
-        for (Semantics.Group group : base.gains.groups)
+        for (Semantics.Group group : base.income.groups)
         {
-            if (group.primaryName.equals("Chaos rune"))
+            if (group.name.equals("Chaos rune"))
             {
                 gain = group;
             }
         }
         assertNotNull(gain);
-        LedgerPage page = openExactReceiptForGroup(market, gain.semanticGroupId);
+        LedgerPage page = openExactReceiptForGroup(market, gain.id);
         assertFalse(LedgerPageProbe.detailTexts(page).contains("Selected-group total"));
     }
 
@@ -474,14 +473,14 @@ public class MarketReceiptDetailTest
     {
         Market market = new Market();
         market.sell(0, CHAOS, 30L, 104, 3_120L, 3_060L);
-        Transaction settlement = market.engine.getActiveSession().getTransactions().get(0);
-        long netBefore = market.engine.getMetrics(market.now).net;
-        long transactionBefore = settlement.getNet();
+        Transaction settlement = market.engine.session().transactions().get(0);
+        long netBefore = market.engine.metrics(market.now).net;
+        long transactionBefore = settlement.net();
 
-        openExactReceipt(market, receipt -> receipt.itemId == CHAOS);
+        openExactReceipt(market, receipt -> receipt.item == CHAOS);
 
-        assertEquals(netBefore, market.engine.getMetrics(market.now).net);
-        assertEquals(transactionBefore, settlement.getNet());
+        assertEquals(netBefore, market.engine.metrics(market.now).net);
+        assertEquals(transactionBefore, settlement.net());
         assertEquals("the frozen basis is untouched by reading the human receipt", 105L,
             MarketFacts.record(market.engine, market.engine.marketRows().get(0)).basisUnitPrice);
     }
@@ -631,7 +630,7 @@ public class MarketReceiptDetailTest
         {
             // Known coverage at the listing reference, so the receipt's known-basis Result is the
             // exact reference-versus-cash comparison these receipt tests assert.
-            engine.getActiveSession().addTransaction(new Transaction(now - 1_000L,
+            engine.session().addTransaction(new Transaction(now - 1_000L,
                 TransactionType.GAIN, Context.GENERIC, "", "Chaos rune", true,
                 Collections.singletonList(new Flow(item, "Chaos rune", filled, quote[0],
                     filled * quote[0], PriceSource.GRAND_EXCHANGE)),
@@ -697,7 +696,7 @@ public class MarketReceiptDetailTest
             LedgerData.Entry.current());
         Semantics.Group group = marketGroup(data);
         assertNotNull(group);
-        return group.semanticGroupId;
+        return group.id;
     }
 
     @Nullable
@@ -727,7 +726,7 @@ public class MarketReceiptDetailTest
     {
         LedgerData grouped = captureWithGroup(market, groupIdOf(market));
         Semantics.Receipt receipt = null;
-        for (Semantics.Receipt candidate : grouped.detail.receipts)
+        for (Semantics.Receipt candidate : grouped.detail.entries)
         {
             if (pick.test(candidate))
             {
@@ -738,17 +737,17 @@ public class MarketReceiptDetailTest
         if (receipt == null)
         {
             StringBuilder dump = new StringBuilder("no receipt matched: ");
-            for (Semantics.Receipt candidate : grouped.detail.receipts)
+            for (Semantics.Receipt candidate : grouped.detail.entries)
             {
-                dump.append('[').append(candidate.itemId).append(':').append(candidate.itemName)
+                dump.append('[').append(candidate.item).append(':').append(candidate.name)
                     .append(':').append(candidate.category).append("] ");
             }
             throw new AssertionError(dump.toString());
         }
         LedgerData data = LedgerData.capture(market.engine, market.now + 1_000L,
             new LedgerData.Entry(LedgerData.Scope.CURRENT_GRIND, null, null,
-                LedgerData.CostView.SUPPLIES, "", receipt.transactionId, receipt.contributionId,
-                grouped.detail.group.semanticGroupId, null));
+                LedgerData.CostView.SUPPLIES, "", receipt.transaction, receipt.id,
+                grouped.detail.group.id, null));
         assertNotNull(data.detail);
         assertNotNull(data.detail.exact);
         return onEdt(() ->
@@ -763,11 +762,11 @@ public class MarketReceiptDetailTest
         throws Exception
     {
         LedgerData grouped = captureWithGroup(market, groupId);
-        assertFalse(grouped.detail.receipts.isEmpty());
-        Semantics.Receipt receipt = grouped.detail.receipts.get(0);
+        assertFalse(grouped.detail.entries.isEmpty());
+        Semantics.Receipt receipt = grouped.detail.entries.get(0);
         LedgerData data = LedgerData.capture(market.engine, market.now + 1_000L,
             new LedgerData.Entry(LedgerData.Scope.CURRENT_GRIND, null, null,
-                LedgerData.CostView.SUPPLIES, "", receipt.transactionId, receipt.contributionId,
+                LedgerData.CostView.SUPPLIES, "", receipt.transaction, receipt.id,
                 groupId, null));
         return onEdt(() ->
         {

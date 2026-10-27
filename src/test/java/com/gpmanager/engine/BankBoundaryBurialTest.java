@@ -32,8 +32,8 @@ public class BankBoundaryBurialTest
         engine.processIfDirty(ContainerSnapshot.empty(), 2200L, null);
         Transaction transaction = engine.processIfDirty(ContainerSnapshot.empty(), 2800L, null);
         assertNotNull(transaction);
-        assertEquals("burial after bank close must be a cost", TransactionType.CONSUMPTION, transaction.getType());
-        assertEquals(35L, engine.getMetrics(2800L).costs);
+        assertEquals("burial after bank close must be a cost", TransactionType.CONSUMPTION, transaction.type());
+        assertEquals(35L, engine.metrics(2800L).cost);
     }
 
 
@@ -52,8 +52,8 @@ public class BankBoundaryBurialTest
         engine.processIfDirty(ContainerSnapshot.empty(), 2200L, null);
         Transaction transaction = engine.processIfDirty(ContainerSnapshot.empty(), 2800L, null);
         assertNotNull(transaction);
-        assertEquals(TransactionType.TRANSFER, transaction.getType());
-        assertFalse(transaction.isCounted());
+        assertEquals(TransactionType.TRANSFER, transaction.type());
+        assertFalse(transaction.counts());
     }
 
 
@@ -73,9 +73,9 @@ public class BankBoundaryBurialTest
         engine.processIfDirty(ContainerSnapshot.empty(), 2800L, null);
         Transaction transaction = engine.processIfDirty(ContainerSnapshot.empty(), 3400L, null);
         assertNotNull(transaction);
-        assertEquals(TransactionType.TRANSFER, transaction.getType());
-        assertFalse(transaction.isCounted());
-        assertEquals(0L, engine.getMetrics(3400L).costs);
+        assertEquals(TransactionType.TRANSFER, transaction.type());
+        assertFalse(transaction.counts());
+        assertEquals(0L, engine.metrics(3400L).cost);
     }
 
     private static Engine engine()

@@ -45,7 +45,7 @@ public class ChargeOutcomeTest
         outcome(ChargeDelta.CheckResult.SEED, tracker.observe(seasCheck(10), "a", 1));
         ChargeDelta same = outcome(ChargeDelta.CheckResult.SAME, tracker.observe(seasCheck(10), "a", 2));
         assertTrue(same.componentDeltas.isEmpty());
-        assertEquals(2L, tracker.baselines.get("a").atEpochMillis);
+        assertEquals(2L, tracker.baseline.get("a").atEpochMillis);
     }
 
     @Test
@@ -80,7 +80,7 @@ public class ChargeOutcomeTest
         tracker.observe(seasCheck(10), "a", 1);
         outcome(ChargeDelta.CheckResult.MISMATCH,
             tracker.observe(ChargeCheck.parse("Darts: Exotic dart x 100. Scales: 90 (1.0%)."), "a", 2));
-        assertNull(tracker.baselines.get("a"));
+        assertNull(tracker.baseline.get("a"));
         outcome(ChargeDelta.CheckResult.SEED, tracker.observe(seasCheck(9), "a", 3));
     }
 
@@ -90,7 +90,7 @@ public class ChargeOutcomeTest
         MeasuredChargeReadTracker tracker = new MeasuredChargeReadTracker();
         tracker.observe(seasCheck(10), "a", 1);
         outcome(ChargeDelta.CheckResult.MISMATCH, tracker.observe(null, "a", 2));
-        assertNotNull(tracker.baselines.get("a"));
+        assertNotNull(tracker.baseline.get("a"));
         outcome(ChargeDelta.CheckResult.SPEND, tracker.observe(seasCheck(9), "a", 3));
     }
 
@@ -126,11 +126,11 @@ public class ChargeOutcomeTest
         ChargeIntake intake = new ChargeIntake(client, null, config, engine, null);
         assertTrue(intake.startCheck(ChargeCheck.ChargedItem.TRIDENT_SEAS, "a", 10, 2));
         assertTrue(intake.observeCheck("Your Trident of the seas has 10 charges.", 1_001L));
-        assertNull(engine.inbox.peek(Inbox.SOFT_TRANSFER));
+        assertNull(engine.events.peek(Inbox.SOFT_TRANSFER));
         assertTrue(intake.startCheck(ChargeCheck.ChargedItem.TRIDENT_SEAS, "a", 10, 2));
         assertTrue(intake.observeCheck("Your Trident of the seas has 20 charges.", 1_002L));
-        assertNotNull(engine.inbox.peek(Inbox.SOFT_TRANSFER));
-        assertTrue(engine.getActiveSession().getTransactions().isEmpty());
+        assertNotNull(engine.events.peek(Inbox.SOFT_TRANSFER));
+        assertTrue(engine.session().transactions().isEmpty());
     }
 
     @Test
@@ -154,16 +154,16 @@ public class ChargeOutcomeTest
         Transaction cast = engine.bookEstimatedCharge("a", "Trident of the seas", ActionKind.CAST,
             Collections.singletonList(new Flow(ItemID.DEATHRUNE, "Death rune", -1, 100, -100,
                 PriceSource.GRAND_EXCHANGE)), 1_002L);
-        String session = engine.getActiveSession().getId();
-        assertEquals(1L, ChargeProbes.adp(engine.chargeEstimateJournal, session, "a", "seas", ItemID.DEATHRUNE));
+        String session = engine.session().id();
+        assertEquals(1L, ChargeProbes.adp(engine.estimate, session, "a", "seas", ItemID.DEATHRUNE));
 
         // A recharge read ("charged with") arrives before its load books: a fresh start.
         assertTrue(intake.startCheck(ChargeCheck.ChargedItem.TRIDENT_SEAS, "a", 10, 2));
         assertTrue(intake.observeCheck("Your Trident of the seas has 150 charges.", 1_003L));
         assertEquals("the next Check never reconciles it", 0L,
-            ChargeProbes.adp(engine.chargeEstimateJournal, session, "a", "seas", ItemID.DEATHRUNE));
-        assertTrue("the cast stays booked", cast.isCounted());
-        assertEquals(100L, engine.getMetrics(2_000L).costs);
+            ChargeProbes.adp(engine.estimate, session, "a", "seas", ItemID.DEATHRUNE));
+        assertTrue("the cast stays booked", cast.counts());
+        assertEquals(100L, engine.metrics(2_000L).cost);
     }
 
     @Test

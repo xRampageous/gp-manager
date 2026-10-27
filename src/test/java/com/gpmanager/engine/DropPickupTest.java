@@ -39,7 +39,7 @@ public class DropPickupTest
         engine.setBaseline(new ContainerSnapshot(Collections.singletonMap(BOLTS, 3L)));
         engine.noteDrop(BOLTS, 6);
         Transaction drop = settle(engine, snapshot(3L - bolts), 1_600L);
-        assertEquals("Dropped", drop.getNote());
+        assertEquals("Dropped", drop.note());
         return engine;
     }
 
@@ -47,13 +47,13 @@ public class DropPickupTest
     public void pickingAllOfADropBackUpLeavesNeitherRow()
     {
         Engine engine = dropped(3L);
-        assertEquals(-30L, engine.getMetrics(3_000L).net);
+        assertEquals(-30L, engine.metrics(3_000L).net);
         settle(engine, snapshot(3L), 4_000L);
-        assertEquals("Net is back where it started", 0L, engine.getMetrics(6_000L).net);
-        List<Transaction> rows = engine.getActiveSession().getTransactions();
+        assertEquals("Net is back where it started", 0L, engine.metrics(6_000L).net);
+        List<Transaction> rows = engine.session().transactions();
         assertEquals("only the Dropped row is kept, excluded", 1, rows.size());
-        assertEquals(Correction.IGNORE, rows.get(0).getCorrection());
-        assertFalse(rows.get(0).isCounted());
+        assertEquals(Correction.IGNORE, rows.get(0).correction());
+        assertFalse(rows.get(0).counts());
     }
 
     @Test
@@ -61,10 +61,10 @@ public class DropPickupTest
     {
         Engine engine = dropped(3L);
         settle(engine, snapshot(1L), 4_000L);
-        Transaction drop = engine.getActiveSession().getTransactions().get(0);
-        assertTrue(drop.isCounted());
-        assertEquals("2 bolts stay on the ground", -20L, engine.getMetrics(6_000L).net);
-        assertEquals(1, engine.getActiveSession().getTransactions().size());
+        Transaction drop = engine.session().transactions().get(0);
+        assertTrue(drop.counts());
+        assertEquals("2 bolts stay on the ground", -20L, engine.metrics(6_000L).net);
+        assertEquals(1, engine.session().transactions().size());
     }
 
     @Test
@@ -72,9 +72,9 @@ public class DropPickupTest
     {
         Engine engine = dropped(1L);
         Transaction extra = settle(engine, snapshot(5L), 4_000L);
-        assertEquals(TransactionType.GAIN, extra.getType());
-        assertEquals("1 cancels the drop, 2 are new", 20L, extra.getRevenue());
-        assertEquals(20L, engine.getMetrics(6_000L).net);
+        assertEquals(TransactionType.GAIN, extra.type());
+        assertEquals("1 cancels the drop, 2 are new", 20L, extra.revenue());
+        assertEquals(20L, engine.metrics(6_000L).net);
     }
 
     @Test
@@ -84,13 +84,13 @@ public class DropPickupTest
         engine.ensureSession(1_000L);
         engine.setBaseline(snapshot(100L));
         Transaction fired = settle(engine, snapshot(60L), 1_600L);
-        assertEquals(ActionKind.FIRE, fired.getActionKind());
-        assertEquals(400L, engine.getMetrics(3_000L).costs);
+        assertEquals(ActionKind.FIRE, fired.action());
+        assertEquals(400L, engine.metrics(3_000L).cost);
         engine.markDirty();
         settle(engine, snapshot(90L), 4_000L);
-        Metrics metrics = engine.getMetrics(6_000L);
-        assertEquals("never income", 0L, metrics.revenue);
-        assertEquals("10 bolts stayed on the ground", 100L, metrics.costs);
+        Metrics metrics = engine.metrics(6_000L);
+        assertEquals("never income", 0L, metrics.income);
+        assertEquals("10 bolts stayed on the ground", 100L, metrics.cost);
     }
 
     private static final int DART = 807;
@@ -105,7 +105,7 @@ public class DropPickupTest
         Transaction shot = engine.bookEstimatedCharge("pipe", "Toxic blowpipe", ActionKind.CAST,
             Arrays.asList(new Flow(DART, "Iron dart", -1L, 10, -10L),
                 new Flow(SCALES, "Zulrah's scales", -1L, 10, -10L)), 1_100L);
-        assertEquals(20L, shot.getCosts());
+        assertEquals(20L, shot.costs());
         return engine;
     }
 
@@ -115,13 +115,13 @@ public class DropPickupTest
         Engine engine = blowpipeShot();
         engine.markDirty();
         settle(engine, new ContainerSnapshot(Collections.singletonMap(DART, 1L)), 2_000L);
-        List<Transaction> rows = engine.getActiveSession().getTransactions();
+        List<Transaction> rows = engine.session().transactions();
         assertEquals("no gain row for the dart", 1, rows.size());
-        assertTrue(rows.get(0).isCounted());
+        assertTrue(rows.get(0).counts());
         assertEquals(0L, rows.get(0).quantity(DART, false));
-        Metrics metrics = engine.getMetrics(4_000L);
-        assertEquals(0L, metrics.revenue);
-        assertEquals("the scale is still spent", 10L, metrics.costs);
+        Metrics metrics = engine.metrics(4_000L);
+        assertEquals(0L, metrics.income);
+        assertEquals("the scale is still spent", 10L, metrics.cost);
     }
 
     @Test
@@ -136,7 +136,7 @@ public class DropPickupTest
         engine.bookChargeSpend(delta, "Toxic blowpipe",
             Arrays.asList(new Flow(DART, "Iron dart", -1L, 10, -10L),
                 new Flow(SCALES, "Zulrah's scales", -1L, 10, -10L)), 5_000L, "pipe");
-        assertEquals("measured 20 less the 10 picked up", 10L, engine.getMetrics(6_000L).costs);
+        assertEquals("measured 20 less the 10 picked up", 10L, engine.metrics(6_000L).cost);
     }
 
     @Test
@@ -148,14 +148,14 @@ public class DropPickupTest
         engine.bookChargeSpend(delta, "Toxic blowpipe",
             Collections.singletonList(new Flow(SCALES, "Zulrah's scales", -1L, 10, -10L)), 1_500L, "pipe");
         engine.clearPendingEstimates("pipe", Collections.singleton(DART));
-        Transaction shot = engine.getActiveSession().getTransactions().get(0);
+        Transaction shot = engine.session().transactions().get(0);
         assertEquals("the Check found no dart used", 0L, shot.quantity(DART, false));
 
         engine.markDirty();
         Transaction gain = settle(engine, new ContainerSnapshot(Collections.singletonMap(DART, 1L)), 2_000L);
-        assertEquals(TransactionType.GAIN, gain.getType());
-        assertEquals(10L, gain.getRevenue());
-        assertEquals(10L, engine.getMetrics(4_000L).costs);
+        assertEquals(TransactionType.GAIN, gain.type());
+        assertEquals(10L, gain.revenue());
+        assertEquals(10L, engine.metrics(4_000L).cost);
     }
 
     @Test
@@ -164,8 +164,8 @@ public class DropPickupTest
         Engine engine = blowpipeShot();
         engine.markDirty();
         Transaction gain = settle(engine, new ContainerSnapshot(Collections.singletonMap(SCALES, 1L)), 2_000L);
-        assertEquals(TransactionType.GAIN, gain.getType());
-        assertEquals(20L, engine.getMetrics(4_000L).costs);
+        assertEquals(TransactionType.GAIN, gain.type());
+        assertEquals(20L, engine.metrics(4_000L).cost);
     }
 
     private static ContainerSnapshot snapshot(long bolts)

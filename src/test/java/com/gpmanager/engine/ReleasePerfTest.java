@@ -36,30 +36,57 @@ public class ReleasePerfTest
             Session done = new Session("Grind " + grind, T0 - (300 - grind) * 3_600_000L, SessionMode.GENERAL);
             for (int i = 0; i < 60; i++)
             {
-                done.addTransaction(receipt(done.startedAtEpochMillis + i * 1_000L), 2_000, false);
+                done.addTransaction(receipt(done.startedAt + i * 1_000L), 2_000, false);
             }
-            done.close(done.startedAtEpochMillis + 3_000_000L);
+            done.close(done.startedAt + 3_000_000L);
             engine.history.add(0, done);
         }
         engine.startCustom("Greater Nechryael", T0);
         for (int i = 0; i < 2_000; i++)
         {
-            engine.getActiveSession().addTransaction(receipt(T0 + i * 1_800L), 2_000, false);
+            engine.session().addTransaction(receipt(T0 + i * 1_800L), 2_000, false);
         }
         long now = T0 + 4_000_000L;
 
-        List<Transaction> all = engine.getActiveSession().getTransactions();
-        report("Bp.transaction x2000", () -> all.stream().mapToLong(t -> Accounting.transaction(t).costs).sum());
+        List<Transaction> all = engine.session().transactions();
+        report("Bp.transaction x2000", () -> all.stream().mapToLong(t -> Accounting.transaction(t).cost).sum());
         report("Bp.costSplit x2000", () -> all.stream().mapToLong(t -> Accounting.costSplit(t).supplies).sum());
         report("spellName x2000", () -> all.stream().mapToLong(t -> t.spellName().length()).sum());
         report("Ledger contributions x2000", () -> all.stream().mapToLong(t -> Contribution.project(t).size()).sum());
-        report("session metrics", () -> engine.getActiveSession().metrics(now).net);
+        report("session metrics", () -> engine.session().metrics(now).net);
         int[] flip = {0};
         report("Live capture (cold)", () -> LiveSnapshot.capture(engine, now,
             new LiveContext(false, null, flip[0]++ % 2, PvpState.NONE, "", false, "", false)).net);
         report("Live capture (warm)", () -> LiveSnapshot.capture(engine, now, LiveContext.NONE).net);
         report("Ledger capture", () -> LedgerData.capture(engine, now, LedgerData.Entry.current()).net);
-        report("Grinds capture", () -> GrindsData.capture(engine, now, false, null).myGrinds.size());
+        report("Grinds capture", () -> GrindsData.capture(engine, now, false, null).plans.size());
+        // A flipper-sized G.E. history (the 64 retained closed lifecycles plus 8 open slots), each
+        // settled by a receipt deep in the finished Grinds, so Market rows pay their receipt lookups.
+        for (int i = 0; i < 72; i++)
+        {
+            GeOffer offer = new GeOffer("perf-offer-" + i, i < 64 ? -1 : i - 64,
+                i % 2 == 0 ? GeOffer.Side.SELL : GeOffer.Side.BUY, 1_319, "Rune axe", 10L, 7_202L,
+                T0 - i * 60_000L, engine.session().id());
+            Session holder = engine.history.get(engine.history.size() - 1 - i);
+            offer.settlementId = holder.transactions().get(holder.transactions().size() - 1).id();
+            offer.stage = i < 64 ? GeOffer.Stage.CLOSED : GeOffer.Stage.OPEN;
+            engine.exchange.records.add(offer);
+        }
+        report("Market rows x72 (old)", () -> engine.marketRows().size());
+        report("Live capture (warm, G.E.)", () -> LiveSnapshot.capture(engine, now, LiveContext.NONE).net);
+        // Settlements in the newest Grinds, then settlements whose receipts retention has compacted.
+        List<GeOffer> offers = engine.exchange.records;
+        for (int i = 0; i < offers.size(); i++)
+        {
+            Session holder = engine.history.get(i);
+            offers.get(i).settlementId = holder.transactions().get(0).id();
+        }
+        report("Market rows x72 (recent)", () -> engine.marketRows().size());
+        for (GeOffer offer : offers)
+        {
+            offer.settlementId = "compacted-" + offer.offerId;
+        }
+        report("Market rows x72 (compacted)", () -> engine.marketRows().size());
         GpManagerConfig config = HudBuilderTest.config(true, 4);
         HudBuilder builder = new HudBuilder(config, null);
         HudOverlay overlay = new HudOverlay(builder, config);
@@ -82,11 +109,11 @@ public class ReleasePerfTest
             FilepathTestSupport.root(java.nio.file.Files.createTempDirectory("gp-perf")), false);
         Persistence coordinator = new Persistence(null, null, repository,
             new OrderedPersistenceWriter(repository, null), engine);
-        report("save intent (client thread)", () -> coordinator.currentIntent().expectedBaseRevision);
+        report("save intent (client thread)", () -> coordinator.currentIntent(false).base);
         // 1.1: the periodic gameplay save reuses closed sessions' JSON; every 10th is full.
-        report("quick save intent (client thread)", () -> coordinator.currentIntent(true).expectedBaseRevision);
+        report("quick save intent (client thread)", () -> coordinator.currentIntent(true).base);
         System.out.println("PERF quick save identical to one toJson: "
-            + coordinator.snapshotJson(null, true).replaceFirst("\"savedAtEpochMillis\":\\d+", "")
+            + PersistenceProbe.snapshotJson(coordinator, null, true).replaceFirst("\"savedAtEpochMillis\":\\d+", "")
                 .equals(gson.toJson(engine.savedState()).replaceFirst("\"savedAtEpochMillis\":\\d+", "")));
     }
 
@@ -127,7 +154,7 @@ public class ReleasePerfTest
         Transaction transaction = new Transaction(at, type,
             type == TransactionType.LOOT ? Context.LOOT : Context.GENERIC, "",
             "Greater Nechryael", true, flows, Confidence.CONFIRMED, "perf", null);
-        transaction.setActionKind(action);
+        transaction.setAction(action);
         return transaction;
     }
 

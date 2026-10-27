@@ -37,8 +37,8 @@ public class ChargeLoadAnyItemTest
     public void chargingACrystalBowBooksNothing()
     {
         Engine engine = settle(true);
-        assertEquals(0L, engine.getMetrics(T0 + 10_000L).net);
-        assertTrue(engine.getActiveSession().getTransactions().stream().noneMatch(Transaction::isCounted));
+        assertEquals(0L, engine.metrics(T0 + 10_000L).net);
+        assertTrue(engine.session().transactions().stream().noneMatch(Transaction::counts));
     }
 
     @Test
@@ -56,14 +56,14 @@ public class ChargeLoadAnyItemTest
         {
             engine.processIfDirty(new ContainerSnapshot(new HashMap<>(Map.of(ItemID.NATURERUNE, 5_766L, ItemID.NATURE_STAFF_CHARGED, 1L))), T0 + tick * 600L, null);
         }
-        assertEquals("charging the staff is not a cost", 0L, engine.getMetrics(T0 + 10_000L).net);
-        assertTrue("nor Review", engine.getActiveSession().getTransactions().stream().noneMatch(ReviewRules::needsOwnerDecision));
+        assertEquals("charging the staff is not a cost", 0L, engine.metrics(T0 + 10_000L).net);
+        assertTrue("nor Review", engine.session().transactions().stream().noneMatch(ReviewRules::needsReview));
     }
 
     @Test
     public void withoutTheLoadTheSameShardsWouldBeALoss()
     {
-        assertTrue(settle(false).getMetrics(T0 + 10_000L).net < 0L);
+        assertTrue(settle(false).metrics(T0 + 10_000L).net < 0L);
     }
 
     @Test
@@ -84,7 +84,7 @@ public class ChargeLoadAnyItemTest
         {
             engine.processIfDirty(new ContainerSnapshot(new HashMap<>(Map.of(ItemID.BLOODRUNE, 800L, ItemID.VIAL_BLOOD, 4L))), T0 + tick * 600L, null);
         }
-        assertEquals("charging the scythe is not a cost", 0L, engine.getMetrics(T0 + 10_000L).net);
+        assertEquals("charging the scythe is not a cost", 0L, engine.metrics(T0 + 10_000L).net);
     }
 
     private static Engine settle(boolean loaded)

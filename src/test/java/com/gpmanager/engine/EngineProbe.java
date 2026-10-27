@@ -4,13 +4,23 @@ package com.gpmanager;
 /** Test-side reads of engine state; moved out of production to keep the plugin small. */
 public final class EngineProbe
 {
+    public static String saveLiveSession(Engine engine, Session expected, Long start, long now) {
+        synchronized (engine) {
+            return engine.saveLiveSession(expected, start, engine.captureLiveSession(expected, start, now));
+        }
+    }
+
+    public static String saveLiveSession(Engine engine, Session expected, Long start, SavedState.SavedSession copy) {
+        return engine.saveLiveSession(expected, start, copy);
+    }
+
     private EngineProbe()
     {
     }
 
     private static BasisPool pool(Engine engine, int itemId) {
-        synchronized (engine.trackedBasis) {
-            return engine.trackedBasis.pools.get(itemId);
+        synchronized (engine.basis) {
+            return engine.basis.stock.get(itemId);
         }
     }
 
@@ -27,7 +37,7 @@ public final class EngineProbe
     /** Known coverage held out by the item's open SELL custody records. */
     public static long reservedQty(Engine engine, int itemId) {
         long total = 0L;
-        for (GeOffer record : engine.geCustody.records()) {
+        for (GeOffer record : engine.exchange.records()) {
             if (record.itemId == itemId && record.getSide() == GeOffer.Side.SELL) total += record.reservedQty();
         }
         return total;
@@ -35,7 +45,7 @@ public final class EngineProbe
 
     public static long reservedBasisGp(Engine engine, int itemId) {
         long total = 0L;
-        for (GeOffer record : engine.geCustody.records()) {
+        for (GeOffer record : engine.exchange.records()) {
             if (record.itemId == itemId && record.getSide() == GeOffer.Side.SELL) total += record.reservedBasis();
         }
         return total;
@@ -53,7 +63,7 @@ public final class EngineProbe
 
     public static boolean isBaselinePriming(Engine engine) {
         synchronized (engine) {
-            return engine.baselinePriming;
+            return engine.warming;
         }
     }
 
@@ -61,7 +71,7 @@ public final class EngineProbe
     {
         synchronized (engine)
         {
-            return engine.deathReclaim.isAwaitingReclaim();
+            return engine.death.isAwaitingReclaim();
         }
     }
 
@@ -70,7 +80,7 @@ public final class EngineProbe
     {
         synchronized (ledger)
         {
-            return ledger.pendingSettlementCashGp;
+            return ledger.cash;
         }
     }
 }

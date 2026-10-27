@@ -65,15 +65,15 @@ public class LedgerGroupReceiptNavigationTest
         assertFalse("the Market Result is never the primary row value",
             parts[2].equals(Fmt.exactSigned(5L) + " gp"));
 
-        Semantics.Receipt receipt = grouped.detail.receipts.get(0);
+        Semantics.Receipt receipt = grouped.detail.entries.get(0);
         onEdt(() ->
         {
-            LedgerPageProbe.clickReceipt(page, receipt.transactionId);
+            LedgerPageProbe.clickReceipt(page, receipt.transaction);
             return null;
         });
         assertEquals(1, actions.selections.size());
-        assertEquals(receipt.transactionId, actions.selections.get(0)[0]);
-        assertEquals(receipt.contributionId, actions.selections.get(0)[1]);
+        assertEquals(receipt.transaction, actions.selections.get(0)[0]);
+        assertEquals(receipt.id, actions.selections.get(0)[1]);
         assertEquals(null, actions.selections.get(0)[2]);
     }
 
@@ -83,10 +83,10 @@ public class LedgerGroupReceiptNavigationTest
         Market market = new Market();
         market.sell(0, LAW, 5L, 122, 610L, 610L);
         LedgerData grouped = captureWithGroup(market, groupIdOf(market));
-        Semantics.Receipt receipt = grouped.detail.receipts.get(0);
+        Semantics.Receipt receipt = grouped.detail.entries.get(0);
         LedgerData selected = LedgerData.capture(market.engine, market.now + 1_000L,
             new LedgerData.Entry(LedgerData.Scope.CURRENT_GRIND, null, null,
-                LedgerData.CostView.SUPPLIES, "", receipt.transactionId, receipt.contributionId, null, null));
+                LedgerData.CostView.SUPPLIES, "", receipt.transaction, receipt.id, null, null));
         RecordingActions actions = new RecordingActions();
         LedgerPage page = onEdt(() ->
         {
@@ -97,11 +97,11 @@ public class LedgerGroupReceiptNavigationTest
         assertEquals("EXACT", LedgerPageProbe.drill(page));
         onEdt(() ->
         {
-            LedgerPageProbe.clickReceipt(page, receipt.transactionId);
+            LedgerPageProbe.clickReceipt(page, receipt.transaction);
             return null;
         });
         assertEquals("clicking the open receipt closes it, keeping its group",
-            Arrays.asList(null, null, grouped.detail.group.semanticGroupId), Arrays.asList(actions.selections.get(0)));
+            Arrays.asList(null, null, grouped.detail.group.id), Arrays.asList(actions.selections.get(0)));
         onEdt(() ->
         {
             LedgerPageProbe.back(page);
@@ -139,12 +139,12 @@ public class LedgerGroupReceiptNavigationTest
         Market market = new Market();
         market.sell(0, LAW, 5L, 122, 610L, 610L);
         LedgerData grouped = captureWithGroup(market, groupIdOf(market));
-        Semantics.Receipt receipt = grouped.detail.receipts.get(0);
+        Semantics.Receipt receipt = grouped.detail.entries.get(0);
 
         LedgerData deepLinked = LedgerData.capture(market.engine, market.now + 1_000L,
             new LedgerData.Entry(LedgerData.Scope.CURRENT_GRIND, null, null,
-                LedgerData.CostView.SUPPLIES, "", receipt.transactionId, receipt.contributionId,
-                grouped.detail.group.semanticGroupId, null));
+                LedgerData.CostView.SUPPLIES, "", receipt.transaction, receipt.id,
+                grouped.detail.group.id, null));
         assertNotNull("the group detail resolves", deepLinked.detail);
         assertNotNull("the deep link resolves the exact receipt", deepLinked.detail.exact);
         LedgerPage page = page(deepLinked);
@@ -162,7 +162,7 @@ public class LedgerGroupReceiptNavigationTest
             new LedgerData.Entry(LedgerData.Scope.CURRENT_GRIND, null, null,
                 LedgerData.CostView.SUPPLIES, "Law rune", null, null, groupId, null));
         assertNotNull(searched.detail);
-        assertEquals(groupId, searched.detail.group.semanticGroupId);
+        assertEquals(groupId, searched.detail.group.id);
     }
 
     // ── metadata and honesty ──────────────────────────────────────────────────────────────────
@@ -190,23 +190,23 @@ public class LedgerGroupReceiptNavigationTest
             Collections.singletonList(new Flow(CHAOS, "Chaos rune", -2L, 100, -200L,
                 PriceSource.GRAND_EXCHANGE)),
             Confidence.CONFIRMED, "", null);
-        eat.setActionKind(ActionKind.EAT);
-        market.engine.getActiveSession().addTransaction(eat, 100, false);
+        eat.setAction(ActionKind.EAT);
+        market.engine.session().addTransaction(eat, 100, false);
         LedgerData base = LedgerData.capture(market.engine, market.now + 1_000L,
             LedgerData.Entry.current());
         Semantics.Group group = null;
         List<String> names = new ArrayList<>();
-        for (Semantics.Group candidate : base.costs.groups)
+        for (Semantics.Group candidate : base.cost.groups)
         {
-            names.add(candidate.primaryName + "/" + candidate.itemId + "/market=" + candidate.market
-                + "/receipts=" + candidate.receiptCount);
-            if (candidate.itemId == CHAOS && !candidate.market)
+            names.add(candidate.name + "/" + candidate.item + "/market=" + candidate.market
+                + "/receipts=" + candidate.count);
+            if (candidate.item == CHAOS && !candidate.market)
             {
                 group = candidate;
             }
         }
         assertNotNull("cost groups: " + names, group);
-        LedgerPage page = page(captureWithGroup(market, group.semanticGroupId));
+        LedgerPage page = page(captureWithGroup(market, group.id));
         List<String> texts = LedgerPageProbe.detailTexts(page);
         List<String> rows = LedgerPageProbe.detailReceiptRowTexts(page);
         assertTrue("action groups count their receipts: " + texts,
@@ -232,7 +232,7 @@ public class LedgerGroupReceiptNavigationTest
             }
         }
         assertNotNull(group);
-        LedgerPage page = page(captureWithGroup(market, group.semanticGroupId));
+        LedgerPage page = page(captureWithGroup(market, group.id));
         assertTrue(LedgerPageProbe.detailReceiptRowTexts(page).isEmpty());
         assertTrue(LedgerPageProbe.detailTexts(page).stream().anyMatch(text -> text.contains("No collected entries yet")));
         List<String> texts = LedgerPageProbe.detailTexts(page);
@@ -251,15 +251,15 @@ public class LedgerGroupReceiptNavigationTest
         LedgerData base = LedgerData.capture(market.engine, market.now + 1_000L,
             LedgerData.Entry.current());
         Semantics.Group group = null;
-        for (Semantics.Group candidate : base.gains.groups)
+        for (Semantics.Group candidate : base.income.groups)
         {
-            if (candidate.primaryName.equals("Law rune"))
+            if (candidate.name.equals("Law rune"))
             {
                 group = candidate;
             }
         }
         assertNotNull(group);
-        LedgerData grouped = captureWithGroup(market, group.semanticGroupId);
+        LedgerData grouped = captureWithGroup(market, group.id);
         RecordingActions actions = new RecordingActions();
         LedgerPage page = onEdt(() ->
         {
@@ -271,13 +271,13 @@ public class LedgerGroupReceiptNavigationTest
 
         onEdt(() ->
         {
-            LedgerPageProbe.clickReceipt(page, second.getId());
+            LedgerPageProbe.clickReceipt(page, second.id());
             return null;
         });
-        assertEquals(second.getId(), actions.selections.get(0)[0]);
+        assertEquals(second.id(), actions.selections.get(0)[0]);
         assertTrue(actions.selections.get(0)[1] != null && !actions.selections.get(0)[1].isEmpty());
         assertFalse("the first receipt keeps its own identity",
-            first.getId().equals(actions.selections.get(0)[0]));
+            first.id().equals(actions.selections.get(0)[0]));
     }
 
     @Test
@@ -285,19 +285,19 @@ public class LedgerGroupReceiptNavigationTest
     {
         Market market = new Market();
         market.sell(0, LAW, 5L, 122, 610L, 610L);
-        long netBefore = market.engine.getMetrics(market.now).net;
-        long revisionBefore = market.engine.getRevision();
+        long netBefore = market.engine.metrics(market.now).net;
+        long revisionBefore = market.engine.revision();
         LedgerData grouped = captureWithGroup(market, groupIdOf(market));
         LedgerPage page = page(grouped);
         onEdt(() ->
         {
-            LedgerPageProbe.clickReceipt(page, grouped.detail.receipts.get(0).transactionId);
+            LedgerPageProbe.clickReceipt(page, grouped.detail.entries.get(0).transaction);
             LedgerPageProbe.back(page);
             return null;
         });
 
-        assertEquals(netBefore, market.engine.getMetrics(market.now).net);
-        assertEquals(revisionBefore, market.engine.getRevision());
+        assertEquals(netBefore, market.engine.metrics(market.now).net);
+        assertEquals(revisionBefore, market.engine.revision());
         assertEquals(110, SavedState.CURRENT_SCHEMA_VERSION);
         assertEquals("RuneLite market", PriceSource.GRAND_EXCHANGE.toString());
     }
@@ -311,7 +311,7 @@ public class LedgerGroupReceiptNavigationTest
         engine.startCustom("Vorkath", T0);
         for (int i = 0; i < 8; i++)
         {
-            engine.getActiveSession().addTransaction(new Transaction(T0 + 10_000L + i * 1_000L, TransactionType.LOOT, Context.LOOT,
+            engine.session().addTransaction(new Transaction(T0 + 10_000L + i * 1_000L, TransactionType.LOOT, Context.LOOT,
                 "", "Vorkath", true,
                 Collections.singletonList(new Flow(536, "Dragon bones", 1L, 2_000, 2_000L)),
                 Confidence.CONFIRMED, "", null), 500, false);
@@ -319,65 +319,65 @@ public class LedgerGroupReceiptNavigationTest
         String groupId = lootGroupId(engine);
         LedgerPage page = page(lootCapture(engine, groupId));
 
-        assertEquals("two pages of receipts", "1/2", page.detailReceipts.pageLabel.getText());
+        assertEquals("two pages of receipts", "1/2", page.receipts.counter.getText());
         onEdt(() ->
         {
-            page.detailReceipts.next.doClick();
+            page.receipts.next.doClick();
             return null;
         });
-        assertEquals(1, page.detailReceipts.page);
+        assertEquals(1, page.receipts.page);
 
         page.apply(lootCapture(engine, groupId));
-        assertEquals("a compatible refresh keeps the page", 1, page.detailReceipts.page);
+        assertEquals("a compatible refresh keeps the page", 1, page.receipts.page);
 
         onEdt(() ->
         {
-            LedgerPageProbe.clickReceipt(page, page.data.detail.receipts.get(5).transactionId);
+            LedgerPageProbe.clickReceipt(page, page.data.detail.entries.get(5).transaction);
             return null;
         });
         page.apply(lootCapture(engine, groupId));
-        assertEquals("selecting a receipt keeps the list's page", 1, page.detailReceipts.page);
+        assertEquals("selecting a receipt keeps the list's page", 1, page.receipts.page);
 
         Engine other = new Engine(deltas -> Collections.emptyList(), new TransactionClassifier(),
             new GpManagerConfig() {});
         other.startCustom("Zulrah", T0);
-        other.getActiveSession().addTransaction(new Transaction(T0 + 10_000L, TransactionType.LOOT, Context.LOOT, "", "Zulrah",
+        other.session().addTransaction(new Transaction(T0 + 10_000L, TransactionType.LOOT, Context.LOOT, "", "Zulrah",
             true, Collections.singletonList(new Flow(1753, "Blue dragonhide", 1L, 2_000, 2_000L)),
             Confidence.CONFIRMED, "", null), 500, false);
         page.apply(lootCapture(other, lootGroupId(other)));
-        assertEquals("a different group starts at the first page", 0, page.detailReceipts.page);
+        assertEquals("a different group starts at the first page", 0, page.receipts.page);
 
         page.apply(lootCapture(engine, groupId));
         onEdt(() ->
         {
-            page.detailReceipts.next.doClick();
+            page.receipts.next.doClick();
             return null;
         });
-        assertEquals(1, page.detailReceipts.page);
+        assertEquals(1, page.receipts.page);
         onEdt(() ->
         {
             page.resetOwner();
             return null;
         });
-        assertEquals("an account reset starts clean", 0, page.detailReceipts.page);
+        assertEquals("an account reset starts clean", 0, page.receipts.page);
 
         page.apply(lootCapture(engine, groupId));
         onEdt(() ->
         {
-            page.detailReceipts.next.doClick();
+            page.receipts.next.doClick();
             return null;
         });
-        assertEquals(1, page.detailReceipts.page);
-        engine.getActiveSession().compactBefore(T0 + 13_000L, null);
+        assertEquals(1, page.receipts.page);
+        engine.session().compactBefore(T0 + 13_000L, null);
         page.apply(lootCapture(engine, groupId));
-        assertEquals("shrunken rows clamp the page", 0, page.detailReceipts.page);
+        assertEquals("shrunken rows clamp the page", 0, page.receipts.page);
     }
 
     private static String lootGroupId(Engine engine)
     {
         LedgerData data = LedgerData.capture(engine, T0 + 30_000L, LedgerData.Entry.current());
-        assertFalse("the loot group exists", data.gains.groups.isEmpty());
-        return data.gains.groups.get(0).semanticGroupId;
+        assertFalse("the loot group exists", data.income.groups.isEmpty());
+        return data.income.groups.get(0).id;
     }
 
     private static LedgerData lootCapture(Engine engine, String groupId)
@@ -398,7 +398,7 @@ public class LedgerGroupReceiptNavigationTest
             Collections.singletonList(new Flow(itemId, "Law rune", quantity, unitPrice,
                 quantity * unitPrice, PriceSource.GRAND_EXCHANGE)),
             Confidence.CONFIRMED, "", null);
-        market.engine.getActiveSession().addTransaction(transaction, 200, false);
+        market.engine.session().addTransaction(transaction, 200, false);
         return transaction;
     }
 
@@ -415,7 +415,7 @@ public class LedgerGroupReceiptNavigationTest
             }
         }
         assertNotNull(group);
-        return group.semanticGroupId;
+        return group.id;
     }
 
     private static LedgerData captureWithGroup(Market market, String groupId)
@@ -549,7 +549,7 @@ public class LedgerGroupReceiptNavigationTest
         void sell(int slot, int item, long qty, int limit, long spent, long cash)
         {
             // Known coverage at the observed quote, so the receipt carries a proven Result.
-            engine.getActiveSession().addTransaction(new Transaction(now - 1_000L,
+            engine.session().addTransaction(new Transaction(now - 1_000L,
                 TransactionType.GAIN, Context.GENERIC, "", "Law rune", true,
                 Collections.singletonList(new Flow(item, "Law rune", qty, quote[0],
                     qty * quote[0], PriceSource.GRAND_EXCHANGE)),

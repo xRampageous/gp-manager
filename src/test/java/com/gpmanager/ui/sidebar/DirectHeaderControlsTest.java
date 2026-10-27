@@ -27,7 +27,7 @@ public class DirectHeaderControlsTest {
                 if (state == 1) engine.startCustom("Zulrah", NOW);
                 if (state == 2) engine.togglePause(NOW + 1L);
                 LiveSnapshot snapshot = TargetFreshStartTest.live(engine, NOW + 2L);
-                snapshot.loggedOut = state == 3;
+                snapshot.offline = state == 3;
                 page.apply(snapshot);
                 assertNull("Live needs no permanent action toolbar", page.pageBar());
                 assertNull(find(page.body(), "Grind"));
@@ -48,8 +48,8 @@ public class DirectHeaderControlsTest {
                     });
             LivePage page = new LivePage(actions, id -> null);
             LiveSnapshot snapshot = TargetFreshStartTest.live(TargetFreshStartTest.engine(), NOW);
-            snapshot.reviewCount = 2;
-            snapshot.pendingKeys = 1;
+            snapshot.reviews = 2;
+            snapshot.keys = 1;
             page.apply(snapshot);
             assertTrue("Review belongs to Live's conditional content", SwingUtilities.isDescendingFrom(page.hero.icons, page.body()));
             assertTrue(SwingUtilities.isDescendingFrom(page.counts, page.body()));
@@ -60,8 +60,8 @@ public class DirectHeaderControlsTest {
             opened.set(null);
             ((JButton) page.counts.getComponent(0)).doClick();
             assertNotNull("Pending still opens Ledger", opened.get());
-            snapshot.reviewCount = 0;
-            snapshot.pendingKeys = 0;
+            snapshot.reviews = 0;
+            snapshot.keys = 0;
             page.apply(snapshot);
             assertSame(page.hero, firstVisible(page.body()));
             return null;
@@ -72,7 +72,7 @@ public class DirectHeaderControlsTest {
         onEdt(() -> {
             SidebarPanel panel = panel();
             String name = "Wilderness Agility Course expedition with a very long saved history name";
-            panel.ledgerEntry = new LedgerData.Entry(LedgerData.Scope.HISTORY, "history", name);
+            panel.scope = new LedgerData.Entry(LedgerData.Scope.HISTORY, "history", name);
             panel.shell.show(Shell.LEDGER);
             SidebarPanelProbe.refresh(panel);
             LedgerPage page = panel.ledger;
@@ -111,7 +111,7 @@ public class DirectHeaderControlsTest {
             assertEquals("blood rune", page.search.getText());
             JPopupMenu menu = page.moreMenu();
             for (String label : new String[]{"Undo last change", "Restore last undo"}) assertNotNull(find(menu, label));
-            assertNotNull(find(menu, GameData.msg("undo-latest-correction")));
+            assertNotNull(find(menu, GameData.msg("undo-tip")));
             assertTrue(((JMenuItem) menu.getComponent(0)).getText().startsWith("Show corrected"));
             return null;
         });
@@ -124,20 +124,20 @@ public class DirectHeaderControlsTest {
             panel.engine.saveGrind("Archived route", null, null, false).archived = true;
             panel.shell.show(Shell.GRINDS);
             SidebarPanelProbe.refresh(panel);
-            AbstractButton archived = find(panel.grinds.bar, "Archived");
+            AbstractButton archived = find(panel.plans.bar, "Archived");
             assertNotNull("Archived is directly available", archived);
             assertFalse(archived.isSelected());
-            assertFalse(rows(panel.grinds).contains("Archived route"));
+            assertFalse(rows(panel.plans).contains("Archived route"));
             archived.doClick();
             SidebarPanelProbe.refresh(panel);
             assertTrue(archived.isSelected());
-            assertTrue(rows(panel.grinds).contains("Archived route"));
+            assertTrue(rows(panel.plans).contains("Archived route"));
             SidebarPanelProbe.refresh(panel);
             assertTrue(archived.isSelected());
             archived.doClick();
             SidebarPanelProbe.refresh(panel);
-            assertFalse(rows(panel.grinds).contains("Archived route"));
-            assertEquals(0L, panel.engine.getMetrics(NOW).net);
+            assertFalse(rows(panel.plans).contains("Archived route"));
+            assertEquals(0L, panel.engine.metrics(NOW).net);
             return null;
         });
     }
@@ -150,7 +150,7 @@ public class DirectHeaderControlsTest {
             TargetFreshStartTest.coins(panel.engine, NOW + 1L, 500L);
             panel.shell.show(Shell.GRINDS);
             SidebarPanelProbe.refresh(panel);
-            GrindsPage page = panel.grinds;
+            GrindsPage page = panel.plans;
             for (int width : new int[]{213, 225, 300, 213}) {
                 size(page.bar, width);
                 Rectangle start = bounds(find(page.bar, "Start Grind"), page.bar);
@@ -158,13 +158,13 @@ public class DirectHeaderControlsTest {
                 assertTrue("Start and Archived do not overlap", start.getMaxX() <= archived.x);
                 assertTrue("Archived stays visible", archived.getMaxX() <= width);
                 size(page.running, width);
-                resize(page.runningName);
-                Rectangle title = bounds(page.runningName, page.running), end = bounds(find(page.running, "End"), page.running);
+                resize(page.caption);
+                Rectangle title = bounds(page.caption, page.running), end = bounds(find(page.running, "End"), page.running);
                 assertTrue("name has its own row", title.getMaxY() <= end.y);
                 assertTrue("End stays visible", end.getMaxX() <= width);
-                assertTrue(page.runningName.getToolTipText().contains(panel.engine.getActiveSession().getName()));
-                assertTrue("name fits", page.runningName.getFontMetrics(page.runningName.getFont()).stringWidth(page.runningName.getText()) <= page.runningName.getWidth());
-                assertTrue("readable minimum", page.runningName.getFont().getSize2D() >= 10f);
+                assertTrue(page.caption.getToolTipText().contains(panel.engine.session().name()));
+                assertTrue("name fits", page.caption.getFontMetrics(page.caption.getFont()).stringWidth(page.caption.getText()) <= page.caption.getWidth());
+                assertTrue("readable minimum", page.caption.getFont().getSize2D() >= 10f);
                 assertEquals("+500", page.runningNet.getText());
             }
             return null;
@@ -176,23 +176,23 @@ public class DirectHeaderControlsTest {
             SidebarPanel panel = panel();
             panel.shell.show(Shell.GRINDS);
             SidebarPanelProbe.refresh(panel);
-            find(panel.grinds.bar, "Start Grind").doClick();
+            find(panel.plans.bar, "Start Grind").doClick();
             assertEquals("Start Grind", ShellProbe.sheetTitle(panel.shell));
             ShellProbe.typeSheet(panel.shell, "Zulrah");
             ShellProbe.pressSheet(panel.shell, "Start");
-            assertTrue(panel.engine.isCustomActive());
+            assertTrue(panel.engine.customActive());
             TargetFreshStartTest.coins(panel.engine, NOW + 1L, 500L);
             panel.shell.show(Shell.GRINDS);
             SidebarPanelProbe.refresh(panel);
-            click(panel.grinds.runningName);
+            click(panel.plans.caption);
             assertEquals("the running name opens Live", Shell.LIVE, panel.shell.currentPage());
             panel.engine.togglePause(NOW + 2L);
             panel.shell.show(Shell.GRINDS);
             SidebarPanelProbe.refresh(panel);
-            find(panel.grinds.running, "End").doClick();
-            assertFalse(panel.engine.isCustomActive());
+            find(panel.plans.running, "End").doClick();
+            assertFalse(panel.engine.customActive());
             assertEquals("", ShellProbe.sheetTitle(panel.shell));
-            assertTrue("the ended Grind keeps its receipts", panel.engine.getHistory().stream().anyMatch(s -> s.metrics(NOW + 3L).net == 500L));
+            assertTrue("the ended Grind keeps its receipts", panel.engine.history().stream().anyMatch(s -> s.metrics(NOW + 3L).net == 500L));
             return null;
         });
     }

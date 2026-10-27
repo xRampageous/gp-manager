@@ -52,14 +52,14 @@ public class ResetSafetyCopyTest
                 Filepath writeBackup(long now) throws java.io.IOException
                 {
                     Filepath backup = super.writeBackup(now);
-                    if (editDuringCopy) engine.getActiveSession().rename("Edited during copy");
+                    if (editDuringCopy) engine.session().rename("Edited during copy");
                     return backup;
                 }
             };
-            assertTrue(persistence.switchIdentity(PROFILE, true, true));
+            assertTrue(persistence.switchIdentity(PROFILE, true));
             engine.ensureSession(NOW);
-            engine.getActiveSession().rename("Before reset");
-            engine.getActiveSession().addTransaction(receipt(NOW), 2_000, false);
+            engine.session().rename("Before reset");
+            engine.session().addTransaction(receipt(NOW), 2_000, false);
             Session closed = new Session("Closed history", NOW - 60_000L, SessionMode.GENERAL);
             closed.addTransaction(receipt(NOW - 30_000L), 2_000, false);
             closed.close(NOW - 1_000L);
@@ -93,15 +93,15 @@ public class ResetSafetyCopyTest
         {
             Persistence persistence = fixture.persistence;
             JsonObject before = Persistence.backupContent(persistence.engine.exportState());
-            Persistence.ResetOutcome reset = persistence.factoryReset(NOW + 1_000L);
+            Persistence.ResetOutcome reset = persistence.factoryReset(NOW + 1_000L, true);
             assertTrue(reset.getDetail(), reset.isApplied());
             assertEquals(1, persistence.backups().size());
             SavedState copy = read(persistence.backups().get(0));
             assertTrue(copy.isSupportedSchema());
             assertEquals(before, Persistence.backupContent(copy));
-            assertEquals(1, copy.generalSession.getTransactions().size());
+            assertEquals(1, copy.generalSession.transactions().size());
             assertEquals(1, copy.history.size());
-            assertNull(persistence.engine.getActiveSession());
+            assertNull(persistence.engine.session());
         }
     }
 
@@ -115,7 +115,7 @@ public class ResetSafetyCopyTest
             Persistence.ResetOutcome reset = persistence.factoryReset(NOW + 1_000L, false);
             assertTrue(reset.getDetail(), reset.isApplied());
             assertEquals(0, persistence.backups().size());
-            assertNull(persistence.engine.getActiveSession());
+            assertNull(persistence.engine.session());
         }
     }
 
@@ -127,10 +127,10 @@ public class ResetSafetyCopyTest
             Persistence persistence = fixture.persistence;
             Filepath backup = persistence.writeBackup(NOW);
             assertTrue(persistence.saveNow());
-            assertTrue(persistence.factoryReset(NOW + 1_000L).isApplied());
+            assertTrue(persistence.factoryReset(NOW + 1_000L, true).isApplied());
             assertEquals(2, persistence.backups().size());
             assertTrue(persistence.backups().contains(backup));
-            assertEquals("Before reset", read(persistence.backups().get(0)).generalSession.getName());
+            assertEquals("Before reset", read(persistence.backups().get(0)).generalSession.name());
         }
     }
 
@@ -141,14 +141,14 @@ public class ResetSafetyCopyTest
         {
             Persistence persistence = fixture.persistence;
             Filepath backup = persistence.writeBackup(NOW);
-            persistence.engine.getActiveSession().rename("Changed before reset");
-            persistence.engine.getActiveSession().addTransaction(receipt(NOW + 500L), 2_000, false);
-            assertTrue(persistence.factoryReset(NOW + 1_000L).isApplied());
+            persistence.engine.session().rename("Changed before reset");
+            persistence.engine.session().addTransaction(receipt(NOW + 500L), 2_000, false);
+            assertTrue(persistence.factoryReset(NOW + 1_000L, true).isApplied());
             assertEquals(2, persistence.backups().size());
-            assertEquals("Before reset", read(backup).generalSession.getName());
+            assertEquals("Before reset", read(backup).generalSession.name());
             SavedState newest = read(persistence.backups().get(0));
-            assertEquals("Changed before reset", newest.generalSession.getName());
-            assertEquals(2, newest.generalSession.getTransactions().size());
+            assertEquals("Changed before reset", newest.generalSession.name());
+            assertEquals(2, newest.generalSession.transactions().size());
         }
     }
 
@@ -161,11 +161,11 @@ public class ResetSafetyCopyTest
             Persistence persistence = fixture.persistence;
             Files.writeString(directory.resolve("backups"), "blocked directory");
             JsonObject before = Persistence.backupContent(persistence.engine.exportState());
-            Persistence.ResetOutcome reset = persistence.factoryReset(NOW);
+            Persistence.ResetOutcome reset = persistence.factoryReset(NOW, true);
             assertFalse(reset.isApplied());
             assertTrue(reset.getDetail(), reset.getDetail().startsWith(GameData.msg("pre-restore")));
             assertEquals(before, Persistence.backupContent(persistence.engine.exportState()));
-            assertEquals("Before reset", fixture.repository.load().generalSession.getName());
+            assertEquals("Before reset", fixture.repository.load().generalSession.name());
             assertFalse(persistence.maintenance);
         }
     }
@@ -184,13 +184,13 @@ public class ResetSafetyCopyTest
                 if (damage == 2) json.addProperty("ownerKey", "another.owner");
                 String damaged = damage == 0 ? "{broken" : json.toString();
                 backup.write(damaged, StandardOpenOption.TRUNCATE_EXISTING, StandardOpenOption.WRITE);
-                assertTrue(persistence.factoryReset(NOW + 1_000L).isApplied());
+                assertTrue(persistence.factoryReset(NOW + 1_000L, true).isApplied());
                 assertEquals(2, persistence.backups().size());
                 assertEquals("existing evidence is preserved", damaged, SessionRepository.readText(backup));
                 SavedState fresh = read(persistence.backups().get(0));
                 assertTrue(fresh.isSupportedSchema());
                 assertEquals(PROFILE.rsProfileKey, fresh.ownerKey);
-                assertEquals("Before reset", fresh.generalSession.getName());
+                assertEquals("Before reset", fresh.generalSession.name());
             }
         }
     }
@@ -201,12 +201,12 @@ public class ResetSafetyCopyTest
         try (Fixture fixture = new Fixture(temporary.newFolder().toPath(), true))
         {
             Persistence persistence = fixture.persistence;
-            Persistence.ResetOutcome reset = persistence.factoryReset(NOW);
+            Persistence.ResetOutcome reset = persistence.factoryReset(NOW, true);
             assertFalse(reset.isApplied());
             assertTrue(reset.getDetail(), reset.getDetail().contains("data changed"));
-            assertEquals("Edited during copy", persistence.engine.getActiveSession().getName());
-            assertEquals("Before reset", read(persistence.backups().get(0)).generalSession.getName());
-            assertEquals(1, persistence.engine.getActiveSession().getTransactions().size());
+            assertEquals("Edited during copy", persistence.engine.session().name());
+            assertEquals("Before reset", read(persistence.backups().get(0)).generalSession.name());
+            assertEquals(1, persistence.engine.session().transactions().size());
             assertFalse(persistence.maintenance);
         }
     }

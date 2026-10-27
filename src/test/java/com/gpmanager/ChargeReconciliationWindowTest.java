@@ -60,10 +60,10 @@ public class ChargeReconciliationWindowTest
         assertEquals(1L, first.quantity(ItemID.DEATHRUNE, false));
         assertEquals(0L, second.quantity(ItemID.DEATHRUNE, false));
         assertEquals(0L, third.quantity(ItemID.DEATHRUNE, false));
-        assertEquals(Correction.IGNORE, second.getCorrection());
-        assertEquals(Correction.IGNORE, third.getCorrection());
-        assertEquals(0L, ChargeProbes.adp(engine.chargeEstimateJournal, 
-            engine.getActiveSession().getId(), "slot-a", "seas", ItemID.DEATHRUNE));
+        assertEquals(Correction.IGNORE, second.correction());
+        assertEquals(Correction.IGNORE, third.correction());
+        assertEquals(0L, ChargeProbes.adp(engine.estimate,
+            engine.session().id(), "slot-a", "seas", ItemID.DEATHRUNE));
     }
 
     @Test
@@ -78,10 +78,10 @@ public class ChargeReconciliationWindowTest
 
         assertEquals(0L, first.quantity(ItemID.DEATHRUNE, false));
         assertEquals(0L, second.quantity(ItemID.DEATHRUNE, false));
-        assertEquals(Correction.IGNORE, first.getCorrection());
-        assertEquals(Correction.IGNORE, second.getCorrection());
-        assertEquals(0L, ChargeProbes.adp(engine.chargeEstimateJournal, 
-            engine.getActiveSession().getId(), "slot-a", "seas", ItemID.DEATHRUNE));
+        assertEquals(Correction.IGNORE, first.correction());
+        assertEquals(Correction.IGNORE, second.correction());
+        assertEquals(0L, ChargeProbes.adp(engine.estimate,
+            engine.session().id(), "slot-a", "seas", ItemID.DEATHRUNE));
     }
 
     private static Transaction estimate(Engine engine, long at)

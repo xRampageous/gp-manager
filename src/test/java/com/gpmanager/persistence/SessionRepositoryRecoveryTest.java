@@ -32,13 +32,13 @@ public class SessionRepositoryRecoveryTest
         PersistenceProbe.save(repository, state("Latest"));
         Files.writeString(directory.resolve("sessions.json"), "{broken");
 
-        assertEquals("Previous", repository.load().getActiveSession().getName());
+        assertEquals("Previous", repository.load().currentSession().name());
         try (java.util.stream.Stream<Path> paths = Files.list(directory))
         {
             assertTrue(paths.anyMatch(path -> path.getFileName().toString().startsWith("sessions.corrupt-")));
         }
         PersistenceProbe.save(repository, state("Recovered"));
-        assertEquals("Recovered", repository.load().getActiveSession().getName());
+        assertEquals("Recovered", repository.load().currentSession().name());
     }
 
     @Test
@@ -49,9 +49,9 @@ public class SessionRepositoryRecoveryTest
         PersistenceProbe.save(repository, state("Previous"));
         PersistenceProbe.save(repository, state("Latest"));
         Files.delete(directory.resolve("sessions.json"));
-        assertEquals("Previous", repository.load().getActiveSession().getName());
+        assertEquals("Previous", repository.load().currentSession().name());
         Files.writeString(directory.resolve("sessions.json"), "");
-        assertEquals("Previous", repository.load().getActiveSession().getName());
+        assertEquals("Previous", repository.load().currentSession().name());
     }
 
     @Test
@@ -73,7 +73,7 @@ public class SessionRepositoryRecoveryTest
             }
         };
         PersistenceProbe.save(failing, state("Uncommitted"));
-        assertEquals("Committed", repository.load().getActiveSession().getName());
+        assertEquals("Committed", repository.load().currentSession().name());
         assertTrue(Files.readString(directory.resolve("sessions.backup.json")).contains("Committed"));
     }
 
@@ -87,7 +87,7 @@ public class SessionRepositoryRecoveryTest
         Files.writeString(directory.resolve("sessions.json"), "null");
         PersistenceProbe.save(repository, state("New"));
         assertTrue(Files.readString(directory.resolve("sessions.backup.json")).contains("Good backup"));
-        assertEquals("New", repository.load().getActiveSession().getName());
+        assertEquals("New", repository.load().currentSession().name());
     }
 
     @Test
@@ -108,9 +108,9 @@ public class SessionRepositoryRecoveryTest
             SessionRepository writer = new SessionRepository(new Gson(), FilepathTestSupport.root(directory), false);
             PersistenceProbe.save(writer, new SavedState(session, null, Collections.emptyList()));
             SavedState reloaded = new SessionRepository(new Gson(), FilepathTestSupport.root(directory), false).load();
-            session = reloaded.getActiveSession();
+            session = reloaded.currentSession();
             assertEquals((i + 1L) * 50L, session.metrics(20_000L).net);
-            assertTrue(session.getTransactions().size() <= 100);
+            assertTrue(session.transactions().size() <= 100);
             assertEquals(SavedState.CURRENT_SCHEMA_VERSION, reloaded.schemaVersion);
         }
         assertEquals(9_900L, session.compactedTransactionCount);
@@ -122,8 +122,8 @@ public class SessionRepositoryRecoveryTest
         Path directory = temporary.newFolder().toPath();
         Session general = new Session("General", 1_000L, SessionMode.GENERAL);
         Session custom = new Session("Custom", 2_000L, SessionMode.GENERAL);
-        general.setProfitTargetGp(1_000_000_000L);
-        custom.setProfitTargetGp(500_000_000L);
+        general.setNetTarget(1_000_000_000L, 0, 0);
+        custom.setNetTarget(500_000_000L, 0, 0);
         Session archived = new Session("Archived", 500L, SessionMode.GENERAL);
         archived.close(900L);
 
@@ -131,12 +131,12 @@ public class SessionRepositoryRecoveryTest
         PersistenceProbe.save(repository, new SavedState(general, custom, Collections.singletonList(archived)));
         SavedState restored = repository.load();
 
-        assertEquals(general.getId(), restored.generalSession.getId());
-        assertEquals(custom.getId(), restored.customSession.getId());
-        assertEquals(Long.valueOf(1_000_000_000L), restored.generalSession.getProfitTargetGp());
-        assertEquals(Long.valueOf(500_000_000L), restored.customSession.getProfitTargetGp());
-        assertEquals(1, restored.getHistory().size());
-        assertEquals(archived.getId(), restored.getHistory().get(0).getId());
+        assertEquals(general.id(), restored.generalSession.id());
+        assertEquals(custom.id(), restored.customSession.id());
+        assertEquals(Long.valueOf(1_000_000_000L), restored.generalSession.targetGp());
+        assertEquals(Long.valueOf(500_000_000L), restored.customSession.targetGp());
+        assertEquals(1, restored.history().size());
+        assertEquals(archived.id(), restored.history().get(0).id());
     }
 
     @Test
@@ -147,8 +147,8 @@ public class SessionRepositoryRecoveryTest
         PersistenceProbe.save(repository, state("Old"));
         PersistenceProbe.save(repository, state("Older backup"));
         assertTrue(PersistenceProbe.replaceStateDetailed(repository, state("Fresh stopped General")).isCommitted());
-        assertEquals("Fresh stopped General", repository.load().getActiveSession().getName());
+        assertEquals("Fresh stopped General", repository.load().currentSession().name());
         Files.delete(directory.resolve("sessions.json"));
-        assertEquals("Fresh stopped General", repository.load().getActiveSession().getName());
+        assertEquals("Fresh stopped General", repository.load().currentSession().name());
     }
 }

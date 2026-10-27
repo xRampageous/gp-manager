@@ -28,7 +28,7 @@ public class HudInsightTest
         builder.interaction("Greater Nechryael", true);
         for (int i = 0; i < 3; i++)
         {
-            builder.tray().kill("Greater Nechryael", NOW - 1L + i, false);
+            builder.tray.kill("Greater Nechryael", NOW - 1L + i, false);
         }
         assertEquals("KC: 3", builder.update(grind(100_000L, null), f -> true, NOW).title);
     }
@@ -41,7 +41,7 @@ public class HudInsightTest
         builder.interaction("Guard", true);
         for (int i = 0; i < 2; i++)
         {
-            builder.tray().kill("Guard", NOW - 1L + i, false);
+            builder.tray.kill("Guard", NOW - 1L + i, false);
         }
         builder.interaction("", false);
         String title = builder.update(grind(100_000L, null), f -> true, NOW).title;
@@ -56,7 +56,7 @@ public class HudInsightTest
         builder.interaction("Vorkath", true);
         for (int i = 0; i < 3; i++)
         {
-            builder.tray().kill("Vorkath", NOW - 1L + i, false);
+            builder.tray.kill("Vorkath", NOW - 1L + i, false);
         }
         HudFrame s = builder.update(grind(100_000L, null), f -> true, NOW);
         assertEquals("KC: 3", s.title);
@@ -70,11 +70,11 @@ public class HudInsightTest
     {
         HudBuilder builder = new HudBuilder(config(true, 4), null);
         builder.update(grind(10_000L, null), f -> true, NOW - 4L);
-        builder.tray().kill("Guard", NOW - 4L, false);
+        builder.tray.kill("Guard", NOW - 4L, false);
         builder.update(grind(20_000L, null), f -> true, NOW - 3L);
-        builder.tray().kill("Man", NOW - 3L, false);
+        builder.tray.kill("Man", NOW - 3L, false);
         builder.update(grind(30_000L, null), f -> true, NOW - 2L);
-        builder.tray().kill("Guard", NOW - 2L, false);
+        builder.tray.kill("Guard", NOW - 2L, false);
         HudFrame s = builder.update(grind(40_000L, null), f -> true, NOW);
         assertEquals("Guard & Man · +10.0k/kill", s.trayLabel);
     }
@@ -88,7 +88,7 @@ public class HudInsightTest
         builder.interaction("Guard", true);
         for (int i = 0; i < 12; i++)
         {
-            builder.tray().kill("Guard", NOW - 1L + i, false);
+            builder.tray.kill("Guard", NOW - 1L + i, false);
         }
         assertEquals("KC: 12", builder.update(grind(100_000L, null), f -> true, NOW).title);
 
@@ -98,7 +98,7 @@ public class HudInsightTest
         HudFrame later = builder.update(grind(100_000L, null), f -> true, endedAt + 5_000L);
 
         builder.interaction("Hill Giant", true);
-        builder.tray().kill("Hill Giant", endedAt + 6_000L, false);
+        builder.tray.kill("Hill Giant", endedAt + 6_000L, false);
         HudFrame next = builder.update(grind(100_000L, null), f -> true, endedAt + 6_000L);
     }
 
@@ -120,12 +120,12 @@ public class HudInsightTest
         free.ensureSession(NOW);
         HudBuilder builder = new HudBuilder(config(false, 4), null);
         builder.update(LiveSnapshot.capture(free, NOW, null), f -> true, NOW);
-        builder.tray().booked(receipt(NOW + 1L, TransactionType.LOOT, flow(1511, "Logs", 11L, 23)), NOW + 1L, false);
+        builder.tray.booked(receipt(NOW + 1L, TransactionType.LOOT, flow(1511, "Logs", 11L, 23)), NOW + 1L, false, NOW + 1L);
         HudFrame freePlay = builder.update(LiveSnapshot.capture(free, NOW + 2L, null), f -> true, NOW + 2L);
 
         HudFrame grinding = builder.update(grind(0L, null), f -> true, NOW + 3L);
         assertTrue("a new Grind starts with a clean tray", grinding.rows.isEmpty());
-        builder.tray().booked(receipt(NOW + 4L, TransactionType.LOOT, flow(1511, "Logs", 1L, 23)), NOW + 4L, false);
+        builder.tray.booked(receipt(NOW + 4L, TransactionType.LOOT, flow(1511, "Logs", 1L, 23)), NOW + 4L, false, NOW + 4L);
     }
 
     @Test
@@ -135,10 +135,9 @@ public class HudInsightTest
         engine.startCustom("Vorkath", NOW);
         HudBuilder builder = new HudBuilder(config(true, 4), null);
         builder.update(LiveSnapshot.capture(engine, NOW, null), f -> true, NOW);
-        engine.getActiveSession().addTransaction(receipt(NOW + 1L, TransactionType.LOOT,
+        engine.session().addTransaction(receipt(NOW + 1L, TransactionType.LOOT,
             flow(536, "Dragon bones", 1L, 1_000_000)), 2_000, false);
-        builder.tray().booked(receipt(NOW + 1L, TransactionType.LOOT, flow(536, "Dragon bones", 1L, 1_000_000)),
-            NOW + 1L, false);
+        builder.tray.booked(receipt(NOW + 1L, TransactionType.LOOT, flow(536, "Dragon bones", 1L, 1_000_000)), NOW + 1L, false, NOW + 1L);
         HudFrame first = builder.update(LiveSnapshot.capture(engine, NOW + 2L, null), f -> true,
             NOW + 2L);
         assertEquals(1, first.rows.size());

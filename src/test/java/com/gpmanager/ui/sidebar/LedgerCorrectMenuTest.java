@@ -22,8 +22,8 @@ public class LedgerCorrectMenuTest
         Engine engine = PresentationLifecycleTest.engine();
         engine.startCustom("Vorkath", T0);
         Transaction bones = loot(T0 + 1_000L, 536, "Dragon bones", 2L, 3_000);
-        engine.getActiveSession().addTransaction(bones, 2_000, false);
-        Harness harness = new Harness(engine, bones.getId());
+        engine.session().addTransaction(bones, 2_000, false);
+        Harness harness = new Harness(engine, bones.id());
         LedgerPage page = harness.page;
 
         List<String> opened = onEdt(() -> LedgerPageProbe.detailTexts(page));
@@ -43,12 +43,12 @@ public class LedgerCorrectMenuTest
         List<String> preview = onEdt(() -> LedgerPageProbe.detailTexts(page));
         assertTrue("the preview opens on the chosen receipt: " + preview, preview.contains("PREVIEW")
             && preview.contains(Fmt.exactSigned(-6_000L) + " gp"));
-        assertEquals("nothing changes before Confirm", 6_000L, engine.getMetrics(T0 + 5_000L).net);
+        assertEquals("nothing changes before Confirm", 6_000L, engine.metrics(T0 + 5_000L).net);
 
         assertTrue(onEdt(() -> click(page.body(), "Confirm")));
-        assertEquals(0L, engine.getMetrics(T0 + 5_000L).net);
-        assertEquals(Correction.IGNORE, engine.getActiveSession().findTransaction(bones.getId())
-            .getCorrection());
+        assertEquals(0L, engine.metrics(T0 + 5_000L).net);
+        assertEquals(Correction.IGNORE, engine.session().findTransaction(bones.id())
+            .correction());
     }
 
     /** Owner 1.1: Split shows the same preview card, with Keep and Others, before it applies. */
@@ -59,8 +59,8 @@ public class LedgerCorrectMenuTest
         Engine engine = PresentationLifecycleTest.engine();
         engine.startCustom("Vorkath", T0);
         Transaction bones = loot(T0 + 1_000L, 536, "Dragon bones", 2L, 3_000);
-        engine.getActiveSession().addTransaction(bones, 2_000, false);
-        Harness harness = new Harness(engine, bones.getId());
+        engine.session().addTransaction(bones, 2_000, false);
+        Harness harness = new Harness(engine, bones.id());
         LedgerPage page = harness.page;
 
         onEdt(() ->
@@ -76,7 +76,7 @@ public class LedgerCorrectMenuTest
 
         assertTrue(onEdt(() -> click(page.body(), "Confirm")));
         assertEquals(1L, bones.quantity(536, true));
-        assertEquals(3_000L, engine.getMetrics(T0 + 5_000L).net);
+        assertEquals(3_000L, engine.metrics(T0 + 5_000L).net);
     }
 
     @Test
@@ -85,12 +85,12 @@ public class LedgerCorrectMenuTest
         Engine engine = PresentationLifecycleTest.engine();
         engine.startCustom("Vorkath", T0);
         Transaction bones = loot(T0 + 1_000L, 536, "Dragon bones", 1L, 3_000);
-        engine.getActiveSession().addTransaction(bones, 2_000, false);
-        String id = engine.getActiveSession().getId();
+        engine.session().addTransaction(bones, 2_000, false);
+        String id = engine.session().id();
         engine.finishCustom(T0 + 2_000L);
-        Harness harness = new Harness(engine, bones.getId());
+        Harness harness = new Harness(engine, bones.id());
         harness.entry = new LedgerData.Entry(LedgerData.Scope.HISTORY, id, "Vorkath",
-            LedgerData.CostView.ALL, "", bones.getId(), null, null, null);
+            LedgerData.CostView.ALL, "", bones.id(), null, null, null);
         onEdt(() ->
         {
             harness.refresh();
@@ -184,7 +184,7 @@ public class LedgerCorrectMenuTest
         @Override
         public void applySplit(String id, long[] split, long revision)
         {
-            engine.splitItem(id, (int) split[0], split[1], T0 + 5_000L, "test");
+            engine.splitItem(id, (int) split[0], split[1], "test");
         }
 
         @Override public void undoCorrection() { }
@@ -206,8 +206,8 @@ public class LedgerCorrectMenuTest
         @Override
         public LedgerPage.CorrectionOutcome correct(String id, Correction correction, long revision)
         {
-            return engine.getRevision() != revision ? LedgerPage.CorrectionOutcome.STALE
-                : engine.correctTransaction(id, correction, T0 + 5_000L, "test")
+            return engine.revision() != revision ? LedgerPage.CorrectionOutcome.STALE
+                : engine.correctTransaction(id, correction, "test")
                     ? LedgerPage.CorrectionOutcome.APPLIED : LedgerPage.CorrectionOutcome.REFUSED;
         }
 

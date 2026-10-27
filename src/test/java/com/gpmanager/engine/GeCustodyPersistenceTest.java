@@ -82,17 +82,17 @@ public class GeCustodyPersistenceTest
         SavedState state = engine.savedState();
         assertEquals(SavedState.CURRENT_SCHEMA_VERSION, state.schemaVersion);
         assertEquals(110, state.schemaVersion);
-        assertEquals(1, state.getGeCustody().size());
-        assertEquals(10L, state.getGeCustody().get(0).getCapturedQty());
+        assertEquals(1, state.geCustody().size());
+        assertEquals(10L, state.geCustody().get(0).getCapturedQty());
 
         Engine restored = engine();
         restored.restore(state, now + 1_000L);
         assertEquals("custody continuity survives restart", 1,
-            restored.geCustody.records().size());
-        assertEquals(10L, restored.geCustody.records().get(0).getCapturedQty());
+            restored.exchange.records().size());
+        assertEquals(10L, restored.exchange.records().get(0).getCapturedQty());
         assertEquals("a restored offer keeps its confidence",
             GeOffer.CustodyConfidence.CONFIRMED,
-            restored.geCustody.records().get(0).getConfidence());
+            restored.exchange.records().get(0).getConfidence());
     }
 
     @Test
@@ -138,17 +138,17 @@ public class GeCustodyPersistenceTest
         Transaction settlement = settle(restored, inventory(COINS, 100_070L), now + 3_500L);
 
         assertNotNull(settlement);
-        assertEquals(TransactionType.TRADE, settlement.getType());
-        assertTrue(settlement.isCounted());
+        assertEquals(TransactionType.TRADE, settlement.type());
+        assertTrue(settlement.counts());
         assertEquals("resumed basis still consumes the exact known coverage",
             -60L, flow(settlement, RUNE));
         assertEquals(70L, flow(settlement, COINS));
         assertEquals("the counted value plus the realized edge", 70L,
-            restored.getMetrics(now + 4_500L).net);
+            restored.metrics(now + 4_500L).net);
 
         // A second replay of the same terminal collection must never book again.
         Transaction again = settle(restored, inventory(COINS, 100_070L), now + 5_000L);
-        assertTrue(again == null || !again.isCounted());
+        assertTrue(again == null || !again.counts());
         assertEquals("only the resumed settlement is counted beyond the gain", 2,
             countCounted(restored));
     }
@@ -191,10 +191,10 @@ public class GeCustodyPersistenceTest
             {
                 restored.noteGeOffer(cleared, "", tomorrow + 60_600L);
             }
-            for (Transaction booking : restored.geCustody.maintenance(tomorrow + 70_000L,
-                restored.getActiveSession().getId()))
+            for (Transaction booking : restored.exchange.maintenance(tomorrow + 70_000L,
+                restored.session().id()))
             {
-                restored.getActiveSession().addTransaction(booking, 500, true);
+                restored.session().addTransaction(booking, 500, true);
             }
 
             assertEquals("sold " + (soldWhileOnline ? "online" : "offline") + ": no Review row", 0,
@@ -251,10 +251,10 @@ public class GeCustodyPersistenceTest
             restored.noteGeCollect(tomorrow + 60_000L);
             settle(restored, inventory(COINS, 105_356L), tomorrow + 60_000L);
             noteGe(restored, live, 0, EMPTY, 0, 0, 0, 0, 0, tomorrow + 60_600L);
-            for (Transaction booking : restored.geCustody.maintenance(tomorrow + 70_000L,
-                restored.getActiveSession().getId()))
+            for (Transaction booking : restored.exchange.maintenance(tomorrow + 70_000L,
+                restored.session().id()))
             {
-                restored.getActiveSession().addTransaction(booking, 500, true);
+                restored.session().addTransaction(booking, 500, true);
             }
 
             String label = "sold " + (soldWhileOnline ? "online" : "offline");
@@ -309,22 +309,22 @@ public class GeCustodyPersistenceTest
                     noteGe(engine, ledger, slot, EMPTY, 0, 0, 0, 0, 0, at + 1_300L);
                 }
             }
-            for (Transaction booking : engine.geCustody.maintenance(now + 20L * 60_000L,
-                engine.getActiveSession().getId()))
+            for (Transaction booking : engine.exchange.maintenance(now + 20L * 60_000L,
+                engine.session().id()))
             {
-                engine.getActiveSession().addTransaction(booking, 500, true);
+                engine.session().addTransaction(booking, 500, true);
             }
 
             String label = changeBeforeClear ? "change before clear" : "clear before change";
             assertEquals(label + ": no Review row", 0, reviewCount(engine));
             assertEquals(label + ": a buy at its own spend is Net-neutral", 0L,
-                engine.getMetrics(now + 21L * 60_000L).net);
+                engine.metrics(now + 21L * 60_000L).net);
             assertEquals(label, 2, engine.marketRows().size());
             for (MarketRows.Row row : engine.marketRows())
             {
                 assertEquals(label, MarketRows.Lifecycle.REALIZED, row.lifecycle);
             }
-            for (GeOffer record : engine.geCustody.records())
+            for (GeOffer record : engine.exchange.records())
             {
                 assertEquals(label + ": reserve = spend + change, so the offer closes",
                     GeOffer.Stage.CLOSED, record.getStage());
@@ -344,7 +344,7 @@ public class GeCustodyPersistenceTest
         slots.put(0, new OfferSlots.Snapshot(0, SELLING, RUNE, 10, 4, 7, 28));
         engine.seedGeSlots(slots, now);
 
-        List<GeOffer> records = engine.geCustody.records();
+        List<GeOffer> records = engine.exchange.records();
         assertEquals(1, records.size());
         assertEquals(GeOffer.CustodyConfidence.LEGACY_UNBASED, records.get(0).getConfidence());
         assertFalse("no basis is invented for a pre-upgrade offer",
@@ -355,7 +355,7 @@ public class GeCustodyPersistenceTest
         // Its movements follow the ordinary classification path; custody records nothing.
         Transaction loss = settle(engine, inventory(COINS, 100_000L, RUNE, 6L), now + 1_000L);
         assertNotNull(loss);
-        assertEquals(records.size(), engine.geCustody.records().size());
+        assertEquals(records.size(), engine.exchange.records().size());
     }
 
     @Test
@@ -371,15 +371,15 @@ public class GeCustodyPersistenceTest
         settle(engine, inventory(COINS, 100_000L, RUNE, 0L), now);
         SavedState profileA = engine.savedState();
         profileA.setOwnerKey("rsprofile.ge-audit-a");
-        assertEquals(1, profileA.getGeCustody().size());
+        assertEquals(1, profileA.geCustody().size());
 
         engine.restoreProfile("rsprofile.ge-audit-b", new SavedState(), now + 1_000L);
         assertTrue("another profile never sees the previous custody state",
-            engine.geCustody.records().isEmpty());
+            engine.exchange.records().isEmpty());
 
         engine.restoreProfile("rsprofile.ge-audit-a", profileA, now + 2_000L);
         assertEquals("the owning profile recovers exactly its own custody state",
-            1, engine.geCustody.records().size());
+            1, engine.exchange.records().size());
     }
 
     @Test
@@ -387,14 +387,14 @@ public class GeCustodyPersistenceTest
     {
         SavedState state = new SavedState();
         state.setSchemaVersion(103);
-        assertTrue("pre-104 files carry no custody", state.getGeCustody().isEmpty());
+        assertTrue("pre-104 files carry no custody", state.geCustody().isEmpty());
 
         List<GeOffer> records = new ArrayList<>();
         GeOffer invalid = new GeOffer();
         records.add(invalid);
         state.setGeCustody(records);
         assertTrue("records without a stable offer id are dropped",
-            state.getGeCustody().isEmpty());
+            state.geCustody().isEmpty());
 
         GeOffer unknownEnums = new GeOffer("offer-1", 0, GeOffer.Side.BUY,
             RUNE, "Nature rune", 10L, 7L, T0, "");
@@ -404,9 +404,9 @@ public class GeCustodyPersistenceTest
 
         Engine engine = engine();
         engine.restore(state, T0 + 1_000L);
-        assertEquals(1, engine.geCustody.records().size());
+        assertEquals(1, engine.exchange.records().size());
         assertEquals("legacy/unbased records never invent basis",
-false, engine.geCustody.records().get(0).hasFrozenBasis());
+false, engine.exchange.records().get(0).hasFrozenBasis());
     }
 
     @Test
@@ -423,7 +423,7 @@ false, engine.geCustody.records().get(0).hasFrozenBasis());
 
         Engine engine = engine();
         engine.restore(state, T0);
-        GeOffer restored = engine.geCustody.records().get(0);
+        GeOffer restored = engine.exchange.records().get(0);
         assertEquals("an unknown side reads as BUY, as before", GeOffer.Side.BUY, restored.getSide());
         assertEquals(GeOffer.Stage.OPEN, restored.getStage());
         assertEquals(GeOffer.CustodyConfidence.CONFIRMED, restored.getConfidence());
@@ -455,12 +455,12 @@ false, engine.geCustody.records().get(0).hasFrozenBasis());
         // Owner policy 2026-09-24 (replaces PRE-R5B 11.19): the exact settlement books in the
         // collecting Grind; the closed origin Grind is never rewritten.
         assertEquals("a cross-Grind settlement is an exact market settlement",
-            TransactionType.TRADE, settlement.getType());
-        assertFalse("never a Review nag", ReviewRules.needsOwnerDecision(settlement));
+            TransactionType.TRADE, settlement.type());
+        assertFalse("never a Review nag", ReviewRules.needsReview(settlement));
         assertTrue("booked in the collecting Grind",
-            engine.getActiveSession().getTransactions().contains(settlement));
+            engine.session().transactions().contains(settlement));
         assertEquals("an untaxed unknown-basis sale stays Net-neutral", 0L,
-            engine.getMetrics(now + 3_000L).net);
+            engine.metrics(now + 3_000L).net);
     }
 
     @Test
@@ -485,18 +485,18 @@ false, engine.geCustody.records().get(0).hasFrozenBasis());
         assertNotNull(last);
         long total = 0L;
         int countedRows = 0;
-        for (Transaction transaction : engine.getActiveSession().getTransactions())
+        for (Transaction transaction : engine.session().transactions())
         {
-            if (transaction != null && transaction.isCounted()
-                && transaction.autoType() == TransactionType.TRADE)
+            if (transaction != null && transaction.counts()
+                && transaction.original() == TransactionType.TRADE)
             {
                 countedRows++;
-                total += transaction.getNet();
+                total += transaction.net();
             }
         }
         assertEquals("per-offer executions plus one batch adjustment", 3, countedRows);
         assertEquals("the counted value plus the exact realized edge equals the observed cash",
-            138L, engine.getMetrics(now + 2_000L).net);
+            138L, engine.metrics(now + 2_000L).net);
         assertEquals(18L, total);
     }
 
@@ -566,20 +566,20 @@ false, engine.geCustody.records().get(0).hasFrozenBasis());
         assertEquals(4_680L, taxTotal);
         assertEquals(236_280L, receivedTotal);
         assertEquals("unknown bank stock contributes exactly the proven tax per sale",
-            -4_680L, engine.getMetrics(now + 12_000L).net);
-        for (Transaction transaction : engine.getActiveSession().getTransactions())
+            -4_680L, engine.metrics(now + 12_000L).net);
+        for (Transaction transaction : engine.session().transactions())
         {
             assertFalse("no counted Coins fee row may exist: " + transaction,
-                transaction != null && transaction.isCounted()
-                    && transaction.autoType() == TransactionType.TRADE
-                    && transaction.getFlows().size() == 1
-                    && transaction.getFlows().get(0).itemId == COINS);
-            if (transaction != null && transaction.isCounted()
-                && transaction.autoType() == TransactionType.TRADE)
+                transaction != null && transaction.counts()
+                    && transaction.original() == TransactionType.TRADE
+                    && transaction.flows().size() == 1
+                    && transaction.flows().get(0).item == COINS);
+            if (transaction != null && transaction.counts()
+                && transaction.original() == TransactionType.TRADE)
             {
                 assertEquals("each counted settlement books exactly its accepted tax",
-                    -tax[slotByItem.get(transaction.getFlows().get(0).itemId)],
-                    transaction.getNet());
+                    -tax[slotByItem.get(transaction.flows().get(0).item)],
+                    transaction.net());
             }
         }
     }
@@ -600,7 +600,7 @@ false, engine.geCustody.records().get(0).hasFrozenBasis());
 
         assertOwnerBatchSettled(engine, now + 22_000L);
         assertEquals("nothing is retained once the batch is exact", 0L,
-            EngineProbe.pendingSettlementCash(engine.geCustody));
+            EngineProbe.pendingSettlementCash(engine.exchange));
     }
 
     @Test
@@ -619,7 +619,7 @@ false, engine.geCustody.records().get(0).hasFrozenBasis());
         engine.noteGeCollect(now + 20_000L);
         settle(engine, inventory(COINS, 100_000L + OWNER_BATCH_RECEIVED_TOTAL), now + 20_000L);
         assertEquals("the observed collect is retained internally, not reviewed",
-            OWNER_BATCH_RECEIVED_TOTAL, EngineProbe.pendingSettlementCash(engine.geCustody));
+            OWNER_BATCH_RECEIVED_TOTAL, EngineProbe.pendingSettlementCash(engine.exchange));
         assertEquals("a held collect never reaches the decision inbox", 0, reviewCount(engine));
         assertTrue("no settlement exists before the execution evidence arrives",
             engine.marketRows().stream()
@@ -628,7 +628,7 @@ false, engine.geCustody.records().get(0).hasFrozenBasis());
         // The fill/terminal evidence arrives afterward; the held batch settles exactly.
         completeOwnerBatch(engine, ledger, now + 30_000L);
         assertOwnerBatchSettled(engine, now + 40_000L);
-        assertEquals(0L, EngineProbe.pendingSettlementCash(engine.geCustody));
+        assertEquals(0L, EngineProbe.pendingSettlementCash(engine.exchange));
     }
 
     @Test
@@ -648,7 +648,7 @@ false, engine.geCustody.records().get(0).hasFrozenBasis());
         engine.noteGeCollect(now + 1_000L);
         settle(engine, inventory(COINS, 105_356L), now + 1_000L);
         assertEquals("the collect is retained until the sale is proven", 5_356L,
-            EngineProbe.pendingSettlementCash(engine.geCustody));
+            EngineProbe.pendingSettlementCash(engine.exchange));
         assertEquals(0, reviewCount(engine));
 
         // The SOLD evidence completes the exact sale.
@@ -659,8 +659,8 @@ false, engine.geCustody.records().get(0).hasFrozenBasis());
         assertEquals(104L, row.inferredGeTaxGp);
         assertEquals(MarketRows.Lifecycle.REALIZED, row.lifecycle);
         assertEquals("the proven tax is the only unknown-basis contribution", -104L,
-            engine.getMetrics(now + 3_000L).net);
-        assertEquals(0L, EngineProbe.pendingSettlementCash(engine.geCustody));
+            engine.metrics(now + 3_000L).net);
+        assertEquals(0L, EngineProbe.pendingSettlementCash(engine.exchange));
     }
 
     @Test
@@ -682,7 +682,7 @@ false, engine.geCustody.records().get(0).hasFrozenBasis());
         engine.noteGeCollect(now + 25_000L);
         settle(engine, inventory(COINS, 100_000L + OWNER_BATCH_RECEIVED_TOTAL), now + 25_000L);
         assertEquals("a partially proven batch is never partially booked",
-            OWNER_BATCH_RECEIVED_TOTAL, EngineProbe.pendingSettlementCash(engine.geCustody));
+            OWNER_BATCH_RECEIVED_TOTAL, EngineProbe.pendingSettlementCash(engine.exchange));
         assertEquals(0, reviewCount(engine));
 
         // The remaining four terminal states arrive afterward.
@@ -691,7 +691,7 @@ false, engine.geCustody.records().get(0).hasFrozenBasis());
             completeOwnerSale(engine, ledger, slot, now + 30_000L + slot * 1_000L);
         }
         assertOwnerBatchSettled(engine, now + 40_000L);
-        assertEquals(0L, EngineProbe.pendingSettlementCash(engine.geCustody));
+        assertEquals(0L, EngineProbe.pendingSettlementCash(engine.exchange));
     }
 
     @Test
@@ -715,20 +715,20 @@ false, engine.geCustody.records().get(0).hasFrozenBasis());
         engine.noteGeCollect(now + 30_000L);
         settle(engine, inventory(COINS, 100_000L + OWNER_BATCH_RECEIVED_TOTAL), now + 30_000L);
         assertEquals("the collect is retained until the SLOT WINDOW confirms it",
-            OWNER_BATCH_RECEIVED_TOTAL, EngineProbe.pendingSettlementCash(engine.geCustody));
+            OWNER_BATCH_RECEIVED_TOTAL, EngineProbe.pendingSettlementCash(engine.exchange));
         // The unique exact attribution books at the window end when no contradicting slot evidence
         // arrived; the terminal SOLD states are still unobserved.
-        for (Transaction booking : engine.geCustody.maintenance(now + 33_500L,
-            engine.getActiveSession().getId()))
+        for (Transaction booking : engine.exchange.maintenance(now + 33_500L,
+            engine.session().id()))
         {
-            engine.getActiveSession().addTransaction(booking, 500, true);
+            engine.session().addTransaction(booking, 500, true);
         }
         assertOwnerBatchSettled(engine, now + 33_500L);
 
         // The late terminal states must never double book.
         completeOwnerBatch(engine, ledger, now + 40_000L);
         assertOwnerBatchSettled(engine, now + 42_000L);
-        assertEquals(0L, EngineProbe.pendingSettlementCash(engine.geCustody));
+        assertEquals(0L, EngineProbe.pendingSettlementCash(engine.exchange));
     }
 
     @Test
@@ -746,9 +746,9 @@ false, engine.geCustody.records().get(0).hasFrozenBasis());
         settle(engine, inventory(COINS, 100_000L + OWNER_BATCH_RECEIVED_TOTAL - 5L), now + 20_000L);
 
         assertEquals("no invented distribution may reach Net", 0L,
-            engine.getMetrics(now + 22_000L).net);
+            engine.metrics(now + 22_000L).net);
         assertEquals("an all-terminal wrong gap is never held", 0L,
-            EngineProbe.pendingSettlementCash(engine.geCustody));
+            EngineProbe.pendingSettlementCash(engine.exchange));
         Map<Integer, Integer> slotByItem = ownerBatchSlots();
         for (MarketRows.Row row : engine.marketRows())
         {
@@ -783,14 +783,14 @@ false, engine.geCustody.records().get(0).hasFrozenBasis());
         {
             noteGe(engine, ledger, slot, EMPTY, 0, 0, 0, 0, 0, now + 20_600L + slot * 100L);
         }
-        for (Transaction booking : engine.geCustody.maintenance(now + 23_000L,
-            engine.getActiveSession().getId()))
+        for (Transaction booking : engine.exchange.maintenance(now + 23_000L,
+            engine.session().id()))
         {
-            engine.getActiveSession().addTransaction(booking, 500, true);
+            engine.session().addTransaction(booking, 500, true);
         }
 
         assertEquals("the mixed movement is not retained as a GE settlement", 0L,
-            EngineProbe.pendingSettlementCash(engine.geCustody));
+            EngineProbe.pendingSettlementCash(engine.exchange));
         Map<Integer, Integer> slotByItem = ownerBatchSlots();
         for (MarketRows.Row row : engine.marketRows())
         {
@@ -802,18 +802,18 @@ false, engine.geCustody.records().get(0).hasFrozenBasis());
         assertEquals("the unexplained movement stays its own uncounted row", 1,
             countUncertainCoinRows(engine));
         long excess = 0L;
-        for (Transaction transaction : engine.getActiveSession().getTransactions())
+        for (Transaction transaction : engine.session().transactions())
         {
-            if (transaction.autoType() == TransactionType.UNCERTAIN
-                && transaction.getFlows().size() == 1
-                && transaction.getFlows().get(0).itemId == COINS)
+            if (transaction.original() == TransactionType.UNCERTAIN
+                && transaction.flows().size() == 1
+                && transaction.flows().get(0).item == COINS)
             {
-                excess = transaction.getFlows().get(0).valueDelta;
+                excess = transaction.flows().get(0).value;
             }
         }
         assertEquals("nothing is absorbed into the batch: the whole mixed movement stays uncounted",
             OWNER_BATCH_RECEIVED_TOTAL + 500L, excess);
-        assertEquals("nothing is counted", 0L, engine.getMetrics(now + 24_000L).net);
+        assertEquals("nothing is counted", 0L, engine.metrics(now + 24_000L).net);
     }
 
     @Test
@@ -830,15 +830,15 @@ false, engine.geCustody.records().get(0).hasFrozenBasis());
         settle(engine, inventory(COINS, 100_000L + OWNER_BATCH_RECEIVED_TOTAL), now + 20_000L);
         assertOwnerBatchSettled(engine, now + 22_000L);
 
-        int transactions = engine.getActiveSession().getTransactions().size();
-        long net = engine.getMetrics(now + 22_000L).net;
+        int transactions = engine.session().transactions().size();
+        long net = engine.metrics(now + 22_000L).net;
         // A duplicate collect movement and replayed terminal snapshots add nothing.
         settle(engine, inventory(COINS, 100_000L + OWNER_BATCH_RECEIVED_TOTAL), now + 30_000L);
         completeOwnerBatch(engine, ledger, now + 31_000L);
-        engine.geCustody.maintenance(now + 32_000L, engine.getActiveSession().getId());
+        engine.exchange.maintenance(now + 32_000L, engine.session().id());
 
-        assertEquals(transactions, engine.getActiveSession().getTransactions().size());
-        assertEquals(net, engine.getMetrics(now + 32_000L).net);
+        assertEquals(transactions, engine.session().transactions().size());
+        assertEquals(net, engine.metrics(now + 32_000L).net);
         assertOwnerBatchSettled(engine, now + 32_000L);
     }
 
@@ -858,15 +858,15 @@ false, engine.geCustody.records().get(0).hasFrozenBasis());
         engine.noteGeCollect(now + 1_000L);
         settle(engine, inventory(COINS, 100_070L), now + 1_000L);
         assertEquals("the observed collect is retained", 70L,
-            EngineProbe.pendingSettlementCash(engine.geCustody));
+            EngineProbe.pendingSettlementCash(engine.exchange));
 
         // A later offer event past the bounded lifecycle releases the cash to Review.
         noteGe(engine, ledger, 1, SELLING, RUNE, 10, 0, 7, 0, now + 11 * 60_000L);
         assertEquals("the expired hold is released, never guessed", 0L,
-            EngineProbe.pendingSettlementCash(engine.geCustody));
+            EngineProbe.pendingSettlementCash(engine.exchange));
         assertEquals("the observed cash stays visible as one uncounted row", 1,
             countUncertainCoinRows(engine));
-        assertEquals(0L, engine.getMetrics(now + 12 * 60_000L).net);
+        assertEquals(0L, engine.metrics(now + 12 * 60_000L).net);
     }
 
     @Test
@@ -882,11 +882,11 @@ false, engine.geCustody.records().get(0).hasFrozenBasis());
         settle(engine, inventory(COINS, 100_500L), now + 1_000L);
 
         assertEquals("no sell lifecycle may absorb an unrelated movement", 0L,
-            EngineProbe.pendingSettlementCash(engine.geCustody));
+            EngineProbe.pendingSettlementCash(engine.exchange));
         assertTrue("no custody settlement is invented", engine.marketRows().isEmpty());
         assertEquals("the unexplained cash stays on the ordinary review path", 1,
             reviewCount(engine));
-        assertEquals(0L, engine.getMetrics(now + 2_000L).net);
+        assertEquals(0L, engine.metrics(now + 2_000L).net);
     }
 
     @Test
@@ -911,7 +911,7 @@ false, engine.geCustody.records().get(0).hasFrozenBasis());
         assertEquals(5_460L, MarketFacts.grossGeReferenceGp(MarketFacts.record(engine, row)));
         assertEquals(MarketRows.Coverage.FULLY_UNKNOWN, row.coverage);
         assertEquals("unknown liquidation contributes exactly the proven tax", -104L,
-            engine.getMetrics(now + 3_000L).net);
+            engine.metrics(now + 3_000L).net);
     }
 
     @Test
@@ -929,7 +929,7 @@ false, engine.geCustody.records().get(0).hasFrozenBasis());
         Transaction settlement = settle(engine, inventory(COINS, 105_356L), now + 2_000L);
 
         assertNotNull(settlement);
-        assertTrue(settlement.isCounted());
+        assertTrue(settlement.counts());
         MarketRows.Row row = engine.marketRows().get(0);
         assertEquals(MarketRows.Coverage.FULLY_KNOWN, row.coverage);
         assertEquals(5_000L, row.trackedBasisConsumedGp);
@@ -937,7 +937,7 @@ false, engine.geCustody.records().get(0).hasFrozenBasis());
         assertEquals("Result = after-tax Received - proven tracked basis", 356L,
             row.realizedResultGp);
         assertEquals("tax is never booked a second time", 5_356L,
-            engine.getMetrics(now + 3_000L).net);
+            engine.metrics(now + 3_000L).net);
     }
 
     @Test
@@ -956,28 +956,28 @@ false, engine.geCustody.records().get(0).hasFrozenBasis());
         noteGe(engine, ledger, 1, SOLD, RUNE, 10, 10, 7, 70, now + 800L);
         settle(engine, inventory(COINS, 100_138L), now + 1_000L);
 
-        assertEquals(0L, engine.getMetrics(now + 2_000L).net);
+        assertEquals(0L, engine.metrics(now + 2_000L).net);
         for (MarketRows.Row row : engine.marketRows())
         {
             assertEquals(MarketRows.Lifecycle.AMBIGUOUS, row.lifecycle);
             assertEquals("unexplained gross evidence is retained, not split",
                 70L, row.observedSettlementGp);
         }
-        for (Transaction transaction : engine.getActiveSession().getTransactions())
+        for (Transaction transaction : engine.session().transactions())
         {
             assertFalse("no counted Coins loss may be invented for the gap: " + transaction,
-                transaction != null && transaction.isCounted()
-                    && transaction.autoType() == TransactionType.TRADE);
+                transaction != null && transaction.counts()
+                    && transaction.original() == TransactionType.TRADE);
         }
     }
 
     private static long flow(Transaction transaction, int itemId)
     {
-        for (Flow itemFlow : transaction.getFlows())
+        for (Flow itemFlow : transaction.flows())
         {
-            if (itemFlow.itemId == itemId)
+            if (itemFlow.item == itemId)
             {
-                return itemFlow.valueDelta;
+                return itemFlow.value;
             }
         }
         return 0L;
@@ -986,7 +986,7 @@ false, engine.geCustody.records().get(0).hasFrozenBasis());
     /** Establish exact known coverage for an item (schema-106 tracked basis). */
     private static void gain(Engine engine, int item, long quantity, long value, long at)
     {
-        engine.getActiveSession().addTransaction(new Transaction(at,
+        engine.session().addTransaction(new Transaction(at,
             TransactionType.GAIN, Context.GENERIC, "", "Loot", true,
             Collections.singletonList(new Flow(item, "Nature rune", quantity,
                 (int) (quantity > 0L ? value / quantity : 0L), value,
@@ -997,9 +997,9 @@ false, engine.geCustody.records().get(0).hasFrozenBasis());
     private static int countCounted(Engine engine)
     {
         int counted = 0;
-        for (Transaction transaction : engine.getActiveSession().getTransactions())
+        for (Transaction transaction : engine.session().transactions())
         {
-            if (transaction != null && transaction.isCounted())
+            if (transaction != null && transaction.counts())
             {
                 counted++;
             }
@@ -1112,22 +1112,22 @@ false, engine.geCustody.records().get(0).hasFrozenBasis());
         assertEquals(OWNER_BATCH_TAX_TOTAL, taxTotal);
         assertEquals(OWNER_BATCH_RECEIVED_TOTAL, receivedTotal);
         assertEquals("unknown bank stock drops by exactly the proven batch tax", -480L,
-            engine.getMetrics(now).net);
-        for (Transaction transaction : engine.getActiveSession().getTransactions())
+            engine.metrics(now).net);
+        for (Transaction transaction : engine.session().transactions())
         {
             assertFalse("no uncounted review row may exist for an exact batch: " + transaction,
-                ReviewRules.needsOwnerDecision(transaction));
+                ReviewRules.needsReview(transaction));
             assertFalse("no synthetic Coins fee row may exist: " + transaction,
-                transaction != null && transaction.isCounted()
-                    && transaction.autoType() == TransactionType.TRADE
-                    && transaction.getFlows().size() == 1
-                    && transaction.getFlows().get(0).itemId == COINS);
-            if (transaction != null && transaction.isCounted()
-                && transaction.autoType() == TransactionType.TRADE)
+                transaction != null && transaction.counts()
+                    && transaction.original() == TransactionType.TRADE
+                    && transaction.flows().size() == 1
+                    && transaction.flows().get(0).item == COINS);
+            if (transaction != null && transaction.counts()
+                && transaction.original() == TransactionType.TRADE)
             {
                 assertEquals("one counted settlement per sale, each exactly its accepted tax",
-                    -OWNER_BATCH_TAX[slotByItem.get(transaction.getFlows().get(0).itemId)],
-                    transaction.getNet());
+                    -OWNER_BATCH_TAX[slotByItem.get(transaction.flows().get(0).item)],
+                    transaction.net());
             }
         }
     }
@@ -1145,9 +1145,9 @@ false, engine.geCustody.records().get(0).hasFrozenBasis());
     private static int reviewCount(Engine engine)
     {
         int reviews = 0;
-        for (Transaction transaction : engine.getActiveSession().getTransactions())
+        for (Transaction transaction : engine.session().transactions())
         {
-            if (ReviewRules.needsOwnerDecision(transaction))
+            if (ReviewRules.needsReview(transaction))
             {
                 reviews++;
             }
@@ -1158,11 +1158,11 @@ false, engine.geCustody.records().get(0).hasFrozenBasis());
     private static int countUncertainCoinRows(Engine engine)
     {
         int rows = 0;
-        for (Transaction transaction : engine.getActiveSession().getTransactions())
+        for (Transaction transaction : engine.session().transactions())
         {
-            if (transaction != null && transaction.autoType() == TransactionType.UNCERTAIN
-                && transaction.getFlows().size() == 1
-                && transaction.getFlows().get(0).itemId == COINS)
+            if (transaction != null && transaction.original() == TransactionType.UNCERTAIN
+                && transaction.flows().size() == 1
+                && transaction.flows().get(0).item == COINS)
             {
                 rows++;
             }

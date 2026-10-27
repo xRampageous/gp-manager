@@ -49,7 +49,7 @@ public class ResetStateLifecycleTest
         Engine engine = engine(autoStart);
         engine.ensureSession(1_000L);
         engine.setBaseline(new ContainerSnapshot(new HashMap<>()));
-        engine.getActiveSession().addTransaction(Tx.of(1_500L, TransactionType.GAIN,
+        engine.session().addTransaction(Tx.of(1_500L, TransactionType.GAIN,
             Context.GENERIC, "Old", true,
             Collections.singletonList(new Flow(OAK_LOGS, "Oak logs", 5L, 40, 200L))), 100, false);
         engine.resetData(2_000L);
@@ -60,12 +60,12 @@ public class ResetStateLifecycleTest
     public void resetLeavesANewInstall()
     {
         Engine engine = resetEngine(new AtomicBoolean(true));
-        assertNull("no session until play or Start", engine.getActiveSession());
-        assertNull(engine.getGeneralSession());
-        assertEquals("no history survives", 0, engine.getHistory().size());
-        assertEquals(0L, engine.getMetrics(2_000L).net);
-        assertEquals(0L, engine.getMetrics(3_600_000L).elapsedMillis);
-        assertFalse("no custom session starts because of reset", engine.isCustomActive());
+        assertNull("no session until play or Start", engine.session());
+        assertNull(engine.freePlay());
+        assertEquals("no history survives", 0, engine.history().size());
+        assertEquals(0L, engine.metrics(2_000L).net);
+        assertEquals(0L, engine.metrics(3_600_000L).elapsed);
+        assertFalse("no custom session starts because of reset", engine.customActive());
     }
 
     @Test
@@ -73,12 +73,12 @@ public class ResetStateLifecycleTest
     {
         Engine engine = resetEngine(new AtomicBoolean(false));
         engine.togglePause(3_000L);
-        assertNotNull("Start creates Free play", engine.getActiveSession());
-        assertFalse("and it runs, never born paused", engine.getActiveSession().paused);
-        assertEquals("active time starts at Start", 60_000L, engine.getActiveSession().getElapsedMillis(63_000L));
-        String id = engine.getActiveSession().getId();
+        assertNotNull("Start creates Free play", engine.session());
+        assertFalse("and it runs, never born paused", engine.session().paused);
+        assertEquals("active time starts at Start", 60_000L, engine.session().elapsed(63_000L));
+        String id = engine.session().id();
         assertFalse("no second start from the activity path", engine.autoStart(3_100L));
-        assertEquals(id, engine.getActiveSession().getId());
+        assertEquals(id, engine.session().id());
     }
 
     @Test
@@ -95,8 +95,8 @@ public class ResetStateLifecycleTest
         assertNull(engine.processIfDirty(new ContainerSnapshot(logs), 3_200L, null));
         Transaction gain = engine.processIfDirty(new ContainerSnapshot(logs), 3_800L, null);
         assertNotNull(gain);
-        assertEquals(40L, gain.getNet());
-        assertEquals(40L, engine.getMetrics(4_000L).net);
+        assertEquals(40L, gain.net());
+        assertEquals(40L, engine.metrics(4_000L).net);
     }
 
     @Test
@@ -112,14 +112,14 @@ public class ResetStateLifecycleTest
         engine.resume(15_000L, PauseReason.LIFECYCLE);
         engine.resume(15_000L, PauseReason.IDLE, PauseReason.RECOVERY);
         engine.resume(15_000L, PauseReason.IDLE);
-        assertNull("resumes have nothing to resume", engine.getActiveSession());
+        assertNull("resumes have nothing to resume", engine.session());
 
         SavedState committed = engine.savedState();
-        assertTrue(committed.getHistory().isEmpty());
+        assertTrue(committed.history().isEmpty());
         Engine reloaded = engine(new AtomicBoolean(true));
         reloaded.restore(new Gson().fromJson(new Gson().toJson(committed), SavedState.class), 16_000L);
-        assertNull("a reload of the reset profile is still a new install", reloaded.getActiveSession());
-        assertEquals(0L, reloaded.getMetrics(3_600_000L).net);
+        assertNull("a reload of the reset profile is still a new install", reloaded.session());
+        assertEquals(0L, reloaded.metrics(3_600_000L).net);
     }
 
     @Test
@@ -128,7 +128,7 @@ public class ResetStateLifecycleTest
         AtomicBoolean autoStart = new AtomicBoolean(false);
         Engine engine = resetEngine(autoStart);
         assertFalse("Automatic tracking off: activity cannot start", engine.autoStart(3_000L));
-        assertNull(engine.getActiveSession());
+        assertNull(engine.session());
         autoStart.set(true);
         assertTrue(engine.autoStart(4_000L));
         assertFalse(engine.autoStart(4_100L));

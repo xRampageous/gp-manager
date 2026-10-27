@@ -9,7 +9,6 @@ import org.junit.Test;
 import static com.gpmanager.GameData.msg;
 import static org.junit.Assert.assertEquals;
 import static org.junit.Assert.assertFalse;
-import static org.junit.Assert.assertNotEquals;
 import static org.junit.Assert.assertNotNull;
 import static org.junit.Assert.assertSame;
 import static org.junit.Assert.assertTrue;
@@ -17,7 +16,7 @@ import static org.junit.Assert.assertTrue;
 /**
  * Owner live 2026-10-16: coins picked up at Commander Zilyana went to Review as "Grand Exchange
  * movement not claimable by a custody lifecycle", because a sale had finished in the last two
- * hours. The GE-collect gate stops new ones; the load-time recheck rebooks the old ones.
+ * hours. The GE-collect gate stops new ones. The obsolete historical repair is now retired.
  */
 public class GeCollectRecheckTest
 {
@@ -25,39 +24,38 @@ public class GeCollectRecheckTest
     private static final int COINS = 995, BONES = 526;
 
     @Test
-    public void aPreGateCoinPickupBooksAsTodaysPickup()
+    public void aPreGateReviewStaysUntouchedWhileTodaysPickupStillBooks()
     {
         Engine engine = engine();
         engine.startCustom("Zilyana", T0);
-        Session session = engine.getActiveSession();
+        Session session = engine.session();
         Transaction old = geReview(Context.GENERIC, coins(19_911L));
-        String id = old.getId();
+        String id = old.id();
         session.addTransaction(old, 2_000, false);
-        assertTrue("it starts in Review", ReviewRules.needsOwnerDecision(old));
-        long revision = engine.getRevision();
+        assertTrue("it starts in Review", ReviewRules.needsReview(old));
+        long revision = engine.revision();
 
         engine.recheck(item -> 0);
 
         Transaction today = pickup(19_911L);
         assertNotNull("today's code books the same coins", today);
-        assertSame(today.getType(), old.getType());
-        assertSame(TransactionType.GAIN, old.getType());
-        assertEquals(today.isCounted(), old.isCounted());
-        assertTrue(old.isCounted());
-        assertSame(today.getConfidence(), old.getConfidence());
-        assertEquals(today.getExplanation(), old.getExplanation());
-        assertEquals(today.getNote(), old.getNote());
-        assertFalse("it leaves Review", ReviewRules.needsOwnerDecision(old));
-        assertEquals("same row", id, old.getId());
-        assertEquals("same time", T0, old.timestampEpochMillis);
-        assertEquals("same activity", "Growler", old.getActivityName());
-        assertSame(Correction.AUTO, old.getCorrection());
-        assertEquals("the session's Net counts it", 19_911L, session.metrics(T0).net);
-        assertNotEquals("the HUD and totals hear of it", revision, engine.getRevision());
+        assertSame(TransactionType.GAIN, today.type());
+        assertTrue(today.counts());
+        assertSame("retired migration cannot rewrite old history", TransactionType.UNCERTAIN, old.type());
+        assertFalse(old.counts());
+        assertTrue(ReviewRules.needsReview(old));
+        assertEquals("Grand Exchange", old.note());
+        assertEquals(msg("ge-movement"), old.explanation());
+        assertEquals("same row", id, old.id());
+        assertEquals("same time", T0, old.timestamp);
+        assertEquals("same activity", "Growler", old.activityName());
+        assertSame(Correction.AUTO, old.correction());
+        assertEquals("unprocessed history remains uncounted", 0L, session.metrics(T0).net);
+        assertEquals(revision, engine.revision());
 
-        revision = engine.getRevision();
+        revision = engine.revision();
         engine.recheck(item -> 0);
-        assertEquals("a second pass changes nothing", revision, engine.getRevision());
+        assertEquals("a second pass changes nothing", revision, engine.revision());
     }
 
     @Test
@@ -65,28 +63,28 @@ public class GeCollectRecheckTest
     {
         Engine engine = engine();
         engine.startCustom("Zilyana", T0);
-        Session session = engine.getActiveSession();
+        Session session = engine.session();
         Transaction market = geReview(Context.MARKET, coins(5_000L));
         Transaction withLoss = geReview(Context.GENERIC, coins(5_000L),
             new Flow(BONES, "Bones", -1L, 100, -100L, PriceSource.GRAND_EXCHANGE));
         Transaction withItem = geReview(Context.GENERIC, coins(5_000L),
             new Flow(BONES, "Bones", 1L, 100, 100L, PriceSource.GRAND_EXCHANGE));
         Transaction counted = geReview(Context.GENERIC, coins(5_000L));
-        counted.applyCorrection(Correction.REVENUE, T0);
+        counted.applyCorrection(Correction.REVENUE, "Manual correction");
         for (Transaction row : List.of(market, withLoss, withItem, counted)) session.addTransaction(row, 2_000, false);
-        long revision = engine.getRevision();
+        long revision = engine.revision();
 
         engine.recheck(item -> 0);
 
         for (Transaction row : List.of(market, withLoss, withItem, counted))
         {
-            assertSame(TransactionType.UNCERTAIN, row.autoType());
-            assertEquals("Grand Exchange", row.getNote());
-            assertEquals(msg("grand-exchange-movement"), row.getExplanation());
+            assertSame(TransactionType.UNCERTAIN, row.original());
+            assertEquals("Grand Exchange", row.note());
+            assertEquals(msg("ge-movement"), row.explanation());
             assertFalse(row.autoCounted());
         }
-        assertSame("the owner's Count stays theirs", Correction.REVENUE, counted.getCorrection());
-        assertEquals("nothing changed", revision, engine.getRevision());
+        assertSame("the owner's Count stays theirs", Correction.REVENUE, counted.correction());
+        assertEquals("nothing changed", revision, engine.revision());
     }
 
     private static Flow coins(long quantity)
@@ -98,7 +96,7 @@ public class GeCollectRecheckTest
     private static Transaction geReview(Context context, Flow... flows)
     {
         return new Transaction(T0, TransactionType.UNCERTAIN, context, "Grand Exchange", "Growler", false,
-            List.of(flows), Confidence.UNCERTAIN, msg("grand-exchange-movement"), null);
+            List.of(flows), Confidence.UNCERTAIN, msg("ge-movement"), null);
     }
 
     /** The same coins landing in the pack today, with no Collect click. */

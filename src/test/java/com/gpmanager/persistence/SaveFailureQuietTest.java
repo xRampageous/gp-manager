@@ -61,24 +61,32 @@ public class SaveFailureQuietTest
                 return !fail[0];
             }
         };
-        OrderedPersistenceWriter writer = new OrderedPersistenceWriter(repository);
+        // Each failed request has used its three bounded attempts; only the request counts.
+        OrderedPersistenceWriter writer = new OrderedPersistenceWriter(repository)
+        {
+            @Override // PAUSE-SEAM
+            boolean pause(long millis) // PAUSE-SEAM
+            { // PAUSE-SEAM
+                return true; // PAUSE-SEAM
+            } // PAUSE-SEAM
+        };
         try
         {
             for (int attempt = 1; attempt <= 2; attempt++)
             {
-                save(writer, repository, attempt);
+                save(writer, repository, attempt, false);
                 assertNotEquals("a one-off failure stays quiet (attempt " + attempt + ")",
-                    SaveStatus.State.FAILED, writer.getStatus().state);
+                    SaveStatus.State.FAILED, writer.status().state);
             }
-            save(writer, repository, 3);
-            assertEquals("the third failure in a row warns", SaveStatus.State.FAILED, writer.getStatus().state);
+            save(writer, repository, 3, false);
+            assertEquals("the third failure in a row warns", SaveStatus.State.FAILED, writer.status().state);
 
             fail[0] = false;
-            save(writer, repository, 4);
-            assertEquals(SaveStatus.State.OK, writer.getStatus().state);
+            save(writer, repository, 4, true);
+            assertEquals(SaveStatus.State.OK, writer.status().state);
             fail[0] = true;
-            save(writer, repository, 5);
-            assertNotEquals("a success starts the count again", SaveStatus.State.FAILED, writer.getStatus().state);
+            save(writer, repository, 5, false);
+            assertNotEquals("a success starts the count again", SaveStatus.State.FAILED, writer.status().state);
         }
         finally
         {
@@ -86,11 +94,13 @@ public class SaveFailureQuietTest
         }
     }
 
-    private static void save(OrderedPersistenceWriter writer, SessionRepository repository, long revision)
+    /** 1.7.0: a flush reports durability, so a deliberately failed write is no longer acknowledged. */
+    private static void save(OrderedPersistenceWriter writer, SessionRepository repository, long revision,
+        boolean durable)
     {
         SavedState state = new SavedState();
         state.setRevision(revision);
-        writer.submit(new WriteIntent(null, repository.scopeGeneration, repository.lastKnownDiskRevision, state, null));
-        assertTrue(writer.flush(Duration.ofSeconds(5)));
+        writer.submit(new WriteIntent(null, repository.generation, repository.revision, state, null));
+        assertEquals(durable, writer.flush(Duration.ofSeconds(5)));
     }
 }

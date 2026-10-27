@@ -144,20 +144,20 @@ public class GePerFillTaxTest
         fixture.sellInFills(0, new long[] {30L, 10L}, new long[] {4_200L, 1_290L}, T0 + 1_000L);
         SavedState state = fixture.engine.savedState();
         assertEquals(110, state.schemaVersion);
-        GeOffer saved = state.getGeCustody().get(0);
+        GeOffer saved = state.geCustody().get(0);
         assertTrue(saved.fillTaxExact);
         assertEquals(80L, saved.getFillTaxGp());
 
         String json = JsonCodec.gson().toJson(state);
         SavedState reloaded = JsonCodec.gson().fromJson(json, SavedState.class);
-        assertTrue(reloaded.getGeCustody().get(0).fillTaxExact);
-        assertEquals(80L, reloaded.getGeCustody().get(0).getFillTaxGp());
+        assertTrue(reloaded.geCustody().get(0).fillTaxExact);
+        assertEquals(80L, reloaded.geCustody().get(0).getFillTaxGp());
 
         // A pre-107 record has no per-fill fields: it keeps the conservative uniform rule.
         String legacy = json.replace("\"fillTaxExact\":true", "\"fillTaxExact\":false")
             .replace("\"fillTaxGp\":80", "\"fillTaxGp\":0");
         GeOffer old = JsonCodec.gson().fromJson(legacy, SavedState.class)
-            .getGeCustody().get(0);
+            .geCustody().get(0);
         assertFalse(old.fillTaxExact);
     }
 
@@ -246,15 +246,15 @@ public class GePerFillTaxTest
 
         long net()
         {
-            return engine.getMetrics(T0 + 60_000L).net;
+            return engine.metrics(T0 + 60_000L).net;
         }
 
         int reviewRows()
         {
             int count = 0;
-            for (Transaction transaction : engine.getActiveSession().getTransactions())
+            for (Transaction transaction : engine.session().transactions())
             {
-                if (ReviewRules.needsOwnerDecision(transaction))
+                if (ReviewRules.needsReview(transaction))
                 {
                     count++;
                 }

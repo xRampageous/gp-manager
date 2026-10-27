@@ -15,14 +15,14 @@ public class FactoryResetResumeTest
     {
         Engine engine = engine();
         engine.ensureSession(T0);
-        assertNotNull(engine.getActiveSession());
+        assertNotNull(engine.session());
         engine.resetData(T0 + 1_000L);
-        assertNull("a reset clears the session", engine.getActiveSession());
+        assertNull("a reset clears the session", engine.session());
 
         engine.tickAutoStart(T0 + 1_500L);
-        assertNull("still warming up", engine.getActiveSession());
+        assertNull("still warming up", engine.session());
         engine.tickAutoStart(T0 + 5_001L);
-        assertNotNull("the reset resumes tracking by itself", engine.getActiveSession());
+        assertNotNull("the reset resumes tracking by itself", engine.session());
     }
 
     @Test
@@ -31,14 +31,14 @@ public class FactoryResetResumeTest
         Engine engine = engine();
         engine.resetData(T0);
         engine.togglePause(T0 + 1_000L);
-        assertNotNull(engine.getActiveSession());
+        assertNotNull(engine.session());
         engine.togglePause(T0 + 2_000L);
-        assertTrue("the second toggle is a manual pause", engine.getActiveSession().paused);
+        assertTrue("the second toggle is a manual pause", engine.session().paused);
 
-        String id = engine.getActiveSession().getId();
+        String id = engine.session().id();
         engine.tickAutoStart(T0 + 9_999L);
-        assertEquals("a manual pause is respected", id, engine.getActiveSession().getId());
-        assertTrue(engine.getActiveSession().paused);
+        assertEquals("a manual pause is respected", id, engine.session().id());
+        assertTrue(engine.session().paused);
     }
 
     private static Engine engine()

@@ -143,8 +143,8 @@ public class ClueClaimTest
         engine.startCustom("Clues", now);
         engine.setBaseline(new ContainerSnapshot(new HashMap<>(inventory)));
         change(MYSTERY, 1L);
-        Flow flow = engine.getActiveSession().getTransactions().get(0).getFlows().get(0);
-        assertEquals(PriceSource.HIGH_ALCHEMY, flow.getPriceSource());
+        Flow flow = engine.session().transactions().get(0).flows().get(0);
+        assertEquals(PriceSource.HIGH_ALCHEMY, flow.source());
     }
 
     /** The GOTR reward pouch: held at zero until opened, then its contents book once. */
@@ -177,15 +177,15 @@ public class ClueClaimTest
 
     private long net()
     {
-        return engine.getMetrics(now + 60_000L).net;
+        return engine.metrics(now + 60_000L).net;
     }
 
     private int reviews()
     {
         int count = 0;
-        for (Transaction transaction : engine.getActiveSession().getTransactions())
+        for (Transaction transaction : engine.session().transactions())
         {
-            if (ReviewRules.needsOwnerDecision(transaction))
+            if (ReviewRules.needsReview(transaction))
             {
                 count++;
             }

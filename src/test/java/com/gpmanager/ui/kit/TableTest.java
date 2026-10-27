@@ -27,9 +27,9 @@ public class TableTest
     @Test
     public void pagesClampAndReset()
     {
-        Table table = new Table("GAINS").setRowsPerPage(10).setRows(rows(23));
+        Table table = new Table("GAINS").setPageSize(10).setRows(rows(23));
         assertEquals(3, table.pages());
-        assertEquals("1/3", table.pageLabel.getText());
+        assertEquals("1/3", table.counter.getText());
 
         // Last page, then a shorter list: the page clamps instead of going blank.
         lastPage(table);
@@ -81,7 +81,7 @@ public class TableTest
 
     private static void clickNext(Table table)
     {
-        for (java.awt.Component c : table.pageLabel.getParent().getComponents())
+        for (java.awt.Component c : table.counter.getParent().getComponents())
         {
             if (c instanceof javax.swing.JButton && "›".equals(((javax.swing.JButton) c).getText()))
             {
@@ -95,7 +95,7 @@ public class TableTest
     @Test
     public void rowsPerPageIsCappedAtFifteen()
     {
-        Table table = new Table("RECENT").setRowsPerPage(40).setRows(rows(30));
+        Table table = new Table("RECENT").setPageSize(40).setRows(rows(30));
         assertEquals(15, table.body.getComponentCount());
         assertEquals(2, table.pages());
     }
@@ -103,7 +103,7 @@ public class TableTest
     @Test
     public void minRowsFixesBodyHeight()
     {
-        Table table = new Table("COSTS").setRowsPerPage(5).setMinRows(5).setRows(rows(2));
+        Table table = new Table("COSTS").setPageSize(5).setMinRows(5).setRows(rows(2));
         assertEquals(5 * Kit.ROW, table.body.getPreferredSize().height);
         table.setRows(rows(5));
         assertEquals(5 * Kit.ROW, table.body.getPreferredSize().height);
@@ -112,10 +112,10 @@ public class TableTest
     @Test
     public void emptyTableShowsItsText()
     {
-        Table table = new Table("MARKET").setEmptyText("No settled sales").setRows(Collections.emptyList());
+        Table table = new Table("MARKET").setEmpty("No settled sales").setRows(Collections.emptyList());
         assertEquals(1, table.body.getComponentCount());
         assertEquals("No settled sales", ((JLabel) table.body.getComponent(0)).getText());
-        assertTrue(table.pageLabel.getParent() == null);
+        assertTrue(table.counter.getParent() == null);
     }
 
     @Test
@@ -194,7 +194,7 @@ public class TableTest
     public void changedMenuLabelsReplaceStaleCommandsWithoutChangingThePage()
     {
         int[] picked = {0};
-        Table table = new Table("GRINDS").setRowsPerPage(1);
+        Table table = new Table("GRINDS").setPageSize(1);
         List<Table.Row> initial = rows(2);
         initial.get(1).menu = Collections.singletonList(new Table.Menu("Archive", () -> picked[0] = 1));
         table.setRows(initial);

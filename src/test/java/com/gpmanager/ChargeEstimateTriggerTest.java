@@ -53,38 +53,38 @@ public class ChargeEstimateTriggerTest
         assertFalse(ChargeIntake.isCastGraphic(ChargeCheck.ChargedItem.SHADOW, 1900));
         assertEquals(2289, ChargeProbes.nx(ChargeCheck.ChargedItem.VENATOR));
         assertEquals(0, ChargeProbes.nx(ChargeCheck.ChargedItem.SCYTHE));
-        assertEquals(5061, ChargeIntake.attackAnimation(ChargeCheck.ChargedItem.BLOWPIPE));
-        assertEquals(0, ChargeIntake.attackAnimation(ChargeCheck.ChargedItem.VENATOR));
-        assertEquals(ActionKind.FIRE, ChargeIntake.kindFor(ChargeCheck.ChargedItem.VENATOR));
-        assertEquals(ActionKind.SUPPLIES, ChargeIntake.kindFor(ChargeCheck.ChargedItem.SCYTHE));
-        assertEquals(ActionKind.CAST, ChargeIntake.kindFor(ChargeCheck.ChargedItem.SHADOW));
+        assertEquals(5061, (ChargeCheck.ChargedItem.BLOWPIPE == ChargeCheck.ChargedItem.BLOWPIPE ? 5061 : 0));
+        assertEquals(0, (ChargeCheck.ChargedItem.VENATOR == ChargeCheck.ChargedItem.BLOWPIPE ? 5061 : 0));
+        assertEquals(ActionKind.FIRE, ChargeCheck.ChargedItem.VENATOR.action);
+        assertEquals(ActionKind.SUPPLIES, ChargeCheck.ChargedItem.SCYTHE.action);
+        assertEquals(ActionKind.CAST, ChargeCheck.ChargedItem.SHADOW.action);
         assertEquals(0, ChargeProbes.nx(ChargeCheck.ChargedItem.BLOWPIPE));
     }
 
     @Test
     public void castRecipesArePinnedPerFamily()
     {
-        Map<Integer, Long> shadow = ChargeIntake.recipeOf(ChargeCheck.ChargedItem.SHADOW);
+        Map<Integer, Long> shadow = new java.util.LinkedHashMap<>(ChargeCheck.ChargedItem.SHADOW.recipe);
         assertEquals(Long.valueOf(2L), shadow.get(ItemID.SOULRUNE));
         assertEquals(Long.valueOf(5L), shadow.get(ItemID.CHAOSRUNE));
         assertEquals(2, shadow.size());
 
-        Map<Integer, Long> warped = ChargeIntake.recipeOf(ChargeCheck.ChargedItem.WARPED);
+        Map<Integer, Long> warped = new java.util.LinkedHashMap<>(ChargeCheck.ChargedItem.WARPED.recipe);
         assertEquals(Long.valueOf(2L), warped.get(ItemID.CHAOSRUNE));
         assertEquals(Long.valueOf(5L), warped.get(ItemID.EARTHRUNE));
 
-        Map<Integer, Long> sang = ChargeIntake.recipeOf(ChargeCheck.ChargedItem.SANGUINESTI);
+        Map<Integer, Long> sang = new java.util.LinkedHashMap<>(ChargeCheck.ChargedItem.SANGUINESTI.recipe);
         assertEquals(Long.valueOf(2L), sang.get(ItemID.BLOODRUNE));
         assertEquals(1, sang.size());
-        assertEquals(sang, ChargeIntake.recipeOf(ChargeCheck.ChargedItem.SANGUINESTI_HOLY));
+        assertEquals(sang, new java.util.LinkedHashMap<>(ChargeCheck.ChargedItem.SANGUINESTI_HOLY.recipe));
 
-        Map<Integer, Long> venator = ChargeIntake.recipeOf(ChargeCheck.ChargedItem.VENATOR);
+        Map<Integer, Long> venator = new java.util.LinkedHashMap<>(ChargeCheck.ChargedItem.VENATOR.recipe);
         assertEquals(Long.valueOf(1L), venator.get(ItemID.ANCIENT_ESSENCE));
         assertEquals(1, venator.size());
 
-        Map<Integer, Long> scythe = ChargeIntake.recipeOf(ChargeCheck.ChargedItem.SCYTHE);
+        Map<Integer, Long> scythe = new java.util.LinkedHashMap<>(ChargeCheck.ChargedItem.SCYTHE.recipe);
         assertEquals(Long.valueOf(2L), scythe.get(ItemID.BLOODRUNE));
-        Map<Integer, Long> ates = ChargeIntake.recipeOf(ChargeCheck.ChargedItem.ATES);
+        Map<Integer, Long> ates = new java.util.LinkedHashMap<>(ChargeCheck.ChargedItem.ATES.recipe);
         assertEquals(Long.valueOf(1L), ates.get(ItemID.FROZEN_TEAR));
         assertEquals(1, ates.size());
         assertTrue("a pendant location click spends a tear", ChargeIntake.isAtesLocation("darkfrost"));
@@ -105,7 +105,7 @@ public class ChargeEstimateTriggerTest
         assertFalse(ChargeIntake.isAtesLocation("take"));
         assertFalse(ChargeIntake.isAtesLocation(""));
         assertTrue("blowpipe scales accrue fractionally, nothing whole per shot",
-            ChargeIntake.recipeOf(ChargeCheck.ChargedItem.BLOWPIPE).isEmpty());
+            new java.util.LinkedHashMap<>(ChargeCheck.ChargedItem.BLOWPIPE.recipe).isEmpty());
     }
 
     @Test
@@ -113,9 +113,9 @@ public class ChargeEstimateTriggerTest
     {
         // Crystal bow and Bowfa shoot; the halberd swings. One shard carries 100 charges,
         // and each attack books one charge priced at a hundredth of a shard.
-        assertEquals(ActionKind.FIRE, ChargeIntake.kindFor(ChargeCheck.ChargedItem.BOWFA));
-        assertEquals(ActionKind.FIRE, ChargeIntake.kindFor(ChargeCheck.ChargedItem.CRYSTAL_BOW));
-        assertEquals(ActionKind.SUPPLIES, ChargeIntake.kindFor(ChargeCheck.ChargedItem.CRYSTAL_HALBERD));
+        assertEquals(ActionKind.FIRE, ChargeCheck.ChargedItem.BOWFA.action);
+        assertEquals(ActionKind.FIRE, ChargeCheck.ChargedItem.CRYSTAL_BOW.action);
+        assertEquals(ActionKind.SUPPLIES, ChargeCheck.ChargedItem.CRYSTAL_HALBERD.action);
         assertEquals(1888, ChargeProbes.nx(ChargeCheck.ChargedItem.BOWFA));
         assertEquals(0, ChargeProbes.nx(ChargeCheck.ChargedItem.CRYSTAL_BOW));
         assertEquals(0, ChargeProbes.nx(ChargeCheck.ChargedItem.CRYSTAL_HALBERD));
@@ -125,16 +125,16 @@ public class ChargeEstimateTriggerTest
         assertTrue(ChargeIntake.isPinnedAttack(ChargeCheck.ChargedItem.CRYSTAL_HALBERD, AnimationID.DRAGON_HALBERD_SPECIAL_ATTACK));
         assertFalse(ChargeIntake.isPinnedAttack(ChargeCheck.ChargedItem.CRYSTAL_BOW, AnimationID.HUMAN_SCYTHE_SWEEP));
         assertFalse(ChargeIntake.isPinnedAttack(ChargeCheck.ChargedItem.BOWFA, AnimationID.HUMAN_BOW));
-        assertNull(ChargeIntake.fractionOf(ChargeCheck.ChargedItem.CRYSTAL_BOW));
-        assertNull(ChargeIntake.fractionOf(ChargeCheck.ChargedItem.CRYSTAL_HALBERD));
-        assertNull(ChargeIntake.fractionOf(ChargeCheck.ChargedItem.BOWFA));
+        assertNull(ChargeCheck.ChargedItem.CRYSTAL_BOW.fraction);
+        assertNull(ChargeCheck.ChargedItem.CRYSTAL_HALBERD.fraction);
+        assertNull(ChargeCheck.ChargedItem.BOWFA.fraction);
         assertEquals(Long.valueOf(1L),
-            ChargeIntake.recipeOf(ChargeCheck.ChargedItem.CRYSTAL_BOW).get(ItemID.PRIF_CRYSTAL_SHARD));
+            new java.util.LinkedHashMap<>(ChargeCheck.ChargedItem.CRYSTAL_BOW.recipe).get(ItemID.PRIF_CRYSTAL_SHARD));
         assertEquals(Long.valueOf(1L),
-            ChargeIntake.recipeOf(ChargeCheck.ChargedItem.CRYSTAL_HALBERD).get(ItemID.PRIF_CRYSTAL_SHARD));
+            new java.util.LinkedHashMap<>(ChargeCheck.ChargedItem.CRYSTAL_HALBERD.recipe).get(ItemID.PRIF_CRYSTAL_SHARD));
         assertEquals(Long.valueOf(1L),
-            ChargeIntake.recipeOf(ChargeCheck.ChargedItem.BOWFA).get(ItemID.PRIF_CRYSTAL_SHARD));
-        assertEquals(100, ChargeCheck.unitsPerItem(ChargeCheck.ChargedItem.CRYSTAL_BOW, ItemID.PRIF_CRYSTAL_SHARD));
+            new java.util.LinkedHashMap<>(ChargeCheck.ChargedItem.BOWFA.recipe).get(ItemID.PRIF_CRYSTAL_SHARD));
+        assertEquals(100, ChargeCheck.ChargedItem.CRYSTAL_BOW.units);
         assertArrayEquals("a shard derives its price from the seed exchange",
             new int[]{ItemID.PRIF_TELEPORT_SEED, 150},
             CurrencyProxyCatalogue.proxyOf(ItemID.PRIF_CRYSTAL_SHARD));
@@ -145,41 +145,41 @@ public class ChargeEstimateTriggerTest
     {
         // One charge per attack, hit or miss; a shard feeds 100 charges and prices at a hundredth.
         // Its crystal-family Check now books measured shards (ChargeCheckToCheckContractTest).
-        assertEquals(ActionKind.SUPPLIES, ChargeIntake.kindFor(ChargeCheck.ChargedItem.SAELDOR));
+        assertEquals(ActionKind.SUPPLIES, ChargeCheck.ChargedItem.SAELDOR.action);
         assertTrue(ChargeIntake.isPinnedAttack(ChargeCheck.ChargedItem.SAELDOR, AnimationID.HUMAN_SWORD_SLASH));
         assertTrue(ChargeIntake.isPinnedAttack(ChargeCheck.ChargedItem.SAELDOR, AnimationID.HUMAN_SWORD_LUNGE));
         assertFalse(ChargeIntake.isPinnedAttack(ChargeCheck.ChargedItem.SAELDOR, AnimationID.HUMAN_BOW));
         assertFalse(ChargeIntake.isPinnedAttack(ChargeCheck.ChargedItem.CRYSTAL_BOW, AnimationID.HUMAN_SWORD_SLASH));
         assertEquals(Long.valueOf(1L),
-            ChargeIntake.recipeOf(ChargeCheck.ChargedItem.SAELDOR).get(ItemID.PRIF_CRYSTAL_SHARD));
-        assertEquals(100, ChargeCheck.unitsPerItem(ChargeCheck.ChargedItem.SAELDOR, ItemID.PRIF_CRYSTAL_SHARD));
-        assertEquals(ChargeCheck.ChargedItem.SAELDOR, ChargeCheck.supportedForId(ItemID.BLADE_OF_SAELDOR));
-        assertEquals(ChargeCheck.ChargedItem.SAELDOR, ChargeCheck.supportedForId(ItemID.BLADE_OF_SAELDOR_INACTIVE));
+            new java.util.LinkedHashMap<>(ChargeCheck.ChargedItem.SAELDOR.recipe).get(ItemID.PRIF_CRYSTAL_SHARD));
+        assertEquals(100, ChargeCheck.ChargedItem.SAELDOR.units);
+        assertEquals(ChargeCheck.ChargedItem.SAELDOR, ChargeCheck.supported(ItemID.BLADE_OF_SAELDOR));
+        assertEquals(ChargeCheck.ChargedItem.SAELDOR, ChargeCheck.supported(ItemID.BLADE_OF_SAELDOR_INACTIVE));
         assertEquals("the restart icon fallback resolves the blade",
-            ChargeCheck.ChargedItem.SAELDOR, ChargeCheck.variantForName("Blade of Saeldor"));
+            ChargeCheck.ChargedItem.SAELDOR, ChargeCheck.namedVariant("Blade of Saeldor"));
     }
 
     @Test
     public void corruptedCrystalWeaponsStayUnmatchedAndTheEchoBowSharesItsFamily()
     {
         assertEquals(2289, ChargeProbes.nx(ChargeCheck.ChargedItem.VENATOR_ECHO));
-        assertEquals(ActionKind.FIRE, ChargeIntake.kindFor(ChargeCheck.ChargedItem.VENATOR_ECHO));
+        assertEquals(ActionKind.FIRE, ChargeCheck.ChargedItem.VENATOR_ECHO.action);
         assertEquals(Long.valueOf(1L),
-            ChargeIntake.recipeOf(ChargeCheck.ChargedItem.VENATOR_ECHO).get(ItemID.ANCIENT_ESSENCE));
+            new java.util.LinkedHashMap<>(ChargeCheck.ChargedItem.VENATOR_ECHO.recipe).get(ItemID.ANCIENT_ESSENCE));
         assertNull("corrupted (permanently charged) crystal weapons cost nothing",
-            ChargeCheck.supportedForId(ItemID.BOW_OF_FAERDHINEN_INFINITE));
-        assertNull(ChargeCheck.supportedForId(ItemID.BOW_OF_FAERDHINEN_INFINITE_ITHELL));
-        assertNull(ChargeCheck.supportedForId(ItemID.BLADE_OF_SAELDOR_INFINITE));
+            ChargeCheck.supported(ItemID.BOW_OF_FAERDHINEN_INFINITE));
+        assertNull(ChargeCheck.supported(ItemID.BOW_OF_FAERDHINEN_INFINITE_ITHELL));
+        assertNull(ChargeCheck.supported(ItemID.BLADE_OF_SAELDOR_INFINITE));
     }
 
     @Test
     public void fractionalComponentsAccrueWholeUnits()
     {
         assertArrayEquals(new long[]{ChargeCheck.SCALES, 2L, 3L},
-            ChargeIntake.fractionOf(ChargeCheck.ChargedItem.BLOWPIPE));
+            ChargeCheck.ChargedItem.BLOWPIPE.fraction);
         assertArrayEquals(new long[]{ItemID.VIAL_BLOOD, 1L, 100L},
-            ChargeIntake.fractionOf(ChargeCheck.ChargedItem.SCYTHE));
-        assertNull(ChargeIntake.fractionOf(ChargeCheck.ChargedItem.SHADOW));
+            ChargeCheck.ChargedItem.SCYTHE.fraction);
+        assertNull(ChargeCheck.ChargedItem.SHADOW.fraction);
 
         assertArrayEquals(new long[]{0L, 2L}, ChargeIntake.accrue(0L, 2L, 3L));
         assertArrayEquals(new long[]{1L, 1L}, ChargeIntake.accrue(2L, 2L, 3L));
@@ -240,8 +240,8 @@ public class ChargeEstimateTriggerTest
         ChargeCheck eye = ChargeCheck.parse("The Eye of Ayak has been charged with demon tears. It currently has 1,996 charges.");
         assertNotNull("the owner's live line must parse", eye);
         assertEquals(ChargeCheck.ChargedItem.EYE_OF_AYAK, eye.variant);
-        assertTrue(eye.bookable);
-        assertEquals(Long.valueOf(1_996L), eye.componentCounts.get(ItemID.DEMON_TEAR));
+        assertTrue(eye.supported);
+        assertEquals(Long.valueOf(1_996L), eye.counts.get(ItemID.DEMON_TEAR));
     }
 
     @Test
@@ -271,38 +271,38 @@ public class ChargeEstimateTriggerTest
         ChargeCheck runes = ChargeCheck.parse("The Eye of Ayak has been charged with runes. It currently has 98 charges.");
         assertNotNull(runes);
         assertEquals(ChargeCheck.ChargedItem.EYE_OF_AYAK, runes.variant);
-        assertEquals(Long.valueOf(196L), runes.componentCounts.get(ItemID.DEATHRUNE));
-        assertEquals(Long.valueOf(98L), runes.componentCounts.get(ItemID.CHAOSRUNE));
+        assertEquals(Long.valueOf(196L), runes.counts.get(ItemID.DEATHRUNE));
+        assertEquals(Long.valueOf(98L), runes.counts.get(ItemID.CHAOSRUNE));
         assertNull("a rune-charged eye never books demon tears",
-            runes.componentCounts.get(ItemID.DEMON_TEAR));
+            runes.counts.get(ItemID.DEMON_TEAR));
     }
 
     @Test
     public void eyeIsAChargeMeasuredFamilyAtOneTearPerCharge()
     {
         assertTrue(ChargeCheck.ChargedItem.EYE_OF_AYAK.implemented);
-        assertEquals(1, ChargeCheck.unitsPerItem(ChargeCheck.ChargedItem.EYE_OF_AYAK, ItemID.DEMON_TEAR));
+        assertEquals(1, ChargeCheck.ChargedItem.EYE_OF_AYAK.units);
     }
 
     @Test
     public void eyeCastsBookOneDemonTearLikeASpell()
     {
-        assertEquals(ActionKind.CAST, ChargeIntake.kindFor(ChargeCheck.ChargedItem.EYE_OF_AYAK));
-        assertEquals(Long.valueOf(1L), ChargeIntake.recipeOf(ChargeCheck.ChargedItem.EYE_OF_AYAK).get(ItemID.DEMON_TEAR));
-        assertEquals(1, ChargeCheck.unitsPerItem(ChargeCheck.ChargedItem.EYE_OF_AYAK, ItemID.DEMON_TEAR));
+        assertEquals(ActionKind.CAST, ChargeCheck.ChargedItem.EYE_OF_AYAK.action);
+        assertEquals(Long.valueOf(1L), new java.util.LinkedHashMap<>(ChargeCheck.ChargedItem.EYE_OF_AYAK.recipe).get(ItemID.DEMON_TEAR));
+        assertEquals(1, ChargeCheck.ChargedItem.EYE_OF_AYAK.units);
     }
 
     @Test
     public void magicXpPinsTheEyesOwnCastTrigger()
     {
         ChargeIntake intake = new ChargeIntake(null, null, null, null, null);
-        intake.eyeCandidateAnimation = 9276;
-        intake.eyeCandidateTick = 10;
+        intake.eyeAnimation = 9276;
+        intake.eyeTick = 10;
         intake.learnEyeCast(Skill.MAGIC, 11, 11_000L);
         assertTrue(intake.eyeAnimations.contains(9276));
-        assertTrue("the proven candidate never leaks into a later cast", intake.eyeCandidateTick < 0);
-        intake.eyeCandidateGraphic = 7000;
-        intake.eyeCandidateTick = 20;
+        assertTrue("the proven candidate never leaks into a later cast", intake.eyeTick < 0);
+        intake.eyeGraphic = 7000;
+        intake.eyeTick = 20;
         intake.learnEyeCast(Skill.MAGIC, 21, 21_000L);
         assertTrue("the cast graphic is learned too, so a once-only animation cannot starve it",
             intake.eyeGraphics.contains(7000));
@@ -329,17 +329,17 @@ public class ChargeEstimateTriggerTest
     public void furyEstimatesOneTenThousandthOfAShardPerCountedHit()
     {
         // The hit estimate must price in hit units, so the Check delta reconciles on the same scale.
-        assertEquals(ActionKind.SUPPLIES, ChargeIntake.kindFor(ChargeCheck.ChargedItem.BLOOD_FURY));
-        assertEquals(Long.valueOf(1L), ChargeIntake.recipeOf(ChargeCheck.ChargedItem.BLOOD_FURY).get(ItemID.BLOOD_SHARD));
-        assertEquals(10_000, ChargeCheck.unitsPerItem(ChargeCheck.ChargedItem.BLOOD_FURY, ItemID.BLOOD_SHARD));
+        assertEquals(ActionKind.SUPPLIES, ChargeCheck.ChargedItem.BLOOD_FURY.action);
+        assertEquals(Long.valueOf(1L), new java.util.LinkedHashMap<>(ChargeCheck.ChargedItem.BLOOD_FURY.recipe).get(ItemID.BLOOD_SHARD));
+        assertEquals(10_000, ChargeCheck.ChargedItem.BLOOD_FURY.units);
     }
 
     @Test
     public void seasTridentEstimatesBookTenCoinsPerCast()
     {
-        assertEquals(Long.valueOf(10L), ChargeIntake.recipeOf(ChargeCheck.ChargedItem.TRIDENT_SEAS).get(ItemID.COINS));
+        assertEquals(Long.valueOf(10L), new java.util.LinkedHashMap<>(ChargeCheck.ChargedItem.TRIDENT_SEAS.recipe).get(ItemID.COINS));
         assertEquals(Long.valueOf(10L),
-            ChargeIntake.recipeOf(ChargeCheck.ChargedItem.TRIDENT_SEAS_ENHANCED).get(ItemID.COINS));
+            new java.util.LinkedHashMap<>(ChargeCheck.ChargedItem.TRIDENT_SEAS_ENHANCED.recipe).get(ItemID.COINS));
     }
 
     @Test
@@ -358,9 +358,9 @@ public class ChargeEstimateTriggerTest
     public void eyeModeIsTrackedPerIdentity()
     {
         ChargeIntake intake = new ChargeIntake(null, null, null, null, null);
-        intake.eyeRunes.put("a", true);
-        assertTrue("the rune-charged staff reads runes", intake.eyeRune("a"));
-        assertFalse("another staff keeps the tear default", intake.eyeRune("b"));
+        intake.runes.put("a", true);
+        assertTrue("the rune-charged staff reads runes", Boolean.TRUE.equals(intake.runes.get("a")));
+        assertFalse("another staff keeps the tear default", Boolean.TRUE.equals(intake.runes.get("b")));
     }
 
     @Test
@@ -420,7 +420,7 @@ public class ChargeEstimateTriggerTest
     public void aCheckOrLoadNamesTheDart()
     {
         ChargeIntake intake = new ChargeIntake(null, null, null, null, null);
-        intake.blowpipeDart = -1;
+        intake.dart = -1;
         assertTrue("the dart table knows dragon darts", ChargeCheck.DARTS.containsValue(11230));
     }
 

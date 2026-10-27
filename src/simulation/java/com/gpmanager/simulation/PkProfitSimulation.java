@@ -59,7 +59,7 @@ public final class PkProfitSimulation
             "PK loot",
             Collections.singletonList(SimulationSupport.gain(10001, 1L)));
         session.addTransaction(loot, 100, false);
-        session.attachToEncounter(loot.getId(), kill, false);
+        session.attachToEncounter(loot.id(), kill, false);
 
         long[] money = money(session, kill);
         SimulationSupport.equal(1, session.pk().kills, "kill count");
@@ -67,7 +67,7 @@ public final class PkProfitSimulation
         SimulationSupport.equal(780_000L, money[0], "PK loot revenue");
         SimulationSupport.equal(738_000L, money[2], "PK win net");
         SimulationSupport.equal(738_000L, session.bestKill(), "best kill");
-        SimulationSupport.equal(TransactionType.PK_SUPPLY_COST, supplies.autoType(), "retrospective supply type");
+        SimulationSupport.equal(TransactionType.PK_SUPPLY_COST, supplies.original(), "retrospective supply type");
     }
 
     private static void pkDeath()
@@ -97,9 +97,9 @@ public final class PkProfitSimulation
         session.addTransaction(supplies, 100, false);
         session.addTransaction(risk, 100, false);
         session.addTransaction(fee, 100, false);
-        session.attachToEncounter(supplies.getId(), death, false);
-        session.attachToEncounter(risk.getId(), death, false);
-        session.attachToEncounter(fee.getId(), death, false);
+        session.attachToEncounter(supplies.id(), death, false);
+        session.attachToEncounter(risk.id(), death, false);
+        session.attachToEncounter(fee.id(), death, false);
 
         long[] money = money(session, death);
         SimulationSupport.equal(1, session.pk().deaths, "death count");
@@ -123,7 +123,7 @@ public final class PkProfitSimulation
             false,
             Collections.singletonList(SimulationSupport.gain(11941, 1L)));
         session.addTransaction(keyReceipt, 100, false);
-        session.attachToEncounter(keyReceipt.getId(), kill, false);
+        session.attachToEncounter(keyReceipt.id(), kill, false);
 
         Transaction contents = transaction(
             30_000L,
@@ -132,7 +132,7 @@ public final class PkProfitSimulation
             "Loot key opened",
             Collections.singletonList(SimulationSupport.gain(10001, 1L)));
         session.addTransaction(contents, 100, false);
-        session.attachToEncounter(contents.getId(), kill, false);
+        session.attachToEncounter(contents.id(), kill, false);
 
         Transaction keyRemoval = Tx.of(
             30_000L,
@@ -144,7 +144,7 @@ public final class PkProfitSimulation
             false,
             Collections.singletonList(SimulationSupport.cost(11941, 1L)));
         session.addTransaction(keyRemoval, 100, false);
-        session.attachToEncounter(keyRemoval.getId(), kill, false);
+        session.attachToEncounter(keyRemoval.id(), kill, false);
 
         long[] money = money(session, kill);
         SimulationSupport.equal(780_000L, money[0], "loot-key contents revenue");
@@ -171,8 +171,8 @@ public final class PkProfitSimulation
             Collections.singletonList(SimulationSupport.valuedFlow(12002, "Second pickup", 1L, 480_000)));
         session.addTransaction(firstPickup, 100, false);
         session.addTransaction(secondPickup, 100, false);
-        session.attachToEncounter(firstPickup.getId(), kill, false);
-        session.attachToEncounter(secondPickup.getId(), kill, false);
+        session.attachToEncounter(firstPickup.id(), kill, false);
+        session.attachToEncounter(secondPickup.id(), kill, false);
 
         SimulationSupport.equal(1, session.pk().kills, "partial-pickup kill count");
         SimulationSupport.equal(780_000L, session.bestKill(), "partial-pickup total");
@@ -196,8 +196,8 @@ public final class PkProfitSimulation
         session.addTransaction(firstLoot, 100, false);
         session.addTransaction(secondLoot, 100, false);
         session.addTransaction(bank, 100, false);
-        session.attachToEncounter(firstLoot.getId(), first, false);
-        session.attachToEncounter(secondLoot.getId(), second, false);
+        session.attachToEncounter(firstLoot.id(), first, false);
+        session.attachToEncounter(secondLoot.id(), second, false);
 
         SimulationSupport.equal(2, session.pk().kills, "multi-kill count");
         SimulationSupport.equal(820_000L, money(session, first)[2] + money(session, second)[2], "multi-kill net");
@@ -212,14 +212,14 @@ public final class PkProfitSimulation
             11_000L, TransactionType.PK_LOOT, Context.PK_LOOT,
             "Carried PK loot", Collections.singletonList(SimulationSupport.gain(10004, 1L)));
         session.addTransaction(loot, 100, false);
-        session.attachToEncounter(loot.getId(), kill, false);
+        session.attachToEncounter(loot.id(), kill, false);
 
         String death = session.addEncounter(false, 20_000L);
         Transaction loss = transaction(
             20_000L, TransactionType.PK_DEATH_LOSS, Context.PK_DEATH,
             "Carried PK loot lost", Collections.singletonList(SimulationSupport.cost(10004, 1L)));
         session.addTransaction(loss, 100, false);
-        session.attachToEncounter(loss.getId(), death, false);
+        session.attachToEncounter(loss.id(), death, false);
 
         SimulationSupport.equal(1, session.pk().kills, "carry-death kills");
         SimulationSupport.equal(1, session.pk().deaths, "carry-death deaths");
@@ -244,16 +244,16 @@ public final class PkProfitSimulation
             "No confirmed player-loot correlation was available.",
             kill);
         session.addTransaction(uncertain, 100, false);
-        session.attachToEncounter(uncertain.getId(), kill, false);
+        session.attachToEncounter(uncertain.id(), kill, false);
         SimulationSupport.equal(0L, session.bestKill(), "uncertain PK net before correction");
 
         SimulationSupport.check(
-            session.correctTransaction(uncertain.getId(), Correction.REVENUE, 12_000L, "Manual correction"),
+            session.correctTransaction(uncertain.id(), Correction.REVENUE, "Manual correction"),
             "PK correction should apply");
         SimulationSupport.equal(200_000L, session.bestKill(), "corrected PK revenue");
 
         Transaction removed = session.undoTransaction();
-        SimulationSupport.equal(uncertain.getId(), removed.getId(), "PK undo transaction id");
+        SimulationSupport.equal(uncertain.id(), removed.id(), "PK undo transaction id");
         SimulationSupport.equal(0L, session.bestKill(), "PK net after undo");
     }
 
@@ -265,19 +265,19 @@ public final class PkProfitSimulation
             11_000L, TransactionType.PK_LOOT, Context.PK_LOOT,
             "PK loot", Collections.singletonList(SimulationSupport.gain(10004, 1L)));
         session.addTransaction(loot, 100, false);
-        session.attachToEncounter(loot.getId(), kill, false);
+        session.attachToEncounter(loot.id(), kill, false);
 
         String death = session.addEncounter(false, 20_000L);
         Transaction loss = transaction(
             20_000L, TransactionType.PK_DEATH_LOSS, Context.PK_DEATH,
             "Risk lost", Collections.singletonList(SimulationSupport.cost(10002, 1L)));
         session.addTransaction(loss, 100, false);
-        session.attachToEncounter(loss.getId(), death, false);
+        session.attachToEncounter(loss.id(), death, false);
         session.close(61_000L);
 
-        SimulationSupport.check(session.getTransactions().stream().anyMatch(t -> t.getType() == TransactionType.PK_LOOT),
+        SimulationSupport.check(session.transactions().stream().anyMatch(t -> t.type() == TransactionType.PK_LOOT),
             "PvP loot rows");
-        SimulationSupport.check(session.getTransactions().stream().anyMatch(t -> t.getType() == TransactionType.PK_DEATH_LOSS),
+        SimulationSupport.check(session.transactions().stream().anyMatch(t -> t.type() == TransactionType.PK_DEATH_LOSS),
             "PvP death rows");
 
 
@@ -307,14 +307,14 @@ public final class PkProfitSimulation
     private static long[] money(Session session, String encounterId)
     {
         long[] money = new long[3];
-        for (Transaction transaction : session.getTransactions())
+        for (Transaction transaction : session.transactions())
         {
-            if (!encounterId.equals(transaction.getEncounterId())) continue;
+            if (!encounterId.equals(transaction.encounterId())) continue;
             Accounting.Amounts amounts = Accounting.transaction(transaction);
             if (!amounts.available || !amounts.included) continue;
-            money[0] += amounts.revenue;
-            money[1] += amounts.costs;
-            money[2] += amounts.getNet();
+            money[0] += amounts.income;
+            money[1] += amounts.cost;
+            money[2] += amounts.net();
         }
         return money;
     }

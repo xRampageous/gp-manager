@@ -58,7 +58,7 @@ public class CodexResearchFixesTest
     public void aWaitingBankFeeIsDroppedAtTheAccountFence()
     {
         ReviewFixesTest.Plugin p = plugin(engine(), new int[]{11});
-        p.engine.inbox.put(Inbox.FEE, -1, 5_964L, 10, null);
+        p.engine.events.put(Inbox.FEE, -1, 5_964L, 10, null);
         p.ready = false;
         p.onGameTick(new GameTick());
         assertEquals(0L, ReviewFixesTest.qty(p, Inbox.FEE));
@@ -73,11 +73,11 @@ public class CodexResearchFixesTest
         e.observeCheck(ChargeCheck.parse("Your Trident of the seas has 100 charges."), target, T0);
         e.bookEstimatedCharge(target, ChargeCheck.ChargedItem.TRIDENT_SEAS.getDisplayName(), ActionKind.CAST,
             List.of(new Flow(ItemID.DEATHRUNE, "Death rune", -1, 100, -100, PriceSource.GRAND_EXCHANGE)), T0 + 1_000L);
-        assertTrue(e.getMetrics(T0 + 1_500L).costs > 0L);
+        assertTrue(e.metrics(T0 + 1_500L).cost > 0L);
         ReviewFixesTest.Plugin p = plugin(e, new int[]{100});
         p.charges.startCheck(ChargeCheck.ChargedItem.TRIDENT_SEAS, target, 100, 2);
         assertTrue(p.charges.observeCheck("Your Trident of the seas has 100 charges.", T0 + 2_000L));
-        assertEquals("the matching Check proves no charge was used", 0L, e.getMetrics(T0 + 5_000L).costs);
+        assertEquals("the matching Check proves no charge was used", 0L, e.metrics(T0 + 5_000L).cost);
     }
 
     /** Finding 6: checking one staff keeps another same-kind staff's estimate credit. */
@@ -90,9 +90,9 @@ public class CodexResearchFixesTest
         e.bookEstimatedCharge("staff-a", family, ActionKind.CAST, use, T0 + 1_000L);
         e.bookEstimatedCharge("staff-b", family, ActionKind.CAST, use, T0 + 1_001L);
         e.clearPendingEstimates("staff-a", java.util.Collections.emptySet());
-        String session = e.getActiveSession().getId();
-        assertTrue(e.chargeEstimateJournal.receiptsFor(session, "staff-a").isEmpty());
-        assertFalse("staff B keeps its own credit", e.chargeEstimateJournal.receiptsFor(session, "staff-b").isEmpty());
+        String session = e.session().id();
+        assertTrue(e.estimate.receiptsFor(session, "staff-a").isEmpty());
+        assertFalse("staff B keeps its own credit", e.estimate.receiptsFor(session, "staff-b").isEmpty());
     }
 
     /** Conditional trace: a split catch books only the fish missing from the inventory. */
@@ -100,20 +100,11 @@ public class CodexResearchFixesTest
     public void aSplitCatchBooksOnlyWhatIsMissingFromTheInventory()
     {
         Engine e = engine();
-        ReviewFixesTest.Plugin p = plugin(e, new int[]{11});
-        p.snapshotFactory = new ContainerSnapshotFactory(p.client, null)
-        {
-            @Override
-            ContainerSnapshot capture(boolean equipment, boolean pouch)
-            {
-                return new ContainerSnapshot(Map.of(335, 1L));
-            }
-        };
-        ReviewFixesTest.take(p).item = 335;
-        ReviewFixesTest.take(p).held = 0;
-        ReviewFixesTest.bag(p).at = 10;
-        ReviewFixesTest.bag(p).qty = 2;
-        p.bagSettle();
-        assertEquals("one in the pack, one in the barrel", -1L, e.baseline.quantityOf(335));
+        var fixture = new LootingBagMovementTest.Fixture(e);
+        fixture.pack.put(335, 1L); fixture.tick = 11;
+        var gain = e.events.add(Inbox.BAG_GAIN, 335, 2, 5, null);
+        gain.held = 0; gain.at = 10;
+        fixture.plugin.bagSettle();
+        assertEquals("one in the pack, one in the barrel", -1L, e.baseline.quantity(335));
     }
 }

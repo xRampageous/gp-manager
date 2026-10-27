@@ -1,6 +1,7 @@
 # Pinned item/action and Check-message grammars: key, exact regex, Java Pattern flags.
 herblore-ingredient	.* (weed|leaf|grass|root|dust|berries|berry|horn|fungus|nest|eggs)$	0
 dose-suffix	\((\d)\)\s*$	0
+blighted-dose	^Blighted (?:super restore|overload)\(	2
 ammunition	.*( (arrows?|bolts?( \(e\))?|darts?|javelins?|knife|knives|thrownaxe|throwing axe)|chinchompa)$	0
 fletching-part	.*(arrowtip|bolt tip|dart tip|javelin head|arrow shaft).*	0
 trident-check	^Your Trident of the (seas|swamp)( \(e\))? has (?:((?:\d{1,3}(?:,\d{3})+|\d+)) charges|(one) charge|(no) charges)\.$	2
@@ -73,3 +74,4 @@ gem-vyre-single	^You put the stolen Uncut ([\w ]+) into your gem (?:bag|sack)\.$
 target-net	\d+(?:\.\d+)?[kmb]?	0
 target-minutes	\d+(?:\.\d+)?	0
 target-time	^(?:(\d+(?:\.\d+)?)\s*h)?\s*(?:(\d+(?:\.\d+)?)\s*m)?$	0
+ghommal-save	^Ghommal's luck saves a charge on your .+\.$	2

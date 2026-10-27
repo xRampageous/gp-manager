@@ -31,9 +31,9 @@ public class SmeltingSupplyTest
         Transaction failed = settle(engine, held, T0 + 600L);
 
         assertNotNull(failed);
-        assertFalse("a failed smelt is not a Review decision", ReviewRules.needsOwnerDecision(failed));
-        assertEquals("the ore it used is a supply", CostKind.SUPPLIES, CostKind.of(failed, failed.getFlows().get(0)));
-        assertEquals("the run's first receipt names its skill before any XP", "Smithing", failed.getActivityName());
+        assertFalse("a failed smelt is not a Review decision", ReviewRules.needsReview(failed));
+        assertEquals("the ore it used is a supply", CostKind.SUPPLIES, CostKind.of(failed, failed.flows().get(0)));
+        assertEquals("the run's first receipt names its skill before any XP", "Smithing", failed.activityName());
     }
 
     @Test
@@ -56,7 +56,7 @@ public class SmeltingSupplyTest
         held.put(IRON_ORE, 6L);
         Transaction gone = settle(engine, held, T0 + 600L);
         assertNotNull(gone);
-        assertEquals(CostKind.LOSS, CostKind.of(gone, gone.getFlows().get(0)));
+        assertEquals(CostKind.LOSS, CostKind.of(gone, gone.flows().get(0)));
     }
 
     private static Transaction settle(Engine engine, Map<Integer, Long> held, long now)

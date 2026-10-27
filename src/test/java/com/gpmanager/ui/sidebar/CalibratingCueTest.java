@@ -25,7 +25,7 @@ public class CalibratingCueTest
         engine.ensureSession(NOW);
         assertFalse("a plain start alone arms nothing", engine.calibrating(NOW + 100L));
 
-        engine.getActiveSession().pause(NOW + 1_000L, PauseReason.IDLE);
+        engine.session().pause(NOW + 1_000L, PauseReason.IDLE);
         assertTrue(engine.resume(NOW + 2_000L, PauseReason.IDLE));
         assertTrue("the cue is up right after resume", engine.calibrating(NOW + 2_100L));
         assertFalse("the cue clears after 2.5s", engine.calibrating(NOW + 4_600L));
@@ -45,17 +45,17 @@ public class CalibratingCueTest
     {
         Engine engine = engine();
         engine.startCustom("Vorkath", NOW);
-        engine.getActiveSession().pause(NOW + 1_000L, PauseReason.IDLE);
+        engine.session().pause(NOW + 1_000L, PauseReason.IDLE);
         engine.resume(NOW + 2_000L, PauseReason.IDLE);
 
         LiveSnapshot during = LiveSnapshot.capture(engine, NOW + 2_500L, null);
-        assertTrue(during.calibrating);
+        assertTrue(during.warming);
         assertEquals("CALIBRATING", LivePage.wordOf(during));
         HudBuilder builder = new HudBuilder(new GpManagerConfig() {}, null);
         assertEquals("Calibrating\u2026", builder.update(during, f -> true, NOW + 2_500L).context);
 
         LiveSnapshot after = LiveSnapshot.capture(engine, NOW + 5_000L, null);
-        assertFalse(after.calibrating);
+        assertFalse(after.warming);
         assertEquals("plain running needs no status word", "", LivePage.wordOf(after));
         assertEquals("", builder.update(after, f -> true, NOW + 5_000L).context);
     }

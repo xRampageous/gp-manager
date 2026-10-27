@@ -37,11 +37,11 @@ public class PluginProductionResumeTest
         harness.inventory = new ContainerSnapshot(Map.of(LOG, 5L, BOW, 10L)); // Churn while disabled is baseline material.
         harness.enable(T0 + 3_000L);
         Transaction after = harness.make(Skill.FLETCHING, T0 + 3_600L);
-        assertEquals(TransactionType.PROCESSING, after.getType());
-        assertTrue(after.isCounted());
-        assertTrue("already booked history is preserved", harness.plugin.engine.activeSession.getTransactions().contains(before));
-        assertEquals(2, harness.plugin.engine.activeSession.getTransactions().size());
-        assertEquals("only two enabled actions count", 120L, harness.plugin.engine.getMetrics(T0 + 6_000L).net);
+        assertEquals(TransactionType.PROCESSING, after.type());
+        assertTrue(after.counts());
+        assertTrue("already booked history is preserved", harness.plugin.engine.current.transactions().contains(before));
+        assertEquals(2, harness.plugin.engine.current.transactions().size());
+        assertEquals("only two enabled actions count", 120L, harness.plugin.engine.metrics(T0 + 6_000L).net);
     }
 
     @Test public void productionCanResumeAfterTheOldRunExpiredOrWithAFreshPlugin()
@@ -53,9 +53,9 @@ public class PluginProductionResumeTest
             harness.plugin.activity.armProduction(skill.getName(), T0 - 60_000L);
             harness.enable(T0);
             Transaction row = harness.make(skill, T0 + 600L);
-            assertEquals(skill.getName(), TransactionType.PROCESSING, row.getType());
-            assertTrue(row.isCounted());
-            assertEquals(60L, harness.plugin.engine.getMetrics(T0 + 3_000L).net);
+            assertEquals(skill.getName(), TransactionType.PROCESSING, row.type());
+            assertTrue(row.counts());
+            assertEquals(60L, harness.plugin.engine.metrics(T0 + 3_000L).net);
         }
     }
 
@@ -68,8 +68,8 @@ public class PluginProductionResumeTest
         harness.at(T0 + 60_000L);
         harness.plugin.ready = true;
         harness.plugin.initLoggedIn();
-        assertEquals(TransactionType.PROCESSING, harness.make(Skill.FLETCHING, T0 + 60_600L).getType());
-        assertEquals(60L, harness.plugin.engine.getMetrics(T0 + 63_000L).net);
+        assertEquals(TransactionType.PROCESSING, harness.make(Skill.FLETCHING, T0 + 60_600L).type());
+        assertEquals(60L, harness.plugin.engine.metrics(T0 + 63_000L).net);
     }
 
     @Test public void enablingOrUnchangedXpCannotConfirmAMixedChange()
@@ -79,9 +79,9 @@ public class PluginProductionResumeTest
         harness.plugin.onStatChanged(new StatChanged(Skill.FLETCHING, 1_000, 1, 1));
         harness.plugin.onStatChanged(new StatChanged(Skill.FLETCHING, 999, 1, 1));
         Transaction row = harness.change(T0 + 600L);
-        assertEquals(TransactionType.UNCERTAIN, row.getType());
-        assertFalse(row.isCounted());
-        assertEquals(0L, harness.plugin.engine.getMetrics(T0 + 3_000L).net);
+        assertEquals(TransactionType.UNCERTAIN, row.type());
+        assertFalse(row.counts());
+        assertEquals(0L, harness.plugin.engine.metrics(T0 + 3_000L).net);
     }
 
     @Test public void combatAndGatherXpCannotConfirmProduction()
@@ -91,8 +91,8 @@ public class PluginProductionResumeTest
             Harness harness = new Harness();
             harness.enable(T0);
             Transaction row = harness.make(skill, T0 + 600L);
-            assertEquals(skill.getName(), TransactionType.UNCERTAIN, row.getType());
-            assertFalse(row.isCounted());
+            assertEquals(skill.getName(), TransactionType.UNCERTAIN, row.type());
+            assertFalse(row.counts());
         }
     }
 
@@ -100,7 +100,7 @@ public class PluginProductionResumeTest
     {
         Harness harness = new Harness();
         harness.enable(T0);
-        assertEquals(TransactionType.UNCERTAIN, harness.make(Skill.FLETCHING, T0 + 31_000L).getType());
+        assertEquals(TransactionType.UNCERTAIN, harness.make(Skill.FLETCHING, T0 + 31_000L).type());
     }
 
     @Test public void anOrdinaryProfileResumeCannotRenewTheEnableWindow()
@@ -109,22 +109,22 @@ public class PluginProductionResumeTest
         harness.enable(T0);
         harness.at(T0 + 60_000L);
         harness.plugin.initLoggedIn();
-        assertEquals(TransactionType.UNCERTAIN, harness.make(Skill.FLETCHING, T0 + 60_600L).getType());
+        assertEquals(TransactionType.UNCERTAIN, harness.make(Skill.FLETCHING, T0 + 60_600L).type());
     }
 
     @Test public void aManualPauseStaysHeldThroughToggleAndProductionXp()
     {
         Harness harness = new Harness();
         harness.enable(T0);
-        harness.plugin.engine.activeSession.pause(T0 + 600L, PauseReason.MANUAL);
+        harness.plugin.engine.current.pause(T0 + 600L, PauseReason.MANUAL);
         harness.disable(T0 + 1_200L);
         harness.enable(T0 + 1_800L);
         harness.at(T0 + 2_400L);
         harness.xp.put(Skill.FLETCHING, 1_100);
         harness.plugin.onStatChanged(new StatChanged(Skill.FLETCHING, 1_100, 1, 1));
-        assertEquals(PauseReason.MANUAL, harness.plugin.engine.activeSession.getPauseReason());
+        assertEquals(PauseReason.MANUAL, harness.plugin.engine.current.pauseReason());
         assertNull(harness.plugin.engine.processIfDirty(new ContainerSnapshot(Map.of(BOW, 1L)), T0 + 3_000L, null));
-        assertTrue(harness.plugin.engine.activeSession.getTransactions().isEmpty());
+        assertTrue(harness.plugin.engine.current.transactions().isEmpty());
     }
 
     static class Plugin extends GpManagerPlugin
@@ -182,20 +182,20 @@ public class PluginProductionResumeTest
             {
                 @Override public void invokeLater(Runnable task) { callbacks.add(task); }
             };
-            plugin.snapshotFactory = new ContainerSnapshotFactory(plugin.client, null)
+            plugin.containers = new ContainerSnapshotFactory(plugin.client, null)
             {
                 @Override ContainerSnapshot capture(boolean equipment, boolean pouch) { return inventory; }
             };
             // Disk/UI are excluded; the real plugin enable, disable, baseline and XP handlers run.
-            plugin.persistence = new Persistence(plugin.client, null, null, null, plugin.engine)
+            plugin.storage = new Persistence(plugin.client, null, null, null, plugin.engine)
             {
                 @Override void initAsync(Runnable task) { }
-                @Override void shutdown(boolean persist) { fence(); }
+                @Override void shutdown() { fence(); }
             };
-            plugin.geOfferLedger = new OfferSlots();
+            plugin.offers = new OfferSlots();
             plugin.activity = new ActivityDetector(plugin.config, plugin.engine);
-            plugin.interactionContextTracker = GpManagerPluginProbe.tracker(plugin.client, plugin.engine, plugin.config);
-            plugin.characterIdleTracker = new CharacterIdleTracker(plugin.client, new CharacterIdleModel());
+            plugin.targets = GpManagerPluginProbe.tracker(plugin.client, plugin.engine, plugin.config);
+            plugin.idle = new CharacterIdleTracker(plugin.client, new CharacterIdleModel());
             plugin.charges = new ChargeIntake(plugin.client, null, plugin.config, plugin.engine, null)
             {
                 @Override void learnEyeCast(Skill skill, int tick, long now) { }
@@ -220,7 +220,7 @@ public class PluginProductionResumeTest
         }
         Transaction change(long now)
         {
-            Map<Integer, Long> next = new java.util.HashMap<>(inventory.quantities);
+            Map<Integer, Long> next = new java.util.HashMap<>(inventory.items);
             next.merge(LOG, -1L, Long::sum);
             next.merge(BOW, 1L, Long::sum);
             inventory = new ContainerSnapshot(next);

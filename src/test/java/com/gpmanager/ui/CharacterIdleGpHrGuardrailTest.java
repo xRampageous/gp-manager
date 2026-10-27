@@ -29,14 +29,14 @@ public class CharacterIdleGpHrGuardrailTest
 
         Metrics before = session.metrics(10_000L);
         CharacterIdleModel idle = new CharacterIdleModel();
-        idle.delayMillis = 2_000L;
+        idle.delay = 2_000L;
         assertFalse(idle.tick(false, false, 10_000L));
         assertTrue(idle.tick(false, false, 12_000L));
-        assertTrue(idle.characterIdle);
+        assertTrue(idle.idle);
 
         Metrics after = session.metrics(10_000L);
-        assertEquals(before.elapsedMillis, after.elapsedMillis);
-        assertEquals(before.profitPerHour, after.profitPerHour);
+        assertEquals(before.elapsed, after.elapsed);
+        assertEquals(before.rate, after.rate);
         assertEquals(before.net, after.net);
         assertFalse(session.paused);
     }
@@ -46,8 +46,8 @@ public class CharacterIdleGpHrGuardrailTest
     public void theActivityNameWaitsTheLabelTimeout()
     {
         CharacterIdleModel idle = new CharacterIdleModel();
-        idle.delayMillis = GpManagerPlugin.idleDelay(new GpManagerConfig() {});
-        assertEquals(15_000L, idle.delayMillis);
+        idle.delay = GpManagerPlugin.idleDelay(new GpManagerConfig() {});
+        assertEquals(15_000L, idle.delay);
         assertFalse(idle.tick(true, true, 0L));
         assertFalse("still named 6 s after the kill", idle.tick(false, false, 1_000L));
         assertFalse(idle.tick(false, false, 7_000L));
@@ -72,8 +72,8 @@ public class CharacterIdleGpHrGuardrailTest
         session.pause(2_000L, PauseReason.IDLE);
         Metrics atPause = session.metrics(2_000L);
         Metrics later = session.metrics(62_000L);
-        assertEquals(atPause.elapsedMillis, later.elapsedMillis);
-        assertEquals(atPause.profitPerHour, later.profitPerHour);
-        assertEquals(PauseReason.IDLE, session.getPauseReason());
+        assertEquals(atPause.elapsed, later.elapsed);
+        assertEquals(atPause.rate, later.rate);
+        assertEquals(PauseReason.IDLE, session.pauseReason());
     }
 }

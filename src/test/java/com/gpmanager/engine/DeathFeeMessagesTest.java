@@ -17,7 +17,7 @@ public class DeathFeeMessagesTest
     {
         Matcher m = GameData.pattern(key).matcher(message.toLowerCase());
         assertTrue(message, m.matches());
-        return ChargeCheck.parseCount(m.group(1));
+        return ChargeCheck.digits(m.group(1));
     }
 
     @Test

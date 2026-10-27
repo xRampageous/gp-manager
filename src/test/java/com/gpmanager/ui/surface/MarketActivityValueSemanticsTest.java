@@ -41,7 +41,7 @@ public class MarketActivityValueSemanticsTest
         LiveSnapshot snapshot = LiveSnapshot.capture(market.engine, market.now + 1_000L, null);
         LiveSnapshot.Recent row = marketRow(snapshot);
         assertNotNull(row);
-        assertTrue("the primary value is the observed settlement", row.marketSettlementValue);
+        assertTrue("the primary value is the observed settlement", row.amount);
         assertEquals("proceeds are positive", 36_000L, row.value);
         assertEquals(-1_200L, row.marketResult);
         assertEquals("Sold", row.marketSide);
@@ -49,8 +49,8 @@ public class MarketActivityValueSemanticsTest
         assertTrue("secondary line names the side and the Result: " + meta,
             meta.contains("Sold") && meta.contains("Result " + Fmt.signed(-1_200L)));
         assertEquals("the proven quantity sits in the quantity column", Fmt.times(200L), row.qty);
-        assertFalse("and is not repeated on the second line: " + row.actionLabel,
-            row.actionLabel.contains(Fmt.times(200L)));
+        assertFalse("and is not repeated on the second line: " + row.label,
+            row.label.contains(Fmt.times(200L)));
     }
 
     @Test
@@ -63,7 +63,7 @@ public class MarketActivityValueSemanticsTest
         LiveSnapshot snapshot = LiveSnapshot.capture(market.engine, market.now + 1_000L, null);
         assertEquals("Net moves by the result only, never by the gross proceeds",
             37_200L - 1_200L, snapshot.net);
-        assertEquals(market.engine.getMetrics(market.now + 1_000L).net, snapshot.net);
+        assertEquals(market.engine.metrics(market.now + 1_000L).net, snapshot.net);
     }
 
     @Test
@@ -75,8 +75,8 @@ public class MarketActivityValueSemanticsTest
         LiveSnapshot snapshot = LiveSnapshot.capture(market.engine, market.now + 1_000L, null);
         LiveSnapshot.Recent row = marketRow(snapshot);
         assertNotNull(row);
-        assertTrue(row.marketSettlementValue);
-        assertFalse("automatic Result is unavailable", row.valueAvailable);
+        assertTrue(row.amount);
+        assertFalse("automatic Result is unavailable", row.known);
         assertEquals(180L, row.value);
         assertEquals(Fmt.signed(180L), LivePage.valueText(row));
         assertTrue(LivePage.metaOf(row).contains("Sold \u00b7 Result \u2014"));
@@ -92,7 +92,7 @@ public class MarketActivityValueSemanticsTest
         LiveSnapshot snapshot = LiveSnapshot.capture(market.engine, market.now + 1_000L, null);
         LiveSnapshot.Recent row = marketRow(snapshot);
         assertNotNull(row);
-        assertTrue("the primary value is the observed settlement", row.marketSettlementValue);
+        assertTrue("the primary value is the observed settlement", row.amount);
         assertEquals("spend is negative", -36_000L, row.value);
         assertEquals("a NEW BUY is Net-neutral, so its Result is known zero", 0L, row.marketResult);
         assertEquals("Bought", row.marketSide);
@@ -132,8 +132,8 @@ public class MarketActivityValueSemanticsTest
         LiveSnapshot snapshot = LiveSnapshot.capture(market.engine, market.now + 1_000L, null);
         LiveSnapshot.Recent row = marketRow(snapshot);
         assertNotNull(row);
-        assertFalse("pending never claims a realized settlement", row.valueAvailable);
-        assertFalse(row.marketSettlementValue);
+        assertFalse("pending never claims a realized settlement", row.known);
+        assertFalse(row.amount);
         assertEquals("Buying", LivePage.valueText(row));
         assertTrue("the detail line is the quantity, not the state again", LivePage.metaOf(row).contains("×"));
         assertFalse("status is not repeated on both sides",
@@ -152,7 +152,7 @@ public class MarketActivityValueSemanticsTest
         assertNotNull(row);
         assertEquals("Pending", LivePage.valueText(row));
         assertTrue(LivePage.metaOf(row).contains("Part sold 5/11"));
-        assertFalse(row.marketSettlementValue);
+        assertFalse(row.amount);
         assertEquals(0L, snapshot.net);
     }
 
@@ -165,7 +165,7 @@ public class MarketActivityValueSemanticsTest
         LiveSnapshot snapshot = LiveSnapshot.capture(market.engine, market.now + 1_000L, null);
         // Owner 2026-09-28: a canceled, returned offer stays in the Ledger but leaves Recent.
         assertNull(marketRow(snapshot));
-        assertEquals(0, snapshot.marketPending);
+        assertEquals(0, snapshot.pendingMarket);
         assertEquals(0L, snapshot.net);
     }
 
@@ -176,7 +176,7 @@ public class MarketActivityValueSemanticsTest
         Transaction copy = new Transaction(1_000L, TransactionType.TRADE, Context.MARKET,
             "Grand Exchange", "Market", false, java.util.Arrays.asList(new Flow(526, "Bones", -2L, 37, -74L),
                 new Flow(995, "Coins", 74L, 1, 74L)), Confidence.CONFIRMED, "fixture", null);
-        assertTrue(Semantics.capture(Collections.singletonList(copy), Collections.emptyList(),
+        assertTrue(SemanticProbe.capture(Collections.singletonList(copy), Collections.emptyList(),
             "", null).groups.isEmpty());
     }
 
@@ -229,7 +229,7 @@ public class MarketActivityValueSemanticsTest
             }
         }
         assertNotNull(group);
-        assertNotNull("the raw settlement evidence resolves", data.marketRow(group.marketPresentationId));
+        assertNotNull("the raw settlement evidence resolves", data.marketRow(group.marketId));
 
         LedgerPage page = onEdt(() ->
         {
@@ -237,7 +237,7 @@ public class MarketActivityValueSemanticsTest
             created.apply(data);
             return created;
         });
-        String semantics = LedgerPageProbe.marketRowSemantics(page, group.semanticGroupId);
+        String semantics = LedgerPageProbe.marketRowSemantics(page, group.id);
         assertEquals(Fmt.signed(36_000L) + "|Sold \u00b7 Result " + Fmt.signed(-1_200L), semantics);
     }
 
@@ -297,7 +297,7 @@ public class MarketActivityValueSemanticsTest
 
         void gain(int item, long qty, long value, long at)
         {
-            engine.getActiveSession().addTransaction(new Transaction(at,
+            engine.session().addTransaction(new Transaction(at,
                 TransactionType.GAIN, Context.GENERIC, "", "Loot", true,
                 Collections.singletonList(new Flow(item, "Death rune", qty,
                     (int) (qty > 0L ? value / qty : 0L), value, PriceSource.GRAND_EXCHANGE)),

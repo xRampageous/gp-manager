@@ -125,7 +125,7 @@ public class LedgerUndoScopeTest
 
         void apply(LedgerData.Entry entry)
         {
-            panel.ledgerEntry = entry;
+            panel.scope = entry;
             panel.ledger.apply(LedgerData.capture(engine, NOW + 10L, entry));
         }
     }
@@ -143,7 +143,7 @@ public class LedgerUndoScopeTest
         }
 
         @Override
-        synchronized boolean undoCorrection(long now)
+        synchronized boolean undoCorrection()
         {
             corrections++;
             return true;

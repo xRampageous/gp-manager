@@ -82,7 +82,7 @@ public class GeCollectToBankTest
 
         assertEquals("3,513 / 50 = 70 at most, never less than the truth", -70L, net());
         assertEquals(0, reviewRows());
-        assertTrue(lastTrade().getExplanation().contains("highest tax"));
+        assertTrue(lastTrade().explanation().contains("highest tax"));
     }
 
     @Test
@@ -127,15 +127,15 @@ public class GeCollectToBankTest
 
     private long net()
     {
-        return engine.getMetrics(T0 + 60L * 60_000L).net;
+        return engine.metrics(T0 + 60L * 60_000L).net;
     }
 
     private int reviewRows()
     {
         int count = 0;
-        for (Transaction transaction : engine.getActiveSession().getTransactions())
+        for (Transaction transaction : engine.session().transactions())
         {
-            if (ReviewRules.needsOwnerDecision(transaction)) count++;
+            if (ReviewRules.needsReview(transaction)) count++;
         }
         return count;
     }
@@ -143,9 +143,9 @@ public class GeCollectToBankTest
     private int trades()
     {
         int count = 0;
-        for (Transaction transaction : engine.getActiveSession().getTransactions())
+        for (Transaction transaction : engine.session().transactions())
         {
-            if (transaction.autoType() == TransactionType.TRADE) count++;
+            if (transaction.original() == TransactionType.TRADE) count++;
         }
         return count;
     }
@@ -153,9 +153,9 @@ public class GeCollectToBankTest
     private Transaction lastTrade()
     {
         Transaction last = null;
-        for (Transaction transaction : engine.getActiveSession().getTransactions())
+        for (Transaction transaction : engine.session().transactions())
         {
-            if (transaction.autoType() == TransactionType.TRADE) last = transaction;
+            if (transaction.original() == TransactionType.TRADE) last = transaction;
         }
         return last;
     }

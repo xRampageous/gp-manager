@@ -67,16 +67,16 @@ public class ToolChargeRowsTest
                 T0 + tick * 600L, null);
         }
         assertEquals("a dismantle loses the shard charges, so the load books", true,
-            engine.getActiveSession().getTransactions().stream().anyMatch(Transaction::isCounted));
-        assertTrue("and it is a cost", engine.getMetrics(T0 + 10_000L).net < 0L);
+            engine.session().transactions().stream().anyMatch(Transaction::counts));
+        assertTrue("and it is a cost", engine.metrics(T0 + 10_000L).net < 0L);
 
         ChargeIntake intake = new ChargeIntake(client(null, null), null, CONFIG, engine, null);
         assertTrue("the tool's Check is a read, consumed",
             intake.observeCheck("Your crystal axe has 9,000 charges remaining.", T0 + 12_000L));
         assertTrue("and books nothing",
-            engine.getActiveSession().getTransactions().stream().noneMatch(
-                row -> row.isCounted() && row.getNote() != null
-                    && row.getNote().toLowerCase().contains("check")));
+            engine.session().transactions().stream().noneMatch(
+                row -> row.counts() && row.note() != null
+                    && row.note().toLowerCase().contains("check")));
     }
 
     @Test
@@ -93,7 +93,7 @@ public class ToolChargeRowsTest
             engine.processIfDirty(new ContainerSnapshot(new HashMap<>(Map.of(STONE, 1L, ItemID.DRAGON_AXE, 1L))),
                 T0 + tick * 600L, null);
         }
-        assertTrue("the stone books as a cost", engine.getMetrics(T0 + 10_000L).net < 0L);
+        assertTrue("the stone books as a cost", engine.metrics(T0 + 10_000L).net < 0L);
 
         engine.markChargeLoad(ChargeCheck.ChargedItem.INFERNAL_AXE, ItemID.DRAGON_AXE, "Dragon axe",
             "149:0:13241:INFERNAL_AXE", ChargeIntake.LOAD_TICKS);
@@ -104,8 +104,8 @@ public class ToolChargeRowsTest
                 T0 + 6_000L + tick * 600L, null);
         }
         assertTrue("the dragon-tool recharge books too",
-            engine.getActiveSession().getTransactions().stream()
-                .filter(Transaction::isCounted).count() >= 2);
+            engine.session().transactions().stream()
+                .filter(Transaction::counts).count() >= 2);
     }
 
     @Test
@@ -122,7 +122,7 @@ public class ToolChargeRowsTest
             engine.processIfDirty(new ContainerSnapshot(new HashMap<>(Map.of(ECHO, 0L, ENCHANT, 1L))),
                 T0 + tick * 600L, null);
         }
-        assertTrue("the echo crystal books as a cost", engine.getMetrics(T0 + 10_000L).net < 0L);
+        assertTrue("the echo crystal books as a cost", engine.metrics(T0 + 10_000L).net < 0L);
 
         engine.markChargeLoad(ChargeCheck.ChargedItem.SLAYER_STAFF_E, ENCHANT, "Slayer's enchantment",
             "149:0:21255:SLAYER_STAFF_E", ChargeIntake.LOAD_TICKS);
@@ -133,8 +133,8 @@ public class ToolChargeRowsTest
                 T0 + 6_000L + tick * 600L, null);
         }
         assertTrue("the enchantment books too",
-            engine.getActiveSession().getTransactions().stream()
-                .filter(Transaction::isCounted).count() >= 2);
+            engine.session().transactions().stream()
+                .filter(Transaction::counts).count() >= 2);
     }
 
     @Test
@@ -155,8 +155,8 @@ public class ToolChargeRowsTest
             if (row != null) load = row;
         }
         assertNotNull(load);
-        assertEquals("a refundable load is a neutral transfer", TransactionType.TRANSFER, load.getType());
-        assertEquals(0L, engine.getMetrics(T0 + 10_000L).net);
+        assertEquals("a refundable load is a neutral transfer", TransactionType.TRANSFER, load.type());
+        assertEquals(0L, engine.metrics(T0 + 10_000L).net);
 
         // A cast books one chaos rune from the pinned cast animations.
         Valuation valuation = ModelProbe.valuation(CONFIG, ToolChargeRowsTest::compositionOf,
@@ -168,10 +168,10 @@ public class ToolChargeRowsTest
             client(container(EquipmentInventorySlot.WEAPON.getSlotIdx(), ItemID.RAT_BONE_STAFF), null),
             lookup(), CONFIG, castEngine, valuation);
         intake.onAnimation(1162, T0);
-        List<Transaction> rows = castEngine.getActiveSession().getTransactions();
+        List<Transaction> rows = castEngine.session().transactions();
         assertEquals(rows.toString(), 1, rows.size());
         assertEquals(1L, rows.get(0).quantity(CHAOS, false));
-        assertTrue(rows.get(0).isCounted());
+        assertTrue(rows.get(0).counts());
     }
 
     @Test

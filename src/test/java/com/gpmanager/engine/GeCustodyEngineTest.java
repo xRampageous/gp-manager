@@ -63,7 +63,7 @@ public class GeCustodyEngineTest
                 new OfferSlots.Snapshot(slot, state, item, total, traded, price, spent)).orElse(null);
             if (transition != null)
             {
-                engine.noteGeOffer(transition, name(transition.current.itemId), now);
+                engine.noteGeOffer(transition, name(transition.current.item), now);
             }
             return transition;
         }
@@ -90,7 +90,7 @@ public class GeCustodyEngineTest
         /** Establish exact known coverage for an item (schema-106 tracked basis). */
         void gain(int item, long quantity, long value, long at)
         {
-            engine.getActiveSession().addTransaction(new Transaction(at,
+            engine.session().addTransaction(new Transaction(at,
                 TransactionType.GAIN, Context.GENERIC, "", "Loot", true,
                 Collections.singletonList(new Flow(item, name(item), quantity,
                     (int) (quantity > 0L ? value / quantity : 0L), value,
@@ -100,13 +100,13 @@ public class GeCustodyEngineTest
 
         long net()
         {
-            return engine.getMetrics(now).net;
+            return engine.metrics(now).net;
         }
 
         List<Transaction> transactions()
         {
             List<Transaction> out = new ArrayList<>();
-            for (Transaction transaction : engine.getActiveSession().getTransactions())
+            for (Transaction transaction : engine.session().transactions())
             {
                 if (transaction != null)
                 {
@@ -121,7 +121,7 @@ public class GeCustodyEngineTest
             List<Transaction> out = new ArrayList<>();
             for (Transaction transaction : transactions())
             {
-                if (transaction.isCounted())
+                if (transaction.counts())
                 {
                     out.add(transaction);
                 }
@@ -134,8 +134,8 @@ public class GeCustodyEngineTest
             List<Transaction> out = new ArrayList<>();
             for (Transaction transaction : transactions())
             {
-                if (!transaction.isCounted()
-                    && transaction.autoType() == TransactionType.UNCERTAIN)
+                if (!transaction.counts()
+                    && transaction.original() == TransactionType.UNCERTAIN)
                 {
                     out.add(transaction);
                 }
@@ -182,11 +182,11 @@ public class GeCustodyEngineTest
 
     private static long flow(Transaction transaction, int itemId)
     {
-        for (Flow itemFlow : transaction.getFlows())
+        for (Flow itemFlow : transaction.flows())
         {
-            if (itemFlow.itemId == itemId)
+            if (itemFlow.item == itemId)
             {
-                return itemFlow.valueDelta;
+                return itemFlow.value;
             }
         }
         return 0L;
@@ -221,7 +221,7 @@ public class GeCustodyEngineTest
             Transaction law = h.settle(with(h.inventory, COINS, 123_600L));
             assertNotNull(law);
             assertEquals("known basis gives -800; unknown basis counts only the proven -400 tax",
-                earlierAcquisition ? -800L : -400L, law.getNet());
+                earlierAcquisition ? -800L : -400L, law.net());
 
             h.quote[0] = 136;
             h.engine.markTransfer("Bank withdrawal", 6);
@@ -231,11 +231,11 @@ public class GeCustodyEngineTest
             h.offer(1, SOLD, RUNE, 200, 200, 137, 27_400);
             Transaction nature = h.settle(with(h.inventory, COINS, 150_600L));
             assertNotNull(nature);
-            assertEquals(-400L, nature.getNet());
+            assertEquals(-400L, nature.net());
             assertEquals("only genuine earlier law basis supports the owner's -1.2k total",
                 earlierAcquisition ? -1_200L : -800L, h.net());
             assertEquals("sale proceeds never become ordinary Gains", 0L,
-                LiveSnapshot.capture(h.engine, h.now, null).gains);
+                LiveSnapshot.capture(h.engine, h.now, null).income);
         }
     }
 
@@ -250,10 +250,10 @@ public class GeCustodyEngineTest
         Transaction placement = h.settle(with(h.inventory, RUNE, 0L));
         assertNotNull(placement);
         assertEquals("placement principal is a custody transfer",
-            TransactionType.TRANSFER, placement.getType());
-        assertFalse(placement.isCounted());
+            TransactionType.TRANSFER, placement.type());
+        assertFalse(placement.counts());
         assertEquals("pending SELL must not change canonical Net", 0L, h.net());
-        assertEquals(1, h.engine.geCustody.records().size());
+        assertEquals(1, h.engine.exchange.records().size());
     }
 
     @Test
@@ -263,8 +263,8 @@ public class GeCustodyEngineTest
         h.offer(1, BUYING, LOGS, 100, 0, 7, 0);
         Transaction reserve = h.settle(with(h.inventory, COINS, 100_000L - 700L));
         assertNotNull(reserve);
-        assertEquals(TransactionType.TRANSFER, reserve.getType());
-        assertFalse(reserve.isCounted());
+        assertEquals(TransactionType.TRANSFER, reserve.type());
+        assertFalse(reserve.counts());
         assertEquals("pending BUY reserve must not change canonical Net", 0L, h.net());
     }
 
@@ -299,7 +299,7 @@ public class GeCustodyEngineTest
 
         assertNotNull(pickup);
         assertFalse("another item's gain is not this offer's cancellation return",
-            pickup.getType() == TransactionType.TRANSFER);
+            pickup.type() == TransactionType.TRANSFER);
     }
 
     // ---- SELL realization ----------------------------------------------------------------
@@ -318,16 +318,16 @@ public class GeCustodyEngineTest
         Transaction settlement = h.settle(with(h.inventory, COINS, 100_070L));
 
         assertNotNull(settlement);
-        assertEquals(TransactionType.TRADE, settlement.getType());
-        assertTrue(settlement.isCounted());
+        assertEquals(TransactionType.TRADE, settlement.type());
+        assertTrue(settlement.counts());
         assertEquals("known basis consumed at the pooled value", -60L, flow(settlement, RUNE));
         assertEquals("observed cash settlement", 70L, flow(settlement, COINS));
         assertEquals("the sale realizes +10 on top of the counted 60", 70L, h.net());
         assertEquals(2, h.counted().size());
 
         // A duplicate terminal replay and a restart must not book again.
-        assertTrue(h.engine.geCustody.records().isEmpty()
-            || h.engine.geCustody.records().get(0).getSettledQty() == 10L);
+        assertTrue(h.engine.exchange.records().isEmpty()
+            || h.engine.exchange.records().get(0).getSettledQty() == 10L);
         assertEquals(2, h.counted().size());
     }
 
@@ -343,7 +343,7 @@ public class GeCustodyEngineTest
         h.settle(with(h.inventory, RUNE, 0L));
         h.offer(0, SOLD, RUNE, 10, 10, 7, 50);
         Transaction settlement = h.settle(with(h.inventory, COINS, 100_050L));
-        assertEquals("the sale realizes -20 against the counted 70", -20L, settlement.getNet());
+        assertEquals("the sale realizes -20 against the counted 70", -20L, settlement.net());
         assertEquals("end to end the received 50 is the tracked realization", 50L, h.net());
     }
 
@@ -359,7 +359,7 @@ public class GeCustodyEngineTest
         h.settle(with(h.inventory, RUNE, 0L));
         h.offer(0, SOLD, RUNE, 10, 10, 6, 60);
         Transaction settlement = h.settle(with(h.inventory, COINS, 100_060L));
-        assertEquals(0L, settlement.getNet());
+        assertEquals(0L, settlement.net());
         assertEquals("the counted 60 stays realized", 60L, h.net());
     }
 
@@ -376,7 +376,7 @@ public class GeCustodyEngineTest
         h.offer(0, SELLING, RUNE, 10, 5, 7, 27);
         h.offer(0, SOLD, RUNE, 10, 10, 7, 69);
         Transaction settlement = h.settle(with(h.inventory, COINS, 100_069L));
-        assertEquals("exact total execution 69 against the counted 60", 9L, settlement.getNet());
+        assertEquals("exact total execution 69 against the counted 60", 9L, settlement.net());
         assertEquals("the counted 60 plus the realized 9", 69L, h.net());
     }
 
@@ -397,9 +397,9 @@ public class GeCustodyEngineTest
 
         Transaction settlement = h.settle(with(h.inventory, COINS, 100_210L));
         assertEquals("only the 30 filled units realize", 700L, h.net());
-        assertEquals(0L, settlement.getNet());
+        assertEquals(0L, settlement.net());
         assertEquals("the reservation consumed exactly the filled basis", 210L,
-            h.engine.geCustody.records().get(0).getConsumedTrackedBasisGp());
+            h.engine.exchange.records().get(0).getConsumedTrackedBasisGp());
         assertEquals("the returned reservation is available again", 70L,
             EngineProbe.knownCoverageQty(h.engine, RUNE));
         assertEquals(2, h.counted().size());
@@ -423,7 +423,7 @@ public class GeCustodyEngineTest
         h.offer(0, SOLD, RUNE, 100, 100, 7, 600);
         h.settle(with(h.inventory, COINS, 100_600L));
         assertEquals("second collection settles only the new 60 units", 600L, h.net());
-        assertEquals(100L, h.engine.geCustody.records().get(0).getSettledQty());
+        assertEquals(100L, h.engine.exchange.records().get(0).getSettledQty());
         assertEquals(3, h.counted().size());
     }
 
@@ -439,7 +439,7 @@ public class GeCustodyEngineTest
 
         // An alch or shop sale lands coins while the sale waits in the GE, with no Collect click.
         h.settle(with(h.inventory, COINS, 100_050L));
-        GeOffer sale = h.engine.geCustody.records().get(0);
+        GeOffer sale = h.engine.exchange.records().get(0);
         assertEquals("the sale is still waiting to be collected", 0L, sale.getSettledQty());
         h.settle(with(h.inventory, COINS, 101_550L));
         assertEquals("a bigger alch never claims it either", 0L, sale.getSettledQty());
@@ -478,7 +478,7 @@ public class GeCustodyEngineTest
         h.offer(0, CANCELLED_SELL, RUNE, 10, 0, 7, 0);
         h.settle(with(h.inventory, RUNE, 10L));
 
-        GeOffer record = h.engine.geCustody.records().get(0);
+        GeOffer record = h.engine.exchange.records().get(0);
         assertEquals("custody basis is not repriced by a later quote", 6L, record.getBasisUnitPrice());
         assertEquals(0L, h.net());
         assertEquals(0L, record.heldQty());
@@ -498,7 +498,7 @@ public class GeCustodyEngineTest
         h.quote[0] = 60;
         Transaction settlement = h.settle(with(h.inventory, LOGS, 10L));
         assertNotNull(settlement);
-        assertEquals(TransactionType.TRADE, settlement.getType());
+        assertEquals(TransactionType.TRADE, settlement.type());
         assertEquals("the asset value is the exact spend", 480L, flow(settlement, LOGS));
         assertEquals("exact execution spend", -480L, flow(settlement, COINS));
         assertEquals("a NEW BUY is Net-neutral", 0L, h.net());
@@ -545,30 +545,7 @@ public class GeCustodyEngineTest
         assertEquals("only the purchase is counted", 1, h.counted().size());
     }
 
-    /** Owner live 2026-10-16: change already sent to Review before 1.5.1 rebooks on login. */
-    @Test
-    public void oldBankPaidChangeRowsRebookOnLogin()
-    {
-        Harness h = new Harness(48);
-        h.inventory = with(h.inventory, COINS, 0L);
-        h.engine.setBaseline(new ContainerSnapshot(h.inventory));
-        h.offer(0, BUYING, LOGS, 10, 0, 50, 0);
-        h.offer(0, BOUGHT, LOGS, 10, 10, 50, 480);
-        h.settle(with(h.inventory, LOGS, 10L));
-        // The row the old build saved for the 20 change.
-        Transaction old = new Transaction(h.now, TransactionType.UNCERTAIN, Context.MARKET,
-            GameData.msg("grand-exchange-collect"), "Market", false,
-            Collections.singletonList(new Flow(COINS, "Coins", 20L, 1, 20L, PriceSource.FACE_VALUE)),
-            Confidence.UNCERTAIN, GameData.msg("grand-exchange-movement"), null);
-        h.engine.getActiveSession().addTransaction(old, 2_000, false);
-        h.engine.recheck(item -> 0);
-        assertEquals(TransactionType.TRANSFER, old.getType());
-        assertTrue("with audit rows on, the neutral change stays as one", h.transactions().contains(old));
-        assertEquals(0, h.reviews().size());
-        assertEquals(0L, h.net());
-        h.engine.recheck(item -> 0);
-        assertEquals(0, h.reviews().size());
-    }
+
 
     @Test
     public void buyRefundIsNeutral()
@@ -605,12 +582,12 @@ public class GeCustodyEngineTest
         h.engine.setBaseline(new ContainerSnapshot(h.inventory));
 
         h.offer(0, SELLING, RUNE, 100, 0, 7, 0);
-        h.engine.noteConsume(ItemID.SHARK, 18, false, ActionKind.EAT);
+        h.engine.noteConsume(ItemID.SHARK, 18, false, ActionKind.EAT, null);
         Transaction settle = h.settle(with(h.inventory, RUNE, 0L, ItemID.SHARK, 0L));
 
         assertNotNull(settle);
         assertEquals("the shark keeps its own supply classification",
-            TransactionType.CONSUMPTION, settle.getType());
+            TransactionType.CONSUMPTION, settle.type());
         assertEquals(-6L, flow(settle, ItemID.SHARK));
         assertEquals("the rune loss never appears as a supply",
             0L, flow(settle, RUNE));
@@ -641,7 +618,7 @@ public class GeCustodyEngineTest
         h.offer(1, SELLING, RUNE, 200, 0, 7, 0);
         h.settle(with(h.inventory, RUNE, 0L));
 
-        List<GeOffer> records = h.engine.geCustody.records();
+        List<GeOffer> records = h.engine.exchange.records();
         assertEquals(2, records.size());
         long captured = 0L;
         for (GeOffer record : records)
@@ -660,11 +637,11 @@ public class GeCustodyEngineTest
         h.engine.setBaseline(new ContainerSnapshot(h.inventory));
 
         h.offer(0, SELLING, RUNE, 5, 0, 7, 0);
-        h.engine.noteConsume(RUNE, 18, false, ActionKind.CAST);
+        h.engine.noteConsume(RUNE, 18, false, ActionKind.CAST, null);
         Transaction cast = h.settle(with(h.inventory, RUNE, 9L));
 
         assertNotNull(cast);
-        assertEquals(TransactionType.CONSUMPTION, cast.getType());
+        assertEquals(TransactionType.CONSUMPTION, cast.type());
         assertEquals("Cast", Semantics.verbOf(cast));
         assertEquals(-6L, h.net());
     }
@@ -691,8 +668,8 @@ public class GeCustodyEngineTest
 
         assertEquals("7 each pays no tax and its prior value is unknown: Net-neutral", 0L, h.net());
         assertEquals("nothing is handed to Review", 0, h.reviews().size());
-        assertTrue("the sale is settled and closed", h.engine.geCustody.records().stream()
-            .allMatch(record -> record.getStage() == GeOffer.Stage.CLOSED && record.pendingQty() == 0L));
+        assertTrue("the sale is settled and closed", h.engine.exchange.records().stream()
+            .allMatch(record -> record.getStage() == GeOffer.Stage.CLOSED && record.reserved() == 0L));
     }
 
     @Test
@@ -713,11 +690,11 @@ public class GeCustodyEngineTest
         // going straight to Review (a fast collect-and-relist settles a moment later).
         assertEquals("nothing is handed to Review yet", 0, h.reviews().size());
         assertEquals("the new offer is a fresh identity beside the waiting sale", 2,
-            h.engine.geCustody.records().size());
+            h.engine.exchange.records().size());
         h.engine.tickGe(h.now + GeCustodyLedger.UNOBSERVED_GRACE_MILLIS + 1_000L);
         assertEquals("coins never seen: they went to the bank and the sale settles from its offer",
             0, h.reviews().size());
-        assertEquals("the waiting sale settled; the new offer stays open", 1, h.engine.geCustody.records().stream()
+        assertEquals("the waiting sale settled; the new offer stays open", 1, h.engine.exchange.records().stream()
             .filter(record -> record.getStage() != GeOffer.Stage.CLOSED).count());
     }
 
@@ -762,7 +739,7 @@ public class GeCustodyEngineTest
         h.now += GeCustodyLedger.PLACEMENT_WINDOW_MILLIS + 1_000L;
         Transaction later = h.settle(with(h.inventory, RUNE, 4L));
         assertNotNull(later);
-        assertEquals(TransactionType.CONSUMPTION, later.getType());
+        assertEquals(TransactionType.CONSUMPTION, later.type());
         assertEquals(-6L, h.net());
     }
 
@@ -782,9 +759,9 @@ public class GeCustodyEngineTest
         Transaction settlement = h.settle(with(h.inventory, COINS, 100_000L + 2_000_000_000L));
 
         assertEquals("exact long arithmetic, never a rounded average",
-            2_000_000_000L - basis, settlement.getNet());
+            2_000_000_000L - basis, settlement.net());
         assertEquals("end to end the received cash is the realization", 2_000_000_000L, h.net());
-        GeOffer record = h.engine.geCustody.records().get(0);
+        GeOffer record = h.engine.exchange.records().get(0);
         assertEquals(2_000_000_000L, record.getSpentGp());
         assertEquals(basis, record.basisFor(quantity));
         assertEquals("the whole known basis was consumed exactly", basis,
@@ -847,8 +824,8 @@ public class GeCustodyEngineTest
         assertEquals(10L, before.realizedResultGp);
         assertTrue(before.realizedResultCorrectionAware);
 
-        h.engine.correctTransaction(settlement.getId(),
-            Correction.IGNORE, h.now, "audit test");
+        h.engine.correctTransaction(settlement.id(),
+            Correction.IGNORE, "audit test");
         MarketRows.Row after = h.engine.marketRows().get(0);
         assertEquals("the projection consumes effective corrected truth", 0L, after.realizedResultGp);
         assertEquals("the counted gain remains", 60L, h.net());
@@ -876,4 +853,64 @@ public class GeCustodyEngineTest
             return flows;
         }, new TransactionClassifier(), config);
     }
+    @Test public void activePartialBuyPriceImprovementNeverNeedsReview() {
+        for (boolean bank:new boolean[]{false,true}) {
+            Harness h=new Harness(1016);
+            h.inventory=with(h.inventory,COINS,bank?0L:1000000L);h.engine.setBaseline(new ContainerSnapshot(h.inventory));
+            h.offer(3,BUYING,LOGS,200,0,1054,0);
+            if(!bank)h.settle(with(h.inventory,COINS,789200L));
+            h.offer(3,BUYING,LOGS,200,156,1054,158496);
+            h.engine.noteGeCollect(h.now);h.engine.markContext(Context.MARKET,10,GameData.msg("ge-collect"));
+            h.settle(with(h.inventory,LOGS,156L,COINS,h.inventory.getOrDefault(COINS,0L)+5928));
+            assertEquals("a partial buy returns its own price improvement",0,h.reviews().size());
+            assertEquals(0,h.net());
+            var record=h.engine.exchange.records().get(0);
+            assertEquals(5928,record.refundedGp);assertEquals(156,record.settledQty);
+            h.offer(3,CANCELLED_BUY,LOGS,200,156,1054,158496);
+            h.offer(3,EMPTY,0,0,0,0,0);h.engine.noteGeCollect(h.now);h.engine.markContext(Context.MARKET,10,GameData.msg("ge-collect"));
+            h.settle(with(h.inventory,COINS,h.inventory.getOrDefault(COINS,0L)+46376));
+            assertEquals(0,h.reviews().size());assertEquals(0,h.net());assertEquals(52304,record.refundedGp);
+            assertEquals(158496,EngineProbe.knownCoverageBasisGp(h.engine,LOGS));
+        }
+    }
+    @Test public void changeCanArriveJustAfterThePartialItems() {
+        Harness h=new Harness(1016);h.offer(3,BUYING,LOGS,200,0,1054,0);
+        h.offer(3,BUYING,LOGS,200,156,1054,158496);h.engine.noteGeCollect(h.now);h.engine.markContext(Context.MARKET,10,GameData.msg("ge-collect"));
+        h.settle(with(h.inventory,LOGS,156L));h.engine.noteGeCollect(h.now);h.engine.markContext(Context.MARKET,10,GameData.msg("ge-collect"));
+        h.settle(with(h.inventory,COINS,h.inventory.getOrDefault(COINS,0L)+5928));
+        assertEquals(0,h.reviews().size());assertEquals(0,h.net());
+    }
+    @Test public void activeBuyCannotRefundItsUnfilledPrincipal() {
+        Harness h=new Harness(1016);h.inventory=with(h.inventory,COINS,1000000L);h.engine.setBaseline(new ContainerSnapshot(h.inventory));
+        h.offer(3,BUYING,LOGS,200,0,1054,0);h.settle(with(h.inventory,COINS,789200L));
+        h.offer(3,BUYING,LOGS,200,156,1054,158496);
+        h.engine.noteGeCollect(h.now);h.engine.markContext(Context.MARKET,10,GameData.msg("ge-collect"));h.settle(with(h.inventory,LOGS,156L,COINS,841504L));
+        assertEquals(5928,h.engine.exchange.records().get(0).refundedGp);
+        assertEquals("the unfilled reserve is not released",1,h.reviews().size());
+    }
+
+    @Test public void anOldUnmatchedGeReviewIsNotGuessedIntoARefund() {
+        Harness h=new Harness(1016);h.offer(3,BUYING,LOGS,200,0,1054,0);
+        h.offer(3,BUYING,LOGS,200,156,1054,158496);h.engine.noteGeCollect(h.now);h.engine.markContext(Context.MARKET,10,GameData.msg("ge-collect"));
+        var purchase=h.settle(with(h.inventory,LOGS,156L));
+        Transaction old=new Transaction(purchase.timestamp+600,TransactionType.UNCERTAIN,Context.MARKET,
+            GameData.msg("ge-collect"),"Trading",false,List.of(new Flow(COINS,"Coins",5928,1,5928,PriceSource.FACE_VALUE)),
+            Confidence.UNCERTAIN,GameData.msg("ge-movement"),null);
+        h.engine.session().addTransaction(old,2000,false);
+        h.engine.recheck(item->0);assertEquals(TransactionType.UNCERTAIN,old.type());
+    }
+
+    @Test public void bankPaidFinishedBuyCanReturnChangeWithItsItemsBeforeSlotClear() {
+        Harness h=new Harness(48);h.inventory=with(h.inventory,COINS,0L);h.engine.setBaseline(new ContainerSnapshot(h.inventory));
+        h.offer(0,BUYING,LOGS,10,0,50,0);h.offer(0,BOUGHT,LOGS,10,10,50,480);
+        h.engine.noteGeCollect(h.now);h.engine.markContext(Context.MARKET,10,GameData.msg("ge-collect"));
+        h.settle(with(h.inventory,LOGS,10L,COINS,20L));assertEquals(0,h.reviews().size());assertEquals(0,h.net());
+    }
+    @Test public void anActivePartialBuyDoesNotOwnAnUnrelatedCoinPickup() {
+        Harness h=new Harness(1016);h.offer(3,BUYING,LOGS,200,0,1054,0);
+        h.offer(3,BUYING,LOGS,200,156,1054,158496);
+        h.settle(with(h.inventory,COINS,105928L));assertEquals(0,h.engine.exchange.records().get(0).refundedGp);
+        assertEquals(5928,h.net());
+    }
+
 }

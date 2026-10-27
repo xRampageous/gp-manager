@@ -57,8 +57,8 @@ public class PartialCollectReceiptTest
         assertFalse("no Result is invented for a quarantined settlement",
             lines.stream().anyMatch(line -> line.startsWith("Result")));
 
-        Semantics.Receipt receipt = fixture.capture(settlementId, null).detail.receipts.get(0);
-        LedgerPage page = fixture.auy(settlementId, receipt.contributionId);
+        Semantics.Receipt receipt = fixture.capture(settlementId, null).detail.entries.get(0);
+        LedgerPage page = fixture.auy(settlementId, receipt.id);
         assertEquals("EXACT", LedgerPageProbe.drill(page));
         List<String> texts = LedgerPageProbe.detailTexts(page);
         assertTrue("Received is not proven: " + texts, texts.contains("Received") && texts.contains("not proven"));
@@ -70,12 +70,12 @@ public class PartialCollectReceiptTest
         Fixture fixture = ambiguousBoltFixture();
         String settlementId = fixture.row(BOLT).settlementId;
         LedgerData data = fixture.capture(settlementId, null);
-        assertEquals("the market group owns exactly its sale receipt", 1, data.detail.receipts.size());
-        Semantics.Receipt receipt = data.detail.receipts.get(0);
-        assertEquals("never the Coins leg", BOLT, receipt.itemId);
+        assertEquals("the market group owns exactly its sale receipt", 1, data.detail.entries.size());
+        Semantics.Receipt receipt = data.detail.entries.get(0);
+        assertEquals("never the Coins leg", BOLT, receipt.item);
         assertEquals("Bolt of linen", MarketText.receiptTitle(receipt));
         assertFalse("the group never lists an unclaimed Coins receipt",
-            data.detail.receipts.stream().anyMatch(candidate -> candidate.itemId == COINS));
+            data.detail.entries.stream().anyMatch(candidate -> candidate.item == COINS));
 
         // A stale contribution anchor that points at the settlement's Coins leg must never open a
         // receipt titled "Coins": the sale's own receipt and item title win.
@@ -90,11 +90,11 @@ public class PartialCollectReceiptTest
 
         // The unclaimed collect stays its own uncounted Review row.
         int reviewRows = 0;
-        for (Transaction transaction : fixture.engine.getActiveSession().getTransactions())
+        for (Transaction transaction : fixture.engine.session().transactions())
         {
-            if (transaction.autoType() == TransactionType.UNCERTAIN
-                && transaction.getFlows().size() == 1
-                && transaction.getFlows().get(0).itemId == COINS)
+            if (transaction.original() == TransactionType.UNCERTAIN
+                && transaction.flows().size() == 1
+                && transaction.flows().get(0).item == COINS)
             {
                 reviewRows++;
             }
@@ -115,9 +115,9 @@ public class PartialCollectReceiptTest
         // The owner smoke: the collected slot is reused by the next listing.
         fixture.placeAndSell(0, SILVER, 60L, 7_500L, t + 20_000L);
 
-        Semantics.Receipt receipt = fixture.capture(settlementId, null).detail.receipts.get(0);
-        assertEquals(SHARK, receipt.itemId);
-        LedgerPage page = fixture.auy(settlementId, receipt.contributionId);
+        Semantics.Receipt receipt = fixture.capture(settlementId, null).detail.entries.get(0);
+        assertEquals(SHARK, receipt.item);
+        LedgerPage page = fixture.auy(settlementId, receipt.id);
         List<String> texts = LedgerPageProbe.detailTexts(page);
         assertTrue("the sale stays a market receipt: " + texts,
             texts.contains("Received") && texts.contains(Fmt.exact(SHARK_NET) + " gp"));

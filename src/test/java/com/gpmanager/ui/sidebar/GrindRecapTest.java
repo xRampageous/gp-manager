@@ -31,13 +31,13 @@ public class GrindRecapTest
         long start = now - 2 * 3_600_000L;
         String grindId = runGrind(engine, "Vorkath", start, now, 6_000_000L, 500_000L, 5_000_000L,
             3L * 3_600_000L);
-        Session session = engine.getHistory().get(0);
-        assertEquals(grindId, session.getGrindId());
+        Session session = engine.history().get(0);
+        assertEquals(grindId, session.grindId());
 
-        Metrics metrics = engine.historyMetrics(session.getId(), now);
-        String aay = GrindHistory.netOutcome(session.getProfitTargetGp(), metrics.net, true);
-        String akd = GrindHistory.timeOutcome(session.getActiveTimeTargetMillis(),
-            metrics.elapsedMillis);
+        Metrics metrics = engine.historyMetrics(session.id(), now);
+        String aay = GrindHistory.netOutcome(session.targetGp(), metrics.net, true);
+        String akd = GrindHistory.timeOutcome(session.timeTargetMillis(),
+            metrics.elapsed);
         assertTrue(aay.contains("Reached"));
         assertTrue(akd.contains("remaining"));
         assertFalse("the word Failed never appears", aay.contains("Failed"));
@@ -51,11 +51,11 @@ public class GrindRecapTest
         long now = System.currentTimeMillis();
         long start = now - 3_600_000L;
         runGrind(engine, "Vorkath", start, now, 2_000_000L, 0L, 5_000_000L, 3L * 3_600_000L);
-        Session session = engine.getHistory().get(0);
-        Metrics metrics = engine.historyMetrics(session.getId(), now);
-        String aay = GrindHistory.netOutcome(session.getProfitTargetGp(), metrics.net, true);
-        String akd = GrindHistory.timeOutcome(session.getActiveTimeTargetMillis(),
-            metrics.elapsedMillis);
+        Session session = engine.history().get(0);
+        Metrics metrics = engine.historyMetrics(session.id(), now);
+        String aay = GrindHistory.netOutcome(session.targetGp(), metrics.net, true);
+        String akd = GrindHistory.timeOutcome(session.timeTargetMillis(),
+            metrics.elapsed);
 
         assertTrue("not reached is stated factually: " + aay, aay.contains("Ended before target"));
         assertTrue("time target is still open: " + akd, akd.contains("remaining"));
@@ -102,18 +102,18 @@ public class GrindRecapTest
         long costValue, Long netTarget, Long timeTarget)
     {
         SavedState.SavedGrind definition = engine.saveGrind(name, netTarget, timeTarget, false);
-        String grindId = definition.getGrindId();
+        String grindId = definition.id();
         engine.startGrind(name, grindId, netTarget, timeTarget, start);
         if (gainValue != 0L)
         {
-            engine.getActiveSession().addTransaction(
+            engine.session().addTransaction(
                 gain(start + 1_000L, "Dragon bones", 1, 1, (int) gainValue, gainValue), 2_000, false);
         }
         if (costValue != 0L)
         {
             Transaction consumed = cost(start + 2_000L, "Prayer potion(4)", 3, costValue);
-            consumed.setActionKind(ActionKind.DRINK);
-            engine.getActiveSession().addTransaction(consumed, 2_000, false);
+            consumed.setAction(ActionKind.DRINK);
+            engine.session().addTransaction(consumed, 2_000, false);
         }
         engine.finishCustom(end);
         return grindId;

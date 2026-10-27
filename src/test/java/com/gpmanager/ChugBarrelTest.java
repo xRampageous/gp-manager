@@ -71,18 +71,18 @@ public class ChugBarrelTest
         intake.drank(1_001_600L);
         intake.drank(1_002_200L);
 
-        List<Transaction> rows = engine.getActiveSession().getTransactions();
+        List<Transaction> rows = engine.session().transactions();
         assertEquals("one row per chug", 1, rows.size());
         Transaction row = rows.get(0);
         assertEquals("Chugging barrel", row.spellName());
-        assertEquals(ActionKind.DRINK, row.getActionKind());
-        assertEquals("one dose of each", -2_400L - 3_600L, engine.getMetrics(1_100_000L).net);
+        assertEquals(ActionKind.DRINK, row.action());
+        assertEquals("one dose of each", -2_400L - 3_600L, engine.metrics(1_100_000L).net);
         assertEquals("one Recent row", 1, LiveProbe.recent(rows, LiveContext.NONE).size());
-        assertEquals("the row shows the barrel itself", 30000, LiveProbe.recent(rows, LiveContext.NONE).get(0).itemId);
+        assertEquals("the row shows the barrel itself", 30000, LiveProbe.recent(rows, LiveContext.NONE).get(0).item);
         assertEquals("a spell keeps its sprite", -15, Spells.icon("Wind Strike"));
         assertEquals("no label, no icon", -1, Spells.icon("Drank"));
         assertTrue("filling it through its window is a move",
-            GameData.cachedRows("store_windows").stream().anyMatch(store -> "PrepotDevice.FRAME".equals(store[1])));
+            GameData.cached("store_windows").stream().anyMatch(store -> "PrepotDevice.FRAME".equals(store[1])));
     }
 
     @Test
@@ -95,11 +95,35 @@ public class ChugBarrelTest
         engine.setBaseline(new ContainerSnapshot(new HashMap<>()));
         java.util.regex.Matcher line = GameData.pattern("bru").matcher("You remove 1000 charges from your staff, leaving it empty.");
         assertTrue(line.matches());
-        new ChargeIntake(null, null, CONFIG, engine, valuation).emptied(ChargeCheck.parseCount(line.group(1)), 1_001_000L);
-        assertEquals(-138_000L, engine.getMetrics(1_100_000L).net);
-        Transaction row = engine.getActiveSession().getTransactions().get(0);
-        assertEquals("an exact count, not an estimate", "Measured charge spend · Bryophyta's staff", row.getNote());
-        assertEquals(Confidence.CONFIRMED, row.getConfidence());
+        new ChargeIntake(null, null, CONFIG, engine, valuation).emptied(ChargeCheck.digits(line.group(1)), 1_001_000L);
+        assertEquals(-138_000L, engine.metrics(1_100_000L).net);
+        Transaction row = engine.session().transactions().get(0);
+        assertEquals("an exact count, not an estimate", "Measured charge spend · Bryophyta's staff", row.note());
+        assertEquals(Confidence.CONFIRMED, row.confidence());
+    }
+
+    @Test
+    public void onlyGameChatCanBookStaffUncharging() throws Exception
+    {
+        for (net.runelite.api.ChatMessageType type : new net.runelite.api.ChatMessageType[] {
+            net.runelite.api.ChatMessageType.PUBLICCHAT, net.runelite.api.ChatMessageType.CLAN_CHAT,
+            net.runelite.api.ChatMessageType.PRIVATECHAT, net.runelite.api.ChatMessageType.MESBOX})
+        {
+            Valuation valuation = ModelProbe.valuation(CONFIG, ChugBarrelTest::composition, id -> id == 561 ? 138 : 0);
+            Engine engine = new Engine(valuation, new TransactionClassifier(), CONFIG);
+            engine.startCustom("Alching", 1_000_000L);
+            GpManagerPlugin plugin = new GpManagerPluginProbe();
+            GpManagerPluginProbe.set(plugin, "config", CONFIG);
+            GpManagerPluginProbe.set(plugin, "engine", engine);
+            GpManagerPluginProbe.set(plugin, "charges", new ChargeIntake(null, null, CONFIG, engine, valuation));
+            var message = new net.runelite.api.events.ChatMessage();
+            message.setType(type);
+            message.setMessage("You remove 1000 charges from your staff, leaving it empty.");
+            plugin.onChatMessage(message);
+            boolean game = type == net.runelite.api.ChatMessageType.MESBOX;
+            assertEquals(type.toString(), game ? 1 : 0, engine.session().transactions().size());
+            assertEquals(game ? -138_000L : 0L, engine.metrics(System.currentTimeMillis()).net);
+        }
     }
 
     private static ItemComposition composition(int id)

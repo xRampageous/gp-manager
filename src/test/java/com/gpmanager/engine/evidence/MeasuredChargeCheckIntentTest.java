@@ -1,6 +1,9 @@
 package com.gpmanager;
 
 import java.lang.reflect.Proxy;
+import java.util.List;
+import java.util.function.LongSupplier;
+import net.runelite.api.ChatMessageType;
 import net.runelite.api.Client;
 import net.runelite.api.EquipmentInventorySlot;
 import net.runelite.api.Item;
@@ -8,6 +11,7 @@ import net.runelite.api.ItemContainer;
 import net.runelite.api.MenuAction;
 import net.runelite.api.MenuEntry;
 import net.runelite.api.events.MenuOptionClicked;
+import net.runelite.api.events.ChatMessage;
 import net.runelite.api.gameval.ItemID;
 import net.runelite.api.widgets.Widget;
 import org.junit.Test;
@@ -20,6 +24,82 @@ import static org.junit.Assert.assertTrue;
 
 public final class MeasuredChargeCheckIntentTest
 {
+    @Test
+    public void savedChargeChatKeepsThePendingCheckAndItsMeasuredReconciliation()
+    {
+        for (ChatMessageType type : new ChatMessageType[] {ChatMessageType.SPAM, ChatMessageType.GAMEMESSAGE})
+        {
+            ChargeChat fixture = new ChargeChat();
+            fixture.chat(type, "Ghommal's luck saves a charge on your Scythe of Vitur.");
+            assertNotNull("the system notice is compatible with the pending Check", fixture.charges.checkIntent());
+            fixture.chat(ChatMessageType.SPAM, fixture.read);
+            assertEquals("unchanged measured stock removes its automatic estimate", 0L, fixture.costs());
+        }
+    }
+
+    @Test
+    public void playerChatCannotRefundChargesOrDisruptThePendingCheck()
+    {
+        ChargeChat fixture = new ChargeChat();
+        fixture.chat(ChatMessageType.PUBLICCHAT, "Ghommal's luck saves a charge on your Scythe of Vitur.");
+        assertNotNull(fixture.charges.checkIntent());
+        assertEquals(200L, fixture.costs());
+        fixture.chat(ChatMessageType.SPAM, fixture.read);
+        assertEquals(0L, fixture.costs());
+    }
+
+    @Test
+    public void unrelatedSystemChatStillInvalidatesThePendingCheck()
+    {
+        ChargeChat fixture = new ChargeChat();
+        fixture.chat(ChatMessageType.GAMEMESSAGE, "A completely unrelated message.");
+        assertNull(fixture.charges.checkIntent());
+        fixture.chat(ChatMessageType.SPAM, fixture.read);
+        assertEquals("no target proof means no reconciliation", 200L, fixture.costs());
+    }
+
+    private static final class ChargeChat
+    {
+        final Engine engine = ReviewFixesTest.engine();
+        final Client client = wornClient(EquipmentInventorySlot.WEAPON.getSlotIdx(), ItemID.SCYTHE_OF_VITUR, 100);
+        final ChargeIntake charges = new ChargeIntake(client, null, ReviewFixesTest.CONFIG, engine, null);
+        final GpManagerPlugin plugin = new GpManagerPlugin()
+        {
+            @Override boolean canIngest() { return true; }
+        };
+        final String read = "Your scythe of Vitur has 10 charges remaining.";
+
+        ChargeChat()
+        {
+            plugin.engine = engine;
+            plugin.client = client;
+            plugin.config = ReviewFixesTest.CONFIG;
+            plugin.charges = charges;
+            assertTrue(charges.startCheck(ChargeCheck.ChargedItem.SCYTHE, "slot", 100, 2));
+            assertTrue(charges.observeCheck(read, ReviewFixesTest.T0));
+            engine.bookEstimatedCharge("slot", "Scythe of Vitur", ActionKind.SUPPLIES,
+                List.of(new Flow(ItemID.BLOODRUNE, "Blood rune", -2L, 100, -200L, PriceSource.GRAND_EXCHANGE)),
+                ReviewFixesTest.T0 + 1L);
+            assertTrue(charges.startCheck(ChargeCheck.ChargedItem.SCYTHE, "slot", 100, 2));
+        }
+
+        void chat(ChatMessageType type, String text)
+        {
+            LongSupplier clock = SafeMath.clock;
+            SafeMath.clock = () -> ReviewFixesTest.T0 + 2L;
+            try
+            {
+                ChatMessage event = new ChatMessage();
+                event.setType(type);
+                event.setMessage(text);
+                plugin.onChatMessage(event);
+            }
+            finally { SafeMath.clock = clock; }
+        }
+
+        long costs() { return engine.metrics(ReviewFixesTest.T0 + 3L).cost; }
+    }
+
     @Test
     public void exactChatReadConsumesOnlyItsFreshMenuTargetOnce()
     {
@@ -66,7 +146,7 @@ public final class MeasuredChargeCheckIntentTest
             intent.observeCheck("Your crystal shield has 2,470 charges remaining.", 1_000L));
         assertTrue(
             "a Check on a committed-load piece books nothing",
-            engine.getActiveSession().getTransactions().isEmpty());
+            engine.session().transactions().isEmpty());
     }
 
     @Test

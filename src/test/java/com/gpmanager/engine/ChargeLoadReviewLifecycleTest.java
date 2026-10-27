@@ -42,16 +42,16 @@ public class ChargeLoadReviewLifecycleTest
             12934, "Zulrah's scales", TARGET, 8);
         engine.markDirty();
         Transaction load = settle(engine, snapshot(12934, 50L), start + 600L);
-        assertEquals("a validated recharge is neutral on arrival", TransactionType.TRANSFER, load.autoType());
-        assertFalse(load.isCounted());
-        assertEquals("Charge load transfer", load.getNote());
-        assertEquals(0L, engine.getMetrics(start + 2_400L).net);
-        assertEquals(0L, engine.getMetrics(start + 2_400L).costs);
+        assertEquals("a validated recharge is neutral on arrival", TransactionType.TRANSFER, load.original());
+        assertFalse(load.counts());
+        assertEquals("Charge load transfer", load.note());
+        assertEquals(0L, engine.metrics(start + 2_400L).net);
+        assertEquals(0L, engine.metrics(start + 2_400L).cost);
 
         assertEquals("the loaded scales are not use", ChargeDelta.CheckResult.SAME,
             engine.observeCheck(blowpipe(50, 10), TARGET, start + 3_000L).result);
-        assertEquals(TransactionType.TRANSFER, load.autoType());
-        assertEquals(0L, engine.getMetrics(start + 3_000L).net);
+        assertEquals(TransactionType.TRANSFER, load.original());
+        assertEquals(0L, engine.metrics(start + 3_000L).net);
 
         ChargeDelta use = engine.observeCheck(
             blowpipe(48, 10), TARGET, start + 4_000L);
@@ -63,9 +63,9 @@ public class ChargeLoadReviewLifecycleTest
                 -200L, PriceSource.GRAND_EXCHANGE)),
             start + 4_000L, null);
         assertTrue(spend != null);
-        assertEquals(-200L, spend.getNet());
-        assertEquals(200L, engine.getMetrics(start + 4_000L).costs);
-        assertEquals(-200L, engine.getMetrics(start + 4_000L).net);
+        assertEquals(-200L, spend.net());
+        assertEquals(200L, engine.metrics(start + 4_000L).cost);
+        assertEquals(-200L, engine.metrics(start + 4_000L).net);
     }
 
     /** Converting or trimming the Review row is a change like any other: the revision advances. */
@@ -80,10 +80,10 @@ public class ChargeLoadReviewLifecycleTest
         engine.markChargeLoad(ChargeCheck.ChargedItem.BLOWPIPE,
             12934, "Zulrah's scales", TARGET, 8);
         engine.markDirty();
-        long before = engine.getRevision();
+        long before = engine.revision();
         Transaction load = settle(engine, snapshot(12934, 50L), start + 600L);
-        assertEquals(TransactionType.TRANSFER, load.autoType());
-        assertTrue("the load transfer is saved", engine.getRevision() > before);
+        assertEquals(TransactionType.TRANSFER, load.original());
+        assertTrue("the load transfer is saved", engine.revision() > before);
     }
 
     @Test
@@ -105,16 +105,16 @@ public class ChargeLoadReviewLifecycleTest
         Transaction review = settle(engine,
             snapshot(mapOf(560, 8L, 562, 8L, 554, 40L, 995, 80L)),
             start + 600L);
-        assertEquals(TransactionType.TRANSFER, review.autoType());
-        assertEquals(4, review.getFlows().size());
-        assertEquals(0L, engine.getMetrics(start + 2_400L).net);
+        assertEquals(TransactionType.TRANSFER, review.original());
+        assertEquals(4, review.flows().size());
+        assertEquals(0L, engine.metrics(start + 2_400L).net);
 
         assertEquals("the 2 loaded charges are not use", ChargeDelta.CheckResult.SAME,
             engine.observeCheck(ChargeCheck.parse("Your Trident of the seas has 12 charges."),
                 target, start + 3_000L).result);
-        assertEquals(TransactionType.TRANSFER, review.autoType());
-        assertEquals(4, review.getFlows().size());
-        assertEquals(0L, engine.getMetrics(start + 3_000L).net);
+        assertEquals(TransactionType.TRANSFER, review.original());
+        assertEquals(4, review.flows().size());
+        assertEquals(0L, engine.metrics(start + 3_000L).net);
     }
 
     @Test
@@ -129,10 +129,10 @@ public class ChargeLoadReviewLifecycleTest
         engine.markDirty();
         Transaction load = settle(engine, snapshot(12934, 50L), start + 600L);
 
-        assertEquals("a validated recharge never waits in Review", TransactionType.TRANSFER, load.autoType());
-        assertFalse(load.isCounted());
-        assertEquals("Charge load transfer", load.getNote());
-        assertEquals(0L, engine.getMetrics(start + 11 * 60_000L).net);
+        assertEquals("a validated recharge never waits in Review", TransactionType.TRANSFER, load.original());
+        assertFalse(load.counts());
+        assertEquals("Charge load transfer", load.note());
+        assertEquals(0L, engine.metrics(start + 11 * 60_000L).net);
     }
 
     @Test
@@ -149,12 +149,12 @@ public class ChargeLoadReviewLifecycleTest
         engine.markDirty();
         long settleAt = start + 11 * 60_000L;
         Transaction review = settle(engine, snapshot(12934, 50L), settleAt);
-        assertEquals(TransactionType.TRANSFER, review.autoType());
+        assertEquals(TransactionType.TRANSFER, review.original());
 
         engine.observeCheck(blowpipe(50, 10), TARGET, settleAt + 3_000L);
-        assertEquals(TransactionType.TRANSFER, review.autoType());
-        assertFalse(review.isCounted());
-        assertEquals(0L, engine.getMetrics(settleAt + 3_000L).net);
+        assertEquals(TransactionType.TRANSFER, review.original());
+        assertFalse(review.counts());
+        assertEquals(0L, engine.metrics(settleAt + 3_000L).net);
     }
 
     @Test
@@ -179,15 +179,15 @@ public class ChargeLoadReviewLifecycleTest
             Collections.singletonList(new Flow(ItemID.RUNE_DART, "Rune dart", -2L, 500,
                 -1_000L, PriceSource.GRAND_EXCHANGE)),
             start + 3_000L, null);
-        List<Transaction> rows = engine.getActiveSession().getTransactions();
+        List<Transaction> rows = engine.session().transactions();
         Transaction transfer = only(rows, TransactionType.TRANSFER);
         assertEquals("scales and darts load as one neutral transfer", 2,
-            transfer.getFlows().size());
-        assertFalse(transfer.isCounted());
+            transfer.flows().size());
+        assertFalse(transfer.counts());
         // The pack's dart went into the pipe with the scales, and the pipe holds one fewer than
         // the last Check: two darts left it.
         assertTrue("the measured dart use is the cost", spent != null);
-        assertEquals(1_000L, engine.getMetrics(start + 3_000L).costs);
+        assertEquals(1_000L, engine.metrics(start + 3_000L).cost);
     }
 
     @Test
@@ -203,13 +203,13 @@ public class ChargeLoadReviewLifecycleTest
         engine.markDirty();
         Transaction load = settle(engine, snapshot(12934, 50L), start + 600L);
 
-        assertEquals(TransactionType.TRANSFER, load.autoType());
-        assertEquals(-50L, load.getFlows().get(0).quantityDelta);
+        assertEquals(TransactionType.TRANSFER, load.original());
+        assertEquals(-50L, load.flows().get(0).quantity);
         engine.observeCheck(blowpipe(40, 10), TARGET, start + 3_000L);
         assertEquals("a later lower read never repriced the neutral transfer",
-            TransactionType.TRANSFER, load.autoType());
-        assertFalse(load.isCounted());
-        assertEquals(0L, engine.getMetrics(start + 3_000L).net);
+            TransactionType.TRANSFER, load.original());
+        assertFalse(load.counts());
+        assertEquals(0L, engine.metrics(start + 3_000L).net);
     }
 
     @Test
@@ -232,21 +232,21 @@ public class ChargeLoadReviewLifecycleTest
         ChargeOutcomeTest.none(engine.observeCheck(blowpipe(0, 10), TARGET, start + 5_000L));
         ChargeOutcomeTest.none(engine.observeCheck(blowpipe(20, 10), TARGET, start + 6_000L));
         List<Transaction> transfers = new ArrayList<>();
-        for (Transaction row : engine.getActiveSession().getTransactions())
+        for (Transaction row : engine.session().transactions())
         {
-            if (row.autoType() == TransactionType.TRANSFER)
+            if (row.original() == TransactionType.TRANSFER)
             {
                 transfers.add(row);
             }
         }
         assertEquals("each validated load transfers on arrival", 2, transfers.size());
-        assertFalse(transfers.get(0).isCounted());
-        assertFalse(transfers.get(1).isCounted());
-        assertEquals(ActionKind.CHARGE_LOAD_AMBIGUOUS, transfers.get(0).getActionKind());
-        assertEquals(ActionKind.CHARGE_LOAD_AMBIGUOUS, transfers.get(1).getActionKind());
-        assertEquals(0L, engine.getMetrics(start + 6_000L).net);
+        assertFalse(transfers.get(0).counts());
+        assertFalse(transfers.get(1).counts());
+        assertEquals(ActionKind.CHARGE_LOAD_AMBIGUOUS, transfers.get(0).action());
+        assertEquals(ActionKind.CHARGE_LOAD_AMBIGUOUS, transfers.get(1).action());
+        assertEquals(0L, engine.metrics(start + 6_000L).net);
         assertEquals("a load is value moved, never a cost", 0L,
-            engine.getMetrics(start + 7_000L).costs);
+            engine.metrics(start + 7_000L).cost);
     }
 
     @Test
@@ -261,13 +261,13 @@ public class ChargeLoadReviewLifecycleTest
             12934, "Zulrah's scales", TARGET, 8);
         engine.markDirty();
         Transaction review = settle(engine, snapshot(12934, 50L), start + 600L);
-        assertEquals(2, review.getFlows().size());
+        assertEquals(2, review.flows().size());
 
         engine.observeCheck(blowpipe(50, 10), TARGET, start + 3_000L);
-        assertEquals(TransactionType.TRANSFER, review.autoType());
-        assertEquals(2, review.getFlows().size());
-        assertFalse(review.isCounted());
-        assertEquals(0L, engine.getMetrics(start + 3_000L).net);
+        assertEquals(TransactionType.TRANSFER, review.original());
+        assertEquals(2, review.flows().size());
+        assertFalse(review.counts());
+        assertEquals(0L, engine.metrics(start + 3_000L).net);
     }
 
     @Test
@@ -294,7 +294,7 @@ public class ChargeLoadReviewLifecycleTest
                 -100L, PriceSource.GRAND_EXCHANGE)),
             start + 5_000L, null);
         assertTrue("a validated load blocks nothing: the use is the cost", booked != null);
-        assertEquals(100L, engine.getMetrics(start + 5_000L).costs);
+        assertEquals(100L, engine.metrics(start + 5_000L).cost);
     }
 
     @Test
@@ -321,9 +321,9 @@ public class ChargeLoadReviewLifecycleTest
             Collections.singletonList(new Flow(12934, "Zulrah's scales", -1L, 100,
                 -100L, PriceSource.GRAND_EXCHANGE)), start + 3_000L, null) != null);
 
-        assertEquals(300L, engine.getMetrics(start + 3_000L).costs);
-        assertEquals(-300L, engine.getMetrics(start + 3_000L).net);
-        assertEquals(2, countTransactions(engine.getActiveSession(), TransactionType.CONSUMPTION));
+        assertEquals(300L, engine.metrics(start + 3_000L).cost);
+        assertEquals(-300L, engine.metrics(start + 3_000L).net);
+        assertEquals(2, countTransactions(engine.session(), TransactionType.CONSUMPTION));
     }
 
     @Test
@@ -368,8 +368,8 @@ public class ChargeLoadReviewLifecycleTest
             Collections.singletonList(new Flow(12934, "Zulrah's scales", -3L, 100, -300L, PriceSource.GRAND_EXCHANGE)), start + 2_000L, null) != null);
         assertTrue(engine.bookChargeSpend(secondUse, "Toxic blowpipe",
             Collections.singletonList(new Flow(12934, "Zulrah's scales", -1L, 100, -100L, PriceSource.GRAND_EXCHANGE)), start + 3_000L, null) != null);
-        assertEquals(400L, engine.getMetrics(start + 3_000L).costs);
-        assertEquals(2, countTransactions(engine.getActiveSession(), TransactionType.CONSUMPTION));
+        assertEquals(400L, engine.metrics(start + 3_000L).cost);
+        assertEquals(2, countTransactions(engine.session(), TransactionType.CONSUMPTION));
     }
 
     /** Owner-approved: a top-up is measured against that weapon's own last Check. */
@@ -387,15 +387,15 @@ public class ChargeLoadReviewLifecycleTest
             12934, "Zulrah's scales", TARGET, 8);
         engine.markDirty();
         Transaction review = settle(engine, snapshot(12934, 50L), start + 600L);
-        assertEquals(TransactionType.TRANSFER, review.autoType());
+        assertEquals(TransactionType.TRANSFER, review.original());
 
         // The other blowpipe is Checked between the load and this pipe's next Check.
         ChargeOutcomeTest.none(engine.observeCheck(blowpipe(40, 10), second, start + 2_000L));
         assertEquals(ChargeDelta.CheckResult.SAME,
             engine.observeCheck(blowpipe(50, 10), TARGET, start + 3_000L).result);
         assertEquals("the load is confirmed by this pipe's own Check", TransactionType.TRANSFER,
-            review.autoType());
-        assertEquals(0L, engine.getMetrics(start + 3_000L).net);
+            review.original());
+        assertEquals(0L, engine.metrics(start + 3_000L).net);
     }
 
     @Test
@@ -425,18 +425,18 @@ public class ChargeLoadReviewLifecycleTest
         Engine engine = engine();
         long start = 75_000L;
         engine.ensureSession(start);
-        engine.getActiveSession().setActivityHint("Zulrah", start);
+        engine.session().setActivityHint("Zulrah", start);
         ChargeOutcomeTest.none(engine.observeCheck(blowpipe(100, 10), TARGET, start));
         ChargeDelta use = engine.observeCheck(blowpipe(98, 10), TARGET, start + 1_000L);
         Transaction spend = engine.bookChargeSpend(use, "Toxic blowpipe",
             Collections.singletonList(new Flow(12934, "Zulrah's scales", -2L, 100, -200L, PriceSource.GRAND_EXCHANGE)), start + 1_000L, null);
         assertTrue(spend != null);
-        assertEquals("Zulrah", spend.getActivityName());
-        engine.getActiveSession().setActivityHint("Vorkath", start + 2_000L);
+        assertEquals("Zulrah", spend.activityName());
+        engine.session().setActivityHint("Vorkath", start + 2_000L);
         ChargeDelta later = engine.observeCheck(blowpipe(97, 10), TARGET, start + 3_000L);
         Transaction laterSpend = engine.bookChargeSpend(later, "Toxic blowpipe",
             Collections.singletonList(new Flow(12934, "Zulrah's scales", -1L, 100, -100L, PriceSource.GRAND_EXCHANGE)), start + 3_000L, null);
-        assertEquals("Vorkath", laterSpend.getActivityName());
+        assertEquals("Vorkath", laterSpend.activityName());
     }
 
 
@@ -457,23 +457,23 @@ public class ChargeLoadReviewLifecycleTest
             engine.markDirty();
             Transaction load = settle(engine, snapshot(ItemID.PRIF_CRYSTAL_SHARD, 38L), start + 600L);
 
-            assertEquals(piece.name(), TransactionType.CONSUMPTION, load.autoType());
-            assertTrue(piece.name(), load.isCounted());
+            assertEquals(piece.name(), TransactionType.CONSUMPTION, load.original());
+            assertTrue(piece.name(), load.counts());
             assertEquals(piece.name(), GameData.msg("committed-load") + piece.getDisplayName(),
-                load.getNote());
-            assertEquals(piece.name(), ActionKind.SUPPLIES, load.getActionKind());
-            assertEquals(piece.name(), -2_000L, load.getNet());
-            assertEquals(piece.name(), 2_000L, engine.getMetrics(start + 2_400L).costs);
-            assertEquals(piece.name(), -2_000L, engine.getMetrics(start + 2_400L).net);
+                load.note());
+            assertEquals(piece.name(), ActionKind.SUPPLIES, load.action());
+            assertEquals(piece.name(), -2_000L, load.net());
+            assertEquals(piece.name(), 2_000L, engine.metrics(start + 2_400L).cost);
+            assertEquals(piece.name(), -2_000L, engine.metrics(start + 2_400L).net);
         }
     }
 
     private static int countTransactions(Session session, TransactionType type)
     {
         int count = 0;
-        for (Transaction transaction : session.getTransactions())
+        for (Transaction transaction : session.transactions())
         {
-            if (transaction.getType() == type)
+            if (transaction.type() == type)
             {
                 count++;
             }
@@ -532,7 +532,7 @@ public class ChargeLoadReviewLifecycleTest
         Transaction match = null;
         for (Transaction row : rows)
         {
-            if (row.autoType() == type)
+            if (row.original() == type)
             {
                 assertTrue("expected a single row of type " + type, match == null);
                 match = row;

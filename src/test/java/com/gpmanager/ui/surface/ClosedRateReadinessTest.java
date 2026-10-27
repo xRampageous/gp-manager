@@ -21,8 +21,8 @@ public class ClosedRateReadinessTest
     {
         Fixture fixture = new Fixture();
         fixture.engine.startCustom("Vorkath", NOW - HOUR);
-        Session session = fixture.engine.getActiveSession();
-        String id = session.getId();
+        Session session = fixture.engine.session();
+        String id = session.id();
         book(session, NOW - HOUR + 60_000L, 1_000_000L);
         book(session, NOW - 30_000L, 1_000_000L);
         fixture.engine.finishCustom(NOW);
@@ -30,8 +30,8 @@ public class ClosedRateReadinessTest
         Session closed = fixture.engine.historySession(id);
         closed.compactBefore(NOW - 30_000L, null);
         GrindsData data = GrindsData.capture(fixture.engine, NOW, false, id);
-        assertTrue("the closed detail rate is established", data.detail.rateEstablished);
-        assertEquals("on the full-session basis", 2_000_000L, data.detail.gpPerHour);
+        assertTrue("the closed detail rate is established", data.detail.ready);
+        assertEquals("on the full-session basis", 2_000_000L, data.detail.rate);
         assertEquals("the money stays exact", 2_000_000L, data.detail.net);
     }
 
@@ -40,14 +40,14 @@ public class ClosedRateReadinessTest
     {
         Fixture fixture = new Fixture();
         fixture.engine.startCustom("Vorkath", NOW - HOUR);
-        Session session = fixture.engine.getActiveSession();
+        Session session = fixture.engine.session();
         book(session, NOW - HOUR + 60_000L, 1_000_000L);
         book(session, NOW - 30_000L, 1_000_000L);
         session.compactBefore(NOW - 30_000L, null);
-        GrindsData data = GrindsData.capture(fixture.engine, NOW, false, session.getId());
+        GrindsData data = GrindsData.capture(fixture.engine, NOW, false, session.id());
         assertTrue("compaction never hides the live rate: it is Net over active time",
-            data.detail.rateEstablished);
-        assertEquals(2_000_000L, data.detail.gpPerHour);
+            data.detail.ready);
+        assertEquals(2_000_000L, data.detail.rate);
     }
 
     @Test
@@ -55,28 +55,28 @@ public class ClosedRateReadinessTest
     {
         Engine under = engine();
         under.startCustom("Vorkath", NOW - 59_000L);
-        book(under.getActiveSession(), NOW - 58_000L, 60_000L);
-        String underId = under.getActiveSession().getId();
+        book(under.session(), NOW - 58_000L, 60_000L);
+        String underId = under.session().id();
         under.finishCustom(NOW);
         assertFalse("under a minute has no rate",
-            GrindsData.capture(under, NOW, false, underId).detail.rateEstablished);
+            GrindsData.capture(under, NOW, false, underId).detail.ready);
 
         Engine exact = engine();
         exact.startCustom("Vorkath", NOW - 60_000L);
-        book(exact.getActiveSession(), NOW - 59_000L, 60_000L);
-        String exactId = exact.getActiveSession().getId();
+        book(exact.session(), NOW - 59_000L, 60_000L);
+        String exactId = exact.session().id();
         exact.finishCustom(NOW);
         GrindsData closed = GrindsData.capture(exact, NOW, false, exactId);
-        assertTrue("exactly a minute qualifies", closed.detail.rateEstablished);
-        assertEquals(3_600_000L, closed.detail.gpPerHour);
+        assertTrue("exactly a minute qualifies", closed.detail.ready);
+        assertEquals(3_600_000L, closed.detail.rate);
 
         Engine zero = engine();
         zero.startCustom("Vorkath", NOW - 120_000L);
-        String zeroId = zero.getActiveSession().getId();
+        String zeroId = zero.session().id();
         zero.finishCustom(NOW);
         GrindsData empty = GrindsData.capture(zero, NOW, false, zeroId);
-        assertTrue("a real zero is not unavailable", empty.detail.rateEstablished);
-        assertEquals(0L, empty.detail.gpPerHour);
+        assertTrue("a real zero is not unavailable", empty.detail.ready);
+        assertEquals(0L, empty.detail.rate);
     }
 
     private static void book(Session session, long at, long value)

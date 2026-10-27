@@ -17,7 +17,7 @@ action.FIRE	Fired
 action.MIX	Mixed
 action.OFFER	Offered
 action.SCATTER	Scattered
-same-target-measured-check	A same-target measured Check confirmed these component quantities were loaded; unconfirmed quantities remain in Review.
+load-confirmed	A same-target measured Check confirmed these component quantities were loaded; unconfirmed quantities remain in Review.
 untradeable-chest	Untradeable chest key held as a non-counted claim token; contents are valued only after a settled INV gain.
 vyre-well	Vyre well
 detailed-entries	Detailed entries unavailable for older compacted history. Retained totals still reconcile.
@@ -33,14 +33,14 @@ counted-as.REVENUE	Counted as Revenue
 counted-as.TRANSFER	Transfer
 death-items	Death: items held by gravestone / retrieval service
 ownership-neutral-transfer	Ownership-neutral transfer: Death: items held by gravestone / retrieval service. Measured inventory/equipment stacks moved while ownership stayed with the player.
-death-reclaim-fee	Death reclaim fee — observed carried-coin loss with returned death items
-grand-exchange-batch	Grand Exchange batch settlement adjustment: exact observed cash differs from attributed gross execution; per-offer allocation is not provable.
-grand-exchange-purchase	Grand Exchange purchase settled: actual spend becomes tracked value; acquisition is Net-neutral.
-grand-exchange-collection	Grand Exchange collection could not be attributed to exact sell executions; the observed cash stays uncounted for review.
-ownership-neutral-grand	Ownership-neutral Grand Exchange custody movement: principal entering or returning from the exchange is a transfer, not realized economics.
-lifecycle-could-settled	This lifecycle could not be settled exactly; it needs your review.
-barrows-wear	Barrows wear
-barrows-gear	Barrows gear wore down a stage or was repaired: the same item, so neutral. Repair fees still count.
+reclaim-fee	Death reclaim fee — observed carried-coin loss with returned death items
+ge-batch	Grand Exchange batch settlement adjustment: exact observed cash differs from attributed gross execution; per-offer allocation is not provable.
+ge-purchase	Grand Exchange purchase settled: actual spend becomes tracked value; acquisition is Net-neutral.
+ge-collection	Grand Exchange collection could not be attributed to exact sell executions; the observed cash stays uncounted for review.
+ge-neutral	Ownership-neutral Grand Exchange custody movement: principal entering or returning from the exchange is a transfer, not realized economics.
+lifecycle-review	This lifecycle could not be settled exactly; it needs your review.
+barrows-wear	Equipment wear
+barrows-gear	Equipment wore down or was repaired: the same item, so neutral. Repair fees still count.
 drunk-chugging	Drunk from the chugging barrel: one dose of each potion in it, as the game's own lines name them.
 game-counted	The game counted these charges out when you uncharged 
 bug-report	https://github.com/xRampageous/gp-manager/issues/new/choose
@@ -50,21 +50,22 @@ house-servant	A house servant fetched, banked or un-noted these items: moved, no
 gbank	 Collected to the bank after filling at several prices: it counts the highest tax it could have paid, so its result is never overstated.
 filled-quantity	Filled quantity is not collected yet; nothing is realized.
 grand-exchange-sale	Grand Exchange sale settled: known proceeds against consumed tracked basis.
-grand-exchange-sale-settled	Grand Exchange sale settled: observed cash retained as liquidation evidence; the prior tracked value of these units is unknown, so no profit is booked automatically.
-grand-exchange-sale-settled-quantity	Grand Exchange sale settled: only the quantity with proven prior tracked value contributes; the remaining liquidation cash stays Net-neutral.
-grand-exchange-sale-settled-proven	Grand Exchange sale settled: only the proven GE tax is counted because the prior tracked value of these units is unknown; no profit is booked automatically.
-grand-exchange-movement	Grand Exchange movement not claimable by a custody lifecycle; recorded for review without booking profit, cost or basis.
+sale-settled	Grand Exchange sale settled: observed cash retained as liquidation evidence; the prior tracked value of these units is unknown, so no profit is booked automatically.
+sale-quantity	Grand Exchange sale settled: only the quantity with proven prior tracked value contributes; the remaining liquidation cash stays Net-neutral.
+sale-proven	Grand Exchange sale settled: only the proven GE tax is counted because the prior tracked value of these units is unknown; no profit is booked automatically.
+ge-movement	Grand Exchange movement not claimable by a custody lifecycle; recorded for review without booking profit, cost or basis.
 hides-my	Hides it from My Grinds; its history is untouched.
 removes-my	Removes it from My Grinds. Its run history is kept.
 logged-out	Logged out · tracking waits until you log back in
 settled-loot	Settled loot-key pickup retained as a non-counted audit row; key contents are valued only when they enter INV.
 primary-value	 · primary value is the observed settlement; Result is versus basis
 realized-market	Realized trade result versus basis · pending trades never count in Net
-observed-settlement-result	 · observed settlement; Result unavailable because prior basis is unknown
+settlement-result	 · observed settlement; Result unavailable because prior basis is unknown
 items-restored	Items restored after leaving the neutral zone; ownership never changed.
 saved-grinds	Grinds you start appear here
 entries-changed	Entries changed while the preview was open · check again
-items-waiting-reclaimed	Items waiting to be reclaimed after death · a reclaimed item stays neutral apart from the fee
+session-changed	The session changed while this was open · nothing was saved
+grave-pending	Items waiting to be reclaimed after death · a reclaimed item stays neutral apart from the fee
 another-client-changed	another client changed this account after the flush; nothing was overwritten.
 resets-gp	Deletes this account's runs, Ledger, My Grinds and totals. Back up & delete saves a safety copy first; without a backup it cannot be undone. Only want fresh numbers? Click the ACTIVE clock for a new session, or Reset free-play in this menu.
 review.COST	Count as cost
@@ -76,7 +77,7 @@ proven-item	The proven per-item GE sell tax for this sale; it reduces Net as a m
 gp-manager-did	GP Manager did not observe enough prior accounting for these units to determine profit. The received cash is liquidation; only a proven GE tax (and any correction) affects Net.
 received-cash	Received is cash from selling owned items; the GE tax row and the Result affect Net.
 collected-cash	The collected cash for this sale was never observed; the booked allocation is not counted.
-result-includes-units	Result includes only units whose previously counted value GP Manager can prove.
+result-covered	Result includes only units whose previously counted value GP Manager can prove.
 spent-cash	Spent is cash used to acquire owned items; only Result affects Net.
 proven-ge	 A proven GE tax is still counted as a market trade cost.
 price-known	No price known · not in Net until priced.
@@ -93,15 +94,15 @@ why-correction.COST	Counted as a cost by you.
 why-correction.IGNORE	Excluded by you.
 why-correction.REVENUE	Counted as a gain by you.
 why-correction.TRANSFER	Marked as a transfer by you.
-stable-inventory-equipment	Stable inventory/equipment value decreased without a stronger context.
-stable-inventory-equipment-value	Stable inventory/equipment value increased without a stronger context.
+stable-stock	Stable inventory/equipment value decreased without a stronger context.
+stable-value	Stable inventory/equipment value increased without a stronger context.
 grand-exchange-shop	Grand Exchange / shop inventory change observed but not counted.
-mixed-gains-costs	Mixed gains and costs had no confirmed context; counted by configuration.
-mixed-gains-costs-confirmed	Mixed gains and costs had no confirmed context and were excluded pending review.
+mixed-flows	Mixed gains and costs had no confirmed context; counted by configuration.
+mixed-confirmed	Mixed gains and costs had no confirmed context and were excluded pending review.
 matched-item-ids	Matched item IDs and quantities to a RuneLite NPC-loot event.
 inventory-equipment	Inventory/equipment value fell after a confirmed player-combat death.
-supply-loss-occurred	Supply loss occurred shortly before a confirmed player-loot event.
-matched-item-ids-quantities	Matched item IDs and quantities to a RuneLite player-loot event.
+combat-supply	Supply loss occurred shortly before a confirmed player-loot event.
+matched-stock	Matched item IDs and quantities to a RuneLite player-loot event.
 simultaneous-inputs	Simultaneous inputs and outputs were observed during a production context.
 trade-inventory	Trade inventory movement observed; GE sales use the net coins actually collected.
 why-type.CONSUMPTION	Used during this Grind.
@@ -111,21 +112,21 @@ why-type.PROCESSING	Production inputs and outputs during this Grind.
 why-type.TRADE	Settled through a trade.
 why-type.TRANSFER	Ownership-neutral move; nothing books.
 verb-exchanged	Exchanged
-traded-bought	Bought
-traded-sold-for	Sold for
+purchase-label	Bought
+sale-unbased	Sold for
 traded-paid	Paid
-traded-sold	Sold
-lifecycle-could-settled-exactly	 This lifecycle could not be settled exactly, so it 
-grand-exchange-lifecycle	Grand Exchange lifecycle could not be settled exactly (
+sale-label	Sold
+lifecycle-evidence	 This lifecycle could not be settled exactly, so it 
+ge-lifecycle	Grand Exchange lifecycle could not be settled exactly (
 known-facts	); only known facts are recorded for review. No Market result is invented.
 savedstate-owner	SavedState owner does not match the requested profile
 excluded-because	Excluded because a bank or deposit interface was active.
 ignoring-late	Ignoring late save success for abandoned scope gen {} (live gen {})
-tracking-paused-back	 Tracking paused; back up current data, then restart RuneLite to reload this profile.
+tracking-paused-back	 Tracking is paused. Back up your current history, then restart RuneLite to load the saved history.
 refusing-account-switch	Refusing account switch: previous scope flush did not complete
-refusing-account-switch-after	Refusing account switch after failed save: {}
-refusing-account-switch-profile	Refusing account switch: profile restore could not be prepared
-account-clear	Account clear proceeded with undrained pending save
+switch-save-paused	Tracking for this account is paused because the previous account could not be saved. Close other RuneLite clients, if any, then log out and back in to retry.
+switch-profile-conflict	Refusing account switch: profile restore could not be prepared
+account-clear	Account clear held: the previous account's latest save did not complete
 current-runescape	The current RuneScape profile is not safely bound
 unable-capture	Unable to capture final GP Manager shutdown snapshot
 local-data	Local data was written by another GP Manager version (schema 
@@ -137,17 +138,17 @@ refusing-overwrite	Refusing to overwrite GP Manager state written by unsupported
 refusing-concurrent	Refusing concurrent/stale {}: disk revision {} != expected base {}
 refusing-non	Refusing non-advancing revision {} against disk {}
 cannot-preserve	Cannot preserve damaged state; refusing to overwrite it
-reset-primary-committed	Reset primary committed; obsolete backup invalidated after align failure
-reset-primary-committed-but	Reset primary committed but backup could not be aligned; obsolete backup removed
-primary-already	Primary already holds the new revision after a partial failure
-reset-did	Reset did not commit; previous disk state retained
+reset-flush-error	Reset primary committed; obsolete backup invalidated after align failure
+reset-backup-error	Reset primary committed but backup could not be aligned; obsolete backup removed
+primary-already	Your changes were saved, but the recovery copy could not be updated.
+reset-did	Your history could not be reset. Your previous saved history is still safe.
 reset-refused	Delete Profile was not applied: 
 reset-data-changed	data changed while the safety copy was prepared; retry.
-save-did	Save did not commit; previous disk state retained
-read-corrections-apply	Read-only · corrections apply to the current grind.
-observed-settlement-result-affects	 · observed settlement; only Result affects Net
+save-did	Your latest changes could not be saved. Your previous saved history is still safe.
+correction-help	Read-only · corrections apply to the current grind.
+settlement-profit	 · observed settlement; only Result affects Net
 review-read	Review is read-only in this historical scope
-read-corrections-apply-current	Read-only · corrections apply to the current grind.
+correction-rules	Read-only · corrections apply to the current grind.
 gp-manager-cannot	GP Manager cannot determine profit for these units because their prior tracked value 
 unknown-received	is unknown. Received cash is liquidation, not automatically counted as profit.
 returned-canceled	Returned · Canceled
@@ -155,70 +156,71 @@ awaiting-collection	 · Awaiting collection
 canceled-returned	Canceled; the returned principal is ownership-neutral.
 food-potions	Food, potions, runes, ammo and charges · 
 deaths-tax	Deaths, tax, fees and drops · 
-items-waiting-reclaimed-after	Items waiting to be reclaimed after death: 
+grave-expired	Items waiting to be reclaimed after death: 
 gp-manager-icon	GP Manager icon resource missing or unreadable; using a placeholder sidebar icon
 gp-manager-icon-resource	GP Manager icon resource failed to load; using a placeholder sidebar icon
 jsoncodec-bind	JsonCodec.bind(gson) must run at plugin start-up before any JSON work
 gp-manager-sidebar	GP Manager sidebar button was not registered (toolbar={} icon={})
 claim-reclaim	(claim|reclaim|retrieve|loot|collect|talk|check|search|open).*
-unable-schedule-gp	Unable to schedule GP Manager persistence initialization
+schedule-failed	Unable to schedule GP Manager persistence initialization
 i-bank	(?i)Bank transfer|Bank deposit|Bank/deposit transfer
-pending-save	Pending save abandoned after account scope changed
-trackingidentity-rsprofilekey	TrackingIdentity{rsProfileKey=***, accountHashSet=
+pending-save	The account changed before these changes could be saved.
+profile-key	TrackingIdentity{rsProfileKey=***, accountHashSet=
 collected-settlement	No collected settlement yet; nothing is realized.
-unable-initialize-gp	Unable to initialize GP Manager plugin directory
-primary-reset	Primary reset committed; backup align incomplete
-stable-inventory-equipment-change	Stable inventory/equipment change was observed.
+startup-failed	Unable to initialize GP Manager plugin directory
+primary-reset	Your history was reset, but its recovery copy could not be updated.
+stable-change	Stable inventory/equipment change was observed.
 vial-ashes	Vial, Ashes, Coins, Bones, Bucket, Jug, Seaweed
-unable-schedule-gp-manager	Unable to schedule GP Manager persistence drain
+lifecycle-schedule-error	Unable to schedule GP Manager persistence drain
 end-grind	End this Grind; tracking continues as free play
 logs-kindling	.*(logs|kindling|pyre|blisterwood|juniper).*
-unable-initialize-gp-manager	Unable to initialize GP Manager persistence
-another-client-holds	Another client holds the account write lock
+startup-error	Unable to initialize GP Manager persistence
+another-client-holds	Another RuneLite client is using this account’s history. Close it, then retry.
 unable-preserve	Unable to preserve corrupt GP Manager state
 older-save	A GP Manager save from schema {} was set aside; this profile starts fresh
 current-profile	Current profile data could not be flushed
 open-ledger	Open in Ledger shows this run on its own.
 gods-very	gods are very pleased with your offering
 offer-identity	offer identity replaced without evidence
-gp-manager-repository-initialized	GP Manager repository is not initialized
+repository-ready	GP Manager repository is not initialized
 unable-replace	Unable to replace GP Manager reset state
 account-identity-write	No account identity on the write intent
 unable-release	Unable to release GP Manager write lock
 ownership-neutral-move	Ownership-neutral move; nothing books.
 reset-committed	Reset committed to primary and backup
 pizza-pie	.*(pizza| pie|cake|slice|1/2|half).*
-grand-exchange-settlement	Grand Exchange settlement adjustment
+ge-settlement	Grand Exchange settlement adjustment
 gp-manager-sidebar-button	GP Manager sidebar button registered
-result-includes-manual	Result includes a manual correction.
-swing-owner	Swing owner-scope transition failed.
+result-adjusted	Result includes a manual correction.
 gods-pleased	gods are pleased with your offering
 item-loss	. No item loss or fee was inferred.
 gp-manager-presentation	GP Manager presentation unavailable
 plank-sack	Plank sack delta ambiguous — Review
 unable-read	Unable to read GP Manager backup {}
-persistence-executor	Persistence executor rejected work
+persistence-executor	Saving is temporarily unavailable. Please retry.
 gp-manager-background	GP Manager background save crashed
 version-modify	); this version will not modify it
 recovered-gp	Recovered GP Manager state from {}
-gravestone-retrieval	a gravestone or retrieval service
+grave-retrieval	a gravestone or retrieval service
 tracking-paused-click	Tracking paused · click to resume
 review-row	No review row matches the search
 ground-items	Ground Items config unavailable
 unable-save	Unable to save GP Manager state
 nothing-corrected	Nothing corrected in this scope
 fill-check	fill|check|open|view|use|store
-offer-changed	offer changed while unobserved
 death-reclaim-items	Death reclaim: items recovered
-sessions-backup-reset	sessions.backup.reset.json.tmp
+death-view	Death losses and reclaim fees are included in LOSS. Gravestone storage and recovery remain 0 GP.
+pvm-loss	Death: PvE
+bag-destroyed	The looting bag itself was destroyed on an observed PvM death; its known grave contents remain owned.
+backup-reset	sessions.backup.reset.json.tmp
 live-tracking	Live tracking · click to pause
 fresh-general	Fresh General owner committed
 tracking-click	Not tracking · click to start
-save-failed	Save failed; retry available
-sessions-backup-invalidated	sessions.backup.invalidated-
+save-failed	Your latest changes could not be saved. Please retry.
+backup-invalidated	sessions.backup.invalidated-
 stays-uncounted	stays uncounted for review.
 finished-grinds	Finished Grinds appear here
-grave-reclaim-fee-tiered	Grave reclaim fee (tiered)
+grave-fee	Grave reclaim fee (tiered)
 slot-reused	slot reused by a new offer
 click-change	Click to change the target
 pace-once	Pace once the rate settles
@@ -229,20 +231,20 @@ account-identity-bound	No account identity bound
 export-backups	GP Manager actions
 collected-entries	No collected entries yet
 unreadable-session	Unreadable session state
-sessions-backup-json	sessions.backup.json.tmp
+backup-prefix	sessions.backup.json.tmp
 div-style	<html><div style='width:
 nothing-needs	Nothing needs a decision
 profit-manager	/profit_manager_icon.png
 light-tend	light|tend-to|tend to
 charge-load-transfer	Charge load transfer
-grand-exchange-custody	Grand Exchange custody
+ge-custody	Grand Exchange custody
 settlement-observed	settlement not observed
 unclassified-local	__unclassified-local-death__
 neutral-zone-instance	Neutral zone instance
-neutral-zone-instance-2	Neutral zone instance
+zone-expired	Neutral zone instance
 uncertain-transaction	Uncertain transaction
-death-reclaim-expired	Death reclaim expired
-neutral-zone-instance-3	Neutral zone instance
+reclaim-expired	Death reclaim expired
+zone-restored	Neutral zone instance
 loot-key	Loot key received - value deferred
 lms-invent-wipe	LMS invent wipe (enter) — baseline refresh
 lms-invent-restore	LMS invent restore (exit) — baseline refresh
@@ -266,41 +268,41 @@ raid-shared	Raid shared bag transfer
 costume-room	costume room|poh costume
 poh-costume	PoH costume room transfer
 deposit-box-transfer	Deposit box transfer
-grand-exchange-offer	Grand Exchange offer
-grand-exchange-collect	Grand Exchange collect
+ge-offer	Grand Exchange offer
+ge-collect	Grand Exchange collect
 deposit-box-transfer-2	Deposit box transfer
 deposit-pool	Deposit pool transfer
 bank-deposit	Bank/deposit transfer
-neutral-zone-instance-4	Neutral zone instance
-neutral-zone-instance-5	Neutral zone instance
+zone-left	Neutral zone instance
+zone-stored	Neutral zone instance
 lootpresentationfilter	lootPresentationFilter
 highlighted-list	Highlighted list only
 bulk-review	Bulk review decision
 gp-manager-lifecycle	gp-manager-lifecycle
-gp-manager-lifecycle-2	gp-manager-lifecycle
-sessions-backup-json-2	sessions.backup.json
+lifecycle-thread	gp-manager-lifecycle
+backup-suffix	sessions.backup.json
 config-edit	config_edit_icon.png
-undo-latest-correction	Undo latest correction
+undo-tip	Undo latest correction
 correct-entry	Correct this entry
-undo-latest-correction-2	Undo latest correction
+undo-reason	Undo latest correction
 waiting-activity	Waiting for activity
 awaiting-decision	Awaiting your decision.
 guardians-rift	guardians of the rift
 copy-data	Copy data folder path
 data-folder	Data folder path copied
 fresh-profile	Everything for this account starts fresh. The safety copy is in GP Manager's backups folder.
-active-time-target-2	No Active Time target
+time-paused	No Active Time target
 net-gp	Net GP will not change.
 failed	Failed
 failed-inputs	Failed: the inputs were used and nothing was produced.
 charge-unload	Charge unload
 charge-load	Charge load
 committed-load	Charge load · 
-committed-load-why	Charge components loaded into 
+committed-proof	Charge components loaded into 
 after-death	 after a death; ownership never changed.
 amulet-blood	your amulet of blood fury will work for 
-eye-ayak-been	the eye of ayak has been charged with demon tears.
-eye-ayak-been-charged	the eye of ayak has been charged with runes.
+eye-capacity	the eye of ayak has been charged with demon tears.
+eye-loaded	the eye of ayak has been charged with runes.
 corrected	 · Corrected
 current-run	Current run + runs started today; whole-run totals
 runs-today	Runs today · Current run + runs started today; whole-run totals.
@@ -326,7 +328,7 @@ opened-books	 not opened yet · books normally when it is opened
 ended-before	Ended before target · 
 reached	Not reached yet · 
 follow-ground	Follow Ground Items
-ownership-neutral-transfer-2	Ownership-neutral transfer: 
+neutral-prefix	Ownership-neutral transfer: 
 measured-check	Measured Check difference for 
 items-recovered	Items recovered from 
 item-retrieval	Item retrieval fee — 
@@ -340,23 +342,23 @@ instance-fee	Instance fee (coffer)
 instance-fee-bank	Instance fee (bank)
 death-s	Death's fee (coffer or bank)
 pre-restore	Pre-restore backup failed: 
-unable-schedule-gp-manager-2	Unable to schedule GP Manager 
+save-schedule-error	Unable to schedule GP Manager 
 unable-complete	Unable to complete GP Manager 
-disk-revision	Disk revision changed (expected base 
-advance-disk	 does not advance disk revision 
-disk-state	Disk state uses unsupported data schema 
+disk-revision	Your saved history changed in another RuneLite client.
+advance-disk	This copy is older than your saved history. Restart RuneLite to load your latest history.
+disk-state	This history needs a different GP Manager version. Saved format: 
 empty-session	Empty session state
 gp-h	GP/h over active time
 previously-counted	Previously counted|
 received-proven	Received|not proven
 correction-applied	That correction was not applied
 confirm-correction	Confirm correction
-result-includes-manual-correction	 · Result includes a manual correction.
+result-corrected	 · Result includes a manual correction.
 if-counted-cost	If counted as a cost: Net 
-if-counted-gain	If counted as a gain: Net 
+gain-help	If counted as a gain: Net 
 incomplete-value	 · not counted: no known value
 market-result	 · Market result is not realized
-grand-exchange-offers	Grand Exchange offers still open: 
+ge-offers	Grand Exchange offers still open: 
 loot-keys	Loot keys not yet opened: 
 loot-keys-worth	 — worth 
 items-need	 items need your decision
@@ -370,7 +372,7 @@ click-set	 · click to set a target; it starts Live fresh
 split-unavailable	 (split unavailable)
 detail-unavailable	Detail unavailable
 partially-realized	Partially realized
-counted-automatically	Counted automatically.
+automatic-count	Counted automatically.
 recovered-backup	Recovered from backup
 split-applied	that split was not applied
 entry-longer	that entry is no longer here
@@ -383,14 +385,27 @@ cannon-parts	Cannon set up or picked up
 cannon-why	A dwarf multicannon's parts stay yours wherever it stands; Nulodion replaces a lost one free.
 new-session	Restart GP/h starts Active Time at zero and uses displayed Net after one minute. New session also clears Live Net and Recent; every booking stays in the run and Ledger. Saving or continuing returns to the full run clock. Keep previous clock freezes the clock before restarting; Restore time resumes it, or uses the original run time if none was saved.
 save-session	Keep this Live session as a separate entry under Saved sessions in Grinds? Your totals are counted once.
-guide	Live: Net, GP/h and newest changes. Click the clock to restart GP/h or start a new session; a target starts a new session too. Free play keeps every total; Reset free-play in the gear menu clears it. | Gains: loot and income. Costs: supplies, charges, deaths. Banking and trades are neutral. | Grinds: start one by name. It remembers its targets, best run and average GP/h. | Ledger: why each number changed. Check Review rows; Correct fixes any row. | HUD+: the in-game overlay. Set it up in plugin settings. | Values: GE price, else alch. — means worthless, ? means no price yet.
+guide	Live: tracks as you play. Net is what you make after costs. Click Gains, Supply, Loss or Trade for entries. KILLS shows recorded PK loot; DEATHS shows losses and fees. | What counts: loot you collect, supplies you use, lost items and fees you pay. Banking and recovered gear stay neutral. | Grinds: start one to track an activity. Free play keeps everything outside Grinds. | Raids: loot, death fees and All raids totals. Entering a raid unlocks the tab; open it manually. | Ledger: see why entries counted. Check Review when GP Manager needs your decision. | Save: gear → View recap shows this session. Save session keeps a copy in Saved sessions. | Prices: GE, otherwise alch. — means no value; ? means no price yet.
 bf-coffer	Blast Furnace coffer
 free-play-kept	Free play is kept.
 bag-reward	Agility dispenser · looting bag
-bag-reward-why	The Agility dispenser paid this into your open looting bag; its chat line named it.
+bag-proof	The Agility dispenser paid this into your open looting bag; its chat line named it.
 run-total	Everything since Free play or this Grind began; a new session never removes it. Click to save this session or show the whole run on Live again.
 free-play-over	Free play so far moves to your Grinds history as a finished run; nothing is deleted. A new Free play starts at zero, and your milestone counts it.
 run-total-target	Everything since Free play or this Grind began; a target never removes it. Click to save this session; after Done, you can also show the whole run again.
 restore-free-play	It becomes your Free play again, and the current one moves under FREE PLAY so you can swap back. Nothing is deleted.
 session-new-tip	Start Net, Recent and Active Time at zero; every booking stays in the run and Ledger.
+kn	Retained, linked loot only.
+ke	No retained PK loot
+ku	Unknown key contents
+kt	Recorded PK loot this Grind.
 session-restore-tip	Resume the frozen saved time, or the original run time if none was saved; keep displayed Net and bookings.
+banked-reward	Banked reward
+banked-proof	Received from a reward chest using Bank-all; only its measured decrease counts.
+fractured-archive	Fractured Archive
+bag-loss	PK death loss · looting bag
+bag-loss-proof	Remembered contents of the carried looting bag were lost on this PK death.
+
+captured-dose	Recovered from original blighted dose prices; later tracked item values are unchanged.
+
+raid-supply-credit	Raid-provided supplies excluded; only the paid portion counts

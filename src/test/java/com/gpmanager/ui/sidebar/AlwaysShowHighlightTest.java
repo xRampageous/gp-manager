@@ -39,7 +39,7 @@ public class AlwaysShowHighlightTest
 
             public boolean alwaysShows(Flow flow)
             {
-                return LootPresentationFilterService.listState(always, "", flow.itemName, Math.abs(flow.quantityDelta))
+                return LootPresentationFilterService.listState(always, "", flow.name, Math.abs(flow.quantity))
                     == LootPresentationFilterService.HIGHLIGHTED;
             }
 

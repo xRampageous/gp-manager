@@ -50,11 +50,11 @@ public class MilestoneHudTest {
         coins(engine, 5L, 100_000L); engine.setMilestone(100_000L);
         LiveSnapshot snapshot = live(engine, 10L);
         HudBuilder hud = new HudBuilder(HudBuilderTest.config(false, 4), null);
-        snapshot.reviewCount = 1; snapshot.reclaimItems = 2;
+        snapshot.reviews = 1; snapshot.returns = 2;
         assertEquals("(!) 1 item needs review", hud.contextLine(snapshot));
-        snapshot.reviewCount = 0;
+        snapshot.reviews = 0;
         assertEquals("Reclaim waiting · 2 items", hud.contextLine(snapshot));
-        snapshot.reclaimItems = 0;
+        snapshot.returns = 0;
         assertEquals("Milestone reached · 100k", hud.contextLine(snapshot));
         HudBuilder hidden = new HudBuilder(new GpManagerConfig() {
             public boolean showHud() { return false; }

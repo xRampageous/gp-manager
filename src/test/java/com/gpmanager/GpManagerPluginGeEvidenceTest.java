@@ -131,10 +131,10 @@ public class GpManagerPluginGeEvidenceTest
             Transaction withdrawn = settleProduction(engine, inventory(ItemID.LAWRUNE, 200L), T0 + 600L);
 
             assertNotNull(withdrawn);
-            assertEquals("a bank withdrawal is ownership movement", TransactionType.TRANSFER, withdrawn.getType());
-            assertTrue("a withdrawal never counts as revenue", !withdrawn.isCounted());
-            assertEquals(0L, engine.getMetrics(T0 + 1_800L).net);
-            assertEquals(0L, engine.getMetrics(T0 + 1_800L).revenue);
+            assertEquals("a bank withdrawal is ownership movement", TransactionType.TRANSFER, withdrawn.type());
+            assertTrue("a withdrawal never counts as revenue", !withdrawn.counts());
+            assertEquals(0L, engine.metrics(T0 + 1_800L).net);
+            assertEquals(0L, engine.metrics(T0 + 1_800L).income);
         }
     }
 
@@ -161,8 +161,8 @@ public class GpManagerPluginGeEvidenceTest
         plugin.onItemContainerChanged(new ItemContainerChanged(InventoryID.INV, null));
         Transaction harvested = settleProduction(engine, inventory(ItemID.LOGS, 1L), T0 + 600L);
         assertNotNull(harvested);
-        assertEquals(TransactionType.GAIN, harvested.getType());
-        assertEquals(200L, engine.getMetrics(T0 + 1_800L).net);
+        assertEquals(TransactionType.GAIN, harvested.type());
+        assertEquals(200L, engine.metrics(T0 + 1_800L).net);
     }
 
     // ── production-faithful GE sell placement evidence ─────────────────────────────────────────
@@ -184,10 +184,10 @@ public class GpManagerPluginGeEvidenceTest
         Transaction sale = settleProduction(engine, inventory(COINS, 100_000L, NATURE_RUNE, 4L), now);
         assertNotNull("the rune loss settles", sale);
         assertEquals("a proven GE sale placement is ownership-neutral custody",
-            TransactionType.TRANSFER, sale.getType());
-        assertEquals(Context.TRANSFER, sale.getContext());
-        assertTrue("custody never counts money", !sale.isCounted());
-        assertEquals("pending custody never changes Net", 0L, engine.getMetrics(now + 1_800L).net);
+            TransactionType.TRANSFER, sale.type());
+        assertEquals(Context.TRANSFER, sale.context());
+        assertTrue("custody never counts money", !sale.counts());
+        assertEquals("pending custody never changes Net", 0L, engine.metrics(now + 1_800L).net);
         assertEquals(1, engine.marketRows().size());
     }
 
@@ -216,12 +216,12 @@ public class GpManagerPluginGeEvidenceTest
             Transaction sale = settleProduction(engine, inventory, now + i * 10_000L);
             assertNotNull("sale settles: " + names[i], sale);
             assertEquals("every genuine sell placement is custody: " + names[i],
-                TransactionType.TRANSFER, sale.getType());
-            assertEquals("custody is never counted: " + names[i], false, sale.isCounted());
+                TransactionType.TRANSFER, sale.type());
+            assertEquals("custody is never counted: " + names[i], false, sale.counts());
         }
         assertEquals("no placement fell through to a counted cost",
-            0L, engine.getMetrics(now).net);
-        assertEquals(runes.length, engine.getActiveSession().getTransactions().size());
+            0L, engine.metrics(now).net);
+        assertEquals(runes.length, engine.session().transactions().size());
     }
 
     @Test
@@ -261,7 +261,7 @@ public class GpManagerPluginGeEvidenceTest
     {
         GpManagerPlugin plugin = plugin(engine, geVisibleClient());
         set(plugin, "activity", new ActivityDetector(new GpManagerConfig() {}, engine));
-        set(plugin, "geOfferLedger", new OfferSlots());
+        set(plugin, "offers", new OfferSlots());
         return plugin;
     }
 
@@ -351,7 +351,7 @@ public class GpManagerPluginGeEvidenceTest
         set(plugin, "engine", engine);
         set(plugin, "config", config);
         set(plugin, "client", client);
-        set(plugin, "interactionContextTracker",
+        set(plugin, "targets",
             GpManagerPluginProbe.tracker(client, engine, config));
         set(plugin, "charges", new ChargeIntake(client, null, config, engine, null));
         return plugin;
@@ -460,14 +460,6 @@ public class GpManagerPluginGeEvidenceTest
                 transferArms.add(note == null ? "" : note);
             }
             super.markContext(newContext, ticks, note);
-        }
-
-        @Override
-        public synchronized void noteConsume(int itemId, int ticks, boolean destroy,
-            @javax.annotation.Nullable ActionKind actionKind)
-        {
-            consumptionArms.add(itemId);
-            super.noteConsume(itemId, ticks, destroy, actionKind);
         }
 
         @Override

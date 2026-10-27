@@ -18,13 +18,13 @@ public class MilestoneExpiryTest {
         int alpha = hud.update(live(engine, 7_600L), f -> true, 7_600L).contextColor.getAlpha();
         assertTrue("last second fades", alpha > 0 && alpha < 255);
         engine.tickMilestone(8_100L);
-        assertNull(engine.getGeneralSession().milestoneGp);
+        assertNull(engine.freePlay().milestoneGp);
         assertEquals("", hud.update(live(engine, 8_100L), f -> true, 8_100L).context);
-        assertEquals(Long.valueOf(10_000L), engine.getActiveSession().getProfitTargetGp());
-        assertEquals(Long.valueOf(60_000L), engine.getActiveSession().getActiveTimeTargetMillis());
-        long revision = engine.getRevision();
+        assertEquals(Long.valueOf(10_000L), engine.session().targetGp());
+        assertEquals(Long.valueOf(60_000L), engine.session().timeTargetMillis());
+        long revision = engine.revision();
         engine.tickMilestone(9_000L);
-        assertEquals(revision, engine.getRevision());
+        assertEquals(revision, engine.revision());
     }
 
     @Test public void replacingTargetOrFreePlayCancelsTheOldCountdown() {
@@ -33,10 +33,10 @@ public class MilestoneExpiryTest {
         engine.tickMilestone(100L);
         engine.setMilestone(500_000L);
         engine.tickMilestone(8_100L);
-        assertEquals(Long.valueOf(500_000L), engine.getGeneralSession().milestoneGp);
+        assertEquals(Long.valueOf(500_000L), engine.freePlay().milestoneGp);
         engine.setMilestone(400_000L); engine.tickMilestone(8_200L);
         engine.startFreePlayOver(8_300L); engine.tickMilestone(20_000L);
-        assertEquals(Long.valueOf(400_000L), engine.getGeneralSession().milestoneGp);
+        assertEquals(Long.valueOf(400_000L), engine.freePlay().milestoneGp);
     }
 
     @Test public void completionSurvivesANetDipAndDoesNotRequireAVisibleHud() {
@@ -45,7 +45,7 @@ public class MilestoneExpiryTest {
         engine.tickMilestone(100L);
         coins(engine, 1_000L, -10_000L);
         engine.tickMilestone(8_100L);
-        assertNull(engine.getGeneralSession().milestoneGp);
+        assertNull(engine.freePlay().milestoneGp);
     }
 
     @Test public void aGrindCannotConsumeFreePlaysMilestone() {
@@ -53,7 +53,7 @@ public class MilestoneExpiryTest {
         coins(engine, 10L, 400_000L); engine.setMilestone(400_000L);
         engine.startCustom("Vorkath", 20L); engine.tickMilestone(30L);
         engine.tickMilestone(9_000L);
-        assertEquals(Long.valueOf(400_000L), engine.getGeneralSession().milestoneGp);
+        assertEquals(Long.valueOf(400_000L), engine.freePlay().milestoneGp);
     }
 
     @Test public void aRestoredProfilesFutureTargetCannotInheritThePreviousCountdown() {
@@ -62,10 +62,10 @@ public class MilestoneExpiryTest {
         coins(engine, 10L, 400_000L); engine.setMilestone(400_000L); engine.tickMilestone(100L);
         Engine other = engine(); other.setMilestone(500_000L);
         engine.restoreProfile("other", other.savedState(), 1_000L);
-        assertEquals(0L, live(engine, 1_000L).milestoneUntil);
+        assertEquals(0L, live(engine, 1_000L).targetUntil);
         HudBuilder hud = new HudBuilder(HudBuilderTest.config(false, 4), null);
         assertEquals("", hud.update(live(engine, 1_000L), f -> true, 1_000L).context);
         engine.tickMilestone(10_000L);
-        assertEquals(Long.valueOf(500_000L), engine.getGeneralSession().milestoneGp);
+        assertEquals(Long.valueOf(500_000L), engine.freePlay().milestoneGp);
     }
 }

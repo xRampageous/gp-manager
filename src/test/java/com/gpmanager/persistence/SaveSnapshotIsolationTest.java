@@ -19,17 +19,18 @@ public class SaveSnapshotIsolationTest {
     static JsonElement seed(Type type, String path) {
         if(type instanceof ParameterizedType) {
             ParameterizedType p=(ParameterizedType)type;
-            if(p.getRawType()==List.class) {JsonArray a=new JsonArray();a.add(seed(p.getActualTypeArguments()[0],path+"[0]"));return a;}
+            if(p.getRawType()==List.class||p.getRawType()==Set.class) {JsonArray a=new JsonArray();a.add(seed(p.getActualTypeArguments()[0],path+"[0]"));return a;}
             if(p.getRawType()==Map.class) {JsonObject o=new JsonObject();o.add(p.getActualTypeArguments()[0]==Integer.class?"19":"key",seed(p.getActualTypeArguments()[1],path+".value"));return o;}
             throw new AssertionError(type);
         }
         Class<?> c=(Class<?>)type;
+        if(c.isArray()){JsonArray a=new JsonArray();a.add(seed(c.getComponentType(),path+"[0]"));return a;}
         if(c==String.class)return new JsonPrimitive(path);
         if(c==boolean.class||c==Boolean.class)return new JsonPrimitive(true);
         if(c.isPrimitive()||Number.class.isAssignableFrom(c))return new JsonPrimitive(123);
         if(c.isEnum())return new JsonPrimitive(((Enum<?>)c.getEnumConstants()[0]).name());
         JsonObject object=new JsonObject();
-        for(Field f:fields(c)) if(!Modifier.isStatic(f.getModifiers())&&!Modifier.isTransient(f.getModifiers())&&!f.isSynthetic()) object.add(f.getName(),seed(f.getGenericType(),path+"."+f.getName()));
+        for(Field f:fields(c)) if(!Modifier.isStatic(f.getModifiers())&&!Modifier.isTransient(f.getModifiers())&&!f.isSynthetic()) object.add(f.isAnnotationPresent(com.google.gson.annotations.SerializedName.class)?f.getAnnotation(com.google.gson.annotations.SerializedName.class).value():f.getName(),seed(f.getGenericType(),path+"."+f.getName()));
         return object;
     }
     static void aliases(Object a,Object b) throws Exception {
@@ -38,6 +39,8 @@ public class SaveSnapshotIsolationTest {
         if(c.isEnum()||a instanceof String||a instanceof Number||a instanceof Boolean)return;
         if(a==b)throw new AssertionError("shared mutable reference: "+c);
         if(!inspected.add(a))return;
+        if(a instanceof Set) {var x=((Set<?>)a).iterator();var y=((Set<?>)b).iterator();while(x.hasNext())aliases(x.next(),y.next());return;}
+        if(c.isArray()){for(int i=0;i<java.lang.reflect.Array.getLength(a);i++)aliases(java.lang.reflect.Array.get(a,i),java.lang.reflect.Array.get(b,i));return;}
         if(a instanceof List) {List<?> x=(List<?>)a,y=(List<?>)b;for(int i=0;i<x.size();i++)aliases(x.get(i),y.get(i));return;}
         if(a instanceof Map) {Map<?,?> x=(Map<?,?>)a,y=(Map<?,?>)b;for(Object key:x.keySet())aliases(x.get(key),y.get(key));return;}
         for(Field f:fields(c))if(!Modifier.isStatic(f.getModifiers())&&!Modifier.isTransient(f.getModifiers())&&!f.isSynthetic()) {f.setAccessible(true);aliases(f.get(a),f.get(b));}

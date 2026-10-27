@@ -15,22 +15,22 @@ public class PlayerCombatLifecycleTest
         plugin.config = new GpManagerConfig() {};
         plugin.engine = new Engine(d -> Collections.emptyList(), new TransactionClassifier(), plugin.config);
         plugin.charges = new ChargeIntake(null, null, plugin.config, plugin.engine, null);
-        plugin.geOfferLedger = new OfferSlots();
-        plugin.characterIdleTracker = new CharacterIdleTracker(null, new CharacterIdleModel());
-        plugin.interactionContextTracker = new InteractionContextTracker(null, plugin.engine, plugin.config);
-        plugin.persistence = new Persistence(null, null, null, null, plugin.engine)
+        plugin.offers = new OfferSlots();
+        plugin.idle = new CharacterIdleTracker(null, new CharacterIdleModel());
+        plugin.targets = new InteractionContextTracker(null, plugin.engine, plugin.config);
+        plugin.storage = new Persistence(null, null, null, null, plugin.engine)
         {
             @Override boolean isTrackingReady() { return false; }
-            @Override void onLogout(boolean persistHistory) { }
+            @Override void onLogout() { }
         };
-        plugin.recentPlayerCombatTicks = 20;
+        plugin.combat = 20;
         return plugin;
     }
 
     private void assertPvmReclaimAllowed(GpManagerPlugin plugin)
     {
         assertEquals(GpManagerPlugin.DeathOutcome.TRACK_PVM_RECLAIM,
-            GpManagerPlugin.deathOutcome(true, plugin.recentPlayerCombatTicks, true, PvpContext.DANGEROUS_PVP));
+            GpManagerPlugin.deathOutcome(true, plugin.combat, true, PvpContext.DANGEROUS_PVP));
     }
 
     private GameStateChanged event(GameState state)
@@ -65,19 +65,19 @@ public class PlayerCombatLifecycleTest
         GpManagerPlugin plugin = plugin();
         plugin.engine.ensureSession(1_000L);
         plugin.engine.noteGeCollect(1_100L);
-        plugin.engine.geCustody.now = 1_200L;
-        plugin.engine.geCustody.holdCash(100L);
-        Session previous = plugin.engine.getActiveSession();
+        plugin.engine.exchange.now = 1_200L;
+        plugin.engine.exchange.holdCash(100L);
+        Session previous = plugin.engine.session();
         plugin.beginOwnerSwitch();
-        assertNull(plugin.engine.inbox.peek(Inbox.GE_COLLECT));
-        assertEquals(0L, plugin.engine.geCustody.pendingSettlementCashGp);
-        assertEquals(1, previous.getTransactions().size());
-        Transaction held = previous.getTransactions().get(0);
-        assertEquals(TransactionType.UNCERTAIN, held.getType());
-        assertFalse(held.isCounted());
-        assertEquals(100L, held.getFlows().get(0).valueDelta);
-        assertEquals(1_200L, held.timestampEpochMillis);
-        assertEquals(1, plugin.engine.savedState().getActiveSession().getTransactions().size());
+        assertNull(plugin.engine.events.peek(Inbox.GE_COLLECT));
+        assertEquals(0L, plugin.engine.exchange.cash);
+        assertEquals(1, previous.transactions().size());
+        Transaction held = previous.transactions().get(0);
+        assertEquals(TransactionType.UNCERTAIN, held.type());
+        assertFalse(held.counts());
+        assertEquals(100L, held.flows().get(0).value);
+        assertEquals(1_200L, held.timestamp);
+        assertEquals(1, plugin.engine.savedState().currentSession().transactions().size());
     }
 
     @Test
@@ -85,6 +85,6 @@ public class PlayerCombatLifecycleTest
     {
         GpManagerPlugin plugin = plugin();
         plugin.onGameStateChanged(event(GameState.LOADING));
-        assertEquals(20, plugin.recentPlayerCombatTicks);
+        assertEquals(20, plugin.combat);
     }
 }

@@ -44,7 +44,7 @@ public class InjectedInteractionTrackerTest
         tracker.bindPresentation(() -> true, (name, combat) -> published[0] = name);
         tracker.onInteractingChanged(new InteractingChanged(local, target));
         assertEquals("Goblin", published[0]);
-        assertTrue(tracker.hasPvmContext());
+        assertTrue(tracker.pvmContext());
     }
 
     private static <T> T proxy(Class<T> type, Function<String, Object> values)

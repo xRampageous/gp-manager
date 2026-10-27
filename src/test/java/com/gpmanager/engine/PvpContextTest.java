@@ -67,17 +67,17 @@ public class PvpContextTest
         Engine engine = engine();
         engine.ensureSession(1_000L);
         engine.startCustom("PK Trip", 2_000L);
-        String tripId = engine.getActiveSession().getId();
+        String tripId = engine.session().id();
 
         // Context is bookkeeping only: it never creates, renames or splits the manual session.
         engine.markPkLoot(Collections.singletonMap(4151, 1L), 10, 3_000L);
-        engine.markPkDeath(4_000L);
+        engine.markPkDeath(4_000L, java.util.Collections.emptyMap(), null, engine.events.owner);
 
-        assertEquals(tripId, engine.getActiveSession().getId());
-        assertEquals("PK Trip", engine.getActiveSession().getName());
-        assertEquals(SessionMode.AUTO, engine.getActiveSession().getMode());
-        assertEquals(2, engine.getActiveSession().pk().encounters());
-        assertEquals("no automatic session was spawned", 0, engine.getHistory().size());
+        assertEquals(tripId, engine.session().id());
+        assertEquals("PK Trip", engine.session().name());
+        assertEquals(SessionMode.AUTO, engine.session().mode());
+        assertEquals(2, engine.session().pk().encounters());
+        assertEquals("no automatic session was spawned", 0, engine.history().size());
     }
 
     @Test
@@ -86,10 +86,10 @@ public class PvpContextTest
         Engine engine = engine();
         engine.ensureSession(1_000L);
         engine.markPkLoot(Collections.emptyMap(), 10, 2_000L);
-        engine.markPkDeath(3_000L);
-        String json = new com.google.gson.Gson().toJson(engine.getActiveSession());
+        engine.markPkDeath(3_000L, java.util.Collections.emptyMap(), null, engine.events.owner);
+        String json = new com.google.gson.Gson().toJson(engine.session());
         assertFalse("no opponent label is stored", json.contains("Player kill"));
-        assertEquals(1, engine.getActiveSession().pk().deaths);
+        assertEquals(1, engine.session().pk().deaths);
     }
 
     @Test
@@ -102,19 +102,19 @@ public class PvpContextTest
         engine.markPkLoot(Collections.singletonMap(4151, 1L), 10, 2_000L);
         Transaction loot = settle(engine, Collections.singletonMap(4151, 1L), 2_600L);
         assertNotNull(loot);
-        assertEquals(TransactionType.PK_LOOT, loot.getType());
+        assertEquals(TransactionType.PK_LOOT, loot.type());
         assertEquals(1_000_000L, engine.bestKill());
 
-        assertTrue(engine.correctTransaction(loot.getId(), Correction.IGNORE, 3_000L, "not mine"));
+        assertTrue(engine.correctTransaction(loot.id(), Correction.IGNORE, "not mine"));
         assertEquals("an excluded kill receipt leaves the encounter but not its value", 1,
-            engine.getActiveSession().pk().kills);
+            engine.session().pk().kills);
         assertEquals(0L, engine.bestKill());
 
-        assertTrue(engine.correctTransaction(loot.getId(), Correction.REVENUE, 3_500L, "counted again"));
+        assertTrue(engine.correctTransaction(loot.id(), Correction.REVENUE, "counted again"));
         assertEquals(1_000_000L, engine.bestKill());
 
-        engine.markPkDeath(4_000L);
-        assertEquals(1, engine.getActiveSession().pk().deaths);
+        engine.markPkDeath(4_000L, java.util.Collections.emptyMap(), null, engine.events.owner);
+        assertEquals(1, engine.session().pk().deaths);
         assertEquals("a death never changes the best kill", 1_000_000L, engine.bestKill());
     }
 
@@ -126,10 +126,10 @@ public class PvpContextTest
         engine.markPkLoot(Collections.emptyMap(), 10, 2_000L);
         engine.pauseForLifecycle(3_000L);
         engine.resume(4_000L, PauseReason.LIFECYCLE);
-        engine.markPkDeath(5_000L);
-        assertEquals(1, engine.getActiveSession().pk().kills);
-        assertEquals(1, engine.getActiveSession().pk().deaths);
-        assertEquals("relog never closes the owner", 0L, engine.getActiveSession().endedAtEpochMillis);
+        engine.markPkDeath(5_000L, java.util.Collections.emptyMap(), null, engine.events.owner);
+        assertEquals(1, engine.session().pk().kills);
+        assertEquals(1, engine.session().pk().deaths);
+        assertEquals("relog never closes the owner", 0L, engine.session().endedAt);
     }
 
     private static Transaction settle(Engine engine, Map<Integer, Long> quantities, long now)

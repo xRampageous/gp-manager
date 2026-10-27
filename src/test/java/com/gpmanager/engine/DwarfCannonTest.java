@@ -66,19 +66,19 @@ public class DwarfCannonTest
 
         engine.moveCannon();
         settle(engine, snapshot(false, 100L), 1_600L);
-        assertEquals("setting it up is neutral", 0L, engine.getMetrics(5_000L).net);
+        assertEquals("setting it up is neutral", 0L, engine.metrics(5_000L).net);
 
         engine.loadCannon(6);
         Transaction load = settle(engine, snapshot(false, 70L), 6_000L);
-        assertEquals("Loaded into the cannon", load.getNote());
-        assertEquals(-6_000L, engine.getMetrics(10_000L).net);
+        assertEquals("Loaded into the cannon", load.note());
+        assertEquals(-6_000L, engine.metrics(10_000L).net);
         assertEquals("the balls are a supply, not an item loss", ActionKind.SUPPLIES,
-            load.getActionKind());
-        assertEquals(CostKind.SUPPLIES, CostKind.of(load, load.getFlows().get(0)));
+            load.action());
+        assertEquals(CostKind.SUPPLIES, CostKind.of(load, load.flows().get(0)));
 
         engine.moveCannon();
         settle(engine, snapshot(true, 80L), 12_000L);
-        assertEquals("20 balls were fired; parts and 10 balls came back", -4_000L, engine.getMetrics(20_000L).net);
+        assertEquals("20 balls were fired; parts and 10 balls came back", -4_000L, engine.metrics(20_000L).net);
         assertEquals(0, engine.getReviewRows(20_000L).size());
     }
 
@@ -92,9 +92,9 @@ public class DwarfCannonTest
         engine.setBaseline(snapshot(true, 100L));
 
         Transaction loss = settle(engine, snapshot(true, 55L), 2_000L);
-        assertEquals("", loss.getNote());
-        assertEquals(ActionKind.SUPPLIES, loss.getActionKind());
-        assertEquals(CostKind.SUPPLIES, CostKind.of(loss, loss.getFlows().get(0)));
+        assertEquals("", loss.note());
+        assertEquals(ActionKind.SUPPLIES, loss.action());
+        assertEquals(CostKind.SUPPLIES, CostKind.of(loss, loss.flows().get(0)));
     }
 
     @Test
@@ -105,8 +105,8 @@ public class DwarfCannonTest
         engine.setBaseline(held(ItemID.GRANITE_CANNONBALL, 30L));
 
         Transaction loss = settle(engine, held(ItemID.GRANITE_CANNONBALL, 10L), 2_000L);
-        assertEquals(ActionKind.SUPPLIES, loss.getActionKind());
-        assertEquals(CostKind.SUPPLIES, CostKind.of(loss, loss.getFlows().get(0)));
+        assertEquals(ActionKind.SUPPLIES, loss.action());
+        assertEquals(CostKind.SUPPLIES, CostKind.of(loss, loss.flows().get(0)));
     }
 
     @Test
@@ -118,8 +118,8 @@ public class DwarfCannonTest
 
         Transaction mixed = settle(
             engine, held(ItemID.MCANNONBALL, 95L, ItemID.COINS, 20L), 2_000L);
-        assertEquals(TransactionType.UNCERTAIN, mixed.getType());
-        assertNull(mixed.getActionKind());
+        assertEquals(TransactionType.UNCERTAIN, mixed.type());
+        assertNull(mixed.action());
         assertEquals(1, engine.getReviewRows(9_000L).size());
     }
 
@@ -133,35 +133,35 @@ public class DwarfCannonTest
         engine.ensureSession(1_000L);
         engine.setBaseline(ContainerSnapshot.empty());
         settle(engine, held(ItemID.MCANNONBALL, 90L), 2_000L);
-        assertEquals(18_000L, engine.getMetrics(10_000L).net);
+        assertEquals(18_000L, engine.metrics(10_000L).net);
 
         engine.moveCannon();
         engine.loadCannon(6);
         Transaction setup = settle(engine, held(ItemID.MCANNONBALL, 45L), 20_000L);
-        assertEquals("Loaded into the cannon", setup.getNote());
-        assertTrue(setup.isOnGround());
+        assertEquals("Loaded into the cannon", setup.note());
+        assertTrue(setup.onGround());
         assertEquals("the 45 it took book and can come back", 18_000L - 9_000L,
-            engine.getMetrics(50_000L).net);
+            engine.metrics(50_000L).net);
 
         engine.loadCannon(6);
         settle(engine, held(ItemID.MCANNONBALL, 25L), 60_000L);
-        assertEquals(9_000L - 4_000L, engine.getMetrics(90_000L).net);
+        assertEquals(9_000L - 4_000L, engine.metrics(90_000L).net);
 
         settle(engine, held(ItemID.MCANNONBALL, 60L), 100_000L);
         assertEquals("the 35 returned shrink the loads; no gain books", 1L,
-            engine.getActiveSession().getTransactions().stream()
-                .filter(row -> row.isCounted() && row.getType() == TransactionType.GAIN)
+            engine.session().transactions().stream()
+                .filter(row -> row.counts() && row.type() == TransactionType.GAIN)
                 .count());
         assertEquals("30 balls stayed out: 65 loaded, 35 back", 18_000L - 30L * 200L,
-            engine.getMetrics(150_000L).net);
+            engine.metrics(150_000L).net);
         assertEquals(0, engine.getReviewRows(150_000L).size());
 
         wait(engine, held(ItemID.MCANNONBALL, 60L), 2_150L, 200_000L);
         assertEquals("nothing more books after the windows", 18_000L - 30L * 200L,
-            engine.getMetrics(10_000_000L).net);
+            engine.metrics(10_000_000L).net);
         assertEquals(1L,
-            engine.getActiveSession().getTransactions().stream()
-                .filter(row -> row.isCounted() && row.getType() == TransactionType.GAIN)
+            engine.session().transactions().stream()
+                .filter(row -> row.counts() && row.type() == TransactionType.GAIN)
                 .count());
     }
 
@@ -179,13 +179,13 @@ public class DwarfCannonTest
         engine.loadCannon(40);
         wait(engine, snapshot(true, 90L), 20L, 2_000L);
         Transaction load = settle(engine, snapshot(false, 45L), 20_000L);
-        assertEquals("Loaded into the cannon", load.getNote());
-        assertTrue(load.isOnGround());
+        assertEquals("Loaded into the cannon", load.note());
+        assertTrue(load.onGround());
         assertEquals("parts are neutral; only the loaded 45 book", -(45L * 200L),
-            engine.getMetrics(90_000L).net);
+            engine.metrics(90_000L).net);
 
         settle(engine, snapshot(false, 80L), 100_000L);
-        assertEquals("the return shrinks the load", -(10L * 200L), engine.getMetrics(150_000L).net);
+        assertEquals("the return shrinks the load", -(10L * 200L), engine.metrics(150_000L).net);
         assertEquals(0, engine.getReviewRows(150_000L).size());
     }
 
@@ -206,14 +206,14 @@ public class DwarfCannonTest
         engine.markDirty();
 
         Transaction load = settle(engine, snapshot(false, 45L), 20_000L);
-        assertEquals("Loaded into the cannon", load.getNote());
-        assertEquals(-(45L * 200L), engine.getMetrics(50_000L).net);
+        assertEquals("Loaded into the cannon", load.note());
+        assertEquals(-(45L * 200L), engine.metrics(50_000L).net);
 
         settle(engine, snapshot(false, 80L), 60_000L);
         assertEquals("the return shrinks the load, never a gain", -(10L * 200L),
-            engine.getMetrics(90_000L).net);
-        assertEquals(0L, engine.getActiveSession().getTransactions().stream()
-            .filter(row -> row.isCounted() && row.getType() == TransactionType.GAIN).count());
+            engine.metrics(90_000L).net);
+        assertEquals(0L, engine.session().transactions().stream()
+            .filter(row -> row.counts() && row.type() == TransactionType.GAIN).count());
     }
 
     @Test
@@ -228,9 +228,9 @@ public class DwarfCannonTest
 
         Transaction loss = settle(engine,
             held(ItemID.BRONZE_CANNONBALL, 25L, ItemID.DRAGON_CHAINSHOT_CANNONBALL, 2L), 2_000L);
-        assertEquals(ActionKind.SUPPLIES, loss.getActionKind());
-        assertEquals(CostKind.SUPPLIES, CostKind.of(loss, loss.getFlows().get(0)));
-        assertEquals(-(15L * 30L) - (3L * 300L), engine.getMetrics(5_000L).net);
+        assertEquals(ActionKind.SUPPLIES, loss.action());
+        assertEquals(CostKind.SUPPLIES, CostKind.of(loss, loss.flows().get(0)));
+        assertEquals(-(15L * 30L) - (3L * 300L), engine.metrics(5_000L).net);
     }
 
     private static ContainerSnapshot snapshot(boolean parts, long balls)

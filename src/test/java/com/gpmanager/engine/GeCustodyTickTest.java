@@ -56,14 +56,14 @@ public class GeCustodyTickTest
         inventory.put(COINS, 1_000_000L + RECEIVED);
         settle(engine, inventory, t + 10_000L);
         assertEquals("the tied cash is held for slot evidence", RECEIVED,
-            EngineProbe.pendingSettlementCash(engine.geCustody));
+            EngineProbe.pendingSettlementCash(engine.exchange));
         assertEquals(0, reviewRows(engine));
 
         assertFalse("inside the window nothing is decided", engine.tickGe(t + 10_600L));
         assertTrue("the first tick after the window resolves it", engine.tickGe(t + 12_400L));
-        assertEquals(0L, EngineProbe.pendingSettlementCash(engine.geCustody));
+        assertEquals(0L, EngineProbe.pendingSettlementCash(engine.exchange));
         assertTrue("a tie with no slot evidence fails closed visibly", reviewRows(engine) > 0);
-        assertEquals("nothing is counted from an unproven tie", 0L, engine.getMetrics(t + 13_000L).net);
+        assertEquals("nothing is counted from an unproven tie", 0L, engine.metrics(t + 13_000L).net);
     }
 
     @Test
@@ -78,9 +78,9 @@ public class GeCustodyTickTest
     private static int reviewRows(Engine engine)
     {
         int count = 0;
-        for (Transaction transaction : engine.getActiveSession().getTransactions())
+        for (Transaction transaction : engine.session().transactions())
         {
-            if (ReviewRules.needsOwnerDecision(transaction))
+            if (ReviewRules.needsReview(transaction))
             {
                 count++;
             }

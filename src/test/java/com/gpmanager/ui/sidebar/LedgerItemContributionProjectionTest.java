@@ -20,24 +20,24 @@ public class LedgerItemContributionProjectionTest
             TransactionType.CONSUMPTION, Context.GENERIC, "", "Vorkath", true,
             Arrays.asList(consumedDose, remainingDose, companionGain),
             Confidence.CONFIRMED, "Drink evidence", null);
-        transaction.setActionKind(ActionKind.DRINK);
+        transaction.setAction(ActionKind.DRINK);
 
         List<Contribution> contributions = Contribution.project(transaction);
         assertEquals("one normalized potion plus the unrelated gain", 2, contributions.size());
         Contribution supply = contributions.get(0);
-        assertTrue(supply.normalizedConsume);
-        assertEquals("Prayer potion", supply.itemName);
-        assertEquals(-40L, supply.effectiveValue);
-        assertEquals(2, supply.rawFlows.size());
+        assertTrue(supply.dose);
+        assertEquals("Prayer potion", supply.name);
+        assertEquals(-40L, supply.value);
+        assertEquals(2, supply.flows.size());
         assertEquals(Contribution.Category.SUPPLY, supply.category);
         Contribution companion = contributions.get(1);
-        assertFalse(companion.normalizedConsume);
-        assertEquals("Potato", companion.itemName);
-        assertEquals(25L, companion.effectiveValue);
+        assertFalse(companion.dose);
+        assertEquals("Potato", companion.name);
+        assertEquals(25L, companion.value);
 
-        long projected = contributions.stream().mapToLong((itemData -> itemData.effectiveValue)).sum();
-        assertEquals("normalized rows reconcile to the canonical transaction", transaction.getNet(), projected);
-        assertEquals("projection does not mutate canonical raw flows", 3, transaction.getFlows().size());
+        long projected = contributions.stream().mapToLong((itemData -> itemData.value)).sum();
+        assertEquals("normalized rows reconcile to the canonical transaction", transaction.net(), projected);
+        assertEquals("projection does not mutate canonical raw flows", 3, transaction.flows().size());
     }
 
     @Test
@@ -47,28 +47,28 @@ public class LedgerItemContributionProjectionTest
             new Flow(1, "Half pizza", 1L, 250, 250L), ActionKind.EAT);
         List<Contribution> food = Contribution.project(pizza);
         assertEquals(1, food.size());
-        assertTrue(food.get(0).normalizedConsume);
-        assertEquals("pizza", food.get(0).itemName.toLowerCase(java.util.Locale.ROOT));
-        assertEquals(-250L, food.get(0).effectiveValue);
+        assertTrue(food.get(0).dose);
+        assertEquals("pizza", food.get(0).name.toLowerCase(java.util.Locale.ROOT));
+        assertEquals(-250L, food.get(0).value);
 
         List<Flow> decantFlows = Arrays.asList(
             new Flow(2434, "Prayer potion(4)", -1L, 400, -400L),
             new Flow(139, "Prayer potion(2)", 1L, 100, 100L),
             new Flow(139, "Prayer potion(2)", 1L, 100, 100L));
         assertFalse("dose conserving changes do not form consume pairs",
-            ActionReader.isDoseStep(decantFlows));
+            ActionReader.doseStep(decantFlows));
         Transaction decant = transaction(decantFlows, ActionKind.DECANT);
         assertTrue(Contribution.project(decant).stream()
-            .noneMatch((itemData -> itemData.normalizedConsume)));
+            .noneMatch((itemData -> itemData.dose)));
 
         List<Flow> ambiguous = Arrays.asList(
             new Flow(2434, "Prayer potion(4)", -1L, 400, -400L),
             new Flow(139, "Prayer potion(3)", 1L, 300, 300L),
             new Flow(139, "Prayer potion(3)", 1L, 300, 300L));
-        assertFalse("ambiguous remainders fail closed", ActionReader.isDoseStep(ambiguous));
+        assertFalse("ambiguous remainders fail closed", ActionReader.doseStep(ambiguous));
         Transaction ambiguousDrink = transaction(ambiguous, ActionKind.DRINK);
         assertTrue(Contribution.project(ambiguousDrink).stream()
-            .noneMatch((itemData -> itemData.normalizedConsume)));
+            .noneMatch((itemData -> itemData.dose)));
     }
 
     @Test
@@ -78,10 +78,10 @@ public class LedgerItemContributionProjectionTest
             new Flow(2434, "Prayer potion(4)", -1L, 3600, -3600L),
             new Flow(139, "Prayer potion(3)", 1L, 2600, 2600L),
             new Flow(143, "Prayer potion(1)", 1L, 1000, 1000L)), ActionKind.DECANT);
-        assertEquals(3600L, Accounting.transaction(decant).revenue);
-        assertEquals(3600L, Accounting.transaction(decant).costs);
+        assertEquals(3600L, Accounting.transaction(decant).income);
+        assertEquals(3600L, Accounting.transaction(decant).cost);
         assertTrue(Contribution.project(decant).stream()
-            .noneMatch((itemData -> itemData.normalizedConsume)));
+            .noneMatch((itemData -> itemData.dose)));
     }
 
     @Test
@@ -90,10 +90,10 @@ public class LedgerItemContributionProjectionTest
         Transaction mixed = transaction(
             new Flow(2434, "Prayer potion(4)", -1L, 3600, -3600L, PriceSource.GRAND_EXCHANGE),
             new Flow(139, "Prayer potion(3)", 1L, 2600, 2600L, PriceSource.MANUAL_OVERRIDE), ActionKind.DRINK);
-        assertEquals(2600L, Accounting.transaction(mixed).revenue);
-        assertEquals(3600L, Accounting.transaction(mixed).costs);
+        assertEquals(2600L, Accounting.transaction(mixed).income);
+        assertEquals(3600L, Accounting.transaction(mixed).cost);
         assertTrue(Contribution.project(mixed).stream()
-            .noneMatch((itemData -> itemData.normalizedConsume)));
+            .noneMatch((itemData -> itemData.dose)));
     }
 
     @Test
@@ -103,8 +103,8 @@ public class LedgerItemContributionProjectionTest
             Context.PRODUCTION, "", "Herblore", true,
             List.of(new Flow(143, "Prayer potion(1)", -1L, 1000, -1000L)),
             Confidence.CONFIRMED, "", null);
-        processing.setActionKind(ActionKind.DRINK);
-        assertFalse(Contribution.project(processing).get(0).normalizedConsume);
+        processing.setAction(ActionKind.DRINK);
+        assertFalse(Contribution.project(processing).get(0).dose);
     }
 
     private static Transaction transaction(Flow first, Flow second, ActionKind kind)
@@ -117,7 +117,7 @@ public class LedgerItemContributionProjectionTest
         Transaction transaction = new Transaction(10_000L,
             TransactionType.CONSUMPTION, Context.GENERIC, "", "Vorkath", true, flows,
             Confidence.CONFIRMED, "partial consume test", null);
-        transaction.setActionKind(kind);
+        transaction.setAction(kind);
         return transaction;
     }
 }

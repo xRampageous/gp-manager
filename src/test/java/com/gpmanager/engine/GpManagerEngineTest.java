@@ -61,17 +61,17 @@ public class GpManagerEngineTest
         Transaction transfer = settle(engine, snapshot(995, 2_000L), now + 600L);
 
         assertNotNull(transfer);
-        assertEquals(TransactionType.TRANSFER, transfer.getType());
-        assertFalse(transfer.isCounted());
-        assertEquals(0L, engine.getMetrics(now + 2_400L).net);
+        assertEquals(TransactionType.TRANSFER, transfer.type());
+        assertFalse(transfer.counts());
+        assertEquals(0L, engine.metrics(now + 2_400L).net);
 
         engine.markDirty();
         Transaction consumption = settle(
             engine,
             snapshot(995, 1_900L),
             now + 3_000L);
-        assertEquals(TransactionType.CONSUMPTION, consumption.getType());
-        assertEquals(-100L, consumption.getNet());
+        assertEquals(TransactionType.CONSUMPTION, consumption.type());
+        assertEquals(-100L, consumption.net());
 
         engine.markLoot(
             Collections.singletonMap(100, 2L),
@@ -88,15 +88,15 @@ public class GpManagerEngineTest
             new ContainerSnapshot(lootValues),
             now + 5_400L);
 
-        assertEquals(TransactionType.LOOT, loot.getType());
-        assertEquals(200L, loot.getNet());
-        assertEquals("Loot from Goblin", loot.getNote());
+        assertEquals(TransactionType.LOOT, loot.type());
+        assertEquals(200L, loot.net());
+        assertEquals("Loot from Goblin", loot.note());
 
-        Metrics metrics = engine.getMetrics(now + 8_000L);
-        assertEquals(200L, metrics.revenue);
-        assertEquals(100L, metrics.costs);
+        Metrics metrics = engine.metrics(now + 8_000L);
+        assertEquals(200L, metrics.income);
+        assertEquals(100L, metrics.cost);
         assertEquals(100L, metrics.net);
-        assertEquals("Goblin", metrics.activityHint);
+        assertEquals("Goblin", metrics.activity);
     }
 
     @Test
@@ -112,13 +112,13 @@ public class GpManagerEngineTest
         assertNull(engine.processIfDirty(snapshot(1205, 1L), now + 1_800L, null));
         assertNull(engine.processIfDirty(snapshot(1205, 1L), now + 2_400L, null));
 
-        assertEquals(0L, engine.getMetrics(now + 2_400L).revenue);
-        assertTrue(engine.getActiveSession().getTransactions().isEmpty());
+        assertEquals(0L, engine.metrics(now + 2_400L).income);
+        assertTrue(engine.session().transactions().isEmpty());
 
         engine.markDirty();
         Transaction cost = settle(engine, ContainerSnapshot.empty(), now + 3_000L);
-        assertEquals(TransactionType.CONSUMPTION, cost.getType());
-        assertEquals(-100L, cost.getNet());
+        assertEquals(TransactionType.CONSUMPTION, cost.type());
+        assertEquals(-100L, cost.net());
     }
 
     @Test
@@ -138,9 +138,9 @@ public class GpManagerEngineTest
         Transaction transaction = engine.processIfDirty(snapshot(1942, 2L), settleAt, null);
 
         assertNotNull(transaction);
-        assertEquals(150L, transaction.getFlows().get(0).valueDelta);
-        assertEquals(PriceSource.GRAND_EXCHANGE, transaction.getFlows().get(0).getPriceSource());
-        assertEquals(settleAt, transaction.getFlows().get(0).getPriceCapturedAtEpochMillis());
+        assertEquals(150L, transaction.flows().get(0).value);
+        assertEquals(PriceSource.GRAND_EXCHANGE, transaction.flows().get(0).source());
+        assertEquals(settleAt, transaction.flows().get(0).pricedAt());
     }
 
     @Test
@@ -171,10 +171,10 @@ public class GpManagerEngineTest
             now + 1_800L);
 
         assertNotNull(transaction);
-        assertEquals(TransactionType.LOOT, transaction.getType());
-        assertEquals(31L, transaction.getNet());
-        assertEquals(1, transaction.getFlows().size());
-        assertEquals(526, transaction.getFlows().get(0).itemId);
+        assertEquals(TransactionType.LOOT, transaction.type());
+        assertEquals(31L, transaction.net());
+        assertEquals(1, transaction.flows().size());
+        assertEquals(526, transaction.flows().get(0).item);
     }
 
     @Test
@@ -195,8 +195,8 @@ public class GpManagerEngineTest
         assertNull(engine.processIfDirty(snapshot(2309, 1L), now + 2_400L, null));
         assertNull(engine.processIfDirty(snapshot(2309, 1L), now + 3_000L, null));
 
-        assertTrue(engine.getActiveSession().getTransactions().isEmpty());
-        assertEquals(0L, engine.getMetrics(now + 3_000L).net);
+        assertTrue(engine.session().transactions().isEmpty());
+        assertEquals(0L, engine.metrics(now + 3_000L).net);
     }
 
     @Test
@@ -228,10 +228,10 @@ public class GpManagerEngineTest
         Transaction transfer = settle(engine, snapshot(12934, 50L), now + 600L);
 
         assertNotNull(transfer);
-        assertEquals(TransactionType.TRANSFER, transfer.getType());
-        assertEquals("Bank transfer", transfer.getNote());
-        assertEquals(1, engine.getActiveSession().getTransactions().size());
-        assertEquals(-5_000L, engine.getActiveSession().getTransactions().get(0).getNet());
+        assertEquals(TransactionType.TRANSFER, transfer.type());
+        assertEquals("Bank transfer", transfer.note());
+        assertEquals(1, engine.session().transactions().size());
+        assertEquals(-5_000L, engine.session().transactions().get(0).net());
     }
 
     @Test
@@ -264,15 +264,15 @@ public class GpManagerEngineTest
         engine.markDirty();
         Transaction load = settle(engine, snapshot(12934, 50L), now + 600L);
 
-        assertEquals("a validated load moves value, never a cost", TransactionType.TRANSFER, load.getType());
-        assertFalse(load.isCounted());
-        assertEquals("Charge load transfer", load.getNote());
+        assertEquals("a validated load moves value, never a cost", TransactionType.TRANSFER, load.type());
+        assertFalse(load.counts());
+        assertEquals("Charge load transfer", load.note());
         assertEquals(-5_000L, load.autoNet());
-        assertEquals(-5_000L, load.getNet());
-        assertEquals(0L, engine.getMetrics(now + 3_000L).net);
-        assertEquals(1, load.getFlows().size());
+        assertEquals(-5_000L, load.net());
+        assertEquals(0L, engine.metrics(now + 3_000L).net);
+        assertEquals(1, load.flows().size());
         assertFalse(new com.google.gson.Gson().toJson(load).contains("chargeLoadReviewProvenance"));
-        assertEquals(ActionKind.CHARGE_LOAD_AMBIGUOUS, load.getActionKind());
+        assertEquals(ActionKind.CHARGE_LOAD_AMBIGUOUS, load.action());
     }
 
     @Test
@@ -287,9 +287,9 @@ public class GpManagerEngineTest
         engine.markDirty();
         Transaction transaction = settle(engine, snapshot(995, 200L), now + 600L);
 
-        assertEquals(TransactionType.GAIN, transaction.getType());
-        assertEquals(Context.GENERIC, transaction.getContext());
-        assertEquals("", transaction.getNote());
+        assertEquals(TransactionType.GAIN, transaction.type());
+        assertEquals(Context.GENERIC, transaction.context());
+        assertEquals("", transaction.note());
     }
 
     @Test
@@ -304,9 +304,9 @@ public class GpManagerEngineTest
         engine.markDirty();
         Transaction transaction = settle(engine, snapshot(526, 5L), now + 600L);
 
-        assertEquals(TransactionType.GAIN, transaction.getType());
-        assertEquals(Context.GENERIC, transaction.getContext());
-        assertEquals("", transaction.getNote());
+        assertEquals(TransactionType.GAIN, transaction.type());
+        assertEquals(Context.GENERIC, transaction.context());
+        assertEquals("", transaction.note());
     }
 
     @Test
@@ -328,9 +328,9 @@ public class GpManagerEngineTest
         Transaction transaction = settle(engine, snapshot(1942, 1L), now + 600L);
 
         assertNotNull(transaction);
-        assertEquals(TransactionType.GAIN, transaction.getType());
-        assertEquals(1L, transaction.getFlows().get(0).quantityDelta);
-        assertEquals(PriceSource.UNPRICED, transaction.getFlows().get(0).getPriceSource());
+        assertEquals(TransactionType.GAIN, transaction.type());
+        assertEquals(1L, transaction.flows().get(0).quantity);
+        assertEquals(PriceSource.UNPRICED, transaction.flows().get(0).source());
     }
 
     @Test
@@ -341,12 +341,12 @@ public class GpManagerEngineTest
 
         engine.pauseForLifecycle(2_000L);
         engine.resume(12_000L, PauseReason.LIFECYCLE);
-        assertEquals(2_000L, engine.getMetrics(13_000L).elapsedMillis);
+        assertEquals(2_000L, engine.metrics(13_000L).elapsed);
 
         engine.togglePause(14_000L);
         engine.pauseForLifecycle(15_000L);
         engine.resume(25_000L, PauseReason.LIFECYCLE);
-        assertTrue(engine.getMetrics(26_000L).paused);
+        assertTrue(engine.metrics(26_000L).paused);
     }
 
     @Test
@@ -363,7 +363,7 @@ public class GpManagerEngineTest
         Transaction gain = settle(engine, snapshot(1942, 1L), now + 600L);
 
         assertNotNull(gain);
-        assertEquals(TransactionType.GAIN, gain.getType());
+        assertEquals(TransactionType.GAIN, gain.type());
     }
 
     @Test
@@ -372,19 +372,19 @@ public class GpManagerEngineTest
         Engine engine = engine();
         engine.ensureSession(1_000L);
 
-        engine.getActiveSession().pause(2_000L, PauseReason.IDLE);
+        engine.session().pause(2_000L, PauseReason.IDLE);
         assertTrue(engine.isIdlePaused());
-        assertTrue(engine.getMetrics(3_000L).paused);
+        assertTrue(engine.metrics(3_000L).paused);
 
         engine.pauseForLifecycle(4_000L);
         engine.resume(14_000L, PauseReason.LIFECYCLE);
 
         assertTrue(engine.isIdlePaused());
-        assertTrue(engine.getMetrics(15_000L).paused);
+        assertTrue(engine.metrics(15_000L).paused);
 
         engine.resume(16_000L, PauseReason.IDLE);
         assertFalse(engine.isIdlePaused());
-        assertFalse(engine.getMetrics(17_000L).paused);
+        assertFalse(engine.metrics(17_000L).paused);
     }
 
     @Test
@@ -408,16 +408,16 @@ public class GpManagerEngineTest
 
         engine.markDirty();
         Transaction bones = settle(engine, snapshot(526, 1L), now + 7_000L);
-        assertEquals(TransactionType.LOOT, bones.getType());
-        assertEquals("Goblin", bones.getActivityName());
+        assertEquals(TransactionType.LOOT, bones.type());
+        assertEquals("Goblin", bones.activityName());
 
         Map<Integer, Long> allLoot = new HashMap<>();
         allLoot.put(526, 1L);
         allLoot.put(555, 6L);
         engine.markDirty();
         Transaction runes = settle(engine, new ContainerSnapshot(allLoot), now + 10_000L);
-        assertEquals(TransactionType.LOOT, runes.getType());
-        assertEquals("Goblin", runes.getActivityName());
+        assertEquals(TransactionType.LOOT, runes.type());
+        assertEquals("Goblin", runes.activityName());
 
     }
 
@@ -466,10 +466,10 @@ public class GpManagerEngineTest
         engine.markDirty();
         Transaction loot = settle(engine, snapshot(526, 1L), now + 1_200L);
 
-        assertEquals(TransactionType.PK_LOOT, loot.getType());
-        assertEquals(Confidence.CONFIRMED, loot.getConfidence());
-        assertFalse(loot.getEncounterId().isEmpty());
-        assertEquals(1, engine.getActiveSession().pk().kills);
+        assertEquals(TransactionType.PK_LOOT, loot.type());
+        assertEquals(Confidence.CONFIRMED, loot.confidence());
+        assertFalse(loot.encounterId().isEmpty());
+        assertEquals(1, engine.session().pk().kills);
         assertEquals(31L, engine.bestKill());
     }
 
@@ -480,11 +480,11 @@ public class GpManagerEngineTest
         long now = 72_000L;
         engine.ensureSession(now);
         engine.markPkLoot(Collections.emptyMap(), 10, now + 1L);
-        engine.markPkDeath(now + 2L);
+        engine.markPkDeath(now + 2L, java.util.Collections.emptyMap(), null, engine.events.owner);
 
-        assertEquals(1, engine.getActiveSession().pk().kills);
-        assertEquals(1, engine.getActiveSession().pk().deaths);
-        String json = new com.google.gson.Gson().toJson(engine.getActiveSession());
+        assertEquals(1, engine.session().pk().kills);
+        assertEquals(1, engine.session().pk().deaths);
+        String json = new com.google.gson.Gson().toJson(engine.session());
         assertFalse("location is a detection signal only, never a persisted PvP fact", json.contains("Wilderness"));
         assertFalse(json.contains("Gauntlet"));
         assertFalse(json.contains("locationLabel"));
@@ -504,10 +504,10 @@ public class GpManagerEngineTest
         engine.markDirty();
         Transaction transaction = settle(engine, new ContainerSnapshot(after), now + 600L);
 
-        assertEquals(TransactionType.UNCERTAIN, transaction.getType());
-        assertEquals(Confidence.UNCERTAIN, transaction.getConfidence());
-        assertFalse(transaction.isCounted());
-        assertEquals(0L, engine.getMetrics(now + 3_000L).net);
+        assertEquals(TransactionType.UNCERTAIN, transaction.type());
+        assertEquals(Confidence.UNCERTAIN, transaction.confidence());
+        assertFalse(transaction.counts());
+        assertEquals(0L, engine.metrics(now + 3_000L).net);
     }
 
 
@@ -519,15 +519,15 @@ public class GpManagerEngineTest
         engine.ensureSession(now);
         engine.setBaseline(snapshot(1265, 1L));
 
-        engine.markPkDeath(now + 600L);
+        engine.markPkDeath(now + 600L, java.util.Collections.emptyMap(), null, engine.events.owner);
         engine.markDirty();
         Transaction loss = settle(engine, ContainerSnapshot.empty(), now + 1_200L);
 
-        assertEquals(TransactionType.PK_DEATH_LOSS, loss.getType());
-        assertEquals(Confidence.CONFIRMED, loss.getConfidence());
-        assertEquals(-100L, loss.getNet());
-        assertEquals(1, engine.getActiveSession().pk().deaths);
-        assertFalse(loss.getEncounterId().isEmpty());
+        assertEquals(TransactionType.PK_DEATH_LOSS, loss.type());
+        assertEquals(Confidence.CONFIRMED, loss.confidence());
+        assertEquals(-100L, loss.net());
+        assertEquals(1, engine.session().pk().deaths);
+        assertFalse(loss.encounterId().isEmpty());
     }
 
     /** Guice calls every @Inject method when it builds the engine; only setters may carry it. */

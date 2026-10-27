@@ -27,19 +27,19 @@ public class PolishInteractionTest {
             field(shell, "netField").setText("lots");
             field(shell, "timeField").setText("1h 30m");
             ShellProbe.pressSheet(shell, "Start");
-            assertEquals("Start Grind", shell.sheetTitle);
+            assertEquals("Start Grind", shell.heading);
             assertEquals("Wilderness route", field(shell, "nameField").getText());
             assertEquals("lots", field(shell, "netField").getText());
             assertEquals("1h 30m", field(shell, "timeField").getText());
             assertTrue("saved picker stays on its page", ShellProbe.sheetButtonTexts(shell).contains("Saved route 7"));
-            assertFalse(panel.engine.isCustomActive());
-            assertEquals(8, panel.engine.getSavedGrinds(true).size());
+            assertFalse(panel.engine.customActive());
+            assertEquals(8, panel.engine.plans(true).size());
             field(shell, "netField").setText("5m");
             ShellProbe.pressSheet(shell, "Start");
-            assertEquals("", shell.sheetTitle);
-            assertEquals("Wilderness route", panel.engine.getActiveSession().getName());
-            assertEquals(Long.valueOf(5_000_000L), panel.engine.getActiveSession().getProfitTargetGp());
-            assertEquals(Long.valueOf(5_400_000L), panel.engine.getActiveSession().getActiveTimeTargetMillis());
+            assertEquals("", shell.heading);
+            assertEquals("Wilderness route", panel.engine.session().name());
+            assertEquals(Long.valueOf(5_000_000L), panel.engine.session().targetGp());
+            assertEquals(Long.valueOf(5_400_000L), panel.engine.session().timeTargetMillis());
             return null;
         });
     }
@@ -56,27 +56,27 @@ public class PolishInteractionTest {
             field(shell, "timeField").setText("3h");
             field(shell, "milestoneField").setText("many");
             ShellProbe.pressSheet(shell, "Save");
-            assertEquals("Set a Target", shell.sheetTitle);
+            assertEquals("Set a Target", shell.heading);
             assertEquals("2m", field(shell, "netField").getText());
             assertEquals("3h", field(shell, "timeField").getText());
             assertEquals("many", field(shell, "milestoneField").getText());
-            assertEquals(Long.valueOf(1_000L), panel.engine.getActiveSession().getProfitTargetGp());
-            assertEquals(Long.valueOf(60_000L), panel.engine.getActiveSession().getActiveTimeTargetMillis());
-            assertEquals(Long.valueOf(400_000L), panel.engine.getActiveSession().milestoneGp);
-            assertEquals(500L, panel.engine.getMetrics(NOW + 2L).net);
+            assertEquals(Long.valueOf(1_000L), panel.engine.session().targetGp());
+            assertEquals(Long.valueOf(60_000L), panel.engine.session().timeTargetMillis());
+            assertEquals(Long.valueOf(400_000L), panel.engine.session().milestoneGp);
+            assertEquals(500L, panel.engine.metrics(NOW + 2L).net);
             field(shell, "milestoneField").setText("500k");
             ShellProbe.pressSheet(shell, "Save");
-            assertEquals("", shell.sheetTitle);
-            assertEquals(Long.valueOf(2_000_000L), panel.engine.getActiveSession().getProfitTargetGp());
-            assertEquals(Long.valueOf(10_800_000L), panel.engine.getActiveSession().getActiveTimeTargetMillis());
-            assertEquals(Long.valueOf(500_000L), panel.engine.getActiveSession().milestoneGp);
-            assertEquals("setting targets preserves the whole run", 500L, panel.engine.getMetrics(NOW + 2L).net);
+            assertEquals("", shell.heading);
+            assertEquals(Long.valueOf(2_000_000L), panel.engine.session().targetGp());
+            assertEquals(Long.valueOf(10_800_000L), panel.engine.session().timeTargetMillis());
+            assertEquals(Long.valueOf(500_000L), panel.engine.session().milestoneGp);
+            assertEquals("setting targets preserves the whole run", 500L, panel.engine.metrics(NOW + 2L).net);
             new GrindsController(panel).openTargets();
             field(shell, "netField").setText("bad");
             ShellProbe.pressSheet(shell, "Save");
             ShellProbe.pressSheet(shell, "Cancel");
-            assertEquals("", shell.sheetTitle);
-            assertEquals(Long.valueOf(2_000_000L), panel.engine.getActiveSession().getProfitTargetGp());
+            assertEquals("", shell.heading);
+            assertEquals(Long.valueOf(2_000_000L), panel.engine.session().targetGp());
             return null;
         });
     }
@@ -88,15 +88,15 @@ public class PolishInteractionTest {
             field(panel.shell, "nameField").setText("Previous owner route");
             field(panel.shell, "netField").setText("invalid");
             ShellProbe.pressSheet(panel.shell, "Start");
-            assertEquals("Start Grind", panel.shell.sheetTitle);
+            assertEquals("Start Grind", panel.shell.heading);
             panel.suspend();
             panel.engine.restoreProfile("next-owner", new SavedState(), NOW);
             panel.resume();
-            assertEquals("", panel.shell.sheetTitle);
+            assertEquals("", panel.shell.heading);
             new GrindsController(panel).newGrind();
             assertFalse(field(panel.shell, "nameField").getText().contains("Previous owner"));
             assertEquals("", field(panel.shell, "netField").getText());
-            assertFalse(panel.engine.isCustomActive());
+            assertFalse(panel.engine.customActive());
             return null;
         });
     }
@@ -105,24 +105,24 @@ public class PolishInteractionTest {
         onEdt(() -> {
             SidebarPanel panel = DirectHeaderControlsTest.panel();
             SavedState.SavedGrind saved = panel.engine.saveGrind("Zulrah", 1_000L, 60_000L, true);
-            new GrindsController(panel).editSavedGrind(saved.getGrindId());
+            new GrindsController(panel).editSavedGrind(saved.id());
             Shell shell = panel.shell;
             field(shell, "nameField").setText("Zulrah bowfa");
             field(shell, "netField").setText("5m");
             field(shell, "timeField").setText("forever");
             ShellProbe.pressSheet(shell, "Save");
-            assertEquals("Edit Zulrah", shell.sheetTitle);
+            assertEquals("Edit Zulrah", shell.heading);
             assertEquals("Zulrah bowfa", field(shell, "nameField").getText());
             assertEquals("5m", field(shell, "netField").getText());
             assertEquals("forever", field(shell, "timeField").getText());
-            assertEquals("Zulrah", saved.getName());
-            assertEquals(Long.valueOf(1_000L), saved.getNetTargetGp());
+            assertEquals("Zulrah", saved.name());
+            assertEquals(Long.valueOf(1_000L), saved.targetGp());
             field(shell, "timeField").setText("2h");
             ShellProbe.pressSheet(shell, "Save");
-            assertEquals("", shell.sheetTitle);
-            assertEquals("Zulrah bowfa", saved.getName());
-            assertEquals(Long.valueOf(5_000_000L), saved.getNetTargetGp());
-            assertEquals(Long.valueOf(7_200_000L), saved.getActiveTimeTargetMillis());
+            assertEquals("", shell.heading);
+            assertEquals("Zulrah bowfa", saved.name());
+            assertEquals(Long.valueOf(5_000_000L), saved.targetGp());
+            assertEquals(Long.valueOf(7_200_000L), saved.timeTargetMillis());
             assertTrue(saved.favorite);
             return null;
         });
@@ -134,10 +134,10 @@ public class PolishInteractionTest {
             SavedState.SavedGrind saved = panel.engine.saveGrind("Zulrah", null, null, false);
             TargetFreshStartTest.coins(panel.engine, NOW, 500L);
             panel.shell.show(Shell.GRINDS);
-            panel.grindsShowArchived = true;
+            panel.archived = true;
             SidebarPanelProbe.refresh(panel);
             menu(panel, "Archive").doClick();
-            assertEquals("Archive Grind", panel.shell.sheetTitle);
+            assertEquals("Archive Grind", panel.shell.heading);
             ShellProbe.pressSheet(panel.shell, "Archive");
             SidebarPanelProbe.refresh(panel);
             assertTrue(saved.archived);
@@ -145,14 +145,14 @@ public class PolishInteractionTest {
             SidebarPanelProbe.refresh(panel);
             assertFalse(saved.archived);
             assertNotNull(menu(panel, "Archive"));
-            assertEquals(500L, panel.engine.getMetrics(NOW + 1L).net);
-            assertEquals(1, panel.engine.getSavedGrinds(true).size());
+            assertEquals(500L, panel.engine.metrics(NOW + 1L).net);
+            assertEquals(1, panel.engine.plans(true).size());
             return null;
         });
     }
 
     static JMenuItem menu(SidebarPanel panel, String text) {
-        JComponent row = (JComponent) panel.grinds.mine.body.getComponent(0);
+        JComponent row = (JComponent) panel.plans.mine.body.getComponent(0);
         for (Component item : row.getComponentPopupMenu().getComponents()) {
             if (item instanceof JMenuItem && text.equals(((JMenuItem) item).getText())) return (JMenuItem) item;
         }

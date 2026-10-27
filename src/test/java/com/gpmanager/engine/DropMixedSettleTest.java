@@ -68,20 +68,20 @@ public class DropMixedSettleTest
         engine.noteDrop(EMPTY_PLANT_POT, 6);
         settle(engine, held(Map.of(CALQUAT_FRUIT, 1L)), 1_600L);
 
-        List<Transaction> rows = engine.getActiveSession().getTransactions();
+        List<Transaction> rows = engine.session().transactions();
         assertEquals(rows.toString(), 2, rows.size());
         Transaction drop = rows.get(0);
-        assertEquals(TransactionType.CONSUMPTION, drop.getType());
-        assertEquals("Dropped", drop.getNote());
-        assertTrue(drop.isCounted());
+        assertEquals(TransactionType.CONSUMPTION, drop.type());
+        assertEquals("Dropped", drop.note());
+        assertTrue(drop.counts());
         assertEquals(11L, drop.quantity(EMPTY_PLANT_POT, false));
         Transaction harvest = rows.get(1);
-        assertEquals(TransactionType.GAIN, harvest.getType());
+        assertEquals(TransactionType.GAIN, harvest.type());
         assertEquals(1L, harvest.quantity(CALQUAT_FRUIT, true));
         assertEquals("no Review", 0, engine.getReviewRows(10_000L).size());
-        Metrics metrics = engine.getMetrics(10_000L);
-        assertEquals(11L, metrics.costs);
-        assertEquals(600L, metrics.revenue);
+        Metrics metrics = engine.metrics(10_000L);
+        assertEquals(11L, metrics.cost);
+        assertEquals(600L, metrics.income);
     }
 
     @Test
@@ -94,10 +94,10 @@ public class DropMixedSettleTest
         engine.markDirty();
         settle(engine, held(Map.of(CALQUAT_FRUIT, 1L, EMPTY_PLANT_POT, 5L)), 4_000L);
 
-        assertEquals("the pickup books no new row", 2, engine.getActiveSession().getTransactions().size());
-        Metrics metrics = engine.getMetrics(10_000L);
-        assertEquals("6 pots stay on the ground", 6L, metrics.costs);
-        assertEquals(600L, metrics.revenue);
+        assertEquals("the pickup books no new row", 2, engine.session().transactions().size());
+        Metrics metrics = engine.metrics(10_000L);
+        assertEquals("6 pots stay on the ground", 6L, metrics.cost);
+        assertEquals(600L, metrics.income);
     }
 
     @Test
@@ -107,10 +107,10 @@ public class DropMixedSettleTest
         engine.noteDrop(EMPTY_PLANT_POT, 6);
         settle(engine, held(Map.of(CALQUAT_FRUIT, 1L, SHARK, 1L)), 1_600L);
 
-        List<Transaction> rows = engine.getActiveSession().getTransactions();
+        List<Transaction> rows = engine.session().transactions();
         assertEquals(rows.toString(), 1, rows.size());
-        assertFalse("Dropped", "Dropped".equals(rows.get(0).getNote()));
-        assertEquals(TransactionType.UNCERTAIN, rows.get(0).getType());
+        assertFalse("Dropped", "Dropped".equals(rows.get(0).note()));
+        assertEquals(TransactionType.UNCERTAIN, rows.get(0).type());
         assertEquals(1, engine.getReviewRows(10_000L).size());
     }
 
@@ -119,13 +119,13 @@ public class DropMixedSettleTest
     {
         Engine engine = engine(Map.of(EMPTY_PLANT_POT, 11L, SHARK, 2L));
         engine.noteDrop(EMPTY_PLANT_POT, 6);
-        engine.noteConsume(SHARK, 6, false);
+        engine.noteConsume(SHARK, 6, false, null, null);
         settle(engine, held(Map.of(CALQUAT_FRUIT, 1L, SHARK, 1L)), 1_600L);
 
-        List<Transaction> rows = engine.getActiveSession().getTransactions();
+        List<Transaction> rows = engine.session().transactions();
         assertEquals(rows.toString(), 1, rows.size());
-        assertFalse("Dropped", "Dropped".equals(rows.get(0).getNote()));
-        assertEquals(TransactionType.CONSUMPTION, rows.get(0).getType());
+        assertFalse("Dropped", "Dropped".equals(rows.get(0).note()));
+        assertEquals(TransactionType.CONSUMPTION, rows.get(0).type());
     }
 
     @Test
@@ -136,9 +136,9 @@ public class DropMixedSettleTest
         engine.markContext(Context.PK_LOOT, 6, "PKing");
         settle(engine, held(Map.of(CALQUAT_FRUIT, 1L)), 1_600L);
 
-        List<Transaction> rows = engine.getActiveSession().getTransactions();
+        List<Transaction> rows = engine.session().transactions();
         assertEquals(rows.toString(), 1, rows.size());
-        assertFalse("Dropped", "Dropped".equals(rows.get(0).getNote()));
+        assertFalse("Dropped", "Dropped".equals(rows.get(0).note()));
     }
 
     private Engine engine(Map<Integer, Long> baseline)

@@ -88,14 +88,14 @@ public class ChargeReloadTest
     {
         Engine engine = fired(10);
         settle(engine, 5L, 2_000L);
-        assertEquals("5 picked back up", 50L, engine.getMetrics(5_000L).costs);
+        assertEquals("5 picked back up", 50L, engine.metrics(5_000L).cost);
 
         assertTrue(engine.markChargeLoad(ChargeCheck.ChargedItem.BLOWPIPE, DART, "Iron dart", PIPE, 20));
         settle(engine, 0L, 6_000L);
-        assertEquals("the reload is a transfer", 50L, engine.getMetrics(9_000L).costs);
+        assertEquals("the reload is a transfer", 50L, engine.metrics(9_000L).cost);
 
         check(engine, 95L, 10_000L);
-        assertEquals("10 fired, 5 recovered: 5 darts lost", 50L, engine.getMetrics(11_000L).costs);
+        assertEquals("10 fired, 5 recovered: 5 darts lost", 50L, engine.metrics(11_000L).cost);
     }
 
     @Test
@@ -108,7 +108,7 @@ public class ChargeReloadTest
         settle(engine, 0L, 6_000L);
 
         check(engine, 100L, 10_000L);
-        assertEquals("5 fired, count unchanged after a 5-dart top-up", 50L, engine.getMetrics(11_000L).costs);
+        assertEquals("5 fired, count unchanged after a 5-dart top-up", 50L, engine.metrics(11_000L).cost);
     }
 
     @Test
@@ -117,9 +117,9 @@ public class ChargeReloadTest
         // Twelve shots; eight of the fired darts are picked up and go straight back into the pipe,
         // so the pack never changes and the next Check reads only four fewer.
         Engine engine = fired(12);
-        assertEquals("before a Check every shot is an estimate", 120L, engine.getMetrics(2_000L).costs);
+        assertEquals("before a Check every shot is an estimate", 120L, engine.metrics(2_000L).cost);
         check(engine, 96L, 10_000L);
-        assertEquals("the Check measures 4 darts lost", 40L, engine.getMetrics(11_000L).costs);
+        assertEquals("the Check measures 4 darts lost", 40L, engine.metrics(11_000L).cost);
     }
 
     @Test
@@ -128,9 +128,9 @@ public class ChargeReloadTest
         Engine engine = fired(12);
         engine.pickUpIntoPipe(DART, 8L, 5_000L);
         assertEquals("8 of the 12 fired darts went back into the pipe", 40L,
-            engine.getMetrics(6_000L).costs);
+            engine.metrics(6_000L).cost);
         check(engine, 96L, 10_000L);
-        assertEquals("the Check agrees: 4 darts lost, never 0", 40L, engine.getMetrics(11_000L).costs);
+        assertEquals("the Check agrees: 4 darts lost, never 0", 40L, engine.metrics(11_000L).cost);
     }
 
     @Test
@@ -138,6 +138,6 @@ public class ChargeReloadTest
     {
         Engine engine = fired(2);
         engine.pickUpIntoPipe(DART, 8L, 5_000L);
-        assertEquals("only the 2 fired darts can come back", 0L, engine.getMetrics(6_000L).costs);
+        assertEquals("only the 2 fired darts can come back", 0L, engine.metrics(6_000L).cost);
     }
 }

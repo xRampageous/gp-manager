@@ -64,11 +64,11 @@ public class ImbueSwapTest
                 : id == ItemID.MAGIC_SHORTBOW ? 1_800 : 0);
         assertEquals(2_800_000, valuation.valueComponent(ItemID.NZONE_BERZERKER_RING, 1L, 0L).unitPrice);
         assertSame(PriceSource.CURRENCY_PROXY,
-            valuation.valueComponent(ItemID.NZONE_BERZERKER_RING, 1L, 0L).getPriceSource());
+            valuation.valueComponent(ItemID.NZONE_BERZERKER_RING, 1L, 0L).source());
         assertEquals(400_000, valuation.valueComponent(ItemID.RING_OF_WEALTH_I5, 1L, 0L).unitPrice);
         assertEquals(1_800, valuation.valueComponent(ItemID.MAGIC_SHORTBOW_I, 1L, 0L).unitPrice);
         assertSame("a quoteless base leaves the imbued leg unpriced",
-            PriceSource.UNPRICED, valuation.valueComponent(ItemID.NZONE_SALVE_AMULET, 1L, 0L).getPriceSource());
+            PriceSource.UNPRICED, valuation.valueComponent(ItemID.NZONE_SALVE_AMULET, 1L, 0L).source());
     }
 
     @Test
@@ -77,24 +77,24 @@ public class ImbueSwapTest
         // The NMZ/Soul Wars imbues consume no items; a rune lost in the same settle still books.
         Engine engine = settle(mapOf(ItemID.RING_OF_WEALTH, 1L, ItemID.NATURERUNE, 1L),
             mapOf(ItemID.RING_OF_WEALTH_I, 1L));
-        for (Transaction row : engine.getActiveSession().getTransactions())
+        for (Transaction row : engine.session().transactions())
         {
-            for (Flow flow : row.getFlows())
+            for (Flow flow : row.flows())
             {
-                assertTrue("the imbue pair never books: " + flow.itemId,
-                    flow.itemId != ItemID.RING_OF_WEALTH && flow.itemId != ItemID.RING_OF_WEALTH_I);
+                assertTrue("the imbue pair never books: " + flow.item,
+                    flow.item != ItemID.RING_OF_WEALTH && flow.item != ItemID.RING_OF_WEALTH_I);
             }
         }
-        assertEquals(-300L, engine.getMetrics(1_010_000L).net);
+        assertEquals(-300L, engine.metrics(1_010_000L).net);
     }
 
     @Test
     public void theDamnedDegradeBooksNothing()
     {
         Engine engine = settle(mapOf(DAMNED, 1L), mapOf(DAMNED_DUST, 1L));
-        assertTrue(engine.getActiveSession().getTransactions().toString(),
-            engine.getActiveSession().getTransactions().isEmpty());
-        assertEquals(0L, engine.getMetrics(1_010_000L).net);
+        assertTrue(engine.session().transactions().toString(),
+            engine.session().transactions().isEmpty());
+        assertEquals(0L, engine.metrics(1_010_000L).net);
     }
 
     @Test
@@ -109,16 +109,16 @@ public class ImbueSwapTest
         Engine engine = settle(
             mapOf(ItemID.SAILORS_AMULET_EMPTY, 1L, ItemID.LAWRUNE, 1L, ItemID.WATERRUNE, 10L),
             mapOf(ItemID.SAILORS_AMULET, 1L));
-        for (Transaction row : engine.getActiveSession().getTransactions())
+        for (Transaction row : engine.session().transactions())
         {
-            for (Flow flow : row.getFlows())
+            for (Flow flow : row.flows())
             {
-                assertTrue("the amulet's states never book: " + flow.itemId,
-                    flow.itemId != ItemID.SAILORS_AMULET
-                        && flow.itemId != ItemID.SAILORS_AMULET_EMPTY);
+                assertTrue("the amulet's states never book: " + flow.item,
+                    flow.item != ItemID.SAILORS_AMULET
+                        && flow.item != ItemID.SAILORS_AMULET_EMPTY);
             }
         }
-        assertEquals(-(300L + 10L * 5L), engine.getMetrics(1_010_000L).net);
+        assertEquals(-(300L + 10L * 5L), engine.metrics(1_010_000L).net);
     }
 
     private static void assertSwapped(int first, int second)

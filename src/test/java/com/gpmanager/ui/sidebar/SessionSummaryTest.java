@@ -24,7 +24,7 @@ public class SessionSummaryTest
         onEdt(() ->
         {
             Engine engine = SavedSessionTest.window();
-            engine.restartRate(2 * MINUTE);
+            engine.restartRate(2 * MINUTE, true);
             SafeMath.clock = () -> 3 * MINUTE;
             SidebarPanel panel = RateRestartTest.panel(engine);
             AtomicReference<String> copied = new AtomicReference<>();
@@ -44,8 +44,8 @@ public class SessionSummaryTest
         onEdt(() ->
         {
             Engine engine = SavedSessionTest.window();
-            Session source = engine.getActiveSession();
-            String id = engine.saveLiveSession(source, source.sessionStartAt, 2 * MINUTE);
+            Session source = engine.session();
+            String id = EngineProbe.saveLiveSession(engine, source, source.sessionStartAt, 2 * MINUTE);
             coins(engine, 2 * MINUTE + 5, 900L);
             SafeMath.clock = () -> 4 * MINUTE;
             SidebarPanel panel = RateRestartTest.panel(engine);
@@ -53,7 +53,7 @@ public class SessionSummaryTest
             GrindsController controller = controller(panel, copied);
             GrindsPage page = new GrindsPage(controller);
             page.apply(GrindsData.capture(engine, 4 * MINUTE, false, null));
-            Table.Row row = page.savedSessions.rows.stream().filter(item -> item.key.equals(id)).findFirst().orElseThrow();
+            Table.Row row = page.saved.rows.stream().filter(item -> item.key.equals(id)).findFirst().orElseThrow();
             Table.Menu copy = row.menu.stream().filter(item -> item.label.equals("Copy summary")).findFirst().orElse(null);
             assertNotNull("saved session row offers Copy summary", copy);
             long allTime = GrindsData.allTime(engine, 4 * MINUTE).net;
@@ -86,7 +86,7 @@ public class SessionSummaryTest
         onEdt(() ->
         {
             Engine engine = engine();
-            engine.getActiveSession().addTransaction(SavedSessionTest.trade(1L), 2_000, false);
+            engine.session().addTransaction(SavedSessionTest.trade(1L), 2_000, false);
             SafeMath.clock = () -> MINUTE;
             AtomicReference<String> copied = new AtomicReference<>();
             copyLive(controller(RateRestartTest.panel(engine), copied));
@@ -103,7 +103,7 @@ public class SessionSummaryTest
         {
             Engine engine = engine();
             engine.resetData(0L);
-            assertNull(engine.getActiveSession());
+            assertNull(engine.session());
             JMenuItem copy = liveItem(controller(RateRestartTest.panel(engine), new AtomicReference<>()));
             assertFalse(copy.isEnabled());
             return null;
@@ -138,8 +138,8 @@ public class SessionSummaryTest
         onEdt(() ->
         {
             Engine engine = SavedSessionTest.window();
-            Session source = engine.getActiveSession();
-            String id = engine.saveLiveSession(source, source.sessionStartAt, 2 * MINUTE);
+            Session source = engine.session();
+            String id = EngineProbe.saveLiveSession(engine, source, source.sessionStartAt, 2 * MINUTE);
             AtomicReference<String> copied = new AtomicReference<>("unchanged");
             GrindsController controller = controller(RateRestartTest.panel(engine), copied);
             assertTrue(engine.deleteHistory(id));
@@ -161,8 +161,8 @@ public class SessionSummaryTest
                 @Override void copyText(String text) { throw new IllegalStateException("clipboard busy"); }
             };
             copyLive(controller);
-            assertEquals("Copy failed · clipboard busy", panel.shell.noticeText.getToolTipText());
-            assertEquals(1_500L, engine.getMetrics(2 * MINUTE).net);
+            assertEquals("Copy failed · clipboard busy", panel.shell.message.getToolTipText());
+            assertEquals(1_500L, engine.metrics(2 * MINUTE).net);
             return null;
         });
     }

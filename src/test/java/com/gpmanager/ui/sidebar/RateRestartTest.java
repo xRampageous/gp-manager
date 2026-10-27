@@ -23,15 +23,15 @@ public class RateRestartTest {
             coins(engine, 5L, 566_329L);
             restart(engine, HOUR);
             LiveSnapshot waiting = live(engine, HOUR + MINUTE - 1L);
-            assertFalse(waiting.rateEstablished);
-            assertEquals("Calculating…", LivePage.rateText(waiting.rateEstablished, waiting.gpPerHour));
+            assertFalse(waiting.ready);
+            assertEquals("Calculating…", LivePage.rateText(waiting.ready, waiting.rate));
             long[] activeMillis = {MINUTE, 72_000L, 2L * MINUTE, HOUR};
             long[] expectedRates = {33_979_740L, 28_316_450L, 16_989_870L, 566_329L};
             for (int i = 0; i < activeMillis.length; i++) {
                 LiveSnapshot next = live(engine, HOUR + activeMillis[i]);
-                assertTrue(next.rateEstablished);
-                assertEquals(activeMillis[i], next.elapsedMillis);
-                assertEquals(expectedRates[i], next.gpPerHour);
+                assertTrue(next.ready);
+                assertEquals(activeMillis[i], next.elapsed);
+                assertEquals(expectedRates[i], next.rate);
                 assertEquals(566_329L, next.net);
                 assertEquals(566_329L, recentTotal(next));
                 HudFrame hud = new HudBuilder(HudBuilderTest.config(false, 4), null)
@@ -46,15 +46,15 @@ public class RateRestartTest {
         onEdt(() -> {
             Engine engine = engine();
             coins(engine, 5L, 500_000L);
-            engine.newLiveSession(HOUR);
+            engine.newLive(HOUR);
             coins(engine, HOUR + 5L, 566_329L);
             restart(engine, 2L * HOUR);
             LiveSnapshot next = live(engine, 2L * HOUR + MINUTE);
             assertEquals(566_329L, next.net);
-            assertEquals(1_066_329L, next.runNet);
+            assertEquals(1_066_329L, next.run);
             assertEquals(566_329L, recentTotal(next));
-            assertEquals(33_979_740L, next.gpPerHour);
-            assertEquals(MINUTE, next.elapsedMillis);
+            assertEquals(33_979_740L, next.rate);
+            assertEquals(MINUTE, next.elapsed);
             return null;
         });
     }
@@ -63,7 +63,7 @@ public class RateRestartTest {
         onEdt(() -> {
             Engine engine = engine();
             coins(engine, 5L, 500_000L);
-            Session run = engine.getActiveSession();
+            Session run = engine.session();
             ContainerSnapshot baseline = ContainerSnapshot.empty();
             engine.baseline = baseline;
             restart(engine, HOUR);
@@ -71,25 +71,25 @@ public class RateRestartTest {
             LiveSnapshot just = live(engine, HOUR);
             assertEquals(500_000L, just.net);
             assertEquals(500_000L, recentTotal(just));
-            assertEquals(0L, just.elapsedMillis);
-            assertEquals(0L, just.gpPerHour);
-            assertFalse(just.rateEstablished);
+            assertEquals(0L, just.elapsed);
+            assertEquals(0L, just.rate);
+            assertFalse(just.ready);
             coins(engine, HOUR + 5L, 50_000L);
             LiveSnapshot next = live(engine, HOUR + HOUR / 2L);
             assertEquals(550_000L, next.net);
-            assertEquals(550_000L, next.runNet);
+            assertEquals(550_000L, next.run);
             assertEquals(550_000L, recentTotal(next));
-            assertEquals(HOUR / 2L, next.elapsedMillis);
-            assertEquals(1_100_000L, next.gpPerHour);
-            assertSame(run, engine.getActiveSession());
-            assertEquals(2, run.getTransactions().size());
-            assertTrue(engine.getHistory().isEmpty());
+            assertEquals(HOUR / 2L, next.elapsed);
+            assertEquals(1_100_000L, next.rate);
+            assertSame(run, engine.session());
+            assertEquals(2, run.transactions().size());
+            assertTrue(engine.history().isEmpty());
             assertEquals(550_000L, engine.summary().metrics(run, HOUR + HOUR / 2L).net);
             HudFrame hud = new HudBuilder(HudBuilderTest.config(false, 4), null)
                     .update(next, f -> true, HOUR + HOUR / 2L);
             assertEquals(Fmt.signed(next.net), hud.net);
-            assertEquals(LivePage.rateText(true, next.gpPerHour), hud.rate);
-            assertEquals(new HudBuilder(HudBuilderTest.config(false, 4), null).timer(next.elapsedMillis), hud.timer);
+            assertEquals(LivePage.rateText(true, next.rate), hud.rate);
+            assertEquals(new HudBuilder(HudBuilderTest.config(false, 4), null).timer(next.elapsed), hud.timer);
             return null;
         });
     }
@@ -102,11 +102,11 @@ public class RateRestartTest {
                 restart(engine, HOUR);
                 coins(engine, HOUR + 5L, -200L);
                 assertEquals(base - 200L, live(engine, 2L * HOUR).net);
-                assertEquals(base - 200L, live(engine, 2L * HOUR).gpPerHour);
+                assertEquals(base - 200L, live(engine, 2L * HOUR).rate);
                 restart(engine, 2L * HOUR);
                 coins(engine, 2L * HOUR + 5L, 50L);
                 assertEquals(base - 150L, live(engine, 3L * HOUR).net);
-                assertEquals(base - 150L, live(engine, 3L * HOUR).gpPerHour);
+                assertEquals(base - 150L, live(engine, 3L * HOUR).rate);
             }
             Engine extreme = engine();
             coins(extreme, 5L, Long.MIN_VALUE + 1L);
@@ -115,7 +115,7 @@ public class RateRestartTest {
             coins(extreme, HOUR + 6L, Long.MAX_VALUE);
             assertEquals("saturated revenue and costs leave zero displayed Net", 0L,
                     live(extreme, 2L * HOUR).net);
-            assertEquals(0L, live(extreme, 2L * HOUR).gpPerHour);
+            assertEquals(0L, live(extreme, 2L * HOUR).rate);
             for (long net : new long[]{Long.MAX_VALUE, -Long.MAX_VALUE}) {
                 Engine signed = engine();
                 coins(signed, 5L, net);
@@ -123,7 +123,7 @@ public class RateRestartTest {
                 LiveSnapshot next = live(signed, HOUR + MINUTE);
                 assertEquals(net, next.net);
                 assertEquals("a signed rate saturates rather than wrapping",
-                        net > 0L ? Long.MAX_VALUE : Long.MIN_VALUE, next.gpPerHour);
+                        net > 0L ? Long.MAX_VALUE : Long.MIN_VALUE, next.rate);
             }
             return null;
         });
@@ -139,14 +139,14 @@ public class RateRestartTest {
             restart(engine, HOUR);
             LiveSnapshot after = live(engine, HOUR);
             assertEquals(before.goal.current, after.goal.current);
-            assertEquals(before.goal.timeRemainingMillis, after.goal.timeRemainingMillis);
+            assertEquals(before.goal.remaining, after.goal.remaining);
             assertEquals(before.milestone, after.milestone);
-            assertEquals(before.runNet, after.runNet);
+            assertEquals(before.run, after.run);
             coins(engine, HOUR + 5L, 500L);
             LiveSnapshot next = live(engine, HOUR + HOUR / 2L);
             assertEquals(1_500L, next.goal.current);
-            assertEquals(5L * HOUR / 2L, next.goal.timeRemainingMillis);
-            assertEquals(3_000L, next.gpPerHour);
+            assertEquals(5L * HOUR / 2L, next.goal.remaining);
+            assertEquals(3_000L, next.rate);
             return null;
         });
     }
@@ -157,13 +157,13 @@ public class RateRestartTest {
             coins(engine, 5L, 1_000L);
             engine.togglePause(HOUR);
             restart(engine, 2L * HOUR);
-            assertTrue(engine.getActiveSession().paused);
-            assertEquals(0L, live(engine, 3L * HOUR).elapsedMillis);
+            assertTrue(engine.session().paused);
+            assertEquals(0L, live(engine, 3L * HOUR).elapsed);
             engine.togglePause(3L * HOUR);
             coins(engine, 3L * HOUR + 5L, 500L);
             LiveSnapshot next = live(engine, 4L * HOUR);
-            assertEquals(HOUR, next.elapsedMillis);
-            assertEquals(1_500L, next.gpPerHour);
+            assertEquals(HOUR, next.elapsed);
+            assertEquals(1_500L, next.rate);
             assertEquals(1_500L, next.net);
             return null;
         });
@@ -177,12 +177,12 @@ public class RateRestartTest {
             engine.undoTransaction();
             assertEquals(0L, live(engine, 2L * HOUR).net);
             assertEquals("zero displayed Net means a zero rate", 0L,
-                    live(engine, 2L * HOUR).gpPerHour);
+                    live(engine, 2L * HOUR).rate);
             engine.restoreUndo();
             assertEquals(1_000L, live(engine, 2L * HOUR).net);
-            assertEquals(1_000L, live(engine, 2L * HOUR).gpPerHour);
+            assertEquals(1_000L, live(engine, 2L * HOUR).rate);
             coins(engine, HOUR + 5L, 500L);
-            assertEquals(1_500L, live(engine, 2L * HOUR).gpPerHour);
+            assertEquals(1_500L, live(engine, 2L * HOUR).rate);
             return null;
         });
     }
@@ -197,20 +197,20 @@ public class RateRestartTest {
             JsonObject json = gson.toJsonTree(engine.exportState()).getAsJsonObject();
             Engine loaded = load(json, 2L * HOUR);
             assertEquals(1_500L, live(loaded, 2L * HOUR).net);
-            assertEquals(1_500L, live(loaded, 2L * HOUR).gpPerHour);
-            assertEquals(HOUR, live(loaded, 2L * HOUR).elapsedMillis);
+            assertEquals(1_500L, live(loaded, 2L * HOUR).rate);
+            assertEquals(HOUR, live(loaded, 2L * HOUR).elapsed);
             JsonObject savedRun = json.getAsJsonObject("generalSession");
             savedRun.remove("rateStartAt");
             savedRun.remove("rateSetMillis");
             savedRun.addProperty("rateSetNet", 1_000L);
-            assertEquals(750L, live(load(json, 2L * HOUR), 2L * HOUR).gpPerHour);
+            assertEquals(750L, live(load(json, 2L * HOUR), 2L * HOUR).rate);
             for (long invalid : new long[]{-1L, 3L * HOUR}) {
                 savedRun.addProperty("rateStartAt", HOUR);
                 savedRun.addProperty("rateSetMillis", invalid);
-                assertEquals(750L, live(load(json, 2L * HOUR), 2L * HOUR).gpPerHour);
+                assertEquals(750L, live(load(json, 2L * HOUR), 2L * HOUR).rate);
                 savedRun.addProperty("rateSetMillis", HOUR);
                 savedRun.addProperty("rateStartAt", invalid);
-                assertEquals(750L, live(load(json, 2L * HOUR), 2L * HOUR).gpPerHour);
+                assertEquals(750L, live(load(json, 2L * HOUR), 2L * HOUR).rate);
             }
             return null;
         });
@@ -221,16 +221,16 @@ public class RateRestartTest {
             Engine engine = engine();
             coins(engine, 5L, 1_000L);
             restart(engine, HOUR);
-            engine.newLiveSession(2L * HOUR);
+            engine.newLive(2L * HOUR);
             coins(engine, 2L * HOUR + 5L, 500L);
             assertEquals(500L, live(engine, 3L * HOUR).net);
-            assertEquals(500L, live(engine, 3L * HOUR).gpPerHour);
+            assertEquals(500L, live(engine, 3L * HOUR).rate);
             restart(engine, 3L * HOUR);
             engine.showWholeRun();
             LiveSnapshot whole = live(engine, 3L * HOUR);
             assertEquals(1_500L, whole.net);
-            assertEquals(3L * HOUR, whole.elapsedMillis);
-            assertEquals(500L, whole.gpPerHour);
+            assertEquals(3L * HOUR, whole.elapsed);
+            assertEquals(500L, whole.rate);
             return null;
         });
     }
@@ -242,19 +242,19 @@ public class RateRestartTest {
             coins(engine, 5L, 1_000L);
             restart(engine, HOUR);
             coins(engine, HOUR + 5L, 500L);
-            assertEquals(1_500L, live(engine, 2L * HOUR).gpPerHour);
-            assertEquals(750L, GrindsData.capture(engine, 2L * HOUR, false, null).activeGpPerHour);
+            assertEquals(1_500L, live(engine, 2L * HOUR).rate);
+            assertEquals(750L, GrindsData.capture(engine, 2L * HOUR, false, null).rate);
             engine.finishCustom(2L * HOUR);
-            assertEquals(750L, engine.getHistory().get(0).metrics(2L * HOUR).profitPerHour);
+            assertEquals(750L, engine.history().get(0).metrics(2L * HOUR).rate);
             engine.startCustom("Zulrah", 2L * HOUR);
             coins(engine, 2L * HOUR + 5L, 50L);
-            assertEquals(50L, live(engine, 3L * HOUR).gpPerHour);
-            assertEquals(HOUR, live(engine, 3L * HOUR).elapsedMillis);
+            assertEquals(50L, live(engine, 3L * HOUR).rate);
+            assertEquals(HOUR, live(engine, 3L * HOUR).elapsed);
             engine.restoreProfile("next-owner", new SavedState(), 3L * HOUR);
             engine.ensureSession(3L * HOUR);
             coins(engine, 3L * HOUR + 5L, 50L);
             assertEquals(50L, live(engine, 4L * HOUR).net);
-            assertEquals(50L, live(engine, 4L * HOUR).gpPerHour);
+            assertEquals(50L, live(engine, 4L * HOUR).rate);
             return null;
         });
     }
@@ -308,11 +308,11 @@ public class RateRestartTest {
             assertTrue(ShellProbe.sheetButtonTexts(panel.shell).contains("Restart GP/h"));
             assertTrue(ShellProbe.sheetButtonTexts(panel.shell).contains("New session"));
             ShellProbe.pressSheet(panel.shell, "Cancel");
-            assertEquals(HOUR, live(engine, HOUR).elapsedMillis);
-            assertEquals(1_000L, live(engine, HOUR).gpPerHour);
+            assertEquals(HOUR, live(engine, HOUR).elapsed);
+            assertEquals(1_000L, live(engine, HOUR).rate);
             Engine idle = PresentationLifecycleTest.engine();
             restart(idle, HOUR);
-            assertNull(idle.getActiveSession());
+            assertNull(idle.session());
             return null;
         });
     }
@@ -327,7 +327,7 @@ public class RateRestartTest {
         DirectHeaderControlsTest.click(panel.live.hero.clock);
         assertTrue("clock offers a rate-only restart", ShellProbe.sheetButtonTexts(panel.shell).contains("Restart GP/h"));
         ShellProbe.pressSheet(panel.shell, "Restart GP/h");
-        assertEquals("", panel.shell.sheetTitle);
+        assertEquals("", panel.shell.heading);
     }
 
     static Engine load(JsonObject json, long at) {

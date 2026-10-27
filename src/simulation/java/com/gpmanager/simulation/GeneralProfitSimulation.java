@@ -53,13 +53,13 @@ public final class GeneralProfitSimulation
         SimulationSupport.equal(null, engine.processIfDirty(SimulationSupport.snapshot(1265, 1L), start + 1_800L, null), "warm-up tick 3");
         SimulationSupport.equal(null, engine.processIfDirty(SimulationSupport.snapshot(1265, 1L), start + 2_400L, null), "warm-up tick 4");
 
-        SimulationSupport.equal(0L, engine.getMetrics(start + 2_400L).net, "opening inventory net");
-        SimulationSupport.equal(0, engine.getActiveSession().getTransactions().size(), "opening inventory transactions");
+        SimulationSupport.equal(0L, engine.metrics(start + 2_400L).net, "opening inventory net");
+        SimulationSupport.equal(0, engine.session().transactions().size(), "opening inventory transactions");
 
         engine.markDirty();
         Transaction consumed = SimulationSupport.settle(engine, ContainerSnapshot.empty(), start + 3_000L);
-        SimulationSupport.equal(TransactionType.CONSUMPTION, consumed.getType(), "post-baseline removal type");
-        SimulationSupport.equal(-100L, consumed.getNet(), "post-baseline removal value");
+        SimulationSupport.equal(TransactionType.CONSUMPTION, consumed.type(), "post-baseline removal type");
+        SimulationSupport.equal(-100L, consumed.net(), "post-baseline removal value");
     }
 
     private static void bankAndEquipmentTransfersAreNeutral()
@@ -79,8 +79,8 @@ public final class GeneralProfitSimulation
         SimulationSupport.equal(null, engine.processIfDirty(SimulationSupport.snapshot(1265, 1L), start + 2_400L, null), "restore tick 2");
         SimulationSupport.equal(null, engine.processIfDirty(SimulationSupport.snapshot(1265, 1L), start + 3_000L, null), "restore settle");
 
-        SimulationSupport.equal(0, engine.getActiveSession().getTransactions().size(), "round-trip transaction count");
-        SimulationSupport.equal(0L, engine.getMetrics(start + 3_000L).net, "round-trip net");
+        SimulationSupport.equal(0, engine.session().transactions().size(), "round-trip transaction count");
+        SimulationSupport.equal(0L, engine.metrics(start + 3_000L).net, "round-trip net");
     }
 
     private static void npcLootAndSupplies()
@@ -95,8 +95,8 @@ public final class GeneralProfitSimulation
             engine,
             SimulationSupport.snapshot(379, 3L, 892, 90L, 555, 45L),
             start + 600L);
-        SimulationSupport.equal(TransactionType.CONSUMPTION, supplies.getType(), "supply transaction type");
-        SimulationSupport.equal(875L, engine.getMetrics(start + 2_400L).costs, "all settled supply costs");
+        SimulationSupport.equal(TransactionType.CONSUMPTION, supplies.type(), "supply transaction type");
+        SimulationSupport.equal(875L, engine.metrics(start + 2_400L).cost, "all settled supply costs");
 
         Map<Integer, Long> loot = new LinkedHashMap<>();
         loot.put(526, 1L);
@@ -109,12 +109,12 @@ public final class GeneralProfitSimulation
             SimulationSupport.snapshot(379, 3L, 892, 90L, 555, 51L, 526, 1L),
             start + 3_000L);
 
-        SimulationSupport.equal(TransactionType.LOOT, drop.getType(), "loot transaction type");
-        SimulationSupport.equal(Confidence.CONFIRMED, drop.getConfidence(), "loot confidence");
-        SimulationSupport.equal(61L, drop.getRevenue(), "loot revenue");
-        Metrics metrics = engine.getMetrics(start + 6_000L);
-        SimulationSupport.equal(61L, metrics.revenue, "session revenue");
-        SimulationSupport.equal(875L, metrics.costs, "session costs");
+        SimulationSupport.equal(TransactionType.LOOT, drop.type(), "loot transaction type");
+        SimulationSupport.equal(Confidence.CONFIRMED, drop.confidence(), "loot confidence");
+        SimulationSupport.equal(61L, drop.revenue(), "loot revenue");
+        Metrics metrics = engine.metrics(start + 6_000L);
+        SimulationSupport.equal(61L, metrics.income, "session revenue");
+        SimulationSupport.equal(875L, metrics.cost, "session costs");
         SimulationSupport.equal(-814L, metrics.net, "session net");
     }
 
@@ -132,10 +132,10 @@ public final class GeneralProfitSimulation
             SimulationSupport.snapshot(1511, 5L, 50, 5L),
             start + 600L);
 
-        SimulationSupport.equal(TransactionType.PROCESSING, processing.getType(), "processing type");
-        SimulationSupport.equal(600L, processing.getRevenue(), "output value");
-        SimulationSupport.equal(250L, processing.getCosts(), "input value");
-        SimulationSupport.equal(350L, processing.getNet(), "processing margin");
+        SimulationSupport.equal(TransactionType.PROCESSING, processing.type(), "processing type");
+        SimulationSupport.equal(600L, processing.revenue(), "output value");
+        SimulationSupport.equal(250L, processing.costs(), "input value");
+        SimulationSupport.equal(350L, processing.net(), "processing margin");
     }
 
     private static void uncertainCorrectionAndUndo()
@@ -151,20 +151,20 @@ public final class GeneralProfitSimulation
             SimulationSupport.snapshot(995, 50L, 526, 2L),
             start + 600L);
 
-        SimulationSupport.equal(TransactionType.UNCERTAIN, uncertain.getType(), "automatic uncertain type");
-        SimulationSupport.check(!uncertain.isCounted(), "uncertain transaction should be excluded");
-        SimulationSupport.equal(0L, engine.getMetrics(start + 3_000L).net, "uncertain net before correction");
+        SimulationSupport.equal(TransactionType.UNCERTAIN, uncertain.type(), "automatic uncertain type");
+        SimulationSupport.check(!uncertain.counts(), "uncertain transaction should be excluded");
+        SimulationSupport.equal(0L, engine.metrics(start + 3_000L).net, "uncertain net before correction");
 
         SimulationSupport.check(
-            engine.correctTransaction(uncertain.getId(), Correction.REVENUE, start + 4_000L,
+            engine.correctTransaction(uncertain.id(), Correction.REVENUE,
                 "Manual revenue correction"),
             "manual revenue correction should apply");
-        SimulationSupport.equal(112L, engine.getMetrics(start + 4_000L).net, "corrected gross revenue");
+        SimulationSupport.equal(112L, engine.metrics(start + 4_000L).net, "corrected gross revenue");
 
         Transaction removed = engine.undoTransaction();
-        SimulationSupport.equal(uncertain.getId(), removed.getId(), "undo transaction id");
-        SimulationSupport.equal(0, engine.getActiveSession().getTransactions().size(), "transactions after undo");
-        SimulationSupport.equal(0L, engine.getMetrics(start + 5_000L).net, "net after undo");
+        SimulationSupport.equal(uncertain.id(), removed.id(), "undo transaction id");
+        SimulationSupport.equal(0, engine.session().transactions().size(), "transactions after undo");
+        SimulationSupport.equal(0L, engine.metrics(start + 5_000L).net, "net after undo");
     }
 
     private static void pauseFreezesRates()
@@ -185,11 +185,11 @@ public final class GeneralProfitSimulation
         session.pause(2_000L, PauseReason.MANUAL);
         Metrics atPause = session.metrics(2_000L);
         Metrics oneMinuteLater = session.metrics(62_000L);
-        SimulationSupport.equal(atPause.elapsedMillis, oneMinuteLater.elapsedMillis, "paused elapsed time");
-        SimulationSupport.equal(atPause.profitPerHour, oneMinuteLater.profitPerHour, "paused session rate");
+        SimulationSupport.equal(atPause.elapsed, oneMinuteLater.elapsed, "paused elapsed time");
+        SimulationSupport.equal(atPause.rate, oneMinuteLater.rate, "paused session rate");
 
         session.resume(62_000L);
-        SimulationSupport.equal(3_000L, session.metrics(63_000L).elapsedMillis, "resumed active time");
+        SimulationSupport.equal(3_000L, session.metrics(63_000L).elapsed, "resumed active time");
     }
 
     private static void idlePauseAndAutoActivity()
@@ -199,16 +199,16 @@ public final class GeneralProfitSimulation
         engine.setDetectedActivity("PvM", 500L);
         engine.setDetectedActivity("Skilling", 1_000L);
 
-        SimulationSupport.equal("Skilling", engine.getMetrics(1_000L).activityHint, "auto activity hint");
+        SimulationSupport.equal("Skilling", engine.metrics(1_000L).activity, "auto activity hint");
 
-        engine.getActiveSession().pause(2_000L, PauseReason.IDLE);
+        engine.session().pause(2_000L, PauseReason.IDLE);
         SimulationSupport.check(engine.isIdlePaused(), "engine must record idle pause reason");
-        long frozenElapsed = engine.getMetrics(8_000L).elapsedMillis;
+        long frozenElapsed = engine.metrics(8_000L).elapsed;
         SimulationSupport.equal(2_000L, frozenElapsed, "idle pause frozen elapsed");
 
         engine.resume(8_000L, PauseReason.IDLE);
         SimulationSupport.check(!engine.isIdlePaused(), "idle pause must clear after activity");
-        SimulationSupport.equal(3_000L, engine.getMetrics(9_000L).elapsedMillis, "active time after idle resume");
+        SimulationSupport.equal(3_000L, engine.metrics(9_000L).elapsed, "active time after idle resume");
     }
 
     private static void crashSafeRestore(Path output) throws Exception
@@ -226,17 +226,17 @@ public final class GeneralProfitSimulation
                 true,
                 Collections.singletonList(SimulationSupport.gain(526, 2L))),
             100, false);
-        repository.save(new WriteIntent(null, repository.scopeGeneration,
-            repository.lastKnownDiskRevision, new SavedState(session, null, Collections.emptyList()), null));
+        repository.save(new WriteIntent(null, repository.generation,
+            repository.revision, new SavedState(session, null, Collections.emptyList()), null));
 
         SavedState restored = repository.load();
-        SimulationSupport.check(restored.getActiveSession() != null, "active session should restore");
-        SimulationSupport.equal("Recovered session", restored.getActiveSession().getName(), "restored session name");
-        SimulationSupport.equal(62L, restored.getActiveSession().metrics(3_000L).net, "restored session net");
+        SimulationSupport.check(restored.currentSession() != null, "active session should restore");
+        SimulationSupport.equal("Recovered session", restored.currentSession().name(), "restored session name");
+        SimulationSupport.equal(62L, restored.currentSession().metrics(3_000L).net, "restored session net");
 
         Engine engine = SimulationSupport.newEngine(SessionMode.GENERAL);
         engine.restore(restored, SafeMath.now());
-        SimulationSupport.equal(PauseReason.RECOVERY, engine.getActiveSession().getPauseReason(),
+        SimulationSupport.equal(PauseReason.RECOVERY, engine.session().pauseReason(),
             "interrupted active session waits paused for recovery");
     }
 
@@ -286,10 +286,10 @@ public final class GeneralProfitSimulation
         Engine engine = SimulationSupport.newEngine(SessionMode.GENERAL);
         engine.restore(new SavedState(current, null, Arrays.asList(profitable, loss)), 3_600_000L);
 
-        SimulationSupport.equal(2, engine.getHistory().size(), "compared session count");
-        SimulationSupport.equal(600L, engine.getMetrics(3_600_000L).net, "current net");
-        SimulationSupport.equal(1_000L, engine.historyMetrics(profitable.getId(), 3_600_000L).net, "best historical net");
-        SimulationSupport.equal(-500L, engine.historyMetrics(loss.getId(), 3_600_000L).net, "worst historical net");
+        SimulationSupport.equal(2, engine.history().size(), "compared session count");
+        SimulationSupport.equal(600L, engine.metrics(3_600_000L).net, "current net");
+        SimulationSupport.equal(1_000L, engine.historyMetrics(profitable.id(), 3_600_000L).net, "best historical net");
+        SimulationSupport.equal(-500L, engine.historyMetrics(loss.id(), 3_600_000L).net, "worst historical net");
     }
 
     private static void historyManagement()
@@ -338,19 +338,19 @@ public final class GeneralProfitSimulation
         Engine engine = SimulationSupport.newEngine(SessionMode.GENERAL);
         engine.restore(new SavedState(null, null, Arrays.asList(pvm, skilling, trading)), 3_600_000L);
 
-        engine.historySession(pvm.getId()).rename("Vorkath");
+        engine.historySession(pvm.id()).rename("Vorkath");
 
-        Metrics before = engine.historyMetrics(trading.getId(), 3_600_000L);
+        Metrics before = engine.historyMetrics(trading.id(), 3_600_000L);
         SimulationSupport.equal(-200L, before.net, "historical net before correction");
         SimulationSupport.check(
-            engine.historySession(trading.getId()).correctTransaction(
-                tradeLoss.getId(), Correction.REVENUE, 4_000_000L, "Manual correction"),
+            engine.historySession(trading.id()).correctTransaction(
+                tradeLoss.id(), Correction.REVENUE, "Manual correction"),
             "historical correction");
-        Metrics after = engine.historyMetrics(trading.getId(), 4_000_000L);
+        Metrics after = engine.historyMetrics(trading.id(), 4_000_000L);
         SimulationSupport.equal(200L, after.net, "historical net after correction");
 
-        SimulationSupport.check(engine.deleteHistory(skilling.getId()), "history deletion");
-        SimulationSupport.equal(2, engine.getHistory().size(), "history size after deletion");
+        SimulationSupport.check(engine.deleteHistory(skilling.id()), "history deletion");
+        SimulationSupport.equal(2, engine.history().size(), "history size after deletion");
     }
 
     private static void sessionIntelligenceComplete()
@@ -364,8 +364,8 @@ public final class GeneralProfitSimulation
         Engine engine = SimulationSupport.newEngine(SessionMode.GENERAL);
         engine.restore(new SavedState(null, null, Arrays.asList(pvm, skilling, trading)), now);
 
-        SimulationSupport.equal(3, engine.getHistory().size(), "history retained");
-        SimulationSupport.equal("Vorkath", engine.getHistory().get(0).getName(), "newest first");
+        SimulationSupport.equal(3, engine.history().size(), "history retained");
+        SimulationSupport.equal("Vorkath", engine.history().get(0).name(), "newest first");
     }
 
     private static Session completedSession(
@@ -410,6 +410,6 @@ public final class GeneralProfitSimulation
             100, false);
         session.close(61_000L);
 
-        SimulationSupport.check(!session.getTransactions().isEmpty(), "the Grind keeps its receipts");
+        SimulationSupport.check(!session.transactions().isEmpty(), "the Grind keeps its receipts");
     }
 }

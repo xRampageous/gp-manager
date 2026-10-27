@@ -20,7 +20,7 @@ public final class HeroProbe
 
     /** The value shown in the strip cell labelled {@code label}, or "" when there is none. */
     public static String cell(Hero hero, String label) {
-        for (List<Hero.Cell> strip : hero.drawnStrips) {
+        for (List<Hero.Cell> strip : hero.drawn) {
             for (Hero.Cell cell : strip) {
                 if (cell.label.equals(label)) {
                     return cell.value;

@@ -29,48 +29,48 @@ public class KeyChestClaimTest
             snapshot(ItemID.KONAR_KEY, 1L), 1_000L);
 
         assertNotNull(received);
-        assertEquals(TransactionType.TRANSFER, received.getType());
-        assertFalse(received.isCounted());
-        assertEquals(ActionKind.DEFERRED_CLAIM, received.getActionKind());
-        assertEquals("Key held · Brimstone chest", received.getNote());
-        assertEquals("Brimstone chest", received.getActivityName());
-        assertEquals(PriceSource.DEFERRED_CLAIM, received.getFlows().get(0).getPriceSource());
+        assertEquals(TransactionType.TRANSFER, received.type());
+        assertFalse(received.counts());
+        assertEquals(ActionKind.DEFERRED_CLAIM, received.action());
+        assertEquals("Key held · Brimstone chest", received.note());
+        assertEquals("Brimstone chest", received.activityName());
+        assertEquals(PriceSource.DEFERRED_CLAIM, received.flows().get(0).source());
 
         engine.observeChest("Open", "Brimstone chest");
         assertNull("menu click alone is not a claim",
             engine.processIfDirty(snapshot(ItemID.KONAR_KEY, 1L), 2_800L, null));
-        PendingClaim pending = engine.getPendingClaims().get(0);
-        assertEquals(received.getId(), pending.getClaimId());
+        PendingClaim pending = engine.pendingClaims().get(0);
+        assertEquals(received.id(), pending.claimId());
         assertEquals(ItemID.KONAR_KEY, pending.itemOrKeyId);
-        assertEquals(1L, pending.getQuantity());
+        assertEquals(1L, pending.quantity());
 
         Map<Integer, Long> afterOpen = new HashMap<>();
         afterOpen.put(CONTENTS_ITEM, 1L);
         Transaction contents = settle(engine, new ContainerSnapshot(afterOpen), 3_400L);
 
         assertNotNull(contents);
-        assertEquals(TransactionType.LOOT, contents.getType());
-        assertTrue(contents.isCounted());
-        assertEquals("Brimstone chest", contents.getActivityName());
-        assertEquals(CONTENTS_PRICE, contents.getNet());
-        assertEquals(1, contents.getFlows().size());
-        assertEquals(CONTENTS_ITEM, contents.getFlows().get(0).itemId);
+        assertEquals(TransactionType.LOOT, contents.type());
+        assertTrue(contents.counts());
+        assertEquals("Brimstone chest", contents.activityName());
+        assertEquals(CONTENTS_PRICE, contents.net());
+        assertEquals(1, contents.flows().size());
+        assertEquals(CONTENTS_ITEM, contents.flows().get(0).item);
         assertEquals("settlement and claim removal happen in the same revision",
-            received.getId(), contents.sourceClaimId());
-        assertTrue(engine.getPendingClaims().isEmpty());
-        assertEquals(CONTENTS_PRICE, engine.getMetrics(5_200L).net);
+            received.id(), contents.claimId());
+        assertTrue(engine.pendingClaims().isEmpty());
+        assertEquals(CONTENTS_PRICE, engine.metrics(5_200L).net);
 
         // Replay: a stale duplicate of the settled claim can never book again.
         SavedState saved = engine.savedState();
         List<PendingClaim> stale = new ArrayList<>();
-        stale.add(new PendingClaim(received.getId(), ItemID.KONAR_KEY, 1L,
+        stale.add(new PendingClaim(received.id(), ItemID.KONAR_KEY, 1L,
             1_000L));
         saved.setPendingClaims(stale);
         Engine reloaded = engine(ContainerSnapshot.empty());
         reloaded.restore(saved, 6_000L);
-        assertTrue("the settled sourceClaimId removes the stale claim on load", reloaded.getPendingClaims().isEmpty());
-        assertEquals(CONTENTS_PRICE, reloaded.getMetrics(6_000L).net);
-        assertEquals(2, reloaded.getActiveSession().getTransactions().size());
+        assertTrue("the settled sourceClaimId removes the stale claim on load", reloaded.pendingClaims().isEmpty());
+        assertEquals(CONTENTS_PRICE, reloaded.metrics(6_000L).net);
+        assertEquals(2, reloaded.session().transactions().size());
     }
 
     @Test
@@ -87,13 +87,13 @@ public class KeyChestClaimTest
         Transaction contents = settle(engine, new ContainerSnapshot(contentsSnapshot), 3_400L);
 
         assertNotNull(contents);
-        assertEquals(TransactionType.GAIN, contents.getType());
+        assertEquals(TransactionType.GAIN, contents.type());
         assertFalse("unmeasured click cannot relabel an ordinary gain",
-            "Brimstone chest".equals(contents.getActivityName()));
-        assertTrue("the held key stays a durable unresolved claim", engine.getPendingClaims().size() == 1
-            && received.getId().equals(engine.getPendingClaims().get(0).getClaimId()));
-        assertTrue(contents.sourceClaimId().isEmpty());
-        assertEquals(CONTENTS_PRICE, engine.getMetrics(5_200L).net);
+            "Brimstone chest".equals(contents.activityName()));
+        assertTrue("the held key stays a durable unresolved claim", engine.pendingClaims().size() == 1
+            && received.id().equals(engine.pendingClaims().get(0).claimId()));
+        assertTrue(contents.claimId().isEmpty());
+        assertEquals(CONTENTS_PRICE, engine.metrics(5_200L).net);
     }
 
     @Test
@@ -104,8 +104,8 @@ public class KeyChestClaimTest
         Engine reloaded = engine(snapshot(ItemID.KONAR_KEY, 1L));
         reloaded.restore(engine.savedState(), 2_000L);
         assertEquals("a durable claim does not expire with the runtime window",
-            received.getId(), reloaded.getPendingClaims().get(0).getClaimId());
-        assertTrue("a recovered owner resumes paused", reloaded.getActiveSession().paused);
+            received.id(), reloaded.pendingClaims().get(0).claimId());
+        assertTrue("a recovered owner resumes paused", reloaded.session().paused);
         reloaded.togglePause(2_100L);
         reloaded.setBaseline(snapshot(ItemID.KONAR_KEY, 1L));
 
@@ -115,11 +115,11 @@ public class KeyChestClaimTest
         Transaction contents = settle(reloaded, new ContainerSnapshot(afterOpen), 3_400L);
 
         assertNotNull(contents);
-        assertEquals(received.getId(), contents.sourceClaimId());
-        assertTrue(reloaded.getPendingClaims().isEmpty());
-        assertEquals(CONTENTS_PRICE, reloaded.getMetrics(5_200L).net);
+        assertEquals(received.id(), contents.claimId());
+        assertTrue(reloaded.pendingClaims().isEmpty());
+        assertEquals(CONTENTS_PRICE, reloaded.metrics(5_200L).net);
         assertTrue("settlement lands in the active session",
-            reloaded.getActiveSession().getTransactions().contains(contents));
+            reloaded.session().transactions().contains(contents));
     }
 
     @Test
@@ -133,13 +133,13 @@ public class KeyChestClaimTest
         Transaction contents = settle(engine, new ContainerSnapshot(afterOpen), 1_600L);
 
         assertNotNull(contents);
-        assertEquals(TransactionType.LOOT, contents.getType());
-        assertEquals("Crystal chest", contents.getActivityName());
-        assertEquals(CONTENTS_PRICE - 18_000L, contents.getNet());
-        assertEquals(-18_000L, flow(contents, ItemID.CRYSTAL_KEY).valueDelta);
-        assertEquals(PriceSource.GRAND_EXCHANGE, flow(contents, ItemID.CRYSTAL_KEY).getPriceSource());
-        assertEquals(1, engine.getActiveSession().getTransactions().size());
-        assertTrue(engine.getPendingClaims().isEmpty());
+        assertEquals(TransactionType.LOOT, contents.type());
+        assertEquals("Crystal chest", contents.activityName());
+        assertEquals(CONTENTS_PRICE - 18_000L, contents.net());
+        assertEquals(-18_000L, flow(contents, ItemID.CRYSTAL_KEY).value);
+        assertEquals(PriceSource.GRAND_EXCHANGE, flow(contents, ItemID.CRYSTAL_KEY).source());
+        assertEquals(1, engine.session().transactions().size());
+        assertTrue(engine.pendingClaims().isEmpty());
     }
 
     @Test
@@ -150,10 +150,10 @@ public class KeyChestClaimTest
         Transaction receipt = settle(engine, snapshot(ItemID.CRYSTAL_KEY, 1L), 1_000L);
 
         assertNotNull(receipt);
-        assertEquals(TransactionType.GAIN, receipt.getType());
-        assertEquals(18_000L, receipt.getNet());
-        assertTrue(engine.getPendingClaims().isEmpty());
-        assertNull(receipt.getActionKind());
+        assertEquals(TransactionType.GAIN, receipt.type());
+        assertEquals(18_000L, receipt.net());
+        assertTrue(engine.pendingClaims().isEmpty());
+        assertNull(receipt.action());
     }
 
     @Test
@@ -166,9 +166,9 @@ public class KeyChestClaimTest
         Transaction closed = settle(engine, ContainerSnapshot.empty(), 2_800L);
 
         assertNull("the deferred token itself is never booked as a cost", closed);
-        assertTrue("a key lost on death closes its claim without a key cost", engine.getPendingClaims().isEmpty());
-        assertEquals(received.getId(), engine.getActiveSession().getTransactions().get(0).getId());
-        assertEquals(0L, engine.getMetrics(4_600L).net);
+        assertTrue("a key lost on death closes its claim without a key cost", engine.pendingClaims().isEmpty());
+        assertEquals(received.id(), engine.session().transactions().get(0).id());
+        assertEquals(0L, engine.metrics(4_600L).net);
     }
 
     @Test
@@ -177,9 +177,9 @@ public class KeyChestClaimTest
         Engine engine = engine(ContainerSnapshot.empty());
         Transaction audit = settle(engine, snapshot(ItemID.KONAR_KEY, 2L), 1_000L);
         assertNotNull(audit);
-        PendingClaim claim = engine.getPendingClaims().get(0);
-        assertEquals("one audit row carries the full held quantity", audit.getId(), claim.getClaimId());
-        assertEquals(2L, claim.getQuantity());
+        PendingClaim claim = engine.pendingClaims().get(0);
+        assertEquals("one audit row carries the full held quantity", audit.id(), claim.claimId());
+        assertEquals(2L, claim.quantity());
 
         engine.observeChest("Open", "Brimstone chest");
         Map<Integer, Long> afterFirstOpen = new HashMap<>();
@@ -188,12 +188,12 @@ public class KeyChestClaimTest
         Transaction partial = settle(engine, new ContainerSnapshot(afterFirstOpen), 3_400L);
 
         assertNotNull(partial);
-        assertEquals(CONTENTS_PRICE, partial.getNet());
+        assertEquals(CONTENTS_PRICE, partial.net());
         assertTrue("a partial settlement relates the claim and never proves closure",
-            partial.sourceClaimId().isEmpty());
-        PendingClaim remainder = engine.getPendingClaims().get(0);
-        assertEquals(audit.getId(), remainder.getClaimId());
-        assertEquals("one key remains unresolved", 1L, remainder.getQuantity());
+            partial.claimId().isEmpty());
+        PendingClaim remainder = engine.pendingClaims().get(0);
+        assertEquals(audit.id(), remainder.claimId());
+        assertEquals("one key remains unresolved", 1L, remainder.quantity());
 
         Gson gson = new Gson();
         SavedState saved = engine.savedState();
@@ -201,17 +201,17 @@ public class KeyChestClaimTest
 
         Engine reloaded = engine(ContainerSnapshot.empty());
         reloaded.restore(saved, 4_000L);
-        assertEquals("the unresolved remainder survives restart", 1, reloaded.getPendingClaims().size());
-        PendingClaim restored = reloaded.getPendingClaims().get(0);
-        assertEquals(audit.getId(), restored.getClaimId());
-        assertEquals(1L, restored.getQuantity());
-        assertEquals(CONTENTS_PRICE, reloaded.getMetrics(4_600L).net);
+        assertEquals("the unresolved remainder survives restart", 1, reloaded.pendingClaims().size());
+        PendingClaim restored = reloaded.pendingClaims().get(0);
+        assertEquals(audit.id(), restored.claimId());
+        assertEquals(1L, restored.quantity());
+        assertEquals(CONTENTS_PRICE, reloaded.metrics(4_600L).net);
 
         Engine reloadedAgain = engine(ContainerSnapshot.empty());
         reloadedAgain.restore(savedCopy, 4_000L);
-        assertEquals("repeated restore converges on the same claim", 1, reloadedAgain.getPendingClaims().size());
-        assertEquals(1L, reloadedAgain.getPendingClaims().get(0).getQuantity());
-        assertEquals(CONTENTS_PRICE, reloadedAgain.getMetrics(4_600L).net);
+        assertEquals("repeated restore converges on the same claim", 1, reloadedAgain.pendingClaims().size());
+        assertEquals(1L, reloadedAgain.pendingClaims().get(0).quantity());
+        assertEquals(CONTENTS_PRICE, reloadedAgain.metrics(4_600L).net);
 
         reloaded.togglePause(4_100L);
         reloaded.setBaseline(snapshot(ItemID.KONAR_KEY, 1L));
@@ -221,9 +221,9 @@ public class KeyChestClaimTest
         Transaction closed = settle(reloaded, new ContainerSnapshot(afterSecondOpen), 5_200L);
 
         assertNotNull(closed);
-        assertEquals("the reaching-zero settlement carries the claim id", audit.getId(), closed.sourceClaimId());
-        assertTrue("the fully settled claim is gone", reloaded.getPendingClaims().isEmpty());
-        assertEquals(2L * CONTENTS_PRICE, reloaded.getMetrics(5_800L).net);
+        assertEquals("the reaching-zero settlement carries the claim id", audit.id(), closed.claimId());
+        assertTrue("the fully settled claim is gone", reloaded.pendingClaims().isEmpty());
+        assertEquals(2L * CONTENTS_PRICE, reloaded.metrics(5_800L).net);
 
         assertNull("replaying the already settled snapshot books nothing",
             settle(reloaded, new ContainerSnapshot(afterSecondOpen), 6_600L));
@@ -231,11 +231,11 @@ public class KeyChestClaimTest
         SavedState closedCopy = gson.fromJson(gson.toJson(reloaded.savedState()), SavedState.class);
         Engine afterClose = engine(ContainerSnapshot.empty());
         afterClose.restore(closedCopy, 7_200L);
-        assertTrue("a settled claim never comes back", afterClose.getPendingClaims().isEmpty());
-        assertEquals(2L * CONTENTS_PRICE, afterClose.getMetrics(7_800L).net);
+        assertTrue("a settled claim never comes back", afterClose.pendingClaims().isEmpty());
+        assertEquals(2L * CONTENTS_PRICE, afterClose.metrics(7_800L).net);
         assertEquals("reload never books the settlement twice",
-            reloaded.getActiveSession().getTransactions().size(),
-            afterClose.getActiveSession().getTransactions().size());
+            reloaded.session().transactions().size(),
+            afterClose.session().transactions().size());
     }
 
     @Test
@@ -249,7 +249,7 @@ public class KeyChestClaimTest
         lifecycle.chestClick("Open", "Larran's big chest");
         KeyClaims.ChestOpen match = lifecycle.matchChest(keyLoss, contents, null);
         assertNotNull(match);
-        assertEquals("Larran's big chest", match.chestName);
+        assertEquals("Larran's big chest", match.chest);
     }
 
     @Test
@@ -268,9 +268,9 @@ public class KeyChestClaimTest
             lifecycle.matchChest(Collections.emptyMap(), contents, null);
 
         assertNotNull(match);
-        assertEquals(ItemID.SLAYER_WILDERNESS_KEY, match.keyItemId);
+        assertEquals(ItemID.SLAYER_WILDERNESS_KEY, match.key);
         assertEquals(1L, match.quantity);
-        assertEquals("Larran's big chest", match.chestName);
+        assertEquals("Larran's big chest", match.chest);
     }
 
     @Test
@@ -323,9 +323,9 @@ public class KeyChestClaimTest
         assertFalse(row.contains("chestName"));
 
         SavedState state = gson.fromJson(gson.toJson(engine.savedState()), SavedState.class);
-        assertEquals(1, state.getPendingClaims().size());
-        assertEquals(received.getId(), state.getPendingClaims().get(0).getClaimId());
-        assertEquals(ItemID.KONAR_KEY, state.getPendingClaims().get(0).itemOrKeyId);
+        assertEquals(1, state.pendingClaims().size());
+        assertEquals(received.id(), state.pendingClaims().get(0).claimId());
+        assertEquals(ItemID.KONAR_KEY, state.pendingClaims().get(0).itemOrKeyId);
     }
 
     private static Engine engine(ContainerSnapshot baseline)
@@ -372,9 +372,9 @@ public class KeyChestClaimTest
 
     private static Flow flow(Transaction transaction, int itemId)
     {
-        for (Flow flow : transaction.getFlows())
+        for (Flow flow : transaction.flows())
         {
-            if (flow.itemId == itemId)
+            if (flow.item == itemId)
             {
                 return flow;
             }

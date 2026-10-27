@@ -59,12 +59,12 @@ public class HudBuilderTest
     {
         Engine engine = engine();
         engine.startCustom("Vorkath", NOW);
-        engine.getActiveSession().id = "hud-test-grind";
-        engine.getActiveSession().addTransaction(receipt(NOW + 1_000L, TransactionType.LOOT,
+        engine.session().id = "hud-test-grind";
+        engine.session().addTransaction(receipt(NOW + 1_000L, TransactionType.LOOT,
             flow(536, "Dragon bones", 1L, (int) net)), 2_000, false);
         if (target != null)
         {
-            engine.getActiveSession().setProfitTargetGp(target);
+            engine.session().setNetTarget(target, 0, 0);
         }
         return LiveSnapshot.capture(engine, NOW + 2_000L, null);
     }
@@ -87,7 +87,7 @@ public class HudBuilderTest
         Engine engine = engine();
         engine.startCustom("Vorkath", NOW);
         engine.togglePause(NOW + 1_000L);
-        assertTrue(engine.getActiveSession().paused);
+        assertTrue(engine.session().paused);
         assertFalse("a paused Grind is not tracking", new HudBuilder(config(true, 4), null)
             .update(LiveSnapshot.capture(engine, NOW + 2_000L, null), f -> true, NOW + 2_000L).visible);
         assertTrue("the option off keeps it", new HudBuilder(config(false, 4), null)
@@ -96,10 +96,10 @@ public class HudBuilderTest
         Engine free = engine();
         free.ensureSession(NOW);
         HudBuilder builder = new HudBuilder(config(true, 4), null);
-        builder.tray().observed(11286, "Draconic visage", 1L, 2_500_000L, NOW, false);
+        builder.tray.observed(11286, "Draconic visage", 1L, 2_500_000L, NOW, false);
         assertFalse("held reward-window loot is not booked yet", builder
             .update(LiveSnapshot.capture(free, NOW + 10L, null), f -> true, NOW + 10L).visible);
-        free.getActiveSession().addTransaction(receipt(NOW + 20L, TransactionType.LOOT,
+        free.session().addTransaction(receipt(NOW + 20L, TransactionType.LOOT,
             flow(536, "Dragon bones", 1L, 2_000)), 2_000, false);
         assertTrue("Free play shows once something is booked", builder
             .update(LiveSnapshot.capture(free, NOW + 30L, null), f -> true, NOW + 30L).visible);
@@ -120,9 +120,9 @@ public class HudBuilderTest
         // A reached aim reads zero with a full bar and the done signal (owner live 2026-10-14).
         Engine done = engine();
         done.startCustom("Vorkath", NOW);
-        done.getActiveSession().addTransaction(receipt(NOW + 1_000L, TransactionType.LOOT,
+        done.session().addTransaction(receipt(NOW + 1_000L, TransactionType.LOOT,
             flow(536, "Dragon bones", 1L, 300_000)), 2_000, false);
-        done.getActiveSession().setProfitTargetGp(200_000L);
+        done.session().setNetTarget(200_000L, 0, 0);
         HudFrame reached = new HudBuilder(config(true, 4), null)
             .update(LiveSnapshot.capture(done, NOW + 2_000L, null), f -> true, NOW + 2_000L);
         assertEquals("a reached aim reads zero left", "0", reached.target);
@@ -137,19 +137,19 @@ public class HudBuilderTest
     {
         Engine engine = engine();
         engine.startCustom("Vorkath", NOW - 60_000L);
-        engine.getActiveSession().setActiveTimeTargetMillis(2L * 60_000L, NOW);
-        engine.getActiveSession().activeTimeTargetSetMillis = 0L;
+        engine.session().setTimeTarget(2L * 60_000L, NOW);
+        engine.session().activeTimeTargetSetMillis = 0L;
         HudFrame mid = new HudBuilder(config(true, 4), null)
             .update(LiveSnapshot.capture(engine, NOW + 1_000L, null), f -> true, NOW + 1_000L);
         assertEquals("the label is the live countdown", "59s", mid.target);
-        assertFalse("no warning before the final seconds", mid.targetWarning);
+        assertFalse("no warning before the final seconds", mid.warning);
 
-        engine.getActiveSession().setActiveTimeTargetMillis(60_000L, NOW + 1_000L);
-        engine.getActiveSession().activeTimeTargetSetMillis = 9_000L;
+        engine.session().setTimeTarget(60_000L, NOW + 1_000L);
+        engine.session().activeTimeTargetSetMillis = 9_000L;
         HudFrame late = new HudBuilder(config(true, 4), null)
             .update(LiveSnapshot.capture(engine, NOW + 1_000L, null), f -> true, NOW + 1_000L);
         assertEquals("seconds remain in the countdown", "8s", late.target);
-        assertTrue("the final seconds warn (default 10)", late.targetWarning);
+        assertTrue("the final seconds warn (default 10)", late.warning);
         assertEquals("the bar tracks the window, not the Net", 52d / 60d, late.progress, 0.01d);
 
         GpManagerConfig noWarning = new GpManagerConfig()
@@ -162,43 +162,43 @@ public class HudBuilderTest
         HudFrame off = new HudBuilder(noWarning, null)
             .update(LiveSnapshot.capture(engine, NOW + 1_000L, null), f -> true, NOW + 1_000L);
         assertEquals("the countdown stays", "8s", off.target);
-        assertFalse("0 turns the warning off", off.targetWarning);
+        assertFalse("0 turns the warning off", off.warning);
 
         // Both targets: the Net label stays until the final seconds, then the countdown replaces
         // it (owner live 2026-10-13).
         Engine both = engine();
         both.startCustom("Vorkath", NOW - 61_000L);
-        both.getActiveSession().setProfitTargetGp(200_000L);
-        both.getActiveSession().setActiveTimeTargetMillis(60_000L, NOW);
-        both.getActiveSession().activeTimeTargetSetMillis = 20_000L;
+        both.session().setNetTarget(200_000L, 0, 0);
+        both.session().setTimeTarget(60_000L, NOW);
+        both.session().activeTimeTargetSetMillis = 20_000L;
         HudFrame running = new HudBuilder(config(true, 4), null)
             .update(LiveSnapshot.capture(both, NOW, null), f -> true, NOW);
         assertEquals("the both-run drains from its aim", "200k", running.target);
-        assertFalse("no warning outside the final seconds", running.targetWarning);
+        assertFalse("no warning outside the final seconds", running.warning);
 
-        both.getActiveSession().activeTimeTargetSetMillis = 9_000L;
+        both.session().activeTimeTargetSetMillis = 9_000L;
         HudFrame flip = new HudBuilder(config(true, 4), null)
             .update(LiveSnapshot.capture(both, NOW, null), f -> true, NOW);
         assertEquals("the label flips to the countdown", "8s", flip.target);
-        assertTrue("the both-target run warns too", flip.targetWarning);
+        assertTrue("the both-target run warns too", flip.warning);
 
         // A frozen countdown never warns (owner live 2026-10-14): a both-run returns to its Net
         // label, a time-only run keeps its frozen seconds.
-        both.getActiveSession().pauseTimeTarget(NOW + 1_000L);
+        both.session().pauseTimeTarget(NOW + 1_000L);
         HudFrame frozen = new HudBuilder(config(true, 4), null)
             .update(LiveSnapshot.capture(both, NOW + 1_000L, null), f -> true, NOW + 1_000L);
         assertEquals("the frozen both-run keeps its drain value", "200k", frozen.target);
-        assertFalse("a frozen countdown never warns", frozen.targetWarning);
+        assertFalse("a frozen countdown never warns", frozen.warning);
 
-        engine.getActiveSession().pauseTimeTarget(NOW + 1_000L);
+        engine.session().pauseTimeTarget(NOW + 1_000L);
         HudFrame frozenOnly = new HudBuilder(config(true, 4), null)
             .update(LiveSnapshot.capture(engine, NOW + 1_000L, null), f -> true, NOW + 1_000L);
         assertEquals("the frozen time-only countdown keeps its value", "8s", frozenOnly.target);
-        assertFalse("and still never warns", frozenOnly.targetWarning);
+        assertFalse("and still never warns", frozenOnly.warning);
 
         // Zero warning seconds keep the Net gauge throughout on a both-run (owner live
         // 2026-10-14: the countdown replacement follows the setting).
-        both.getActiveSession().resumeTimeTarget(NOW + 1_000L);
+        both.session().resumeTimeTarget(NOW + 1_000L);
         GpManagerConfig noWarn = new GpManagerConfig()
         {
             @Override public boolean hudHideWhenIdle() { return true; }
@@ -209,10 +209,10 @@ public class HudBuilderTest
         HudFrame silent = new HudBuilder(noWarn, null)
             .update(LiveSnapshot.capture(both, NOW + 1_000L, null), f -> true, NOW + 1_000L);
         assertEquals("no countdown without a warning window", "200k", silent.target);
-        assertFalse("and no warning", silent.targetWarning);
+        assertFalse("and no warning", silent.warning);
 
         // The window follows the setting: 30s warns at 25s left, not at 34s (owner live 2026-10-14).
-        engine.getActiveSession().resumeTimeTarget(NOW + 1_000L);
+        engine.session().resumeTimeTarget(NOW + 1_000L);
         GpManagerConfig wide = new GpManagerConfig()
         {
             @Override public boolean hudHideWhenIdle() { return true; }
@@ -220,14 +220,14 @@ public class HudBuilderTest
             @Override public int hudTargetWarningSeconds() { return 30; }
             @Override public int stabilizationTicks() { return 1; }
         };
-        engine.getActiveSession().activeTimeTargetSetMillis = 35_000L;
+        engine.session().activeTimeTargetSetMillis = 35_000L;
         HudFrame wideQuiet = new HudBuilder(wide, null)
             .update(LiveSnapshot.capture(engine, NOW + 1_000L, null), f -> true, NOW + 1_000L);
-        assertFalse("30s window does not warn at 34s left", wideQuiet.targetWarning);
-        engine.getActiveSession().activeTimeTargetSetMillis = 26_000L;
+        assertFalse("30s window does not warn at 34s left", wideQuiet.warning);
+        engine.session().activeTimeTargetSetMillis = 26_000L;
         HudFrame wideWarn = new HudBuilder(wide, null)
             .update(LiveSnapshot.capture(engine, NOW + 1_000L, null), f -> true, NOW + 1_000L);
-        assertTrue("but warns at 25s left", wideWarn.targetWarning);
+        assertTrue("but warns at 25s left", wideWarn.warning);
         assertEquals("25s", wideWarn.target);
     }
 
@@ -236,9 +236,9 @@ public class HudBuilderTest
     {
         Engine engine = engine();
         engine.startCustom("Zulrah", NOW);
-        engine.getActiveSession().addTransaction(receipt(NOW + 1_000L, TransactionType.CONSUMPTION,
+        engine.session().addTransaction(receipt(NOW + 1_000L, TransactionType.CONSUMPTION,
             flow(385, "Shark", -10L, 900)), 2_000, false);
-        engine.getActiveSession().setProfitTargetGp(1_000_000L);
+        engine.session().setNetTarget(1_000_000L, 0, 0);
         HudFrame s = new HudBuilder(config(true, 4), null)
             .update(LiveSnapshot.capture(engine, NOW + 2_000L, null), f -> true, NOW);
         assertEquals(Kit.Tone.LOSS.color, s.netColor);
@@ -252,10 +252,9 @@ public class HudBuilderTest
         HudBuilder builder = new HudBuilder(config(true, 2), null);
         for (int i = 0; i < 4; i++)
         {
-            builder.tray().booked(receipt(NOW + i, TransactionType.LOOT, flow(100 + i, "Item " + i, 1L, 1_000)),
-                NOW + i, false);
+            builder.tray.booked(receipt(NOW + i, TransactionType.LOOT, flow(100 + i, "Item " + i, 1L, 1_000)), NOW + i, false, NOW + i);
         }
-        HudFrame s = builder.update(grind(1_000L, null), flow -> flow.itemId != 100, NOW + 10L);
+        HudFrame s = builder.update(grind(1_000L, null), flow -> flow.item != 100, NOW + 10L);
         assertEquals(2, s.rows.size());
         assertEquals("Item 3 ×1", s.rows.get(0).name);
         assertEquals("the hidden item rides the footer, unnamed", "+1 more · +1 hidden", s.more);
@@ -271,15 +270,15 @@ public class HudBuilderTest
     public void hiddenLootNeverReopensAFoldedTray()
     {
         HudBuilder builder = new HudBuilder(config(true, 4), null);
-        builder.tray().booked(receipt(NOW, TransactionType.LOOT, flow(536, "Dragon bones", 1L, 2_000)), NOW, false);
+        builder.tray.booked(receipt(NOW, TransactionType.LOOT, flow(536, "Dragon bones", 1L, 2_000)), NOW, false, NOW);
         long later = NOW + builder.stayMillis() + HudBuilder.FADE_MILLIS + 1_000L;
-        builder.tray().booked(receipt(later, TransactionType.LOOT, flow(526, "Bones", 1L, 100)), later, false);
-        HudFrame s = builder.update(grind(1_000L, null), flow -> flow.itemId != 526, later + 10L);
+        builder.tray.booked(receipt(later, TransactionType.LOOT, flow(526, "Bones", 1L, 100)), later, false, later);
+        HudFrame s = builder.update(grind(1_000L, null), flow -> flow.item != 526, later + 10L);
         assertTrue("the visible row stays folded", s.rows.isEmpty());
         assertEquals("a folded tray shows no footer", "", s.more);
         assertEquals("the money still flashes beside Net", "+100", s.trip);
 
-        HudFrame all = builder.update(grind(1_000L, null), flow -> flow.itemId != 526, later + 20L);
+        HudFrame all = builder.update(grind(1_000L, null), flow -> flow.item != 526, later + 20L);
         assertEquals("folds by its visible entries' time", NOW + builder.stayMillis(), all.foldAt);
     }
 
@@ -287,7 +286,7 @@ public class HudBuilderTest
     public void anAllHiddenTrayStaysShut()
     {
         HudBuilder builder = new HudBuilder(config(true, 4), null);
-        builder.tray().booked(receipt(NOW, TransactionType.LOOT, flow(526, "Bones", 3L, 100)), NOW, false);
+        builder.tray.booked(receipt(NOW, TransactionType.LOOT, flow(526, "Bones", 3L, 100)), NOW, false, NOW);
         HudFrame s = builder.update(grind(1_000L, null), f -> false, NOW + 10L);
         assertTrue(s.rows.isEmpty());
         assertEquals("", s.more);
@@ -297,11 +296,11 @@ public class HudBuilderTest
     public void theHiddenFooterSkipsMarketCash()
     {
         HudBuilder builder = new HudBuilder(config(true, 4), null);
-        builder.tray().booked(receipt(NOW, TransactionType.LOOT, flow(536, "Dragon bones", 1L, 2_000)), NOW, false);
-        builder.tray().booked(receipt(NOW + 1L, TransactionType.LOOT, flow(526, "Bones", 2L, 100)), NOW + 1L, false);
-        builder.tray().booked(Tx.of(NOW + 2L, null, TransactionType.TRADE, Context.MARKET, "GE trade", "Trading", true,
-            List.of(flow(995, "Coins", 5_000L, 1))), NOW + 2L, false);
-        HudFrame s = builder.update(grind(1_000L, null), flow -> flow.itemId == 536, NOW + 10L);
+        builder.tray.booked(receipt(NOW, TransactionType.LOOT, flow(536, "Dragon bones", 1L, 2_000)), NOW, false, NOW);
+        builder.tray.booked(receipt(NOW + 1L, TransactionType.LOOT, flow(526, "Bones", 2L, 100)), NOW + 1L, false, NOW + 1L);
+        builder.tray.booked(Tx.of(NOW + 2L, null, TransactionType.TRADE, Context.MARKET, "GE trade", "Trading", true,
+            List.of(flow(995, "Coins", 5_000L, 1))), NOW + 2L, false, NOW + 2L);
+        HudFrame s = builder.update(grind(1_000L, null), flow -> flow.item == 536, NOW + 10L);
         assertEquals(1, s.rows.size());
         assertEquals("one hidden loot row; GE cash is not hidden loot", "+1 hidden", s.more);
     }
@@ -312,8 +311,8 @@ public class HudBuilderTest
         for (long quantity : new long[] {23_600L, -24_000L})
         {
             HudBuilder builder = new HudBuilder(config(true, 4), null);
-            builder.tray().booked(Tx.of(NOW, null, TransactionType.TRADE, Context.MARKET,
-                "GE trade", "Trading", true, List.of(flow(995, "Coins", quantity, 1))), NOW, false);
+            builder.tray.booked(Tx.of(NOW, null, TransactionType.TRADE, Context.MARKET,
+                "GE trade", "Trading", true, List.of(flow(995, "Coins", quantity, 1))), NOW, false, NOW);
             HudFrame snapshot = builder.update(grind(-400L, null), f -> false, NOW + 10L);
             assertTrue(snapshot.rows.isEmpty());
             assertEquals("market cash cannot open a filtered tray", 0f,
@@ -332,14 +331,13 @@ public class HudBuilderTest
         Graphics2D g = canvas.createGraphics();
         assertNull("hidden paints nothing", overlay.render(g));
 
-        builder.tray().booked(receipt(NOW, TransactionType.LOOT, flow(4151, "Abyssal whip with a long name", 1L, 1_500_000)),
-            NOW, false);
+        builder.tray.booked(receipt(NOW, TransactionType.LOOT, flow(4151, "Abyssal whip with a long name", 1L, 1_500_000)), NOW, false, NOW);
         builder.update(grind(1_500_000L, 100_000_000L), f -> true, NOW + 10L);
         Dimension wide = overlay.render(g);
         assertNotNull(wide);
         assertTrue(wide.width >= 130);
 
-        builder.tray().booked(receipt(NOW + 20L, TransactionType.LOOT, flow(1, "Ash", 1L, 10)), NOW + 20L, false);
+        builder.tray.booked(receipt(NOW + 20L, TransactionType.LOOT, flow(1, "Ash", 1L, 10)), NOW + 20L, false, NOW + 20L);
         builder.update(grind(1_500_000L, null), f -> true, NOW + 30L);
         assertTrue(overlay.render(g).width >= wide.width);
 
@@ -387,7 +385,7 @@ public class HudBuilderTest
     public void theTrayFadesOutJustBeforeItFoldsAndABigDropWearsGold()
     {
         HudBuilder builder = new HudBuilder(config(true, 4), null);
-        builder.tray().booked(receipt(NOW, TransactionType.LOOT, flow(20997, "Twisted bow", 1L, 1_200_000_000)), NOW, false);
+        builder.tray.booked(receipt(NOW, TransactionType.LOOT, flow(20997, "Twisted bow", 1L, 1_200_000_000)), NOW, false, NOW);
         HudFrame fresh = builder.update(grind(1_000L, null), f -> true, NOW + 10L);
         assertEquals(NOW + builder.stayMillis(), fresh.foldAt);
         HudFrame fading = builder.update(grind(1_000L, null), f -> true, NOW + builder.stayMillis() + HudBuilder.FADE_MILLIS / 2);
@@ -401,9 +399,9 @@ public class HudBuilderTest
     public void theRowThatLastGrewLeadsTheTray()
     {
         HudBuilder builder = new HudBuilder(config(true, 4), null);
-        builder.tray().booked(receipt(NOW, TransactionType.LOOT, flow(1, "Bones", 1L, 100)), NOW, false);
-        builder.tray().booked(receipt(NOW + 1L, TransactionType.LOOT, flow(2, "Coins", 50L, 50)), NOW + 1L, false);
-        builder.tray().booked(receipt(NOW + 2L, TransactionType.LOOT, flow(1, "Bones", 1L, 100)), NOW + 2L, false);
+        builder.tray.booked(receipt(NOW, TransactionType.LOOT, flow(1, "Bones", 1L, 100)), NOW, false, NOW);
+        builder.tray.booked(receipt(NOW + 1L, TransactionType.LOOT, flow(2, "Coins", 50L, 50)), NOW + 1L, false, NOW + 1L);
+        builder.tray.booked(receipt(NOW + 2L, TransactionType.LOOT, flow(1, "Bones", 1L, 100)), NOW + 2L, false, NOW + 2L);
         HudFrame s = builder.update(grind(1_000L, null), f -> true, NOW + 10L);
         assertEquals("Bones ×2", s.rows.get(0).name);
         assertEquals("Coins ×50", s.rows.get(1).name);
@@ -414,10 +412,10 @@ public class HudBuilderTest
     public void aBigDropKeepsItsRowWhenCheaperLootOverflowsTheTray()
     {
         HudBuilder builder = new HudBuilder(config(true, 2), null);
-        builder.tray().booked(receipt(NOW, TransactionType.LOOT, flow(20997, "Twisted bow", 1L, 1_200_000_000)), NOW, false);
+        builder.tray.booked(receipt(NOW, TransactionType.LOOT, flow(20997, "Twisted bow", 1L, 1_200_000_000)), NOW, false, NOW);
         for (int i = 1; i <= 3; i++)
         {
-            builder.tray().booked(receipt(NOW + i, TransactionType.LOOT, flow(i, "Junk " + i, 1L, 100)), NOW + i, false);
+            builder.tray.booked(receipt(NOW + i, TransactionType.LOOT, flow(i, "Junk " + i, 1L, 100)), NOW + i, false, NOW + i);
         }
         HudFrame s = builder.update(grind(1_000L, null), f -> true, NOW + 10L);
         assertEquals(2, s.rows.size());
@@ -430,7 +428,7 @@ public class HudBuilderTest
     public void theChipKeepsItsOwnSecondsWhateverTheTrayDoes()
     {
         HudBuilder builder = new HudBuilder(config(true, 4), null);
-        builder.tray().booked(receipt(NOW, TransactionType.LOOT, flow(1, "Bones", 1L, 300)), NOW, false);
+        builder.tray.booked(receipt(NOW, TransactionType.LOOT, flow(1, "Bones", 1L, 300)), NOW, false, NOW);
         HudFrame fresh = builder.update(grind(300L, null), f -> true, NOW + 10L);
         assertEquals("+300", fresh.trip);
         assertEquals(NOW + HudBuilder.CHIP_MILLIS, fresh.chipUntil);
@@ -443,7 +441,7 @@ public class HudBuilderTest
     public void theTraySlidesOpenAndShutOnTheSnapshotClock()
     {
         HudBuilder builder = new HudBuilder(config(true, 4), null);
-        builder.tray().booked(receipt(NOW, TransactionType.LOOT, flow(1, "Bones", 1L, 300)), NOW, false);
+        builder.tray.booked(receipt(NOW, TransactionType.LOOT, flow(1, "Bones", 1L, 300)), NOW, false, NOW);
         HudFrame s = builder.update(grind(300L, null), f -> true, NOW + 10L);
         assertEquals(NOW + 10L, s.openedAt);
         assertEquals(0f, HudOverlay.trayOpen(s, s.openedAt, true), 0f);

@@ -20,7 +20,7 @@ public class LifecycleWordTest
         engine.pauseForLifecycle(NOW + 1_000L);
 
         LiveSnapshot hop = LiveSnapshot.capture(engine, NOW + 2_000L, context(false, true));
-        assertTrue("the lifecycle pause still holds", hop.loggedOut);
+        assertTrue("the lifecycle pause still holds", hop.offline);
         assertEquals("RECONNECTING", LivePage.wordOf(hop));
         assertTrue(LivePage.statusTooltip(hop).startsWith("Reconnecting"));
 
@@ -42,7 +42,7 @@ public class LifecycleWordTest
         engine.togglePause(NOW + 1_000L);
         engine.resume(NOW + 2_000L, PauseReason.LIFECYCLE);
         assertTrue("a manual pause never becomes an automatic resume",
-            engine.getActiveSession().paused);
+            engine.session().paused);
         assertEquals("PAUSED",
             LivePage.wordOf(LiveSnapshot.capture(engine, NOW + 2_100L, context(false, false))));
     }

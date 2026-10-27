@@ -53,15 +53,15 @@ public class ObservedActionLabelTest
             TransactionType.CONSUMPTION, Context.GENERIC, "", "Vorkath", true,
             Arrays.asList(new Flow(560, "Death rune", -1L, 100, -100L)),
             Confidence.CONFIRMED, "Exact rune cost", null);
-        transaction.setActionKind(ActionKind.CAST);
-        long netBefore = transaction.getNet();
-        boolean countedBefore = transaction.isCounted();
-        TransactionType typeBefore = transaction.getType();
+        transaction.setAction(ActionKind.CAST);
+        long netBefore = transaction.net();
+        boolean countedBefore = transaction.counts();
+        TransactionType typeBefore = transaction.type();
         transaction.setActionLabel(ActionLabel.of("Ice Burst"));
 
-        assertEquals(netBefore, transaction.getNet());
-        assertEquals(countedBefore, transaction.isCounted());
-        assertEquals(typeBefore, transaction.getType());
+        assertEquals(netBefore, transaction.net());
+        assertEquals(countedBefore, transaction.counts());
+        assertEquals(typeBefore, transaction.type());
         assertEquals(110, SavedState.CURRENT_SCHEMA_VERSION);
 
         Gson gson = new Gson();
@@ -71,8 +71,8 @@ public class ObservedActionLabelTest
         Transaction loaded = gson.fromJson(json, Transaction.class);
         assertNotNull("a schema-105 receipt keeps its exact label", loaded.actionLabel());
         assertEquals("Ice Burst", loaded.actionLabel().value());
-        assertEquals(netBefore, loaded.getNet());
-        assertEquals(countedBefore, loaded.isCounted());
-        assertEquals(typeBefore, loaded.getType());
+        assertEquals(netBefore, loaded.net());
+        assertEquals(countedBefore, loaded.counts());
+        assertEquals(typeBefore, loaded.type());
     }
 }

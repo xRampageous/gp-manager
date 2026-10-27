@@ -25,10 +25,10 @@ public class IronmanValueTest
         valuation.alch = true;
         Flow whip = valuation.valueComponent(WHIP, 1L, 0L);
         assertEquals("its high alchemy price", 72_000, whip.unitPrice);
-        assertSame(PriceSource.HIGH_ALCHEMY, whip.getPriceSource());
+        assertSame(PriceSource.HIGH_ALCHEMY, whip.source());
         assertEquals("coins stay coins", 1, valuation.valueComponent(995, 1L, 0L).unitPrice);
         assertEquals("your own override still wins", 2_000_000,
-            valuation.valueOne(WHIP, 1L, Map.of(WHIP, 2_000_000), 0L).unitPrice);
+            valuation.valueOne(WHIP, 1L, Map.of(WHIP, 2_000_000L), 0L, true).unitPrice);
     }
 
     private static ItemComposition composition(int id)

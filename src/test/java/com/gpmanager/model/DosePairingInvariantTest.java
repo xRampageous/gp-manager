@@ -37,31 +37,31 @@ public class DosePairingInvariantTest
             long revenue = 0L;
             long costs = 0L;
             long raw = 0L;
-            for (Flow flow : transaction.getFlows())
+            for (Flow flow : transaction.flows())
             {
                 Accounting.Amounts amounts = Accounting.flow(transaction, flow);
-                revenue += amounts.revenue;
-                costs += amounts.costs;
-                raw += flow.valueDelta;
+                revenue += amounts.income;
+                costs += amounts.cost;
+                raw += flow.value;
             }
-            String where = "case " + i + " " + transaction.getFlows();
-            assertEquals(where, total.revenue, revenue);
-            assertEquals(where, total.costs, costs);
-            if (transaction.getCorrection() == Correction.AUTO)
+            String where = "case " + i + " " + transaction.flows();
+            assertEquals(where, total.income, revenue);
+            assertEquals(where, total.cost, costs);
+            if (transaction.correction() == Correction.AUTO)
             {
-                assertEquals("Net stays the raw flow sum: " + where, raw, total.getNet());
+                assertEquals("Net stays the raw flow sum: " + where, raw, total.net());
             }
             Accounting.CostSplit split = Accounting.costSplit(transaction);
             if (split.available)
             {
-                assertEquals("the split covers the costs: " + where, total.costs, split.supplies + split.other);
+                assertEquals("the split covers the costs: " + where, total.cost, split.supplies + split.other);
             }
             long ledger = 0L;
             for (Contribution contribution : Contribution.project(transaction))
             {
-                ledger += contribution.effectiveValue;
+                ledger += contribution.value;
             }
-            assertEquals("the Ledger adds up to Net: " + where, total.getNet(), ledger);
+            assertEquals("the Ledger adds up to Net: " + where, total.net(), ledger);
             if (!Accounting.consumePairs(transaction).isEmpty())
             {
                 paired++;
@@ -122,11 +122,11 @@ public class DosePairingInvariantTest
         TransactionType type = random.nextInt(4) == 0 ? TransactionType.LOOT : TransactionType.CONSUMPTION;
         Transaction transaction = new Transaction(1_000L + i, type, Context.GENERIC, "",
             "Vorkath", true, flows, Confidence.LIKELY, "fixture", null);
-        transaction.setActionKind(ACTIONS[random.nextInt(ACTIONS.length)]);
+        transaction.setAction(ACTIONS[random.nextInt(ACTIONS.length)]);
         Correction correction = CORRECTIONS[random.nextInt(CORRECTIONS.length)];
         if (correction != Correction.AUTO)
         {
-            transaction.applyCorrection(correction, 2_000L + i);
+            transaction.applyCorrection(correction, "Manual correction");
         }
         return transaction;
     }

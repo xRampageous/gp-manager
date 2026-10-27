@@ -30,7 +30,7 @@ public class MilestoneTest
         engine.setTargets(5_000_000L, null, HOUR);
         LiveSnapshot live = live(engine, HOUR);
         assertEquals("the target counts fresh", 0L, live.net);
-        assertEquals("the milestone counts all of Free play", 400_000_000L, live.runNet);
+        assertEquals("the milestone counts all of Free play", 400_000_000L, live.run);
         assertFalse(live.milestoneReached());
 
         coins(engine, HOUR + 5L, 600_000_000L);
@@ -45,7 +45,7 @@ public class MilestoneTest
         engine.startCustom("Vorkath", HOUR);
         assertNull(live(engine, HOUR).milestone);
         assertFalse(engine.setMilestone(5_000_000_000L));
-        assertEquals(Long.valueOf(1_000_000_000L), engine.getGeneralSession().milestoneGp);
+        assertEquals(Long.valueOf(1_000_000_000L), engine.freePlay().milestoneGp);
     }
 
     /** The HUD+ kill-streak line measures the whole run, so a target start never moves it. */
@@ -67,19 +67,19 @@ public class MilestoneTest
         Engine engine = PresentationLifecycleTest.engine();
         engine.ensureSession(System.currentTimeMillis());
         SidebarPanel panel = onEdt(() -> new SidebarPanel(engine, PresentationLifecycleTest.config(), null, null, null));
-        Shell shell = panel.shell();
+        Shell shell = panel.shell;
         GrindsController grinds = new GrindsController(panel);
         assertTrue("a milestone pick", onEdt(() ->
         {
             grinds.openTargets();
-            assertEquals("Set a Target", shell.sheetTitle);
+            assertEquals("Set a Target", shell.heading);
             boolean picked = ShellProbe.pressSheetText(shell, "5b");
             ShellProbe.pressSheet(shell, "Save");
             return picked;
         }));
-        assertEquals(Long.valueOf(5_000_000_000L), engine.getGeneralSession().milestoneGp);
-        assertNull("a milestone alone sets no target", engine.getActiveSession().getProfitTargetGp());
-        assertNull(engine.getActiveSession().sessionStartAt);
+        assertEquals(Long.valueOf(5_000_000_000L), engine.freePlay().milestoneGp);
+        assertNull("a milestone alone sets no target", engine.session().targetGp());
+        assertNull(engine.session().sessionStartAt);
 
         engine.startCustom("Vorkath", System.currentTimeMillis());
         assertFalse("no milestone in a Grind", onEdt(() ->
@@ -121,14 +121,14 @@ public class MilestoneTest
         assertFalse("the whole run needs no total line", onEdt(() ->
         {
             page.apply(live(engine, HOUR));
-            return page.runTotal.isVisible();
+            return page.total.isVisible();
         }));
         engine.setTargets(5_000_000L, null, HOUR);
         LiveSnapshot live = live(engine, HOUR);
         assertEquals("Free play " + Fmt.signed(420_000_000L), onEdt(() ->
         {
             page.apply(live);
-            return page.runTotal.isVisible() ? page.runTotal.getText() : "";
+            return page.total.isVisible() ? page.total.getText() : "";
         }));
         assertEquals("Live itself counts fresh", 0L, live.net);
     }
@@ -140,6 +140,6 @@ public class MilestoneTest
         engine.setMilestone(1_000_000_000L);
         engine.resetData(HOUR);
         engine.ensureSession(HOUR);
-        assertNull(engine.getGeneralSession().milestoneGp);
+        assertNull(engine.freePlay().milestoneGp);
     }
 }

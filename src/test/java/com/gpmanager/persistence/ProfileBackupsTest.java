@@ -34,9 +34,9 @@ public class ProfileBackupsTest
         try
         {
             JsonCodec.bind(new Gson());
-            assertTrue(coordinator.switchIdentity(ALICE, true, true));
+            assertTrue(coordinator.switchIdentity(ALICE, true));
             engine.ensureSession(1_000L);
-            engine.getActiveSession().rename("Before restore");
+            engine.session().rename("Before restore");
             assertTrue(coordinator.saveNow());
 
             Filepath first = coordinator.writeBackup(T0);

@@ -13,20 +13,20 @@ public class LootingBagRiskRestoreTest {
     @org.junit.Before public void bindJson() {JsonCodec.bind(new Gson());}
     @Test public void rememberedContentsAndUnseenRewardsSurviveLoginWithoutBookingAgain() throws Exception {
         Engine engine = TargetFreshStartTest.engine();
-        engine.bagContents.put(562,100L); engine.bagAdded.put(562,20L);
-        long net=engine.getMetrics(20L).net;
+        engine.contents.put(562,100L); engine.bag.put(562,20L);
+        long net=engine.metrics(20L).net;
         Gson gson=new Gson();
         SavedState saved=gson.fromJson(gson.toJson(engine.savedState()),SavedState.class);
         engine.restoreProfile("same",saved,30L);
         assertEquals(Map.of(562,120L),bag(engine,true,null));
-        assertEquals("bag stocks never create an income receipt",net,engine.getMetrics(40L).net);
+        assertEquals("bag stocks never create an income receipt",net,engine.metrics(40L).net);
         assertTrue("not carried means not at risk",bag(engine,false,null).isEmpty());
         assertEquals(Map.of(562,120L),bag(engine,true,null));
         assertEquals("an observed empty bag supersedes old contents",Map.of(),bag(engine,true,new Item[0]));
     }
     @Test public void anotherAccountAndAResetCannotInheritTheBag() throws Exception {
         Engine engine=TargetFreshStartTest.engine();
-        engine.bagContents.put(562,100L);
+        engine.contents.put(562,100L);
         SavedState saved=engine.savedState();
         engine.restoreProfile("other",new SavedState(),30L);
         assertTrue(bag(engine,true,null).isEmpty());
@@ -37,9 +37,9 @@ public class LootingBagRiskRestoreTest {
     }
     @Test public void aFreshContainerAndRewardEachContributeOnce() throws Exception {
         Engine engine=TargetFreshStartTest.engine();
-        engine.bagContents.put(562,100L);engine.bagAdded.put(562,20L);
+        engine.contents.put(562,100L);engine.bag.put(562,20L);
         assertEquals(Map.of(562,120L),bag(engine,true,new Item[]{new Item(562,100)}));
-        engine.bagAdded.clear();
+        engine.bag.clear();
         assertEquals(Map.of(562,120L),bag(engine,true,new Item[]{new Item(562,120)}));
         engine.restoreProfile("same",engine.savedState(),50L);
         assertEquals(Map.of(562,120L),bag(engine,true,null));

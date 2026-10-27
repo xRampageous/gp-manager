@@ -33,7 +33,7 @@ public class PipePickupTest
                 Collections.singletonList(dartsSpent(1)), ReviewFixesTest.T0 + 100L + shot);
         }
         ReviewFixesTest.Plugin p = ReviewFixesTest.plugin(engine, tick);
-        p.snapshotFactory = new ContainerSnapshotFactory(p.client, null)
+        p.containers = new ContainerSnapshotFactory(p.client, null)
         {
             @Override
             ContainerSnapshot capture(boolean equipment, boolean pouch)
@@ -47,7 +47,7 @@ public class PipePickupTest
                 return false;
             }
         };
-        p.charges.blowpipeDart = DART;
+        p.charges.dart = DART;
         Observation take = ReviewFixesTest.take(p);
         take.item = DART;
         take.at = 10;
@@ -69,13 +69,13 @@ public class PipePickupTest
         int[] tick = {11};
         ReviewFixesTest.Plugin p = firedThenTake(0L, tick);
         p.pipePickups();
-        assertEquals("the decision waits for the pack", 120L, p.engine.getMetrics(ReviewFixesTest.T0 + 1_000L).costs);
+        assertEquals("the decision waits for the pack", 120L, p.engine.metrics(ReviewFixesTest.T0 + 1_000L).cost);
         tick[0] = 13;
         p.pipePickups();
         assertEquals("8 of the 12 darts went back into the pipe", 40L,
-            p.engine.getMetrics(ReviewFixesTest.T0 + 1_000L).costs);
+            p.engine.metrics(ReviewFixesTest.T0 + 1_000L).cost);
         p.pipePickups();
-        assertEquals("one pickup recovers once", 40L, p.engine.getMetrics(ReviewFixesTest.T0 + 1_000L).costs);
+        assertEquals("one pickup recovers once", 40L, p.engine.metrics(ReviewFixesTest.T0 + 1_000L).cost);
     }
 
     @Test
@@ -86,6 +86,6 @@ public class PipePickupTest
         tick[0] = 13;
         p.pipePickups();
         assertEquals("the pack's own settle books this pickup, not the pipe path", 120L,
-            p.engine.getMetrics(ReviewFixesTest.T0 + 1_000L).costs);
+            p.engine.metrics(ReviewFixesTest.T0 + 1_000L).cost);
     }
 }

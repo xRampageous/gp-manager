@@ -29,7 +29,7 @@ public class GemBagAcquisitionTest {
         QuiverSupportTest.Harness h = new QuiverSupportTest.Harness();
         h.inventory.put(ItemID.GEM_SACK_OPEN, 1L); h.engine.setBaseline(h.capture());
         h.chat("You just mined a Ruby!");
-        h.engine.inbox.owner(1L); // Persistence fences the owner before replacing a profile.
+        h.engine.events.owner(1L); // Persistence fences the owner before replacing a profile.
         h.engine.resetData(QuiverSupportTest.T0 + 10L);
         h.engine.ensureSession(QuiverSupportTest.T0 + 20L);
         h.engine.setBaseline(h.capture()); h.finishBagTick();
@@ -44,7 +44,7 @@ public class GemBagAcquisitionTest {
             h.engine.setBaseline(h.capture()); h.chat(message); h.finishBagTick();
             assertEquals(message,message.contains(" x 2")?40L:20L,h.net());
             assertEquals(1,h.rows().size());
-            assertTrue(h.rows().get(0).isCounted());
+            assertTrue(h.rows().get(0).counts());
         }
     }
     @Test public void severalGemMessagesInOneTickRetainEveryGem() throws Exception {

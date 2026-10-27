@@ -27,7 +27,7 @@ public class PkTallyTest
         String id = session.addEncounter(true, at);
         Transaction loot = loot(at, gp);
         session.addTransaction(loot, limit, false);
-        session.attachToEncounter(loot.getId(), id, false);
+        session.attachToEncounter(loot.id(), id, false);
         return loot;
     }
 
@@ -54,9 +54,9 @@ public class PkTallyTest
         Transaction first = loot(1_000L, 400L);
         Transaction second = loot(1_100L, 500L);
         session.addTransaction(first, 3, false);
-        session.attachToEncounter(first.getId(), id, false);
+        session.attachToEncounter(first.id(), id, false);
         session.addTransaction(second, 3, false);
-        session.attachToEncounter(second.getId(), id, false);
+        session.attachToEncounter(second.id(), id, false);
         assertEquals(900L, session.bestKill());
 
         session.addTransaction(filler(2_000L), 3, false);
@@ -77,13 +77,13 @@ public class PkTallyTest
         Transaction lost = Tx.of(1_000L, TransactionType.PK_DEATH_LOSS, Context.PK_DEATH, "", true,
             Collections.singletonList(new Flow(2, "Loot", -1L, 900, -900L)));
         session.addTransaction(lost, 10, false);
-        session.attachToEncounter(lost.getId(), death, false);
+        session.attachToEncounter(lost.id(), death, false);
         Transaction clue = loot(2_000L, 5_000L);
         session.addTransaction(clue, 10, false);
-        session.attachToEncounter(clue.getId(), "loot:Reward casket", false);
+        session.attachToEncounter(clue.id(), "loot:Reward casket", false);
 
         assertEquals(0L, session.bestKill());
-        assertEquals("", clue.getEncounterId());
+        assertEquals("", clue.encounterId());
         assertEquals(1, session.pk().deaths);
         assertEquals(-1, session.pk().streak);
     }

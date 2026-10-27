@@ -45,7 +45,7 @@ public class FactoryResetPresentationTest
         try
         {
             coordinator.start();
-            assertTrue(coordinator.switchIdentity(new TrackingIdentity("rsprofile.alice", TrackingIdentity.ACCOUNT_HASH_INVALID), true, true));
+            assertTrue(coordinator.switchIdentity(new TrackingIdentity("rsprofile.alice", TrackingIdentity.ACCOUNT_HASH_INVALID), true));
 
             long now = System.currentTimeMillis();
             engine.ensureSession(now);
@@ -77,7 +77,7 @@ public class FactoryResetPresentationTest
         }
         finally
         {
-            coordinator.shutdown(false);
+            coordinator.shutdown();
         }
     }
 
@@ -115,7 +115,7 @@ public class FactoryResetPresentationTest
         }
         finally
         {
-            coordinator.shutdown(false);
+            coordinator.shutdown();
         }
     }
 
@@ -136,9 +136,9 @@ public class FactoryResetPresentationTest
     {
         for (int k = 0; k < 3; k++)
         {
-            builder.tray().kill("Vorkath", now + k, false);
+            builder.tray.kill("Vorkath", now + k, false);
         }
-        builder.tray().booked(receipt(now, flow(11286, "Draconic visage", 1L, 2_500_000)), now, false);
+        builder.tray.booked(receipt(now, flow(11286, "Draconic visage", 1L, 2_500_000)), now, false, now);
     }
 
     private static HudFrame render(HudBuilder builder, Engine engine, long now) throws Exception
@@ -152,9 +152,9 @@ public class FactoryResetPresentationTest
         assertNotNull("the reset action is present", reset);
         assertTrue("the reset action is enabled", reset.isEnabled());
         reset.doClick();
-        assertEquals("Delete Profile", ShellProbe.sheetTitle(panel.shell()));
-        ShellProbe.pressSheet(panel.shell(), "Back up & delete");
-        assertEquals("the sheet closes once the reset ran", "", ShellProbe.sheetTitle(panel.shell()));
+        assertEquals("Delete Profile", ShellProbe.sheetTitle(panel.shell));
+        ShellProbe.pressSheet(panel.shell, "Back up & delete");
+        assertEquals("the sheet closes once the reset ran", "", ShellProbe.sheetTitle(panel.shell));
     }
 
     private static JMenuItem find(JPopupMenu menu, String textPrefix)

@@ -50,8 +50,8 @@ public class GeEvidenceOwnershipTest
 
         assertNotNull(loot);
         assertEquals("real loot owns its delta over a recent GE buy of the same item",
-            TransactionType.LOOT, loot.getType());
-        assertEquals("Loot from Goblin", loot.getNote());
+            TransactionType.LOOT, loot.type());
+        assertEquals("Loot from Goblin", loot.note());
     }
 
     @Test
@@ -69,7 +69,7 @@ public class GeEvidenceOwnershipTest
         Transaction gain = settle(engine, inventory(COINS, 100_000L, LOGS, 1L), now + 1_200L);
 
         assertNotNull(gain);
-        assertEquals(TransactionType.GAIN, gain.getType());
+        assertEquals(TransactionType.GAIN, gain.type());
     }
 
     @Test
@@ -88,7 +88,7 @@ public class GeEvidenceOwnershipTest
 
         assertNotNull(gain);
         assertEquals("unsettled progress cannot make a same-item gain look like a collection",
-            TransactionType.GAIN, gain.getType());
+            TransactionType.GAIN, gain.type());
     }
 
     @Test
@@ -107,7 +107,7 @@ public class GeEvidenceOwnershipTest
         Transaction purchase = settle(engine, inventory(COINS, 99_200L, SHARK, 1L), now + 1_200L);
 
         assertNotNull(purchase);
-        assertEquals(TransactionType.UNCERTAIN, purchase.getType());
+        assertEquals(TransactionType.UNCERTAIN, purchase.type());
     }
 
     @Test
@@ -125,7 +125,7 @@ public class GeEvidenceOwnershipTest
 
         assertNotNull(loss);
         assertEquals("a cancelled sell returns items; it cannot explain a later loss",
-            TransactionType.CONSUMPTION, loss.getType());
+            TransactionType.CONSUMPTION, loss.type());
     }
 
     @Test
@@ -143,7 +143,7 @@ public class GeEvidenceOwnershipTest
 
         assertNotNull(loss);
         assertEquals("a cancelled buy refunds coins; it cannot explain a later coin loss",
-            TransactionType.CONSUMPTION, loss.getType());
+            TransactionType.CONSUMPTION, loss.type());
     }
 
     @Test
@@ -166,9 +166,9 @@ public class GeEvidenceOwnershipTest
 
         assertNotNull(gain);
         assertEquals("the previous owner's GE evidence must not classify the new owner's delta",
-            TransactionType.GAIN, gain.getType());
+            TransactionType.GAIN, gain.type());
         assertTrue("the previous owner's custody lifecycles never leak across profiles",
-            engine.geCustody.records().isEmpty());
+            engine.exchange.records().isEmpty());
     }
 
     @Test
@@ -191,9 +191,9 @@ public class GeEvidenceOwnershipTest
 
         assertNotNull(gain);
         assertEquals("cleared GE evidence must not reappear after a destructive reset",
-            TransactionType.GAIN, gain.getType());
+            TransactionType.GAIN, gain.type());
         assertTrue("destructive reset clears schema-104 custody state",
-            engine.geCustody.records().isEmpty());
+            engine.exchange.records().isEmpty());
     }
 
     @Test
@@ -211,11 +211,11 @@ public class GeEvidenceOwnershipTest
 
         assertNotNull(trade);
         assertEquals("a proven placement principal is custody, not finalized economics",
-            TransactionType.TRANSFER, trade.getType());
-        assertEquals(Context.TRANSFER, trade.getContext());
+            TransactionType.TRANSFER, trade.type());
+        assertEquals(Context.TRANSFER, trade.context());
         assertEquals("pending SELL custody never changes canonical Net",
-            0L, engine.getMetrics(now + 1_200L).net);
-        assertEquals(1, engine.geCustody.records().size());
+            0L, engine.metrics(now + 1_200L).net);
+        assertEquals(1, engine.exchange.records().size());
     }
 
     @Test
@@ -233,10 +233,10 @@ public class GeEvidenceOwnershipTest
 
         assertNotNull(trade);
         assertEquals("an observed buy reserve is custody, not finalized economics",
-            TransactionType.TRANSFER, trade.getType());
-        assertEquals(Context.TRANSFER, trade.getContext());
+            TransactionType.TRANSFER, trade.type());
+        assertEquals(Context.TRANSFER, trade.context());
         assertEquals("pending BUY reserve never changes canonical Net",
-            0L, engine.getMetrics(now + 1_200L).net);
+            0L, engine.metrics(now + 1_200L).net);
     }
 
     @Test
@@ -251,8 +251,8 @@ public class GeEvidenceOwnershipTest
         noteGe(engine, ledger, 0, BUYING, SHARK, 5, 0, 800, 0, now);
         noteGe(engine, ledger, 0, BOUGHT, SHARK, 5, 5, 800, 4_000, now + 600L);
 
-        assertEquals(0, engine.getActiveSession().getTransactions().size());
-        assertEquals(0L, engine.getMetrics(now + 1_200L).net);
+        assertEquals(0, engine.session().transactions().size());
+        assertEquals(0L, engine.metrics(now + 1_200L).net);
     }
 
     private static void noteGe(

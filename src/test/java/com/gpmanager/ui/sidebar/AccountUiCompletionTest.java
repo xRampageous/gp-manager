@@ -56,7 +56,7 @@ public class AccountUiCompletionTest
     {
         try (Fixture fixture = new Fixture())
         {
-            fixture.beforeWork(() -> fixture.disk.lifecycleRequest.incrementAndGet());
+            fixture.beforeWork(() -> fixture.disk.request.incrementAndGet());
         }
     }
 
@@ -93,7 +93,7 @@ public class AccountUiCompletionTest
             {
                 fixture.changeAccount();
                 fixture.disk.activeIdentity = fixture.original;
-                fixture.disk.lifecycleRequest.incrementAndGet();
+                fixture.disk.request.incrementAndGet();
             });
             assertEquals(0, delivered.get());
         }
@@ -110,7 +110,7 @@ public class AccountUiCompletionTest
                 return new Persistence.ResetOutcome(true, "reset");
             }, fixture.controller::reset, () -> { });
             assertEquals(1, fixture.panel.resets.get());
-            assertTrue(fixture.disk.lifecycleRequest.get() > 0L);
+            assertTrue(fixture.disk.request.get() > 0L);
         }
     }
 
@@ -135,7 +135,7 @@ public class AccountUiCompletionTest
         {
             AtomicInteger delivered = new AtomicInteger();
             fixture.completeBeforeDelivery(() -> 1, ignored -> delivered.incrementAndGet(),
-                () -> fixture.disk.lifecycleShutdown = true);
+                () -> fixture.disk.closing = true);
             assertEquals(0, delivered.get());
         }
     }
@@ -168,7 +168,7 @@ public class AccountUiCompletionTest
             Engine engine = PresentationLifecycleTest.engine();
             disk = new Persistence(null, null, null, null, engine);
             disk.activeIdentity = original;
-            disk.lifecycleExecutor = worker;
+            disk.worker = worker;
             SwingUtilities.invokeAndWait(() ->
             {
                 panel = new RecordingPanel(engine, disk);
@@ -178,7 +178,7 @@ public class AccountUiCompletionTest
 
         void changeAccount()
         {
-            disk.lifecycleRequest.incrementAndGet();
+            disk.request.incrementAndGet();
             disk.activeIdentity = new TrackingIdentity("second", 2L);
             panel.shell.tell("Current account", "ready", false);
         }
@@ -227,7 +227,7 @@ public class AccountUiCompletionTest
 
         void assertNotice(String expected) throws Exception
         {
-            SwingUtilities.invokeAndWait(() -> assertEquals(expected, panel.shell.noticeText.getToolTipText()));
+            SwingUtilities.invokeAndWait(() -> assertEquals(expected, panel.shell.message.getToolTipText()));
         }
 
         void drainWorker()
@@ -256,7 +256,7 @@ public class AccountUiCompletionTest
             assertTrue(worker.awaitTermination(5, TimeUnit.SECONDS));
             SwingUtilities.invokeAndWait(() ->
             {
-                panel.shell.noticeTimer.stop();
+                panel.shell.timer.stop();
                 panel.clockPulse.stop();
             });
         }

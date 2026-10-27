@@ -25,20 +25,20 @@ public class ItemSplitAccountingTest
         session.addTransaction(loot, 50, false);
 
         assertEquals(10L, session.metrics(2_000L).net);
-        assertTrue(session.splitItem(loot.getId(), 995, 4L, 3_000L, "team"));
+        assertTrue(session.splitItem(loot.id(), 995, 4L, "team"));
         assertEquals(4L, session.metrics(4_000L).net);
-        assertEquals(priceCapturedAt, loot.getFlows().get(0).getPriceCapturedAtEpochMillis());
-        assertTrue(ItemSplits.isSplitReason(loot.getExplanation()));
-        assertTrue(ItemSplits.isSplitReason(loot.correctionReason()));
+        assertEquals(priceCapturedAt, loot.flows().get(0).pricedAt());
+        assertTrue(ItemSplits.splitReason(loot.explanation()));
+        assertTrue(ItemSplits.splitReason(loot.correctionReason()));
         assertEquals(1, ModelProbe.activeCorrections(session).size());
-        assertTrue(ModelProbe.activeCorrections(session).get(0).getChanges().get(0).hasFlowSnapshot());
+        assertTrue(ModelProbe.activeCorrections(session).get(0).changes().get(0).hasFlowSnapshot());
         assertEquals(priceCapturedAt,
-            ModelProbe.activeCorrections(session).get(0).getChanges().get(0).getFlowSnapshot().get(0).getPriceCapturedAtEpochMillis());
+            ModelProbe.activeCorrections(session).get(0).changes().get(0).flowSnapshot().get(0).pricedAt());
 
-        assertTrue(session.undoCorrection(5_000L));
+        assertTrue(session.undoCorrection());
         assertEquals(10L, session.metrics(6_000L).net);
-        assertEquals(priceCapturedAt, loot.getFlows().get(0).getPriceCapturedAtEpochMillis());
-        assertFalse(ItemSplits.isSplitReason(loot.getExplanation()));
+        assertEquals(priceCapturedAt, loot.flows().get(0).pricedAt());
+        assertFalse(ItemSplits.splitReason(loot.explanation()));
     }
 
     @Test
@@ -54,11 +54,11 @@ public class ItemSplitAccountingTest
             Collections.singletonList(new Flow(526, "Bones", 3, 50, 150)));
         session.addTransaction(loot, 50, false);
 
-        assertTrue(session.splitItem(loot.getId(), 526, 0L, 2_000L, null));
-        assertEquals(Correction.IGNORE, loot.getCorrection());
+        assertTrue(session.splitItem(loot.id(), 526, 0L, null));
+        assertEquals(Correction.IGNORE, loot.correction());
         assertEquals(0L, session.metrics(3_000L).net);
-        assertTrue(session.undoCorrection(4_000L));
-        assertEquals(Correction.AUTO, loot.getCorrection());
+        assertTrue(session.undoCorrection());
+        assertEquals(Correction.AUTO, loot.correction());
         assertEquals(150L, session.metrics(5_000L).net);
     }
 
@@ -68,6 +68,6 @@ public class ItemSplitAccountingTest
         String reason = ItemSplits.reason(2, 5, "Alice");
         assertTrue(reason, reason.startsWith("Split keep 2/5"));
         assertTrue(reason, reason.contains("Split share"));
-        assertTrue(ItemSplits.isSplitReason(reason));
+        assertTrue(ItemSplits.splitReason(reason));
     }
 }

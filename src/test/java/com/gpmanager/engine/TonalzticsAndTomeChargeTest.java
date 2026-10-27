@@ -47,7 +47,7 @@ public class TonalzticsAndTomeChargeTest
         ChargeDelta delta = observe(engine, "Your Tonalztics of Ralos has 998 charges.", RALOS, 2_000L);
         assertNotNull(delta);
         assertEquals(-2L, quantityDelta(delta, ItemID.SUNFIRESPLINTER));
-        assertEquals(1, ChargeCheck.unitsPerItem(ChargeCheck.ChargedItem.TONALZTICS, ItemID.SUNFIRESPLINTER));
+        assertEquals(1, ChargeCheck.ChargedItem.TONALZTICS.units);
     }
 
     @Test
@@ -68,14 +68,14 @@ public class TonalzticsAndTomeChargeTest
         };
         intent.armCheck(click(MenuAction.CC_OP, "Charge", item(ItemID.TONALZTICS_OF_RALOS_CHARGED, 0)),
             "charge", "Tonalztics of Ralos");
-        assertEquals(ChargeCheck.ChargedItem.TONALZTICS, engine.inbox.peek(Inbox.LOAD_TARGET).variant);
-        assertEquals(ItemID.SUNFIRESPLINTER, engine.inbox.item(Inbox.LOAD_TARGET));
+        assertEquals(ChargeCheck.ChargedItem.TONALZTICS, engine.events.peek(Inbox.LOAD_TARGET).variant);
+        assertEquals(ItemID.SUNFIRESPLINTER, engine.events.item(Inbox.LOAD_TARGET));
 
         engine.markDirty();
         Transaction load = settle(engine, snapshot(ItemID.SUNFIRESPLINTER, 400L), start + 600L);
-        assertEquals("a load is a neutral transfer", TransactionType.TRANSFER, load.getType());
-        assertFalse(load.isCounted());
-        assertEquals(0L, engine.getMetrics(start + 2_400L).net);
+        assertEquals("a load is a neutral transfer", TransactionType.TRANSFER, load.type());
+        assertFalse(load.counts());
+        assertEquals(0L, engine.metrics(start + 2_400L).net);
     }
 
     @Test
@@ -90,7 +90,7 @@ public class TonalzticsAndTomeChargeTest
             "149:5:0:25574:TW", 2_000L);
         assertNotNull(delta);
         assertEquals(-40L, quantityDelta(delta, ItemID.SOAKED_PAGE));
-        assertEquals(20, ChargeCheck.unitsPerItem(ChargeCheck.ChargedItem.TOME_OF_WATER, ItemID.SOAKED_PAGE));
+        assertEquals(20, ChargeCheck.ChargedItem.TOME_OF_WATER.units);
     }
 
     @Test

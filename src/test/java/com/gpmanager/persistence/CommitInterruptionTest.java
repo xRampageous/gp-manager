@@ -72,7 +72,7 @@ public class CommitInterruptionTest
 
     private static String activeName(SessionRepository repository)
     {
-        return repository.load().getActiveSession().getName();
+        return repository.load().currentSession().name();
     }
 
     @Test
@@ -87,18 +87,18 @@ public class CommitInterruptionTest
 
             SessionRepository failing = failingAt(root, crashPoint);
             failing.load();
-            assertFalse(crashPoint, failing.save(new WriteIntent(IDENTITY, failing.scopeGeneration, 1L, named("New", 2L), null)));
+            assertFalse(crashPoint, failing.save(new WriteIntent(IDENTITY, failing.generation, 1L, named("New", 2L), null)));
 
             // Old valid state, byte-identical primary; the next load sees exactly that.
             SessionRepository reload = bound(root);
             assertEquals(crashPoint, "Old", activeName(reload));
             assertEquals(crashPoint, before, primary(reload));
-            assertEquals(1L, reload.lastKnownDiskRevision);
-            assertEquals("", reload.lastRecoveredFrom);
+            assertEquals(1L, reload.revision);
+            assertEquals("", reload.recovery);
 
             // Recovery finishes idempotently: the next save advances from the old lineage and
             // leaves no staged leftovers behind.
-            assertTrue(reload.save(new WriteIntent(IDENTITY, reload.scopeGeneration, 1L, named("After", 2L), null)));
+            assertTrue(reload.save(new WriteIntent(IDENTITY, reload.generation, 1L, named("After", 2L), null)));
             assertEquals("After", activeName(bound(root)));
             assertFalse(reload.dataDir().joinSegment("sessions.commit.stage").exists());
             assertFalse(reload.dataDir().joinSegment("sessions.next.json").exists());
@@ -120,7 +120,7 @@ public class CommitInterruptionTest
         noAtomic.bindIdentity(IDENTITY);
         assertTrue(PersistenceProbe.save(noAtomic, named("First", 1L)));
         assertTrue(PersistenceProbe.save(noAtomic, named("Second", 2L)));
-        assertTrue(noAtomic.replaceStateDetailed(new WriteIntent(IDENTITY, noAtomic.scopeGeneration, 2L, named("Reset", 3L), null)).isCommitted());
+        assertTrue(noAtomic.replaceStateDetailed(new WriteIntent(IDENTITY, noAtomic.generation, 2L, named("Reset", 3L), null)).isCommitted());
         assertEquals("Reset", activeName(bound(root)));
         try (Stream<Path> files = Files.list(FilepathTestSupport.path(noAtomic.dataDir())))
         {
@@ -142,17 +142,17 @@ public class CommitInterruptionTest
 
         SessionRepository reload = bound(root);
         assertEquals("Two", activeName(reload));
-        assertEquals("sessions.backup.json", reload.lastRecoveredFrom);
-        assertEquals(2L, reload.lastKnownDiskRevision);
+        assertEquals("sessions.backup.json", reload.recovery);
+        assertEquals(2L, reload.revision);
         try (Stream<Path> files = Files.list(dir))
         {
             assertTrue("the corrupt primary is preserved as evidence",
                 files.map(path -> path.getFileName().toString()).anyMatch(name -> name.startsWith("sessions.corrupt-")));
         }
         // The next save continues from the recovered lineage.
-        assertTrue(reload.save(new WriteIntent(IDENTITY, reload.scopeGeneration, 2L, named("Four", 3L), null)));
+        assertTrue(reload.save(new WriteIntent(IDENTITY, reload.generation, 2L, named("Four", 3L), null)));
         assertEquals("Four", activeName(bound(root)));
-        assertEquals("", bound(root).lastRecoveredFrom);
+        assertEquals("", bound(root).recovery);
     }
 
     private static Client client()

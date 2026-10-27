@@ -16,10 +16,10 @@ public class SipAccountingTest
                 new Flow(2434, "Prayer potion(4)", -quantity, 9_800, -quantity * 9_800L),
                 new Flow(139, "Prayer potion(3)", quantity, 7_350, quantity * 7_350L)),
             Confidence.LIKELY, "fixture", null);
-        sips.setActionKind(ActionKind.DRINK);
+        sips.setAction(ActionKind.DRINK);
         if (correction != null)
         {
-            sips.applyCorrection(correction, 1_500L);
+            sips.applyCorrection(correction, "Manual correction");
         }
         return sips;
     }
@@ -30,10 +30,10 @@ public class SipAccountingTest
         Session session = new Session("Vorkath", 0L, SessionMode.GENERAL);
         session.addTransaction(sips(12L, null), 100, false);
         Metrics metrics = session.metrics(2_000L);
-        assertEquals("the (3) left over is no gain", 0L, metrics.revenue);
-        assertEquals("only the doses drunk are a cost", 12L * 2_450L, metrics.costs);
-        assertTrue(metrics.costSplitAvailable);
-        assertEquals("a drink is a supply", 12L * 2_450L, metrics.suppliesCosts);
+        assertEquals("the (3) left over is no gain", 0L, metrics.income);
+        assertEquals("only the doses drunk are a cost", 12L * 2_450L, metrics.cost);
+        assertTrue(metrics.split);
+        assertEquals("a drink is a supply", 12L * 2_450L, metrics.supplies);
         assertEquals(-12L * 2_450L, metrics.net);
     }
 
@@ -44,6 +44,6 @@ public class SipAccountingTest
         Session session = new Session("Vorkath", 0L, SessionMode.GENERAL);
         session.addTransaction(sips(1L, Correction.COST), 100, false);
         assertEquals("a Cost correction still costs the gross, as before", 9_800L + 7_350L,
-            session.metrics(2_000L).costs);
+            session.metrics(2_000L).cost);
     }
 }

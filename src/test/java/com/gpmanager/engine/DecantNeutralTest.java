@@ -64,21 +64,21 @@ public class DecantNeutralTest
     public void combiningByHandBooksNothingAndNeedsNoReview()
     {
         Engine engine = settle(false, Map.of(PRAYER_3, 1L, PRAYER_1, 1L), Map.of(PRAYER_4, 1L, VIAL, 1L));
-        assertEquals("no money moved", 0L, engine.getMetrics(1_010_000L).net);
-        assertTrue("no Review row: " + engine.getActiveSession().getTransactions(),
-            engine.getActiveSession().getTransactions().isEmpty());
+        assertEquals("no money moved", 0L, engine.metrics(1_010_000L).net);
+        assertTrue("no Review row: " + engine.session().transactions(),
+            engine.session().transactions().isEmpty());
     }
 
     @Test
     public void aDecantIsANeutralTransferInTheAudit()
     {
         Engine engine = settle(true, Map.of(PRAYER_2, 2L), Map.of(PRAYER_4, 1L));
-        List<Transaction> rows = engine.getActiveSession().getTransactions();
+        List<Transaction> rows = engine.session().transactions();
         assertEquals(rows.toString(), 1, rows.size());
         Transaction decant = rows.get(0);
-        assertEquals(TransactionType.TRANSFER, decant.autoType());
-        assertEquals("Decanted", decant.getNote());
-        assertEquals(false, decant.isCounted());
-        assertEquals(0L, engine.getMetrics(1_010_000L).net);
+        assertEquals(TransactionType.TRANSFER, decant.original());
+        assertEquals("Decanted", decant.note());
+        assertEquals(false, decant.counts());
+        assertEquals(0L, engine.metrics(1_010_000L).net);
     }
 }

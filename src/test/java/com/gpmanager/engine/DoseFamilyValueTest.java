@@ -40,13 +40,13 @@ public class DoseFamilyValueTest
         assertEquals(1_338, one(service, BURNING_3).unitPrice);
         assertEquals(892, one(service, BURNING_2).unitPrice);
         assertEquals(446, one(service, BURNING_1).unitPrice);
-        assertEquals(PriceSource.GRAND_EXCHANGE, one(service, BURNING_4).getPriceSource());
+        assertEquals(PriceSource.GRAND_EXCHANGE, one(service, BURNING_4).source());
 
         Map<Integer, Long> swap = new HashMap<>();
         swap.put(BURNING_3, -1L);
         swap.put(BURNING_2, 1L);
         long net = 0L;
-        for (Flow flow : service.value(swap, 1_000L)) net += flow.valueDelta;
+        for (Flow flow : service.value(swap, 1_000L)) net += flow.value;
         assertEquals("one teleport is a fifth of the amulet", -446L, net);
     }
 
@@ -63,7 +63,7 @@ public class DoseFamilyValueTest
         };
         Valuation fromFull = service(full, Map.of());
         assertEquals(2_000, one(fromFull, BURNING_4).unitPrice);
-        assertEquals(PriceSource.MANUAL_OVERRIDE, one(fromFull, BURNING_4).getPriceSource());
+        assertEquals(PriceSource.MANUAL_OVERRIDE, one(fromFull, BURNING_4).source());
 
         GpManagerConfig oneDose = new GpManagerConfig()
         {
@@ -76,7 +76,7 @@ public class DoseFamilyValueTest
         Valuation fromOne = service(oneDose, Map.of(BURNING_5, 2_231));
         assertEquals("an override outranks the family quote", 2_000,
             one(fromOne, BURNING_4).unitPrice);
-        assertEquals(PriceSource.MANUAL_OVERRIDE, one(fromOne, BURNING_4).getPriceSource());
+        assertEquals(PriceSource.MANUAL_OVERRIDE, one(fromOne, BURNING_4).source());
     }
 
     @Test
@@ -84,8 +84,8 @@ public class DoseFamilyValueTest
     {
         Valuation service = service(new GpManagerConfig() { }, Map.of());
         assertEquals(0, one(service, BURNING_4).unitPrice);
-        assertEquals(PriceSource.UNPRICED, one(service, BURNING_4).getPriceSource());
-        assertEquals(PriceSource.UNPRICED, one(service, 999_999).getPriceSource());
+        assertEquals(PriceSource.UNPRICED, one(service, BURNING_4).source());
+        assertEquals(PriceSource.UNPRICED, one(service, 999_999).source());
     }
 
     static Valuation service(GpManagerConfig config, Map<Integer, Integer> prices)
@@ -113,6 +113,6 @@ public class DoseFamilyValueTest
     {
         List<Flow> flows = service.value(Map.of(itemId, 1L), 1_000L);
         assertNotNull(flows);
-        return flows.stream().filter(flow -> flow.itemId == itemId).findFirst().orElseThrow();
+        return flows.stream().filter(flow -> flow.item == itemId).findFirst().orElseThrow();
     }
 }

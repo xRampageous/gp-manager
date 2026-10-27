@@ -21,7 +21,7 @@ public final class MarketFacts
 
     public static GeOffer record(Engine engine, MarketRows.Row row)
     {
-        for (GeOffer record : engine.geCustody.records())
+        for (GeOffer record : engine.exchange.records())
         {
             if (record.getOfferId().equals(row.presentationId))
             {
@@ -38,7 +38,7 @@ public final class MarketFacts
 
     private static boolean basisKnown(GeOffer r)
     {
-        return r.hasFrozenBasis() && !r.isUnbased();
+        return r.hasFrozenBasis() && !r.unbased();
     }
 
     public static long basisValueGp(GeOffer r)
@@ -71,7 +71,7 @@ public final class MarketFacts
         long settled = r.getSettledQty();
         long observed = Math.abs(r.settledCashGp);
         return settled <= 0L ? 0L : sell(r)
-            ? BasisMath.knownProceedsOf(observed, settled, trackedQtyConsumed(r)) : observed;
+            ? BasisMath.shareOf(settled, observed, trackedQtyConsumed(r)) : observed;
     }
 
     public static long unknownLiquidationGp(GeOffer r)

@@ -73,14 +73,14 @@ public class TableHeaderReuseTest {
 
     @Test public void pagesStillUpdateAndClampWithoutReparenting() throws Exception {
         edt(() -> {
-            Table table = new Table("GAINS").setRowsPerPage(10).setRows(rows(23));
+            Table table = new Table("GAINS").setPageSize(10).setRows(rows(23));
             AtomicInteger count = changes(table);
             table.showPage(2);
-            assertEquals("3/3", table.pageLabel.getText());
+            assertEquals("3/3", table.counter.getText());
             assertTrue(table.previous.isEnabled());
             assertFalse(table.next.isEnabled());
             table.setRows(rows(12));
-            assertEquals("2/2", table.pageLabel.getText());
+            assertEquals("2/2", table.counter.getText());
             assertEquals(2, table.body.getComponentCount());
             assertFalse(table.next.isEnabled());
             assertEquals(0, count.get());
@@ -90,14 +90,14 @@ public class TableHeaderReuseTest {
     @Test public void headerShapeFollowsFoldEmptyAndTotalTransitions() throws Exception {
         edt(() -> {
             Table table = new Table("GAINS").setFoldable(true).setRows(rows(20)).setTotal("+500", Kit.Tone.GAIN);
-            assertEquals(Arrays.asList(table.total, table.previous, table.pageLabel, table.next), parts(table));
+            assertEquals(Arrays.asList(table.total, table.previous, table.counter, table.next), parts(table));
             table.setFolded(true);
             assertEquals(Collections.singletonList(table.total), parts(table));
-            assertEquals("Expand GAINS", table.chevron.getAccessibleContext().getAccessibleName());
+            assertEquals("Expand GAINS", table.arrow.getAccessibleContext().getAccessibleName());
             table.setTotal("", Kit.Tone.DIM);
             assertTrue(parts(table).isEmpty());
             table.setFolded(false);
-            assertEquals(Arrays.asList(table.previous, table.pageLabel, table.next), parts(table));
+            assertEquals(Arrays.asList(table.previous, table.counter, table.next), parts(table));
             table.setRows(Collections.emptyList());
             assertTrue(parts(table).isEmpty());
         });
@@ -117,7 +117,7 @@ public class TableHeaderReuseTest {
             assertEquals(0, first.get());
             assertEquals(1, second.get());
             table.setAction(null);
-            assertEquals(Arrays.asList(table.previous, table.pageLabel, table.next), parts(table));
+            assertEquals(Arrays.asList(table.previous, table.counter, table.next), parts(table));
         });
     }
 

@@ -62,19 +62,19 @@ public class PersistenceHardeningTest
         Path backup = dir.resolve("sessions.backup.json");
         assertTrue(Files.exists(backup));
         assertFalse(Files.exists(dir.resolve("sessions.backup.json.1")));
-        assertEquals("Save 5", new Gson().fromJson(Files.readString(backup), SavedState.class).getActiveSession().getName());
+        assertEquals("Save 5", new Gson().fromJson(Files.readString(backup), SavedState.class).currentSession().name());
 
         // A damaged primary loads from the crash copy and says so.
         Files.writeString(dir.resolve("sessions.json"), "{not json", StandardCharsets.UTF_8);
         SessionRepository reopened = new SessionRepository(new Gson(), FilepathTestSupport.root(dir), false);
         SavedState loaded = reopened.load();
-        assertEquals("Save 5", loaded.getActiveSession().getName());
-        assertEquals("sessions.backup.json", reopened.lastRecoveredFrom);
+        assertEquals("Save 5", loaded.currentSession().name());
+        assertEquals("sessions.backup.json", reopened.recovery);
 
         // A clean load afterwards clears the marker.
         assertTrue(PersistenceProbe.save(reopened, state("Save 7", 0L)));
-        assertEquals("Save 7", reopened.load().getActiveSession().getName());
-        assertEquals("", reopened.lastRecoveredFrom);
+        assertEquals("Save 7", reopened.load().currentSession().name());
+        assertEquals("", reopened.recovery);
     }
 
     @Test
@@ -92,7 +92,7 @@ public class PersistenceHardeningTest
         Files.deleteIfExists(dir.resolve("sessions.json"));
         Files.deleteIfExists(dir.resolve("sessions.backup.json"));
         SavedState loaded = new SessionRepository(new Gson(), FilepathTestSupport.root(dir), false).load();
-        assertTrue(loaded == null || loaded.getActiveSession() == null || !loaded.getActiveSession().getName().startsWith("Before"));
+        assertTrue(loaded == null || loaded.currentSession() == null || !loaded.currentSession().name().startsWith("Before"));
     }
 
     @Test
@@ -117,8 +117,8 @@ public class PersistenceHardeningTest
         assertTrue(loaded.isSupportedSchema());
         Engine second = engine();
         second.restore(loaded, now);
-        assertEquals(engine.getHistory().get(0).metrics(now).net,
-            second.getHistory().get(0).metrics(now).net);
+        assertEquals(engine.history().get(0).metrics(now).net,
+            second.history().get(0).metrics(now).net);
         String out = gson.toJson(second.savedState());
         assertFalse(out.contains("futureTopLevel"));
         assertFalse(out.contains("futureSessionField"));
@@ -150,7 +150,7 @@ public class PersistenceHardeningTest
 
         SavedState loaded = repository.load();
         assertTrue(loaded.isSupportedSchema());
-        assertNull(loaded.getActiveSession());
+        assertNull(loaded.currentSession());
         Path kept;
         try (java.util.stream.Stream<Path> paths = Files.list(primary.getParent()))
         {
@@ -158,8 +158,8 @@ public class PersistenceHardeningTest
                 .findFirst().orElseThrow();
         }
         assertEquals(original, Files.readString(kept, StandardCharsets.UTF_8));
-        assertTrue(repository.save(new WriteIntent(null, repository.scopeGeneration,
-            repository.lastKnownDiskRevision, state("Current", 2L), null)));
+        assertTrue(repository.save(new WriteIntent(null, repository.generation,
+            repository.revision, state("Current", 2L), null)));
     }
 
     @Test
@@ -200,13 +200,13 @@ public class PersistenceHardeningTest
         {
             SavedState detached = engine.savedState();
             writer.submit(new WriteIntent(null,
-                repository.scopeGeneration, repository.lastKnownDiskRevision, detached, null));
+                repository.generation, repository.revision, detached, null));
             assertTrue("the save started", inSave.await(5L, TimeUnit.SECONDS));
-            engine.getMetrics(now);
+            engine.metrics(now);
             readDone.countDown();
             assertTrue(writer.flush(Duration.ofSeconds(10)));
             assertTrue("an engine read finished while the save was in flight", readDuringSave.get());
-            assertEquals(SaveStatus.State.OK, writer.getStatus().state);
+            assertEquals(SaveStatus.State.OK, writer.status().state);
         }
         finally
         {
@@ -268,7 +268,7 @@ public class PersistenceHardeningTest
                 Engine again = engine();
                 again.restore(gson.fromJson(gson.toJson(target.savedState()), SavedState.class), now);
                 invariants(again, now, sessions);
-                assertEquals(target.getHistory().size(), again.getHistory().size());
+                assertEquals(target.history().size(), again.history().size());
             }
             catch (Throwable t)
             {
@@ -306,16 +306,16 @@ public class PersistenceHardeningTest
 
     private static void invariants(Engine engine, long now, int sessionsPlayed)
     {
-        List<Session> history = engine.getHistory();
+        List<Session> history = engine.history();
         assertTrue(history.size() <= sessionsPlayed + 1);
         Set<String> ids = new HashSet<>();
         for (Session s : history)
         {
-            assertTrue("duplicate session id " + s.getId(), ids.add(s.getId()));
-            assertTrue(s.getElapsedMillis(now) >= 0L);
-            assertNotNull(engine.historyMetrics(s.getId(), now));
+            assertTrue("duplicate session id " + s.id(), ids.add(s.id()));
+            assertTrue(s.elapsed(now) >= 0L);
+            assertNotNull(engine.historyMetrics(s.id(), now));
         }
-        if (engine.getGeneralSession() == null && engine.getActiveSession() == null && history.isEmpty())
+        if (engine.freePlay() == null && engine.session() == null && history.isEmpty())
         {
             fail("everything vanished");
         }
@@ -326,7 +326,7 @@ public class PersistenceHardeningTest
     private static String history(Engine engine, String name, long startedAt, long length, long logs)
     {
         engine.startCustom(name, startedAt);
-        String id = engine.getActiveSession().getId();
+        String id = engine.session().id();
         engine.setBaseline(new ContainerSnapshot(Collections.emptyMap()));
         settle(engine, new ContainerSnapshot(map(LOGS, logs)), startedAt + 60_000L);
         assertTrue(engine.finishCustom(startedAt + length));

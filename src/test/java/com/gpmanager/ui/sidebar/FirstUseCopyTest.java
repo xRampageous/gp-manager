@@ -16,7 +16,7 @@ public class FirstUseCopyTest
         SidebarPanel automatic = panel(new GpManagerConfig() {});
         refresh(automatic);
         assertEquals("Tracking starts with your first gameplay", automatic.live.recent.emptyText);
-        assertNotNull("starting remains available on Grinds", DirectHeaderControlsTest.find(automatic.grinds.bar, "Start Grind"));
+        assertNotNull("starting remains available on Grinds", DirectHeaderControlsTest.find(automatic.plans.bar, "Start Grind"));
 
         SidebarPanel manual = panel(new GpManagerConfig()
         {

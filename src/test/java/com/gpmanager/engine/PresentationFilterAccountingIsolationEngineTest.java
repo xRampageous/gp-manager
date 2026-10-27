@@ -53,15 +53,15 @@ public class PresentationFilterAccountingIsolationEngineTest
         engine.processIfDirty(ContainerSnapshot.empty(), 1600L, null);
         engine.processIfDirty(ContainerSnapshot.empty(), 2200L, null);
         Transaction tx = engine.processIfDirty(ContainerSnapshot.empty(), 2800L, null);
-        assertEquals(TransactionType.CONSUMPTION, tx.getType());
+        assertEquals(TransactionType.CONSUMPTION, tx.type());
     }
 
     @Test public void hiddenItemsStillCountInNetAndInsights()
     {
         Engine engine = engine();
         onlyFeathers(engine);
-        engine.getActiveSession().addTransaction(gain(new Flow(526, "Bones", 1L, 35, 35L)), 100, false);
-        assertEquals(35L, engine.getMetrics(2800L).net);
+        engine.session().addTransaction(gain(new Flow(526, "Bones", 1L, 35, 35L)), 100, false);
+        assertEquals(35L, engine.metrics(2800L).net);
     }
 
     @Test public void correctionsOperateOnTheWholeCanonicalRow()
@@ -70,20 +70,20 @@ public class PresentationFilterAccountingIsolationEngineTest
         onlyFeathers(engine);
         Transaction tx = gain(new Flow(526, "Bones", 1L, 35, 35L),
             new Flow(314, "Feather", 1L, 10, 10L));
-        engine.getActiveSession().addTransaction(tx, 100, false);
-        assertEquals(45L, engine.getMetrics(2800L).revenue);
-        engine.getActiveSession().correctTransaction(tx.getId(), Correction.REVENUE, 3000L, "Manual correction");
-        assertEquals(45L, engine.getMetrics(3100L).revenue);
+        engine.session().addTransaction(tx, 100, false);
+        assertEquals(45L, engine.metrics(2800L).income);
+        engine.session().correctTransaction(tx.id(), Correction.REVENUE, "Manual correction");
+        assertEquals(45L, engine.metrics(3100L).income);
     }
 
     @Test public void compactionFoldsExactRawValues()
     {
         Engine engine = engine();
         onlyFeathers(engine);
-        Session session = engine.getActiveSession();
+        Session session = engine.session();
         session.addTransaction(gain(new Flow(526, "Bones", 1L, 35, 35L)), 1, false);
         session.addTransaction(gain(new Flow(526, "Bones", 1L, 35, 35L)), 1, false);
         assertTrue(session.compactedTransactionCount > 0L);
-        assertEquals(70L, engine.getMetrics(2800L).net);
+        assertEquals(70L, engine.metrics(2800L).net);
     }
 }

@@ -45,8 +45,8 @@ public class GeFastBuyTest
         settle(engine, inventory, t + 200L);
 
         assertEquals("no coin row in Review", 0, reviewRows(engine));
-        assertTrue(engine.getActiveSession().getTransactions().stream().anyMatch(row -> row.autoType() == TransactionType.TRADE));
-        assertEquals("buying is Net-neutral", 0L, engine.getMetrics(t + 1_000L).net);
+        assertTrue(engine.session().transactions().stream().anyMatch(row -> row.original() == TransactionType.TRADE));
+        assertEquals("buying is Net-neutral", 0L, engine.metrics(t + 1_000L).net);
     }
 
     @Test
@@ -68,15 +68,15 @@ public class GeFastBuyTest
         settle(engine, inventory, t + 200L);
 
         assertEquals("no Review for the reused slot", 0, reviewRows(engine));
-        assertTrue(engine.getActiveSession().getTransactions().stream().anyMatch(row -> row.autoType() == TransactionType.TRADE));
+        assertTrue(engine.session().transactions().stream().anyMatch(row -> row.original() == TransactionType.TRADE));
     }
 
     private static int reviewRows(Engine engine)
     {
         int count = 0;
-        for (Transaction transaction : engine.getActiveSession().getTransactions())
+        for (Transaction transaction : engine.session().transactions())
         {
-            if (ReviewRules.needsOwnerDecision(transaction))
+            if (ReviewRules.needsReview(transaction))
             {
                 count++;
             }

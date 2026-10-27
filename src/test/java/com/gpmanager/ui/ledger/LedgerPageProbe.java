@@ -82,10 +82,10 @@ public final class LedgerPageProbe
     /** One rendered Market receipt row as "title|sub|value". */
     public static String marketReceiptRowText(Receipt receipt, long capturedAt)
     {
-        boolean realized = MarketText.receiptRealized(receipt);
+        boolean realized = MarketText.realized(receipt);
         return MarketText.receiptTitle(receipt) + "|" + MarketText.receiptSub(receipt, capturedAt) + "|"
             + (realized ? Fmt.exactSigned(MarketText.receiptPrimary(receipt)) + " gp"
-                : MarketText.stateWord(receipt.marketSettlement));
+                : MarketText.stateWord(receipt.market));
     }
 
 
@@ -106,7 +106,7 @@ public final class LedgerPageProbe
 
     public static void toggleCorrected(LedgerPage p)
     {
-        p.showCorrected = !p.showCorrected;
+        p.corrections = !p.corrections;
         if (p.data != null)
         {
             p.apply(p.data);
@@ -121,11 +121,11 @@ public final class LedgerPageProbe
         }
         if (p.data.detail.group.market)
         {
-            for (Receipt receipt : p.data.detail.receipts)
+            for (Receipt receipt : p.data.detail.entries)
             {
-                if (receipt.transactionId.equals(transactionId))
+                if (receipt.transaction.equals(transactionId))
                 {
-                    p.clickReceipt(receipt.transactionId, receipt.contributionId);
+                    p.clickReceipt(receipt.transaction, receipt.id);
                     return;
                 }
             }
@@ -133,9 +133,9 @@ public final class LedgerPageProbe
         }
         for (LedgerData.Card card : LedgerData.cards(p.data.detail.group))
         {
-            if (card.transactionId.equals(transactionId))
+            if (card.transaction.equals(transactionId))
             {
-                p.clickReceipt(card.transactionId, card.contributionId);
+                p.clickReceipt(card.transaction, card.id);
                 return;
             }
         }
@@ -148,11 +148,11 @@ public final class LedgerPageProbe
         {
             if (p.data.detail.group.market)
             {
-                for (Receipt receipt : p.data.detail.receipts)
+                for (Receipt receipt : p.data.detail.entries)
                 {
-                    if (!ids.contains(receipt.transactionId))
+                    if (!ids.contains(receipt.transaction))
                     {
-                        ids.add(receipt.transactionId);
+                        ids.add(receipt.transaction);
                     }
                 }
             }
@@ -160,7 +160,7 @@ public final class LedgerPageProbe
             {
                 for (LedgerData.Card card : LedgerData.cards(p.data.detail.group))
                 {
-                    ids.add(card.transactionId);
+                    ids.add(card.transaction);
                 }
             }
         }
@@ -177,15 +177,15 @@ public final class LedgerPageProbe
         Semantics.Group group = p.data.detail.group;
         if (group.market)
         {
-            for (Receipt receipt : p.data.detail.receipts)
+            for (Receipt receipt : p.data.detail.entries)
             {
-                texts.add(marketReceiptRowText(receipt, p.data.capturedAt));
+                texts.add(marketReceiptRowText(receipt, p.data.at));
             }
             return texts;
         }
         for (LedgerData.Card card : LedgerData.cards(group))
         {
-            texts.add(group.primaryName + "|" + card.summaryText() + "|"
+            texts.add(group.name + "|" + card.summaryText() + "|"
                 + (card.incomplete ? "—" : Fmt.exactSigned(card.value) + " gp"));
         }
         return texts;
@@ -199,10 +199,10 @@ public final class LedgerPageProbe
 
     public static void preview(LedgerPage p, LedgerData.CorrectionPreview preview, Correction correction)
     {
-        p.pendingPreview = preview;
+        p.preview = preview;
         p.pendingCorrection = correction;
-        p.pendingTransaction = p.data == null || p.data.detail == null || p.data.detail.exact == null ? null
-            : p.data.detail.exact.transactionId;
+        p.transaction = p.data == null || p.data.detail == null || p.data.detail.exact == null ? null
+            : p.data.detail.exact.transaction;
     }
 
     public static void select(LedgerPage p, String transactionId)
@@ -215,7 +215,7 @@ public final class LedgerPageProbe
         for (Semantics.Group group : p.data == null ? Collections.<Semantics.Group>emptyList()
             : p.data.market.groups)
         {
-            if (group.semanticGroupId.equals(groupId))
+            if (group.id.equals(groupId))
             {
                 return Fmt.signed(MarketText.marketPrimary(p.data, group)) + "|" + MarketText.marketLead(p.data, group);
             }
@@ -228,9 +228,9 @@ public final class LedgerPageProbe
         JPopupMenu menu = new JPopupMenu();
         for (Decision decision : Decision.values())
         {
-            if (row.validDecisions.contains(decision))
+            if (row.decisions.contains(decision))
             {
-                menu.add(Kit.item(LedgerPage.reviewLabel(decision), () -> p.actions.decide(row.transactionId, decision)));
+                menu.add(Kit.item(LedgerPage.reviewLabel(decision), () -> p.actions.decide(row.transaction, decision)));
             }
         }
         return menu;
@@ -251,7 +251,7 @@ public final class LedgerPageProbe
     }
     public enum FinancialTable { GAINS, COSTS, MARKET }
     private static Table axd(LedgerPage p, FinancialTable table) {
-        return table == FinancialTable.GAINS ? p.gains : table == FinancialTable.MARKET ? p.market : p.costs;
+        return table == FinancialTable.GAINS ? p.income : table == FinancialTable.MARKET ? p.market : p.cost;
     }
 
     static void walk(Component component, List<String> out, boolean tips) {

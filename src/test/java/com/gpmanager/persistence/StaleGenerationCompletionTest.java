@@ -51,7 +51,7 @@ public class StaleGenerationCompletionTest
         @Override
         public boolean save(WriteIntent intent)
         {
-            if (intent.scopeGeneration == gatedGeneration)
+            if (intent.generation == gatedGeneration)
             {
                 gatedGeneration = -1L;
                 entered.countDown();
@@ -105,12 +105,12 @@ public class StaleGenerationCompletionTest
         /** Alice books a note, then a save for her generation is started and parked inside the repository. */
         long startParkedAliceSave() throws Exception
         {
-            assertTrue(coordinator.switchIdentity(new TrackingIdentity(ALICE, TrackingIdentity.ACCOUNT_HASH_INVALID), true, true));
+            assertTrue(coordinator.switchIdentity(new TrackingIdentity(ALICE, TrackingIdentity.ACCOUNT_HASH_INVALID), true));
             engine.ensureSession(NOW - 10_000L);
-            engine.getGeneralSession().rename("Alice general");
+            engine.freePlay().rename("Alice general");
             assertTrue(coordinator.saveNow());
-            long aliceGeneration = repository.scopeGeneration;
-            engine.getGeneralSession().rename("in flight");
+            long aliceGeneration = repository.generation;
+            engine.freePlay().rename("in flight");
             repository.gatedGeneration = aliceGeneration;
             coordinator.scheduleSave();
             assertTrue("drain entered the repository", repository.entered.await(10, TimeUnit.SECONDS));
@@ -139,16 +139,16 @@ public class StaleGenerationCompletionTest
 
             // Logout, then Bob logs in while Alice's write is still parked. No flush is possible
             // (the write is in flight), so the switch goes through the unbound state.
-            rig.coordinator.onHashInvalidated(false);
-            assertTrue(rig.coordinator.switchIdentity(new TrackingIdentity(BOB, TrackingIdentity.ACCOUNT_HASH_INVALID), true, true));
+            PersistenceProbe.unbindWithoutSave(rig.coordinator);
+            assertTrue(rig.coordinator.switchIdentity(new TrackingIdentity(BOB, TrackingIdentity.ACCOUNT_HASH_INVALID), true));
             rig.engine.ensureSession(NOW);
-            rig.engine.getGeneralSession().rename("Bob general");
-            long bobGeneration = rig.repository.scopeGeneration;
+            rig.engine.freePlay().rename("Bob general");
+            long bobGeneration = rig.repository.generation;
             assertNotEquals(aliceGeneration, bobGeneration);
-            String bobGeneralId = rig.engine.getGeneralSession().getId();
+            String bobGeneralId = rig.engine.freePlay().id();
             long bobApplied = rig.writer.appliedRevision();
-            long bobDisk = rig.repository.lastKnownDiskRevision;
-            SaveStatus bobStatus = rig.writer.getStatus();
+            long bobDisk = rig.repository.revision;
+            SaveStatus bobStatus = rig.writer.status();
             Path bobPrimary = FilepathTestSupport.path(rig.repository.dataDir().joinSegment("sessions.json"));
             assertFalse(Files.exists(bobPrimary));
 
@@ -160,19 +160,19 @@ public class StaleGenerationCompletionTest
             assertNotEquals(aliceBefore, Files.readString(alicePrimary));
             assertTrue(Files.readString(alicePrimary).contains("in flight"));
             assertFalse("no durable state for Bob was created by Alice's completion", Files.exists(bobPrimary));
-            assertEquals(bobGeneration, rig.repository.scopeGeneration);
+            assertEquals(bobGeneration, rig.repository.generation);
             assertEquals(bobApplied, rig.writer.appliedRevision());
-            assertEquals(bobDisk, rig.repository.lastKnownDiskRevision);
-            assertEquals(bobStatus.state, rig.writer.getStatus().state);
-            assertSame(bobStatus, rig.writer.getStatus());
-            assertEquals(bobGeneralId, rig.engine.getGeneralSession().getId());
-            assertEquals("Bob general", rig.engine.getGeneralSession().getName());
+            assertEquals(bobDisk, rig.repository.revision);
+            assertEquals(bobStatus.state, rig.writer.status().state);
+            assertSame(bobStatus, rig.writer.status());
+            assertEquals(bobGeneralId, rig.engine.freePlay().id());
+            assertEquals("Bob general", rig.engine.freePlay().name());
             assertEquals(BOB, rig.engine.exportState().ownerKey);
 
             // Bob's own first save then starts a fresh lineage at revision 1.
             assertTrue(rig.coordinator.saveNow());
             assertEquals(1L, rig.repository.load().revision);
-            assertEquals("Bob general", rig.repository.load().getActiveSession().getName());
+            assertEquals("Bob general", rig.repository.load().currentSession().name());
         }
         finally
         {
@@ -188,11 +188,11 @@ public class StaleGenerationCompletionTest
         try
         {
             rig.startParkedAliceSave();
-            rig.coordinator.onHashInvalidated(false);
+            PersistenceProbe.unbindWithoutSave(rig.coordinator);
             assertNull(rig.coordinator.getActiveIdentity());
             assertFalse(rig.repository.isBound());
-            SaveStatus unboundStatus = rig.writer.getStatus();
-            long unboundGeneration = rig.repository.scopeGeneration;
+            SaveStatus unboundStatus = rig.writer.status();
+            long unboundGeneration = rig.repository.generation;
 
             rig.repository.release.countDown();
             assertTrue(rig.writer.flush(Duration.ofSeconds(10)));
@@ -200,8 +200,8 @@ public class StaleGenerationCompletionTest
             // Unbound: nothing is written to the root or the unassigned marker, status is not
             // rewritten for the abandoned generation, and a new save is refused outright.
             assertFalse(rig.repository.dataDir().joinSegment("sessions.json").exists());
-            assertEquals(unboundGeneration, rig.repository.scopeGeneration);
-            assertSame(unboundStatus, rig.writer.getStatus());
+            assertEquals(unboundGeneration, rig.repository.generation);
+            assertSame(unboundStatus, rig.writer.status());
             assertEquals(0L, rig.writer.appliedRevision());
             assertFalse(rig.coordinator.saveNow());
             rig.coordinator.scheduleSave();

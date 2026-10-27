@@ -11,40 +11,40 @@ public class CharacterIdleModelTest
     public void delayRequiredBeforeIdle()
     {
         CharacterIdleModel model = new CharacterIdleModel();
-        model.delayMillis = 5_000L;
+        model.delay = 5_000L;
         assertFalse(model.tick(false, false, 1_000L));
-        assertFalse(model.characterIdle);
+        assertFalse(model.idle);
         assertFalse(model.tick(false, false, 5_999L));
-        assertFalse(model.characterIdle);
+        assertFalse(model.idle);
         assertTrue(model.tick(false, false, 6_000L));
-        assertTrue(model.characterIdle);
+        assertTrue(model.idle);
         assertFalse(model.tick(false, false, 7_000L));
-        assertTrue(model.characterIdle);
+        assertTrue(model.idle);
     }
 
     @Test
     public void animationOrInteractClearsIdle()
     {
         CharacterIdleModel model = new CharacterIdleModel();
-        model.delayMillis = 2_000L;
+        model.delay = 2_000L;
         assertFalse(model.tick(false, false, 1_000L));
         assertTrue(model.tick(false, false, 3_000L));
-        assertTrue(model.characterIdle);
+        assertTrue(model.idle);
         assertFalse(model.tick(true, false, 3_100L));
-        assertFalse(model.characterIdle);
+        assertFalse(model.idle);
         assertFalse(model.tick(false, true, 4_000L));
-        assertFalse(model.characterIdle);
+        assertFalse(model.idle);
     }
 
     @Test
     public void clearResetsState()
     {
         CharacterIdleModel model = new CharacterIdleModel();
-        model.delayMillis = 2_000L;
+        model.delay = 2_000L;
         assertFalse(model.tick(false, false, 1_000L));
         assertTrue(model.tick(false, false, 3_000L));
         model.clear();
-        assertFalse(model.characterIdle);
+        assertFalse(model.idle);
         assertFalse(model.tick(false, false, 3_500L));
     }
 
@@ -52,37 +52,37 @@ public class CharacterIdleModelTest
     public void busyAndXpPreventIdle()
     {
         CharacterIdleModel model = new CharacterIdleModel();
-        model.delayMillis = 2_000L;
+        model.delay = 2_000L;
         assertFalse(model.tick(true, false, 1_000L));
-        assertFalse(model.characterIdle);
+        assertFalse(model.idle);
         assertFalse(model.tick(false, false, 3_000L));
-        assertFalse(model.characterIdle);
+        assertFalse(model.idle);
         assertTrue(model.tick(false, false, 5_000L));
-        assertTrue(model.characterIdle);
+        assertTrue(model.idle);
 
         model.clear();
         model.noteSkillingXp(10_000L);
         assertFalse(model.tick(false, false, 11_000L));
-        assertFalse(model.characterIdle);
+        assertFalse(model.idle);
         // XP soft-busy lasts for the idle delay after the drop — Idle fires then,
         // without stacking a second full delay.
         assertFalse(model.tick(false, false, 11_999L));
-        assertFalse(model.characterIdle);
+        assertFalse(model.idle);
         assertTrue(model.tick(false, false, 12_000L));
-        assertTrue(model.characterIdle);
+        assertTrue(model.idle);
     }
 
     @Test
     public void hardBusyStillRequiresFullDelayAfterClear()
     {
         CharacterIdleModel model = new CharacterIdleModel();
-        model.delayMillis = 2_000L;
+        model.delay = 2_000L;
         model.noteSkillingXp(10_000L);
         assertFalse(model.tick(true, false, 10_500L));
         assertFalse(model.tick(false, false, 12_000L));
-        assertFalse(model.characterIdle);
+        assertFalse(model.idle);
         assertTrue(model.tick(false, false, 14_000L));
-        assertTrue(model.characterIdle);
+        assertTrue(model.idle);
     }
 
 }

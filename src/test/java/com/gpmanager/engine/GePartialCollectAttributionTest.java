@@ -114,7 +114,7 @@ public class GePartialCollectAttributionTest
         assertEquals(0, owner.reviewCount());
         assertEquals("no Coins row", 0, owner.unattributedCoinRows());
         assertEquals("no adjustment row", 0, owner.adjustmentRows());
-        assertEquals(0L, EngineProbe.pendingSettlementCash(owner.engine.geCustody));
+        assertEquals(0L, EngineProbe.pendingSettlementCash(owner.engine.exchange));
 
         // Step 3: list Bolt of linen in slot 0; step 4: Collect All.
         owner.placeAndSell(0, BOLT, BOLT_QTY, BOLT_GROSS, t + 30_000L);
@@ -155,7 +155,7 @@ public class GePartialCollectAttributionTest
         assertEquals(0, owner.reviewCount());
         assertEquals(0, owner.unattributedCoinRows());
         assertEquals(0, owner.adjustmentRows());
-        assertEquals(0L, EngineProbe.pendingSettlementCash(owner.engine.geCustody));
+        assertEquals(0L, EngineProbe.pendingSettlementCash(owner.engine.exchange));
     }
 
     @Test
@@ -178,7 +178,7 @@ public class GePartialCollectAttributionTest
         restored.placeAndSell(0, BOLT, BOLT_QTY, BOLT_GROSS, t + 30_000L);
         restored.collect(OWNER_SECOND_COLLECT, t + 40_000L, true);
         assertEquals("the collect is retained after the reload", OWNER_SECOND_COLLECT,
-            EngineProbe.pendingSettlementCash(restored.engine.geCustody));
+            EngineProbe.pendingSettlementCash(restored.engine.exchange));
         // Slot-clear evidence is transient and did not survive the restart; the window end still
         // books the one exact attribution because no contradicting evidence arrived.
         restored.maintenance(t + 42_000L);
@@ -233,7 +233,7 @@ public class GePartialCollectAttributionTest
         owner.collect(200L, t + 20_000L, true);
         for (int slot = 0; slot < 4; slot++) assertEquals("no arbitrary pair settles", 0L,
             owner.rowAt(slot, CHICKEN).settledQty);
-        assertEquals(200L, EngineProbe.pendingSettlementCash(owner.engine.geCustody));
+        assertEquals(200L, EngineProbe.pendingSettlementCash(owner.engine.exchange));
         owner.maintenance(t + 22_500L);
         assertEquals(1, owner.unattributedCoinRows());
         assertTrue("only the cleared slot is quarantined", owner.rowAt(1, CHICKEN).collectionAmbiguous);
@@ -250,11 +250,11 @@ public class GePartialCollectAttributionTest
         owner.placeAndSell(3, SHARK, 10L, 9_780L, t);
         owner.placeAndSell(5, SHARK, 10L, 9_780L, t + 2_000L);
         owner.collect(9_590L, t + 20_000L, true);
-        assertEquals(9_590L, EngineProbe.pendingSettlementCash(owner.engine.geCustody));
+        assertEquals(9_590L, EngineProbe.pendingSettlementCash(owner.engine.exchange));
         owner.engine.pauseForLifecycle(t + 20_500L);
         assertEquals("observed cash remains reviewable before evidence is dropped", 1, owner.unattributedCoinRows());
-        assertEquals(0L, EngineProbe.pendingSettlementCash(owner.engine.geCustody));
-        assertEquals(null, owner.engine.inbox.peek(Inbox.GE_COLLECT));
+        assertEquals(0L, EngineProbe.pendingSettlementCash(owner.engine.exchange));
+        assertEquals(null, owner.engine.events.peek(Inbox.GE_COLLECT));
         owner.engine.resume(t + 20_600L, PauseReason.LIFECYCLE);
         owner.clearSlot(3, SHARK, t + 20_700L);
         owner.maintenance(t + 21_000L);
@@ -275,14 +275,14 @@ public class GePartialCollectAttributionTest
             owner.placeAndSell(3, SHARK, 10L, 9_780L, t + 1_000L);
             owner.placeAndSell(5, SHARK, 10L, 9_780L, t + 3_000L);
             owner.collect(9_590L, t + 20_000L, true);
-            Session original = owner.engine.getActiveSession();
+            Session original = owner.engine.session();
             if (end) owner.engine.finishCustom(t + 20_500L);
             else owner.engine.startCustom("New", t + 20_500L);
-            long reviews = original.getTransactions().stream().filter(row -> row.getType() == TransactionType.UNCERTAIN
-                && row.getNote().equals("Grand Exchange")).count();
+            long reviews = original.transactions().stream().filter(row -> row.type() == TransactionType.UNCERTAIN
+                && row.note().equals("Grand Exchange")).count();
             assertEquals("held cash is preserved on the original financial owner", 1L, reviews);
-            assertTrue(owner.engine.getActiveSession().getTransactions().stream().noneMatch(row -> row.getType() == TransactionType.UNCERTAIN));
-            assertEquals(0L, EngineProbe.pendingSettlementCash(owner.engine.geCustody));
+            assertTrue(owner.engine.session().transactions().stream().noneMatch(row -> row.type() == TransactionType.UNCERTAIN));
+            assertEquals(0L, EngineProbe.pendingSettlementCash(owner.engine.exchange));
         }
     }
 
@@ -315,7 +315,7 @@ public class GePartialCollectAttributionTest
 
         owner.collect(9_590L, t + 20_000L, true);
         assertEquals("a tie is held for the SLOT WINDOW", 9_590L,
-            EngineProbe.pendingSettlementCash(owner.engine.geCustody));
+            EngineProbe.pendingSettlementCash(owner.engine.exchange));
         owner.maintenance(t + 22_500L);
 
         assertEquals("neither offer is settled arbitrarily", 0L, owner.rowAt(3, SHARK).settledQty);
@@ -433,13 +433,13 @@ public class GePartialCollectAttributionTest
     private static void assertPickup(Owner owner, long coins, long at)
     {
         owner.collect(coins, at, false);
-        List<Transaction> rows = owner.engine.getActiveSession().getTransactions();
+        List<Transaction> rows = owner.engine.session().transactions();
         Transaction pickup = rows.get(rows.size() - 1);
-        assertEquals(TransactionType.GAIN, pickup.getType());
-        assertTrue("the pickup counts", pickup.isCounted());
-        assertEquals("", pickup.getNote());
-        assertFalse("no Review", ReviewRules.needsOwnerDecision(pickup));
-        assertEquals(coins, pickup.getFlows().get(0).quantityDelta);
+        assertEquals(TransactionType.GAIN, pickup.type());
+        assertTrue("the pickup counts", pickup.counts());
+        assertEquals("", pickup.note());
+        assertFalse("no Review", ReviewRules.needsReview(pickup));
+        assertEquals(coins, pickup.flows().get(0).quantity);
     }
 
     @Test
@@ -547,7 +547,7 @@ public class GePartialCollectAttributionTest
         Owner owner = new Owner();
         long t = T0 + 10_000L;
         owner.placeAndSell(0, SHARK, 10L, 9_780L, t);
-        assertFalse(owner.row(SHARK).isRealizedIncluded());
+        assertFalse(owner.row(SHARK).realized());
 
         // More than the unobserved grace passes with unrelated activity; the coins are still in
         // GE custody and the lifecycle must not be handed to Review.
@@ -729,10 +729,10 @@ public class GePartialCollectAttributionTest
         /** Trigger the engine's own custody maintenance without inventing a movement. */
         void maintenance(long at)
         {
-            for (Transaction booking : engine.geCustody.maintenance(at,
-                engine.getActiveSession().getId()))
+            for (Transaction booking : engine.exchange.maintenance(at,
+                engine.session().id()))
             {
-                engine.getActiveSession().addTransaction(booking, 500, true);
+                engine.session().addTransaction(booking, 500, true);
             }
         }
 
@@ -746,7 +746,7 @@ public class GePartialCollectAttributionTest
 
         void gain(int item, long quantity, long value, long at)
         {
-            engine.getActiveSession().addTransaction(new Transaction(at,
+            engine.session().addTransaction(new Transaction(at,
                 TransactionType.GAIN, Context.GENERIC, "", "Loot", true,
                 Collections.singletonList(new Flow(item, name(item), quantity,
                     (int) (quantity > 0L ? value / quantity : 0L), value,
@@ -800,15 +800,15 @@ public class GePartialCollectAttributionTest
 
         long net(long at)
         {
-            return engine.getMetrics(at).net;
+            return engine.metrics(at).net;
         }
 
         int reviewCount()
         {
             int reviews = 0;
-            for (Transaction transaction : engine.getActiveSession().getTransactions())
+            for (Transaction transaction : engine.session().transactions())
             {
-                if (ReviewRules.needsOwnerDecision(transaction))
+                if (ReviewRules.needsReview(transaction))
                 {
                     reviews++;
                 }
@@ -819,7 +819,7 @@ public class GePartialCollectAttributionTest
         int ambiguousCount()
         {
             int ambiguous = 0;
-            for (GeOffer record : engine.geCustody.records())
+            for (GeOffer record : engine.exchange.records())
             {
                 if (record.collectionAmbiguous)
                 {
@@ -831,18 +831,18 @@ public class GePartialCollectAttributionTest
 
         int recordCount()
         {
-            return engine.geCustody.records().size();
+            return engine.exchange.records().size();
         }
 
         /** One uncounted Coins-only row: the fail-closed Review evidence. */
         int unattributedCoinRows()
         {
             int rows = 0;
-            for (Transaction transaction : engine.getActiveSession().getTransactions())
+            for (Transaction transaction : engine.session().transactions())
             {
-                if (transaction.autoType() == TransactionType.UNCERTAIN
-                    && transaction.getFlows().size() == 1
-                    && transaction.getFlows().get(0).itemId == COINS)
+                if (transaction.original() == TransactionType.UNCERTAIN
+                    && transaction.flows().size() == 1
+                    && transaction.flows().get(0).item == COINS)
                 {
                     rows++;
                 }
@@ -854,10 +854,10 @@ public class GePartialCollectAttributionTest
         int settlementTransactions()
         {
             int rows = 0;
-            for (Transaction transaction : engine.getActiveSession().getTransactions())
+            for (Transaction transaction : engine.session().transactions())
             {
-                if (transaction.autoType() == TransactionType.TRADE
-                    && transaction.getNote().equals("Grand Exchange"))
+                if (transaction.original() == TransactionType.TRADE
+                    && transaction.note().equals("Grand Exchange"))
                 {
                     rows++;
                 }
@@ -868,9 +868,9 @@ public class GePartialCollectAttributionTest
         int adjustmentRows()
         {
             int rows = 0;
-            for (Transaction transaction : engine.getActiveSession().getTransactions())
+            for (Transaction transaction : engine.session().transactions())
             {
-                if (transaction.getNote().startsWith("Grand Exchange settlement adjustment"))
+                if (transaction.note().startsWith("Grand Exchange settlement adjustment"))
                 {
                     rows++;
                 }

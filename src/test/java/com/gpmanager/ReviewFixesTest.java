@@ -53,32 +53,32 @@ public class ReviewFixesTest {
             put("getGameState", GameState.LOGIN_SCREEN);
             put("getLocalPlayer", proxy(Player.class, Collections.singletonMap("getWorldLocation", new WorldPoint(100, 100, 0))));
         }});
-        p.snapshotFactory = new ContainerSnapshotFactory(p.client, null) {
+        p.containers = new ContainerSnapshotFactory(p.client, null) {
             @Override ContainerSnapshot capture(boolean equipment, boolean pouch) { return ContainerSnapshot.empty(); }
             @Override boolean bagOpen() { return true; }
         };
-        p.persistence = new Persistence(p.client, null, null, null, engine);
+        p.storage = new Persistence(p.client, null, null, null, engine);
         p.charges = new ChargeIntake(p.client, null, CONFIG, engine, null);
         return p;
     }
 
     static Observation take(Plugin p) {
-        Observation e = p.engine.inbox.peek(Inbox.GROUND_CLICK);
-        return e == null ? p.engine.inbox.add(Inbox.GROUND_CLICK, -1, 1, 5, null) : e;
+        Observation e = p.engine.events.peek(Inbox.GROUND_CLICK);
+        return e == null ? p.engine.events.add(Inbox.GROUND_CLICK, -1, 1, 5, null) : e;
     }
 
     static Observation bag(Plugin p) {
-        Observation e = p.engine.inbox.open.stream().filter(v -> v.kind == Inbox.BAG_GAIN).findFirst().orElse(null);
+        Observation e = p.engine.events.open.stream().filter(v -> v.kind == Inbox.BAG_GAIN).findFirst().orElse(null);
         if (e == null) {
             Observation click = take(p);
-            e = p.engine.inbox.add(Inbox.BAG_GAIN, click.item, 0, 5, null);
+            e = p.engine.events.add(Inbox.BAG_GAIN, click.item, 0, 5, null);
             e.held = click.held;
         }
         return e;
     }
 
     static long qty(Plugin p, int kind) {
-        Observation e = p.engine.inbox.peek(kind);
+        Observation e = p.engine.events.peek(kind);
         return e == null ? 0L : e.qty;
     }
 
@@ -91,7 +91,7 @@ public class ReviewFixesTest {
         ReviewFixesTest.bag(p).qty = 3;
         p.ready = false; // An account switch, restore or logout has fenced ingestion.
         p.onGameTick(new GameTick());
-        assertEquals("a held account must not acquire a synthetic inventory delta", 0L, e.baseline.quantityOf(BONES));
+        assertEquals("a held account must not acquire a synthetic inventory delta", 0L, e.baseline.quantity(BONES));
     }
 
     @Test public void fencedBagSettlementMustNotWaitForTheEngineMonitor() throws Exception {
@@ -148,18 +148,18 @@ public class ReviewFixesTest {
         Valuation values = proxyValuation(Valuation.Economy.NORMAL);
         Flow shard = values.value(Collections.singletonMap(23962, 1L), T0).get(0);
         assertEquals(100, shard.unitPrice);
-        assertEquals(PriceSource.CURRENCY_PROXY, shard.getPriceSource());
+        assertEquals(PriceSource.CURRENCY_PROXY, shard.source());
     }
 
     @Test public void specialWorldMustNotPriceCrystalShardsFromTheMainGameMarket() {
         Flow shard = proxyValuation(Valuation.Economy.UNSUPPORTED_SPECIAL).value(Collections.singletonMap(23962, 1L), T0).get(0);
-        assertEquals(PriceSource.UNPRICED, shard.getPriceSource());
+        assertEquals(PriceSource.UNPRICED, shard.source());
         assertEquals(0, shard.unitPrice);
     }
 
     @Test public void unknownWorldMustNotPriceCrystalShardsBeforeLogin() {
         Flow shard = proxyValuation(Valuation.Economy.UNKNOWN).value(Collections.singletonMap(23962, 1L), T0).get(0);
-        assertEquals(PriceSource.UNPRICED, shard.getPriceSource());
+        assertEquals(PriceSource.UNPRICED, shard.source());
     }
 
     @Test public void aHigherShardQuoteMustOnlyPriceTheNewCharge() {
@@ -181,7 +181,7 @@ public class ReviewFixesTest {
         CountDownLatch diskCanFinish = new CountDownLatch(1);
         CountDownLatch uiHeartbeat = new CountDownLatch(1);
         Persistence disk = new Persistence(null, null, null, null, null) {
-            @Override synchronized ResetOutcome factoryReset(long now) {
+            @Override synchronized ResetOutcome factoryReset(long now, boolean backup) {
                 diskEntered.countDown();
                 try { diskCanFinish.await(2, TimeUnit.SECONDS); }
                 catch (InterruptedException ex) { throw new AssertionError(ex); }

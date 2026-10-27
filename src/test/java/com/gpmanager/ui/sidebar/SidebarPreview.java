@@ -63,6 +63,13 @@ public final class SidebarPreview
     private static void run(File out) throws IOException
     {
         CategoryToggleTest.previews(out);
+        DeathViewTest.previews(out);
+        var previewClock = SafeMath.clock;
+        KillViewTest.previews(out);
+        if (SafeMath.clock != previewClock) throw new AssertionError("KILLS preview leaked its clock");
+        LiveCategoryLayoutTest.retainedPreviews(out);
+        PvpDeathSkullTest.previews(out);
+        RaidHistoryUiTest.previews(out);
         savedSessions(out);
         HudPreview.write(out);
         for (int width : new int[]{213, 225, 300})
@@ -70,21 +77,21 @@ public final class SidebarPreview
         Engine pickups = PresentationLifecycleTest.engine();
         long at = SafeMath.now() - 60_000L;
         pickups.startCustom("Greater Nechryael", at);
-        pickups.getActiveSession().addTransaction(RecentSupplyAndPickupTest.item(TransactionType.GAIN, null,
+        pickups.session().addTransaction(RecentSupplyAndPickupTest.item(TransactionType.GAIN, null,
             565, "Blood rune", 200L, 344, at + 1L), 2000, false);
-        pickups.getActiveSession().addTransaction(RecentSupplyAndPickupTest.item(TransactionType.LOOT, null,
+        pickups.session().addTransaction(RecentSupplyAndPickupTest.item(TransactionType.LOOT, null,
             1359, "Rune axe", 10L, 7060, at + 2L), 2000, false);
-        pickups.getActiveSession().addTransaction(RecentSupplyAndPickupTest.item(TransactionType.LOOT, null,
+        pickups.session().addTransaction(RecentSupplyAndPickupTest.item(TransactionType.LOOT, null,
             565, "Blood rune", 120L, 344, at + 3L), 2000, false);
         liveShot(out, "f6-live-combined-blood-pickups.png", pickups, PvpState.NONE);
         for (String title : new String[]{"Wilderness Agility Course", "Chambers of Xeric: Challenge Mode"}) {
             Engine activity = PresentationLifecycleTest.engine();
             activity.ensureSession(at);
-            activity.getActiveSession().setActivityHint(title, at);
+            activity.session().setActivityHint(title, at);
             SidebarPanel panel = panel(activity, PvpState.NONE);
             paint(panel,new File(out,"header-"+title.substring(0,title.indexOf(' ')).toLowerCase()+".png"));
             if (title.equals("Wilderness Agility Course")) {
-                activity.getActiveSession().pause(SafeMath.now(), PauseReason.IDLE);
+                activity.session().pause(SafeMath.now(), PauseReason.IDLE);
                 liveShot(out, "header-wilderness-away.png", activity, PvpState.NONE);
                 activity.resume(SafeMath.now(), PauseReason.IDLE);
                 liveShot(out, "header-wilderness-calibrating.png", activity, PvpState.NONE);
@@ -103,12 +110,15 @@ public final class SidebarPreview
         fullPositive(out);
         emptyWaiting(out);
         pvpContext(out);
+        LiveDeathFeedbackTest.previews(out);
+        CapturedBlightedRecoveryTest.previews(out);
         raidLoot(out);
         pausedPill(out);
         timeTarget(out);
         bothTargets(out);
         ledgerNormal(out);
         ledgerDetail(out);
+        deathDetails(out);
         ledgerLootKey(out);
         ledgerCorrectionPreview(out);
         ledgerChargeUsed(out);
@@ -140,22 +150,22 @@ public final class SidebarPreview
         Engine engine = PresentationLifecycleTest.engine();
         engine.ensureSession(now - 3_600_000L);
         TargetFreshStartTest.coins(engine, now - 3_600_000L + 5L, 500_000L);
-        engine.newLiveSession(now - 60_000L);
+        engine.newLive(now - 60_000L);
         TargetFreshStartTest.coins(engine, now - 59_995L, 25_000L);
         SidebarPanel prompt = panel(engine, PvpState.NONE);
-        prompt.grindActions.saveSessionPrompt();
+        prompt.actions.saveSessionPrompt();
         paint(prompt, new File(out, "saved-session-prompt.png"));
-        String id = engine.saveLiveSession(engine.getActiveSession(), engine.getActiveSession().sessionStartAt, now);
+        String id = EngineProbe.saveLiveSession(engine, engine.session(), engine.session().sessionStartAt, now);
         engine.showWholeRun();
         SidebarPanel list = panel(engine, PvpState.NONE);
         list.shell.show(Shell.GRINDS);
         paint(list, new File(out, "saved-sessions-grinds.png"));
         SidebarPanel detail = panel(engine, PvpState.NONE);
-        detail.grindsDetailId = id;
+        detail.selection = id;
         detail.shell.show(Shell.GRINDS);
         paint(detail, new File(out, "saved-session-detail.png"));
         SidebarPanel ledger = panel(engine, PvpState.NONE);
-        ledger.grindActions.openLedger(id);
+        ledger.actions.openLedger(id);
         paint(ledger, new File(out, "saved-session-ledger.png"));
     }
 
@@ -165,7 +175,7 @@ public final class SidebarPreview
         long hour = 3_600_000L;
         Engine engine = PresentationLifecycleTest.engine();
         engine.ensureSession(now - hour);
-        engine.getActiveSession().setActivityHint("Wilderness Agility Course", now - hour);
+        engine.session().setActivityHint("Wilderness Agility Course", now - hour);
         TargetFreshStartTest.coins(engine, now - hour + 5L, 500_000L);
         SidebarPanel controls = panel(engine, PvpState.NONE);
         new GrindsController(controls).newSession();
@@ -191,7 +201,7 @@ public final class SidebarPreview
             Engine retained = PresentationLifecycleTest.engine();
             retained.ensureSession(now - hour);
             TargetFreshStartTest.coins(retained, now - hour + 5L, 566_329L);
-            retained.restartRate(now - seconds * 1_000L);
+            retained.restartRate(now - seconds * 1_000L, true);
             liveShot(out, "rate-retained-net-" + seconds + "s.png", retained, PvpState.NONE);
         }
         engine.pauseForLifecycle(now);
@@ -200,7 +210,7 @@ public final class SidebarPreview
         reconnecting.bindHopping(() -> true);
         paint(reconnecting, new File(out, "status-reconnecting.png"));
         Engine resuming = PresentationLifecycleTest.engine();
-        resuming.autoStartAtEpochMillis = now + 3_000L;
+        resuming.startAt = now + 3_000L;
         liveShot(out, "status-resuming.png", resuming, PvpState.NONE);
         SidebarPanel deletion = panel(engine, PvpState.NONE);
         new GrindsController(deletion).factoryReset();
@@ -237,21 +247,21 @@ public final class SidebarPreview
         Engine engine = PresentationLifecycleTest.engine();
         String name = "Wilderness Agility Course & a long northern expedition";
         engine.startCustom(name, at);
-        String id = engine.getActiveSession().getId();
-        engine.getActiveSession().addTransaction(booked(at + 1L, "Blood rune", 565, 200, 344, 68_800L), 2_000, false);
+        String id = engine.session().id();
+        engine.session().addTransaction(booked(at + 1L, "Blood rune", 565, 200, 344, 68_800L), 2_000, false);
         engine.saveGrind("Barrows", null, null, false).archived = true;
         SidebarPanel grinds = panel(engine, PvpState.NONE);
         grinds.shell.show(Shell.GRINDS);
-        grinds.grinds.archived.doClick();
+        grinds.plans.archived.doClick();
         paint(grinds, new File(out, "direct-grinds-long-name.png"));
         engine.finishCustom(at + 10_000L);
         SidebarPanel ledger = panel(engine, PvpState.NONE);
-        ledger.ledgerEntry = new LedgerData.Entry(LedgerData.Scope.HISTORY, id, name);
+        ledger.scope = new LedgerData.Entry(LedgerData.Scope.HISTORY, id, name);
         ledger.shell.show(Shell.LEDGER);
         paint(ledger, new File(out, "direct-ledger-long-scope.png"));
         Engine review = PresentationLifecycleTest.engine();
         review.startCustom("Zulrah", at);
-        review.getActiveSession().addTransaction(new Transaction(at + 1L, TransactionType.UNCERTAIN, Context.GENERIC,
+        review.session().addTransaction(new Transaction(at + 1L, TransactionType.UNCERTAIN, Context.GENERIC,
             "", "Zulrah", false, java.util.List.of(new Flow(995, "Coins", -500L, 1, -500L)), Confidence.UNCERTAIN,
             "Unconfirmed movement.", null), 2_000, false);
         liveShot(out, "direct-live-review.png", review, PvpState.NONE);
@@ -263,7 +273,7 @@ public final class SidebarPreview
         Engine engine = engine();
         long now = SafeMath.now() - 20 * 60_000L;
         engine.startCustom("Vorkath", now);
-        engine.getActiveSession().addTransaction(consumed(now + 1_000L, "Prayer potion(4)", 2434, -12, 9_800, -117_600L), 2_000, false);
+        engine.session().addTransaction(consumed(now + 1_000L, "Prayer potion(4)", 2434, -12, 9_800, -117_600L), 2_000, false);
         liveShot(out, "a-live-normal-negative.png", engine, PvpState.NONE);
     }
 
@@ -273,11 +283,11 @@ public final class SidebarPreview
         Engine engine = engine();
         long now = SafeMath.now() - 45 * 60_000L;
         engine.startCustom("Vorkath", now);
-        engine.getActiveSession().addTransaction(booked(now + 1_000L, "Dragon bones", 536, 2, 3_930, 7_860), 2_000, false);
-        engine.getActiveSession().addTransaction(booked(now + 2_000L, "Battlestaff", 1397, 5, 8_782, 43_910), 2_000, false);
-        engine.getActiveSession().addTransaction(consumed(now + 3_000L, "Prayer potion(4)", 2434, -2, 9_800, -19_600L), 2_000, false);
-        engine.getActiveSession().addTransaction(booked(now + 4_000L, "Skeletal visage", 22006, 1, 11_590_000, 11_590_000), 2_000, false);
-        engine.getActiveSession().setProfitTargetGp(1_000_000L);
+        engine.session().addTransaction(booked(now + 1_000L, "Dragon bones", 536, 2, 3_930, 7_860), 2_000, false);
+        engine.session().addTransaction(booked(now + 2_000L, "Battlestaff", 1397, 5, 8_782, 43_910), 2_000, false);
+        engine.session().addTransaction(consumed(now + 3_000L, "Prayer potion(4)", 2434, -2, 9_800, -19_600L), 2_000, false);
+        engine.session().addTransaction(booked(now + 4_000L, "Skeletal visage", 22006, 1, 11_590_000, 11_590_000), 2_000, false);
+        engine.session().setNetTarget(1_000_000L, 0, 0);
         liveShot(out, "b-live-full-positive.png", engine, PvpState.NONE);
     }
 
@@ -293,12 +303,13 @@ public final class SidebarPreview
         Engine engine = engine();
         long now = SafeMath.now() - 15 * 60_000L;
         engine.startCustom("Wilderness", now);
-        engine.getActiveSession().addTransaction(booked(now + 1_000L, "Dragon bones", 536, 1, 3_930, 3_930), 2_000, false);
-        engine.getActiveSession().addTransaction(pkDeath(now + 2_000L), 2_000, false);
+        engine.session().addTransaction(booked(now + 1_000L, "Dragon bones", 536, 1, 3_930, 3_930), 2_000, false);
+        engine.session().addTransaction(pkDeath(now + 2_000L), 2_000, false);
         // Owner live 2026-10-13: a PK kill whose victim dropped a loot key (unopened) and bones.
-        engine.getActiveSession().addTransaction(pkKill(now + 4_000L), 2_000, false);
-        engine.getActiveSession().addTransaction(keyClaim(now + 6_000L), 2_000, false);
-        engine.getActiveSession().addEncounter(false, now + 4_000L);
+        engine.session().addTransaction(pkKill(now + 4_000L), 2_000, false);
+        engine.session().addTransaction(keyClaim(now + 6_000L), 2_000, false);
+        engine.session().addEncounter(false, now + 2_000L);
+        engine.session().addEncounter(true, now + 4_000L);
         liveShot(out, "d-live-pvp-context.png", engine, new PvpState(true, true, true, 140_000L));
     }
 
@@ -308,10 +319,10 @@ public final class SidebarPreview
         Engine engine = engine();
         long now = SafeMath.now() - 35 * 60_000L;
         engine.startCustom("Theatre of Blood", now);
-        engine.getActiveSession().addTransaction(booked(now + 1_000L, "Scythe of vitur", 22486, 1, 1_219_300_000, 1_219_300_000L), 2_000, false);
-        engine.getActiveSession().addTransaction(booked(now + 2_000L, "Blood rune", 565, 56, 339, 18_984L), 2_000, false);
-        engine.getActiveSession().addTransaction(booked(now + 3_000L, "Death rune", 560, 128, 187, 23_936L), 2_000, false);
-        engine.getActiveSession().addTransaction(booked(now + 4_000L, "Nature rune", 561, 33, 199, 6_567L), 2_000, false);
+        engine.session().addTransaction(booked(now + 1_000L, "Scythe of vitur", 22486, 1, 1_219_300_000, 1_219_300_000L), 2_000, false);
+        engine.session().addTransaction(booked(now + 2_000L, "Blood rune", 565, 56, 339, 18_984L), 2_000, false);
+        engine.session().addTransaction(booked(now + 3_000L, "Death rune", 560, 128, 187, 23_936L), 2_000, false);
+        engine.session().addTransaction(booked(now + 4_000L, "Nature rune", 561, 33, 199, 6_567L), 2_000, false);
         // Vials of blood charge the scythe: a charge component, booked under Supplies (owner
         // live 2026-10-13: as a bare consumption the engine honestly called it a loss).
         engine.bookEstimatedCharge("worn:scythe", "Scythe of vitur", ActionKind.SUPPLIES,
@@ -325,7 +336,7 @@ public final class SidebarPreview
         Engine engine = engine();
         long now = SafeMath.now() - 8 * 60_000L;
         engine.startCustom("Vorkath", now);
-        engine.getActiveSession().addTransaction(booked(now + 1_000L, "Dragon bones", 536, 2, 3_930, 7_860), 2_000, false);
+        engine.session().addTransaction(booked(now + 1_000L, "Dragon bones", 536, 2, 3_930, 7_860), 2_000, false);
         engine.togglePause(SafeMath.now());
         liveShot(out, "x-live-paused-pill.png", engine, PvpState.NONE);
     }
@@ -336,11 +347,11 @@ public final class SidebarPreview
         Engine engine = engine();
         long now = SafeMath.now() - 35 * 60_000L;
         engine.startCustom("Zulrah", now);
-        engine.getActiveSession().addTransaction(booked(now + 1_000L, "Zulrah's scales", 12934, 247, 154, 38_038L), 2_000, false);
-        engine.getActiveSession().setActiveTimeTargetMillis(3L * 3_600_000L, SafeMath.now());
+        engine.session().addTransaction(booked(now + 1_000L, "Zulrah's scales", 12934, 247, 154, 38_038L), 2_000, false);
+        engine.session().setTimeTarget(3L * 3_600_000L, SafeMath.now());
         // The fixture shows a target set 35m ago (the timer counts from the set moment).
-        engine.getActiveSession().activeTimeTargetSetMillis =
-                engine.getActiveSession().getElapsedMillis(SafeMath.now()) - 35L * 60_000L;
+        engine.session().activeTimeTargetSetMillis =
+                engine.session().elapsed(SafeMath.now()) - 35L * 60_000L;
         liveShot(out, "f-live-time-target.png", engine, PvpState.NONE);
     }
 
@@ -353,15 +364,15 @@ public final class SidebarPreview
         Engine engine = engine();
         long now = SafeMath.now() - 62 * 60_000L;
         engine.startCustom("Zulrah", now);
-        engine.getActiveSession().addTransaction(booked(now + 1_000L, "Zulrah's scales", 12934, 247, 154, 38_038L), 2_000, false);
+        engine.session().addTransaction(booked(now + 1_000L, "Zulrah's scales", 12934, 247, 154, 38_038L), 2_000, false);
         engine.setTargets(200_000L, 150L * 60_000L, SafeMath.now());
         // The fixture's aim counts the run's net: baseline zero.
-        engine.getActiveSession().profitTargetSetNet = 0L;
-        engine.getActiveSession().sessionStartAt = null;
-        engine.getActiveSession().profitTargetSetActiveMillis = 0L;
+        engine.session().profitTargetSetNet = 0L;
+        engine.session().sessionStartAt = null;
+        engine.session().profitTargetSetActiveMillis = 0L;
         // The fixture shows the timer set at the run's start (62m in), not a fresh zero.
-        engine.getActiveSession().activeTimeTargetSetMillis =
-                engine.getActiveSession().getElapsedMillis(SafeMath.now()) - 62L * 60_000L;
+        engine.session().activeTimeTargetSetMillis =
+                engine.session().elapsed(SafeMath.now()) - 62L * 60_000L;
         liveShot(out, "f2-live-both-targets.png", engine, PvpState.NONE);
     }
 
@@ -378,16 +389,31 @@ public final class SidebarPreview
         Engine engine = engine();
         long now = SafeMath.now() - 8 * 60_000L;
         engine.startCustom("Wilderness", now);
-        engine.getActiveSession().addTransaction(booked(now + 1_000L, "Dragon bones", 536, 1, 3_930, 3_930L), 2_000, false);
+        engine.session().addTransaction(booked(now + 1_000L, "Dragon bones", 536, 1, 3_930, 3_930L), 2_000, false);
         Transaction key = keyClaim(now + 2_000L);
-        engine.getActiveSession().addTransaction(key, 2_000, false);
-        ledgerShot(out, "led-h-ledger-key.png", engine, key.getId(), null);
+        engine.session().addTransaction(key, 2_000, false);
+        ledgerShot(out, "led-h-ledger-key.png", engine, key.id(), null);
     }
 
     private static void ledgerDetail(File out) throws IOException    {
         Engine engine = mixedEngine();
         ledgerShot(out, "led-c-ledger-detail.png", engine,
-            engine.getActiveSession().getTransactions().get(0).getId(), null);
+            engine.session().transactions().get(0).id(), null);
+    }
+
+    private static void deathDetails(File out) throws IOException {
+        Engine engine=engine(); long now=SafeMath.now(); engine.ensureSession(now-60000);
+        Transaction bag=DeathRowGroupingTest.bag("death:preview"),gear=DeathRowGroupingTest.gear("death:preview");
+        bag.timestamp=now-6000; gear.timestamp=now-5400;
+        engine.session().addTransaction(bag,2000,false); engine.session().addTransaction(gear,2000,false);
+        liveShot(out,"death-recent.png",engine,PvpState.NONE);
+        for (boolean contents : new boolean[]{false,true}) {
+            SidebarPanel panel=panel(engine,PvpState.NONE);panel.shell.show(Shell.LEDGER);
+            LedgerPageProbe.select(panel.ledger,gear.id()); SidebarPanelProbe.refresh(panel);
+            if(contents) panel.ledger.items(panel.ledger.data.detail.group).stream()
+                    .filter(row->row.name.equals("Looting bag")).findFirst().orElseThrow().open.run();
+            paint(panel,new File(out,contents?"death-bag-contents.png":"death-detail.png"));
+        }
     }
 
     /** Owner 2026-10-03: a charged weapon's row lists what its uses spent, item by item. */
@@ -408,7 +434,7 @@ public final class SidebarPreview
             Transaction booked = engine.bookEstimatedCharge("worn:scythe", "Scythe of vitur", ActionKind.SUPPLIES, spent, now + hit * 2_400L);
             first = first == null ? booked : first;
         }
-        ledgerShot(out, "led-f-ledger-charge-used.png", engine, first == null ? null : first.getId(), null);
+        ledgerShot(out, "led-f-ledger-charge-used.png", engine, first == null ? null : first.id(), null);
     }
 
     /** Owner 1.2: a single scythe hit still names the blood runes it spent. */
@@ -419,14 +445,14 @@ public final class SidebarPreview
         engine.startCustom("Theatre of Blood", now);
         Transaction hit = engine.bookEstimatedCharge("worn:scythe", "Scythe of vitur", ActionKind.SUPPLIES,
             java.util.List.of(new Flow(565, "Blood rune", -2L, 339, -678L)), now);
-        ledgerShot(out, "led-g-ledger-charge-one-hit.png", engine, hit == null ? null : hit.getId(), null);
+        ledgerShot(out, "led-g-ledger-charge-one-hit.png", engine, hit == null ? null : hit.id(), null);
     }
 
     private static void ledgerCorrectionPreview(File out) throws IOException
     {
         Engine engine = mixedEngine();
         ledgerShot(out, "led-d-correction-preview.png", engine,
-            engine.getActiveSession().getTransactions().get(0).getId(), Correction.TRANSFER);
+            engine.session().transactions().get(0).id(), Correction.TRANSFER);
     }
 
     private static void ledgerCompacted(File out) throws IOException
@@ -436,9 +462,9 @@ public final class SidebarPreview
         engine.startCustom("Old grind", now);
         for (int i = 0; i < 8; i++)
         {
-            engine.getActiveSession().addTransaction(booked(now + i, "Old bone " + i, 1, 1, 100, 100), 2_000, false);
+            engine.session().addTransaction(booked(now + i, "Old bone " + i, 1, 1, 100, 100), 2_000, false);
         }
-        engine.getActiveSession().compactBefore(now + 7L, transaction -> false);
+        engine.session().compactBefore(now + 7L, transaction -> false);
         ledgerShot(out, "led-e-ledger-compacted.png", engine, null, null);
     }
 
@@ -451,8 +477,8 @@ public final class SidebarPreview
         Engine engine = engine();
         long now = SafeMath.now();
         engine.startCustom("2323", now - 20_000L);
-        engine.getActiveSession().addTransaction(booked(now - 15_000L, "Willow logs", 1519, 5, 22, 110), 2_000, false);
-        engine.getActiveSession().addTransaction(consumed(now - 10_000L, "Prayer potion(4)", 2434, -1, 210, -210L), 2_000, false);
+        engine.session().addTransaction(booked(now - 15_000L, "Willow logs", 1519, 5, 22, 110), 2_000, false);
+        engine.session().addTransaction(consumed(now - 10_000L, "Prayer potion(4)", 2434, -1, 210, -210L), 2_000, false);
         liveShot(out, "r31-a-fresh-live.png", engine, PvpState.NONE);
     }
 
@@ -462,9 +488,9 @@ public final class SidebarPreview
         Engine engine = engine();
         long now = SafeMath.now();
         engine.startCustom("Vorkath", now - 20_000L);
-        engine.getActiveSession().addTransaction(booked(now - 15_000L, "Dragon bones", 536, 1, 3_930, 3_930), 2_000, false);
+        engine.session().addTransaction(booked(now - 15_000L, "Dragon bones", 536, 1, 3_930, 3_930), 2_000, false);
         SidebarPanel panel = panel(engine, PvpState.NONE);
-        panel.shell().show(Shell.GRINDS);
+        panel.shell.show(Shell.GRINDS);
         paint(panel, new File(out, "r31-b-grinds-no-targets.png"));
     }
 
@@ -474,12 +500,12 @@ public final class SidebarPreview
         Engine engine = engine();
         long now = SafeMath.now();
         engine.startCustom("Vorkath", now - 20_000L);
-        engine.getActiveSession().addTransaction(booked(now - 15_000L, "Dragon bones", 536, 1, 3_930, 3_930), 2_000, false);
-        engine.getActiveSession().setProfitTargetGp(5_000_000L);
+        engine.session().addTransaction(booked(now - 15_000L, "Dragon bones", 536, 1, 3_930, 3_930), 2_000, false);
+        engine.session().setNetTarget(5_000_000L, 0, 0);
         SidebarPanel panel = panel(engine, PvpState.NONE);
-        panel.shell().show(Shell.GRINDS);
+        panel.shell.show(Shell.GRINDS);
         paint(panel, new File(out, "r31-c-grinds-target-calculating.png"));
-        panel.shell().show(Shell.LIVE);
+        panel.shell.show(Shell.LIVE);
         paint(panel, new File(out, "r31-d-live-net-running.png"));
     }
 
@@ -490,7 +516,7 @@ public final class SidebarPreview
     {
         Engine engine = insightsFixture();
         SidebarPanel panel = panel(engine, PvpState.NONE);
-        panel.shell().show(Shell.GRINDS);
+        panel.shell.show(Shell.GRINDS);
         SidebarPanelProbe.openGrindsDetail(panel, latestSessionNamed(engine, "Vorkath"));
         paint(panel, new File(out, "r4-e-grind-detail-complete.png"));
     }
@@ -502,7 +528,7 @@ public final class SidebarPreview
         long now = SafeMath.now();
         finishedGrind(engine, "Muspah", now - 3 * 3_600_000L, 612_000L);
         SidebarPanel panel = panel(engine, PvpState.NONE);
-        panel.shell().show(Shell.GRINDS);
+        panel.shell.show(Shell.GRINDS);
         SidebarPanelProbe.openGrindsDetail(panel, latestSessionNamed(engine, "Muspah"));
         paint(panel, new File(out, "r4-f-grind-detail-no-previous.png"));
     }
@@ -513,9 +539,9 @@ public final class SidebarPreview
         Engine engine = engine();
         long now = SafeMath.now();
         finishedLinked(engine, "Vorkath", now - 4 * 3_600_000L, 3_600_000L, 400_000L, 3 * 3_600_000L);
-        engine.getHistory().get(0).compactBefore(now - 2 * 3_600_000L, transaction -> false);
+        engine.history().get(0).compactBefore(now - 2 * 3_600_000L, transaction -> false);
         SidebarPanel panel = panel(engine, PvpState.NONE);
-        panel.shell().show(Shell.GRINDS);
+        panel.shell.show(Shell.GRINDS);
         SidebarPanelProbe.openGrindsDetail(panel, latestSessionNamed(engine, "Vorkath"));
         paint(panel, new File(out, "r4-g-grind-detail-compacted.png"));
     }
@@ -535,9 +561,9 @@ public final class SidebarPreview
         long activeMillis)
     {
         SavedState.SavedGrind definition = null;
-        for (SavedState.SavedGrind saved : engine.getSavedGrinds(true))
+        for (SavedState.SavedGrind saved : engine.plans(true))
         {
-            if (name.equals(saved.getName()))
+            if (name.equals(saved.name()))
             {
                 definition = saved;
             }
@@ -546,13 +572,13 @@ public final class SidebarPreview
         {
             definition = engine.saveGrind(name, null, null, false);
         }
-        engine.startGrind(name, definition.getGrindId(), null, null, startedAt);
-        engine.getActiveSession().addTransaction(booked(startedAt + 1_000L, "Dragon bones", 536, 1,
+        engine.startGrind(name, definition.id(), null, null, startedAt);
+        engine.session().addTransaction(booked(startedAt + 1_000L, "Dragon bones", 536, 1,
             (int) gain, gain), 2_000, false);
         Transaction supply = consumed(startedAt + 2_000L, "Prayer potion(4)", 2434, -1,
             (int) Math.max(1L, cost / 3L), -cost);
-        supply.setActionKind(ActionKind.DRINK);
-        engine.getActiveSession().addTransaction(supply, 2_000, false);
+        supply.setAction(ActionKind.DRINK);
+        engine.session().addTransaction(supply, 2_000, false);
         engine.finishCustom(startedAt + activeMillis);
     }
 
@@ -561,12 +587,12 @@ public final class SidebarPreview
     {
         String found = null;
         long at = Long.MIN_VALUE;
-        for (Session session : engine.getHistory())
+        for (Session session : engine.history())
         {
-            if (session != null && name.equals(session.getName()) && session.endedAtEpochMillis > at)
+            if (session != null && name.equals(session.name()) && session.endedAt > at)
             {
-                at = session.endedAtEpochMillis;
-                found = session.getId();
+                at = session.endedAt;
+                found = session.id();
             }
         }
         return found;
@@ -580,17 +606,17 @@ public final class SidebarPreview
         Engine engine = engine();
         long now = SafeMath.now() - 5 * 60_000L;
         engine.startCustom("Vorkath", now);
-        engine.getActiveSession().addTransaction(booked(now + 1_000L, "Cooked chicken", 2140, 1, 62, 62L), 2_000, false);
+        engine.session().addTransaction(booked(now + 1_000L, "Cooked chicken", 2140, 1, 62, 62L), 2_000, false);
         Transaction drink = consumed(now + 2_000L, "Super attack potion(4)", 3, -1, 2_400, -2_400L);
-        drink.setActionKind(ActionKind.DRINK);
-        engine.getActiveSession().addTransaction(drink, 2_000, false);
-        engine.getActiveSession().addTransaction(new Transaction(now + 3_000L, TransactionType.GAIN,
+        drink.setAction(ActionKind.DRINK);
+        engine.session().addTransaction(drink, 2_000, false);
+        engine.session().addTransaction(new Transaction(now + 3_000L, TransactionType.GAIN,
             Context.GENERIC, "", "Wilderness Agility", true,
             Collections.singletonList(new Flow(1,
                 "Extremely long ancient item name for width", 1, 99_900_000, 99_900_000L)),
             Confidence.LIKELY, "Preview sample.", null), 2_000, false);
         SidebarPanel panel = panel(engine, PvpState.NONE);
-        panel.shell().show(Shell.LEDGER);
+        panel.shell.show(Shell.LEDGER);
         paint(panel, new File(out, "r41-f-ledger-long-row.png"));
     }
 
@@ -599,7 +625,7 @@ public final class SidebarPreview
         Engine engine = engine();
         long now = SafeMath.now();
         engine.startCustom("Vorkath", now - 3_600_000L);
-        engine.getActiveSession().addTransaction(booked(now - 3_500_000L, "Dragon bones", 536, 1, 3_930, 3_930L),
+        engine.session().addTransaction(booked(now - 3_500_000L, "Dragon bones", 536, 1, 3_930, 3_930L),
             2_000, false);
         return engine;
     }
@@ -611,7 +637,7 @@ public final class SidebarPreview
     {
         SidebarPanel panel = panel(ledgerIconEngine(99_900_000L), PvpState.NONE);
         SidebarPanelProbe.bindSprites(panel, SidebarPreview::previewSprite);
-        panel.shell().show(Shell.LEDGER);
+        panel.shell.show(Shell.LEDGER);
         paint(panel, new File(out, "r41a-a-ledger-icon-positive.png"));
     }
 
@@ -620,7 +646,7 @@ public final class SidebarPreview
     {
         SidebarPanel panel = panel(ledgerIconEngine(-99_900_000L), PvpState.NONE);
         SidebarPanelProbe.bindSprites(panel, SidebarPreview::previewSprite);
-        panel.shell().show(Shell.LEDGER);
+        panel.shell.show(Shell.LEDGER);
         paint(panel, new File(out, "r41a-b-ledger-icon-negative.png"));
     }
 
@@ -629,9 +655,9 @@ public final class SidebarPreview
         Engine engine = engine();
         long now = SafeMath.now() - 5 * 60_000L;
         engine.startCustom("Vorkath", now);
-        engine.getActiveSession().addTransaction(consumed(now + 1_000L, "Cooked chicken", 2140, 1, 62, -62L),
+        engine.session().addTransaction(consumed(now + 1_000L, "Cooked chicken", 2140, 1, 62, -62L),
             2_000, false);
-        engine.getActiveSession().addTransaction(new Transaction(now + 2_000L,
+        engine.session().addTransaction(new Transaction(now + 2_000L,
             longValue >= 0L ? TransactionType.GAIN : TransactionType.CONSUMPTION, Context.GENERIC, "",
             "Extremely Long Wilderness Activity Name", true,
             Collections.singletonList(new Flow(1, "Extremely long ancient item name for width", 1,
@@ -653,9 +679,9 @@ public final class SidebarPreview
     {
         String name = "Extremely Long Vorkath V With A Very Long Suffix";
         SavedState.SavedGrind definition = null;
-        for (SavedState.SavedGrind saved : engine.getSavedGrinds(true))
+        for (SavedState.SavedGrind saved : engine.plans(true))
         {
-            if (name.equals(saved.getName()))
+            if (name.equals(saved.name()))
             {
                 definition = saved;
             }
@@ -664,8 +690,8 @@ public final class SidebarPreview
         {
             definition = engine.saveGrind(name, null, null, false);
         }
-        engine.startGrind(name, definition.getGrindId(), null, null, start);
-        engine.getActiveSession().addTransaction(booked(start + 1_000L, "Dragon bones", 536, 1,
+        engine.startGrind(name, definition.id(), null, null, start);
+        engine.session().addTransaction(booked(start + 1_000L, "Dragon bones", 536, 1,
             (int) net, net), 2_000, false);
         engine.finishCustom(end);
     }
@@ -702,10 +728,10 @@ public final class SidebarPreview
         Engine engine = engine();
         long now = SafeMath.now() - 30 * 60_000L;
         engine.startCustom("Vorkath", now);
-        engine.getActiveSession().addTransaction(booked(now + 1_000L, "Willow logs", 1519, 5, 22, 110), 2_000, false);
-        engine.getActiveSession().addTransaction(consumed(now + 2_000L, "Prayer potion(4)", 2434, -2, 9_800, -19_600L), 2_000, false);
-        engine.getActiveSession().addTransaction(booked(now + 3_000L, "Battlestaff", 1397, 5, 8_782, 43_910), 2_000, false);
-        engine.getActiveSession().addTransaction(pkDeath(now + 4_000L), 2_000, false);
+        engine.session().addTransaction(booked(now + 1_000L, "Willow logs", 1519, 5, 22, 110), 2_000, false);
+        engine.session().addTransaction(consumed(now + 2_000L, "Prayer potion(4)", 2434, -2, 9_800, -19_600L), 2_000, false);
+        engine.session().addTransaction(booked(now + 3_000L, "Battlestaff", 1397, 5, 8_782, 43_910), 2_000, false);
+        engine.session().addTransaction(pkDeath(now + 4_000L), 2_000, false);
         return engine;
     }
 
@@ -716,7 +742,7 @@ public final class SidebarPreview
     {
         Engine engine = grindsFixture();
         SidebarPanel panel = panel(engine, PvpState.NONE);
-        panel.shell().show(Shell.GRINDS);
+        panel.shell.show(Shell.GRINDS);
         paint(panel, new File(out, "g-a-grinds-current.png"));
     }
 
@@ -724,8 +750,8 @@ public final class SidebarPreview
     {
         Engine engine = grindsFixture();
         SidebarPanel panel = panel(engine, PvpState.NONE);
-        panel.shell().show(Shell.GRINDS);
-        panel.grinds.select(engine.getSavedGrinds(false).get(0).grindId);
+        panel.shell.show(Shell.GRINDS);
+        panel.plans.select(engine.plans(false).get(0).grindId);
         paint(panel, new File(out, "g-b-my-grinds.png"));
     }
 
@@ -738,16 +764,16 @@ public final class SidebarPreview
         finishedGrind(engine, "Zulrah", now - 2 * day, -412_000L);
         finishedGrind(engine, "Muspah", now - 3 * day, 612_000L);
         SidebarPanel panel = panel(engine, PvpState.NONE);
-        panel.shell().show(Shell.GRINDS);
+        panel.shell.show(Shell.GRINDS);
         paint(panel, new File(out, "g-c-recent-grinds.png"));
     }
 
     private static void finishedGrind(Engine engine, String name, long startedAt, long net)
     {
         engine.startCustom(name, startedAt);
-        engine.getActiveSession().addTransaction(booked(startedAt + 1_000L, "Willow logs", 1519, 5, 42,
+        engine.session().addTransaction(booked(startedAt + 1_000L, "Willow logs", 1519, 5, 42,
             Math.abs(net) / 5), 2_000, false);
-        engine.getActiveSession().addTransaction(consumed(startedAt + 2_000L, "Prayer potion(4)", 2434, -5, 100,
+        engine.session().addTransaction(consumed(startedAt + 2_000L, "Prayer potion(4)", 2434, -5, 100,
             net < 0 ? net * 4 / 5 : -Math.abs(net) / 5), 2_000, false);
         engine.finishCustom(startedAt + 3_000L);
     }
@@ -755,9 +781,9 @@ public final class SidebarPreview
     private static void grindsDetail(File out) throws IOException
     {
         Engine engine = grindsFixture();
-        String historyId = engine.getHistory().isEmpty() ? null : engine.getHistory().get(0).getId();
+        String historyId = engine.history().isEmpty() ? null : engine.history().get(0).id();
         SidebarPanel panel = panel(engine, PvpState.NONE);
-        panel.shell().show(Shell.GRINDS);
+        panel.shell.show(Shell.GRINDS);
         if (historyId != null)
         {
             SidebarPanelProbe.openGrindsDetail(panel, historyId);
@@ -774,7 +800,7 @@ public final class SidebarPreview
             engine.finishCustom(SafeMath.now());
             engine.setDetectedActivity(doing, SafeMath.now());
             SidebarPanel panel = panel(engine, PvpState.NONE);
-            panel.shell().show(Shell.GRINDS);
+            panel.shell.show(Shell.GRINDS);
             new GrindsController(panel).newGrind();
             paint(panel, new File(out, "g-e-start-grind-" + doing.toLowerCase() + ".png"));
         }
@@ -784,7 +810,7 @@ public final class SidebarPreview
     {
         Engine engine = grindsFixture();
         SidebarPanel panel = panel(engine, PvpState.NONE);
-        panel.shell().show(Shell.GRINDS);
+        panel.shell.show(Shell.GRINDS);
         javax.swing.JPopupMenu menu = SidebarPanelProbe.dataMenu(panel);
         SidebarPanelProbe.disposeFrame(panel);
         menu.setSize(Math.max(200, menu.getPreferredSize().width), Math.max(40, menu.getPreferredSize().height));
@@ -812,17 +838,17 @@ public final class SidebarPreview
         freePlay.finishCustom(SafeMath.now() - 60_000L);
         freePlay.startFreePlayOver(SafeMath.now() - 30_000L);
         SidebarPanel freePlayPanel = panel(freePlay, PvpState.NONE);
-        freePlayPanel.shell().show(Shell.GRINDS);
+        freePlayPanel.shell.show(Shell.GRINDS);
         paint(freePlayPanel, new File(out, "g-l2-grinds-free-play.png"));
         Engine pastFree = engine();
         long pastStart = SafeMath.now() - 3_600_000L;
         pastFree.ensureSession(pastStart);
-        Session pastRun = pastFree.getGeneralSession();
+        Session pastRun = pastFree.freePlay();
         pastRun.addTransaction(booked(pastStart + 1_000L, "Zulrah's scales", 12934, 4_000, 210, 840_000L), 2_000, false);
         pastFree.startFreePlayOver(SafeMath.now() - 60_000L);
         SidebarPanel pastPanel = panel(pastFree, PvpState.NONE);
-        pastPanel.shell().show(Shell.GRINDS);
-        new GrindsController(pastPanel).openDetail(pastRun.getId());
+        pastPanel.shell.show(Shell.GRINDS);
+        new GrindsController(pastPanel).openDetail(pastRun.id());
         paint(pastPanel, new File(out, "g-l3-free-play-detail.png"));
         SidebarPanel reset = panel(grindsFixture(), PvpState.NONE);
         new GrindsController(reset).factoryReset();
@@ -834,32 +860,32 @@ public final class SidebarPreview
         Engine play = engine();
         long start = SafeMath.now() - 2 * 3_600_000L;
         play.ensureSession(start);
-        play.getActiveSession().addTransaction(booked(start + 1_000L, "Zulrah's scales", 12934, 2_000_000, 210, 420_000_000L), 2_000, false);
+        play.session().addTransaction(booked(start + 1_000L, "Zulrah's scales", 12934, 2_000_000, 210, 420_000_000L), 2_000, false);
         play.setMilestone(1_000_000_000L);
         SidebarPanel playTargets = panel(play, PvpState.NONE);
         new GrindsController(playTargets).openTargets();
         paint(playTargets, new File(out, "g-l-targets-free-play.png"));
         play.setTargets(5_000_000L, null, SafeMath.now() - 20L * 60_000L);
-        play.getActiveSession().addTransaction(booked(SafeMath.now() - 10L * 60_000L, "Zulrah's scales", 12934, 4_000, 210, 840_000L), 2_000, false);
+        play.session().addTransaction(booked(SafeMath.now() - 10L * 60_000L, "Zulrah's scales", 12934, 4_000, 210, 840_000L), 2_000, false);
         liveShot(out, "f3-live-target-fresh-milestone.png", play, PvpState.NONE);
-        play.getActiveSession().addTransaction(booked(SafeMath.now() - 5L * 60_000L, "Zulrah's scales", 12934, 3_000_000, 210, 630_000_000L), 2_000, false);
+        play.session().addTransaction(booked(SafeMath.now() - 5L * 60_000L, "Zulrah's scales", 12934, 3_000_000, 210, 630_000_000L), 2_000, false);
         liveShot(out, "f4-live-milestone-reached.png", play, PvpState.NONE);
         // Risk under the Net and the milestone bar keep a long name's room in the header.
         play.setTargets(null, null, SafeMath.now());
         liveShot(out, "f5-live-risk-milestone.png", play, new PvpState(true, true, false, 12_400_000L));
-        play.newLiveSession(SafeMath.now() - 2L * 60_000L);
-        play.getActiveSession().addTransaction(booked(SafeMath.now() - 60_000L, "Zulrah's scales", 12934, 1_000, 210, 210_000L), 2_000, false);
+        play.newLive(SafeMath.now() - 2L * 60_000L);
+        play.session().addTransaction(booked(SafeMath.now() - 60_000L, "Zulrah's scales", 12934, 1_000, 210, 210_000L), 2_000, false);
         liveShot(out, "f7-live-after-reset-net.png", play, new PvpState(true, true, false, 12_400_000L));
         Engine wild = engine();
         wild.startCustom("Wilderness Bandit camp", SafeMath.now() - 30L * 60_000L);
-        wild.getActiveSession().addTransaction(booked(SafeMath.now() - 20L * 60_000L, "Zulrah's scales", 12934, 4_000, 210, 840_000L), 2_000, false);
+        wild.session().addTransaction(booked(SafeMath.now() - 20L * 60_000L, "Zulrah's scales", 12934, 4_000, 210, 840_000L), 2_000, false);
         liveShot(out, "f6-live-long-name-risk.png", wild, new PvpState(true, true, false, 12_400_000L));
         wild.setTargets(5_000_000L, 3L * 3_600_000L, SafeMath.now() - 10L * 60_000L);
-        wild.getActiveSession().addTransaction(booked(SafeMath.now() - 5L * 60_000L, "Zulrah's scales", 12934, 2_000, 210, 420_000L), 2_000, false);
+        wild.session().addTransaction(booked(SafeMath.now() - 5L * 60_000L, "Zulrah's scales", 12934, 2_000, 210, 420_000L), 2_000, false);
         liveShot(out, "f8-live-long-name-both-targets.png", wild, new PvpState(true, true, false, 12_400_000L));
         Engine saved = grindsFixture();
         SidebarPanel edit = panel(saved, PvpState.NONE);
-        new GrindsController(edit).editSavedGrind(saved.getSavedGrinds(false).get(0).grindId);
+        new GrindsController(edit).editSavedGrind(saved.plans(false).get(0).grindId);
         paint(edit, new File(out, "g-k-edit-grind.png"));
     }
 
@@ -868,19 +894,19 @@ public final class SidebarPreview
         Engine engine = engine();
         long now = SafeMath.now() - 2 * 3_600_000L;
         engine.startCustom("Vorkath", now);
-        engine.getActiveSession().addTransaction(booked(now + 1_000L, "Dragon bones", 536, 2, 3_930, 7_860), 2_000, false);
-        engine.getActiveSession().addTransaction(booked(now + 2_000L, "Battlestaff", 1397, 5, 8_782, 43_910), 2_000, false);
-        engine.getActiveSession().addTransaction(consumed(now + 3_000L, "Prayer potion(4)", 2434, -2, 9_800, -19_600L), 2_000, false);
-        engine.getActiveSession().setProfitTargetGp(5_000_000L);
-        engine.getActiveSession().setActiveTimeTargetMillis(3L * 3_600_000L, SafeMath.now());
-        engine.getActiveSession().setGrindId(engine.saveGrind("Vorkath", 5_000_000L, 3L * 3_600_000L, true).getGrindId());
+        engine.session().addTransaction(booked(now + 1_000L, "Dragon bones", 536, 2, 3_930, 7_860), 2_000, false);
+        engine.session().addTransaction(booked(now + 2_000L, "Battlestaff", 1397, 5, 8_782, 43_910), 2_000, false);
+        engine.session().addTransaction(consumed(now + 3_000L, "Prayer potion(4)", 2434, -2, 9_800, -19_600L), 2_000, false);
+        engine.session().setNetTarget(5_000_000L, 0, 0);
+        engine.session().setTimeTarget(3L * 3_600_000L, SafeMath.now());
+        engine.session().setGrindId(engine.saveGrind("Vorkath", 5_000_000L, 3L * 3_600_000L, true).id());
         engine.finishCustom(now + 3_600_000L);
 
         engine.startCustom("Zulrah", SafeMath.now() - 60_000L);
-        engine.getActiveSession().addTransaction(booked(SafeMath.now() - 50_000L, "Magic logs", 1513, 5, 699, 3_495), 2_000, false);
-        engine.getActiveSession().setGrindId(engine.saveGrind("Zulrah", 2_000_000L, null, false).getGrindId());
-        engine.getActiveSession().setProfitTargetGp(5_000_000L);
-        engine.getActiveSession().setActiveTimeTargetMillis(3L * 3_600_000L, SafeMath.now());
+        engine.session().addTransaction(booked(SafeMath.now() - 50_000L, "Magic logs", 1513, 5, 699, 3_495), 2_000, false);
+        engine.session().setGrindId(engine.saveGrind("Zulrah", 2_000_000L, null, false).id());
+        engine.session().setNetTarget(5_000_000L, 0, 0);
+        engine.session().setTimeTarget(3L * 3_600_000L, SafeMath.now());
         return engine;
     }
 
@@ -905,7 +931,7 @@ public final class SidebarPreview
     private static void liveShot(File out, String name, Engine engine, PvpState pvp) throws IOException
     {
         SidebarPanel panel = panel(engine, pvp);
-        panel.shell().show(Shell.LIVE);
+        panel.shell.show(Shell.LIVE);
         SidebarPanelProbe.refresh(panel);
         paint(panel, new File(out, name));
     }
@@ -914,7 +940,7 @@ public final class SidebarPreview
         @Nullable Correction correction) throws IOException
     {
         SidebarPanel panel = panel(engine, PvpState.NONE);
-        panel.shell().show(Shell.LEDGER);
+        panel.shell.show(Shell.LEDGER);
         SidebarPanelProbe.refresh(panel);
         if (transactionId != null && !transactionId.isEmpty())
         {
@@ -958,8 +984,8 @@ public final class SidebarPreview
         SidebarPanelProbe.refresh(panel);
         panel.validate();
         DirectHeaderControlsTest.resize(panel.ledger.scope);
-        DirectHeaderControlsTest.resize(panel.grinds.runningName);
-        ShellProbe.scrollCurrentToTop(panel.shell());
+        DirectHeaderControlsTest.resize(panel.plans.caption);
+        ShellProbe.scrollCurrentToTop(panel.shell);
         BufferedImage image = new BufferedImage(panel.getWidth(), panel.getHeight(), BufferedImage.TYPE_INT_RGB);
         Graphics2D g = image.createGraphics();
         try
@@ -994,7 +1020,7 @@ public final class SidebarPreview
                     new Flow(itemId, name, quantity, unitPrice, quantity * unitPrice),
                     new Flow(itemId + 10_000, name.replace("(4)", "(3)"), -quantity, left, -quantity * left)),
                 Confidence.LIKELY, "Preview sample.", null);
-            sips.setActionKind(ActionKind.DRINK);
+            sips.setAction(ActionKind.DRINK);
             return sips;
         }
         return new Transaction(at, TransactionType.CONSUMPTION, Context.GENERIC, "", "Vorkath",

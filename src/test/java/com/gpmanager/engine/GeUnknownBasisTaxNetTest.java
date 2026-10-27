@@ -64,17 +64,17 @@ public class GeUnknownBasisTaxNetTest
 
         Transaction settlement = market.transaction(row.settlementId);
         assertNotNull(settlement);
-        assertTrue("one counted MARKET settlement", settlement.isCounted());
-        assertEquals(TransactionType.TRADE, settlement.getType());
-        assertEquals(Correction.AUTO, settlement.getCorrection());
-        assertEquals("automatic Net is exactly -accepted tax", -676L, settlement.getNet());
+        assertTrue("one counted MARKET settlement", settlement.counts());
+        assertEquals(TransactionType.TRADE, settlement.type());
+        assertEquals(Correction.AUTO, settlement.correction());
+        assertEquals("automatic Net is exactly -accepted tax", -676L, settlement.net());
         assertEquals(-33_804L, flow(settlement, VIAL));
         assertEquals(33_128L, flow(settlement, COINS));
         assertNoSyntheticTaxFlow(settlement);
 
         assertEquals("exactly one counted settlement exists", 1, market.counted());
         assertEquals("the tax lands in the Market result", -676L,
-            Accounting.marketFold(market.transactions()).getNet());
+            Accounting.marketFold(market.transactions()).net());
         assertEquals("Live/grind Net reads the same booked transaction", -676L, market.net());
         assertEquals("the row shows the collected cash", 33_128L, row.observedSettlementGp);
     }
@@ -110,7 +110,7 @@ public class GeUnknownBasisTaxNetTest
         assertEquals("Result = after-tax Received - proven basis", 356L, row.realizedResultGp);
         assertFalse("a full result is never KNOWN_COST_ONLY", row.knownCostOnly);
         assertEquals("Net = Result; no separate tax contribution", 356L,
-            Accounting.marketFold(market.transactions()).getNet());
+            Accounting.marketFold(market.transactions()).net());
         assertEquals("the earlier counted gain plus the sale Result", 5_356L, market.net());
         assertNoSyntheticTaxFlow(market.transaction(row.settlementId));
     }
@@ -126,7 +126,7 @@ public class GeUnknownBasisTaxNetTest
         assertEquals("the exempt booking keeps the frozen-reference flow exactly", -330L,
             flow(exemptSettlement, CHICKEN));
         assertEquals(315L, flow(exemptSettlement, COINS));
-        assertFalse(exemptSettlement.isCounted());
+        assertFalse(exemptSettlement.counts());
         assertEquals(0L, exemptSettlement.netUnder(Correction.AUTO));
 
         Market known = new Market();
@@ -137,7 +137,7 @@ public class GeUnknownBasisTaxNetTest
         assertEquals("the known-basis booking keeps its consumed-basis flow exactly", -5_000L,
             flow(knownSettlement, RUNE));
         assertEquals(5_356L, flow(knownSettlement, COINS));
-        assertTrue(knownSettlement.isCounted());
+        assertTrue(knownSettlement.counts());
         assertEquals(356L, knownSettlement.netUnder(Correction.AUTO));
     }
 
@@ -186,7 +186,7 @@ public class GeUnknownBasisTaxNetTest
         assertEquals("TRANSFER is unchanged", 0L, settlement.netUnder(Correction.TRANSFER));
         assertEquals("IGNORE is unchanged", 0L, settlement.netUnder(Correction.IGNORE));
         assertEquals("the automatic contribution itself is -acknowledged tax",
-            -676L, settlement.getNet());
+            -676L, settlement.net());
     }
 
     @Test
@@ -204,25 +204,25 @@ public class GeUnknownBasisTaxNetTest
             long expectedAfter = settlement.netUnder(correction);
 
             assertEquals(-676L, market.net());
-            assertTrue(market.engine.correctTransaction(settlementId, correction, market.now + 5_000L,
+            assertTrue(market.engine.correctTransaction(settlementId, correction,
                 "test " + correction));
             assertEquals("the correction REPLACES the automatic tax (never stacks)",
                 expectedAfter, market.net());
             MarketRows.Row corrected = market.row(VIAL);
             assertNotEquals(Correction.AUTO,
-                market.engine.transactionById(corrected.settlementId).getCorrection());
+                market.engine.transactionById(corrected.settlementId).correction());
             assertFalse("a corrected sale is no longer KNOWN_COST_ONLY",
                 corrected.knownCostOnly);
             assertEquals(expectedAfter, corrected.realizedResultGp);
             assertEquals("no second tax contribution appears",
-                expectedAfter, Accounting.marketFold(market.transactions()).getNet());
+                expectedAfter, Accounting.marketFold(market.transactions()).net());
 
-            assertTrue(market.engine.undoCorrection(market.now + 6_000L));
+            assertTrue(market.engine.undoCorrection());
             assertEquals("Undo restores exactly -accepted tax", -676L, market.net());
             MarketRows.Row undone = market.row(VIAL);
             assertTrue("the automatic booked state returns", undone.knownCostOnly);
             assertEquals(-676L, undone.realizedResultGp);
-            assertEquals(Correction.AUTO, market.transaction(settlementId).getCorrection());
+            assertEquals(Correction.AUTO, market.transaction(settlementId).correction());
         }
     }
 
@@ -234,10 +234,9 @@ public class GeUnknownBasisTaxNetTest
         market.sellUnknown(0, VIAL, 4L, 8_536, 33_804, 33_128);
         String settlementId = market.row(VIAL).settlementId;
 
-        assertTrue(market.engine.correctTransaction(settlementId, Correction.TRANSFER,
-            market.now + 5_000L, "test"));
+        assertTrue(market.engine.correctTransaction(settlementId, Correction.TRANSFER, "test"));
         assertEquals(0L, market.net());
-        assertTrue(market.engine.undoCorrection(market.now + 6_000L));
+        assertTrue(market.engine.undoCorrection());
         assertEquals(-676L, market.net());
     }
 
@@ -299,7 +298,7 @@ public class GeUnknownBasisTaxNetTest
         Market market = new Market();
         market.prices.put(VIAL, 8_536L);
         // A pre-6A.1B legacy settlement kept its own -99502 tax flow; it stays exactly as booked.
-        market.engine.getActiveSession().addTransaction(new Transaction(market.now - 10_000L, TransactionType.TRADE, Context.MARKET, "Grand Exchange", "Market", true,
+        market.engine.session().addTransaction(new Transaction(market.now - 10_000L, TransactionType.TRADE, Context.MARKET, "Grand Exchange", "Market", true,
             java.util.Arrays.asList(
                 new Flow(CHAOS, "Chaos rune", -1_000L, 100, -1_000L, PriceSource.GRAND_EXCHANGE),
                 new Flow(COINS, "Coins", 980L, 1, 980L, PriceSource.FACE_VALUE),
@@ -315,12 +314,12 @@ public class GeUnknownBasisTaxNetTest
         assertNoSyntheticTaxFlow(settlement);
         for (Transaction transaction : market.transactions())
         {
-            for (Flow itemFlow : transaction.getFlows())
+            for (Flow itemFlow : transaction.flows())
             {
-                if (itemFlow.itemId == CostKind.GE_TAX_ITEM_ID)
+                if (itemFlow.item == CostKind.GE_TAX_ITEM_ID)
                 {
                     assertEquals("the legacy tax flow is only the legacy one", -20L,
-                        itemFlow.valueDelta);
+                        itemFlow.value);
                 }
             }
         }
@@ -375,18 +374,17 @@ public class GeUnknownBasisTaxNetTest
         restored.engine.restore(state, market.now + 1_000L);
 
         assertEquals("no second booking after reload", transactions,
-            restored.engine.getActiveSession().getTransactions().size());
+            restored.engine.session().transactions().size());
         MarketRows.Row row = restored.row(VIAL);
         assertEquals(settlementId, row.settlementId);
         assertTrue(row.knownCostOnly);
         assertEquals("Result stays unknown", -676L, row.realizedResultGp);
-        assertEquals(-676L, restored.engine.getMetrics(market.now + 2_000L).net);
+        assertEquals(-676L, restored.engine.metrics(market.now + 2_000L).net);
 
-        assertTrue(restored.engine.correctTransaction(settlementId, Correction.REVENUE,
-            market.now + 3_000L, "after reload"));
-        assertEquals(33_128L + 33_804L, restored.engine.getMetrics(market.now + 4_000L).net);
-        assertTrue(restored.engine.undoCorrection(market.now + 5_000L));
-        assertEquals(-676L, restored.engine.getMetrics(market.now + 6_000L).net);
+        assertTrue(restored.engine.correctTransaction(settlementId, Correction.REVENUE, "after reload"));
+        assertEquals(33_128L + 33_804L, restored.engine.metrics(market.now + 4_000L).net);
+        assertTrue(restored.engine.undoCorrection());
+        assertEquals(-676L, restored.engine.metrics(market.now + 6_000L).net);
         assertTrue(restored.row(VIAL).knownCostOnly);
     }
 
@@ -394,11 +392,11 @@ public class GeUnknownBasisTaxNetTest
 
     private static long flow(Transaction transaction, int itemId)
     {
-        for (Flow itemFlow : transaction.getFlows())
+        for (Flow itemFlow : transaction.flows())
         {
-            if (itemFlow.itemId == itemId)
+            if (itemFlow.item == itemId)
             {
-                return itemFlow.valueDelta;
+                return itemFlow.value;
             }
         }
         return 0L;
@@ -407,16 +405,16 @@ public class GeUnknownBasisTaxNetTest
     private static void assertNoSyntheticTaxFlow(Transaction transaction)
     {
         assertNotNull(transaction);
-        for (Flow flow : transaction.getFlows())
+        for (Flow flow : transaction.flows())
         {
             assertTrue("no synthetic GE tax flow may be booked",
-                flow.itemId != CostKind.GE_TAX_ITEM_ID);
+                flow.item != CostKind.GE_TAX_ITEM_ID);
         }
     }
 
     private static void gain(Engine engine, int item, long quantity, long value, long at)
     {
-        engine.getActiveSession().addTransaction(new Transaction(at,
+        engine.session().addTransaction(new Transaction(at,
             TransactionType.GAIN, Context.GENERIC, "", "Loot", true,
             Collections.singletonList(new Flow(item, name(item), quantity,
                 (int) (quantity > 0L ? value / quantity : 0L), value,
@@ -532,14 +530,14 @@ public class GeUnknownBasisTaxNetTest
 
         Transaction transaction(String id)
         {
-            Session session = engine.getActiveSession();
+            Session session = engine.session();
             return session == null ? null : session.findTransaction(id);
         }
 
         List<Transaction> transactions()
         {
-            Session session = engine.getActiveSession();
-            return session == null ? Collections.emptyList() : session.getTransactions();
+            Session session = engine.session();
+            return session == null ? Collections.emptyList() : session.transactions();
         }
 
         int counted()
@@ -547,7 +545,7 @@ public class GeUnknownBasisTaxNetTest
             int counted = 0;
             for (Transaction transaction : transactions())
             {
-                if (transaction != null && transaction.isCounted())
+                if (transaction != null && transaction.counts())
                 {
                     counted++;
                 }
@@ -557,7 +555,7 @@ public class GeUnknownBasisTaxNetTest
 
         long net()
         {
-            return engine.getMetrics(now + 1_000L).net;
+            return engine.metrics(now + 1_000L).net;
         }
     }
 }

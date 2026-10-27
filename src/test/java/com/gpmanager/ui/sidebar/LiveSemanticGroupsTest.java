@@ -24,35 +24,35 @@ public class LiveSemanticGroupsTest
     public void repeatedExactSpellUpdatesOneLiveRowAndBubbles()
     {
         Engine engine = session("Vorkath");
-        engine.getActiveSession().addTransaction(exactCast(T0 + 1_000L, "Ice Barrage", 1, 1, 1), 2_000, false);
-        engine.getActiveSession().addTransaction(exactCast(T0 + 2_000L, "Ice Barrage", 1, 1, 1), 2_000, false);
-        engine.getActiveSession().addTransaction(exactCast(T0 + 3_000L, "Ice Barrage", 1, 1, 1), 2_000, false);
+        engine.session().addTransaction(exactCast(T0 + 1_000L, "Ice Barrage", 1, 1, 1), 2_000, false);
+        engine.session().addTransaction(exactCast(T0 + 2_000L, "Ice Barrage", 1, 1, 1), 2_000, false);
+        engine.session().addTransaction(exactCast(T0 + 3_000L, "Ice Barrage", 1, 1, 1), 2_000, false);
 
         LiveSnapshot snapshot = LiveSnapshot.capture(engine, T0 + 4_000L, LiveContext.NONE);
 
         assertEquals("repeated exact spells are one updating row", 1, snapshot.recent.size());
         LiveSnapshot.Recent row = snapshot.recent.get(0);
         assertEquals("Ice Barrage", row.name);
-        assertEquals("the row counts the receipts it speaks for", 3, row.receipts);
+        assertEquals("the row counts the receipts it speaks for", 3, row.entries);
         assertEquals(-540L, row.value);
         assertEquals("Cast \u00b7 \u00d73", LivePage.metaOf(row));
 
-        engine.getActiveSession().addTransaction(exactCast(T0 + 5_000L, "Blood Barrage", 1, 1, 1), 2_000, false);
+        engine.session().addTransaction(exactCast(T0 + 5_000L, "Blood Barrage", 1, 1, 1), 2_000, false);
         LiveSnapshot bubbled = LiveSnapshot.capture(engine, T0 + 6_000L, LiveContext.NONE);
         assertEquals(2, bubbled.recent.size());
         assertEquals("the newest group bubbles to the top", "Blood Barrage", bubbled.recent.get(0).name);
         assertEquals("Ice Barrage", bubbled.recent.get(1).name);
-        assertEquals(3, bubbled.recent.get(1).receipts);
+        assertEquals(3, bubbled.recent.get(1).entries);
     }
 
     @Test
     public void genericCastCompositionsStaySeparateAndGeneric()
     {
         Engine engine = session("Vorkath");
-        engine.getActiveSession().addTransaction(genericCast(T0 + 1_000L, 1, 1, 1), 2_000, false);
+        engine.session().addTransaction(genericCast(T0 + 1_000L, 1, 1, 1), 2_000, false);
         // 2/2/2 would be Ice Rush's exact cost (named since 2026-09-28); 3/3/3 is no spell's.
-        engine.getActiveSession().addTransaction(genericCast(T0 + 2_000L, 3, 3, 3), 2_000, false);
-        engine.getActiveSession().addTransaction(bloodGenericCast(T0 + 3_000L), 2_000, false);
+        engine.session().addTransaction(genericCast(T0 + 2_000L, 3, 3, 3), 2_000, false);
+        engine.session().addTransaction(bloodGenericCast(T0 + 3_000L), 2_000, false);
 
         LiveSnapshot snapshot = LiveSnapshot.capture(engine, T0 + 4_000L, LiveContext.NONE);
         assertEquals("same normalised composition groups, a different one splits", 2, snapshot.recent.size());
@@ -61,7 +61,7 @@ public class LiveSemanticGroupsTest
             assertEquals("generic casts never receive an inferred spell name", "Cast", row.name);
         }
         LiveSnapshot.Recent grouped = snapshot.recent.stream()
-            .filter(row -> row.receipts == 2).findFirst().orElseThrow(AssertionError::new);
+            .filter(row -> row.entries == 2).findFirst().orElseThrow(AssertionError::new);
         assertEquals(-720L, grouped.value);
         assertEquals("3 rune types \u00b7 \u00d72", LivePage.metaOf(grouped));
     }
@@ -72,7 +72,7 @@ public class LiveSemanticGroupsTest
         Engine engine = session("Vorkath");
         for (int i = 0; i < LiveSnapshot.RECENT_ROWS + 2; i++)
         {
-            engine.getActiveSession().addTransaction(
+            engine.session().addTransaction(
                 gain(T0 + 1_000L + i * 1_000L, "Item " + i, 2_000 + i, 1L, 100, 100L), 2_000, false);
         }
         LiveSnapshot snapshot = LiveSnapshot.capture(engine, T0 + 20_000L, LiveContext.NONE);
@@ -86,17 +86,17 @@ public class LiveSemanticGroupsTest
     public void unpricedFinancialRowsAreNotReviewButCanonicalReviewStillIs()
     {
         Engine engine = session("Vorkath");
-        engine.getActiveSession().addTransaction(unpricedGain(T0 + 1_000L, "Unidentified mineral", 8), 2_000, false);
-        engine.getActiveSession().addTransaction(review(T0 + 2_000L, "Unknown rune", 777), 2_000, false);
+        engine.session().addTransaction(unpricedGain(T0 + 1_000L, "Unidentified mineral", 8), 2_000, false);
+        engine.session().addTransaction(review(T0 + 2_000L, "Unknown rune", 777), 2_000, false);
 
         LiveSnapshot snapshot = LiveSnapshot.capture(engine, T0 + 3_000L, LiveContext.NONE);
 
-        assertEquals("only the canonical review transaction needs a decision", 1, snapshot.reviewCount);
+        assertEquals("only the canonical review transaction needs a decision", 1, snapshot.reviews);
         LiveSnapshot.Recent unpriced = rowNamed(snapshot.recent, "Unidentified mineral");
         assertNotNull(unpriced);
-        assertTrue("the unpriced financial row keeps its incomplete marker", unpriced.unpriced);
+        assertTrue("the unpriced financial row keeps its incomplete marker", unpriced.unknown);
         assertFalse("an unpriced financial row is not a review decision", "review".equals(unpriced.tag));
-        assertNull("an unpriced gain opens Gains, not a Costs view", unpriced.ledgerCostView);
+        assertNull("an unpriced gain opens Gains, not a Costs view", unpriced.cost);
         LiveSnapshot.Recent review = rowNamed(snapshot.recent, "Unknown rune");
         assertNotNull(review);
         assertEquals("review", review.tag);
@@ -107,9 +107,9 @@ public class LiveSemanticGroupsTest
     public void measuredResourceRowsShowInRecentAndStayInTheLedgerChargesChip()
     {
         Engine engine = session("Vorkath");
-        engine.getActiveSession().addTransaction(gain(T0 + 500L, "Older gain", 999, 1L, 50, 50L), 2_000, false);
-        engine.getActiveSession().addTransaction(blowpipeSpend(T0 + 1_000L), 2_000, false);
-        engine.getActiveSession().addTransaction(blowpipeSpend(T0 + 2_000L), 2_000, false);
+        engine.session().addTransaction(gain(T0 + 500L, "Older gain", 999, 1L, 50, 50L), 2_000, false);
+        engine.session().addTransaction(blowpipeSpend(T0 + 1_000L), 2_000, false);
+        engine.session().addTransaction(blowpipeSpend(T0 + 2_000L), 2_000, false);
 
         LiveSnapshot snapshot = LiveSnapshot.capture(engine, T0 + 3_000L, LiveContext.NONE);
 
@@ -117,7 +117,7 @@ public class LiveSemanticGroupsTest
         // holds it.
         LiveSnapshot.Recent scales = rowNamed(snapshot.recent, "Zulrah's scales");
         assertNotNull("the scales charge row is listed now", scales);
-        assertEquals(LedgerData.CostView.CHARGES, scales.ledgerCostView);
+        assertEquals(LedgerData.CostView.CHARGES, scales.cost);
         assertNotNull("owner 1.1: darts are Supplies like arrows", rowNamed(snapshot.recent, "Dragon dart"));
         assertEquals("the darts, the scales and the gain are in Recent", 3, snapshot.recent.size());
         assertNotNull(rowNamed(snapshot.recent, "Older gain"));
@@ -135,20 +135,20 @@ public class LiveSemanticGroupsTest
     {
         Engine engine = session("Vorkath");
         Transaction newest = exactCast(T0 + 2_000L, "Ice Barrage", 1, 1, 1);
-        engine.getActiveSession().addTransaction(exactCast(T0 + 1_000L, "Ice Barrage", 1, 1, 1), 2_000, false);
-        engine.getActiveSession().addTransaction(newest, 2_000, false);
+        engine.session().addTransaction(exactCast(T0 + 1_000L, "Ice Barrage", 1, 1, 1), 2_000, false);
+        engine.session().addTransaction(newest, 2_000, false);
 
         LiveSnapshot snapshot = LiveSnapshot.capture(engine, T0 + 3_000L, LiveContext.NONE);
         LiveSnapshot.Recent row = snapshot.recent.get(0);
 
-        assertEquals("the representative receipt is the newest one", newest.getId(), row.receiptId);
-        assertNotNull(row.contributionId);
+        assertEquals("the representative receipt is the newest one", newest.id(), row.receiptId);
+        assertNotNull(row.id);
         LedgerData.Entry entry = LivePage.entryFor(row);
         assertEquals("deep links never smuggle a search string", "", entry.search);
-        assertEquals(newest.getId(), entry.highlightTransactionId);
+        assertEquals(newest.id(), entry.transaction);
         LedgerData linked = LedgerData.capture(engine, T0 + 3_000L, entry);
         assertNotNull("the stable identity resolves to its group detail", linked.detail);
-        assertTrue(linked.detail.group.containsTransaction(newest.getId()));
+        assertTrue(linked.detail.group.containsTransaction(newest.id()));
     }
 
     // ── fixtures ───────────────────────────────────────────────────────────────────────────────
@@ -187,7 +187,7 @@ public class LiveSemanticGroupsTest
                 rune(CHAOS, "Chaos rune", -chaosQty, 50),
                 rune(WATER, "Water rune", -waterQty, 30)),
             Confidence.CONFIRMED, "Exact fixture", null);
-        transaction.setActionKind(ActionKind.CAST);
+        transaction.setAction(ActionKind.CAST);
         return transaction;
     }
 
@@ -199,7 +199,7 @@ public class LiveSemanticGroupsTest
                 rune(BLOOD, "Blood rune", -1L, 200),
                 rune(WATER, "Water rune", -1L, 30)),
             Confidence.CONFIRMED, "Exact fixture", null);
-        transaction.setActionKind(ActionKind.CAST);
+        transaction.setAction(ActionKind.CAST);
         return transaction;
     }
 
@@ -216,7 +216,7 @@ public class LiveSemanticGroupsTest
                 new Flow(11230, "Dragon dart", -2L, 100, -200L, PriceSource.GRAND_EXCHANGE),
                 new Flow(12934, "Zulrah's scales", -1L, 110, -110L, PriceSource.GRAND_EXCHANGE)),
             Confidence.CONFIRMED, "Measured Check difference for Toxic blowpipe.", null);
-        transaction.setActionKind(ActionKind.FIRE);
+        transaction.setAction(ActionKind.FIRE);
         return transaction;
     }
 

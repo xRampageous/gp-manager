@@ -23,18 +23,19 @@ public final class ShellProbe
     /** Tab labels in order. */
     public static String[] tabLabels(Shell shell)
     {
-        String[] labels = new String[Shell.TABS.length];
-        for (int i = 0; i < Shell.TABS.length; i++)
+        List<String> labels = new ArrayList<>();
+        for (Component component : shell.tabs.getComponents())
         {
-            labels[i] = Shell.TABS[i][1];
+            if (component instanceof MaterialTab)
+                labels.add(((MaterialTab) component).getText());
         }
-        return labels;
+        return labels.toArray(new String[0]);
     }
 
     /** The selected tab's page id, as the tab strip shows it. */
     public static String selectedTab(Shell shell)
     {
-        for (Map.Entry<String, MaterialTab> entry : shell.tabById.entrySet())
+        for (Map.Entry<String, MaterialTab> entry : shell.buttons.entrySet())
         {
             if (entry.getValue().isSelected())
             {
@@ -205,12 +206,12 @@ public final class ShellProbe
 
     public static String sheetTitle(Shell shell)
     {
-        return shell.sheetTitle;
+        return shell.heading;
     }
 
     /** The notification text now showing, or "". */
     public static String noticeText(Shell shell)
     {
-        return shell.notice.isVisible() ? shell.noticeText.getToolTipText() : "";
+        return shell.notice.isVisible() ? shell.message.getToolTipText() : "";
     }
 }

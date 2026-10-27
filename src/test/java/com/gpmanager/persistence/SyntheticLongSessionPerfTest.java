@@ -47,7 +47,7 @@ public class SyntheticLongSessionPerfTest
                     true,
                     Collections.singletonList(new Flow(1511, "Logs", 1L, 39, 39L))), transactions, false);
             }
-            assertEquals("Measure retained records, not only compacted totals", transactions, session.getTransactions().size());
+            assertEquals("Measure retained records, not only compacted totals", transactions, session.transactions().size());
             SavedState state = new SavedState(session, null, Collections.emptyList());
             state.setRevision(round + 1L);
             if (PersistenceProbe.save(repository, state) || PersistenceProbe.replaceStateDetailed(repository, state).isCommitted())

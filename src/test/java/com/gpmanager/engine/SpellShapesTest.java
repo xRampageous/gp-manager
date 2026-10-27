@@ -1,5 +1,7 @@
 package com.gpmanager;
 
+import static org.junit.Assert.assertFalse;
+
 import java.lang.reflect.Proxy;
 import java.util.ArrayList;
 import java.util.HashMap;
@@ -33,9 +35,9 @@ public class SpellShapesTest
         Transaction alch = settle(Map.of(NATURE, 10L, STEAM, 50L, PLATESKIRT, 1L, COINS, 0L),
             Map.of(NATURE, 9L, STEAM, 45L, PLATESKIRT, 0L, COINS, 38_400L),
             PLATESKIRT, ActionKind.CAST, ActionLabel.of("High Level Alchemy"));
-        assertSame(ActionKind.CAST, alch.getActionKind());
+        assertSame(ActionKind.CAST, alch.action());
         assertEquals("High Level Alchemy", alch.spellName());
-        assertEquals("the coins stay on the cast", 4, alch.getFlows().size());
+        assertEquals("the coins stay on the cast", 4, alch.flows().size());
     }
 
     @Test
@@ -46,7 +48,7 @@ public class SpellShapesTest
         Transaction tablet = settle(Map.of(TABLET, 5L, BONES, 3L, PEACH, 0L),
             Map.of(TABLET, 4L, BONES, 0L, PEACH, 3L),
             TABLET, ActionReader.verbOf("break"), ActionLabel.of(Spells.named("bones to peaches")));
-        assertSame(ActionKind.CAST, tablet.getActionKind());
+        assertSame(ActionKind.CAST, tablet.action());
         assertEquals("Bones to Peaches", tablet.spellName());
     }
 
@@ -69,10 +71,10 @@ public class SpellShapesTest
             Transaction settled = engine.processIfDirty(new ContainerSnapshot(new HashMap<>(broken)), T0 + 600L + i * 600L, booked::add);
             if (settled != null) booked.add(settled);
         }
-        Transaction tablet = booked.stream().filter(t -> t.getFlows().stream().anyMatch(f -> f.itemId == TABLET))
+        Transaction tablet = booked.stream().filter(t -> t.flows().stream().anyMatch(f -> f.item == TABLET))
             .findFirst().orElse(null);
         assertNotNull("the break booked: " + booked, tablet);
-        assertSame("the break is still its spell", ActionKind.CAST, tablet.getActionKind());
+        assertSame("the break is still its spell", ActionKind.CAST, tablet.action());
         assertEquals("Bones to Peaches", tablet.spellName());
 
         Map<Integer, Long> eaten = Map.of(TABLET, 4L, BONES, 0L, PEACH, 3L);
@@ -82,10 +84,10 @@ public class SpellShapesTest
             Transaction settled = engine.processIfDirty(new ContainerSnapshot(new HashMap<>(eaten)), T0 + 4_000L + i * 600L, booked::add);
             if (settled != null) booked.add(settled);
         }
-        Transaction bite = booked.stream().filter(t -> t.getFlows().size() == 1 && t.getFlows().get(0).itemId == PEACH)
+        Transaction bite = booked.stream().filter(t -> t.flows().size() == 1 && t.flows().get(0).item == PEACH)
             .findFirst().orElse(null);
         assertNotNull("the bite books on its own: " + booked, bite);
-        assertSame("and keeps its own verb", ActionKind.EAT, bite.getActionKind());
+        assertSame("and keeps its own verb", ActionKind.EAT, bite.action());
     }
 
     /** Owner live 2026-10-16: a spell with a product is one row named by its spell, at its net. */
@@ -108,13 +110,13 @@ public class SpellShapesTest
         assertEquals("coins less the item and runes", 38_400L - 37_000L - 600L, rows.get(0).value);
     }
 
-    /** Owner live 2026-10-16: rows booked before these rules update on load, no reset needed. */
+    /** Ongoing repricing survives retirement of historical spell relabeling. */
     @Test
-    public void oldRowsTakeTheNewRulesOnceAndOnlyWhenAutomatic()
+    public void oldUnpricedRowsRecoverWithoutHistoricalSpellRelabeling()
     {
         Engine engine = engine();
         engine.startCustom("Magic", T0);
-        Session session = engine.getActiveSession();
+        Session session = engine.session();
         Transaction ate = old(TransactionType.CONSUMPTION, Confidence.LIKELY, true, "",
             new Flow(PEACH, "Peach", -1L, 0, 0L, PriceSource.UNPRICED));
         Transaction shards = old(TransactionType.GAIN, Confidence.LIKELY, true, "",
@@ -129,27 +131,27 @@ public class SpellShapesTest
             new Flow(TABLET, "Bones to peaches", -1L, 100, -100L, PriceSource.GRAND_EXCHANGE));
         Transaction decided = old(TransactionType.CONSUMPTION, Confidence.LIKELY, true, "",
             new Flow(TABLET, "Bones to peaches", -1L, 100, -100L, PriceSource.GRAND_EXCHANGE));
-        decided.applyCorrection(Correction.IGNORE, T0);
+        decided.applyCorrection(Correction.IGNORE, "Manual correction");
         for (Transaction row : List.of(ate, shards, review, high, low, dropped, decided)) session.addTransaction(row, 2_000, false);
 
         engine.recheck(id -> id == PLATESKIRT ? 38_400 : 0);
 
-        assertSame("an old peach reads as worth nothing", PriceSource.NO_VALUE, ate.getFlows().get(0).getPriceSource());
-        assertSame("an old untradeable takes its alch value", PriceSource.HIGH_ALCHEMY, shards.getFlows().get(0).getPriceSource());
+        assertSame("an old peach reads as worth nothing", PriceSource.NO_VALUE, ate.flows().get(0).source());
+        assertSame("an old untradeable takes its alch value", PriceSource.HIGH_ALCHEMY, shards.flows().get(0).source());
         assertEquals("and the row's total follows", 18_000L, shards.autoNet());
-        assertSame(ActionKind.CAST, review.getActionKind());
-        assertEquals("Bones to Peaches", review.spellName());
-        assertSame("the tablet leaves Review like a fresh break", TransactionType.CONSUMPTION, review.getType());
-        assertTrue(review.isCounted());
-        assertTrue(!ReviewRules.needsOwnerDecision(review));
-        assertEquals("High Level Alchemy", high.spellName());
-        assertEquals("coins under the alch price are a low alch", "Low Level Alchemy", low.spellName());
-        assertNull("a dropped tablet is no cast", dropped.getActionKind());
-        assertNull("an owner decision is never rewritten", decided.getActionKind());
+        assertNull(review.action());
+        assertEquals("", review.spellName());
+        assertSame("retired repair cannot reclassify history", TransactionType.UNCERTAIN, review.type());
+        assertFalse(review.counts());
+        assertTrue(ReviewRules.needsReview(review));
+        assertEquals("", high.spellName());
+        assertEquals("", low.spellName());
+        assertNull("a dropped tablet is no cast", dropped.action());
+        assertNull("an owner decision is never rewritten", decided.action());
 
-        long revision = engine.getRevision();
+        long revision = engine.revision();
         engine.recheck(id -> id == PLATESKIRT ? 38_400 : 0);
-        assertEquals("a second pass changes nothing", revision, engine.getRevision());
+        assertEquals("a second pass changes nothing", revision, engine.revision());
     }
 
     private static Transaction alch(long coins)
@@ -182,11 +184,11 @@ public class SpellShapesTest
                 Map.of(TABLET, 4L, BONES, 0L, PEACH, 3L, DART, 39L))), T0 + 600L + i * 600L, booked::add);
             if (settled != null) booked.add(settled);
         }
-        Transaction spell = booked.stream().filter(t -> t.getActionKind() == ActionKind.CAST).findFirst().orElse(null);
+        Transaction spell = booked.stream().filter(t -> t.action() == ActionKind.CAST).findFirst().orElse(null);
         assertNotNull("the break books as its spell: " + booked, spell);
-        assertTrue("without the darts", spell.getFlows().stream().noneMatch(f -> f.itemId == DART));
+        assertTrue("without the darts", spell.flows().stream().noneMatch(f -> f.item == DART));
         assertTrue("the darts book as their own gain", booked.stream().anyMatch(t -> t != spell
-            && t.getFlows().size() == 1 && t.getFlows().get(0).itemId == DART && t.getActionKind() == null));
+            && t.flows().size() == 1 && t.flows().get(0).item == DART && t.action() == null));
 
         // A row already booked with both (a dev build only) stays as item rows, darts apart.
         Transaction old = old(TransactionType.CONSUMPTION, Confidence.LIKELY, true, "",
@@ -194,12 +196,10 @@ public class SpellShapesTest
             new Flow(BONES, "Bones", -3L, 100, -300L, PriceSource.GRAND_EXCHANGE),
             new Flow(PEACH, "Peach", 3L, 0, 0L, PriceSource.NO_VALUE),
             new Flow(DART, "Rune dart", 39L, 100, 3_900L, PriceSource.GRAND_EXCHANGE));
-        assertNull("the recheck never names a tablet row that also picked something up",
-            Engine.spellOf(old, id -> 0));
-        old.setActionKind(ActionKind.CAST);
+        old.setAction(ActionKind.CAST);
         old.setActionLabel(ActionLabel.of("Bones to Peaches"));
         List<String> rows = new ArrayList<>();
-        for (Semantics.Group group : Semantics.transactionUnits(old, f -> true)) rows.add(group.primaryName + " " + group.value);
+        for (Semantics.Group group : Semantics.transactionUnits(old, f -> true)) rows.add(group.name + " " + group.value);
         assertTrue("a gain the spell does not make keeps the rows apart: " + rows,
             rows.contains("Rune dart 3900") && rows.size() == 4);
     }
@@ -226,16 +226,16 @@ public class SpellShapesTest
     {
         Valuation valuation = ModelProbe.valuation(new GpManagerConfig() { }, SpellShapesTest::composition, id -> 0);
         Flow hat = valuation.valueComponent(HAT, 1L, 0L);
-        assertSame("a known zero", PriceSource.NO_VALUE, hat.getPriceSource());
+        assertSame("a known zero", PriceSource.NO_VALUE, hat.source());
         assertEquals(0, hat.unitPrice);
         assertSame("a tradeable item without a quote waits for prices, alch value or not",
-            PriceSource.UNPRICED, valuation.valueComponent(BONES, 1L, 0L).getPriceSource());
+            PriceSource.UNPRICED, valuation.valueComponent(BONES, 1L, 0L).source());
         assertEquals("rows worth nothing read as a dash", "—", Fmt.worth(0L));
         assertEquals(Fmt.signed(1_200L), Fmt.worth(1_200L));
 
         Transaction received = settle(Map.of(HAT, 0L), Map.of(HAT, 1L), -1, null, null);
         assertNotNull("receiving it still books", received);
-        assertTrue(received.getFlows().get(0).getPriceSource() == PriceSource.NO_VALUE);
+        assertTrue(received.flows().get(0).source() == PriceSource.NO_VALUE);
     }
 
     private static Engine last;

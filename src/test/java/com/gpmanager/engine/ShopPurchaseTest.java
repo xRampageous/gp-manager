@@ -21,6 +21,11 @@ import static org.junit.Assert.assertTrue;
  */
 public class ShopPurchaseTest
 {
+    static String tradedItems(Transaction row, Contribution part) {
+        var parts = Semantics.tradeParts(row, part);
+        return parts == null ? "" : parts[0]+" "+parts[1];
+    }
+
     private static final int COINS = 995;
     private static final int JAR = 11260;
     private static final int PLATEBODY = 1127;
@@ -61,25 +66,25 @@ public class ShopPurchaseTest
         // can never be recovered: the purchase books the cost (Coinflow 1.7.1 calls this the
         // unrealizable case; owner probe 2026-10-13).
         start();
-        engine.inbox.put(Inbox.DIALOGUE, 0, 1L, 4, null);
+        engine.events.put(Inbox.DIALOGUE, 0, 1L, 4, null);
         Transaction bought = change(COINS, -2L, BOOK, 1L);
-        assertSame(TransactionType.TRADE, bought.getType());
-        assertEquals("Bought", bought.getNote());
-        assertTrue(bought.isCounted());
-        assertFalse("not Review", ReviewRules.needsOwnerDecision(bought));
-        assertEquals(-2L, engine.getMetrics(now + 1_000L).net);
+        assertSame(TransactionType.TRADE, bought.type());
+        assertEquals("Bought", bought.note());
+        assertTrue(bought.counts());
+        assertFalse("not Review", ReviewRules.needsReview(bought));
+        assertEquals(-2L, engine.metrics(now + 1_000L).net);
     }
 
     @Test
     public void coinsForAnItemWithAShopOpenIsAPurchase()
     {
         start();
-        engine.inbox.put(Inbox.DIALOGUE, 0, 1L, 4, null);
+        engine.events.put(Inbox.DIALOGUE, 0, 1L, 4, null);
         Transaction bought = change(COINS, -2_000L, JAR, 1L);
-        assertSame(TransactionType.TRADE, bought.getType());
-        assertEquals("Bought", bought.getNote());
-        assertTrue(bought.isCounted());
-        assertFalse("not Review", ReviewRules.needsOwnerDecision(bought));
+        assertSame(TransactionType.TRADE, bought.type());
+        assertEquals("Bought", bought.note());
+        assertTrue(bought.counts());
+        assertFalse("not Review", ReviewRules.needsReview(bought));
     }
 
     @Test
@@ -87,49 +92,49 @@ public class ShopPurchaseTest
     {
         start();
         assertTrue("without the shop window it stays Review",
-            ReviewRules.needsOwnerDecision(change(PLATEBODY, -1L, COINS, 38_000L)));
+            ReviewRules.needsReview(change(PLATEBODY, -1L, COINS, 38_000L)));
 
-        engine.inbox.put(Inbox.DIALOGUE, 0, 1L, 4, null);
+        engine.events.put(Inbox.DIALOGUE, 0, 1L, 4, null);
         Transaction sold = change(PLATEBODY, -1L, COINS, 38_000L);
-        assertSame(TransactionType.TRADE, sold.getType());
-        assertSame(Context.MARKET, sold.getContext());
-        assertEquals("Sold", sold.getNote());
-        assertTrue(sold.isCounted());
-        assertFalse("not Review", ReviewRules.needsOwnerDecision(sold));
+        assertSame(TransactionType.TRADE, sold.type());
+        assertSame(Context.MARKET, sold.context());
+        assertEquals("Sold", sold.note());
+        assertTrue(sold.counts());
+        assertFalse("not Review", ReviewRules.needsReview(sold));
     }
 
     @Test
     public void aShopTradeEntryNamesWhatItBoughtOrSold()
     {
         start();
-        engine.inbox.put(Inbox.DIALOGUE, 0, 1L, 4, null);
+        engine.events.put(Inbox.DIALOGUE, 0, 1L, 4, null);
         engine.markContext(Context.MARKET, 4, "buy 1 Impling jar");
         Transaction bought = change(COINS, -290L, JAR, 1L);
-        assertSame(TransactionType.TRADE, bought.getType());
+        assertSame(TransactionType.TRADE, bought.type());
         assertEquals("a coin shop keeps its own verb", "Traded", Semantics.verbOf(bought));
         assertEquals("Bought Impling jar",
-            Semantics.tradedItems(bought, contributionOf(bought, COINS)));
+            tradedItems(bought, contributionOf(bought, COINS)));
         assertEquals("Paid Coins ×290",
-            Semantics.tradedItems(bought, contributionOf(bought, JAR)));
+            tradedItems(bought, contributionOf(bought, JAR)));
 
         engine.markContext(Context.MARKET, 4, "buy 50 Death rune");
         Transaction exchanged = change(TOKKUL, -14_550L, DEATH_RUNE, 50L);
-        assertSame(TransactionType.TRADE, exchanged.getType());
+        assertSame(TransactionType.TRADE, exchanged.type());
         assertEquals("a non-coin currency shop reads Exchanged", "Exchanged",
             Semantics.verbOf(exchanged));
         assertEquals("Bought Death rune ×50",
-            Semantics.tradedItems(exchanged, contributionOf(exchanged, TOKKUL)));
+            tradedItems(exchanged, contributionOf(exchanged, TOKKUL)));
         assertEquals("Paid Tokkul ×14,550",
-            Semantics.tradedItems(exchanged, contributionOf(exchanged, DEATH_RUNE)));
+            tradedItems(exchanged, contributionOf(exchanged, DEATH_RUNE)));
 
         engine.markContext(Context.MARKET, 4, "sell 1 Rune platebody");
         Transaction sold = change(PLATEBODY, -1L, COINS, 380L);
-        assertSame(TransactionType.TRADE, sold.getType());
+        assertSame(TransactionType.TRADE, sold.type());
         assertEquals("Traded", Semantics.verbOf(sold));
         assertEquals("Sold Rune platebody",
-            Semantics.tradedItems(sold, contributionOf(sold, COINS)));
+            tradedItems(sold, contributionOf(sold, COINS)));
         assertEquals("Sold for Coins ×380",
-            Semantics.tradedItems(sold, contributionOf(sold, PLATEBODY)));
+            tradedItems(sold, contributionOf(sold, PLATEBODY)));
     }
 
     @Test
@@ -138,21 +143,21 @@ public class ShopPurchaseTest
         start();
         // The sell click arms the shop's MARKET context; outside it the same change fails closed.
         assertTrue("without the click context it stays Review",
-            ReviewRules.needsOwnerDecision(change(PLATEBODY, -1L, TOKKUL, 380L)));
+            ReviewRules.needsReview(change(PLATEBODY, -1L, TOKKUL, 380L)));
 
         engine.markContext(Context.MARKET, 4, "sell 1 Rune platebody");
         Transaction sold = change(PLATEBODY, -1L, TOKKUL, 380L);
-        assertSame(TransactionType.TRADE, sold.getType());
-        assertSame(Context.MARKET, sold.getContext());
+        assertSame(TransactionType.TRADE, sold.type());
+        assertSame(Context.MARKET, sold.context());
         assertEquals("a non-coin currency shop reads Exchanged", "Exchanged", Semantics.verbOf(sold));
-        assertTrue(sold.isCounted());
-        assertFalse("not Review", ReviewRules.needsOwnerDecision(sold));
+        assertTrue(sold.counts());
+        assertFalse("not Review", ReviewRules.needsReview(sold));
     }
 
     private static Contribution contributionOf(Transaction transaction, int itemId)
     {
         for (Contribution contribution : Contribution.project(transaction))
-            if (contribution.itemId == itemId) return contribution;
+            if (contribution.item == itemId) return contribution;
         throw new AssertionError("no contribution for item " + itemId);
     }
 
@@ -160,10 +165,10 @@ public class ShopPurchaseTest
     public void aMixedCoinAndItemGainIsNotASale()
     {
         start();
-        engine.inbox.put(Inbox.DIALOGUE, 0, 1L, 4, null);
+        engine.events.put(Inbox.DIALOGUE, 0, 1L, 4, null);
         Transaction mixed = change(PLATEBODY, -1L, COINS, 1_000L, JAR, 1L);
         assertTrue("coins plus another item is not a sale",
-            ReviewRules.needsOwnerDecision(mixed));
+            ReviewRules.needsReview(mixed));
     }
 
     @Test
@@ -217,11 +222,11 @@ public class ShopPurchaseTest
                 Long::sum);
         }
         inventory.values().removeIf(quantity -> quantity == 0L);
-        int before = engine.getActiveSession().getTransactions().size();
+        int before = engine.session().transactions().size();
         now += 3_000L;
         engine.processIfDirty(new ContainerSnapshot(new HashMap<>(inventory)), now, null);
         engine.processIfDirty(new ContainerSnapshot(new HashMap<>(inventory)), now + 600L, null);
-        List<Transaction> all = engine.getActiveSession().getTransactions();
+        List<Transaction> all = engine.session().transactions();
         return all.size() > before ? all.get(all.size() - 1) : null;
     }
 }

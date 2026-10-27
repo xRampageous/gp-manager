@@ -63,8 +63,8 @@ public class PartialSaleRecentTest
         collect(21_717L);
         offer(EMPTY, 0, 0);
         check("last collect", 1_927L, 329_517L, -5_781L);
-        assertEquals("three settlements, one per collect", 3, engine.getActiveSession().getTransactions().size());
-        assertEquals("only the tax is lost", -5_781L, engine.getMetrics(now).net);
+        assertEquals("three settlements, one per collect", 3, engine.session().transactions().size());
+        assertEquals("only the tax is lost", -5_781L, engine.metrics(now).net);
     }
 
     private void check(String step, long quantity, long received, long result)
@@ -76,7 +76,7 @@ public class PartialSaleRecentTest
             assertEquals(step + ": the Result adds every settlement", result, row.realizedResultGp);
         }
         List<LiveSnapshot.Recent> recent = LiveSnapshot.recentRows(engine.summary().view(engine.summary().scope(
-            Collections.singletonList(engine.getActiveSession())), LiveContext.NONE::flowVisible), rows, null);
+            Collections.singletonList(engine.session())), LiveContext.NONE::flowVisible), rows, null);
         assertEquals(step + ": one row, no separate Traded item cost", 1, recent.size());
         LiveSnapshot.Recent row = recent.get(0);
         assertTrue(step, row.market);

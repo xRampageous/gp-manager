@@ -119,7 +119,7 @@ public class GeSlotReuseSettledHistoryTest
         fixture.maintenance(t + total * 20_000L);
 
         int closed = 0;
-        for (GeOffer record : fixture.engine.geCustody.records())
+        for (GeOffer record : fixture.engine.exchange.records())
         {
             if (record.getStage() == GeOffer.Stage.CLOSED)
             {
@@ -130,6 +130,33 @@ public class GeSlotReuseSettledHistoryTest
         assertNull("the oldest closed record is the one dropped", fixture.rowFor(settlements.get(0)));
         assertNotNull("the newest closed record is kept", fixture.rowFor(settlements.get(total - 1)));
         assertEquals("every sale stays booked", total, fixture.settlementTransactions());
+    }
+
+    /**
+     * P1 (2026-10-23 review): Market rows resolve settlements through a receipt index built once
+     * per refresh. The indexed rows must match the per-receipt search, across Grinds, and the
+     * index must not outlive the refresh.
+     */
+    @Test
+    public void indexedMarketRowsMatchThePerReceiptSearchAcrossGrinds()
+    {
+        Fixture fixture = new Fixture();
+        long t = T0 + 10_000L;
+        String shark = fixture.sellAndCollectAlone(0, SHARK, SHARK_QTY, SHARK_GROSS, SHARK_RECEIVED, t);
+        fixture.engine.startCustom("Second", t + 20_000L);
+        fixture.engine.setBaseline(new ContainerSnapshot(fixture.inventory));
+        String mithril = fixture.sellAndCollectAlone(1, MITHRIL, MITHRIL_QTY, MITHRIL_GROSS, MITHRIL_RECEIVED,
+            t + 30_000L);
+
+        Engine engine = fixture.engine;
+        List<MarketRows.Row> indexed = engine.marketRows();
+        assertNull("the receipt index is released after the refresh", engine.holders);
+        List<MarketRows.Row> searched = MarketRows.rows(engine.exchange.records(), engine::transactionById,
+            engine);
+        com.google.gson.Gson gson = new com.google.gson.Gson();
+        assertEquals(gson.toJson(searched), gson.toJson(indexed));
+        assertEquals(SHARK_RECEIVED, fixture.rowFor(shark).observedSettlementGp);
+        assertEquals(MITHRIL_RECEIVED, fixture.rowFor(mithril).observedSettlementGp);
     }
 
     // ── fixture ────────────────────────────────────────────────────────────────────────────────
@@ -210,10 +237,10 @@ public class GeSlotReuseSettledHistoryTest
 
         void maintenance(long at)
         {
-            for (Transaction booking : engine.geCustody.maintenance(at,
-                engine.getActiveSession().getId()))
+            for (Transaction booking : engine.exchange.maintenance(at,
+                engine.session().id()))
             {
-                engine.getActiveSession().addTransaction(booking, 500, true);
+                engine.session().addTransaction(booking, 500, true);
             }
         }
 
@@ -251,7 +278,7 @@ public class GeSlotReuseSettledHistoryTest
         GeOffer openOrClosedRecord(int slot, int item)
         {
             GeOffer found = null;
-            for (GeOffer record : engine.geCustody.records())
+            for (GeOffer record : engine.exchange.records())
             {
                 if (record.slot == slot && record.itemId == item)
                 {
@@ -263,7 +290,7 @@ public class GeSlotReuseSettledHistoryTest
 
         GeOffer openRecord(int slot)
         {
-            for (GeOffer record : engine.geCustody.records())
+            for (GeOffer record : engine.exchange.records())
             {
                 if (record.slot == slot && record.getStage() != GeOffer.Stage.CLOSED)
                 {
@@ -276,7 +303,7 @@ public class GeSlotReuseSettledHistoryTest
         int openRecords(int slot)
         {
             int open = 0;
-            for (GeOffer record : engine.geCustody.records())
+            for (GeOffer record : engine.exchange.records())
             {
                 if (record.slot == slot && record.getStage() != GeOffer.Stage.CLOSED)
                 {
@@ -289,9 +316,9 @@ public class GeSlotReuseSettledHistoryTest
         int settlementTransactions()
         {
             int count = 0;
-            for (Transaction transaction : engine.getActiveSession().getTransactions())
+            for (Transaction transaction : engine.session().transactions())
             {
-                if (transaction.autoType() == TransactionType.TRADE && transaction.isCounted())
+                if (transaction.original() == TransactionType.TRADE && transaction.counts())
                 {
                     count++;
                 }
@@ -302,9 +329,9 @@ public class GeSlotReuseSettledHistoryTest
         int reviewCount()
         {
             int reviews = 0;
-            for (Transaction transaction : engine.getActiveSession().getTransactions())
+            for (Transaction transaction : engine.session().transactions())
             {
-                if (ReviewRules.needsOwnerDecision(transaction))
+                if (ReviewRules.needsReview(transaction))
                 {
                     reviews++;
                 }
@@ -315,11 +342,11 @@ public class GeSlotReuseSettledHistoryTest
         int unattributedCoinRows()
         {
             int rows = 0;
-            for (Transaction transaction : engine.getActiveSession().getTransactions())
+            for (Transaction transaction : engine.session().transactions())
             {
-                if (transaction.autoType() == TransactionType.UNCERTAIN
-                    && transaction.getFlows().size() == 1
-                    && transaction.getFlows().get(0).itemId == COINS)
+                if (transaction.original() == TransactionType.UNCERTAIN
+                    && transaction.flows().size() == 1
+                    && transaction.flows().get(0).item == COINS)
                 {
                     rows++;
                 }
@@ -329,7 +356,7 @@ public class GeSlotReuseSettledHistoryTest
 
         long net(long at)
         {
-            return engine.getMetrics(at).net;
+            return engine.metrics(at).net;
         }
     }
 }

@@ -28,8 +28,8 @@ public class SessionHistoryEngineTest
         Engine engine = engine();
         engine.restore(new SavedState(interrupted, null, Collections.emptyList()), SafeMath.now());
 
-        assertNotNull(engine.getActiveSession());
-        assertEquals(PauseReason.RECOVERY, engine.getActiveSession().getPauseReason());
+        assertNotNull(engine.session());
+        assertEquals(PauseReason.RECOVERY, engine.session().pauseReason());
     }
 
     @Test
@@ -45,12 +45,12 @@ public class SessionHistoryEngineTest
         Engine engine = engine();
         engine.restore(new SavedState(null, null, Arrays.asList(pvm, skilling, trading)), 3_600_000L);
 
-        engine.historySession(pvm.getId()).rename("Vorkath");
-        assertEquals("Vorkath", engine.historySession(pvm.getId()).getName());
+        engine.historySession(pvm.id()).rename("Vorkath");
+        assertEquals("Vorkath", engine.historySession(pvm.id()).name());
 
-        assertTrue(engine.deleteHistory(skilling.getId()));
-        assertNull(engine.historySession(skilling.getId()));
-        assertEquals(2, engine.getHistory().size());
+        assertTrue(engine.deleteHistory(skilling.id()));
+        assertNull(engine.historySession(skilling.id()));
+        assertEquals(2, engine.history().size());
     }
 
     @Test
@@ -58,16 +58,16 @@ public class SessionHistoryEngineTest
     {
         Session session = session("Review", Context.GENERIC, TransactionType.CONSUMPTION, -300L);
         session.close(60_000L);
-        Transaction transaction = session.getTransactions().get(0);
+        Transaction transaction = session.transactions().get(0);
 
         Engine engine = engine();
         engine.restore(new SavedState(null, null, Collections.singletonList(session)), 60_000L);
-        Metrics before = engine.historyMetrics(session.getId(), 60_000L);
+        Metrics before = engine.historyMetrics(session.id(), 60_000L);
         assertEquals(-300L, before.net);
 
-        assertTrue(engine.historySession(session.getId()).correctTransaction(
-            transaction.getId(), Correction.REVENUE, 70_000L, "Manual correction"));
-        Metrics after = engine.historyMetrics(session.getId(), 70_000L);
+        assertTrue(engine.historySession(session.id()).correctTransaction(
+            transaction.id(), Correction.REVENUE, "Manual correction"));
+        Metrics after = engine.historyMetrics(session.id(), 70_000L);
         assertEquals(300L, after.net);
     }
 
@@ -81,9 +81,9 @@ public class SessionHistoryEngineTest
         Engine engine = engine();
         engine.restore(new SavedState(null, null, Collections.singletonList(session)), 60_000L);
 
-        Session retained = engine.historySession(session.getId());
+        Session retained = engine.historySession(session.id());
         assertTrue(retained.grind);
-        assertFalse(retained.getMode() == SessionMode.AUTO);
+        assertFalse(retained.mode() == SessionMode.AUTO);
     }
 
     @Test
@@ -98,8 +98,8 @@ public class SessionHistoryEngineTest
         Engine engine = engine();
         engine.restore(new SavedState(null, null, Arrays.asList(pvm, skilling, trading)), now);
 
-        assertEquals("Vorkath", engine.getHistory().get(0).getName());
-        assertEquals(3, engine.getHistory().size());
+        assertEquals("Vorkath", engine.history().get(0).name());
+        assertEquals(3, engine.history().size());
 
     }
 

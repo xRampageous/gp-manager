@@ -41,7 +41,7 @@ public class GpManagerPluginResumeBaselineTest
         Harness harness = new Harness();
         harness.engine.ensureSession(1_000L);
         harness.engine.setBaseline(ContainerSnapshot.empty());
-        harness.engine.getActiveSession().pause(2_000L, PauseReason.IDLE);
+        harness.engine.session().pause(2_000L, PauseReason.IDLE);
         assertTrue("the session is idle-paused", harness.engine.isIdlePaused());
 
         Method activity = GpManagerPlugin.class.getDeclaredMethod(
@@ -76,7 +76,7 @@ public class GpManagerPluginResumeBaselineTest
             set(plugin, "client", client);
             set(plugin, "config", config);
             set(plugin, "engine", engine);
-            set(plugin, "snapshotFactory", new ContainerSnapshotFactory(client, null));
+            set(plugin, "containers", new ContainerSnapshotFactory(client, null));
             set(plugin, "activity", new ActivityDetector(config, engine));
         }
 
@@ -89,8 +89,8 @@ public class GpManagerPluginResumeBaselineTest
             Transaction gain = engine.processIfDirty(potato, now + 1_200L, null);
 
             assertNotNull("the first action books, not the baseline", gain);
-            assertEquals(TransactionType.GAIN, gain.getType());
-            assertEquals(50L, engine.getMetrics(now + 1_200L).revenue);
+            assertEquals(TransactionType.GAIN, gain.type());
+            assertEquals(50L, engine.metrics(now + 1_200L).income);
         }
     }
 

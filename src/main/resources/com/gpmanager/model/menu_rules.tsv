@@ -14,3 +14,7 @@ spared	dark lord spares
 spend.chat	bury+dig|bury+^you bury|@gods-pleased|@gods-very|you offer |you scatter |you drink |you eat |dose of potion left
 
 gather.exclude	=rake|=plant
+
+# Executed reward dispositions invalidate an earlier unconfirmed Bank-all window.
+chest-disposition	^take|^destroy|^discard
+chest-action	^take|^destroy|^discard|=bank-all

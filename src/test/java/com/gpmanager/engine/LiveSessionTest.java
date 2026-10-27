@@ -21,24 +21,24 @@ public class LiveSessionTest
     {
         Engine engine = TargetFreshStartTest.engine();
         coins(engine, 5L, 1_000L);
-        engine.newLiveSession(HOUR);
+        engine.newLive(HOUR);
         LiveSnapshot fresh = live(engine, HOUR);
         assertEquals(0L, fresh.net);
-        assertEquals(0L, fresh.gains);
-        assertEquals(0L, fresh.elapsedMillis);
-        assertEquals(0L, fresh.gpPerHour);
+        assertEquals(0L, fresh.income);
+        assertEquals(0L, fresh.elapsed);
+        assertEquals(0L, fresh.rate);
         assertTrue("Recent starts empty", fresh.recent.isEmpty());
         assertTrue("the run total line shows", fresh.fresh);
-        assertEquals("the run keeps its whole total", 1_000L, fresh.runNet);
+        assertEquals("the run keeps its whole total", 1_000L, fresh.run);
 
         coins(engine, HOUR + 5L, 500L);
         LiveSnapshot later = live(engine, 2 * HOUR);
         assertEquals(500L, later.net);
         assertEquals(500L, recentTotal(later));
-        assertEquals(HOUR, later.elapsedMillis);
-        assertEquals(500L, later.gpPerHour);
-        assertEquals(2, engine.getActiveSession().getTransactions().size());
-        assertEquals(1_500L, engine.getMetrics(2 * HOUR).net);
+        assertEquals(HOUR, later.elapsed);
+        assertEquals(500L, later.rate);
+        assertEquals(2, engine.session().transactions().size());
+        assertEquals(1_500L, engine.metrics(2 * HOUR).net);
     }
 
     @Test
@@ -47,7 +47,7 @@ public class LiveSessionTest
         Engine engine = TargetFreshStartTest.engine();
         engine.setTargets(5_000_000L, null, 0L);
         coins(engine, 5L, 1_000L);
-        engine.newLiveSession(HOUR);
+        engine.newLive(HOUR);
         assertEquals(0L, live(engine, HOUR).goal.current);
         coins(engine, HOUR + 5L, 300L);
         assertEquals(300L, live(engine, 2 * HOUR).goal.current);
@@ -59,14 +59,14 @@ public class LiveSessionTest
     {
         Engine engine = TargetFreshStartTest.engine();
         coins(engine, 5L, 1_000L);
-        engine.newLiveSession(HOUR);
+        engine.newLive(HOUR);
         coins(engine, HOUR + 5L, 500L);
         engine.showWholeRun();
         LiveSnapshot whole = live(engine, 2 * HOUR);
         assertFalse(whole.fresh);
         assertEquals(1_500L, whole.net);
         assertEquals(1_500L, recentTotal(whole));
-        assertEquals(2 * HOUR, whole.elapsedMillis);
+        assertEquals(2 * HOUR, whole.elapsed);
 
         engine.setTargets(5_000_000L, null, 2 * HOUR);
         engine.showWholeRun();
@@ -90,7 +90,7 @@ public class LiveSessionTest
         Engine engine = PresentationLifecycleTest.engine();
         engine.ensureSession(System.currentTimeMillis() - HOUR);
         SidebarPanel panel = MilestoneTest.onEdt(() -> new SidebarPanel(engine, PresentationLifecycleTest.config(), null, null, null));
-        Shell shell = panel.shell();
+        Shell shell = panel.shell;
         GrindsController grinds = new GrindsController(panel);
         assertEquals("Session controls", MilestoneTest.onEdt(() ->
         {
@@ -99,6 +99,6 @@ public class LiveSessionTest
             ShellProbe.pressSheet(shell, "New session");
             return title;
         }));
-        assertTrue(engine.getActiveSession().sessionStartAt != null);
+        assertTrue(engine.session().sessionStartAt != null);
     }
 }

@@ -51,9 +51,9 @@ public class BagPickupTest
         Engine engine = started(0L);
         engine.bagged(BONES, 3L);
         Transaction pickup = settle(engine, ContainerSnapshot.empty(), 1_600L);
-        assertEquals(TransactionType.GAIN, pickup.getType());
-        assertTrue(pickup.isCounted());
-        assertEquals(105L, engine.getMetrics(5_000L).net);
+        assertEquals(TransactionType.GAIN, pickup.type());
+        assertTrue(pickup.counts());
+        assertEquals(105L, engine.metrics(5_000L).net);
     }
 
 
@@ -65,14 +65,14 @@ public class BagPickupTest
         engine.markLoot(Collections.singletonMap(BONES, 3L), 50, "Loot from Guard", "Guard");
         for (int tick = 0; tick < 60; tick++)
         {
-            engine.inbox.tick(engine.inbox.now + 1);
+            engine.events.tick(engine.events.now + 1);
         }
-        assertTrue("past the 30 s attribution window", (engine.inbox.has(Inbox.PRIVATE_LOOT, BONES)));
+        assertTrue("past the 30 s attribution window", (engine.events.has(Inbox.PRIVATE_LOOT, BONES)));
         for (int tick = 60; tick < 100; tick++)
         {
-            engine.inbox.tick(engine.inbox.now + 1);
+            engine.events.tick(engine.events.now + 1);
         }
-        assertFalse("forgotten once the minute is over", (engine.inbox.has(Inbox.PRIVATE_LOOT, BONES)));
+        assertFalse("forgotten once the minute is over", (engine.events.has(Inbox.PRIVATE_LOOT, BONES)));
     }
 
     @Test

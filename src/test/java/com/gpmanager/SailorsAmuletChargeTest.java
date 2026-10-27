@@ -84,7 +84,7 @@ public class SailorsAmuletChargeTest
         // Ten charges spent; the stock is the count times one use's recipe.
         assertEquals(-10L, quantityDelta(delta, LAW));
         assertEquals(-100L, quantityDelta(delta, WATER));
-        assertEquals(10, ChargeCheck.unitsPerItem(ChargeCheck.ChargedItem.SAILORS_AMULET, LAW));
+        assertEquals(10, ChargeCheck.ChargedItem.SAILORS_AMULET.units);
     }
 
     @Test
@@ -96,13 +96,13 @@ public class SailorsAmuletChargeTest
             ChargeLoadAnyItemTest.click(MenuAction.CC_OP_LOW_PRIORITY, "the pandemonium",
                 ChargeLoadAnyItemTest.widget(AMULET, InterfaceID.Wornitems.UNIVERSE, -1)),
             "the pandemonium", "");
-        List<Transaction> rows = h.engine.getActiveSession().getTransactions();
+        List<Transaction> rows = h.engine.session().transactions();
         assertEquals(rows.toString(), 1, rows.size());
         assertEquals(1L, rows.get(0).quantity(LAW, false));
         assertEquals(10L, rows.get(0).quantity(WATER, false));
-        assertEquals(ActionKind.SUPPLIES, rows.get(0).getActionKind());
+        assertEquals(ActionKind.SUPPLIES, rows.get(0).action());
         assertEquals("one charge: a tenth of a law plus a water", 14L,
-            h.engine.getMetrics(T0 + 1_000L).costs);
+            h.engine.metrics(T0 + 1_000L).cost);
     }
 
     @Test
@@ -113,7 +113,7 @@ public class SailorsAmuletChargeTest
             ChargeLoadAnyItemTest.click(MenuAction.CC_OP, "deepfin point",
                 ChargeLoadAnyItemTest.widget(AMULET, InterfaceID.Wornitems.UNIVERSE, -1)),
             "deepfin point", "");
-        List<Transaction> rows = h.engine.getActiveSession().getTransactions();
+        List<Transaction> rows = h.engine.session().transactions();
         assertEquals(rows.toString(), 1, rows.size());
         assertEquals(1L, rows.get(0).quantity(LAW, false));
     }
@@ -126,7 +126,7 @@ public class SailorsAmuletChargeTest
             ChargeLoadAnyItemTest.click(MenuAction.CC_OP, "port roberts",
                 ChargeLoadAnyItemTest.widget(AMULET, InterfaceID.Wornitems.UNIVERSE, -1)),
             "port roberts", "");
-        assertEquals(0, h.engine.getActiveSession().getTransactions().size());
+        assertEquals(0, h.engine.session().transactions().size());
     }
 
     @Test
@@ -140,7 +140,7 @@ public class SailorsAmuletChargeTest
             ChargeLoadAnyItemTest.click(MenuAction.CC_OP, "deepfin point",
                 ChargeLoadAnyItemTest.widget(0, InterfaceID.Wornitems.UNIVERSE, -1)),
             "deepfin point", "");
-        assertEquals(0, h.engine.getActiveSession().getTransactions().size());
+        assertEquals(0, h.engine.session().transactions().size());
     }
 
     @Test
@@ -153,7 +153,7 @@ public class SailorsAmuletChargeTest
             ChargeLoadAnyItemTest.click(MenuAction.CC_OP_LOW_PRIORITY, "red rock",
                 ChargeLoadAnyItemTest.widget(-1, InterfaceID.Wornitems.UNIVERSE, -1)),
             "red rock", "sailors' amulet");
-        List<Transaction> rows = h.engine.getActiveSession().getTransactions();
+        List<Transaction> rows = h.engine.session().transactions();
         assertEquals(rows.toString(), 1, rows.size());
         assertEquals(1L, rows.get(0).quantity(LAW, false));
     }
@@ -174,7 +174,7 @@ public class SailorsAmuletChargeTest
                 option, "");
         }
         assertEquals("ten charges cost exactly one law and ten waters", 140L,
-            h.engine.getMetrics(T0 + 1_000L).costs);
+            h.engine.metrics(T0 + 1_000L).cost);
     }
 
     @Test
@@ -197,7 +197,7 @@ public class SailorsAmuletChargeTest
             identity, ChargeIntake.LOAD_TICKS));
         engine.markDirty();
         Transaction lawLoad = settle(engine, new ContainerSnapshot(mapOf(LAW, 498L, WATER, 500L)), start + 600L);
-        assertEquals(TransactionType.TRANSFER, lawLoad.getType());
+        assertEquals(TransactionType.TRANSFER, lawLoad.type());
         ChargeDelta loadedLaw = observe(engine, "The amulet has 120 charges.", start + 3_000L);
         assertNotNull(loadedLaw);
         ChargeOutcomeTest.outcome(ChargeDelta.CheckResult.LOAD, loadedLaw);
@@ -207,7 +207,7 @@ public class SailorsAmuletChargeTest
             identity, ChargeIntake.LOAD_TICKS));
         engine.markDirty();
         Transaction waterLoad = settle(engine, new ContainerSnapshot(mapOf(LAW, 498L, WATER, 480L)), start + 6_600L);
-        assertEquals(TransactionType.TRANSFER, waterLoad.getType());
+        assertEquals(TransactionType.TRANSFER, waterLoad.type());
         ChargeDelta loadedWater = observe(engine, "The amulet has 140 charges.", start + 9_000L);
         assertNotNull(loadedWater);
         ChargeOutcomeTest.outcome(ChargeDelta.CheckResult.LOAD, loadedWater);
@@ -224,7 +224,7 @@ public class SailorsAmuletChargeTest
             ChargeLoadAnyItemTest.click(MenuAction.CC_OP, "the pandemonium.",
                 ChargeLoadAnyItemTest.widget(-1, InterfaceID.Chatmenu.OPTIONS, -1)),
             "the pandemonium.", "");
-        List<Transaction> rows = h.engine.getActiveSession().getTransactions();
+        List<Transaction> rows = h.engine.session().transactions();
         assertEquals(rows.toString(), 1, rows.size());
         assertEquals(1L, rows.get(0).quantity(LAW, false));
         assertEquals(10L, rows.get(0).quantity(WATER, false));
@@ -235,7 +235,7 @@ public class SailorsAmuletChargeTest
                 ChargeLoadAnyItemTest.widget(-1, InterfaceID.Chatmenu.OPTIONS, -1)),
             "deepfin point.", "");
         assertEquals("no amulet, nothing to spend", 0,
-            none.engine.getActiveSession().getTransactions().size());
+            none.engine.session().transactions().size());
     }
 
     @Test
@@ -273,14 +273,14 @@ public class SailorsAmuletChargeTest
         intake.armLoad(
             ChargeLoadAnyItemTest.click(MenuAction.WIDGET_TARGET_ON_WIDGET, "use", item(AMULET, 3)),
             "use");
-        assertEquals(ChargeCheck.ChargedItem.SAILORS_AMULET, engine.inbox.peek(Inbox.LOAD_TARGET).variant);
-        assertEquals(LAW, engine.inbox.item(Inbox.LOAD_TARGET));
+        assertEquals(ChargeCheck.ChargedItem.SAILORS_AMULET, engine.events.peek(Inbox.LOAD_TARGET).variant);
+        assertEquals(LAW, engine.events.item(Inbox.LOAD_TARGET));
 
         engine.markDirty();
         Transaction load = settle(engine, snapshot(LAW, 400L), start + 600L);
-        assertEquals("a load is a neutral transfer", TransactionType.TRANSFER, load.getType());
-        assertFalse(load.isCounted());
-        assertEquals(0L, engine.getMetrics(start + 2_400L).net);
+        assertEquals("a load is a neutral transfer", TransactionType.TRANSFER, load.type());
+        assertFalse(load.counts());
+        assertEquals(0L, engine.metrics(start + 2_400L).net);
     }
 
     private static ChargeDelta observe(Engine engine, String chat, long now)

@@ -112,7 +112,7 @@ public class PendingKeyValueTest
         int valued = 0;
         for (LedgerData.PendingItem item : items)
         {
-            if (item.itemId != KEY) continue;
+            if (item.item != KEY) continue;
             rows++;
             if (item.value > 0L) valued++;
         }
@@ -139,8 +139,8 @@ public class PendingKeyValueTest
         Engine engine = engine();
         engine.markPkLoot(Collections.singletonMap(KEY, 2L), 50, T0);
         assertNotNull("the key pickup books its audit row", settle(engine, KEY, 2L, T0 + 600L));
-        assertFalse("and opens a pending claim", engine.getPendingClaims().isEmpty());
-        assertEquals(2L, engine.getPendingClaims().get(0).getQuantity());
+        assertFalse("and opens a pending claim", engine.pendingClaims().isEmpty());
+        assertEquals(2L, engine.pendingClaims().get(0).quantity());
 
         engine.setChestVisible(true);
         engine.observeKeyContainer(KEY, mapOf(FANG, 1L, RING, 1L));

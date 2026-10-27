@@ -44,18 +44,18 @@ public class LiveMarketExclusionTest
         market.sell(0, CHAOS, 30L, 104, 3_120L, 3_060L);
 
         LiveSnapshot snapshot = snapshot(market);
-        Metrics metrics = market.engine.getMetrics(market.now + 1_000L);
+        Metrics metrics = market.engine.metrics(market.now + 1_000L);
 
         assertEquals("the canonical session still books the coverage gain and the sale cash",
-            10_000L + 3_150L + 3_060L, metrics.revenue);
+            10_000L + 3_150L + 3_060L, metrics.income);
         assertEquals("the canonical session still books the consumed known basis",
-            2_000L + 3_150L, metrics.costs);
+            2_000L + 3_150L, metrics.cost);
         assertEquals("ordinary Gains exclude the whole Market transaction",
-            10_000L + 3_150L, snapshot.gains);
+            10_000L + 3_150L, snapshot.income);
         assertEquals("ordinary Losses exclude the whole Market transaction", 2_000L, snapshot.loss);
         assertEquals(0L, snapshot.supplies);
-        assertEquals("combined ordinary Costs exclude the Market gross cost", 2_000L, snapshot.costs);
-        assertEquals("the correction-aware Market net is shown once", -90L, snapshot.marketResult);
+        assertEquals("combined ordinary Costs exclude the Market gross cost", 2_000L, snapshot.cost);
+        assertEquals("the correction-aware Market net is shown once", -90L, snapshot.market);
         assertEquals("Net stays canonical", 13_150L - 2_000L - 90L, snapshot.net);
         assertEquals(metrics.net, snapshot.net);
     }
@@ -67,15 +67,15 @@ public class LiveMarketExclusionTest
         market.buy(0, CHAOS, 30L, 102, 3_060L);
 
         LiveSnapshot snapshot = snapshot(market);
-        Metrics metrics = market.engine.getMetrics(market.now + 1_000L);
+        Metrics metrics = market.engine.metrics(market.now + 1_000L);
 
         assertEquals("the canonical session books the exact spend as the asset value",
-            3_060L, metrics.revenue);
-        assertEquals("the canonical session books the cash spend as costs", 3_060L, metrics.costs);
-        assertEquals("acquired value never appears as an ordinary Gain", 0L, snapshot.gains);
+            3_060L, metrics.income);
+        assertEquals("the canonical session books the cash spend as costs", 3_060L, metrics.cost);
+        assertEquals("acquired value never appears as an ordinary Gain", 0L, snapshot.income);
         assertEquals("purchase cash never appears as an ordinary Loss", 0L, snapshot.loss);
-        assertEquals(0L, snapshot.costs);
-        assertEquals("a NEW BUY is Net-neutral", 0L, snapshot.marketResult);
+        assertEquals(0L, snapshot.cost);
+        assertEquals("a NEW BUY is Net-neutral", 0L, snapshot.market);
         assertEquals(0L, snapshot.net);
     }
 
@@ -87,10 +87,10 @@ public class LiveMarketExclusionTest
 
         LiveSnapshot snapshot = snapshot(market);
 
-        assertEquals("gross settlement is never an ordinary Gain", 0L, snapshot.gains);
+        assertEquals("gross settlement is never an ordinary Gain", 0L, snapshot.income);
         assertEquals("the frozen listed value is never an ordinary Loss", 0L, snapshot.loss);
         assertEquals("pre-existing stock has UNKNOWN basis: only the proven GE tax is counted",
-            -60L, snapshot.marketResult);
+            -60L, snapshot.market);
         assertEquals("only the proven GE tax reduces Net", -60L, snapshot.net);
         assertEquals("no zero acquisition basis was inferred",
             MarketFacts.basisValueGp(MarketFacts.record(market.engine, market.engine.marketRows().get(0))), 3_150L);
@@ -109,7 +109,7 @@ public class LiveMarketExclusionTest
         assertEquals("loot gain plus the known-basis Market result is the booked contribution",
             3_000L + 60L, snapshot.net);
         assertEquals("the +150 holding appreciation is never booked",
-            0L, snapshot.gains - 3_000L);
+            0L, snapshot.income - 3_000L);
         var row = market.engine.marketRows().get(0);
         assertEquals("counted basis + result = settlement",
             row.observedSettlementGp,
@@ -131,15 +131,15 @@ public class LiveMarketExclusionTest
         market.adjustment(25L, market.now - 1_000L);
 
         Accounting.MarketFold fold = Accounting.marketFold(
-            market.engine.getActiveSession().getTransactions());
+            market.engine.session().transactions());
         assertEquals("all three Market-context transactions are folded", 3, fold.transactions);
-        assertEquals(5L, fold.getNet());
+        assertEquals(5L, fold.net());
 
         LiveSnapshot snapshot = snapshot(market);
-        assertEquals("ordinary Gains contain no gross Market legs", 7_100L, snapshot.gains);
+        assertEquals("ordinary Gains contain no gross Market legs", 7_100L, snapshot.income);
         assertEquals("ordinary Losses contain no gross Market legs", 1_000L, snapshot.loss);
         assertEquals("Market is the exact transaction-level sum, including the adjustment",
-            5L, snapshot.marketResult);
+            5L, snapshot.market);
         assertEquals(7_100L - 1_000L + 5L, snapshot.net);
     }
 
@@ -150,23 +150,22 @@ public class LiveMarketExclusionTest
         market.gain(3_150L, CHAOS, 30L, 105, market.now - 55_000L);
         market.sell(0, CHAOS, 30L, 104, 3_120L, 3_060L);
         String settlementId = market.engine.marketRows().get(0).settlementId;
-        assertTrue(market.engine.correctTransaction(settlementId, Correction.COST,
-            market.now, "test"));
+        assertTrue(market.engine.correctTransaction(settlementId, Correction.COST, "test"));
 
         Accounting.MarketFold corrected = Accounting.marketFold(
-            market.engine.getActiveSession().getTransactions());
+            market.engine.session().transactions());
         assertEquals("a correction never moves the transaction out of Market",
             1, corrected.transactions);
         LiveSnapshot after = snapshot(market);
         assertEquals("effective corrected costs drive the Market result",
-            -(3_150L + 3_060L), after.marketResult);
-        assertEquals("ordinary Gains keep only the loot gain", 3_150L, after.gains);
+            -(3_150L + 3_060L), after.market);
+        assertEquals("ordinary Gains keep only the loot gain", 3_150L, after.income);
         assertEquals("no gross leg leaks back into ordinary Losses", 0L, after.loss);
 
-        assertTrue(market.engine.undoCorrection(market.now));
+        assertTrue(market.engine.undoCorrection());
         LiveSnapshot restored = snapshot(market);
-        assertEquals("Undo restores the derived presentation", -90L, restored.marketResult);
-        assertEquals("the ordinary loot gain is untouched by the undo", 3_150L, restored.gains);
+        assertEquals("Undo restores the derived presentation", -90L, restored.market);
+        assertEquals("the ordinary loot gain is untouched by the undo", 3_150L, restored.income);
     }
 
     @Test
@@ -179,9 +178,9 @@ public class LiveMarketExclusionTest
 
         LiveSnapshot snapshot = snapshot(market);
         Accounting.MarketFold fold = Accounting.marketFold(
-            market.engine.getActiveSession().getTransactions());
-        assertEquals("one winner and one loser fold transaction-level", -20L, fold.getNet());
-        assertEquals("the Market line is the transaction-level sum", -20L, snapshot.marketResult);
+            market.engine.session().transactions());
+        assertEquals("one winner and one loser fold transaction-level", -20L, fold.net());
+        assertEquals("the Market line is the transaction-level sum", -20L, snapshot.market);
         assertEquals(2, market.engine.marketRows().size());
     }
 
@@ -201,19 +200,19 @@ public class LiveMarketExclusionTest
         LiveSnapshot threshold = LiveSnapshot.capture(market.engine, market.now + 1_000L,
             new LiveContext(false, null, 1_000L, PvpState.NONE, "", false, "", false));
         LiveSnapshot itemFiltered = LiveSnapshot.capture(market.engine, market.now + 1_000L,
-            new LiveContext(false, flow -> flow.itemId != CHEAP, 0L, PvpState.NONE, "", false, "", false));
+            new LiveContext(false, flow -> flow.item != CHEAP, 0L, PvpState.NONE, "", false, "", false));
 
-        assertEquals("cheap hidden loot still counts in canonical Gains", 13_200L, threshold.gains);
-        assertEquals(plain.gains, threshold.gains);
-        assertEquals(plain.gains, itemFiltered.gains);
-        assertEquals("the SELL coin leg still drives the Market math", -90L, threshold.marketResult);
-        assertEquals("the unfiltered capture agrees", -90L, plain.marketResult);
-        assertEquals(plain.marketResult, itemFiltered.marketResult);
+        assertEquals("cheap hidden loot still counts in canonical Gains", 13_200L, threshold.income);
+        assertEquals(plain.income, threshold.income);
+        assertEquals(plain.income, itemFiltered.income);
+        assertEquals("the SELL coin leg still drives the Market math", -90L, threshold.market);
+        assertEquals("the unfiltered capture agrees", -90L, plain.market);
+        assertEquals(plain.market, itemFiltered.market);
         assertEquals(plain.net, threshold.net);
         assertEquals(plain.net, itemFiltered.net);
-        assertEquals("pending Market is counted canonically", 1, plain.marketPending);
-        assertEquals("display filters never change the pending count", 1, threshold.marketPending);
-        assertEquals(1, itemFiltered.marketPending);
+        assertEquals("pending Market is counted canonically", 1, plain.pendingMarket);
+        assertEquals("display filters never change the pending count", 1, threshold.pendingMarket);
+        assertEquals(1, itemFiltered.pendingMarket);
 
         assertTrue("the cheap row is visible without a filter",
             hasRecentItem(plain, CHEAP));
@@ -236,7 +235,7 @@ public class LiveMarketExclusionTest
             Collections.singletonList(trade));
         Metrics metrics = new Metrics("", false, 0L, 10_000L + 3_060L, 2_000L + 3_150L, 7_910L, 0L, 0L, 0L, false);
 
-        assertFalse(metrics.costSplitAvailable);
+        assertFalse(metrics.split);
         assertEquals(-1L, LiveSnapshot.visibleSupplies(metrics, fold));
         assertEquals(-1L, LiveSnapshot.visibleLosses(metrics, fold));
         assertEquals("combined ordinary Costs exclude the Market gross cost",
@@ -267,15 +266,15 @@ public class LiveMarketExclusionTest
                 LedgerData.CostView.LOSS, "", null, null, null, null));
 
         assertEquals("Live Gains match the Ledger Gains total",
-            snapshot.gains, suppliesView.gains.total);
+            snapshot.income, suppliesView.income.total);
         assertEquals("Live Supplies match the Ledger Supplies total",
-            -snapshot.supplies, suppliesView.costs.total);
+            -snapshot.supplies, suppliesView.cost.total);
         assertEquals("Live Losses match the Ledger Loss total",
-            -snapshot.loss, lossView.costs.total);
+            -snapshot.loss, lossView.cost.total);
         assertEquals("Costs defaults to All: Supply and Loss together",
-            -snapshot.supplies - snapshot.loss, allView.costs.total);
+            -snapshot.supplies - snapshot.loss, allView.cost.total);
         assertEquals("Live Market matches the Ledger Market net",
-            snapshot.marketResult, suppliesView.market.total);
+            snapshot.market, suppliesView.market.total);
         assertEquals("Live Net matches the canonical scope Net", snapshot.net, suppliesView.net);
     }
 
@@ -285,15 +284,15 @@ public class LiveMarketExclusionTest
         Market market = new Market();
         market.gain(10_000L, CHEAP, 100L, 100, market.now - 60_000L);
         market.sell(0, CHAOS, 30L, 104, 3_120L, 3_060L);
-        Transaction settlement = market.engine.getActiveSession().getTransactions().get(1);
-        long revisionBefore = market.engine.getRevision();
-        long netBefore = settlement.getNet();
+        Transaction settlement = market.engine.session().transactions().get(1);
+        long revisionBefore = market.engine.revision();
+        long netBefore = settlement.net();
 
         LiveSnapshot snapshot = snapshot(market);
         new LivePage(new LiveNoop(), id -> null).apply(snapshot);
 
-        assertEquals(revisionBefore, market.engine.getRevision());
-        assertEquals(netBefore, settlement.getNet());
+        assertEquals(revisionBefore, market.engine.revision());
+        assertEquals(netBefore, settlement.net());
         assertEquals(110, SavedState.CURRENT_SCHEMA_VERSION);
     }
 
@@ -308,7 +307,7 @@ public class LiveMarketExclusionTest
     {
         for (LiveSnapshot.Recent row : snapshot.recent)
         {
-            if (row.itemId == itemId)
+            if (row.item == itemId)
             {
                 return true;
             }
@@ -369,7 +368,7 @@ public class LiveMarketExclusionTest
 
         void gain(long value, int itemId, long quantity, int unit, long at)
         {
-            engine.getActiveSession().addTransaction(new Transaction(at,
+            engine.session().addTransaction(new Transaction(at,
                 TransactionType.GAIN, Context.GENERIC, "", "Loot", true,
                 Collections.singletonList(new Flow(itemId, "Item " + itemId, quantity, unit, value,
                     PriceSource.GRAND_EXCHANGE)),
@@ -379,7 +378,7 @@ public class LiveMarketExclusionTest
         /** An unrelated ordinary loss (a distinct item, so no tracked coverage is depleted). */
         void loss(long value, long at)
         {
-            engine.getActiveSession().addTransaction(new Transaction(at,
+            engine.session().addTransaction(new Transaction(at,
                 TransactionType.CONSUMPTION, Context.GENERIC, "", "Loss", true,
                 Collections.singletonList(new Flow(385, "Shark", -value / 100L, 100, -value,
                     PriceSource.GRAND_EXCHANGE)),
@@ -388,7 +387,7 @@ public class LiveMarketExclusionTest
 
         void adjustment(long coins, long at)
         {
-            engine.getActiveSession().addTransaction(new Transaction(at,
+            engine.session().addTransaction(new Transaction(at,
                 TransactionType.TRADE, Context.MARKET, "Grand Exchange settlement adjustment",
                 "Market", true,
                 Collections.singletonList(new Flow(COINS, "Coins", coins, 1, coins,

@@ -66,9 +66,9 @@ public class GroundBasisTest
         assertEquals(10L, EngineProbe.knownCoverageQty(engine, BOLTS));
         engine.noteDrop(BOLTS, 6);
         settle(engine, pack(BOLTS, 7L));
-        Transaction drop = engine.getActiveSession().getTransactions().get(1);
-        assertEquals("Dropped", drop.getNote());
-        assertTrue(drop.isOnGround());
+        Transaction drop = engine.session().transactions().get(1);
+        assertEquals("Dropped", drop.note());
+        assertTrue(drop.onGround());
         return engine;
     }
 
@@ -79,7 +79,7 @@ public class GroundBasisTest
         assertEquals("still on the ground", 10L, EngineProbe.knownCoverageQty(engine, BOLTS));
         wait(engine, pack(BOLTS, 7L), WINDOW_TICKS);
         assertEquals("never picked up: used up", 7L, EngineProbe.knownCoverageQty(engine, BOLTS));
-        assertFalse(engine.getActiveSession().getTransactions().get(1).isOnGround());
+        assertFalse(engine.session().transactions().get(1).onGround());
     }
 
     @Test
@@ -117,8 +117,8 @@ public class GroundBasisTest
     public void aDropCompactedWhileOnTheGroundStillLeavesTheRecord()
     {
         Engine engine = droppedThree();
-        engine.getActiveSession().compactBefore(now + 1L, null);
-        assertTrue(engine.getActiveSession().getTransactions().isEmpty());
+        engine.session().compactBefore(now + 1L, null);
+        assertTrue(engine.session().transactions().isEmpty());
         assertEquals(7L, EngineProbe.knownCoverageQty(engine, BOLTS));
         wait(engine, pack(BOLTS, 7L), WINDOW_TICKS);
         assertEquals("settled once", 7L, EngineProbe.knownCoverageQty(engine, BOLTS));
@@ -128,7 +128,7 @@ public class GroundBasisTest
     public void anUndoneDropNeverLeavesTheRecord()
     {
         Engine engine = droppedThree();
-        assertNotNull(engine.getActiveSession().undoTransaction());
+        assertNotNull(engine.session().undoTransaction());
         wait(engine, pack(BOLTS, 7L), WINDOW_TICKS);
         assertEquals(10L, EngineProbe.knownCoverageQty(engine, BOLTS));
     }
@@ -147,7 +147,7 @@ public class GroundBasisTest
             Collections.singletonList(new Flow(DART, "Iron dart", -4L, 10, -40L, PriceSource.GRAND_EXCHANGE)),
             now, null);
         assertNotNull(spent);
-        assertFalse("a measured spend is not on the ground", spent.isOnGround());
+        assertFalse("a measured spend is not on the ground", spent.onGround());
         assertEquals(6L, EngineProbe.knownCoverageQty(engine, DART));
     }
 
@@ -155,7 +155,7 @@ public class GroundBasisTest
     public void onlyRowsOnTheGroundCarryTheFlagInASave()
     {
         Engine engine = droppedThree();
-        String json = JsonCodec.gson().toJson(engine.getActiveSession());
+        String json = JsonCodec.gson().toJson(engine.session());
         assertEquals("one row on the ground", 1, json.split("\"onGround\"", -1).length - 1);
     }
 }

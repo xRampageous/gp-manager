@@ -1,6 +1,9 @@
 package com.gpmanager;
+import static java.nio.file.StandardCopyOption.*;
+import static java.nio.file.StandardOpenOption.*;
+import static com.gpmanager.SaveStatus.State.*;
 
-
+import static com.gpmanager.SafeMath.*;
 
 import static com.gpmanager.GameData.msg;
 import static java.lang.Math.*;
@@ -17,7 +20,6 @@ import net.runelite.client.config.ConfigManager;
 import net.runelite.client.util.Filepath;
 import org.slf4j.*;
 import static com.gpmanager.Phrases.*;
-import static com.gpmanager.SafeMath.nonNeg;
 import static java.util.Collections.*;
 import java.util.*;
 import com.google.gson.*;
@@ -25,7 +27,6 @@ import com.gpmanager.SaveStatus.State;
 import java.io.*;
 import java.nio.channels.*;
 import java.nio.file.*;
-import static com.gpmanager.SafeMath.now;
 
 /** Coordinates account binding, detached snapshots, and ordered persistence. */
 @Singleton
@@ -33,18 +34,18 @@ import static com.gpmanager.SafeMath.now;
 class Persistence {
     static final Logger log = LoggerFactory.getLogger(Persistence.class);
     final Client client;
-    final ConfigManager configManager;
-    @Getter final SessionRepository repository;
-    @Getter final OrderedPersistenceWriter writer;
+    final ConfigManager config;
+    final SessionRepository repository;
+    final OrderedPersistenceWriter writer;
     final Engine engine;
-    long nextRevision = 1;
+    long next = 1;
     @Getter TrackingIdentity activeIdentity;
 
     /**
      * Set when the bound scope holds data this plugin must not rewrite (newer schema or refused
      * migration).
      */
-    String readOnlyReason;
+    String reason;
 
     /**
      * A restore or reset is replacing the bound account; ingestion is paused until it re-primes.
@@ -58,35 +59,33 @@ class Persistence {
     volatile boolean busy, okay;
 
     /** Lifecycle identity work is serialized off the RuneLite lifecycle/client callbacks. */
-    final Object lifecycleExecutorLock = new Object();
+    final Object lock = new Object();
 
-    ExecutorService lifecycleExecutor;
-    volatile boolean lifecycleShutdown, lifecyclePending, lifecycleInitializationFailed, shutdownSnapshotPending;
-    volatile boolean shutdownPersistHistory;
+    ExecutorService worker;
+    volatile boolean closing, loading, failed, needsSnapshot, switchBlocked;
 
     /**
      * Serializes backup file IO without holding the coordinator monitor the client thread reads.
      */
-    final Object backupLock = new Object();
+    final Object backup = new Object();
 
-    final AtomicLong lifecycleRequest = new AtomicLong(), lifecycleEpoch = new AtomicLong();
-    final AtomicBoolean identityReadyTransition = new AtomicBoolean(), shutdownFinalized = new AtomicBoolean();
+    final AtomicLong request = new AtomicLong(), epoch = new AtomicLong();
+    final AtomicBoolean readySignal = new AtomicBoolean(), closed = new AtomicBoolean();
 
     void start() {
-        synchronized (lifecycleExecutorLock) {
-            if (lifecycleShutdown) return;
+        synchronized (lock) {
+            if (closing) return;
             writer.start();
-            lifecycleEpoch.incrementAndGet();
-            lifecycleShutdown = false;
-            lifecyclePending = false;
-            lifecycleInitializationFailed = false;
-            shutdownSnapshotPending = false;
-            shutdownPersistHistory = false;
-            identityReadyTransition.set(false);
-            shutdownFinalized.set(false);
-            if (lifecycleExecutor == null || lifecycleExecutor.isShutdown()) {
-                lifecycleExecutor = OrderedPersistenceWriter.daemonExecutor(msg("gp-manager-lifecycle"));
-            }
+            epoch.incrementAndGet();
+            closing = false;
+            loading = false;
+            failed = false;
+            switchBlocked = false;
+            needsSnapshot = false;
+            readySignal.set(false);
+            closed.set(false);
+            if (worker == null || worker.isShutdown())
+                worker = OrderedPersistenceWriter.daemonExecutor(msg("gp-manager-lifecycle"));
         }
     }
 
@@ -96,40 +95,40 @@ class Persistence {
      * operation on the same executor.
      */
     void initAsync(Runnable initialization) {
-        synchronized (lifecycleExecutorLock) {
+        synchronized (lock) {
             // A plugin re-enable may arrive after the prior lifecycle fenced
             // this coordinator. Reopen only the lifecycle executor; writer
             // start remains ordered inside the initialization task.
-            if (lifecycleShutdown) {
-                lifecycleShutdown = false;
-                lifecycleEpoch.incrementAndGet();
+            if (closing) {
+                closing = false;
+                epoch.incrementAndGet();
             }
         }
-        long epoch = lifecycleEpoch.get();
-        var executor = lifecycleExecutor();
+        long epoch = this.epoch.get();
+        var executor = executor();
         if (executor == null) {
-            lifecycleInitializationFailed = true;
+            failed = true;
             return;
         }
         try {
             executor.execute(() -> {
                         try {
-                            if (!lifecycleShutdown && epoch == lifecycleEpoch.get())
+                            if (!closing && epoch == this.epoch.get())
                                 initialization.run();
                         } catch (RuntimeException ex) {
-                            if (epoch == lifecycleEpoch.get()) lifecycleInitializationFailed = true;
-                            log.warn(msg("unable-initialize-gp-manager"), ex);
+                            if (epoch == this.epoch.get()) failed = true;
+                            log.warn(msg("startup-error"), ex);
                         }
                     });
         } catch (RuntimeException ex) {
-            lifecycleInitializationFailed = true;
-            log.warn(msg("unable-schedule-gp"), ex);
+            failed = true;
+            log.warn(msg("schedule-failed"), ex);
         }
     }
 
     TrackingIdentity resolveCurrentIdentity() {
-        if (configManager == null) return null;
-        String profileKey = configManager.getRSProfileKey();
+        if (config == null) return null;
+        String profile = config.getRSProfileKey();
         long accountHash = TrackingIdentity.ACCOUNT_HASH_INVALID;
         if (client != null) {
             try {
@@ -138,9 +137,8 @@ class Persistence {
                 // Client may not expose hash before login.
             }
         }
-        if (!blank(profileKey)) {
-            return new TrackingIdentity(profileKey.trim(), accountHash);
-        }
+        if (!blank(profile))
+            return new TrackingIdentity(profile.trim(), accountHash);
         return null;
     }
 
@@ -149,41 +147,37 @@ class Persistence {
      * bind/load/flush on the lifecycle executor. The next game tick consumes the ready transition
      * after the worker has installed the scope.
      */
-    void syncIdentityAsync(BooleanSupplier persist) {
-        switchIdentityAsync(resolveCurrentIdentity(), persist, false);
+    void syncIdentityAsync() {
+        switchIdentityAsync(resolveCurrentIdentity(), false);
     }
 
     /** Seam for deterministic lifecycle tests and explicit profile events. */
-    void switchIdentityAsync(TrackingIdentity next, boolean persist) {
-        switchIdentityAsync(next, () -> persist, true);
+    void switchIdentityAsync(TrackingIdentity next) {
+        switchIdentityAsync(next, true);
     }
 
-    void switchIdentityAsync(TrackingIdentity next, BooleanSupplier persistHistory, boolean captureOnCaller) {
-        runLifecycle(persistHistory, captureOnCaller, "identity switch",
-                persist -> switchIdentity(next, persist, false));
+    void switchIdentityAsync(TrackingIdentity next, boolean captureOnCaller) {
+        runLifecycle(captureOnCaller, "identity switch", () -> switchIdentity(next, false));
     }
 
     /**
      * One lifecycle job on the executor: capture the old owner's latest state (on the caller when
      * asked, else on the worker), run the job unless shut down, then publish whether it is ready.
      */
-    void runLifecycle(BooleanSupplier persistHistory, boolean captureOnCaller, String what,
-            Predicate<Boolean> job) {
-        long request = lifecycleRequest.incrementAndGet();
+    void runLifecycle(boolean captureOnCaller, String what, BooleanSupplier job) {
+        long request = this.request.incrementAndGet();
         fence(nextHash(), request);
         synchronized (this) {
-            if (lifecycleShutdown) return;
+            if (closing) return;
             // Capture the old owner's latest state before the worker can enter
             // its disk wait. A pending earlier lifecycle operation has already
             // made the same capture at its boundary.
-            if (captureOnCaller && !lifecyclePending && activeIdentity != null
-                    && persistHistory.getAsBoolean()) {
+            if (captureOnCaller && !loading && activeIdentity != null)
                 scheduleSave();
-            }
-            lifecyclePending = true;
-            identityReadyTransition.set(false);
+            loading = true;
+            readySignal.set(false);
         }
-        var executor = lifecycleExecutor();
+        var executor = executor();
         if (executor == null) {
             finishRequest(request, false);
             return;
@@ -192,83 +186,82 @@ class Persistence {
             executor.execute(() -> {
                         boolean ready = false;
                         try {
-                            boolean persist = persistHistory.getAsBoolean();
                             if (!captureOnCaller) {
                                 synchronized (this) {
-                                    if (!lifecycleShutdown && activeIdentity != null && persist)
-                                        scheduleSaveLocked();
+                                    if (!closing && activeIdentity != null)
+                                        scheduleSaveLocked(false);
                                 }
                             }
-                            if (!lifecycleShutdown) ready = job.test(persist);
+                            if (!closing) ready = job.getAsBoolean();
                         } catch (RuntimeException ex) {
                             log.warn(msg("unable-complete") + what, ex);
                         }
                         finishRequest(request, ready);
                     });
         } catch (RuntimeException ex) {
-            log.warn(msg("unable-schedule-gp-manager-2") + what, ex);
+            log.warn(msg("save-schedule-error") + what, ex);
             finishRequest(request, false);
         }
     }
 
-    ExecutorService lifecycleExecutor() {
-        synchronized (lifecycleExecutorLock) {
-            if (lifecycleShutdown) return null;
-            if (lifecycleExecutor == null || lifecycleExecutor.isShutdown()) {
-                lifecycleExecutor = OrderedPersistenceWriter.daemonExecutor(msg("gp-manager-lifecycle-2"));
-            }
-            return lifecycleExecutor;
+    ExecutorService executor() {
+        synchronized (lock) {
+            if (closing) return null;
+            if (worker == null || worker.isShutdown())
+                worker = OrderedPersistenceWriter.daemonExecutor(msg("lifecycle-thread"));
+            return worker;
         }
     }
 
     void finishRequest(long request, boolean ready) {
-        if (lifecycleShutdown && shutdownSnapshotPending) finalizeShutdown();
-        if (request != lifecycleRequest.get()) return;
-        lifecyclePending = false;
-        if (ready && !lifecycleShutdown) identityReadyTransition.set(true);
+        if (closing && needsSnapshot) finalizeShutdown();
+        if (request != this.request.get()) return;
+        loading = false;
+        if (ready && !closing) readySignal.set(true);
     }
 
     /** True once for the client tick that may resume ingestion after an async bind. */
     boolean consumeReady() {
-        return identityReadyTransition.compareAndSet(true, false);
+        return readySignal.compareAndSet(true, false);
     }
 
-    synchronized boolean switchIdentity(TrackingIdentity next, boolean persist, boolean capturePrevious) {
+    synchronized boolean switchIdentity(TrackingIdentity next, boolean capturePrevious) {
         if (next == null) return activeIdentity != null;
-        if (next.equals(activeIdentity)) return true;
-        if (capturePrevious) fence(next.accountHash, lifecycleRequest.incrementAndGet());
-        if (lifecycleShutdown && !capturePrevious) return false;
-        if (activeIdentity != null && persist) {
+        if (next.equals(activeIdentity)) {
+            switchBlocked = false;
+            return true;
+        }
+        if (capturePrevious) fence(next.accountHash, request.incrementAndGet());
+        if (closing && !capturePrevious) return false;
+        if (activeIdentity != null) {
             if (capturePrevious) scheduleSave();
+            // The previous owner stays bound until its latest snapshot is durable.
             if (!flush(Duration.ofSeconds(5))) {
                 log.warn(msg("refusing-account-switch"));
-                return false;
-            }
-            var status = writer.getStatus();
-            if (status.isFailure() || status.state == SaveStatus.State.CONFLICT) {
-                log.warn(msg("refusing-account-switch-after"), status.detail);
+                switchBlocked = true;
                 return false;
             }
         }
         var previous = activeIdentity;
-        long previousAppliedRevision = writer.appliedRevision(), previousNextRevision = nextRevision;
+        long previousAppliedRevision = writer.appliedRevision(), previousNextRevision = this.next;
         activeIdentity = next;
         try {
             repository.bindIdentity(next);
-            var loaded = persist ? loadScope(next) : new SavedState();
-            if (persist && lifecycleShutdown && !capturePrevious) {
+            var loaded = loadScope();
+            if (closing && !capturePrevious) {
                 rollBack(previous, previousAppliedRevision, previousNextRevision);
                 return false;
             }
             writer.resetRevision(loaded.revision);
-            nextRevision = max(loaded.revision + 1, 1);
+            this.next = max(loaded.revision + 1, 1);
             engine.restoreProfile(next.rsProfileKey, loaded, now());
         } catch (RuntimeException ex) {
             rollBack(previous, previousAppliedRevision, previousNextRevision);
-            log.warn(msg("refusing-account-switch-profile"), ex);
+            log.warn(msg("switch-profile-conflict"), ex);
             return false;
         }
-        fence(next.accountHash, lifecycleRequest.get());
+        fence(next.accountHash, request.get());
+        switchBlocked = false;
         if (previous == null || !previous.equals(next)) engine.beginPriming();
         return true;
     }
@@ -279,108 +272,106 @@ class Persistence {
         else repository.bindIdentity(previous);
         activeIdentity = previous;
         writer.resetRevision(appliedRevision);
-        nextRevision = previousNextRevision;
+        next = previousNextRevision;
     }
 
     /**
      * Fence evidence with the same generation already used to reject stale lifecycle completions.
      */
     void fence() {
-        fence(nextHash(), lifecycleRequest.incrementAndGet());
+        fence(nextHash(), request.incrementAndGet());
     }
 
     long nextHash() {
-        return client == null ? (activeIdentity == null ? -1L : activeIdentity.accountHash) : client.getAccountHash();
+        return client == null ? activeIdentity == null ? -1 : activeIdentity.accountHash : client.getAccountHash();
     }
 
+    /** Engine then inbox, like every chest consumption, so no owner change lands inside one. */
     void fence(long hash, long generation) {
-        if (engine != null) engine.inbox.owner(hash * 1_000 + generation);
+        if (engine != null) synchronized (engine) {
+            engine.events.owner(hash * 1000 + generation);
+        }
     }
 
-    void onLogout(boolean persistHistory) {
-        if (lifecyclePending) {
+    void onLogout() {
+        if (loading) {
             // A logout advances the existing request generation too. Publish its completion after
             // the earlier bind, so discarding that stale completion cannot leave ingestion fenced.
-            runLifecycle(() -> persistHistory, false, "logout", persist -> false);
+            runLifecycle(false, "logout", () -> false);
             return;
         }
         fence();
         synchronized (this) {
-            if (!lifecyclePending && activeIdentity != null && persistHistory) scheduleSaveLocked();
+            if (!loading && activeIdentity != null) scheduleSaveLocked(false);
         }
     }
 
-    /**
-     * Account-hash invalidation is a lifecycle event; its save/load work stays off the callback,
-     * and the setting is read after queued startup configuration migration completes.
-     */
-    void onHashInvalidatedAsync(BooleanSupplier persistHistory) {
-        runLifecycle(persistHistory, false, "account clear", persist -> {
-                    onHashInvalidated(persist);
+    /** Account-hash invalidation is a lifecycle event; its save/load work stays off the callback. */
+    void hashInvalidatedAsync() {
+        runLifecycle(false, "account clear", () -> {
+                    onHashInvalidated();
                     return false;
                 });
     }
 
-    synchronized void onHashInvalidated(boolean persist) {
-        if (activeIdentity != null && persist) {
-            scheduleSaveLocked();
-            if (!flush(Duration.ofSeconds(5))) log.warn(msg("account-clear"));
-            if (lifecycleShutdown) return;
+    synchronized void onHashInvalidated() {
+        if (activeIdentity != null) {
+            scheduleSaveLocked(false);
+            // An unsaved owner is kept, fenced, rather than cleared; the next bind retries its save.
+            if (!flush(Duration.ofSeconds(5))) {
+                log.warn(msg("account-clear"));
+                return;
+            }
+            if (closing) return;
         }
         engine.clearIdentity();
         activeIdentity = null;
         repository.unbind();
         writer.resetRevision(0);
-        nextRevision = 1;
+        next = 1;
         engine.restoreProfile(null, new SavedState(), now());
+        switchBlocked = false;
     }
 
-    void scheduleSave() {
-        scheduleSave(false);
+    boolean scheduleSave() {
+        return scheduleSave(false);
     }
 
     /** {@code quick}: a gameplay save, which may reuse unchanged closed sessions' JSON. */
-    void scheduleSave(boolean quick) {
+    boolean scheduleSave(boolean quick) {
         // A lifecycle worker may hold this monitor while it waits for a disk
         // flush or loads the next account scope. Gameplay ingestion is already
         // fenced at this point, so a callback request must return without
         // waiting behind that disk work; the lifecycle boundary has its own
         // explicit snapshot path.
-        if (lifecyclePending) return;
+        if (loading) return false;
         synchronized (this) {
-            if (!lifecyclePending) scheduleSaveLocked(quick);
+            return !loading && scheduleSaveLocked(quick);
         }
     }
 
     /** Caller holds this coordinator monitor; used by lifecycle boundary snapshots. */
-    void scheduleSaveLocked() {
-        scheduleSaveLocked(false);
-    }
-
-    void scheduleSaveLocked(boolean quick) {
+    boolean scheduleSaveLocked(boolean quick) {
         var intent = currentIntent(quick);
-        if (intent == null) return;
-        writer.submit(intent);
+        return intent != null && writer.submit(intent);
     }
 
     synchronized boolean saveNow() {
-        var intent = currentIntent();
+        var intent = currentIntent(false);
         if (intent == null) return false;
         writer.submit(intent);
-        if (!writer.flush(Duration.ofSeconds(5))) return false;
-        var status = writer.getStatus();
-        return status != null && !status.isFailure() && status.state != SaveStatus.State.CONFLICT;
+        return writer.flush(Duration.ofSeconds(5));
     }
 
     /** In-memory persistence health for a restrained panel warning; performs no file I/O. */
     SaveStatus saveStatus() {
-        return writer.getStatus();
+        return switchBlocked ? new SaveStatus(FAILED, msg("switch-save-paused"), false, "") : writer.status();
     }
 
     String scopeRefusal() {
         if (activeIdentity == null || !repository.isBound() || !identityMatches())
             return msg("current-runescape");
-        return writer.isConflicted(repository.scopeGeneration) ? writer.getStatus().detail : readOnlyReason;
+        return writer.conflicted(repository.generation) ? writer.status().detail : reason;
     }
 
     /** Outcome of a reset: whether it was applied, and why not when refused. */
@@ -390,7 +381,7 @@ class Persistence {
 
         ResetOutcome(boolean applied, String detail) {
             this.applied = applied;
-            this.detail = orEmpty(detail);
+            this.detail = string(detail);
         }
     }
 
@@ -402,27 +393,23 @@ class Persistence {
      * client advances the account first, the reset is refused (never rebased) and the in-memory
      * profile is restored, so the user can re-run it against the newer state if they still want to.
      */
-    synchronized ResetOutcome factoryReset(long now) {
-        return factoryReset(now, true);
-    }
-
     /** Delete Profile: with a validated safety copy first, or without one (owner 1.5.2). */
-    synchronized ResetOutcome factoryReset(long now, boolean backUp) {
+    synchronized ResetOutcome factoryReset(long now, boolean backup) {
         String scope = scopeRefusal();
         if (scope != null) return new ResetOutcome(false, scope);
         maintenance = true;
         try {
-            return replaceLocked(now, backUp);
+            return replaceLocked(now, backup);
         } finally {
             maintenance = false;
         }
     }
 
     /** Commits a fresh owner (the factory reset) after a validated safety copy, or rolls back. */
-    ResetOutcome replaceLocked(long now, boolean backUp) {
+    ResetOutcome replaceLocked(long now, boolean backup) {
         if (!saveNow()) return new ResetOutcome(false, msg("current-profile"));
         SavedState protectedState = null;
-        if (backUp) {
+        if (backup) {
             try {
                 protectedState = SessionRepository.parseBackup(JsonCodec.gson(), writeBackup(now));
             } catch (IOException | RuntimeException ex) {
@@ -455,7 +442,7 @@ class Persistence {
      * intact; only this account's newest 10 are kept.
      */
     Filepath writeBackup(long now) throws IOException {
-        synchronized (backupLock) {
+        synchronized (backup) {
             return writeBackupLocked(now);
         }
     }
@@ -469,20 +456,20 @@ class Persistence {
     }
 
     private Filepath writeBackupLocked(long now) throws IOException {
-        repository.backupDirectory.createDirectories();
+        repository.backup.createDirectories();
         String name = account() + "-" + java.time.format.DateTimeFormatter.ofPattern("yyyyMMdd-HHmmss")
                                 .withZone(ZoneId.systemDefault()).format(Instant.ofEpochMilli(now));
-        var file = repository.backupDirectory.joinSegment(name + ".json");
-        for (int n = 2; file.exists() && n < 1_000; n++) {
+        var file = repository.backup.joinSegment(name + ".json");
+        for (int n = 2; file.exists() && n < 1000; n++)
             // "_" sorts after ".", so a same-second copy lists as the newer one and is kept
             // (1.3.1).
-            file = repository.backupDirectory.joinSegment(name + "_" + n + ".json");
-        }
-        String json;
+            file = repository.backup.joinSegment(name + "_" + n + ".json");
+        SavedState state;
         synchronized (engine) {
-            json = JsonCodec.gson().toJson(engine.exportState());
+            state = SaveCopies.copy(engine.exportState());
         }
-        file.write(json, StandardOpenOption.CREATE, StandardOpenOption.TRUNCATE_EXISTING, StandardOpenOption.WRITE);
+        String json = JsonCodec.gson().toJson(state);
+        file.write(json, CREATE, TRUNCATE_EXISTING, WRITE);
         SessionRepository.parseBackup(JsonCodec.gson(), file);
         pruneBackups(10);
         return file;
@@ -494,8 +481,8 @@ class Persistence {
 
     /** This account's backups, newest first. */
     List<Filepath> backups() throws IOException {
-        if (!repository.backupDirectory.exists()) return new ArrayList<>();
-        try (var files = repository.backupDirectory.walk(1)) {
+        if (!repository.backup.exists()) return new ArrayList<>();
+        try (var files = repository.backup.walk(1)) {
             return files.filter(f -> f.isFile() && f.getFileName().startsWith(account() + "-"))
                     .sorted(Comparator.reverseOrder()).collect(java.util.stream.Collectors.toList());
         }
@@ -521,17 +508,17 @@ class Persistence {
     boolean isTrackingReady() {
         // Read without the monitor so a restore/reset holding it pauses ingestion instead of
         // blocking the client thread behind the disk work.
-        if (maintenance || lifecyclePending || lifecycleInitializationFailed) return false;
+        if (maintenance || loading || failed) return false;
         if (busy) return okay;
         synchronized (this) {
-            return okay = !maintenance && !lifecyclePending && !lifecycleInitializationFailed && identityMatches()
-                            && readOnlyReason == null && !writer.isConflicted(repository.scopeGeneration);
+            return okay = !maintenance && !loading && !failed && identityMatches()
+                            && reason == null && !writer.conflicted(repository.generation);
         }
     }
 
     synchronized ReplaceOutcome replaceNow() {
-        var intent = currentIntent();
-        if (intent == null) return ReplaceOutcome.failedUnchanged(msg("account-identity-bound"));
+        var intent = currentIntent(false);
+        if (intent == null) return ReplaceOutcome.unchanged(msg("account-identity-bound"));
         return writer.replaceNow(intent);
     }
 
@@ -539,46 +526,48 @@ class Persistence {
         return writer.flush(timeout);
     }
 
-    void shutdown(boolean persist) {
-        boolean lifecycleWasPending = lifecyclePending;
-        lifecycleShutdown = true;
-        lifecycleEpoch.incrementAndGet();
+    void shutdown() {
+        boolean lifecycleWasPending = loading;
+        closing = true;
+        epoch.incrementAndGet();
         fence();
-        lifecyclePending = false;
-        identityReadyTransition.set(false);
-        shutdownPersistHistory = persist;
+        loading = false;
+        readySignal.set(false);
         // If a lifecycle worker is already fencing an owner, it captured that
         // owner's state before entering its disk wait. Keep the worker alive so
         // it can take one final post-shutdown snapshot after that wait returns;
         // the lifecycle callback itself still never waits for the worker.
         if (lifecycleWasPending) {
-            shutdownSnapshotPending = true;
-            synchronized (lifecycleExecutorLock) {
-                if (lifecycleExecutor == null || lifecycleExecutor.isShutdown()) finalizeShutdown();
-                else lifecycleExecutor.shutdown();
+            needsSnapshot = true;
+            synchronized (lock) {
+                if (worker == null || worker.isShutdown()) finalizeShutdown();
+                else {
+                    worker.execute(this::finalizeShutdown);
+                    worker.shutdown();
+                }
             }
             return;
         }
-        if (persist && repository.isBound()) scheduleSave();
+        if (repository.isBound()) scheduleSave();
         writer.shutdown(Duration.ofSeconds(5));
-        synchronized (lifecycleExecutorLock) {
-            if (lifecycleExecutor != null) lifecycleExecutor.shutdown();
+        synchronized (lock) {
+            if (worker != null) worker.shutdown();
         }
     }
 
     /** Completes a deferred shutdown snapshot from the lifecycle worker without waiting on it. */
     void finalizeShutdown() {
-        if (!shutdownSnapshotPending || !shutdownFinalized.compareAndSet(false, true)) return;
-        shutdownSnapshotPending = false;
+        if (!needsSnapshot || !closed.compareAndSet(false, true)) return;
+        needsSnapshot = false;
         try {
-            if (shutdownPersistHistory && repository.isBound()) scheduleSave();
+            if (repository.isBound()) scheduleSave();
         } catch (RuntimeException ex) {
             log.warn(msg("unable-capture"), ex);
         } finally {
             writer.shutdown(Duration.ofSeconds(5));
-            synchronized (lifecycleExecutorLock) {
-                if (lifecycleExecutor != null && !lifecycleExecutor.isShutdown())
-                    lifecycleExecutor.shutdown();
+            synchronized (lock) {
+                if (worker != null && !worker.isShutdown())
+                    worker.shutdown();
             }
         }
     }
@@ -587,12 +576,12 @@ class Persistence {
      * Loads the bound scope. Any schema other than the current one is left exactly as it is and makes the
      * scope read-only; it is never rewritten.
      */
-    SavedState loadScope(TrackingIdentity identity) {
-        readOnlyReason = null;
+    SavedState loadScope() {
+        reason = null;
         var loaded = repository.load();
         if (!loaded.isSupportedSchema()) {
-            readOnlyReason = msg("local-data") + loaded.schemaVersion + msg("version-modify");
-            log.warn(readOnlyReason);
+            reason = msg("local-data") + loaded.schemaVersion + msg("version-modify");
+            log.warn(reason);
             return new SavedState();
         }
         return loaded;
@@ -611,31 +600,22 @@ class Persistence {
         }
     }
 
-    String snapshotJson(SavedState header, boolean quick) {
-        return repository.gson.toJson(snapshotState(header));
-    }
-
-    /** A detached copy of the engine's state; agl normalizes its labels as a load does. */
+    /** A detached copy of the engine's persisted state, without a save header. */
     SavedState snapshot() {
         return snapshotState(null);
     }
 
-    WriteIntent currentIntent() {
-        return currentIntent(false);
-    }
-
     WriteIntent currentIntent(boolean quick) {
-        if (!repository.isBound() || readOnlyReason != null || writer.isConflicted(repository.scopeGeneration)) {
+        if (!repository.isBound() || reason != null || writer.conflicted(repository.generation))
             return null;
-        }
         // Prefer the writer's verified lineage when a prior save is still
         // updating disk lastKnown — avoids queuing another base-N snapshot.
-        long baseRevision = max(repository.lastKnownDiskRevision, writer.appliedRevision());
+        long baseRevision = max(repository.revision, writer.appliedRevision());
         var header = new SavedState();
-        header.setRevision(max(nextRevision, baseRevision + 1));
-        nextRevision = header.revision + 1;
+        header.setRevision(max(next, baseRevision + 1));
+        next = header.revision + 1;
         header.setSavedAtEpochMillis(now());
-        return new WriteIntent(activeIdentity, repository.scopeGeneration, baseRevision, snapshotState(header), null);
+        return new WriteIntent(activeIdentity, repository.generation, baseRevision, snapshotState(header), null);
     }
 }
 
@@ -652,22 +632,22 @@ class SaveStatus {
 
     State state;
     String detail;
-    boolean retryAvailable;
-    String recoveredFrom;
+    boolean retry;
+    String origin;
 
     SaveStatus(State state, String detail, boolean retryAvailable, String recoveredFrom) {
         this.state = state;
-        this.detail = orEmpty(detail);
-        this.retryAvailable = retryAvailable;
-        this.recoveredFrom = orEmpty(recoveredFrom);
+        this.detail = string(detail);
+        retry = retryAvailable;
+        origin = string(recoveredFrom);
     }
 
     static SaveStatus neverSaved() {
-        return new SaveStatus(State.NEVER_SAVED, "", false, "");
+        return new SaveStatus(NEVER_SAVED, "", false, "");
     }
 
     boolean isFailure() {
-        return state == State.FAILED || state == State.CONFLICT;
+        return state == FAILED || state == State.CONFLICT;
     }
 }
 
@@ -715,9 +695,9 @@ class TrackingIdentity {
     String rsProfileKey;
     long accountHash;
 
-    TrackingIdentity(String profileKey, long accountHash) {
-        if (blank(profileKey)) throw new IllegalArgumentException("rsProfileKey");
-        rsProfileKey = profileKey.trim();
+    TrackingIdentity(String profile, long accountHash) {
+        if (blank(profile)) throw new IllegalArgumentException("rsProfileKey");
+        rsProfileKey = profile.trim();
         this.accountHash = accountHash;
     }
 
@@ -726,19 +706,17 @@ class TrackingIdentity {
         var out = new StringBuilder(rsProfileKey.length());
         for (int i = 0; i < rsProfileKey.length(); i++) {
             char c = rsProfileKey.charAt(i);
-            if ((c >= 'a' && c <= 'z') || (c >= 'A' && c <= 'Z') || (c >= '0' && c <= '9') || c == '-' || c == '_'
-                    || c == '.') {
-                out.append(c);
-            } else {
+            if (c >= 'a' && c <= 'z' || c >= 'A' && c <= 'Z' || c >= '0' && c <= '9' || c == '-' || c == '_'
+                    || c == '.')
+                out.append(c); else
                 out.append('_');
-            }
         }
         String name = out.toString();
         return name.isEmpty() ? "profile" : name;
     }
 
     public String toString() {
-        return msg("trackingidentity-rsprofilekey") + (accountHash != ACCOUNT_HASH_INVALID) + "}";
+        return msg("profile-key") + (accountHash != ACCOUNT_HASH_INVALID) + "}";
     }
 }
 
@@ -754,7 +732,7 @@ class TrackingIdentity {
  */
 class WriteIntent {
     TrackingIdentity identity;
-    long scopeGeneration, expectedBaseRevision;
+    long generation, base;
     SavedState state;
     String json;
 
@@ -762,8 +740,8 @@ class WriteIntent {
             String json) {
         if (state == null) throw new IllegalArgumentException("state");
         this.identity = identity;
-        this.scopeGeneration = scopeGeneration;
-        this.expectedBaseRevision = nonNeg(expectedBaseRevision);
+        generation = scopeGeneration;
+        base = positive(expectedBaseRevision);
         this.state = state;
         this.json = json;
     }
@@ -828,7 +806,7 @@ class SavedState extends SaveCopies {
      */
     @Setter TrackedBasisState trackedBasis;
 
-    /** Last observed looting-bag stock, including confirmed dispenser additions; risk only. */
+    /** Last observed looting-bag stock, including confirmed dispenser additions; risk and PK loss. */
     Map<Integer, Long> lootingBag;
 
     /**
@@ -843,6 +821,7 @@ class SavedState extends SaveCopies {
      * and whenever no death awaits reclaim. Evidence only — never valuation, fees or labels.
      */
     PendingDeath pendingDeathReclaim;
+    RaidHistory.State raidHistory;
 
     SavedState() {}
 
@@ -851,7 +830,7 @@ class SavedState extends SaveCopies {
      * oversized or non-compatible values degrade to null; a malformed label never fails the load,
      * never backfills and never infers a spell name from rune recipes.
      */
-    List<SavedGrind> getSavedGrinds() {
+    List<SavedGrind> savedGrinds() {
         if (savedGrinds == null) savedGrinds = new ArrayList<>();
         return savedGrinds;
     }
@@ -860,7 +839,7 @@ class SavedState extends SaveCopies {
         savedGrinds = values == null ? new ArrayList<>() : new ArrayList<>(values);
     }
 
-    List<GeOffer> getGeCustody() {
+    List<GeOffer> geCustody() {
         if (geCustody == null) geCustody = new ArrayList<>();
         return geCustody;
     }
@@ -874,7 +853,7 @@ class SavedState extends SaveCopies {
         }
     }
 
-    TrackedBasisState getTrackedBasis() {
+    TrackedBasisState trackedBasis() {
         if (trackedBasis == null) trackedBasis = new TrackedBasisState();
         return trackedBasis;
     }
@@ -892,27 +871,27 @@ class SavedState extends SaveCopies {
 
         SavedGrind() {}
 
-        SavedGrind(String id, String name, Long profitTarget, Long activeTarget, boolean favorite) {
+        SavedGrind(String id, String name, Long profit, Long active, boolean favorite) {
             grindId = id;
             this.name = name;
-            netTargetGp = profitTarget;
-            activeTimeTargetMillis = activeTarget;
+            netTargetGp = profit;
+            activeTimeTargetMillis = active;
             this.favorite = favorite;
         }
 
-        String getGrindId() {
-            return orEmpty(grindId);
+        String id() {
+            return string(grindId);
         }
 
-        String getName() {
-            return orEmpty(name);
+        String name() {
+            return string(name);
         }
 
-        Long getNetTargetGp() {
+        Long targetGp() {
             return netTargetGp != null && netTargetGp > 0 ? netTargetGp : null;
         }
 
-        Long getActiveTimeTargetMillis() {
+        Long timeTargetMillis() {
             return activeTimeTargetMillis != null && activeTimeTargetMillis > 0 ? activeTimeTargetMillis : null;
         }
     }
@@ -930,24 +909,24 @@ class SavedState extends SaveCopies {
     }
 
     /** The owner that was tracking when this state was saved. */
-    Session getActiveSession() {
+    Session currentSession() {
         return customSession != null ? customSession : generalSession;
     }
 
-    List<Session> getHistory() {
+    List<Session> history() {
         if (history == null) history = new ArrayList<>();
         return history;
     }
 
-    String getProfileTimeZoneId() {
-        return orEmpty(profileTimeZoneId);
+    String profileTimeZoneId() {
+        return string(profileTimeZoneId);
     }
 
     void setProfileTimeZoneId(String value) {
-        profileTimeZoneId = nonBlank(value, "");
+        profileTimeZoneId = fallback(value, "");
     }
 
-    List<PendingClaim> getPendingClaims() {
+    List<PendingClaim> pendingClaims() {
         return pendingClaims == null ? emptyList() : unmodifiableList(pendingClaims);
     }
 
@@ -979,24 +958,24 @@ class SavedState extends SaveCopies {
             this.gravestoneAgeTicks = max(0, gravestoneAgeTicks);
         }
 
-        List<DeathItem> getOutstandingItems() {
+        List<DeathItem> outstandingItems() {
             return outstandingItems == null ? emptyList() : unmodifiableList(outstandingItems);
         }
 
-        List<DeathItem> getHeldAtDeath() {
+        List<DeathItem> heldAtDeath() {
             return heldAtDeath == null ? emptyList() : unmodifiableList(heldAtDeath);
         }
 
-        int getWipeTicksRemaining() {
+        int wipeTicksRemaining() {
             return max(0, wipeTicksRemaining);
         }
 
-        int getGravestoneAgeTicks() {
+        int gravestoneAgeTicks() {
             return max(0, gravestoneAgeTicks);
         }
 
         boolean isEmpty() {
-            return getOutstandingItems().isEmpty() && getHeldAtDeath().isEmpty();
+            return outstandingItems().isEmpty() && heldAtDeath().isEmpty();
         }
 
         static List<DeathItem> copyItems(List<DeathItem> values) {
@@ -1018,15 +997,15 @@ class SavedState extends SaveCopies {
 
         DeathItem(int id, long quantity) {
             itemId = id;
-            this.quantity = nonNeg(quantity);
+            this.quantity = positive(quantity);
         }
 
-        long getQuantity() {
-            return nonNeg(quantity);
+        long quantity() {
+            return positive(quantity);
         }
 
         boolean isValid() {
-            return itemId > 0 && getQuantity() > 0;
+            return itemId > 0 && quantity() > 0;
         }
     }
 
@@ -1046,24 +1025,24 @@ class SavedState extends SaveCopies {
         PendingClaim(String id, int itemOrKeyId, long quantity, long createdAtEpochMillis) {
             claimId = id;
             this.itemOrKeyId = itemOrKeyId;
-            this.quantity = nonNeg(quantity);
-            this.createdAtEpochMillis = nonNeg(createdAtEpochMillis);
+            this.quantity = positive(quantity);
+            this.createdAtEpochMillis = positive(createdAtEpochMillis);
         }
 
-        String getClaimId() {
-            return orEmpty(claimId);
+        String claimId() {
+            return string(claimId);
         }
 
-        long getQuantity() {
-            return nonNeg(quantity);
+        long quantity() {
+            return positive(quantity);
         }
 
-        long getCreatedAtEpochMillis() {
-            return nonNeg(createdAtEpochMillis);
+        long createdAtEpochMillis() {
+            return positive(createdAtEpochMillis);
         }
 
         boolean isValid() {
-            return !getClaimId().isEmpty() && itemOrKeyId > 0 && getQuantity() > 0;
+            return !claimId().isEmpty() && itemOrKeyId > 0 && quantity() > 0;
         }
     }
 }
@@ -1084,29 +1063,29 @@ class SessionRepository {
 
     static final String UNASSIGNED_MARKER = "unbound";
     Gson gson;
-    Filepath rootDirectory;
+    Filepath root;
 
     /** Profile backups, one folder, newest 10 per account (owner 2026-09-28). */
-    Filepath backupDirectory;
+    Filepath backup;
 
-    boolean accountAware;
+    boolean accounts;
 
     /** The bound scope's save files. */
     ScopeFiles bound;
 
     boolean initialized;
-    TrackingIdentity boundIdentity;
-    long lastKnownDiskRevision, scopeGeneration;
+    TrackingIdentity owner;
+    long revision, generation;
 
     @Inject
     SessionRepository(Gson codec) {
         gson = codec;
-        accountAware = true;
+        accounts = true;
     }
 
     SessionRepository(Gson codec, Filepath dataDirectory, boolean accountAware) {
         gson = codec;
-        this.accountAware = accountAware;
+        accounts = accountAware;
         initialize(dataDirectory);
     }
 
@@ -1114,25 +1093,23 @@ class SessionRepository {
         if (pluginDirectory == null) throw new IllegalArgumentException("pluginDirectory");
         Filepath rooted = pluginDirectory.rooted();
         if (initialized) {
-            if (!rootDirectory.equals(rooted))
+            if (!root.equals(rooted))
                 throw new IllegalStateException(msg("gp-manager-repository"));
             return;
         }
-        rootDirectory = rooted;
-        backupDirectory = rooted.joinSegment("backups");
+        root = rooted;
+        backup = rooted.joinSegment("backups");
         initialized = true;
-        if (accountAware) {
+        if (accounts)
             // Production starts unbound: do not write shared root history until
             // an RS profile identity is available and explicitly bound.
-            bindScope(rootDirectory.joinSegment(UNASSIGNED_MARKER), null);
-        } else {
+            bindScope(root.joinSegment(UNASSIGNED_MARKER), null); else
             // Single-scope / test mode: the provided directory is the store.
             bindScope(rooted, null);
-        }
     }
 
     void requireInit() {
-        if (!initialized) throw new IllegalStateException(msg("gp-manager-repository-initialized"));
+        if (!initialized) throw new IllegalStateException(msg("repository-ready"));
     }
 
     /** One scope directory's primary, backup, next and write-lock files. */
@@ -1142,7 +1119,7 @@ class SessionRepository {
         ScopeFiles(Filepath dir) {
             this.dir = dir;
             state = dir.joinSegment("sessions.json");
-            backup = dir.joinSegment(msg("sessions-backup-json-2"));
+            backup = dir.joinSegment(msg("backup-suffix"));
             next = dir.joinSegment("sessions.next.json");
             lock = dir.joinSegment("sessions.write.lock");
         }
@@ -1150,23 +1127,23 @@ class SessionRepository {
 
     void bindScope(Filepath directory, TrackingIdentity identity) {
         bound = new ScopeFiles(directory);
-        boundIdentity = identity;
-        lastKnownDiskRevision = 0;
-        scopeGeneration++;
+        owner = identity;
+        revision = 0;
+        generation++;
     }
 
     /** Directory for an account identity without changing the live bind. */
     Filepath scopeDir(TrackingIdentity identity) {
         requireInit();
         if (identity == null)
-            return accountAware ? rootDirectory.joinSegment(UNASSIGNED_MARKER) : rootDirectory;
-        return rootDirectory.joinSegment(ACCOUNTS_DIRECTORY).joinSegment(identity.folderName());
+            return accounts ? root.joinSegment(UNASSIGNED_MARKER) : root;
+        return root.joinSegment(ACCOUNTS_DIRECTORY).joinSegment(identity.folderName());
     }
 
     /**
      * The backup file the last {@link #load()} had to fall back to; empty when the primary loaded.
      */
-    volatile String lastRecoveredFrom = "";
+    volatile String recovery = "";
 
     /** The folder holding the bound profile's save files. */
     Filepath dataDir() {
@@ -1175,28 +1152,28 @@ class SessionRepository {
     }
 
     boolean isBound() {
-        return !accountAware || boundIdentity != null;
+        return !accounts || owner != null;
     }
 
     /** Bind writes/loads to an account scope. Does not migrate unassigned data. */
     synchronized void bindIdentity(TrackingIdentity identity) {
         requireInit();
         if (identity == null) throw new IllegalArgumentException("identity");
-        var accountDir = rootDirectory.joinSegment(ACCOUNTS_DIRECTORY).joinSegment(identity.folderName());
+        var accountDir = root.joinSegment(ACCOUNTS_DIRECTORY).joinSegment(identity.folderName());
         bindScope(accountDir, identity);
     }
 
     /** Leave any account scope; subsequent saves refuse until rebound. */
     synchronized void unbind() {
         requireInit();
-        bindScope(rootDirectory.joinSegment(UNASSIGNED_MARKER), null);
+        bindScope(root.joinSegment(UNASSIGNED_MARKER), null);
     }
 
     synchronized SavedState load() {
         requireInit();
-        lastRecoveredFrom = "";
+        recovery = "";
         // A save from an older schema starts fresh: it is kept beside the profile, never read.
-        retireIfOlder(bound);
+        retireOlder(bound);
         if (bound.state.exists()) {
             try {
                 SavedState state;
@@ -1209,7 +1186,7 @@ class SessionRepository {
                 }
                 // Load establishes disk truth; do not retain a stale in-memory
                 // high-water mark from a primary that was later discarded.
-                lastKnownDiskRevision = nonNeg(state.revision);
+                revision = positive(state.revision);
                 return state;
             } catch (Exception ex) {
                 log.warn(msg("unable-load"), ex);
@@ -1223,19 +1200,19 @@ class SessionRepository {
             try {
                 var i = readState(bound.backup);
                 log.warn(msg("recovered-gp"), bound.backup.getFileName());
-                lastKnownDiskRevision = nonNeg(i.revision);
-                lastRecoveredFrom = bound.backup.getFileName().toString();
+                revision = positive(i.revision);
+                recovery = bound.backup.getFileName().toString();
                 return i;
             } catch (Exception j) {
                 log.warn(msg("unable-read"), bound.backup, j);
             }
         }
-        lastKnownDiskRevision = 0;
+        revision = 0;
         return new SavedState();
     }
 
     SavedState readState(Filepath path) throws IOException {
-        try (Reader reader = path.openReader(StandardOpenOption.READ)) {
+        try (Reader reader = path.openReader(READ)) {
             return parseState(gson, new JsonParser().parse(reader));
         } catch (RuntimeException ex) {
             throw new IOException(msg("unreadable-session"), ex);
@@ -1272,7 +1249,7 @@ class SessionRepository {
      */
     synchronized ReplaceOutcome replaceStateDetailed(WriteIntent intent) {
         if (intent == null || intent.state == null)
-            return ReplaceOutcome.failedUnchanged("state was null");
+            return ReplaceOutcome.unchanged("state was null");
         return commit(intent, true);
     }
 
@@ -1282,13 +1259,13 @@ class SessionRepository {
      * a later step faulted, {@code CONFLICT} when disk no longer matches the expected base, else
      * {@code FAILED_UNCHANGED}.
      */
-    ReplaceOutcome commit(WriteIntent intent, boolean destructiveReset) {
+    ReplaceOutcome commit(WriteIntent intent, boolean reset) {
         if (intent == null || intent.state == null) throw new IllegalArgumentException("intent");
         var state = intent.state;
         var identity = intent.identity;
-        if (accountAware && identity == null) {
+        if (accounts && identity == null) {
             log.warn(msg("refusing-gp"));
-            return ReplaceOutcome.failedUnchanged(msg("account-identity-write"));
+            return ReplaceOutcome.unchanged(msg("account-identity-write"));
         }
         var target = new ScopeFiles(scopeDir(identity));
         // Owner key is taken from the intent, never from a later live bind.
@@ -1304,41 +1281,39 @@ class SessionRepository {
             lock = lockForWrite(target.lock);
             if (lock == null) {
                 log.warn(msg("another-gp"));
-                return ReplaceOutcome.failedUnchanged(msg("another-client-holds"));
+                return ReplaceOutcome.unchanged(msg("another-client-holds"));
             }
-            retireIfOlder(target);
+            retireOlder(target);
             var diskSchema = peek(target.state).map(SessionRepository::schemaOf);
             if (diskSchema.isPresent() && diskSchema.get() != SavedState.CURRENT_SCHEMA_VERSION) {
                 // Any other schema (a newer version) is preserved read-only.
                 log.warn(msg("refusing-overwrite"), diskSchema.get());
-                return ReplaceOutcome.failedUnchanged(msg("disk-state") + diskSchema.get());
+                return ReplaceOutcome.unchanged(msg("disk-state") + diskSchema.get());
             }
             long revision = peekRevision(target.state).orElse(backupRevision(target.backup).orElse(0L));
             // Compare-and-swap against the base revision observed when the
             // snapshot was created. Equal competing writers both claiming base N
             // must not both succeed — and a destructive reset is no exception:
             // a newer revision written by another client wins and the reset aborts.
-            if (revision != intent.expectedBaseRevision) {
-                log.warn(msg("refusing-concurrent"), destructiveReset ? "reset" : "save", revision,
-                        intent.expectedBaseRevision);
-                if (sameScope(identity)) lastKnownDiskRevision = revision;
-                return ReplaceOutcome.conflict(msg("disk-revision") + intent.expectedBaseRevision + ", found "
-                                + revision + ")");
+            if (revision != intent.base) {
+                log.warn(msg("refusing-concurrent"), reset ? "reset" : "save", revision,
+                        intent.base);
+                if (sameScope(identity)) this.revision = revision;
+                return ReplaceOutcome.conflict(msg("disk-revision"));
             }
-            if (state.revision <= 0) {
-                state.setRevision(revision + 1);
-            } else if (state.revision <= revision) {
+            if (state.revision <= 0)
+                state.setRevision(revision + 1); else if (state.revision <= revision) {
                 log.warn(msg("refusing-non"), state.revision, revision);
-                return ReplaceOutcome.failedUnchanged(
-                        "Revision " + state.revision + msg("advance-disk") + revision);
+                return ReplaceOutcome.unchanged(
+                        msg("advance-disk"));
             }
-            try (Writer writer = target.next.openWriter(StandardOpenOption.CREATE, StandardOpenOption.TRUNCATE_EXISTING,
-                            StandardOpenOption.WRITE)) {
+            try (Writer writer = target.next.openWriter(CREATE, TRUNCATE_EXISTING,
+                            WRITE)) {
                 if (intent.json == null) gson.toJson(state, writer);
                 else writer.write(intent.json);
             }
             var validated = readState(target.next);
-            if (!destructiveReset && target.state.exists()) {
+            if (!reset && target.state.exists()) {
                 boolean valid = false;
                 try {
                     readState(target.state);
@@ -1347,43 +1322,42 @@ class SessionRepository {
                     setAside(target);
                     if (target.state.exists()) throw new IOException(msg("cannot-preserve"), ex);
                 }
-                if (valid) {
-                    replaceBackup(target, msg("sessions-backup-json"));
-                }
+                if (valid)
+                    replaceBackup(target, msg("backup-prefix"));
             }
             primaryAttempted = true;
             // One atomic move: a crash leaves either the old save or the new one, never neither.
             replaceFile(target.next, target.state);
-            if (sameScope(identity)) lastKnownDiskRevision = validated.revision;
-            if (destructiveReset) {
+            if (sameScope(identity)) this.revision = validated.revision;
+            if (reset) {
                 // After a reset the crash copy must not resurrect the cleared data.
                 try {
-                    replaceBackup(target, msg("sessions-backup-reset"));
+                    replaceBackup(target, msg("backup-reset"));
                 } catch (IOException backupEx) {
-                    invalidateBackup(target, msg("reset-primary-committed"));
-                    log.warn(msg("reset-primary-committed-but"), backupEx);
-                    return ReplaceOutcome.committedPrimaryOnly(msg("primary-reset"));
+                    invalidateBackup(target, msg("reset-flush-error"));
+                    log.warn(msg("reset-backup-error"), backupEx);
+                    return ReplaceOutcome.primaryOnly(msg("primary-reset"));
                 }
                 return ReplaceOutcome.committed(msg("reset-committed"));
             }
             return ReplaceOutcome.committed("Save committed");
         } catch (IOException ex) {
-            log.warn(destructiveReset ? msg("unable-replace") : msg("unable-save"), ex);
+            log.warn(reset ? msg("unable-replace") : msg("unable-save"), ex);
             // Still under the account lock, so a primary holding our revision can
             // only be ours: classify, never re-issue the write.
             if (primaryAttempted && peekRevision(target.state).orElse(-1L) == state.revision) {
-                if (sameScope(identity)) lastKnownDiskRevision = state.revision;
-                return ReplaceOutcome.committedPrimaryOnly(msg("primary-already"));
+                if (sameScope(identity)) revision = state.revision;
+                return ReplaceOutcome.primaryOnly(msg("primary-already"));
             }
-            return ReplaceOutcome.failedUnchanged(destructiveReset ? msg("reset-did") : msg("save-did"));
+            return ReplaceOutcome.unchanged(reset ? msg("reset-did") : msg("save-did"));
         } finally {
             releaseLock(lock);
         }
     }
 
     boolean sameScope(TrackingIdentity target) {
-        if (boundIdentity == null && target == null) return true;
-        return boundIdentity != null && boundIdentity.equals(target);
+        if (owner == null && target == null) return true;
+        return owner != null && owner.equals(target);
     }
 
     @AllArgsConstructor
@@ -1401,11 +1375,11 @@ class SessionRepository {
             return new ReplaceOutcome(Kind.COMMITTED, message);
         }
 
-        static ReplaceOutcome committedPrimaryOnly(String message) {
+        static ReplaceOutcome primaryOnly(String message) {
             return new ReplaceOutcome(Kind.COMMITTED_PRIMARY_ONLY, message);
         }
 
-        static ReplaceOutcome failedUnchanged(String message) {
+        static ReplaceOutcome unchanged(String message) {
             return new ReplaceOutcome(Kind.FAILED_UNCHANGED, message);
         }
 
@@ -1420,8 +1394,8 @@ class SessionRepository {
 
     void invalidateBackup(ScopeFiles files, String reason) throws IOException {
         if (files.backup.exists()) {
-            var tombstone = files.dir.joinSegment(msg("sessions-backup-invalidated") + now() + ".json");
-            files.backup.moveTo(tombstone, StandardCopyOption.REPLACE_EXISTING);
+            var tombstone = files.dir.joinSegment(msg("backup-invalidated") + now() + ".json");
+            files.backup.moveTo(tombstone, REPLACE_EXISTING);
             log.warn("{} ({})", reason, tombstone.getFileName());
         }
     }
@@ -1448,14 +1422,14 @@ class SessionRepository {
     }
 
     /** Sets aside a primary or backup from an older schema, so the profile starts fresh. */
-    void retireIfOlder(ScopeFiles files) {
+    void retireOlder(ScopeFiles files) {
         for (var path : new Filepath[] {files.state, files.backup}) {
             int schema = peek(path).map(SessionRepository::schemaOf).orElse(SavedState.CURRENT_SCHEMA_VERSION);
             if (schema >= SavedState.CURRENT_SCHEMA_VERSION) continue;
             try {
                 String name = path.getFileName().toString().replace(".json", "");
                 path.moveTo(files.dir.joinSegment(name + ".schema" + schema + "-" + now() + ".json"),
-                        StandardCopyOption.REPLACE_EXISTING);
+                        REPLACE_EXISTING);
                 log.warn(msg("older-save"), schema);
             } catch (IOException ex) {
                 log.warn(msg("unable-preserve"), ex);
@@ -1475,7 +1449,7 @@ class SessionRepository {
             atomicMove(source, target);
         } catch (AtomicMoveNotSupportedException ex) {
             // Windows/network volumes without atomic rename: plain replace of a validated file.
-            source.moveTo(target, StandardCopyOption.REPLACE_EXISTING);
+            source.moveTo(target, REPLACE_EXISTING);
         } catch (AccessDeniedException ex) {
             // Antivirus or Windows Search can hold a just-written file for a moment; one more try
             // often clears it, and the writer retries later without alarming anyone (owner 1.2).
@@ -1484,7 +1458,7 @@ class SessionRepository {
     }
 
     static String readText(Filepath path) throws IOException {
-        try (Reader reader = path.openReader(StandardOpenOption.READ)) {
+        try (Reader reader = path.openReader(READ)) {
             var text = new StringBuilder();
             char[] buffer = new char[4096];
             int count;
@@ -1494,12 +1468,12 @@ class SessionRepository {
     }
 
     void atomicMove(Filepath source, Filepath target) throws IOException {
-        source.moveTo(target, StandardCopyOption.REPLACE_EXISTING, StandardCopyOption.ATOMIC_MOVE);
+        source.moveTo(target, REPLACE_EXISTING, ATOMIC_MOVE);
     }
 
     FileLock lockForWrite(Filepath lockPath) throws IOException {
         lockPath.getParent().createDirectories();
-        var channel = lockPath.openFileChannel(StandardOpenOption.CREATE, StandardOpenOption.WRITE);
+        var channel = lockPath.openFileChannel(CREATE, WRITE);
         FileLock lock;
         try {
             lock = channel.tryLock();
@@ -1529,7 +1503,7 @@ class SessionRepository {
         try {
             if (files.state.exists()) {
                 var backup = files.dir.joinSegment("sessions.corrupt-" + now() + ".json");
-                files.state.moveTo(backup, StandardCopyOption.REPLACE_EXISTING);
+                files.state.moveTo(backup, REPLACE_EXISTING);
             }
         } catch (IOException backupError) {
             log.warn(msg("unable-preserve"), backupError);
@@ -1539,7 +1513,7 @@ class SessionRepository {
     /** Atomic backup replacement, using each operation's original temporary file name. */
     void replaceBackup(ScopeFiles files, String tempName) throws IOException {
         var temp = files.dir.joinSegment(tempName);
-        files.state.copyTo(temp, StandardCopyOption.REPLACE_EXISTING);
+        files.state.copyTo(temp, REPLACE_EXISTING);
         replaceFile(temp, files.backup);
     }
 }
@@ -1555,45 +1529,55 @@ class OrderedPersistenceWriter {
     static final Logger log = LoggerFactory.getLogger(OrderedPersistenceWriter.class);
     static final Duration DEFAULT_SHUTDOWN_FLUSH = Duration.ofSeconds(5);
     SessionRepository repository;
-    Object executorLock = new Object();
+    Object lock = new Object();
     ExecutorService executor;
 
     /** Ordinary saves that failed in a row; the warning waits for the third. */
-    int failures;
+    int failed;
 
-    boolean externalExecutor;
-    AtomicLong appliedRevision = new AtomicLong(0L);
+    boolean external;
+    AtomicLong written = new AtomicLong(0);
 
     /** Disk truth diverged from this scope's in-memory state; retries must never rebase it. */
-    AtomicLong conflictedGeneration = new AtomicLong(-1L);
+    AtomicLong conflict = new AtomicLong(-1);
 
-    AtomicReference<PendingWrite> coalesced = new AtomicReference<>();
+    AtomicReference<PendingWrite> merged = new AtomicReference<>();
     AtomicReference<SaveStatus> status = new AtomicReference<>(SaveStatus.neverSaved());
-    AtomicBoolean drainScheduled = new AtomicBoolean(false);
-    Object flushMonitor = new Object();
-    volatile boolean acceptingWork = true;
+    AtomicBoolean scheduled = new AtomicBoolean(false);
+    Object monitor = new Object();
+    volatile boolean accept = true;
+
+    /**
+     * The scope generation and revision of the newest write asked for and of the newest committed
+     * one; neither keeps a snapshot alive.
+     */
+    volatile long[] asked, done;
+
+    /** A queued write whose attempts ran out: it waits for a newer snapshot, a retry or a restart. */
+    volatile PendingWrite stuck;
+
+    /** When a shutdown stops starting retries. */
+    volatile long until;
 
     @Inject
     OrderedPersistenceWriter(SessionRepository repository) {
         this.repository = repository;
-        externalExecutor = false;
+        external = false;
         executor = daemonExecutor("gp-manager-persist");
     }
 
     /** Visible for tests that supply a same-thread or controlled executor. */
     OrderedPersistenceWriter(SessionRepository repository, ExecutorService executor) {
         this.repository = repository;
-        externalExecutor = true;
+        external = true;
         this.executor = executor;
     }
 
+    /** Reopens the writer; a write kept after its attempts gets another bounded cycle. */
     void start() {
-        acceptingWork = true;
-        synchronized (executorLock) {
-            if (externalExecutor) return;
-            if (executor == null || executor.isShutdown())
-                executor = daemonExecutor("gp-manager-persist");
-        }
+        accept = true;
+        stuck = null;
+        scheduleDrain();
     }
 
     /** One named daemon worker thread; persistence never keeps the client alive. */
@@ -1605,59 +1589,57 @@ class OrderedPersistenceWriter {
                 });
     }
 
-    SaveStatus getStatus() {
+    SaveStatus status() {
         return status.get();
     }
 
     long appliedRevision() {
-        return appliedRevision.get();
+        return written.get();
     }
 
     void resetRevision(long revision) {
-        appliedRevision.set(nonNeg(revision));
-        if (status.get().state == State.CONFLICT && !isConflicted(repository.scopeGeneration)) {
+        written.set(positive(revision));
+        if (status.get().state == State.CONFLICT && !conflicted(repository.generation))
             status.set(SaveStatus.neverSaved());
-        }
     }
 
-    boolean isConflicted(long generation) {
-        return conflictedGeneration.get() == generation;
+    boolean conflicted(long generation) {
+        return conflict.get() == generation;
     }
 
     /** Enqueue an ordinary save bound to an immutable write intent. */
-    void submit(WriteIntent intent) {
-        if (intent == null || intent.state == null) return;
-        if (isConflicted(intent.scopeGeneration)) return;
-        if (!acceptingWork) {
-            status.set(new SaveStatus(State.FAILED, "Writer is shut down", true, ""));
-            return;
-        }
+    boolean submit(WriteIntent intent) {
+        if (intent == null || intent.state == null) return false;
         var detached = intent.state;
-        long revision = detached.revision;
-        if (revision <= 0) {
-            revision = intent.expectedBaseRevision + 1;
-            detached.setRevision(revision);
-        }
+        if (detached.revision <= 0) detached.setRevision(intent.base + 1);
+        // Asked for even when refused below, so a flush can never report it saved.
         var next = new PendingWrite(intent);
+        asked = new long[] {intent.generation, next.revision};
+        if (conflicted(intent.generation)) return false;
+        if (!accept) {
+            status.set(new SaveStatus(FAILED, "Saving has stopped. Restart RuneLite to try again.", true, ""));
+            return false;
+        }
         while (true) {
-            var current = coalesced.get();
+            var current = merged.get();
             if (current != null) {
                 // Prefer newer revision within the same scope generation.
-                if (current.intent.scopeGeneration == next.intent.scopeGeneration && current.revision > next.revision) {
-                    return;
-                }
+                if (current.intent.generation == next.intent.generation && current.revision > next.revision)
+                    return true;
                 // A newer scope generation supersedes older pending work for a
                 // previous account — but only after the coordinator drained or
                 // abandoned that scope. Drop stale-scope work if a newer scope
                 // is already queued.
-                if (current.intent.scopeGeneration > next.intent.scopeGeneration) {
-                    status.set(new SaveStatus(State.FAILED, msg("pending-save"), false, ""));
-                    return;
+                if (current.intent.generation > next.intent.generation) {
+                    status.set(new SaveStatus(FAILED, msg("pending-save"), false, ""));
+                    return false;
                 }
             }
-            if (coalesced.compareAndSet(current, next)) break;
+            if (merged.compareAndSet(current, next)) break;
         }
-        scheduleDrain();
+        // The newer snapshot supersedes a write whose attempts ran out; nothing else keeps it.
+        stuck = null;
+        return scheduleDrain();
     }
 
     /**
@@ -1668,12 +1650,12 @@ class OrderedPersistenceWriter {
      */
     ReplaceOutcome replaceNow(WriteIntent intent) {
         flush(DEFAULT_SHUTDOWN_FLUSH);
-        if (isConflicted(intent.scopeGeneration))
+        if (conflicted(intent.generation))
             return ReplaceOutcome.conflict(status.get().detail);
         var detached = intent.state;
         // A pre-serialized payload already carries a revision past its expected base.
         if (intent.json == null) {
-            detached.setRevision(max(intent.expectedBaseRevision, appliedRevision.get()) + 1);
+            detached.setRevision(max(intent.base, written.get()) + 1);
             detached.setSavedAtEpochMillis(now());
         }
         var result = repository.replaceStateDetailed(intent);
@@ -1682,51 +1664,64 @@ class OrderedPersistenceWriter {
             return result;
         }
         boolean conflict = result.kind == ReplaceOutcome.Kind.CONFLICT;
-        if (conflict) conflictedGeneration.accumulateAndGet(intent.scopeGeneration, Math::max);
-        status.set(new SaveStatus(conflict ? State.CONFLICT : State.FAILED,
-                        conflict ? conflictDetail(result.message) : result.message, false, ""));
+        if (conflict) this.conflict.accumulateAndGet(intent.generation, Math::max);
+        status.set(new SaveStatus(conflict ? State.CONFLICT : FAILED,
+                        conflict ? result.message + msg("tracking-paused-back") : result.message, false, ""));
         return result;
     }
 
+    /**
+     * Waits for the newest write asked for so far, and is true only when it, or a newer snapshot
+     * of the same scope generation, committed. An empty queue alone proves nothing.
+     */
     boolean flush(Duration timeout) {
         var wait = timeout == null ? DEFAULT_SHUTDOWN_FLUSH : timeout;
+        var want = asked;
         scheduleDrain();
         long deadline = System.nanoTime() + wait.toNanos();
-        synchronized (flushMonitor) {
-            while (coalesced.get() != null || drainScheduled.get()) {
+        synchronized (monitor) {
+            while (pending()) {
                 long remaining = deadline - System.nanoTime();
-                if (remaining <= 0) return coalesced.get() == null && !drainScheduled.get();
+                if (remaining <= 0) break;
                 try {
-                    flushMonitor.wait(min(TimeUnit.NANOSECONDS.toMillis(remaining) + 1, 250));
+                    monitor.wait(min(TimeUnit.NANOSECONDS.toMillis(remaining) + 1, 250));
                 } catch (InterruptedException ex) {
                     return false;
                 }
             }
         }
-        return true;
+        var ok = done;
+        return want == null || ok != null && ok[0] == want[0] && ok[1] >= want[1];
+    }
+
+    /** Work is queued or running; a write whose attempts ran out waits for newer work. */
+    boolean pending() {
+        var work = merged.get();
+        return scheduled.get() || work != null && work != stuck;
     }
 
     void shutdown(Duration timeout) {
-        acceptingWork = false;
+        until = System.nanoTime() + timeout.toNanos();
+        accept = false;
         // Plugin lifecycle callbacks must return without waiting for disk work.
         // The single writer is allowed to drain the already captured intent in
         // order; a later enable creates a fresh executor if this one has
         // terminated.  No new intent can be accepted after this fence.
         scheduleDrain();
-        synchronized (executorLock) {
-            if (externalExecutor || executor == null) return;
+        synchronized (lock) {
+            if (external || executor == null) return;
             executor.shutdown();
         }
     }
 
-    void scheduleDrain() {
-        if (!drainScheduled.compareAndSet(false, true)) return;
+    boolean scheduleDrain() {
+        if (!scheduled.compareAndSet(false, true)) return true;
         ExecutorService active;
-        synchronized (executorLock) {
-            if (!externalExecutor && (executor == null || executor.isShutdown())) {
-                if (!acceptingWork) {
-                    drainScheduled.set(false);
-                    return;
+        synchronized (lock) {
+            if (!external && (executor == null || executor.isShutdown())) {
+                if (!accept) {
+                    scheduled.set(false);
+                    return false;
                 }
                 executor = daemonExecutor("gp-manager-persist");
             }
@@ -1734,74 +1729,95 @@ class OrderedPersistenceWriter {
         }
         try {
             active.execute(this::drain);
+            return true;
         } catch (RuntimeException ex) {
-            drainScheduled.set(false);
-            log.warn(msg("unable-schedule-gp-manager"), ex);
-            status.set(new SaveStatus(State.FAILED, msg("persistence-executor"), true, ""));
+            scheduled.set(false);
+            log.warn(msg("lifecycle-schedule-error"), ex);
+            status.set(new SaveStatus(FAILED, msg("persistence-executor"), true, ""));
+            return false;
         }
     }
 
     void drain() {
         try {
             while (true) {
-                var work = coalesced.getAndSet(null);
-                if (work == null) return;
-                if (isConflicted(work.intent.scopeGeneration)) continue;
-                var intent = rebase(work.intent);
-                boolean ok;
-                try {
-                    ok = repository.save(intent);
-                } catch (RuntimeException ex) {
-                    log.warn(msg("gp-manager-background"), ex);
-                    ok = false;
+                // The write stays queued until it commits, is superseded or meets a conflict.
+                var work = merged.get();
+                if (work == null || work == stuck) return;
+                if (conflicted(work.intent.generation)) {
+                    merged.compareAndSet(work, null);
+                    continue;
+                }
+                WriteIntent intent;
+                boolean ok = false;
+                long disk;
+                // Three attempts, 50 and 200 ms apart on this worker, unless newer work, a
+                // conflict or the end of the shutdown window comes first.
+                for (int attempt = 1; ; attempt++) {
+                    intent = rebase(work.intent);
+                    try {
+                        ok = repository.save(intent);
+                    } catch (RuntimeException ex) {
+                        log.warn(msg("gp-manager-background"), ex);
+                    }
+                    // Only the bound scope's disk revision can prove a competing writer.
+                    disk = intent.generation == repository.generation ? repository.revision : intent.base;
+                    if (ok || disk != intent.base || attempt == 3 || merged.get() != work
+                            || !accept && System.nanoTime() - until >= 0 || !pause(50 * attempt * attempt)
+                            // The window can expire, or shutdown can arrive, during backoff.
+                            || !accept && System.nanoTime() - until >= 0)
+                        break;
                 }
                 if (ok) {
+                    done = new long[] {work.intent.generation, work.revision};
+                    merged.compareAndSet(work, null);
                     // Late completions for an abandoned scope must not rewrite
                     // the live applied revision or OK status for the new scope.
-                    failures = 0;
-                    if (intent.scopeGeneration == repository.scopeGeneration) {
-                        publish(work.revision, "", repository.lastRecoveredFrom);
-                    } else {
-                        log.debug(msg("ignoring-late"), intent.scopeGeneration, repository.scopeGeneration);
-                    }
-                } else {
-                    State state = State.FAILED;
-                    String detail = msg("save-failed");
-                    long disk = repository.lastKnownDiskRevision;
-                    if (disk != intent.expectedBaseRevision) {
-                        state = State.CONFLICT;
-                        conflictedGeneration.accumulateAndGet(intent.scopeGeneration, Math::max);
-                        detail = conflictDetail(msg("disk-revision") + intent.expectedBaseRevision + ", found " + disk
-                                                + ").");
-                    }
-                    // A one-off failure (a scanner briefly holding the file) is silent: the old
-                    // save is intact
-                    // and the next save, within minutes and always at logout, writes the full
-                    // state. Only a
-                    // failure that keeps happening is shown (owner 1.2).
-                    if (intent.scopeGeneration == repository.scopeGeneration
-                            && (state != State.FAILED || ++failures >= 3)) {
-                        status.set(new SaveStatus(state, detail, state == State.FAILED, status.get().recoveredFrom));
-                    }
+                    failed = 0;
+                    if (intent.generation == repository.generation)
+                        publish(work.revision, "", repository.recovery); else
+                        log.debug(msg("ignoring-late"), intent.generation, repository.generation);
+                    continue;
                 }
+                State state = FAILED;
+                String detail = msg("save-failed");
+                if (disk != intent.base) {
+                    state = State.CONFLICT;
+                    conflict.accumulateAndGet(intent.generation, Math::max);
+                    detail = msg("disk-revision") + msg("tracking-paused-back");
+                    merged.compareAndSet(work, null);
+                } else if (merged.get() == work)
+                    stuck = work;
+                // A failure the retries clear (a scanner briefly holding the file) is silent: the
+                // old save is intact. Only a save request that keeps failing is shown (owner 1.2).
+                if (intent.generation == repository.generation
+                        && (state != FAILED || ++failed >= 3))
+                    status.set(new SaveStatus(state, detail, state == FAILED, status.get().origin));
             }
         } finally {
-            drainScheduled.set(false);
-            if (coalesced.get() != null && acceptingWork) scheduleDrain();
-            synchronized (flushMonitor) {
-                flushMonitor.notifyAll();
+            scheduled.set(false);
+            if (pending() && accept) scheduleDrain();
+            synchronized (monitor) {
+                monitor.notifyAll();
             }
+        }
+    }
+
+    /** The wait before a retry, holding no monitor; false when interrupted. */
+    boolean pause(long millis) {
+        try {
+            Thread.sleep(millis);
+            return true;
+        } catch (InterruptedException ex) {
+            // Nothing in the plugin interrupts this daemon worker; an interrupt just ends the retries.
+            return false;
         }
     }
 
     /** Publish a successful write only after the caller's existing scope/generation guard. */
     void publish(long revision, String message, String detail) {
-        appliedRevision.set(revision);
-        status.set(new SaveStatus(State.OK, message, false, detail));
-    }
-
-    private static String conflictDetail(String detail) {
-        return detail + msg("tracking-paused-back");
+        written.set(revision);
+        status.set(new SaveStatus(OK, message, false, detail));
     }
 
     /**
@@ -1812,12 +1828,12 @@ class OrderedPersistenceWriter {
      */
     WriteIntent rebase(WriteIntent intent) {
         if (intent == null) return null;
-        long own = appliedRevision.get();
-        if (own <= 0 || intent.expectedBaseRevision >= own) return intent;
-        if (intent.scopeGeneration != repository.scopeGeneration) return intent;
-        long disk = repository.lastKnownDiskRevision;
+        long own = written.get();
+        if (own <= 0 || intent.base >= own) return intent;
+        if (intent.generation != repository.generation) return intent;
+        long disk = repository.revision;
         if (disk != own) return intent;
-        return new WriteIntent(intent.identity, intent.scopeGeneration, own, intent.state, intent.json);
+        return new WriteIntent(intent.identity, intent.generation, own, intent.state, intent.json);
     }
 
     static class PendingWrite {
@@ -1867,6 +1883,7 @@ class SaveCopies implements Cloneable {
         result.lootingBag = source.lootingBag == null ? null : new LinkedHashMap<>(source.lootingBag);
         result.pendingClaims = list(source.pendingClaims, SaveCopies::copy);
         result.pendingDeathReclaim = copy(source.pendingDeathReclaim);
+        result.raidHistory = source.raidHistory == null ? null : RaidHistory.copy(source.raidHistory);
         return result;
     }
 
@@ -1878,6 +1895,7 @@ class SaveCopies implements Cloneable {
         result.saveStamp = 0;
         result.transactions = list(source.transactions, SaveCopies::copy);
         result.pk = copy(source.pk);
+        result.compactedRaids = RaidHistory.copyMoney(source.compactedRaids);
         result.correctionHistory = list(source.correctionHistory, SaveCopies::copy);
         result.undoHistory = list(source.undoHistory, SaveCopies::copy);
         return result;

@@ -9,7 +9,7 @@ public class ActivityMetadataTest {
     static class CountingEngine extends Engine {
         int folds;
         CountingEngine() { super(d -> java.util.List.of(), new TransactionClassifier(), new GpManagerConfig(){}); }
-        @Override synchronized Metrics getMetrics(long now) { folds++; return super.getMetrics(now); }
+        @Override synchronized Metrics metrics(long now) { folds++; return super.metrics(now); }
     }
     @Test public void readingTheActivityDoesNotCalculateMoney() throws Exception {
         onEdt(() -> {
@@ -28,7 +28,7 @@ public class ActivityMetadataTest {
             String[] raw = {null, "", " ", "General", "general", "MAGIC", " Magic ", "Mining", " Vorkath ", "Magic trees", "Wilderness Agility Course"};
             String[] expected = {"", "", "", "", "", "", "", "Mining", "Vorkath", "Magic trees", "Wilderness Agility Course"};
             for (int i = 0; i < raw.length; i++) {
-                engine.getActiveSession().activityHint = raw[i];
+                engine.session().activityHint = raw[i];
                 assertEquals("label for " + raw[i], expected[i], panel.activityLabel());
             }
             return null;
@@ -41,7 +41,7 @@ public class ActivityMetadataTest {
             engine.setDetectedActivity("Fishing", 2_000); assertEquals("Fishing", panel.activityLabel());
             engine.setDetectedActivity("Theatre of Blood", 3_000); assertEquals("Theatre of Blood", panel.activityLabel());
             engine.setDetectedActivity("Magic", 4_000); assertEquals("", panel.activityLabel());
-            assertTrue(engine.getActiveSession().getTransactions().isEmpty());
+            assertTrue(engine.session().transactions().isEmpty());
             return null;
         });
     }

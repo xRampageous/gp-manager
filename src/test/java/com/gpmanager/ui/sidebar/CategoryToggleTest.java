@@ -13,11 +13,12 @@ public class CategoryToggleTest {
     java.util.function.LongSupplier clock;
     @Before public void clock() { clock=SafeMath.clock; SafeMath.clock=()->NOW; }
     @After public void restore() { SafeMath.clock=clock; }
-    static final Semantics.Table[] CATEGORIES={Semantics.Table.GAINS,Semantics.Table.COSTS_SUPPLIES,Semantics.Table.COSTS_LOSS,Semantics.Table.MARKET};
+    static final Semantics.Table[] CATEGORIES={Semantics.Table.GAINS,Semantics.Table.COSTS_SUPPLIES,Semantics.Table.COSTS_LOSS,Semantics.Table.MARKET,Semantics.Table.valueOf("DEATH")};
     static SidebarPanel panel() {
         var engine=engine();for(int i=0;i<40;i++)gain(engine,i,1000+i);
-        engine.getActiveSession().addTransaction(SavedSessionTest.trade(5000),2000,false);
-        return SavedSessionTest.panel(engine);
+        engine.session().addTransaction(SavedSessionTest.trade(5000),2000,false);
+        var panel=SavedSessionTest.panel(engine);
+        panel.bindPvp(()->new PvpState(true,false,false,0));SidebarPanelProbe.refresh(panel);return panel;
     }
     static JButton find(LedgerPage page) {
         var found=find(page.bar);return found!=null?found:Objects.requireNonNull(find(page.body));
@@ -30,14 +31,14 @@ public class CategoryToggleTest {
         return null;
     }
     static Table table(LedgerPage page,Semantics.Table category) {
-        return category==Semantics.Table.GAINS?page.gains:category==Semantics.Table.MARKET?page.market:page.costs;
+        return category==Semantics.Table.GAINS?page.income:category==Semantics.Table.MARKET?page.market:page.cost;
     }
     @Test public void everyCategoryTogglesBackWithoutChangingBookings() throws Exception {
         onEdt(()->{
             var panel=panel();String before=new Gson().toJson(panel.engine.exportState());
             for(var category:CATEGORIES) {
-                open(panel,category.label);assertEquals(category,panel.liveEntry.liveTable);
-                open(panel,category.label);assertNull(panel.liveEntry);assertTrue(panel.live.recent.isVisible());
+                open(panel,category.label);assertEquals(category,panel.category.table);
+                open(panel,category.label);assertNull(panel.category);assertTrue(panel.live.recent.isVisible());
                 assertFalse(panel.live.breakdown.isVisible());assertEquals(before,new Gson().toJson(panel.engine.exportState()));
             }
             return null;
@@ -45,11 +46,11 @@ public class CategoryToggleTest {
     }
     @Test public void switchingCategoriesResetsThePagerAndKeepsSearchInLedger() throws Exception {
         onEdt(()->{
-            var panel=panel();open(panel,"GAINS");var page=focused(panel);page.gains.showPage(2);
+            var panel=panel();open(panel,"GAINS");var page=focused(panel);page.income.showPage(2);
             for(var category:CATEGORIES) {
-                if(panel.liveEntry.liveTable==category) continue;
-                open(panel,category.label);assertEquals(category,panel.liveEntry.liveTable);
-                assertEquals("",page.data.entry.search);assertFalse(page.searchOpen);assertEquals(0,table(page,category).page);
+                if(panel.category.table==category) continue;
+                open(panel,category.label);assertEquals(category,panel.category.table);
+                assertEquals("",page.data.entry.search);assertFalse(page.searching);assertEquals(0,table(page,category).page);
                 assertNull(find(panel.live.body));assertNull(table(page,category).picker);
             }
             return null;
@@ -59,26 +60,26 @@ public class CategoryToggleTest {
         onEdt(()->{
             var panel=panel();open(panel,"GAINS");var page=focused(panel);
             assertFalse(page.bar.isVisible());assertNull(page.bar.getParent());assertNull(find(panel.live.body));
-            assertNull(page.search.getParent());assertSame(page.gains.right,page.gains.next.getParent());
-            page.gains.next.doClick();assertEquals(1,page.gains.page);
-            assertFalse(page.searchOpen);assertEquals("",page.data.entry.search);
+            assertNull(page.search.getParent());assertSame(page.income.right,page.income.next.getParent());
+            page.income.next.doClick();assertEquals(1,page.income.page);
+            assertFalse(page.searching);assertEquals("",page.data.entry.search);
             return null;
         });
     }
     @Test public void detailHasNoSearchAndTheCategoryCanStillCloseIt() throws Exception {
         onEdt(()->{
-            var panel=panel();open(panel,"GAINS");var page=focused(panel);page.gains.rows.get(0).open.run();SidebarPanelProbe.refresh(panel);
+            var panel=panel();open(panel,"GAINS");var page=focused(panel);page.income.rows.get(0).open.run();SidebarPanelProbe.refresh(panel);
             assertNotNull(page.data.detail);assertNull(find(panel.live.body));assertNull(page.search.getParent());
-            open(panel,"GAINS");assertNull(panel.liveEntry);assertTrue(panel.live.recent.isVisible());
+            open(panel,"GAINS");assertNull(panel.category);assertTrue(panel.live.recent.isVisible());
             return null;
         });
     }
     @Test public void categoryTitleTotalAndPagerFitNarrowHeaders() throws Exception {
         onEdt(()->{
-            var panel=panel();open(panel,"GAINS");var page=focused(panel);var table=page.gains;
+            var panel=panel();open(panel,"GAINS");var page=focused(panel);var table=page.income;
             for(int width:new int[]{213,225,300}) {
                 DirectHeaderControlsTest.size(table,width-12);
-                for(var part:new JComponent[]{table.title,table.total,table.previous,table.pageLabel,table.next}) {
+                for(var part:new JComponent[]{table.title,table.total,table.previous,table.counter,table.next}) {
                     var bounds=DirectHeaderControlsTest.bounds(part,table);
                     assertTrue(part.getClass()+" left at "+width,bounds.x>=0);
                     assertTrue(part.getClass()+" right at "+width,bounds.getMaxX()<=table.getWidth());
@@ -113,7 +114,7 @@ public class CategoryToggleTest {
             frame.add(panel);frame.pack();frame.setSize(width,760);frame.setVisible(true);frame.validate();
             assertEquals(width,panel.getWidth());
             open(panel,category.label);var page=focused(panel);
-            if(detail)page.gains.rows.get(0).open.run();
+            if(detail)page.income.rows.get(0).open.run();
             for(int i=0;i<2;i++){SidebarPanelProbe.refresh(panel);frame.validate();}
             ShellProbe.scrollCurrentToTop(panel.shell);
             var image=new java.awt.image.BufferedImage(width,760,java.awt.image.BufferedImage.TYPE_INT_RGB);

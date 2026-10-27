@@ -26,10 +26,10 @@ public class ActivityDetectorTest
         ActivityDetector detector = new ActivityDetector(config, engine);
 
         detector.observe("Woodcutting", true);
-        assertEquals("Woodcutting", engine.getMetrics(1_100L).activityHint);
+        assertEquals("Woodcutting", engine.metrics(1_100L).activity);
 
         detector.observe("NPC loot", true);
-        assertEquals("a fallback is not an activity", "Woodcutting", engine.getMetrics(1_200L).activityHint);
+        assertEquals("a fallback is not an activity", "Woodcutting", engine.metrics(1_200L).activity);
     }
 
     @Test
@@ -49,14 +49,14 @@ public class ActivityDetectorTest
         ActivityDetector detector = new ActivityDetector(config, engine);
 
         // Clicking a tree with no axe, or before reaching it.
-        detector.gatherSkill = ActionSignals.gatherActivity("chop down");
-        assertEquals("General", engine.getMetrics(1_100L).activityHint);
+        detector.skill = ActionSignals.gatherActivity("chop down");
+        assertEquals("General", engine.metrics(1_100L).activity);
         // Other XP still needs its second drop.
         detector.observeXp("Mining", null, false, 1_200L);
-        assertEquals("General", engine.getMetrics(1_300L).activityHint);
+        assertEquals("General", engine.metrics(1_300L).activity);
         // The first log's XP names the run at once.
         detector.observeXp("Woodcutting", null, false, 1_400L);
-        assertEquals("Woodcutting", engine.getMetrics(1_500L).activityHint);
+        assertEquals("Woodcutting", engine.metrics(1_500L).activity);
     }
 
     /**
@@ -75,12 +75,12 @@ public class ActivityDetectorTest
         long now = 1_000_000L;
 
         detector.armProduction("Smelting", now);
-        engine.inbox.drop(Inbox.CLOCK); // two failed smelts: the six-tick window has lapsed
+        engine.events.drop(Inbox.CLOCK); // two failed smelts: the six-tick window has lapsed
         detector.observeXp("Smithing", null, false, now + 12_000L);
-        assertEquals(Context.PRODUCTION, engine.liveClue().context);
+        assertEquals(Context.PRODUCTION, engine.context().context);
         assertTrue("Smithing XP re-arms the run", engine.clockLeft() > 0);
 
-        engine.inbox.drop(Inbox.CLOCK);
+        engine.events.drop(Inbox.CLOCK);
         detector.observeXp("Attack", null, false, now + 17_000L);
         assertEquals("combat XP never opens production", 0, engine.clockLeft());
 

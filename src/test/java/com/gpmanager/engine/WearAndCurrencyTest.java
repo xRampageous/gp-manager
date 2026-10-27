@@ -57,11 +57,11 @@ public class WearAndCurrencyTest
         change(HELM_100, -1L, HELM_75, 1L);
         change(HELM_75, -1L, HELM_0, 1L);
         assertEquals("wearing down books nothing", 0L, net());
-        assertTrue("and nothing waits in Review", engine.getActiveSession().getTransactions().stream().noneMatch(ReviewRules::needsOwnerDecision));
+        assertTrue("and nothing waits in Review", engine.session().transactions().stream().noneMatch(ReviewRules::needsReview));
 
-        engine.inbox.put(Inbox.DIALOGUE, 0, 1L, 4, null);
+        engine.events.put(Inbox.DIALOGUE, 0, 1L, 4, null);
         Transaction repair = change(HELM_0, -1L, COINS, -100_000L, HELM, 1L);
-        assertTrue(repair.isCounted());
+        assertTrue(repair.counts());
         assertEquals("only the fee counts", -100_000L, net());
 
         assertNull("an ordinary Barrows buy is not wear", Engine.piece(new Flow(COINS, "Coins", 1L, 1, 1L)));
@@ -69,14 +69,45 @@ public class WearAndCurrencyTest
     }
 
     @Test
+    public void brokenWearKeepsSourceConfirmedLootOfTheSamePiece()
+    {
+        assertWearKeepsLoot(HELM_75, HELM_0);
+    }
+
+    @Test
+    public void unbrokenWearKeepsSourceConfirmedLootOfTheSamePiece()
+    {
+        assertWearKeepsLoot(HELM_100, HELM_75);
+    }
+
+    private void assertWearKeepsLoot(int before, int after)
+    {
+        start();
+        change(HELM, -1L, before, 1L);
+        engine.markLoot(Map.of(HELM, 1L), 30, "Loot from fixture NPC", "Fixture NPC");
+        Transaction loot = change(before, -1L, after, 1L, HELM, 1L);
+
+        Metrics metrics = engine.metrics(now + 60_000L);
+        assertEquals(1_200_000L, metrics.net);
+        assertEquals(1_200_000L, metrics.income);
+        assertEquals(0L, metrics.cost);
+        assertSame(TransactionType.LOOT, loot.type());
+        assertTrue(loot.counts());
+        assertEquals(1, loot.flows().size());
+        assertEquals(HELM, loot.flows().get(0).item);
+        assertEquals(1L, loot.flows().get(0).quantity);
+        assertTrue(engine.session().transactions().stream().noneMatch(ReviewRules::needsReview));
+    }
+
+    @Test
     public void anNpcPaidInSkillingCurrencyIsAPurchase()
     {
         start();
-        engine.inbox.put(Inbox.DIALOGUE, 0, 1L, 4, null);
+        engine.events.put(Inbox.DIALOGUE, 0, 1L, 4, null);
         Transaction bought = change(FLAKES, -6_000L, FISH_BARREL, 1L);
-        assertSame(TransactionType.TRADE, bought.getType());
-        assertSame(Context.MARKET, bought.getContext());
-        assertTrue("not Review", !ReviewRules.needsOwnerDecision(bought));
+        assertSame(TransactionType.TRADE, bought.type());
+        assertSame(Context.MARKET, bought.context());
+        assertTrue("not Review", !ReviewRules.needsReview(bought));
     }
 
     @Test
@@ -92,7 +123,7 @@ public class WearAndCurrencyTest
         assertTrue("an empty sack is no claim", !ActionReader.isClaim("Empty sack"));
         start();
         Transaction half = change(KEY_HALF, 1L);
-        assertSame(TransactionType.GAIN, half.getType());
+        assertSame(TransactionType.GAIN, half.type());
         assertEquals(9_543L, net());
     }
 
@@ -109,16 +140,16 @@ public class WearAndCurrencyTest
             inventory.merge((Integer) idsAndDeltas[index], (Long) idsAndDeltas[index + 1], Long::sum);
         }
         inventory.values().removeIf(quantity -> quantity == 0L);
-        int before = engine.getActiveSession().getTransactions().size();
+        int before = engine.session().transactions().size();
         now += 3_000L;
         engine.processIfDirty(new ContainerSnapshot(new HashMap<>(inventory)), now, null);
         engine.processIfDirty(new ContainerSnapshot(new HashMap<>(inventory)), now + 600L, null);
-        List<Transaction> all = engine.getActiveSession().getTransactions();
+        List<Transaction> all = engine.session().transactions();
         return all.size() > before ? all.get(all.size() - 1) : null;
     }
 
     private long net()
     {
-        return engine.getMetrics(now + 60_000L).net;
+        return engine.metrics(now + 60_000L).net;
     }
 }

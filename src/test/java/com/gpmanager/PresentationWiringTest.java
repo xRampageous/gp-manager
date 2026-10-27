@@ -17,11 +17,11 @@ public class PresentationWiringTest
     {
         GpManagerPlugin plugin = new GpManagerPlugin();
         set(plugin, "clientToolbar", null);
-        set(plugin, "lootPresentationFilter",
+        set(plugin, "filter",
             new LootPresentationFilterService(
                 GroundItemsPrefs.disabled()));
         invoke(plugin, "installPresentation", new Class<?>[0]);
-        assertNull("a missing toolbar leaves no panel bound", get(plugin, "activityPanel"));
+        assertNull("a missing toolbar leaves no panel bound", get(plugin, "sidebar"));
     }
 
     @Test
@@ -37,7 +37,8 @@ public class PresentationWiringTest
         invoke(plugin, "ownerScopeChanged", new Class<?>[] {String.class}, "switching");
         assertNull(SidebarPanelProbe.live(panel));
         invoke(plugin, "ownerScopeChanged", new Class<?>[] {String.class}, "12345");
-        assertNotNull("ready presentation resumes its facts", SidebarPanelProbe.live(panel));
+        SwingUtilities.invokeAndWait(() ->
+            assertNotNull("ready presentation resumes its facts", SidebarPanelProbe.live(panel)));
     }
 
     @Test
@@ -47,8 +48,8 @@ public class PresentationWiringTest
         SidebarPanel panel = panel(plugin);
         Engine engine = (Engine) get(plugin, "engine");
         engine.ensureSession(1L);
-        Session session = engine.getActiveSession();
-        long revision = engine.getRevision();
+        Session session = engine.session();
+        long revision = engine.revision();
         invoke(plugin, "pulse", new Class<?>[0]);
         invoke(plugin, "transactionBooked", new Class<?>[] {Transaction.class, long.class},
             Tx.of(1L, null, TransactionType.GAIN, Context.GENERIC, "", "Test", true,
@@ -59,10 +60,10 @@ public class PresentationWiringTest
         SwingUtilities.invokeAndWait(() -> {});
         SwingUtilities.invokeAndWait(() -> {});
         assertNotNull("signals reach the sidebar read model", SidebarPanelProbe.live(panel));
-        assertSame(session, engine.getActiveSession());
-        assertTrue(session.getTransactions().isEmpty());
-        assertEquals(revision, engine.getRevision());
-        assertEquals(0L, engine.getMetrics(1L).net);
+        assertSame(session, engine.session());
+        assertTrue(session.transactions().isEmpty());
+        assertEquals(revision, engine.revision());
+        assertEquals(0L, engine.metrics(1L).net);
     }
 
     @Test
@@ -86,7 +87,7 @@ public class PresentationWiringTest
         SidebarPanel[] panel = new SidebarPanel[1];
         SwingUtilities.invokeAndWait(() -> panel[0] = new SidebarPanel(engine, config, null, null, null));
         set(plugin, "engine", engine);
-        set(plugin, "activityPanel", panel[0]);
+        set(plugin, "sidebar", panel[0]);
         return panel[0];
     }
 

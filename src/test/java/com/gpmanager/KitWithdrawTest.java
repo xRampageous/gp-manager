@@ -48,20 +48,20 @@ public class KitWithdrawTest
     public void takingAHarpoonOutOfTheTackleBoxIsNotLoot()
     {
         Engine engine = withdraw(2);
-        assertEquals(0L, engine.getMetrics(1_010_000L).net);
-        assertTrue(engine.getActiveSession().getTransactions().toString(),
-            engine.getActiveSession().getTransactions().stream().noneMatch(Transaction::isCounted));
+        assertEquals(0L, engine.metrics(1_010_000L).net);
+        assertTrue(engine.session().transactions().toString(),
+            engine.session().transactions().stream().noneMatch(Transaction::counts));
     }
 
     @Test
     public void withoutTheKitChangingTheSameItemCountsAsAGain()
     {
-        assertTrue(withdraw(0).getMetrics(1_010_000L).net > 0L);
+        assertTrue(withdraw(0).metrics(1_010_000L).net > 0L);
     }
 
     @Test
     public void openingAKitForTheFirstTimeIsNotEvidence()
     {
-        assertTrue("a kit loading is not a withdrawal", withdraw(1).getMetrics(1_010_000L).net > 0L);
+        assertTrue("a kit loading is not a withdrawal", withdraw(1).metrics(1_010_000L).net > 0L);
     }
 }

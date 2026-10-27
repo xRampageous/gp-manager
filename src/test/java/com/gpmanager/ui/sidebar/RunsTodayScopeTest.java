@@ -23,12 +23,12 @@ public class RunsTodayScopeTest
         long now = midnight + 12L * 3_600_000L;
 
         engine.startCustom("Overnight", midnight - 300_000L);
-        String overnightId = engine.getActiveSession().getId();
+        String overnightId = engine.session().id();
         book(engine, midnight - 299_000L, 1_000L);
         engine.finishCustom(midnight + 600_000L);
 
         engine.startCustom("Morning", midnight + 900_000L);
-        String morningId = engine.getActiveSession().getId();
+        String morningId = engine.session().id();
         book(engine, midnight + 901_000L, 2_000L);
         engine.finishCustom(midnight + 1_800_000L);
 
@@ -39,10 +39,10 @@ public class RunsTodayScopeTest
         List<Session> sessions = LedgerData.sessionsFor(engine, entry, now);
         assertEquals("whole runs, not calendar slices", 2, sessions.size());
         assertEquals("the current run is included in full even though it started yesterday",
-            engine.getActiveSession().getId(), sessions.get(0).getId());
-        assertEquals("a run that started today is included", morningId, sessions.get(1).getId());
+            engine.session().id(), sessions.get(0).id());
+        assertEquals("a run that started today is included", morningId, sessions.get(1).id());
         assertTrue("the overnight run is out", sessions.stream()
-            .noneMatch(session -> overnightId.equals(session.getId())));
+            .noneMatch(session -> overnightId.equals(session.id())));
 
         LedgerData data = LedgerData.capture(engine, now, entry);
         assertEquals("only whole-run totals: the overnight run's money stays out", 5_000L, data.net);
@@ -59,7 +59,7 @@ public class RunsTodayScopeTest
             long now = midnight + 12L * 3_600_000L;
 
             engine.startCustom("JustBefore", midnight - 1L);
-            String beforeId = engine.getActiveSession().getId();
+            String beforeId = engine.session().id();
             engine.finishCustom(midnight + 60_000L);
 
             engine.startCustom("AtMidnight", midnight);
@@ -67,8 +67,8 @@ public class RunsTodayScopeTest
             LedgerData.Entry entry = LedgerData.Entry.current().withScope(LedgerData.Scope.TODAY, null, null);
             List<Session> sessions = LedgerData.sessionsFor(engine, entry, now);
             assertEquals("only the run started at midnight is today", 1, sessions.size());
-            assertEquals(engine.getActiveSession().getId(), sessions.get(0).getId());
-            assertTrue(sessions.stream().noneMatch(session -> beforeId.equals(session.getId())));
+            assertEquals(engine.session().id(), sessions.get(0).id());
+            assertTrue(sessions.stream().noneMatch(session -> beforeId.equals(session.id())));
         }
     }
 
@@ -117,7 +117,7 @@ public class RunsTodayScopeTest
         Transaction receipt = new Transaction(at, TransactionType.LOOT, Context.LOOT, "", "Vorkath", true,
             Collections.singletonList(new Flow(536, "Dragon bones", 1L, (int) value, value)),
             Confidence.CONFIRMED, "fixture", null);
-        engine.getActiveSession().addTransaction(receipt, 2_000, false);
+        engine.session().addTransaction(receipt, 2_000, false);
         return receipt;
     }
 
@@ -125,7 +125,7 @@ public class RunsTodayScopeTest
     {
         Engine engine = new Engine(deltas -> Collections.emptyList(), new TransactionClassifier(),
             new GpManagerConfig() {});
-        engine.profileTimeZoneId = zoneId;
+        engine.zone = zoneId;
         return engine;
     }
 

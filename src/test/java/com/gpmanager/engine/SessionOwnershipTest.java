@@ -29,28 +29,28 @@ public class SessionOwnershipTest
     {
         Engine engine = engine(10);
         engine.ensureSession(0L);
-        Session general = engine.getGeneralSession();
-        assertEquals("Overall", general.getName());
+        Session general = engine.freePlay();
+        assertEquals("Overall", general.name());
         engine.setBaseline(snapshot(0L));
 
         engine.startCustom("Vorkath", 100L);
-        Session custom = engine.getActiveSession();
-        assertNotEquals(general.getId(), custom.getId());
+        Session custom = engine.session();
+        assertNotEquals(general.id(), custom.id());
         assertTrue(general.paused);
         engine.setBaseline(snapshot(0L));
         engine.markDirty();
         engine.processIfDirty(snapshot(250L), 200L, null);
         Transaction transaction = engine.processIfDirty(snapshot(250L), 201L, null);
 
-        assertEquals(250L, transaction.getNet());
-        assertEquals(1, custom.getTransactions().size());
-        assertEquals(0, general.getTransactions().size());
+        assertEquals(250L, transaction.net());
+        assertEquals(1, custom.transactions().size());
+        assertEquals(0, general.transactions().size());
         assertTrue(engine.finishCustom(1_000L));
-        assertEquals(general.getId(), engine.getActiveSession().getId());
+        assertEquals(general.id(), engine.session().id());
         assertFalse(general.paused);
-        assertEquals(1, engine.getHistory().size());
-        assertEquals(custom.getId(), engine.getHistory().get(0).getId());
-        assertEquals(1_100L, engine.getMetrics(2_000L).elapsedMillis);
+        assertEquals(1, engine.history().size());
+        assertEquals(custom.id(), engine.history().get(0).id());
+        assertEquals(1_100L, engine.metrics(2_000L).elapsed);
     }
 
     @Test
@@ -58,17 +58,17 @@ public class SessionOwnershipTest
     {
         Engine engine = engine(10);
         engine.ensureSession(1_000L);
-        String generalId = engine.getGeneralSession().getId();
+        String generalId = engine.freePlay().id();
 
         engine.pauseForLifecycle(2_000L);
         SavedState saved = engine.savedState();
 
-        assertEquals(generalId, saved.generalSession.getId());
-        assertEquals(0, saved.getHistory().size());
+        assertEquals(generalId, saved.generalSession.id());
+        assertEquals(0, saved.history().size());
         Engine restored = engine(10);
         restored.restore(saved, SafeMath.now());
-        assertEquals(generalId, restored.getActiveSession().getId());
-        assertEquals(PauseReason.RECOVERY, restored.getActiveSession().getPauseReason());
+        assertEquals(generalId, restored.session().id());
+        assertEquals(PauseReason.RECOVERY, restored.session().pauseReason());
     }
 
     @Test
@@ -78,9 +78,9 @@ public class SessionOwnershipTest
 
         engine.togglePause(1_000L);
 
-        assertEquals("Overall", engine.getActiveSession().getName());
-        assertEquals(engine.getGeneralSession().getId(), engine.getActiveSession().getId());
-        assertFalse("Start begins tracking; it never creates a paused owner", engine.getActiveSession().paused);
+        assertEquals("Overall", engine.session().name());
+        assertEquals(engine.freePlay().id(), engine.session().id());
+        assertFalse("Start begins tracking; it never creates a paused owner", engine.session().paused);
     }
 
     @Test
@@ -90,13 +90,13 @@ public class SessionOwnershipTest
         {
             Engine engine = engine(10);
             engine.ensureSession(1_000L);
-            Session general = engine.getGeneralSession();
-            if (reason == PauseReason.IDLE) engine.getActiveSession().pause(1_100L, PauseReason.IDLE);
+            Session general = engine.freePlay();
+            if (reason == PauseReason.IDLE) engine.session().pause(1_100L, PauseReason.IDLE);
             if (reason == PauseReason.MANUAL) engine.togglePause(1_100L);
             if (reason == PauseReason.RECOVERY) general.pause(1_100L, PauseReason.RECOVERY);
             engine.startCustom("Custom", 1_200L);
             engine.finishCustom(1_300L);
-            assertEquals(reason, general.getPauseReason());
+            assertEquals(reason, general.pauseReason());
             if (reason == PauseReason.IDLE || reason == PauseReason.RECOVERY)
             {
                 engine.resume(1_400L, PauseReason.IDLE, PauseReason.RECOVERY);
@@ -116,10 +116,10 @@ public class SessionOwnershipTest
         Engine engine = engine(10);
         engine.ensureSession(0L);
         engine.startCustom("First", 1L);
-        String first = engine.getActiveSession().getId();
+        String first = engine.session().id();
         engine.startCustom("Second", 2L);
-        assertEquals(first, engine.getActiveSession().getId());
-        assertEquals(0, engine.getHistory().size());
+        assertEquals(first, engine.session().id());
+        assertEquals(0, engine.history().size());
     }
 
     @Test
@@ -127,7 +127,7 @@ public class SessionOwnershipTest
     {
         Engine engine = engine(10);
         engine.ensureSession(1_000L);
-        engine.getActiveSession().pause(1_100L, PauseReason.IDLE);
+        engine.session().pause(1_100L, PauseReason.IDLE);
         engine.startCustom("Raid", 1_200L);
         SavedState saved = new Gson().fromJson(new Gson().toJson(engine.savedState()), SavedState.class);
 
@@ -135,9 +135,9 @@ public class SessionOwnershipTest
         restored.restore(saved, SafeMath.now());
         restored.finishCustom(1_300L);
 
-        assertEquals(PauseReason.IDLE, restored.getGeneralSession().getPauseReason());
+        assertEquals(PauseReason.IDLE, restored.freePlay().pauseReason());
         restored.resume(1_400L, PauseReason.IDLE, PauseReason.RECOVERY);
-        assertFalse(restored.getGeneralSession().paused);
+        assertFalse(restored.freePlay().paused);
     }
 
     @Test
@@ -145,19 +145,19 @@ public class SessionOwnershipTest
     {
         Engine engine = engine(10);
         engine.ensureSession(1_000L);
-        String generalId = engine.getGeneralSession().getId();
+        String generalId = engine.freePlay().id();
         engine.startCustom("Raid", 2_000L);
-        String customId = engine.getActiveSession().getId();
+        String customId = engine.session().id();
 
         SavedState saved = new Gson().fromJson(new Gson().toJson(engine.savedState()), SavedState.class);
         Engine restored = engine(10);
         restored.restore(saved, SafeMath.now());
 
-        assertEquals(generalId, restored.getGeneralSession().getId());
-        assertEquals(customId, restored.getActiveSession().getId());
-        assertTrue(restored.isCustomActive());
-        assertEquals(PauseReason.RECOVERY, restored.getActiveSession().getPauseReason());
-        assertTrue(restored.getGeneralSession().paused);
+        assertEquals(generalId, restored.freePlay().id());
+        assertEquals(customId, restored.session().id());
+        assertTrue(restored.customActive());
+        assertEquals(PauseReason.RECOVERY, restored.session().pauseReason());
+        assertTrue(restored.freePlay().paused);
     }
 
     @Test
@@ -165,13 +165,13 @@ public class SessionOwnershipTest
     {
         Engine engine = engine(2);
         engine.ensureSession(1_000L);
-        String generalId = engine.getGeneralSession().getId();
+        String generalId = engine.freePlay().id();
         engine.togglePause(2_000L);
         engine.pauseForLifecycle(3_000L);
         engine.resume(4_000L, PauseReason.LIFECYCLE);
-        assertTrue(engine.getActiveSession().paused);
+        assertTrue(engine.session().paused);
         engine.resume(6_000L, PauseReason.IDLE, PauseReason.RECOVERY);
-        assertTrue("a manual pause waits for Resume", engine.getActiveSession().paused);
+        assertTrue("a manual pause waits for Resume", engine.session().paused);
 
         engine.startCustom("First", 7_000L);
         engine.finishCustom(8_000L);
@@ -180,10 +180,10 @@ public class SessionOwnershipTest
         engine.startCustom("Third", 11_000L);
         engine.finishCustom(12_000L);
 
-        assertEquals(generalId, engine.getGeneralSession().getId());
-        assertEquals(generalId, engine.getActiveSession().getId());
-        assertEquals(2, engine.getHistory().size());
-        assertEquals(PauseReason.MANUAL, engine.getGeneralSession().getPauseReason());
+        assertEquals(generalId, engine.freePlay().id());
+        assertEquals(generalId, engine.session().id());
+        assertEquals("all three finished trips stay owned beyond the old cap", 3, engine.history().size());
+        assertEquals(PauseReason.MANUAL, engine.freePlay().pauseReason());
     }
 
     private static ContainerSnapshot snapshot(long coins)

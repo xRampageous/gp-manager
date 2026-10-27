@@ -47,8 +47,8 @@ public class GeRingAuthorityTest
         assertEquals("the reserve never changes Net", 0L, h.net());
         for (Transaction transaction : h.transactions())
         {
-            assertFalse("no Review row", ReviewRules.needsOwnerDecision(transaction));
-            assertFalse("the reserve is uncounted", transaction.isCounted());
+            assertFalse("no Review row", ReviewRules.needsReview(transaction));
+            assertFalse("the reserve is uncounted", transaction.counts());
         }
 
         h.settle(with(h.inventory, COINS, 1_000_000L - 700L, LOGS, 5L));
@@ -58,8 +58,8 @@ public class GeRingAuthorityTest
         assertEquals(700L, EngineProbe.knownCoverageBasisGp(h.engine, LOGS));
         List<Transaction> counted = h.counted();
         assertEquals("only the authoritative settlement is counted", 1, counted.size());
-        assertEquals(TransactionType.TRADE, counted.get(0).getType());
-        assertEquals("no duplicate spend", 0L, counted.get(0).getNet());
+        assertEquals(TransactionType.TRADE, counted.get(0).type());
+        assertEquals("no duplicate spend", 0L, counted.get(0).net());
     }
 
     @Test
@@ -92,7 +92,7 @@ public class GeRingAuthorityTest
         assertEquals(0L, h.net());
         assertFalse(h.hasCountedCoinsOnlyRow());
         assertEquals(1, h.reviews());
-        assertEquals(TransactionType.UNCERTAIN, h.transactions().get(0).getType());
+        assertEquals(TransactionType.UNCERTAIN, h.transactions().get(0).type());
     }
 
     @Test
@@ -116,7 +116,7 @@ public class GeRingAuthorityTest
         h.settle(with(h.inventory, COINS, 999_990L));
 
         assertEquals(-10L, h.net());
-        assertEquals(TransactionType.TRADE, h.counted().get(0).getType());
+        assertEquals(TransactionType.TRADE, h.counted().get(0).type());
     }
 
     @Test
@@ -136,8 +136,8 @@ public class GeRingAuthorityTest
         List<Transaction> counted = h.counted();
         assertEquals("the gain plus exactly one custody settlement", 2, counted.size());
         Transaction settlement = counted.get(1);
-        assertEquals(TransactionType.TRADE, settlement.getType());
-        assertEquals("custody books the sale exactly once", 15L, settlement.getNet());
+        assertEquals(TransactionType.TRADE, settlement.type());
+        assertEquals("custody books the sale exactly once", 15L, settlement.net());
         assertEquals("known coverage is consumed by the reservation", 0L,
             EngineProbe.knownCoverageQty(h.engine, LOGS));
         assertFalse(h.hasCountedCoinsOnlyRow());
@@ -164,7 +164,7 @@ public class GeRingAuthorityTest
 
         void gain(int item, long qty, long value, long at)
         {
-            engine.getActiveSession().addTransaction(new Transaction(at,
+            engine.session().addTransaction(new Transaction(at,
                 TransactionType.GAIN, Context.GENERIC, "", "Loot", true,
                 Collections.singletonList(new Flow(item, name(item), qty,
                     (int) (qty > 0L ? value / qty : 0L), value, PriceSource.GRAND_EXCHANGE)),
@@ -179,7 +179,7 @@ public class GeRingAuthorityTest
                 new OfferSlots.Snapshot(slot, state, item, total, traded, price, spent)).orElse(null);
             if (transition != null)
             {
-                engine.noteGeOffer(transition, name(transition.current.itemId), now);
+                engine.noteGeOffer(transition, name(transition.current.item), now);
             }
         }
 
@@ -204,13 +204,13 @@ public class GeRingAuthorityTest
 
         long net()
         {
-            return engine.getMetrics(now).net;
+            return engine.metrics(now).net;
         }
 
         List<Transaction> transactions()
         {
             List<Transaction> out = new ArrayList<>();
-            for (Transaction transaction : engine.getActiveSession().getTransactions())
+            for (Transaction transaction : engine.session().transactions())
             {
                 if (transaction != null)
                 {
@@ -225,7 +225,7 @@ public class GeRingAuthorityTest
             List<Transaction> out = new ArrayList<>();
             for (Transaction transaction : transactions())
             {
-                if (transaction.isCounted())
+                if (transaction.counts())
                 {
                     out.add(transaction);
                 }
@@ -238,7 +238,7 @@ public class GeRingAuthorityTest
             int reviews = 0;
             for (Transaction transaction : transactions())
             {
-                if (ReviewRules.needsOwnerDecision(transaction))
+                if (ReviewRules.needsReview(transaction))
                 {
                     reviews++;
                 }
@@ -250,10 +250,10 @@ public class GeRingAuthorityTest
         {
             for (Transaction transaction : counted())
             {
-                boolean coinsOnly = !transaction.getFlows().isEmpty();
-                for (Flow flow : transaction.getFlows())
+                boolean coinsOnly = !transaction.flows().isEmpty();
+                for (Flow flow : transaction.flows())
                 {
-                    coinsOnly &= flow.itemId == COINS;
+                    coinsOnly &= flow.item == COINS;
                 }
                 if (coinsOnly)
                 {

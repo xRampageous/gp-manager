@@ -69,10 +69,10 @@ public class GuardiansOfTheRiftBookingTest
         // runes plus a guardian stone. The strip removes the minigame items (essence, stone); the
         // custody must not swallow the runes with them.
         Engine engine = settle(Map.of(ESSENCE, 1L), Map.of(FIRE_RUNE, 132L, STONE, 40L), POUCH_CUSTODY);
-        List<Transaction> rows = engine.getActiveSession().getTransactions();
+        List<Transaction> rows = engine.session().transactions();
         assertEquals(rows.toString(), 1, rows.size());
-        assertTrue(rows.get(0).isCounted());
-        assertEquals(132L * 5L, engine.getMetrics(1_010_000L).net);
+        assertTrue(rows.get(0).counts());
+        assertEquals(132L * 5L, engine.metrics(1_010_000L).net);
     }
 
     @Test
@@ -80,9 +80,9 @@ public class GuardiansOfTheRiftBookingTest
     {
         // Pure essence has no minigame strip: the custody removal itself keeps the move neutral.
         Engine engine = settle(Map.of(), Map.of(PURE_ESSENCE, 28L), POUCH_CUSTODY);
-        assertTrue(engine.getActiveSession().getTransactions().toString(),
-            engine.getActiveSession().getTransactions().isEmpty());
-        assertEquals(0L, engine.getMetrics(1_010_000L).net);
+        assertTrue(engine.session().transactions().toString(),
+            engine.session().transactions().isEmpty());
+        assertEquals(0L, engine.metrics(1_010_000L).net);
     }
 
     @Test
@@ -91,10 +91,10 @@ public class GuardiansOfTheRiftBookingTest
         // Empty (28 essence) and craft (24 essence used) inside one window: the net essence +4 is
         // the pouch's own leftover and stays neutral; the runes are the craft's real gain.
         Engine engine = settle(Map.of(), Map.of(PURE_ESSENCE, 4L, FIRE_RUNE, 96L), POUCH_CUSTODY);
-        List<Transaction> rows = engine.getActiveSession().getTransactions();
+        List<Transaction> rows = engine.session().transactions();
         assertEquals(rows.toString(), 1, rows.size());
-        assertTrue(rows.get(0).isCounted());
-        assertEquals(96L * 5L, engine.getMetrics(1_010_000L).net);
+        assertTrue(rows.get(0).counts());
+        assertEquals(96L * 5L, engine.metrics(1_010_000L).net);
     }
 
     @Test
@@ -102,7 +102,7 @@ public class GuardiansOfTheRiftBookingTest
     {
         // The control: with no pouch click in the window the runes were already the one gain.
         Engine engine = settle(Map.of(ESSENCE, 1L), Map.of(FIRE_RUNE, 132L, STONE, 40L), null);
-        assertEquals(132L * 5L, engine.getMetrics(1_010_000L).net);
+        assertEquals(132L * 5L, engine.metrics(1_010_000L).net);
     }
 
     @Test
@@ -111,8 +111,8 @@ public class GuardiansOfTheRiftBookingTest
         // "Deposit-runes" on the deposit pool marks a custody transfer (neutral_transfers.tsv):
         // the runes leave for the bank and nothing counts, instead of a rune-only Cast.
         Engine engine = settle(Map.of(FIRE_RUNE, 253L), Map.of(), DEPOSIT_POOL);
-        assertFalse(engine.getActiveSession().getTransactions().stream().anyMatch(Transaction::isCounted));
-        assertEquals(0L, engine.getMetrics(1_010_000L).net);
+        assertFalse(engine.session().transactions().stream().anyMatch(Transaction::counts));
+        assertEquals(0L, engine.metrics(1_010_000L).net);
     }
 
     @Test

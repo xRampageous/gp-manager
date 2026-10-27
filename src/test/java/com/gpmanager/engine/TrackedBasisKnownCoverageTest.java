@@ -68,7 +68,7 @@ public class TrackedBasisKnownCoverageTest
 
         Transaction settlement = h.ajs(row.settlementId);
         assertNotNull(settlement);
-        assertFalse("an unknown-basis settlement is Net-neutral evidence", settlement.isCounted());
+        assertFalse("an unknown-basis settlement is Net-neutral evidence", settlement.counts());
     }
 
     @Test
@@ -192,12 +192,12 @@ public class TrackedBasisKnownCoverageTest
     @Test
     public void mixedProceedsAllocationKeepsExactSum()
     {
-        assertEquals(3L, BasisMath.knownProceedsOf(10L, 3L, 1L));
-        long known = BasisMath.knownProceedsOf(10L, 3L, 1L);
+        assertEquals(3L, BasisMath.shareOf(3L, 10L, 1L));
+        long known = BasisMath.shareOf(3L, 10L, 1L);
         assertEquals("unknown receives the integer remainder", 10L, known + (10L - known));
         assertEquals("all-known takes the exact settlement", 10L,
-            BasisMath.knownProceedsOf(10L, 3L, 3L));
-        assertEquals(0L, BasisMath.knownProceedsOf(10L, 3L, 0L));
+            BasisMath.shareOf(3L, 10L, 3L));
+        assertEquals(0L, BasisMath.shareOf(3L, 10L, 0L));
     }
 
     // ---- reservation ------------------------------------------------------------------------
@@ -222,8 +222,8 @@ public class TrackedBasisKnownCoverageTest
         assertEquals(10_000L, EngineProbe.reservedBasisGp(h.engine, LOGS));
         assertEquals(0L, EngineProbe.availableQty(h.engine, LOGS));
         assertEquals("20 offered units are unknown, never zero basis", 20L,
-            h.engine.geCustody.records().get(1).getOfferedQty()
-                - h.engine.geCustody.records().get(1).getReservedTrackedQty());
+            h.engine.exchange.records().get(1).getOfferedQty()
+                - h.engine.exchange.records().get(1).getReservedTrackedQty());
 
         h.offer(0, CANCELLED_SELL, LOGS, 60, 0, 100, 0);
         h.settle(with(h.inventory, LOGS, 60L));
@@ -250,9 +250,9 @@ public class TrackedBasisKnownCoverageTest
         h.offer(0, SOLD, LOGS, 200, 30, 100, 3_000);
         h.settle(with(h.inventory, COINS, 1_003_000L));
         assertEquals("only the realized 30 consume reserved basis", 30L,
-            h.engine.geCustody.records().get(0).getConsumedTrackedQty());
+            h.engine.exchange.records().get(0).getConsumedTrackedQty());
         assertEquals(3_000L,
-            h.engine.geCustody.records().get(0).getConsumedTrackedBasisGp());
+            h.engine.exchange.records().get(0).getConsumedTrackedBasisGp());
         assertEquals("the earlier counted value plus a zero sale result", 10_000L, h.net());
 
         h.offer(0, CANCELLED_SELL, LOGS, 200, 30, 100, 3_000);
@@ -299,7 +299,7 @@ public class TrackedBasisKnownCoverageTest
         Engine restarted = engine(new int[] {100});
         restarted.restore(state, h.now);
         restarted.setBaseline(new ContainerSnapshot(with(h.inventory, LOGS, 0L)));
-        restarted.getActiveSession().resume(h.now);
+        restarted.session().resume(h.now);
         restarted.seedGeSlots(Collections.singletonMap(0,
             new OfferSlots.Snapshot(0, SELLING, LOGS, 60, 0, 100, 0)), h.now + 500L);
 
@@ -309,7 +309,7 @@ public class TrackedBasisKnownCoverageTest
         assertEquals("the open reservation survives restart", 60L,
             EngineProbe.reservedQty(restarted, LOGS));
         assertEquals(6_000L, EngineProbe.reservedBasisGp(restarted, LOGS));
-        assertEquals(1, restarted.geCustody.records().size());
+        assertEquals(1, restarted.exchange.records().size());
 
         OfferSlots ledger = new OfferSlots();
         OfferSlots.Transition cancel = ledger.observe(
@@ -344,7 +344,7 @@ public class TrackedBasisKnownCoverageTest
         assertEquals("no bank or history backfill", 0L, EngineProbe.knownCoverageQty(migrated, LOGS));
         assertEquals(0L, EngineProbe.knownCoverageBasisGp(migrated, LOGS));
         assertEquals("historical Net is unchanged by migration", historicalNet,
-            migrated.getMetrics(h.now + 1_000L).net);
+            migrated.metrics(h.now + 1_000L).net);
 
         // New post-migration acquisitions still create known coverage.
         Transaction gain = new Transaction(h.now + 2_000L, TransactionType.GAIN,
@@ -352,7 +352,7 @@ public class TrackedBasisKnownCoverageTest
             Collections.singletonList(new Flow(LOGS, "Logs", 3L, 100, 300L,
                 PriceSource.GRAND_EXCHANGE)),
             Confidence.CONFIRMED, "", null);
-        migrated.getActiveSession().addTransaction(gain, 500, false);
+        migrated.session().addTransaction(gain, 500, false);
         assertEquals(3L, EngineProbe.knownCoverageQty(migrated, LOGS));
         assertEquals(300L, EngineProbe.knownCoverageBasisGp(migrated, LOGS));
     }
@@ -442,7 +442,7 @@ public class TrackedBasisKnownCoverageTest
 
         void book(Transaction transaction)
         {
-            engine.getActiveSession().addTransaction(transaction, 500, false);
+            engine.session().addTransaction(transaction, 500, false);
         }
 
         void sell(int slot, int item, long qty, int limit, long cash)
@@ -475,7 +475,7 @@ public class TrackedBasisKnownCoverageTest
                 new OfferSlots.Snapshot(slot, state, item, total, traded, price, spent)).orElse(null);
             if (transition != null)
             {
-                engine.noteGeOffer(transition, name(transition.current.itemId), now);
+                engine.noteGeOffer(transition, name(transition.current.item), now);
             }
         }
 
@@ -500,7 +500,7 @@ public class TrackedBasisKnownCoverageTest
 
         long net()
         {
-            return engine.getMetrics(now).net;
+            return engine.metrics(now).net;
         }
 
         List<MarketRows.Row> rows()
@@ -510,9 +510,9 @@ public class TrackedBasisKnownCoverageTest
 
         Transaction ajs(String id)
         {
-            for (Transaction transaction : engine.getActiveSession().getTransactions())
+            for (Transaction transaction : engine.session().transactions())
             {
-                if (transaction != null && transaction.getId().equals(id))
+                if (transaction != null && transaction.id().equals(id))
                 {
                     return transaction;
                 }

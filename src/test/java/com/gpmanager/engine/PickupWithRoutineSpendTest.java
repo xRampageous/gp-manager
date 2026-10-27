@@ -36,8 +36,8 @@ public class PickupWithRoutineSpendTest
         Transaction settled = settleFrom(POUCH, 2L, 995, 60L, POUCH, 0L);
         assertNotNull(settled);
         assertEquals("the coins count as income, not an uncounted Review",
-            TransactionType.GAIN, settled.getType());
-        assertTrue(settled.isCounted());
+            TransactionType.GAIN, settled.type());
+        assertTrue(settled.counts());
     }
 
     @Test
@@ -45,15 +45,15 @@ public class PickupWithRoutineSpendTest
     {
         Transaction settled = settleFrom(808, 10L, 562, 50L, 808, 9L);
         assertNotNull(settled);
-        assertEquals(TransactionType.GAIN, settled.getType());
-        assertTrue("counted, never an uncounted Review", settled.isCounted());
-        assertEquals("the pickup owns only the runes", 50L * 90L, settled.getNet());
+        assertEquals(TransactionType.GAIN, settled.type());
+        assertTrue("counted, never an uncounted Review", settled.counts());
+        assertEquals("the pickup owns only the runes", 50L * 90L, settled.net());
         assertEquals("session Net still subtracts the dart", 50L * 90L - 4L,
-            lastEngine.getMetrics(T0 + 3_000L).net);
-        Transaction shot = lastEngine.getActiveSession().getTransactions().stream()
-            .filter(row -> row.getActionKind() == ActionKind.FIRE).findFirst().orElseThrow(AssertionError::new);
-        assertEquals(4L, shot.getCosts());
-        assertEquals(CostKind.SUPPLIES, CostKind.of(shot, shot.getFlows().get(0)));
+            lastEngine.metrics(T0 + 3_000L).net);
+        Transaction shot = lastEngine.session().transactions().stream()
+            .filter(row -> row.action() == ActionKind.FIRE).findFirst().orElseThrow(AssertionError::new);
+        assertEquals(4L, shot.costs());
+        assertEquals(CostKind.SUPPLIES, CostKind.of(shot, shot.flows().get(0)));
     }
 
     @Test
@@ -61,7 +61,7 @@ public class PickupWithRoutineSpendTest
     {
         Transaction settled = settleFrom(385, 3L, 562, 50L, 385, 2L);
         assertNotNull(settled);
-        assertEquals("food is not a routine combat spend", TransactionType.UNCERTAIN, settled.getType());
+        assertEquals("food is not a routine combat spend", TransactionType.UNCERTAIN, settled.type());
     }
 
     /** Baseline {first: firstQty}, then {gainId: gainQty, first: firstAfter}. */

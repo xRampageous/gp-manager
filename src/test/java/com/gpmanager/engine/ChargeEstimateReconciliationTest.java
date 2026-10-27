@@ -23,13 +23,13 @@ public class ChargeEstimateReconciliationTest
                 flow(ItemID.CHAOSRUNE, "Chaos rune", -2L, 50)), T0 + 1L);
 
         assertNotNull(receipt);
-        assertEquals(Confidence.LIKELY, receipt.getConfidence());
-        assertEquals("Estimated", receipt.getExplanation());
-        assertEquals(-300L, receipt.getNet());
-        assertEquals(2L, ChargeProbes.adp(engine.chargeEstimateJournal, 
-            engine.getActiveSession().getId(), "slot-a", "seas", ItemID.DEATHRUNE));
-        assertEquals(2L, ChargeProbes.adp(engine.chargeEstimateJournal, 
-            engine.getActiveSession().getId(), "slot-a", "seas", ItemID.CHAOSRUNE));
+        assertEquals(Confidence.LIKELY, receipt.confidence());
+        assertEquals("Estimated", receipt.explanation());
+        assertEquals(-300L, receipt.net());
+        assertEquals(2L, ChargeProbes.adp(engine.estimate,
+            engine.session().id(), "slot-a", "seas", ItemID.DEATHRUNE));
+        assertEquals(2L, ChargeProbes.adp(engine.estimate,
+            engine.session().id(), "slot-a", "seas", ItemID.CHAOSRUNE));
     }
 
     @Test
@@ -59,15 +59,15 @@ public class ChargeEstimateReconciliationTest
 
         assertNotNull(measured);
         assertEquals(2L, estimate.quantity(ItemID.DEATHRUNE, false));
-        assertEquals(100, estimate.getFlows().get(0).unitPrice);
+        assertEquals(100, estimate.flows().get(0).unitPrice);
         assertEquals(1L, estimate.quantity(ItemID.CHAOSRUNE, false));
-        assertEquals(Confidence.CONFIRMED, estimate.getConfidence());
-        assertEquals("Confirmed", estimate.getExplanation());
+        assertEquals(Confidence.CONFIRMED, estimate.confidence());
+        assertEquals("Confirmed", estimate.explanation());
         assertEquals(2L, measured.quantity(ItemID.CHAOSRUNE, false));
-        assertEquals(0L, ChargeProbes.adp(engine.chargeEstimateJournal, 
-            engine.getActiveSession().getId(), "slot-a", "seas", ItemID.DEATHRUNE));
-        assertEquals(0L, ChargeProbes.adp(engine.chargeEstimateJournal, 
-            engine.getActiveSession().getId(), "slot-a", "seas", ItemID.CHAOSRUNE));
+        assertEquals(0L, ChargeProbes.adp(engine.estimate,
+            engine.session().id(), "slot-a", "seas", ItemID.DEATHRUNE));
+        assertEquals(0L, ChargeProbes.adp(engine.estimate,
+            engine.session().id(), "slot-a", "seas", ItemID.CHAOSRUNE));
     }
 
     @Test
@@ -78,8 +78,8 @@ public class ChargeEstimateReconciliationTest
         Transaction estimate = engine.bookEstimatedCharge("slot-a", "seas",
             ActionKind.CAST, Collections.singletonList(flow(ItemID.DEATHRUNE, "Death rune", -3L, 100)),
             T0 + 1L);
-        assertTrue(engine.getActiveSession().correctTransaction(estimate.getId(),
-            Correction.COST, T0 + 2L, "Owner decision"));
+        assertTrue(engine.session().correctTransaction(estimate.id(),
+            Correction.COST, "Owner decision"));
 
         ChargeDelta delta = new ChargeDelta(ChargeCheck.ChargedItem.TRIDENT_SEAS,
             Collections.singletonList(new ChargeDelta.ComponentDelta(ItemID.DEATHRUNE, -2L)), ChargeDelta.CheckResult.SPEND);
@@ -87,9 +87,9 @@ public class ChargeEstimateReconciliationTest
             Collections.singletonList(flow(ItemID.DEATHRUNE, "Death rune", -2L, 100)), T0 + 3L, "slot-a");
 
         assertNull(measured);
-        assertEquals(Correction.COST, estimate.getCorrection());
+        assertEquals(Correction.COST, estimate.correction());
         assertEquals(3L, estimate.quantity(ItemID.DEATHRUNE, false));
-        assertEquals(100, estimate.getFlows().get(0).unitPrice);
+        assertEquals(100, estimate.flows().get(0).unitPrice);
     }
 
     @Test
@@ -100,7 +100,7 @@ public class ChargeEstimateReconciliationTest
         Transaction old = engine.bookEstimatedCharge("slot-a", "seas",
             ActionKind.CAST, Collections.singletonList(flow(ItemID.DEATHRUNE, "Death rune", -2L, 100)),
             T0 + 1L);
-        String oldSession = engine.getActiveSession().getId();
+        String oldSession = engine.session().id();
         engine.startCustom("Custom", T0 + 2L);
 
         ChargeDelta delta = new ChargeDelta(ChargeCheck.ChargedItem.TRIDENT_SEAS,
@@ -111,7 +111,7 @@ public class ChargeEstimateReconciliationTest
         assertNotNull(measured);
         assertEquals(2L, old.quantity(ItemID.DEATHRUNE, false));
         assertEquals(2L, measured.quantity(ItemID.DEATHRUNE, false));
-        assertEquals(0L, ChargeProbes.adp(engine.chargeEstimateJournal, oldSession,
+        assertEquals(0L, ChargeProbes.adp(engine.estimate, oldSession,
             "slot-a", "seas", ItemID.DEATHRUNE));
     }
 
@@ -123,8 +123,8 @@ public class ChargeEstimateReconciliationTest
         engine.bookEstimatedCharge("slot-a", "seas", ActionKind.CAST,
             Collections.singletonList(flow(ItemID.DEATHRUNE, "Death rune", -1L, 100)), T0 + 1L);
         engine.pauseForLifecycle(T0 + 2L);
-        assertEquals(0L, ChargeProbes.adp(engine.chargeEstimateJournal, 
-            engine.getActiveSession().getId(), "slot-a", "seas", ItemID.DEATHRUNE));
+        assertEquals(0L, ChargeProbes.adp(engine.estimate,
+            engine.session().id(), "slot-a", "seas", ItemID.DEATHRUNE));
     }
 
     @Test

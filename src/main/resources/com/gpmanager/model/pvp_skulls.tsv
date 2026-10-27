@@ -1,0 +1,8 @@
+# BH loss tiers: exclusive lower bounds; equality stays in the lower tier.
+# Artwork 0 is the ordinary skull; 1..5 are bronze, iron, green, blue, red.
+# https://oldschool.runescape.wiki/w/Bounty_Hunter#Skulls
+0
+200000
+800000
+2000000
+8000000

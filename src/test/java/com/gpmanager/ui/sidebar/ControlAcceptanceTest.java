@@ -36,7 +36,7 @@ public class ControlAcceptanceTest {
             panel.shell.show(Shell.LEDGER);
             SidebarPanelProbe.refresh(panel);
             assertEquals(Shell.LEDGER, panel.shell.currentPage());
-            assertEquals(LedgerData.Entry.current().scope, panel.ledgerEntry.scope);
+            assertEquals(LedgerData.Entry.current().scope, panel.scope.scope);
             assertEquals("", panel.ledgerSearch);
             assertEquals(1_500L, panel.ledger.data.net);
             assertEquals("opening the breakdown preserves the fresh Live window", before,
@@ -108,7 +108,7 @@ public class ControlAcceptanceTest {
     @Test public void ledgerTabKeepsFocusedKeyboardBindings() throws Exception {
         onEdt(() -> {
             SidebarPanel panel = SavedSessionTest.panel(SavedSessionTest.window());
-            JComponent tab = panel.shell.tabById.get(Shell.LEDGER);
+            JComponent tab = panel.shell.buttons.get(Shell.LEDGER);
             assertTrue("Tab may focus Ledger", tab.isFocusable());
             assertTrue(tab.getFocusTraversalKeysEnabled());
             for (String stroke : new String[]{"SPACE", "ENTER"}) {
@@ -174,7 +174,7 @@ public class ControlAcceptanceTest {
                     Rectangle amount = bounds(recent.total, recent);
                     assertTrue("total fits the header", amount.x >= 0 && amount.getMaxX() <= recent.getWidth());
                 }
-            } finally { panel.shell.noticeTimer.stop(); }
+            } finally { panel.shell.timer.stop(); }
             return null;
         });
     }

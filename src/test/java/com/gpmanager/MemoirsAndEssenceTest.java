@@ -23,8 +23,8 @@ public class MemoirsAndEssenceTest
     {
         ChargeCheck read = ChargeCheck.parse("On the inside of the cover a message is displayed in dark ink. It reads: 87 memories remain.");
         assertEquals(ChargeCheck.ChargedItem.MEMOIRS, read.variant);
-        assertEquals(Long.valueOf(87L), read.componentCounts.get(ItemID.SOULRUNE));
-        assertEquals(Long.valueOf(87L), read.componentCounts.get(ItemID.LAWRUNE));
+        assertEquals(Long.valueOf(87L), read.counts.get(ItemID.SOULRUNE));
+        assertEquals(Long.valueOf(87L), read.counts.get(ItemID.LAWRUNE));
         assertEquals(ChargeCheck.ChargedItem.MEMOIRS, ChargeCheck.supportedForName("Book of the dead"));
     }
 
@@ -39,8 +39,8 @@ public class MemoirsAndEssenceTest
     @Test
     public void chargingAtTheOldMemorialBooksNothing()
     {
-        assertEquals(0L, memorial(true).getMetrics(T0 + 10_000L).net);
-        assertTrue("without the memorial click the runes would be a loss", memorial(false).getMetrics(T0 + 10_000L).net < 0L);
+        assertEquals(0L, memorial(true).metrics(T0 + 10_000L).net);
+        assertTrue("without the memorial click the runes would be a loss", memorial(false).metrics(T0 + 10_000L).net < 0L);
     }
 
     @Test
@@ -50,16 +50,16 @@ public class MemoirsAndEssenceTest
         Engine engine = HudBuilderTest.engine();
         engine.ensureSession(T0);
         engine.setBaseline(new ContainerSnapshot(new HashMap<>(Map.of(ItemID.BLOOD_ESSENCE_INACTIVE, 2L))));
-        engine.noteConsume(ItemID.BLOOD_ESSENCE_INACTIVE, 6, false);
+        engine.noteConsume(ItemID.BLOOD_ESSENCE_INACTIVE, 6, false, null, null);
         engine.markDirty();
         for (int tick = 1; tick <= 5; tick++)
         {
             engine.processIfDirty(new ContainerSnapshot(new HashMap<>(Map.of(ItemID.BLOOD_ESSENCE_INACTIVE, 1L, ItemID.BLOOD_ESSENCE_ACTIVE, 1L))),
                 T0 + tick * 600L, null);
         }
-        assertTrue(engine.getActiveSession().getTransactions().toString(),
-            engine.getActiveSession().getTransactions().stream().allMatch(row -> row.autoType() == TransactionType.CONSUMPTION));
-        assertEquals(1, engine.getActiveSession().getTransactions().size());
+        assertTrue(engine.session().transactions().toString(),
+            engine.session().transactions().stream().allMatch(row -> row.original() == TransactionType.CONSUMPTION));
+        assertEquals(1, engine.session().transactions().size());
     }
 
     private static Engine memorial(boolean inspected)

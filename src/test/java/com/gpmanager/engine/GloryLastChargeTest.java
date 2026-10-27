@@ -36,11 +36,11 @@ public class GloryLastChargeTest
     public void theLastChargeStepMatchesThePlainAmulet()
     {
         assertTrue("glory(1) to the plain amulet is one dose step",
-            ActionReader.isDoseStep(Arrays.asList(
+            ActionReader.doseStep(Arrays.asList(
                 flow(GLORY_1, "Amulet of glory(1)", -1L),
                 flow(GLORY, "Amulet of glory", 1L))));
         assertFalse("two remaining doses never leave the plain base",
-            ActionReader.isDoseStep(Arrays.asList(
+            ActionReader.doseStep(Arrays.asList(
                 flow(GLORY_2, "Amulet of glory(2)", -1L),
                 flow(GLORY, "Amulet of glory", 1L))));
     }
@@ -60,10 +60,10 @@ public class GloryLastChargeTest
         engine.setBaseline(held(GLORY_1, 1L));
 
         Transaction step = settle(engine, held(GLORY, 1L), 1_600L);
-        assertEquals(TransactionType.CONSUMPTION, step.getType());
-        assertEquals(ActionKind.SUPPLIES, step.getActionKind());
+        assertEquals(TransactionType.CONSUMPTION, step.type());
+        assertEquals(ActionKind.SUPPLIES, step.action());
         assertEquals(0, engine.getReviewRows(10_000L).size());
-        assertEquals("both legs priced at the same quote", 0L, engine.getMetrics(10_000L).net);
+        assertEquals("both legs priced at the same quote", 0L, engine.metrics(10_000L).net);
     }
 
     private static Flow flow(int itemId, String name, long quantity)

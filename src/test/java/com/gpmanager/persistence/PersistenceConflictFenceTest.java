@@ -36,9 +36,9 @@ public class PersistenceConflictFenceTest
     private void seed(Persistence coordinator)
     {
         JsonCodec.bind(new Gson());
-        assertTrue(coordinator.switchIdentity(ALICE, true, true));
+        assertTrue(coordinator.switchIdentity(ALICE, true));
         coordinator.engine.ensureSession(1_000L);
-        coordinator.engine.getActiveSession().rename("Seed");
+        coordinator.engine.session().rename("Seed");
         assertTrue(coordinator.saveNow());
         assertTrue(coordinator.isTrackingReady());
     }
@@ -48,10 +48,10 @@ public class PersistenceConflictFenceTest
         SessionRepository external = repository(root);
         external.bindIdentity(ALICE);
         SavedState state = external.load();
-        state.getActiveSession().rename("External");
+        state.currentSession().rename("External");
         long base = state.revision;
         state.setRevision(base + 1L);
-        assertTrue(external.save(new WriteIntent(ALICE, external.scopeGeneration, base, state, null)));
+        assertTrue(external.save(new WriteIntent(ALICE, external.generation, base, state, null)));
     }
 
     private SavedState disk(Path root)
@@ -72,24 +72,24 @@ public class PersistenceConflictFenceTest
         {
             seed(coordinator);
             externalWrite(root);
-            coordinator.engine.getActiveSession().rename("Local stale");
+            coordinator.engine.session().rename("Local stale");
             assertFalse(coordinator.saveNow());
-            assertEquals(SaveStatus.State.CONFLICT, writer.getStatus().state);
+            assertEquals(SaveStatus.State.CONFLICT, writer.status().state);
             coordinator.scheduleSave();
-            assertTrue(writer.flush(Duration.ofSeconds(5)));
-            assertEquals("External", disk(root).getActiveSession().getName());
+            assertFalse("1.7.0: a refused write is never acknowledged", writer.flush(Duration.ofSeconds(5)));
+            assertEquals("External", disk(root).currentSession().name());
             assertFalse("new gameplay must wait for disk truth to be reloaded", coordinator.isTrackingReady());
             assertFalse(coordinator.saveNow());
             assertNotNull(coordinator.scopeRefusal());
 
             SavedState stale = coordinator.snapshot();
             stale.setRevision(50L);
-            WriteIntent retry = new WriteIntent(ALICE, repository.scopeGeneration,
-                repository.lastKnownDiskRevision, stale, null);
+            WriteIntent retry = new WriteIntent(ALICE, repository.generation,
+                repository.revision, stale, null);
             writer.submit(retry);
-            assertTrue(writer.flush(Duration.ofSeconds(5)));
+            assertFalse("1.7.0: a refused write is never acknowledged", writer.flush(Duration.ofSeconds(5)));
             assertFalse("reset cannot bypass the same conflict fence", writer.replaceNow(retry).isCommitted());
-            assertEquals("External", disk(root).getActiveSession().getName());
+            assertEquals("External", disk(root).currentSession().name());
             assertEquals(2L, disk(root).revision);
         }
         finally { writer.shutdown(Duration.ofSeconds(5)); }
@@ -106,13 +106,13 @@ public class PersistenceConflictFenceTest
         {
             seed(coordinator);
             SavedState reset = coordinator.snapshot();
-            long base = repository.lastKnownDiskRevision;
+            long base = repository.revision;
             externalWrite(root);
-            assertFalse(writer.replaceNow(new WriteIntent(ALICE, repository.scopeGeneration, base, reset, null)).isCommitted());
-            assertEquals(SaveStatus.State.CONFLICT, writer.getStatus().state);
-            assertTrue(writer.getStatus().detail.contains("back up current data, then restart RuneLite"));
+            assertFalse(writer.replaceNow(new WriteIntent(ALICE, repository.generation, base, reset, null)).isCommitted());
+            assertEquals(SaveStatus.State.CONFLICT, writer.status().state);
+            assertTrue(writer.status().detail.contains("Back up your current history, then restart RuneLite"));
             assertFalse(coordinator.isTrackingReady());
-            assertEquals("External", disk(root).getActiveSession().getName());
+            assertEquals("External", disk(root).currentSession().name());
             assertEquals(2L, disk(root).revision);
         }
         finally { writer.shutdown(Duration.ofSeconds(5)); }
@@ -129,7 +129,7 @@ public class PersistenceConflictFenceTest
             @Override boolean save(WriteIntent intent)
             {
                 boolean ok = super.save(intent);
-                if (!ok && lastKnownDiskRevision != intent.expectedBaseRevision)
+                if (!ok && revision != intent.base)
                 {
                     entered.countDown();
                     try { assertTrue(release.await(5, TimeUnit.SECONDS)); }
@@ -144,15 +144,15 @@ public class PersistenceConflictFenceTest
         {
             seed(coordinator);
             externalWrite(root);
-            coordinator.engine.getActiveSession().rename("Local stale");
+            coordinator.engine.session().rename("Local stale");
             coordinator.scheduleSave();
             assertTrue(entered.await(5, TimeUnit.SECONDS));
             // Disk revision is observed, but the writer has not published CONFLICT yet.
             coordinator.scheduleSave();
             release.countDown();
-            assertTrue(writer.flush(Duration.ofSeconds(5)));
-            assertEquals("External", disk(root).getActiveSession().getName());
-            assertEquals(SaveStatus.State.CONFLICT, writer.getStatus().state);
+            assertFalse("1.7.0: a refused write is never acknowledged", writer.flush(Duration.ofSeconds(5)));
+            assertEquals("External", disk(root).currentSession().name());
+            assertEquals(SaveStatus.State.CONFLICT, writer.status().state);
         }
         finally { release.countDown(); writer.shutdown(Duration.ofSeconds(5)); }
     }
@@ -178,12 +178,12 @@ public class PersistenceConflictFenceTest
         Persistence fresh = coordinator(reopened, newWriter);
         try
         {
-            assertTrue(fresh.switchIdentity(ALICE, true, true));
-            assertEquals("External", fresh.engine.getActiveSession().getName());
+            assertTrue(fresh.switchIdentity(ALICE, true));
+            assertEquals("External", fresh.engine.session().name());
             assertTrue(fresh.isTrackingReady());
-            fresh.engine.getActiveSession().rename("Reloaded local");
+            fresh.engine.session().rename("Reloaded local");
             assertTrue(fresh.saveNow());
-            assertEquals("Reloaded local", disk(root).getActiveSession().getName());
+            assertEquals("Reloaded local", disk(root).currentSession().name());
         }
         finally { newWriter.shutdown(Duration.ofSeconds(5)); }
     }

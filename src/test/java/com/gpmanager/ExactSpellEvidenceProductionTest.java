@@ -49,16 +49,16 @@ public class ExactSpellEvidenceProductionTest
     {
         Harness h = harness("Nechryael");
         h.animate("Ice Burst", 1979);
-        h.engine.noteConsume(2434, 10, false, ActionKind.DRINK);
+        h.engine.noteConsume(2434, 10, false, ActionKind.DRINK, null);
         h.inventory.put(CHAOS_RUNE, 66L); // pickup hides the chaos spent
         Transaction cast = h.settle(new int[] {DEATH_RUNE, WATER_RUNE}, T0 + 100L);
-        Transaction receipt = h.engine.getActiveSession().getTransactions().stream()
-            .filter(t -> t.getActionKind() == ActionKind.CAST).findFirst().orElseThrow(AssertionError::new);
+        Transaction receipt = h.engine.session().transactions().stream()
+            .filter(t -> t.action() == ActionKind.CAST).findFirst().orElseThrow(AssertionError::new);
         assertEquals("Ice Burst", receipt.spellName());
-        assertEquals("Ice Burst", recentFor(h, receipt.getId()).name);
-        assertEquals("measured net quantities stay unchanged", 46L, h.engine.getActiveSession()
-            .getTransactions().stream().flatMap(t -> t.getFlows().stream())
-            .filter(f -> f.itemId == CHAOS_RUNE).mapToLong(f -> f.quantityDelta).sum());
+        assertEquals("Ice Burst", recentFor(h, receipt.id()).name);
+        assertEquals("measured net quantities stay unchanged", 46L, h.engine.session()
+            .transactions().stream().flatMap(t -> t.flows().stream())
+            .filter(f -> f.item == CHAOS_RUNE).mapToLong(f -> f.quantity).sum());
         Transaction restored = new com.google.gson.Gson().fromJson(
             new com.google.gson.Gson().toJson(receipt), Transaction.class);
         assertEquals("the observed spell survives restart", "Ice Burst", restored.spellName());
@@ -108,11 +108,11 @@ public class ExactSpellEvidenceProductionTest
         h.inventory.put(DEATH_RUNE, 18L);
         h.inventory.put(WATER_RUNE, 18L);
         settleStable(h.engine, h.inventory, T0 + 700L);
-        List<Transaction> rows = h.engine.getActiveSession().getTransactions();
+        List<Transaction> rows = h.engine.session().transactions();
         assertEquals(2, rows.size());
         assertEquals("Ice Burst", rows.get(0).spellName());
         assertEquals("Ice Barrage", rows.get(1).spellName());
-        assertEquals(-260L, rows.stream().mapToLong(Transaction::getNet).sum());
+        assertEquals(-260L, rows.stream().mapToLong(Transaction::net).sum());
     }
 
     @Test
@@ -138,7 +138,7 @@ public class ExactSpellEvidenceProductionTest
             h.inventory.put(bolt ? CHAOS_RUNE : DEATH_RUNE, 19L);
             h.inventory.put(WATER_RUNE, bolt ? 18L : 17L);
             Transaction cast = settleStable(h.engine, h.inventory, T0 + 100L);
-            assertEquals(bolt ? "Water Bolt" : "Water Blast", Spells.spellFor(cast.getFlows()));
+            assertEquals(bolt ? "Water Bolt" : "Water Blast", Spells.spellFor(cast.flows()));
             assertEquals("Ice Burst", cast.spellName());
             Transaction copied = MoneySnapshot.copy(cast);
             assertEquals("detached UI reads keep the execution identity", "Ice Burst", copied.spellName());
@@ -172,7 +172,7 @@ public class ExactSpellEvidenceProductionTest
     {
         Harness h = harness("Nechryael");
         Transaction cast = h.settle(new int[] {DEATH_RUNE, WATER_RUNE}, T0 + 100L);
-        long net = cast.getNet();
+        long net = cast.net();
         assertEquals("", cast.spellName());
         cast.observedSpellName = "Ice Burst";
         assertEquals("Ice Burst", cast.spellName());
@@ -182,9 +182,9 @@ public class ExactSpellEvidenceProductionTest
             assertEquals("", cast.spellName());
         }
         cast.observedSpellName = "Ice Burst";
-        cast.setActionKind(ActionKind.DRINK);
+        cast.setAction(ActionKind.DRINK);
         assertEquals("a non-cast ignores a spell stamp", "", cast.spellName());
-        assertEquals("identity never creates or removes money", net, cast.getNet());
+        assertEquals("identity never creates or removes money", net, cast.net());
     }
 
     @Test
@@ -200,8 +200,8 @@ public class ExactSpellEvidenceProductionTest
             h.engine.processIfDirty(new ContainerSnapshot(h.inventory), T0 + tick * 600L, null);
         }
         settleStable(h.engine, h.inventory, T0 + 4_000L);
-        Transaction cast = h.engine.getActiveSession().getTransactions().stream()
-            .filter(t -> t.getActionKind() == ActionKind.CAST).findFirst().orElseThrow(AssertionError::new);
+        Transaction cast = h.engine.session().transactions().stream()
+            .filter(t -> t.action() == ActionKind.CAST).findFirst().orElseThrow(AssertionError::new);
         assertEquals("Ice Burst", cast.spellName());
     }
 
@@ -218,7 +218,7 @@ public class ExactSpellEvidenceProductionTest
         h.inventory.put(DEATH_RUNE, 18L);
         h.inventory.put(WATER_RUNE, 18L);
         settleStable(h.engine, h.inventory, T0 + 700L);
-        List<Transaction> rows = h.engine.getActiveSession().getTransactions();
+        List<Transaction> rows = h.engine.session().transactions();
         assertEquals(2, rows.size());
         assertEquals("Ice Burst", rows.get(0).spellName());
         assertEquals("", rows.get(1).spellName());
@@ -231,17 +231,17 @@ public class ExactSpellEvidenceProductionTest
         Transaction cast = harness.cast("Ice Burst", "Guard", ICE_BURST_RUNES, T0 + 100L);
 
         assertNotNull("the rune spend settles", cast);
-        assertEquals(TransactionType.CONSUMPTION, cast.getType());
-        assertTrue(cast.isCounted());
-        assertEquals(ActionKind.CAST, cast.getActionKind());
+        assertEquals(TransactionType.CONSUMPTION, cast.type());
+        assertTrue(cast.counts());
+        assertEquals(ActionKind.CAST, cast.action());
         assertNotNull("the two-stage interaction keeps its exact spell", cast.actionLabel());
         assertEquals("Ice Burst", cast.actionLabel().value());
-        assertEquals(-180L, cast.getNet());
-        assertEquals("rune accounting is untouched", 3, cast.getFlows().size());
+        assertEquals(-180L, cast.net());
+        assertEquals("rune accounting is untouched", 3, cast.flows().size());
         assertEquals("the spell spend stays a supply",
-            CostKind.SUPPLIES, CostKind.of(cast, cast.getFlows().get(0)));
+            CostKind.SUPPLIES, CostKind.of(cast, cast.flows().get(0)));
 
-        LiveSnapshot.Recent row = recentFor(harness, cast.getId());
+        LiveSnapshot.Recent row = recentFor(harness, cast.id());
         assertEquals("Ice Burst", row.name);
         assertEquals("Cast", LivePage.metaOf(row));
     }
@@ -256,7 +256,7 @@ public class ExactSpellEvidenceProductionTest
         assertNotNull(cast);
         assertNotNull(cast.actionLabel());
         assertEquals("Ice Barrage", cast.actionLabel().value());
-        assertEquals("Ice Barrage", recentFor(harness, cast.getId()).name);
+        assertEquals("Ice Barrage", recentFor(harness, cast.id()).name);
     }
 
     @Test
@@ -286,10 +286,10 @@ public class ExactSpellEvidenceProductionTest
         Transaction cast = harness.settle(ICE_BURST_RUNES, T0 + 8_000L);
 
         assertNotNull(cast);
-        assertEquals(ActionKind.CAST, cast.getActionKind());
+        assertEquals(ActionKind.CAST, cast.action());
         assertNull("expired evidence must never name a later rune loss",
             cast.actionLabel());
-        assertEquals("Cast", recentFor(harness, cast.getId()).name);
+        assertEquals("Cast", recentFor(harness, cast.id()).name);
     }
 
     @Test
@@ -307,7 +307,7 @@ public class ExactSpellEvidenceProductionTest
         assertNotNull(generic);
         assertNull("a target named like a spell cannot fabricate one",
             generic.actionLabel());
-        assertEquals("Cast", recentFor(plain, generic.getId()).name);
+        assertEquals("Cast", recentFor(plain, generic.id()).name);
     }
 
     @Test
@@ -354,8 +354,8 @@ public class ExactSpellEvidenceProductionTest
         Harness harness = harness("Vorkath");
         Transaction cast = harness.cast("Ice Burst", "Guard", ICE_BURST_RUNES, T0 + 100L);
         assertNotNull(cast);
-        long net = cast.getNet();
-        int flows = cast.getFlows().size();
+        long net = cast.net();
+        int flows = cast.flows().size();
 
         // A pending, unbooked selection exists when the owner fence runs.
         harness.select("Ice Burst");
@@ -365,14 +365,14 @@ public class ExactSpellEvidenceProductionTest
         assertNotNull("booked schema-105 labels survive the presentation owner fence",
             cast.actionLabel());
         assertEquals("Ice Burst", cast.actionLabel().value());
-        assertEquals(net, cast.getNet());
-        assertEquals(flows, cast.getFlows().size());
-        assertEquals(TransactionType.CONSUMPTION, cast.getType());
-        assertTrue(cast.isCounted());
+        assertEquals(net, cast.net());
+        assertEquals(flows, cast.flows().size());
+        assertEquals(TransactionType.CONSUMPTION, cast.type());
+        assertTrue(cast.counts());
 
         Transaction later = harness.settle(ICE_BURST_RUNES, T0 + 2_000L);
         assertNotNull(later);
-        assertEquals(ActionKind.CAST, later.getActionKind());
+        assertEquals(ActionKind.CAST, later.action());
         assertNull("pending pre-fence evidence must not label a later cast",
             later.actionLabel());
     }
@@ -392,7 +392,7 @@ public class ExactSpellEvidenceProductionTest
         Transaction cast = harness.settle(ICE_BURST_RUNES, T0 + 2_000L);
 
         assertNotNull(cast);
-        assertEquals(ActionKind.CAST, cast.getActionKind());
+        assertEquals(ActionKind.CAST, cast.action());
         assertNull("a paused/relogged session must not inherit pre-logout spell evidence",
             cast.actionLabel());
     }
@@ -411,22 +411,22 @@ public class ExactSpellEvidenceProductionTest
         LedgerData data = LedgerData.capture(harness.engine, T0 + 5_000L,
             new LedgerData.Entry(LedgerData.Scope.CURRENT_GRIND, null, null,
                 LedgerData.CostView.SUPPLIES, "", null, null, null, null));
-        Semantics.Group burstGroup = groupNamed(data.costs.groups, "Ice Burst", "Cast");
-        Semantics.Group barrage = groupNamed(data.costs.groups, "Ice Barrage", "Cast");
-        Semantics.Group generic = groupNamed(data.costs.groups, "Cast", "Cast");
+        Semantics.Group burstGroup = groupNamed(data.cost.groups, "Ice Burst", "Cast");
+        Semantics.Group barrage = groupNamed(data.cost.groups, "Ice Barrage", "Cast");
+        Semantics.Group generic = groupNamed(data.cost.groups, "Cast", "Cast");
         assertNotNull(burstGroup);
         assertNotNull(barrage);
         assertNotNull(generic);
         assertTrue("repeated exact casts aggregate before paging", burstGroup.actionGroup());
-        assertEquals(2, burstGroup.receiptCount);
+        assertEquals(2, burstGroup.count);
         assertEquals(-360L, burstGroup.value);
-        assertEquals("a different spell is never merged in", 1, barrage.receiptCount);
+        assertEquals("a different spell is never merged in", 1, barrage.count);
         assertEquals(-180L, barrage.value);
-        assertEquals("a generic cast is never mislabelled", 1, generic.receiptCount);
-        assertFalse(burstGroup.semanticGroupId.equals(barrage.semanticGroupId));
-        assertFalse(burstGroup.semanticGroupId.equals(generic.semanticGroupId));
+        assertEquals("a generic cast is never mislabelled", 1, generic.count);
+        assertFalse(burstGroup.id.equals(barrage.id));
+        assertFalse(burstGroup.id.equals(generic.id));
         assertEquals("grouped exact spells reconcile to the canonical session net",
-            -720L, data.costs.total);
+            -720L, data.cost.total);
     }
 
     // ── production harness ─────────────────────────────────────────────────────────────────────
@@ -539,8 +539,8 @@ public class ExactSpellEvidenceProductionTest
     {
         for (Semantics.Group group : groups)
         {
-            if (name.equals(group.primaryName) && action.equals(group.actionLabel.isEmpty() ? ""
-                : group.actionLabel))
+            if (name.equals(group.name) && action.equals(group.label.isEmpty() ? ""
+                : group.label))
             {
                 return group;
             }
@@ -592,7 +592,7 @@ public class ExactSpellEvidenceProductionTest
         set(plugin, "engine", engine);
         set(plugin, "config", config);
         set(plugin, "client", client);
-        set(plugin, "interactionContextTracker",
+        set(plugin, "targets",
             GpManagerPluginProbe.tracker(client, engine, config));
         set(plugin, "charges", new ChargeIntake(client, null, config, engine, null));
         return plugin;

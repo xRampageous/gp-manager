@@ -66,19 +66,19 @@ public class WriterLineageAndIdentityTest
         {
             SavedState first = named("First", 1L);
             writer.submit(new WriteIntent(null,
-                repository.scopeGeneration,
-                repository.lastKnownDiskRevision,
+                repository.generation,
+                repository.revision,
                 first, null));
             assertTrue(entered.await(5, TimeUnit.SECONDS));
 
             SavedState latest = named("Latest", 2L);
             writer.submit(new WriteIntent(null,
-                repository.scopeGeneration,
-                repository.lastKnownDiskRevision,
+                repository.generation,
+                repository.revision,
                 latest, null));
             release.countDown();
             assertTrue(writer.flush(Duration.ofSeconds(5)));
-            assertEquals("Latest", repository.load().getActiveSession().getName());
+            assertEquals("Latest", repository.load().currentSession().name());
         }
         finally
         {
@@ -95,12 +95,12 @@ public class WriterLineageAndIdentityTest
         OrderedPersistenceWriter writer = new OrderedPersistenceWriter(repository);
         try
         {
-            long generation = repository.scopeGeneration;
+            long generation = repository.generation;
             writer.submit(new WriteIntent(null, generation, 0L, named("A", 1L), null));
             writer.submit(new WriteIntent(null, generation, 0L, named("B", 2L), null));
             writer.submit(new WriteIntent(null, generation, 0L, named("C", 3L), null));
             assertTrue(writer.flush(Duration.ofSeconds(5)));
-            assertEquals("C", repository.load().getActiveSession().getName());
+            assertEquals("C", repository.load().currentSession().name());
             assertEquals(3L, repository.load().revision);
         }
         finally
@@ -119,7 +119,7 @@ public class WriterLineageAndIdentityTest
         SessionRepository external = new SessionRepository(new Gson(), FilepathTestSupport.root(directory), false);
         external.load();
         assertTrue(external.save(new WriteIntent(null,
-            external.scopeGeneration,
+            external.generation,
             1L,
             named("External", 2L), null)));
 
@@ -129,14 +129,14 @@ public class WriterLineageAndIdentityTest
             writer.resetRevision(1L);
             // Stale base against external tip must conflict, not overwrite.
             writer.submit(new WriteIntent(null,
-                shared.scopeGeneration,
+                shared.generation,
                 1L,
                 named("Local stale", 2L), null));
-            assertTrue(writer.flush(Duration.ofSeconds(5)));
-            assertTrue(writer.getStatus().isFailure()
-                || writer.getStatus().state == SaveStatus.State.CONFLICT);
+            assertFalse("1.7.0: a refused write is never acknowledged", writer.flush(Duration.ofSeconds(5)));
+            assertTrue(writer.status().isFailure()
+                || writer.status().state == SaveStatus.State.CONFLICT);
             assertEquals("External", new SessionRepository(new Gson(), FilepathTestSupport.root(directory), false).load()
-                .getActiveSession().getName());
+                .currentSession().name());
         }
         finally
         {
@@ -166,14 +166,14 @@ public class WriterLineageAndIdentityTest
 
         TrackingIdentity alice = new TrackingIdentity("rsprofile.alice", TrackingIdentity.ACCOUNT_HASH_INVALID);
         TrackingIdentity bob = new TrackingIdentity("rsprofile.bob", TrackingIdentity.ACCOUNT_HASH_INVALID);
-        assertTrue(coordinator.switchIdentity(alice, true, true));
+        assertTrue(coordinator.switchIdentity(alice, true));
         engine.ensureSession(1_000L);
-        engine.getActiveSession().rename("Alice live");
-        assertEquals("Alice live", engine.getActiveSession().getName());
+        engine.session().rename("Alice live");
+        assertEquals("Alice live", engine.session().name());
 
-        assertFalse(coordinator.switchIdentity(bob, true, true));
+        assertFalse(coordinator.switchIdentity(bob, true));
         assertEquals(alice, coordinator.getActiveIdentity());
-        assertEquals("Alice live", engine.getActiveSession().getName());
+        assertEquals("Alice live", engine.session().name());
         assertNotNull(PersistenceProbe.identityBlockReason(coordinator));
     }
 
@@ -230,7 +230,7 @@ public class WriterLineageAndIdentityTest
             null, null, repository, writer, engine);
         try
         {
-            assertTrue(coordinator.switchIdentity(new TrackingIdentity("rsprofile.alice", TrackingIdentity.ACCOUNT_HASH_INVALID), true, true));
+            assertTrue(coordinator.switchIdentity(new TrackingIdentity("rsprofile.alice", TrackingIdentity.ACCOUNT_HASH_INVALID), true));
             engine.ensureSession(1_000L);
             locked.clear();
             copiedLocked.clear();
@@ -268,9 +268,9 @@ public class WriterLineageAndIdentityTest
         {
             TrackingIdentity alice = new TrackingIdentity("rsprofile.alice", TrackingIdentity.ACCOUNT_HASH_INVALID);
             TrackingIdentity bob = new TrackingIdentity("rsprofile.bob", TrackingIdentity.ACCOUNT_HASH_INVALID);
-            assertTrue(coordinator.switchIdentity(alice, true, true));
+            assertTrue(coordinator.switchIdentity(alice, true));
             engine.ensureSession(1_000L);
-            assertTrue(coordinator.switchIdentity(bob, true, true));
+            assertTrue(coordinator.switchIdentity(bob, true));
             assertEquals(bob, coordinator.getActiveIdentity());
             assertTrue(EngineProbe.isBaselinePriming(engine));
         }
@@ -296,14 +296,14 @@ public class WriterLineageAndIdentityTest
         {
             TrackingIdentity alice = new TrackingIdentity("rsprofile.alice", TrackingIdentity.ACCOUNT_HASH_INVALID);
             TrackingIdentity bob = new TrackingIdentity("rsprofile.bob", TrackingIdentity.ACCOUNT_HASH_INVALID);
-            assertTrue(coordinator.switchIdentity(alice, false, true));
+            assertTrue(coordinator.switchIdentity(alice, true));
             engine.ensureSession(1_000L);
-            engine.getActiveSession().rename("Alice ephemeral");
-            assertTrue(coordinator.switchIdentity(bob, false, true));
+            engine.session().rename("Alice ephemeral");
+            assertTrue(coordinator.switchIdentity(bob, true));
             assertEquals(bob, coordinator.getActiveIdentity());
             // New account gets a fresh empty restore, not Alice's live session.
-            assertTrue(engine.getActiveSession() == null
-                || !"Alice ephemeral".equals(engine.getActiveSession().getName()));
+            assertTrue(engine.session() == null
+                || !"Alice ephemeral".equals(engine.session().name()));
         }
         finally
         {

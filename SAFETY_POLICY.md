@@ -2,6 +2,8 @@
 
 ## Product scope
 
+Supported accounts: **Normal, Ironman and Hardcore Ironman only**. **Ultimate Ironman is unsupported**; no UIM-specific implementation or live acceptance is planned (owner decision, 2026-10-24).
+
 GP Manager is a passive accounting ledger. It may read ordinary RuneLite events and item-container state, perform local arithmetic, display historical totals, and save those totals locally.
 
 ## Permanently prohibited

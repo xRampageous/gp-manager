@@ -1,0 +1,388 @@
+# Raw equipment states of the same owned piece. Coins/materials remain outside the pair.
+# id	piece key	RuneLite gameval ItemID
+# Barrows: https://oldschool.runescape.wiki/w/Barrows_equipment
+# Moons: https://oldschool.runescape.wiki/w/Moon_equipment (all nine new/used/broken pieces)
+# Perdu: https://oldschool.runescape.wiki/w/(broken)#PvP_breakable_items
+4508	castlewars_sword_3	CASTLEWARS_SWORD_3
+4509	castlewars_armour_body_3	CASTLEWARS_ARMOUR_BODY_3
+4510	castlewars_armour_legs_3	CASTLEWARS_ARMOUR_LEGS_3
+4511	castlewars_med_helm_3	CASTLEWARS_MED_HELM_3
+4512	castlewars_shield_3	CASTLEWARS_SHIELD_3
+4708	ahrim's hood	BARROWS_AHRIM_HEAD
+4710	ahrim's staff	BARROWS_AHRIM_WEAPON
+4712	ahrim's robetop	BARROWS_AHRIM_BODY
+4714	ahrim's robeskirt	BARROWS_AHRIM_LEGS
+4716	dharok's helm	BARROWS_DHAROK_HEAD
+4718	dharok's greataxe	BARROWS_DHAROK_WEAPON
+4720	dharok's platebody	BARROWS_DHAROK_BODY
+4722	dharok's platelegs	BARROWS_DHAROK_LEGS
+4724	guthan's helm	BARROWS_GUTHAN_HEAD
+4726	guthan's warspear	BARROWS_GUTHAN_WEAPON
+4728	guthan's platebody	BARROWS_GUTHAN_BODY
+4730	guthan's chainskirt	BARROWS_GUTHAN_LEGS
+4732	karil's coif	BARROWS_KARIL_HEAD
+4734	karil's crossbow	BARROWS_KARIL_WEAPON
+4736	karil's leathertop	BARROWS_KARIL_BODY
+4738	karil's leatherskirt	BARROWS_KARIL_LEGS
+4745	torag's helm	BARROWS_TORAG_HEAD
+4747	torag's hammers	BARROWS_TORAG_WEAPON
+4749	torag's platebody	BARROWS_TORAG_BODY
+4751	torag's platelegs	BARROWS_TORAG_LEGS
+4753	verac's helm	BARROWS_VERAC_HEAD
+4755	verac's flail	BARROWS_VERAC_WEAPON
+4757	verac's brassard	BARROWS_VERAC_BODY
+4759	verac's plateskirt	BARROWS_VERAC_LEGS
+4856	ahrim's hood	BARROWS_AHRIM_HEAD_100
+4857	ahrim's hood	BARROWS_AHRIM_HEAD_75
+4858	ahrim's hood	BARROWS_AHRIM_HEAD_50
+4859	ahrim's hood	BARROWS_AHRIM_HEAD_25
+4860	ahrim's hood	BARROWS_AHRIM_HEAD_BROKEN
+4862	ahrim's staff	BARROWS_AHRIM_WEAPON_100
+4863	ahrim's staff	BARROWS_AHRIM_WEAPON_75
+4864	ahrim's staff	BARROWS_AHRIM_WEAPON_50
+4865	ahrim's staff	BARROWS_AHRIM_WEAPON_25
+4866	ahrim's staff	BARROWS_AHRIM_WEAPON_BROKEN
+4868	ahrim's robetop	BARROWS_AHRIM_BODY_100
+4869	ahrim's robetop	BARROWS_AHRIM_BODY_75
+4870	ahrim's robetop	BARROWS_AHRIM_BODY_50
+4871	ahrim's robetop	BARROWS_AHRIM_BODY_25
+4872	ahrim's robetop	BARROWS_AHRIM_BODY_BROKEN
+4874	ahrim's robeskirt	BARROWS_AHRIM_LEGS_100
+4875	ahrim's robeskirt	BARROWS_AHRIM_LEGS_75
+4876	ahrim's robeskirt	BARROWS_AHRIM_LEGS_50
+4877	ahrim's robeskirt	BARROWS_AHRIM_LEGS_25
+4878	ahrim's robeskirt	BARROWS_AHRIM_LEGS_BROKEN
+4880	dharok's helm	BARROWS_DHAROK_HEAD_100
+4881	dharok's helm	BARROWS_DHAROK_HEAD_75
+4882	dharok's helm	BARROWS_DHAROK_HEAD_50
+4883	dharok's helm	BARROWS_DHAROK_HEAD_25
+4884	dharok's helm	BARROWS_DHAROK_HEAD_BROKEN
+4886	dharok's greataxe	BARROWS_DHAROK_WEAPON_100
+4887	dharok's greataxe	BARROWS_DHAROK_WEAPON_75
+4888	dharok's greataxe	BARROWS_DHAROK_WEAPON_50
+4889	dharok's greataxe	BARROWS_DHAROK_WEAPON_25
+4890	dharok's greataxe	BARROWS_DHAROK_WEAPON_BROKEN
+4892	dharok's platebody	BARROWS_DHAROK_BODY_100
+4893	dharok's platebody	BARROWS_DHAROK_BODY_75
+4894	dharok's platebody	BARROWS_DHAROK_BODY_50
+4895	dharok's platebody	BARROWS_DHAROK_BODY_25
+4896	dharok's platebody	BARROWS_DHAROK_BODY_BROKEN
+4898	dharok's platelegs	BARROWS_DHAROK_LEGS_100
+4899	dharok's platelegs	BARROWS_DHAROK_LEGS_75
+4900	dharok's platelegs	BARROWS_DHAROK_LEGS_50
+4901	dharok's platelegs	BARROWS_DHAROK_LEGS_25
+4902	dharok's platelegs	BARROWS_DHAROK_LEGS_BROKEN
+4904	guthan's helm	BARROWS_GUTHAN_HEAD_100
+4905	guthan's helm	BARROWS_GUTHAN_HEAD_75
+4906	guthan's helm	BARROWS_GUTHAN_HEAD_50
+4907	guthan's helm	BARROWS_GUTHAN_HEAD_25
+4908	guthan's helm	BARROWS_GUTHAN_HEAD_BROKEN
+4910	guthan's warspear	BARROWS_GUTHAN_WEAPON_100
+4911	guthan's warspear	BARROWS_GUTHAN_WEAPON_75
+4912	guthan's warspear	BARROWS_GUTHAN_WEAPON_50
+4913	guthan's warspear	BARROWS_GUTHAN_WEAPON_25
+4914	guthan's warspear	BARROWS_GUTHAN_WEAPON_BROKEN
+4916	guthan's platebody	BARROWS_GUTHAN_BODY_100
+4917	guthan's platebody	BARROWS_GUTHAN_BODY_75
+4918	guthan's platebody	BARROWS_GUTHAN_BODY_50
+4919	guthan's platebody	BARROWS_GUTHAN_BODY_25
+4920	guthan's platebody	BARROWS_GUTHAN_BODY_BROKEN
+4922	guthan's chainskirt	BARROWS_GUTHAN_LEGS_100
+4923	guthan's chainskirt	BARROWS_GUTHAN_LEGS_75
+4924	guthan's chainskirt	BARROWS_GUTHAN_LEGS_50
+4925	guthan's chainskirt	BARROWS_GUTHAN_LEGS_25
+4926	guthan's chainskirt	BARROWS_GUTHAN_LEGS_BROKEN
+4928	karil's coif	BARROWS_KARIL_HEAD_100
+4929	karil's coif	BARROWS_KARIL_HEAD_75
+4930	karil's coif	BARROWS_KARIL_HEAD_50
+4931	karil's coif	BARROWS_KARIL_HEAD_25
+4932	karil's coif	BARROWS_KARIL_HEAD_BROKEN
+4934	karil's crossbow	BARROWS_KARIL_WEAPON_100
+4935	karil's crossbow	BARROWS_KARIL_WEAPON_75
+4936	karil's crossbow	BARROWS_KARIL_WEAPON_50
+4937	karil's crossbow	BARROWS_KARIL_WEAPON_25
+4938	karil's crossbow	BARROWS_KARIL_WEAPON_BROKEN
+4940	karil's leathertop	BARROWS_KARIL_BODY_100
+4941	karil's leathertop	BARROWS_KARIL_BODY_75
+4942	karil's leathertop	BARROWS_KARIL_BODY_50
+4943	karil's leathertop	BARROWS_KARIL_BODY_25
+4944	karil's leathertop	BARROWS_KARIL_BODY_BROKEN
+4946	karil's leatherskirt	BARROWS_KARIL_LEGS_100
+4947	karil's leatherskirt	BARROWS_KARIL_LEGS_75
+4948	karil's leatherskirt	BARROWS_KARIL_LEGS_50
+4949	karil's leatherskirt	BARROWS_KARIL_LEGS_25
+4950	karil's leatherskirt	BARROWS_KARIL_LEGS_BROKEN
+4952	torag's helm	BARROWS_TORAG_HEAD_100
+4953	torag's helm	BARROWS_TORAG_HEAD_75
+4954	torag's helm	BARROWS_TORAG_HEAD_50
+4955	torag's helm	BARROWS_TORAG_HEAD_25
+4956	torag's helm	BARROWS_TORAG_HEAD_BROKEN
+4958	torag's hammers	BARROWS_TORAG_WEAPON_100
+4959	torag's hammers	BARROWS_TORAG_WEAPON_75
+4960	torag's hammers	BARROWS_TORAG_WEAPON_50
+4961	torag's hammers	BARROWS_TORAG_WEAPON_25
+4962	torag's hammers	BARROWS_TORAG_WEAPON_BROKEN
+4964	torag's platebody	BARROWS_TORAG_BODY_100
+4965	torag's platebody	BARROWS_TORAG_BODY_75
+4966	torag's platebody	BARROWS_TORAG_BODY_50
+4967	torag's platebody	BARROWS_TORAG_BODY_25
+4968	torag's platebody	BARROWS_TORAG_BODY_BROKEN
+4970	torag's platelegs	BARROWS_TORAG_LEGS_100
+4971	torag's platelegs	BARROWS_TORAG_LEGS_75
+4972	torag's platelegs	BARROWS_TORAG_LEGS_50
+4973	torag's platelegs	BARROWS_TORAG_LEGS_25
+4974	torag's platelegs	BARROWS_TORAG_LEGS_BROKEN
+4976	verac's helm	BARROWS_VERAC_HEAD_100
+4977	verac's helm	BARROWS_VERAC_HEAD_75
+4978	verac's helm	BARROWS_VERAC_HEAD_50
+4979	verac's helm	BARROWS_VERAC_HEAD_25
+4980	verac's helm	BARROWS_VERAC_HEAD_BROKEN
+4982	verac's flail	BARROWS_VERAC_WEAPON_100
+4983	verac's flail	BARROWS_VERAC_WEAPON_75
+4984	verac's flail	BARROWS_VERAC_WEAPON_50
+4985	verac's flail	BARROWS_VERAC_WEAPON_25
+4986	verac's flail	BARROWS_VERAC_WEAPON_BROKEN
+4988	verac's brassard	BARROWS_VERAC_BODY_100
+4989	verac's brassard	BARROWS_VERAC_BODY_75
+4990	verac's brassard	BARROWS_VERAC_BODY_50
+4991	verac's brassard	BARROWS_VERAC_BODY_25
+4992	verac's brassard	BARROWS_VERAC_BODY_BROKEN
+4994	verac's plateskirt	BARROWS_VERAC_LEGS_100
+4995	verac's plateskirt	BARROWS_VERAC_LEGS_75
+4996	verac's plateskirt	BARROWS_VERAC_LEGS_50
+4997	verac's plateskirt	BARROWS_VERAC_LEGS_25
+4998	verac's plateskirt	BARROWS_VERAC_LEGS_BROKEN
+6570	tzhaar_cape_fire	TZHAAR_CAPE_FIRE
+8839	pest_void_knight_top	PEST_VOID_KNIGHT_TOP
+8840	pest_void_knight_robes	PEST_VOID_KNIGHT_ROBES
+8841	pest_void_knight_mace	PEST_VOID_KNIGHT_MACE
+8842	pest_void_knight_gloves	PEST_VOID_KNIGHT_GLOVES
+8844	bronze_parryingdagger	BRONZE_PARRYINGDAGGER
+8845	iron_parryingdagger	IRON_PARRYINGDAGGER
+8846	steel_parryingdagger	STEEL_PARRYINGDAGGER
+8847	black_parryingdagger	BLACK_PARRYINGDAGGER
+8848	mithril_parryingdagger	MITHRIL_PARRYINGDAGGER
+8849	adamant_parryingdagger	ADAMANT_PARRYINGDAGGER
+8850	rune_parryingdagger	RUNE_PARRYINGDAGGER
+10547	barbassault_penance_healer_hat	BARBASSAULT_PENANCE_HEALER_HAT
+10548	barbassault_penance_fighter_hat	BARBASSAULT_PENANCE_FIGHTER_HAT
+10549	barbassault_penance_runner_hat	BARBASSAULT_PENANCE_RUNNER_HAT
+10550	barbassault_penance_ranger_hat	BARBASSAULT_PENANCE_RANGER_HAT
+10551	barbassault_penance_fighter_torso	BARBASSAULT_PENANCE_FIGHTER_TORSO
+10555	barbassault_penance_ranger_legs	BARBASSAULT_PENANCE_RANGER_LEGS
+11663	game_pest_mage_helm	GAME_PEST_MAGE_HELM
+11664	game_pest_archer_helm	GAME_PEST_ARCHER_HELM
+11665	game_pest_melee_helm	GAME_PEST_MELEE_HELM
+11895	castlewars_armour_skirt_3	CASTLEWARS_ARMOUR_SKIRT_3
+11896	castlewars_mage_top	CASTLEWARS_MAGE_TOP
+11897	castlewars_mage_legs	CASTLEWARS_MAGE_LEGS
+11898	castlewars_mage_hat	CASTLEWARS_MAGE_HAT
+11899	castlewars_range_top	CASTLEWARS_RANGE_TOP
+11900	castlewars_range_legs	CASTLEWARS_RANGE_LEGS
+11901	castlewars_range_quiver	CASTLEWARS_RANGE_QUIVER
+12637	castlewars_saradomin_halo	CASTLEWARS_SARADOMIN_HALO
+12638	castlewars_zamorak_halo	CASTLEWARS_ZAMORAK_HALO
+12639	castlewars_guthix_halo	CASTLEWARS_GUTHIX_HALO
+12851	amulet of the damned	DAMNED_AMULET
+12853	amulet of the damned	DAMNED_AMULET_DEGRADED
+12954	dragon_parryingdagger	DRAGON_PARRYINGDAGGER
+13072	elite_void_knight_top	ELITE_VOID_KNIGHT_TOP
+13073	elite_void_knight_robes	ELITE_VOID_KNIGHT_ROBES
+13329	skillcape_max_firecape	SKILLCAPE_MAX_FIRECAPE
+20445	tzhaar_cape_fire	TZHAAR_CAPE_FIRE_BROKEN
+20447	skillcape_max_firecape	SKILLCAPE_MAX_FIRECAPE_BROKEN
+20449	bronze_parryingdagger	BRONZE_PARRYINGDAGGER_BROKEN
+20451	iron_parryingdagger	IRON_PARRYINGDAGGER_BROKEN
+20453	steel_parryingdagger	STEEL_PARRYINGDAGGER_BROKEN
+20455	black_parryingdagger	BLACK_PARRYINGDAGGER_BROKEN
+20457	mithril_parryingdagger	MITHRIL_PARRYINGDAGGER_BROKEN
+20459	adamant_parryingdagger	ADAMANT_PARRYINGDAGGER_BROKEN
+20461	rune_parryingdagger	RUNE_PARRYINGDAGGER_BROKEN
+20463	dragon_parryingdagger	DRAGON_PARRYINGDAGGER_BROKEN
+20465	pest_void_knight_top	PEST_VOID_KNIGHT_TOP_BROKEN
+20467	elite_void_knight_top	ELITE_VOID_KNIGHT_TOP_BROKEN
+20469	pest_void_knight_robes	PEST_VOID_KNIGHT_ROBES_BROKEN
+20471	elite_void_knight_robes	ELITE_VOID_KNIGHT_ROBES_BROKEN
+20473	pest_void_knight_mace	PEST_VOID_KNIGHT_MACE_BROKEN
+20475	pest_void_knight_gloves	PEST_VOID_KNIGHT_GLOVES_BROKEN
+20477	game_pest_mage_helm	GAME_PEST_MAGE_HELM_BROKEN
+20479	game_pest_archer_helm	GAME_PEST_ARCHER_HELM_BROKEN
+20481	game_pest_melee_helm	GAME_PEST_MELEE_HELM_BROKEN
+20483	castlewars_sword_3	CASTLEWARS_SWORD_3_BROKEN
+20485	castlewars_armour_body_3	CASTLEWARS_ARMOUR_BODY_3_BROKEN
+20487	castlewars_armour_legs_3	CASTLEWARS_ARMOUR_LEGS_3_BROKEN
+20489	castlewars_med_helm_3	CASTLEWARS_MED_HELM_3_BROKEN
+20491	castlewars_shield_3	CASTLEWARS_SHIELD_3_BROKEN
+20493	castlewars_armour_skirt_3	CASTLEWARS_ARMOUR_SKIRT_3_BROKEN
+20495	castlewars_mage_top	CASTLEWARS_MAGE_TOP_BROKEN
+20497	castlewars_mage_legs	CASTLEWARS_MAGE_LEGS_BROKEN
+20499	castlewars_mage_hat	CASTLEWARS_MAGE_HAT_BROKEN
+20501	castlewars_range_top	CASTLEWARS_RANGE_TOP_BROKEN
+20503	castlewars_range_legs	CASTLEWARS_RANGE_LEGS_BROKEN
+20505	castlewars_range_quiver	CASTLEWARS_RANGE_QUIVER_BROKEN
+20507	barbassault_penance_fighter_hat	BARBASSAULT_PENANCE_FIGHTER_HAT_BROKEN
+20509	barbassault_penance_ranger_hat	BARBASSAULT_PENANCE_RANGER_HAT_BROKEN
+20511	barbassault_penance_healer_hat	BARBASSAULT_PENANCE_HEALER_HAT_BROKEN
+20513	barbassault_penance_fighter_torso	BARBASSAULT_PENANCE_FIGHTER_TORSO_BROKEN
+20515	barbassault_penance_ranger_legs	BARBASSAULT_PENANCE_RANGER_LEGS_BROKEN
+20537	castlewars_saradomin_halo	CASTLEWARS_SARADOMIN_HALO_BROKEN
+20539	castlewars_zamorak_halo	CASTLEWARS_ZAMORAK_HALO_BROKEN
+20541	castlewars_guthix_halo	CASTLEWARS_GUTHIX_HALO_BROKEN
+21285	skillcape_max_infernalcape	SKILLCAPE_MAX_INFERNALCAPE
+21287	infernal_cape	INFERNAL_CAPE_BROKEN
+21289	skillcape_max_infernalcape	SKILLCAPE_MAX_INFERNALCAPE_BROKEN
+21295	infernal_cape	INFERNAL_CAPE
+21776	skillcape_max_saradomin2	SKILLCAPE_MAX_SARADOMIN2
+21780	skillcape_max_zamorak2	SKILLCAPE_MAX_ZAMORAK2
+21784	skillcape_max_guthix2	SKILLCAPE_MAX_GUTHIX2
+21791	ma2_saradomin_cape	MA2_SARADOMIN_CAPE
+21793	ma2_guthix_cape	MA2_GUTHIX_CAPE
+21795	ma2_zamorak_cape	MA2_ZAMORAK_CAPE
+21898	skillcape_max_assembler	SKILLCAPE_MAX_ASSEMBLER
+21914	avas_assembler	AVAS_ASSEMBLER_BROKEN
+21916	skillcape_max_assembler	SKILLCAPE_MAX_ASSEMBLER_BROKEN
+22109	avas_assembler	AVAS_ASSEMBLER
+22322	infernal_defender	INFERNAL_DEFENDER
+22441	infernal_defender	INFERNAL_DEFENDER_BROKEN
+24133	skillcape_max_infernalcape_trouver	SKILLCAPE_MAX_INFERNALCAPE_TROUVER
+24147	armadyl_halo	ARMADYL_HALO_BROKEN
+24149	bandos_halo	BANDOS_HALO_BROKEN
+24151	seren_halo	SEREN_HALO_BROKEN
+24153	zaros_halo	ZAROS_HALO_BROKEN
+24155	brassica_halo	BRASSICA_HALO_BROKEN
+24175	barbassault_penance_fighter_torso_trouver	BARBASSAULT_PENANCE_FIGHTER_TORSO_TROUVER
+24177	pest_void_knight_top_trouver	PEST_VOID_KNIGHT_TOP_TROUVER
+24178	elite_void_knight_top_trouver	ELITE_VOID_KNIGHT_TOP_TROUVER
+24179	pest_void_knight_robes_trouver	PEST_VOID_KNIGHT_ROBES_TROUVER
+24180	elite_void_knight_robes_trouver	ELITE_VOID_KNIGHT_ROBES_TROUVER
+24182	pest_void_knight_gloves_trouver	PEST_VOID_KNIGHT_GLOVES_TROUVER
+24183	game_pest_mage_helm_trouver	GAME_PEST_MAGE_HELM_TROUVER
+24184	game_pest_archer_helm_trouver	GAME_PEST_ARCHER_HELM_TROUVER
+24185	game_pest_melee_helm_trouver	GAME_PEST_MELEE_HELM_TROUVER
+24192	armadyl_halo	ARMADYL_HALO
+24195	bandos_halo	BANDOS_HALO
+24198	seren_halo	SEREN_HALO
+24201	zaros_halo	ZAROS_HALO
+24204	brassica_halo	BRASSICA_HALO
+24224	infernal_cape_trouver	INFERNAL_CAPE_TROUVER
+24236	ma2_saradomin_cape	MA2_SARADOMIN_CAPE_BROKEN
+24238	skillcape_max_saradomin2	SKILLCAPE_MAX_SARADOMIN2_BROKEN
+24240	ma2_guthix_cape	MA2_GUTHIX_CAPE_BROKEN
+24242	skillcape_max_guthix2	SKILLCAPE_MAX_GUTHIX2_BROKEN
+24244	ma2_zamorak_cape	MA2_ZAMORAK_CAPE_BROKEN
+24246	skillcape_max_zamorak2	SKILLCAPE_MAX_ZAMORAK2_BROKEN
+24531	barbassault_penance_runner_hat	BARBASSAULT_PENANCE_RUNNER_HAT_BROKEN
+25155	castlewars_boots_3	CASTLEWARS_BOOTS_3_BROKEN
+25157	castlewars_full_helm_3	CASTLEWARS_FULL_HELM_3_BROKEN
+25171	castlewars_boots_3	CASTLEWARS_BOOTS_3
+25174	castlewars_full_helm_3	CASTLEWARS_FULL_HELM_3
+25625	barronite_mace	BARRONITE_MACE_BROKEN
+25641	barronite_mace	BARRONITE_MACE
+27359	avas_assembler_masori	AVAS_ASSEMBLER_MASORI_BROKEN
+27361	skillcape_max_assembler_masori	SKILLCAPE_MAX_ASSEMBLER_MASORI_BROKEN
+27363	skillcape_max_assembler_masori	SKILLCAPE_MAX_ASSEMBLER_MASORI
+27374	avas_assembler_masori	AVAS_ASSEMBLER_MASORI
+27626	ancient_sceptre_trouver	ANCIENT_SCEPTRE_TROUVER
+28238	ancient_sceptre_blood	ANCIENT_SCEPTRE_BLOOD_BROKEN
+28240	ancient_sceptre_smoke	ANCIENT_SCEPTRE_SMOKE_BROKEN
+28242	ancient_sceptre_ice	ANCIENT_SCEPTRE_ICE_BROKEN
+28244	ancient_sceptre_shadow	ANCIENT_SCEPTRE_SHADOW_BROKEN
+28260	ancient_sceptre_blood	ANCIENT_SCEPTRE_BLOOD
+28262	ancient_sceptre_ice	ANCIENT_SCEPTRE_ICE
+28264	ancient_sceptre_smoke	ANCIENT_SCEPTRE_SMOKE
+28266	ancient_sceptre_shadow	ANCIENT_SCEPTRE_SHADOW
+28473	ancient_sceptre_blood_trouver	ANCIENT_SCEPTRE_BLOOD_TROUVER
+28474	ancient_sceptre_ice_trouver	ANCIENT_SCEPTRE_ICE_TROUVER
+28475	ancient_sceptre_smoke_trouver	ANCIENT_SCEPTRE_SMOKE_TROUVER
+28476	ancient_sceptre_shadow_trouver	ANCIENT_SCEPTRE_SHADOW_TROUVER
+28826	dizanas_quiver	DIZANAS_QUIVER_BROKEN
+28828	dizanas_quiver_infinite	DIZANAS_QUIVER_INFINITE_BROKEN
+28830	skillcape_max_dizanas	SKILLCAPE_MAX_DIZANAS_BROKEN
+28902	skillcape_max_dizanas	SKILLCAPE_MAX_DIZANAS
+28906	skillcape_max_dizanas_trouver	SKILLCAPE_MAX_DIZANAS_TROUVER
+28947	dizanas_quiver	DIZANAS_QUIVER_UNCHARGED
+28955	dizanas_quiver_infinite	DIZANAS_QUIVER_INFINITE
+28957	dizanas_quiver_infinite_trouver	DIZANAS_QUIVER_INFINITE_TROUVER
+29004	eclipse_moon_chestplate	ECLIPSE_MOON_CHESTPLATE
+29007	eclipse_moon_tassets	ECLIPSE_MOON_TASSETS
+29010	eclipse_moon_helm	ECLIPSE_MOON_HELM
+29013	frost_moon_chestplate	FROST_MOON_CHESTPLATE
+29016	frost_moon_tassets	FROST_MOON_TASSETS
+29019	frost_moon_helm	FROST_MOON_HELM
+29022	blood_moon_chestplate	BLOOD_MOON_CHESTPLATE
+29025	blood_moon_tassets	BLOOD_MOON_TASSETS
+29028	blood_moon_helm	BLOOD_MOON_HELM
+29031	eclipse_moon_chestplate	ECLIPSE_MOON_CHESTPLATE_DEGRADED
+29033	eclipse_moon_tassets	ECLIPSE_MOON_TASSETS_DEGRADED
+29035	eclipse_moon_helm	ECLIPSE_MOON_HELM_DEGRADED
+29037	frost_moon_chestplate	FROST_MOON_CHESTPLATE_DEGRADED
+29039	frost_moon_tassets	FROST_MOON_TASSETS_DEGRADED
+29041	frost_moon_helm	FROST_MOON_HELM_DEGRADED
+29043	blood_moon_chestplate	BLOOD_MOON_CHESTPLATE_DEGRADED
+29045	blood_moon_tassets	BLOOD_MOON_TASSETS_DEGRADED
+29047	blood_moon_helm	BLOOD_MOON_HELM_DEGRADED
+29049	eclipse_moon_chestplate	ECLIPSE_MOON_CHESTPLATE_BROKEN
+29052	eclipse_moon_tassets	ECLIPSE_MOON_TASSETS_BROKEN
+29055	eclipse_moon_helm	ECLIPSE_MOON_HELM_BROKEN
+29058	frost_moon_chestplate	FROST_MOON_CHESTPLATE_BROKEN
+29061	frost_moon_tassets	FROST_MOON_TASSETS_BROKEN
+29064	frost_moon_helm	FROST_MOON_HELM_BROKEN
+29067	blood_moon_chestplate	BLOOD_MOON_CHESTPLATE_BROKEN
+29070	blood_moon_tassets	BLOOD_MOON_TASSETS_BROKEN
+29073	blood_moon_helm	BLOOD_MOON_HELM_BROKEN
+30445	ahrim's hood (o)	BARROWS_AHRIM_HEAD_ORNAMENT
+30447	ahrim's robetop (o)	BARROWS_AHRIM_BODY_ORNAMENT
+30449	ahrim's robeskirt (o)	BARROWS_AHRIM_LEGS_ORNAMENT
+30519	ahrim's hood (o)	BARROWS_AHRIM_HEAD_ORNAMENT_100
+30521	ahrim's robetop (o)	BARROWS_AHRIM_BODY_ORNAMENT_100
+30523	ahrim's robeskirt (o)	BARROWS_AHRIM_LEGS_ORNAMENT_100
+30525	ahrim's hood (o)	BARROWS_AHRIM_HEAD_ORNAMENT_75
+30527	ahrim's robetop (o)	BARROWS_AHRIM_BODY_ORNAMENT_75
+30529	ahrim's robeskirt (o)	BARROWS_AHRIM_LEGS_ORNAMENT_75
+30531	ahrim's hood (o)	BARROWS_AHRIM_HEAD_ORNAMENT_50
+30533	ahrim's robetop (o)	BARROWS_AHRIM_BODY_ORNAMENT_50
+30535	ahrim's robeskirt (o)	BARROWS_AHRIM_LEGS_ORNAMENT_50
+30537	ahrim's hood (o)	BARROWS_AHRIM_HEAD_ORNAMENT_25
+30539	ahrim's robetop (o)	BARROWS_AHRIM_BODY_ORNAMENT_25
+30541	ahrim's robeskirt (o)	BARROWS_AHRIM_LEGS_ORNAMENT_25
+30543	ahrim's hood (o)	BARROWS_AHRIM_HEAD_ORNAMENT_BROKEN
+30545	ahrim's robetop (o)	BARROWS_AHRIM_BODY_ORNAMENT_BROKEN
+30547	ahrim's robeskirt (o)	BARROWS_AHRIM_LEGS_ORNAMENT_BROKEN
+30568	ahrim's staff (o)	BARROWS_AHRIM_WEAPON_ORNAMENT
+30570	ahrim's staff (o)	BARROWS_AHRIM_WEAPON_ORNAMENT_100
+30571	ahrim's staff (o)	BARROWS_AHRIM_WEAPON_ORNAMENT_75
+30572	ahrim's staff (o)	BARROWS_AHRIM_WEAPON_ORNAMENT_50
+30573	ahrim's staff (o)	BARROWS_AHRIM_WEAPON_ORNAMENT_25
+30574	ahrim's staff (o)	BARROWS_AHRIM_WEAPON_ORNAMENT_BROKEN
+33464	game_pest_melee_helm_trouver	GAME_PEST_MELEE_HELM_TROUVER_BROKEN
+33468	game_pest_mage_helm_trouver	GAME_PEST_MAGE_HELM_TROUVER_BROKEN
+33472	game_pest_archer_helm_trouver	GAME_PEST_ARCHER_HELM_TROUVER_BROKEN
+33476	pest_void_knight_top_trouver	PEST_VOID_KNIGHT_TOP_TROUVER_BROKEN
+33480	elite_void_knight_top_trouver	ELITE_VOID_KNIGHT_TOP_TROUVER_BROKEN
+33484	pest_void_knight_robes_trouver	PEST_VOID_KNIGHT_ROBES_TROUVER_BROKEN
+33488	elite_void_knight_robes_trouver	ELITE_VOID_KNIGHT_ROBES_TROUVER_BROKEN
+33492	pest_void_knight_gloves_trouver	PEST_VOID_KNIGHT_GLOVES_TROUVER_BROKEN
+33496	skillcape_max_infernalcape_trouver	SKILLCAPE_MAX_INFERNALCAPE_TROUVER_BROKEN
+33500	infernal_cape_trouver	INFERNAL_CAPE_TROUVER_BROKEN
+33504	ancient_sceptre_blood_trouver	ANCIENT_SCEPTRE_BLOOD_TROUVER_BROKEN
+33508	ancient_sceptre_ice_trouver	ANCIENT_SCEPTRE_ICE_TROUVER_BROKEN
+33512	ancient_sceptre_smoke_trouver	ANCIENT_SCEPTRE_SMOKE_TROUVER_BROKEN
+33516	ancient_sceptre_shadow_trouver	ANCIENT_SCEPTRE_SHADOW_TROUVER_BROKEN
+33520	barbassault_penance_fighter_torso_trouver	BARBASSAULT_PENANCE_FIGHTER_TORSO_TROUVER_BROKEN
+33528	dizanas_quiver_infinite_trouver	DIZANAS_QUIVER_INFINITE_TROUVER_BROKEN
+33532	skillcape_max_dizanas_trouver	SKILLCAPE_MAX_DIZANAS_TROUVER_BROKEN
+33827	ancient_sceptre_trouver	ANCIENT_SCEPTRE_TROUVER_BROKEN
+34625	skillcape_max_zaros	SKILLCAPE_MAX_ZAROS
+34629	skillcape_max_zaros	SKILLCAPE_MAX_ZAROS_BROKEN
+34633	ma2_zaros_cape	MA2_ZAROS_CAPE
+34635	ma2_zaros_cape	MA2_ZAROS_CAPE_BROKEN
+
+# Charged and inert states of the same owned item; contents count separately.
+34715	obligator	OBLIGATOR
+34717	obligator	OBLIGATOR_UNCHARGED
+34723	archivists_folio	ARCHIVISTS_FOLIO
+34722	archivists_folio	ARCHIVISTS_FOLIO_EMPTY
+34725	zoryas_tome	ZORYAS_TOME
+34727	zoryas_tome	ZORYAS_TOME_UNCHARGED
+33103	cowbell_amulet	COWBELL_AMULET_EMPTY
+33104	cowbell_amulet	COWBELL_AMULET

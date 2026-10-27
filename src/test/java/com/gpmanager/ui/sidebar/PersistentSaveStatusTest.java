@@ -19,7 +19,7 @@ public class PersistentSaveStatusTest
         {
             fixture.shell.notifySticky("Data not saved", "disk full", "Retry", () -> { });
             assertTrue(fixture.shell.notice.isVisible());
-            assertFalse("a failure has no auto-dismiss timer", fixture.shell.noticeTimer.isRunning());
+            assertFalse("a failure has no auto-dismiss timer", fixture.shell.timer.isRunning());
             fixture.shell.noticeClicked();
             assertTrue("a text click does not dismiss a failure", fixture.shell.notice.isVisible());
             fixture.shell.tell("Saved as My Grind", "future defaults only", false);
@@ -47,7 +47,7 @@ public class PersistentSaveStatusTest
             assertFalse("the attempt hides the failure", fixture.shell.notice.isVisible());
             fixture.shell.notifySticky("Data not saved", "disk full", "Retry", () -> { });
             assertTrue("still failing means still visible", fixture.shell.notice.isVisible());
-            assertFalse("and still no timer", fixture.shell.noticeTimer.isRunning());
+            assertFalse("and still no timer", fixture.shell.timer.isRunning());
             return null;
         });
     }
@@ -57,7 +57,7 @@ public class PersistentSaveStatusTest
     {
         FakePersist persist = new FakePersist();
         SidebarPanel panel = onEdt(() -> new SidebarPanel(engine(), new GpManagerConfig() {}, null, null, persist));
-        Shell shell = panel.shell();
+        Shell shell = panel.shell;
         onEdt(() ->
         {
             persist.status = new SaveStatus(SaveStatus.State.FAILED, "disk full", false, "");
@@ -71,7 +71,7 @@ public class PersistentSaveStatusTest
             panel.showPersistenceWarning();
             assertTrue("recovery replaces it with the recovery note",
                 ShellProbe.noticeText(shell).startsWith("Recovered from backup"));
-            assertTrue("routine recovery has a timer", shell.noticeTimer.isRunning());
+            assertTrue("routine recovery has a timer", shell.timer.isRunning());
 
             persist.status = new SaveStatus(SaveStatus.State.FAILED, "disk full", false, "");
             panel.showPersistenceWarning();
@@ -96,7 +96,7 @@ public class PersistentSaveStatusTest
         Fixture() throws Exception
         {
             panel = onEdt(() -> new SidebarPanel(engine(), new GpManagerConfig() {}, null, null, null));
-            shell = panel.shell();
+            shell = panel.shell;
         }
     }
 

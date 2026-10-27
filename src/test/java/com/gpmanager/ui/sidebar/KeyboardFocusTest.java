@@ -129,14 +129,14 @@ public class KeyboardFocusTest {
         edt(() -> {
             SidebarPanel panel = DirectHeaderControlsTest.panel();
             try {
-                panel.grindActions.newSession();
+                panel.actions.newSession();
                 for (String name : new String[]{"New session", "Restore time"}) {
                     AbstractButton button = DirectHeaderControlsTest.find(panel.shell.sheet, name);
                     assertNotNull(name, button);
                     assertEquals(new Insets(4, 5, 4, 5), button.getInsets());
                     assertBorderColor(button, Kit.LINE.getRGB());
                 }
-            } finally { panel.shell.noticeTimer.stop(); }
+            } finally { panel.shell.timer.stop(); }
         });
     }
     @Test public void pendingCountButtonsStayBorderlessWhenFocused() throws Exception {
@@ -149,7 +149,7 @@ public class KeyboardFocusTest {
                 assertEquals(new Insets(0, 0, 0, 0), button.getInsets());
                 assertFalse(button.isFocusPainted());
                 assertBorderColor(button, 0);
-            } finally { panel.shell.noticeTimer.stop(); }
+            } finally { panel.shell.timer.stop(); }
         });
     }
     @Test public void escapeCancelsWithoutCommittingAndTabsHaveLocalNavigation() throws Exception {
@@ -161,12 +161,12 @@ public class KeyboardFocusTest {
                 assertNotNull("Escape cancels this sheet", escape);
                 shell.sheet.getActionMap().get(escape).actionPerformed(new ActionEvent(shell.sheet, 0, "ESCAPE"));
                 assertFalse(shell.sheet.isVisible()); assertEquals(0, committed.get());
-                for (JComponent tab : shell.tabById.values()) {
+                for (JComponent tab : shell.buttons.values()) {
                     assertTrue(tab.isFocusable());
                     for (String key : new String[]{"ENTER", "SPACE", "LEFT", "RIGHT", "HOME", "END"})
                         assertNotNull("Tab " + key, tab.getInputMap().get(KeyStroke.getKeyStroke(key)));
                 }
-            } finally { shell.noticeTimer.stop(); }
+            } finally { shell.timer.stop(); }
         });
     }
     @Test public void ownerBoundaryDisarmsHeldActionsAndClosesOnlyOwnedPopups() throws Exception {
@@ -199,7 +199,7 @@ public class KeyboardFocusTest {
                 shell.remove(row);
                 cancel(shell);
                 assertEquals("owner switches close detached old-row menus too", 0, manager.getSelectedPath().length);
-            } finally { manager.clearSelectedPath(); shell.noticeTimer.stop(); }
+            } finally { manager.clearSelectedPath(); shell.timer.stop(); }
         });
     }
     @Test public void queuedActionsCannotCrossAnOwnerChangeAndValidationIsAtomic() throws Exception {
@@ -211,7 +211,7 @@ public class KeyboardFocusTest {
                 panel.suspend(); panel.resume(); queued.remove(0).run(); assertEquals(0, runs.get());
                 panel.mutate(() -> { assertTrue(Thread.holdsLock(panel.engine)); runs.incrementAndGet(); });
                 queued.remove(0).run(); assertEquals(1, runs.get());
-            } finally { panel.shell.noticeTimer.stop(); }
+            } finally { panel.shell.timer.stop(); }
         });
     }
     @Test public void liveHeaderControlsAndFoldsExposeKeyboardNames() throws Exception {
@@ -219,12 +219,12 @@ public class KeyboardFocusTest {
             SidebarPanel panel = DirectHeaderControlsTest.panel();
             try {
                 for (JComponent component : new JComponent[]{panel.live.hero.dot, panel.live.hero.name, panel.live.hero.net, panel.live.hero.clock,
-                        panel.live.runTotal, panel.live.recent.chevron}) {
+                        panel.live.total, panel.live.recent.arrow}) {
                     assertTrue(component.getClass().getName(), component.isFocusable());
                     assertNotNull(component.getAccessibleContext().getAccessibleName());
                     assertNotNull(component.getInputMap().get(KeyStroke.getKeyStroke("ENTER")));
                 }
-            } finally { panel.shell.noticeTimer.stop(); }
+            } finally { panel.shell.timer.stop(); }
         });
     }
 }

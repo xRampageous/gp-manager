@@ -1,5 +1,18 @@
 # GP Manager changelog
 
+## 1.7.0 - 2026-10-27
+
+- Track CoX, ToB, ToA and The Fractured Archive in Raids, with loot, paid death fees and All raids totals. Raid entry unlocks the tab; you always open it manually. Attempts show a completed clear, a terminal failure or the actual Death Fee; abandoned and retry-only attempts stay out of the list.
+- Open KILLS for recorded PK loot, or DEATHS for death losses and looting-bag contents. PvP skull colours show the booked loss tier; gravestone recovery stays neutral.
+- View a session recap, save it in Grinds and rename saved sessions.
+- Improve raid rewards, borrowed supplies, blighted potion doses, armour repairs and G.E. collections after hops or restarts. Live tables match Recent's width and row sizing; Supply counts use doses.
+- The Obligator, Zorya's tome and the archivist's folio count the runes and ascension shards their charges use. Loading charges and uncharging the two weapons stay neutral.
+- Count Cowbell amulet teleports as air runes used; filling or emptying a bottomless milk bucket stays neutral.
+- Items worth more than 2.147B, such as the Obligator, count at their full G.E. price. Platinum tokens count as cash, so G.E. trades paid in tokens settle normally and swapping coins for tokens books nothing.
+- The Include equipment and Include rune pouch settings are gone: gear swaps and rune-pouch moves always stay neutral. Player chat cannot trigger accounting, and undecided Reviews stay available until you decide.
+- The Save history setting is gone: your history is always kept on your computer. Use ⚙ › Delete Profile to remove it.
+- Clearer save warnings and more reliable Ledger corrections and Undo.
+
 ## 1.6.0 - 2026-10-20
 
 - Click Gains, Supply, Loss or Trade for that Live session's entries, 15 per page; click the same category again to return to Recent. Search is available only on Ledger. Recent stays a dark list with its count, total and row limit: 15 by default, up to 30.

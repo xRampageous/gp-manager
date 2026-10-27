@@ -6,8 +6,31 @@ import net.runelite.client.util.Filepath;
 /** Test-side reads of persistence state; moved out of production to keep the plugin small. */
 public final class PersistenceProbe
 {
+    /** Test-only serializer; both writer routes use the canonical snapshot builder. */
+    public static String snapshotJson(Persistence persistence, SavedState header, boolean quick) {
+        return persistence.repository.gson.toJson(persistence.snapshotState(header));
+    }
+
     private PersistenceProbe()
     {
+    }
+
+    /**
+     * An account clear that skips its save, as the retired history-off mode did: lets a test unbind
+     * while an earlier write is still in flight and check how that stale write completes.
+     */
+    public static void unbindWithoutSave(Persistence persistence)
+    {
+        synchronized (persistence)
+        {
+            persistence.engine.clearIdentity();
+            persistence.activeIdentity = null;
+            persistence.repository.unbind();
+            persistence.writer.resetRevision(0);
+            persistence.next = 1;
+            persistence.engine.restoreProfile(null, new SavedState(), SafeMath.now());
+            persistence.switchBlocked = false;
+        }
     }
 
     /** Saves {@code state} on the disk revision observed now, healing an unreadable primary first. */
@@ -24,7 +47,7 @@ public final class PersistenceProbe
     {
         if (state == null)
         {
-            return SessionRepository.ReplaceOutcome.failedUnchanged("state was null");
+            return SessionRepository.ReplaceOutcome.unchanged("state was null");
         }
         synchronized (repository)
         {
@@ -44,18 +67,18 @@ public final class PersistenceProbe
             catch (Exception ex)
             {
                 repository.setAside(files);
-                repository.lastKnownDiskRevision = repository.backupRevision(files.backup).orElse(0L);
+                repository.revision = repository.backupRevision(files.backup).orElse(0L);
             }
         }
-        if (repository.lastKnownDiskRevision <= 0L)
+        if (repository.revision <= 0L)
         {
-            repository.lastKnownDiskRevision = repository.peekRevision(files.state)
+            repository.revision = repository.peekRevision(files.state)
                 .orElse(repository.backupRevision(files.backup).orElse(0L));
         }
-        long base = repository.lastKnownDiskRevision;
-        return repository.boundIdentity == null
-            ? new WriteIntent(null, repository.scopeGeneration, base, state, null)
-            : new WriteIntent(repository.boundIdentity, repository.scopeGeneration, base, state, null);
+        long base = repository.revision;
+        return repository.owner == null
+            ? new WriteIntent(null, repository.generation, base, state, null)
+            : new WriteIntent(repository.owner, repository.generation, base, state, null);
     }
 
     /**
@@ -66,7 +89,7 @@ public final class PersistenceProbe
     {
         for (int step = 0; step < steps; step++)
         {
-            persistence.lifecycleExecutor().submit(() -> { }).get(5, java.util.concurrent.TimeUnit.SECONDS);
+            persistence.executor().submit(() -> { }).get(5, java.util.concurrent.TimeUnit.SECONDS);
             javax.swing.SwingUtilities.invokeAndWait(() -> { });
         }
     }
@@ -108,13 +131,13 @@ public final class PersistenceProbe
             {
                 return "Tracking identity not bound yet";
             }
-            if (coordinator.readOnlyReason != null)
+            if (coordinator.reason != null)
             {
-                return coordinator.readOnlyReason;
+                return coordinator.reason;
             }
             if (!current.equals(coordinator.activeIdentity))
             {
-                SaveStatus status = coordinator.writer.getStatus();
+                SaveStatus status = coordinator.writer.status();
                 String detail = status == null || status.detail == null || status.detail.isEmpty()
                     ? "previous account save did not finish"
                     : status.detail;

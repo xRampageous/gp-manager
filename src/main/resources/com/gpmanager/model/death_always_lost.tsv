@@ -1,0 +1,5 @@
+# Bracelet protection exceptions only; not a complete death-disposition catalogue.
+# Both forms always drop: OSRS Wiki Bracelet of ethereum; Mage Arena II, Revenant Caves & Deadman Beta.
+# item id <TAB> RuneLite gameval name
+21816	WILD_CAVE_BRACELET_CHARGED
+21817	WILD_CAVE_BRACELET_UNCHARGED

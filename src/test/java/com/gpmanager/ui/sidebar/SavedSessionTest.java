@@ -24,25 +24,25 @@ public class SavedSessionTest {
             Engine engine = engine();
             if (grind) engine.startCustom("Vorkath", 0L);
             coins(engine, 5L, 1_000L);
-            engine.newLiveSession(MINUTE);
+            engine.newLive(MINUTE);
             coins(engine, MINUTE + 5L, 500L);
             SafeMath.clock = () -> 2L * MINUTE;
             SidebarPanel panel = RateRestartTest.panel(engine);
             panel.active = true;
             panel.refreshNow();
-            DirectHeaderControlsTest.click(panel.live.runTotal);
-            assertEquals("Save session?", panel.shell.sheetTitle);
+            DirectHeaderControlsTest.click(panel.live.total);
+            assertEquals("Save session?", panel.shell.heading);
             assertTrue(ShellProbe.sheetButtonTexts(panel.shell).contains("Save session"));
             assertTrue(ShellProbe.sheetButtonTexts(panel.shell).contains("Continue without saving"));
             ShellProbe.pressSheet(panel.shell, "Cancel");
-            assertEquals(Long.valueOf(MINUTE), engine.getActiveSession().sessionStartAt);
-            assertTrue(engine.savedSessions.isEmpty());
-            DirectHeaderControlsTest.click(panel.live.runTotal);
+            assertEquals(Long.valueOf(MINUTE), engine.session().sessionStartAt);
+            assertTrue(engine.saved.isEmpty());
+            DirectHeaderControlsTest.click(panel.live.total);
             ShellProbe.pressSheet(panel.shell, "Continue without saving");
-            assertNull(engine.getActiveSession().sessionStartAt);
+            assertNull(engine.session().sessionStartAt);
             assertEquals(1_500L, live(engine, 2L * MINUTE).net);
-            assertTrue(engine.getHistory().isEmpty());
-            assertTrue(engine.savedSessions.isEmpty());
+            assertTrue(engine.history().isEmpty());
+            assertTrue(engine.saved.isEmpty());
             return null;
         });
     }
@@ -51,25 +51,25 @@ public class SavedSessionTest {
         onEdt(() -> {
             Engine engine = window();
             SidebarPanel panel = panel(engine);
-            DirectHeaderControlsTest.click(panel.live.runTotal);
+            DirectHeaderControlsTest.click(panel.live.total);
             ShellProbe.pressSheet(panel.shell, "Save session");
-            assertEquals(1, engine.savedSessions.size());
-            assertTrue(panel.shell.noticeText.getText().contains("Session saved"));
-            String id = engine.savedSessions.get(0).id;
-            assertNull(engine.getActiveSession().sessionStartAt);
+            assertEquals(1, engine.saved.size());
+            assertTrue(panel.shell.message.getText().contains("Session saved"));
+            String id = engine.saved.get(0).id;
+            assertNull(engine.session().sessionStartAt);
             assertEquals(1_500L, live(engine, 2L * MINUTE).net);
             assertEquals(1_500L, GrindsData.allTime(engine, 2L * MINUTE).net);
             GrindsData data = GrindsData.capture(engine, 2L * MINUTE, false, id);
             assertEquals(500L, data.detail.net);
             assertEquals(MINUTE, data.detail.activeMillis);
-            assertEquals(30_000L, data.detail.gpPerHour);
-            assertEquals(id, data.detail.sessionId);
+            assertEquals(30_000L, data.detail.rate);
+            assertEquals(id, data.detail.session);
             new GrindsController(panel).openLedger(id);
-            LedgerData ledger = LedgerData.capture(engine, 2L * MINUTE, panel.ledgerEntry);
-            assertTrue(ledger.readOnly);
+            LedgerData ledger = LedgerData.capture(engine, 2L * MINUTE, panel.scope);
+            assertTrue(ledger.readonly);
             assertEquals(500L, ledger.net);
-            assertTrue(ledger.reconciled);
-            assertTrue(engine.getHistory().isEmpty());
+            assertTrue(ledger.balanced);
+            assertTrue(engine.history().isEmpty());
             return null;
         });
     }
@@ -78,22 +78,22 @@ public class SavedSessionTest {
         onEdt(() -> {
             Engine engine = window();
             coins(engine, MINUTE + 10L, -100L);
-            Session source = engine.getActiveSession();
-            String cost = source.getTransactions().get(2).getId();
-            String id = engine.saveLiveSession(source, source.sessionStartAt, 2L * MINUTE);
+            Session source = engine.session();
+            String cost = source.transactions().get(2).id();
+            String id = EngineProbe.saveLiveSession(engine, source, source.sessionStartAt, 2L * MINUTE);
             Session saved = engine.historySession(id);
             assertEquals(400L, saved.metrics(0L).net);
-            assertNotSame(source.getTransactions().get(1), saved.getTransactions().get(0));
-            assertTrue(engine.correctTransaction(cost, Correction.IGNORE, 2L * MINUTE, "owner correction"));
+            assertNotSame(source.transactions().get(1), saved.transactions().get(0));
+            assertTrue(engine.correctTransaction(cost, Correction.IGNORE, "owner correction"));
             coins(engine, 2L * MINUTE + 5L, 600L);
             engine.showWholeRun();
-            assertEquals(2_100L, engine.getMetrics(3L * MINUTE).net);
+            assertEquals(2_100L, engine.metrics(3L * MINUTE).net);
             assertEquals(400L, saved.metrics(3L * MINUTE).net);
-            assertEquals(MINUTE, saved.getElapsedMillis(3L * MINUTE));
+            assertEquals(MINUTE, saved.elapsed(3L * MINUTE));
             LedgerData ledger = LedgerData.capture(engine, 3L * MINUTE,
-                    new LedgerData.Entry(LedgerData.Scope.HISTORY, id, saved.getName()));
+                    new LedgerData.Entry(LedgerData.Scope.HISTORY, id, saved.name()));
             assertEquals(400L, ledger.net);
-            assertTrue(ledger.reconciled);
+            assertTrue(ledger.balanced);
             assertEquals(2_100L, GrindsData.allTime(engine, 3L * MINUTE).net);
             return null;
         });
@@ -102,8 +102,8 @@ public class SavedSessionTest {
     @Test public void savedEntriesRoundTripAndStayWithTheirProfile() throws Exception {
         onEdt(() -> {
             Engine engine = window();
-            Session source = engine.getActiveSession();
-            String id = engine.saveLiveSession(source, source.sessionStartAt, 2L * MINUTE);
+            Session source = engine.session();
+            String id = EngineProbe.saveLiveSession(engine, source, source.sessionStartAt, 2L * MINUTE);
             Gson gson = new Gson();
             SavedState disk = gson.fromJson(gson.toJson(engine.exportState()), SavedState.class);
             Engine loaded = engine();
@@ -111,9 +111,9 @@ public class SavedSessionTest {
             assertEquals(500L, loaded.historySession(id).metrics(0L).net);
             assertEquals(1_500L, GrindsData.allTime(loaded, 3L * MINUTE).net);
             assertTrue(LedgerData.capture(loaded, 3L * MINUTE,
-                    new LedgerData.Entry(LedgerData.Scope.HISTORY, id, "Saved")).reconciled);
+                    new LedgerData.Entry(LedgerData.Scope.HISTORY, id, "Saved")).balanced);
             loaded.restoreProfile("another-owner", new SavedState(), 4L * MINUTE);
-            assertTrue(loaded.savedSessions.isEmpty());
+            assertTrue(loaded.saved.isEmpty());
             assertNull(loaded.historySession(id));
             loaded.restoreProfile("saved-owner", disk, 5L * MINUTE);
             assertEquals(500L, loaded.historySession(id).metrics(0L).net);
@@ -124,11 +124,11 @@ public class SavedSessionTest {
     @Test public void restoredCopiesCleanNullRowsAndFlowsWithoutChangingValidReceipts() throws Exception {
         onEdt(() -> {
             Engine original = window();
-            Session source = original.getActiveSession();
-            String id = original.saveLiveSession(source, source.sessionStartAt, 2L * MINUTE);
+            Session source = original.session();
+            String id = EngineProbe.saveLiveSession(original, source, source.sessionStartAt, 2L * MINUTE);
             Gson gson = JsonCodec.gson();
-            String canonical = gson.toJson(source.getTransactions());
-            String receipt = gson.toJson(original.historySession(id).getTransactions().get(0));
+            String canonical = gson.toJson(source.transactions());
+            String receipt = gson.toJson(original.historySession(id).transactions().get(0));
             var json = gson.toJsonTree(original.exportState()).getAsJsonObject();
             var saved = json.getAsJsonArray("savedSessions").get(0).getAsJsonObject()
                     .getAsJsonObject("session");
@@ -139,19 +139,19 @@ public class SavedSessionTest {
             loaded.restoreProfile("copy-cleanup", gson.fromJson(json, SavedState.class), 3L * MINUTE);
             Session copy = loaded.historySession(id);
             LedgerData ledger = LedgerData.capture(loaded, 3L * MINUTE,
-                    new LedgerData.Entry(LedgerData.Scope.HISTORY, id, copy.getName()));
-            assertTrue(ledger.readOnly);
-            assertTrue(ledger.reconciled);
+                    new LedgerData.Entry(LedgerData.Scope.HISTORY, id, copy.name()));
+            assertTrue(ledger.readonly);
+            assertTrue(ledger.balanced);
             assertEquals(500L, ledger.net);
-            assertEquals(1, copy.getTransactions().size());
-            assertEquals(receipt, gson.toJson(copy.getTransactions().get(0)));
-            assertEquals(canonical, gson.toJson(loaded.getActiveSession().getTransactions()));
+            assertEquals(1, copy.transactions().size());
+            assertEquals(receipt, gson.toJson(copy.transactions().get(0)));
+            assertEquals(canonical, gson.toJson(loaded.session().transactions()));
             assertEquals(1_500L, GrindsData.allTime(loaded, 3L * MINUTE).net);
             Engine reloaded = engine();
             reloaded.restoreProfile("copy-cleanup", loaded.exportState(), 4L * MINUTE);
-            assertEquals(receipt, gson.toJson(reloaded.historySession(id).getTransactions().get(0)));
+            assertEquals(receipt, gson.toJson(reloaded.historySession(id).transactions().get(0)));
             assertEquals(500L, LedgerData.capture(reloaded, 4L * MINUTE,
-                    new LedgerData.Entry(LedgerData.Scope.HISTORY, id, copy.getName())).net);
+                    new LedgerData.Entry(LedgerData.Scope.HISTORY, id, copy.name())).net);
             reloaded.restoreProfile("other-owner", new SavedState(), 5L * MINUTE);
             assertNull(reloaded.historySession(id));
             assertEquals(0L, GrindsData.allTime(reloaded, 5L * MINUTE).net);
@@ -162,11 +162,11 @@ public class SavedSessionTest {
     @Test public void restoredCopiesWithMissingFlowsKeepTheirBookedAmounts() throws Exception {
         onEdt(() -> {
             Engine original = window();
-            Session source = original.getActiveSession();
-            String id = original.saveLiveSession(source, source.sessionStartAt, 2L * MINUTE);
+            Session source = original.session();
+            String id = EngineProbe.saveLiveSession(original, source, source.sessionStartAt, 2L * MINUTE);
             Gson gson = JsonCodec.gson();
-            String canonical = gson.toJson(source.getTransactions());
-            String receiptId = original.historySession(id).getTransactions().get(0).getId();
+            String canonical = gson.toJson(source.transactions());
+            String receiptId = original.historySession(id).transactions().get(0).id();
             for (boolean explicitNull : new boolean[]{false, true}) {
                 var json = gson.toJsonTree(original.exportState()).getAsJsonObject();
                 var receipt = json.getAsJsonArray("savedSessions").get(0).getAsJsonObject()
@@ -177,17 +177,17 @@ public class SavedSessionTest {
                 loaded.restoreProfile("missing-copy-flows", gson.fromJson(json, SavedState.class), 3L * MINUTE);
                 Session copy = loaded.historySession(id);
                 assertEquals(500L, GrindsData.capture(loaded, 3L * MINUTE, false, id).detail.net);
-                Transaction row = copy.getTransactions().get(0);
-                assertEquals(receiptId, row.getId());
-                assertTrue(row.getFlows().isEmpty());
-                assertEquals(500L, row.getRevenue());
-                assertEquals(0L, row.getCosts());
+                Transaction row = copy.transactions().get(0);
+                assertEquals(receiptId, row.id());
+                assertTrue(row.flows().isEmpty());
+                assertEquals(500L, row.revenue());
+                assertEquals(0L, row.costs());
                 LedgerData ledger = LedgerData.capture(loaded, 3L * MINUTE,
-                        new LedgerData.Entry(LedgerData.Scope.HISTORY, id, copy.getName()));
-                assertTrue(ledger.readOnly);
-                assertTrue(ledger.reconciled);
+                        new LedgerData.Entry(LedgerData.Scope.HISTORY, id, copy.name()));
+                assertTrue(ledger.readonly);
+                assertTrue(ledger.balanced);
                 assertEquals(500L, ledger.net);
-                assertEquals(canonical, gson.toJson(loaded.getActiveSession().getTransactions()));
+                assertEquals(canonical, gson.toJson(loaded.session().transactions()));
                 assertEquals(1_500L, GrindsData.allTime(loaded, 3L * MINUTE).net);
             }
             return null;
@@ -197,16 +197,16 @@ public class SavedSessionTest {
     @Test public void deletingACopyKeepsCanonicalBookingsAndProfileResetClearsCopies() throws Exception {
         onEdt(() -> {
             Engine engine = window();
-            Session source = engine.getActiveSession();
-            String id = engine.saveLiveSession(source, source.sessionStartAt, 2L * MINUTE);
+            Session source = engine.session();
+            String id = EngineProbe.saveLiveSession(engine, source, source.sessionStartAt, 2L * MINUTE);
             assertTrue(engine.deleteHistory(id));
             assertNull(engine.historySession(id));
-            assertEquals(1_500L, engine.getMetrics(2L * MINUTE).net);
-            assertEquals(2, source.getTransactions().size());
+            assertEquals(1_500L, engine.metrics(2L * MINUTE).net);
+            assertEquals(2, source.transactions().size());
             assertFalse(engine.deleteHistory(id));
-            engine.saveLiveSession(source, source.sessionStartAt, 2L * MINUTE);
+            EngineProbe.saveLiveSession(engine, source, source.sessionStartAt, 2L * MINUTE);
             engine.resetData(3L * MINUTE);
-            assertTrue(engine.savedSessions.isEmpty());
+            assertTrue(engine.saved.isEmpty());
             return null;
         });
     }
@@ -217,18 +217,18 @@ public class SavedSessionTest {
             engine.setTargets(10_000L, HOUR, MINUTE);
             coins(engine, MINUTE + 5L, 500L);
             engine.togglePause(2L * MINUTE);
-            Session source = engine.getActiveSession();
+            Session source = engine.session();
             LiveSnapshot before = live(engine, 3L * MINUTE);
-            String id = engine.saveLiveSession(source, source.sessionStartAt, 3L * MINUTE);
-            assertEquals(MINUTE, engine.historySession(id).getElapsedMillis(10L * MINUTE));
+            String id = EngineProbe.saveLiveSession(engine, source, source.sessionStartAt, 3L * MINUTE);
+            assertEquals(MINUTE, engine.historySession(id).elapsed(10L * MINUTE));
             assertEquals(before.goal.current, live(engine, 3L * MINUTE).goal.current);
-            assertEquals(before.goal.timeRemainingMillis, live(engine, 3L * MINUTE).goal.timeRemainingMillis);
+            assertEquals(before.goal.remaining, live(engine, 3L * MINUTE).goal.remaining);
             assertTrue(source.paused);
             engine.togglePause(3L * MINUTE);
-            engine.restartRate(4L * MINUTE);
-            String rateId = engine.saveLiveSession(source, source.sessionStartAt, 5L * MINUTE);
-            assertEquals(MINUTE, engine.historySession(rateId).getElapsedMillis(10L * MINUTE));
-            assertEquals(30_000L, engine.historySession(rateId).metrics(0L).profitPerHour);
+            engine.restartRate(4L * MINUTE, true);
+            String rateId = EngineProbe.saveLiveSession(engine, source, source.sessionStartAt, 5L * MINUTE);
+            assertEquals(MINUTE, engine.historySession(rateId).elapsed(10L * MINUTE));
+            assertEquals(30_000L, engine.historySession(rateId).metrics(0L).rate);
             assertEquals(500L, GrindsData.allTime(engine, 5L * MINUTE).net);
             return null;
         });
@@ -238,25 +238,25 @@ public class SavedSessionTest {
         onEdt(() -> {
             Engine engine = window();
             SidebarPanel panel = panel(engine);
-            DirectHeaderControlsTest.click(panel.live.runTotal);
+            DirectHeaderControlsTest.click(panel.live.total);
             javax.swing.JButton old = ShellProbe.sheetButtons(panel.shell).stream()
                     .filter(button -> button.getText().equals("Save session")).findFirst().get();
             javax.swing.JButton continueOld = ShellProbe.sheetButtons(panel.shell).stream()
                     .filter(button -> button.getText().equals("Continue without saving")).findFirst().get();
-            engine.newLiveSession(3L * MINUTE);
+            engine.newLive(3L * MINUTE);
             old.doClick();
             continueOld.doClick();
-            assertTrue(engine.savedSessions.isEmpty());
-            assertEquals(Long.valueOf(3L * MINUTE), engine.getActiveSession().sessionStartAt);
+            assertTrue(engine.saved.isEmpty());
+            assertEquals(Long.valueOf(3L * MINUTE), engine.session().sessionStartAt);
             panel.refreshNow();
-            DirectHeaderControlsTest.click(panel.live.runTotal);
+            DirectHeaderControlsTest.click(panel.live.total);
             javax.swing.JButton another = ShellProbe.sheetButtons(panel.shell).stream()
                     .filter(button -> button.getText().equals("Save session")).findFirst().get();
             engine.restoreProfile("another-owner", new SavedState(), 4L * MINUTE);
             engine.ensureSession(4L * MINUTE);
             another.doClick();
-            assertTrue(engine.savedSessions.isEmpty());
-            assertEquals(0L, engine.getMetrics(4L * MINUTE).net);
+            assertTrue(engine.saved.isEmpty());
+            assertEquals(0L, engine.metrics(4L * MINUTE).net);
             return null;
         });
     }
@@ -267,15 +267,15 @@ public class SavedSessionTest {
                     new GpManagerConfig() { public int maxHistorySessions() { return 1; } });
             engine.startCustom("Vorkath", 0L);
             coins(engine, 5L, 500L);
-            Session source = engine.getActiveSession();
-            String first = engine.saveLiveSession(source, null, MINUTE);
+            Session source = engine.session();
+            String first = EngineProbe.saveLiveSession(engine, source, null, MINUTE);
             coins(engine, MINUTE + 5L, 200L);
-            String second = engine.saveLiveSession(source, null, 2L * MINUTE);
+            String second = EngineProbe.saveLiveSession(engine, source, null, 2L * MINUTE);
             assertNull(engine.historySession(first));
             assertEquals(700L, engine.historySession(second).metrics(0L).net);
             assertEquals(700L, GrindsData.allTime(engine, 2L * MINUTE).net);
-            assertTrue(engine.getHistory().isEmpty());
-            assertNull(GrindsData.allTime(engine, 2L * MINUTE).bestRateName);
+            assertTrue(engine.history().isEmpty());
+            assertNull(GrindsData.allTime(engine, 2L * MINUTE).rateName);
             return null;
         });
     }
@@ -286,10 +286,10 @@ public class SavedSessionTest {
             SavedState state = engine.exportState();
             assertNull(state.savedSessions);
             state.savedSessions = java.util.Arrays.asList(null,
-                    new SavedState.SavedSession("not-a-snapshot", engine.getActiveSession(), java.util.List.of()));
+                    new SavedState.SavedSession("not-a-snapshot", engine.session(), java.util.List.of()));
             engine.restoreProfile("bad-optional-copy", state, MINUTE);
-            assertTrue(engine.savedSessions.isEmpty());
-            assertTrue(engine.getHistory().isEmpty());
+            assertTrue(engine.saved.isEmpty());
+            assertTrue(engine.history().isEmpty());
             return null;
         });
     }
@@ -302,14 +302,14 @@ public class SavedSessionTest {
                 @Override synchronized java.util.List<MarketRows.Row> marketRows() { return markets; }
             };
             engine.ensureSession(0L);
-            Session source = engine.getActiveSession();
+            Session source = engine.session();
             Transaction earlier = trade(5L);
             source.addTransaction(earlier, 2000, false);
-            engine.newLiveSession(MINUTE);
+            engine.newLive(MINUTE);
             Transaction selected = trade(MINUTE + 5L);
             source.addTransaction(selected, 2000, false);
             MarketRows.Row row = new Gson().fromJson("{}", MarketRows.Row.class);
-            row.scopeSessionId = source.getId();
+            row.scopeSessionId = source.id();
             row.presentationId = "offer";
             row.itemId = 536;
             row.itemName = "Dragon bones";
@@ -323,10 +323,10 @@ public class SavedSessionTest {
             row.receivedEachGp = 200L;
             row.listedDuring = "";
             row.settledQty = 2L;
-            row.settlementId = selected.getId();
-            row.earlierSettlements = " " + earlier.getId();
+            row.settlementId = selected.id();
+            row.earlierSettlements = " " + earlier.id();
             markets.add(row);
-            String id = engine.saveLiveSession(source, source.sessionStartAt, 2L * MINUTE);
+            String id = EngineProbe.saveLiveSession(engine, source, source.sessionStartAt, 2L * MINUTE);
             SavedState.SavedSession saved = engine.savedSession(id);
             assertNotSame(row, saved.market.get(0));
             assertEquals("offer context retains its captured lifetime result", 200L,
@@ -346,7 +346,7 @@ public class SavedSessionTest {
             LedgerData ledger = LedgerData.capture(engine, 3L * MINUTE,
                     new LedgerData.Entry(LedgerData.Scope.HISTORY, id, "Saved"));
             assertEquals(100L, ledger.net);
-            assertTrue(ledger.reconciled);
+            assertTrue(ledger.balanced);
             assertEquals("Dragon bones", saved.market.get(0).itemName);
             return null;
         });
@@ -355,7 +355,7 @@ public class SavedSessionTest {
     @Test public void saveChoicesStayReadableOnNarrowSidebars() throws Exception {
         onEdt(() -> {
             SidebarPanel panel = panel(window());
-            DirectHeaderControlsTest.click(panel.live.runTotal);
+            DirectHeaderControlsTest.click(panel.live.total);
             for (int width : new int[]{213, 225, 300}) {
                 DirectHeaderControlsTest.size(panel.shell.sheet, width);
                 for (javax.swing.JButton button : ShellProbe.sheetButtons(panel.shell)) {
@@ -373,15 +373,15 @@ public class SavedSessionTest {
     @Test public void normalAndQuickPersistenceSnapshotsKeepSavedBookingsAlongsideCanonicalHistory() throws Exception {
         onEdt(() -> {
             Engine engine = window();
-            Session source = engine.getActiveSession();
-            String id = engine.saveLiveSession(source, source.sessionStartAt, 2L * MINUTE);
+            Session source = engine.session();
+            String id = EngineProbe.saveLiveSession(engine, source, source.sessionStartAt, 2L * MINUTE);
             engine.startFreePlayOver(3L * MINUTE);
             LedgerData.capture(engine, 3L * MINUTE, new LedgerData.Entry(LedgerData.Scope.HISTORY, id, "Saved"));
             Gson gson = new Gson();
             SessionRepository repository = new SessionRepository(gson);
             Persistence persistence = new Persistence(null, null, repository, null, engine);
             for (boolean quick : new boolean[]{false, true, true, false}) {
-                SavedState saved = gson.fromJson(persistence.snapshotJson(null, quick), SavedState.class);
+                SavedState saved = gson.fromJson(repository.gson.toJson(persistence.snapshotState(null)), SavedState.class);
                 assertEquals(1, saved.savedSessions.size());
                 assertEquals(id, saved.savedSessions.get(0).id);
                 assertEquals(500L, saved.savedSessions.get(0).session.metrics(0L).net);
@@ -404,7 +404,7 @@ public class SavedSessionTest {
     static Engine window() {
         Engine engine = engine();
         coins(engine, 5L, 1_000L);
-        engine.newLiveSession(MINUTE);
+        engine.newLive(MINUTE);
         coins(engine, MINUTE + 5L, 500L);
         return engine;
     }

@@ -30,10 +30,10 @@ public class BloodFuryLoadTest
         Transaction settled = settle(engine, attached, T0);
         assertNotNull(settled);
         assertEquals("a mixed attach with no context stays uncertain", TransactionType.UNCERTAIN,
-            settled.getType());
-        assertFalse("the default never counts an uncertain mixed change", settled.isCounted());
+            settled.type());
+        assertFalse("the default never counts an uncertain mixed change", settled.counts());
         assertEquals("Net stays 0 until a read measures hits used", 0L,
-            engine.getMetrics(T0 + 2_400L).net);
+            engine.metrics(T0 + 2_400L).net);
     }
 
     @Test
@@ -50,9 +50,9 @@ public class BloodFuryLoadTest
 
         Transaction load = settle(engine, new HashMap<>(), T0);
         assertNotNull(load);
-        assertEquals("value moved into charges, never a cost", TransactionType.TRANSFER, load.autoType());
-        assertFalse(load.isCounted());
-        assertEquals(0L, engine.getMetrics(T0 + 2_400L).net);
+        assertEquals("value moved into charges, never a cost", TransactionType.TRANSFER, load.original());
+        assertFalse(load.counts());
+        assertEquals(0L, engine.metrics(T0 + 2_400L).net);
     }
 
     private static Transaction settle(Engine engine, Map<Integer, Long> held, long from)

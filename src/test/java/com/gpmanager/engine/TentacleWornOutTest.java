@@ -45,10 +45,10 @@ public class TentacleWornOutTest
         engine.setBaseline(snapshot(ItemID.ABYSSAL_TENTACLE));
         Transaction row = settle(engine, snapshot(ItemID.KRAKEN_TENTACLE), 1_600L);
         assertNotNull(row);
-        assertTrue(row.isCounted());
-        assertEquals(TransactionType.CONSUMPTION, row.getType());
-        assertEquals("the whip is the loss", -1_300_000L, engine.getMetrics(10_000L).net);
-        Flow tentacle = row.getFlows().stream().filter(Flow::isCost).findFirst().get();
+        assertTrue(row.counts());
+        assertEquals(TransactionType.CONSUMPTION, row.type());
+        assertEquals("the whip is the loss", -1_300_000L, engine.metrics(10_000L).net);
+        Flow tentacle = row.flows().stream().filter(Flow::cost).findFirst().get();
         assertEquals(CostKind.LOSS, CostKind.of(row, tentacle));
         assertEquals(0, engine.getReviewRows(10_000L).size());
     }
@@ -61,7 +61,7 @@ public class TentacleWornOutTest
         engine.setBaseline(snapshot(ItemID.ABYSSAL_TENTACLE));
         Transaction row = settle(engine, ContainerSnapshot.empty(), 1_600L);
         assertTrue("only a used-up or dissolved tentacle books this way",
-            row == null || !GameData.msg("tentacle-used").equals(row.getNote()));
+            row == null || !GameData.msg("tentacle-used").equals(row.note()));
     }
 
     private static ContainerSnapshot snapshot(int itemId)

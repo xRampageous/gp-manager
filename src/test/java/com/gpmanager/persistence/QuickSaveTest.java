@@ -22,8 +22,8 @@ public class QuickSaveTest
         {
             Engine engine = engine();
             Persistence coordinator = coordinator(gson, engine);
-            assertEquals(plain(gson, engine), strip(coordinator.snapshotJson(null, false)));
-            assertEquals(plain(gson, engine), strip(coordinator.snapshotJson(null, true)));
+            assertEquals(plain(gson, engine), strip(PersistenceProbe.snapshotJson(coordinator, null, false)));
+            assertEquals(plain(gson, engine), strip(PersistenceProbe.snapshotJson(coordinator, null, true)));
         }
     }
 
@@ -33,7 +33,7 @@ public class QuickSaveTest
         Gson gson = new Gson();
         Engine engine = new Engine(deltas -> Collections.emptyList(), new TransactionClassifier(), new GpManagerConfig() {});
         Persistence coordinator = coordinator(gson, engine);
-        assertEquals(plain(gson, engine), strip(coordinator.snapshotJson(null, true)));
+        assertEquals(plain(gson, engine), strip(PersistenceProbe.snapshotJson(coordinator, null, true)));
     }
 
     @Test
@@ -42,20 +42,20 @@ public class QuickSaveTest
         Gson gson = new Gson();
         Engine engine = engine();
         Persistence coordinator = coordinator(gson, engine);
-        coordinator.snapshotJson(null, false);
+        PersistenceProbe.snapshotJson(coordinator, null, false);
         Session closed = engine.history.get(1);
-        String row = closed.getTransactions().get(3).getId();
-        closed.correctTransaction(row, Correction.IGNORE, T0, "test");
-        assertEquals(plain(gson, engine), strip(coordinator.snapshotJson(null, true)));
-        closed.compactBefore(closed.startedAtEpochMillis + 5_000L, null);
-        assertEquals(plain(gson, engine), strip(coordinator.snapshotJson(null, true)));
+        String row = closed.transactions().get(3).id();
+        closed.correctTransaction(row, Correction.IGNORE, "test");
+        assertEquals(plain(gson, engine), strip(PersistenceProbe.snapshotJson(coordinator, null, true)));
+        closed.compactBefore(closed.startedAt + 5_000L, null);
+        assertEquals(plain(gson, engine), strip(PersistenceProbe.snapshotJson(coordinator, null, true)));
         Session newlyClosed = new Session("Fresh", T0, SessionMode.GENERAL);
         newlyClosed.addTransaction(receipt(T0 + 1L), 2_000, false);
         newlyClosed.close(T0 + 10L);
         engine.history.add(0, newlyClosed);
-        assertEquals(plain(gson, engine), strip(coordinator.snapshotJson(null, true)));
-        engine.getActiveSession().addTransaction(receipt(T0 + 2L), 2_000, false);
-        assertEquals(plain(gson, engine), strip(coordinator.snapshotJson(null, true)));
+        assertEquals(plain(gson, engine), strip(PersistenceProbe.snapshotJson(coordinator, null, true)));
+        engine.session().addTransaction(receipt(T0 + 2L), 2_000, false);
+        assertEquals(plain(gson, engine), strip(PersistenceProbe.snapshotJson(coordinator, null, true)));
     }
 
     @Test
@@ -96,14 +96,14 @@ public class QuickSaveTest
             Session done = new Session("Grind <" + grind + "> & 'co'", T0 - (5 - grind) * 3_600_000L, SessionMode.GENERAL);
             for (int i = 0; i < 8; i++)
             {
-                done.addTransaction(receipt(done.startedAtEpochMillis + i * 1_000L), 2_000, false);
+                done.addTransaction(receipt(done.startedAt + i * 1_000L), 2_000, false);
             }
-            done.close(done.startedAtEpochMillis + 30_000L);
+            done.close(done.startedAt + 30_000L);
             engine.history.add(0, done);
         }
         engine.history.add(2, null);
         engine.startCustom("Greater Nechryael", T0);
-        engine.getActiveSession().addTransaction(receipt(T0), 2_000, false);
+        engine.session().addTransaction(receipt(T0), 2_000, false);
         return engine;
     }
 

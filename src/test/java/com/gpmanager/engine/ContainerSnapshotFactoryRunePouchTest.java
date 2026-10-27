@@ -47,11 +47,11 @@ public class ContainerSnapshotFactoryRunePouchTest
         ContainerSnapshot with = factory.capture(false, true);
         ContainerSnapshot without = factory.capture(false, false);
 
-        assertEquals(1_520L, with.quantityOf(FIRE_RUNE));
-        assertEquals(40L, with.quantityOf(CHAOS_RUNE));
-        assertEquals(100L, with.quantityOf(995));
-        assertEquals(20L, without.quantityOf(FIRE_RUNE));
-        assertEquals(0L, without.quantityOf(CHAOS_RUNE));
+        assertEquals(1_520L, with.quantity(FIRE_RUNE));
+        assertEquals(40L, with.quantity(CHAOS_RUNE));
+        assertEquals(100L, with.quantity(995));
+        assertEquals(20L, without.quantity(FIRE_RUNE));
+        assertEquals(0L, without.quantity(CHAOS_RUNE));
         // Empty slot with a stale quantity contributes nothing.
         assertEquals(3, with.diff(new ContainerSnapshot(new HashMap<>())).size());
     }
@@ -65,7 +65,7 @@ public class ContainerSnapshotFactoryRunePouchTest
         ContainerSnapshotFactory factory = new ContainerSnapshotFactory(
             client(varbits, new HashMap<>(), new Item(995, 7)), null);
 
-        assertEquals(0L, factory.capture(false, true).quantityOf(FIRE_RUNE));
+        assertEquals(0L, factory.capture(false, true).quantity(FIRE_RUNE));
     }
 
     @Test
@@ -109,7 +109,7 @@ public class ContainerSnapshotFactoryRunePouchTest
         varbits.put(VarbitID.RUNE_POUCH_QUANTITY_1, 100);
         ContainerSnapshot snapshot = new ContainerSnapshotFactory(
             client(varbits, null, new Item(995, 7)), null).capture(false, true);
-        assertEquals(7L, snapshot.quantityOf(995));
+        assertEquals(7L, snapshot.quantity(995));
         assertNull(snapshot.diff(new ContainerSnapshot(new HashMap<>())).get(FIRE_RUNE));
     }
 
@@ -141,11 +141,11 @@ public class ContainerSnapshotFactoryRunePouchTest
         ContainerSnapshot withEquipment = factory.captureDeathHeld(true);
         ContainerSnapshot withoutEquipment = factory.captureDeathHeld(false);
 
-        assertEquals(20L, withEquipment.quantityOf(FIRE_RUNE));
-        assertEquals(50L, withEquipment.quantityOf(995));
-        assertEquals(1L, withEquipment.quantityOf(4151));
-        assertEquals(0L, withEquipment.quantityOf(CHAOS_RUNE));
-        assertEquals(0L, withoutEquipment.quantityOf(4151));
+        assertEquals(20L, withEquipment.quantity(FIRE_RUNE));
+        assertEquals(50L, withEquipment.quantity(995));
+        assertEquals(1L, withEquipment.quantity(4151));
+        assertEquals(0L, withEquipment.quantity(CHAOS_RUNE));
+        assertEquals(0L, withoutEquipment.quantity(4151));
     }
 
     private static Client client(Map<Integer, Integer> varbits, Map<Integer, Integer> runeEnum, Item... inventory)

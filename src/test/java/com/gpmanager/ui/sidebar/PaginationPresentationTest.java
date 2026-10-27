@@ -22,22 +22,22 @@ public class PaginationPresentationTest
         {
             Transaction transaction = booked(now + i + 1L, "Item " + i, 1_000 + i, 100L);
             if (oldest == null) oldest = transaction;
-            engine.getActiveSession().addTransaction(transaction, 2_000, false);
+            engine.session().addTransaction(transaction, 2_000, false);
         }
         assertNotNull(oldest);
-        final String oldId = oldest.getId();
+        final String oldId = oldest.id();
 
         LedgerData first = LedgerData.capture(engine, now + 1_000L,
             LedgerData.Entry.current());
-        assertEquals(225, first.gains.entries);
-        assertEquals("every retained row reaches the page table, which pages it", 225, first.gains.groups.size());
-        assertEquals(22_500L, first.gains.total);
+        assertEquals(225, first.income.entries);
+        assertEquals("every retained row reaches the page table, which pages it", 225, first.income.groups.size());
+        assertEquals(22_500L, first.income.total);
 
         LedgerData searched = LedgerData.capture(engine, now + 1_000L,
             new LedgerData.Entry(LedgerData.Scope.CURRENT_GRIND, null, null,
                 LedgerData.CostView.SUPPLIES, "Item 222", null, null, null, null));
-        assertEquals("search sees the full retained set before page slicing", 1, searched.gains.entries);
-        assertEquals("Item 222", searched.gains.groups.get(0).primaryName);
+        assertEquals("search sees the full retained set before page slicing", 1, searched.income.entries);
+        assertEquals("Item 222", searched.income.groups.get(0).name);
 
         LedgerData deepLink = LedgerData.capture(engine, now + 1_000L,
             new LedgerData.Entry(LedgerData.Scope.CURRENT_GRIND, null, null,
@@ -62,8 +62,8 @@ public class PaginationPresentationTest
         }
 
         GrindsData data = GrindsData.capture(engine, now + 2_000L, false, null);
-        assertEquals("every saved Grind reaches the table", 31, data.myGrinds.size());
-        assertEquals("no Recent runs cap", 31, data.recent.stream().filter(run -> !run.freePlay).count());
+        assertEquals("every saved Grind reaches the table", 31, data.plans.size());
+        assertEquals("no Recent runs cap", 31, data.recent.stream().filter(run -> !run.general).count());
 
         long recentAt = Instant.parse("2024-01-01T11:00:00Z").toEpochMilli();
         long profileNow = Instant.parse("2024-01-01T13:00:00Z").toEpochMilli();

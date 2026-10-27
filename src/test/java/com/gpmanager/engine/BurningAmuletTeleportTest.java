@@ -38,14 +38,14 @@ public class BurningAmuletTeleportTest
         engine.setBaseline(held(BURNING_5, 1L));
 
         Transaction first = settle(engine, held(BURNING_4, 1L), 1_600L);
-        assertEquals(TransactionType.CONSUMPTION, first.getType());
-        assertEquals(ActionKind.SUPPLIES, first.getActionKind());
-        assertEquals(-447L, engine.getMetrics(10_000L).net);
+        assertEquals(TransactionType.CONSUMPTION, first.type());
+        assertEquals(ActionKind.SUPPLIES, first.action());
+        assertEquals(-447L, engine.metrics(10_000L).net);
         assertEquals("no unknown row", 0, engine.getReviewRows(10_000L).size());
 
         engine.markDirty();
         settle(engine, held(BURNING_3, 1L), 4_000L);
-        assertEquals("two teleports are two doses", -893L, engine.getMetrics(10_000L).net);
+        assertEquals("two teleports are two doses", -893L, engine.metrics(10_000L).net);
         assertEquals(0, engine.getReviewRows(10_000L).size());
     }
 

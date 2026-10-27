@@ -47,7 +47,7 @@ public class CrossSurfaceConsistencyTest
         long later = market.now + 1_000L;
         assertTrue("the offer is open first",
             LiveSnapshot.capture(market.engine, later, null).recent.stream().anyMatch(row -> row.open));
-        market.engine.newLiveSession(later);
+        market.engine.newLive(later);
         LiveSnapshot fresh = LiveSnapshot.capture(market.engine, later + 1L, null);
         assertTrue("it stays under Offers", fresh.recent.stream().anyMatch(row -> row.open));
         assertTrue("while Recent itself starts empty", fresh.recent.stream().allMatch(row -> row.open));
@@ -65,7 +65,7 @@ public class CrossSurfaceConsistencyTest
         LiveSnapshot fresh = LiveSnapshot.capture(market.engine, later + 1L, null);
         assertTrue("the target's Recent starts empty: " + fresh.recent.size(),
             fresh.recent.stream().noneMatch(row -> !row.open));
-        assertEquals(0L, fresh.marketResult);
+        assertEquals(0L, fresh.market);
     }
 
     @Test
@@ -75,10 +75,10 @@ public class CrossSurfaceConsistencyTest
         market.sell(0, 561, 10);
 
         LiveSnapshot snapshot = LiveSnapshot.capture(market.engine, market.now + 1_000L, null);
-        assertTrue("a realized Market result is separated", snapshot.marketResult > 0L);
-        assertEquals(0, snapshot.marketPending);
+        assertTrue("a realized Market result is separated", snapshot.market > 0L);
+        assertEquals(0, snapshot.pendingMarket);
         assertEquals("the canonical Net is unchanged by the separation",
-            market.engine.getMetrics(market.now + 1_000L).net, snapshot.net);
+            market.engine.metrics(market.now + 1_000L).net, snapshot.net);
 
         LivePage page = onEdt(() ->
         {
@@ -88,16 +88,16 @@ public class CrossSurfaceConsistencyTest
         });
         List<String> labels = labels(page.body());
         assertFalse("visible Revenue is gone", labels.contains("Revenue"));
-        assertEquals("the Trade cell shows the realized result", Fmt.signed(snapshot.marketResult),
+        assertEquals("the Trade cell shows the realized result", Fmt.signed(snapshot.market),
             onEdt(() -> HeroProbe.cell(page.hero, "TRADE")));
         assertEquals("ordinary Gains exclude the whole Market transaction",
-            Fmt.signed(snapshot.gains), onEdt(() -> HeroProbe.cell(page.hero, "GAINS")));
+            Fmt.signed(snapshot.income), onEdt(() -> HeroProbe.cell(page.hero, "GAINS")));
         Accounting.MarketFold fold =
             Accounting.marketFold(
-                market.engine.getActiveSession().getTransactions());
+                market.engine.session().transactions());
         assertEquals("the canonical session still books the gross Market legs",
-            snapshot.gains + fold.revenue,
-            market.engine.getMetrics(market.now + 1_000L).revenue);
+            snapshot.income + fold.income,
+            market.engine.metrics(market.now + 1_000L).income);
         assertEquals("the hero Net stays canonical", Fmt.signed(snapshot.net).replace('−', '-'),
             onEdt(() -> HeroProbe.netText(page.hero)));
     }
@@ -109,10 +109,10 @@ public class CrossSurfaceConsistencyTest
         market.pendingSell(0, 561, 10);
 
         LiveSnapshot snapshot = LiveSnapshot.capture(market.engine, market.now + 1_000L, null);
-        assertEquals("pending Market is not a realized result", 0L, snapshot.marketResult);
-        assertEquals("pending Market context is counted separately", 1, snapshot.marketPending);
+        assertEquals("pending Market is not a realized result", 0L, snapshot.market);
+        assertEquals("pending Market context is counted separately", 1, snapshot.pendingMarket);
         assertEquals("pending Market never alters Net",
-            market.engine.getMetrics(market.now + 1_000L).net, snapshot.net);
+            market.engine.metrics(market.now + 1_000L).net, snapshot.net);
 
         LivePage page = onEdt(() ->
         {
@@ -132,22 +132,22 @@ public class CrossSurfaceConsistencyTest
             Context.GENERIC, "", "Vorkath", true,
             Collections.singletonList(new Flow(777, "Unknown rune", -1L, 0, 0L)),
             Confidence.UNCERTAIN, "Awaiting a decision", null);
-        engine.getActiveSession().addTransaction(uncertain, 100, false);
-        engine.getActiveSession().addTransaction(unpriced(T0 + 2_000L), 100, false);
+        engine.session().addTransaction(uncertain, 100, false);
+        engine.session().addTransaction(unpriced(T0 + 2_000L), 100, false);
 
         LiveSnapshot live = LiveSnapshot.capture(engine, T0 + 3_000L, null);
         LedgerData ledger = captureLedger(engine, T0 + 3_000L);
         assertEquals("Live and Ledger share one owner-decision truth",
-            ledger.review.scopeCount, live.reviewCount);
-        assertEquals(1, live.reviewCount);
+            ledger.review.total, live.reviews);
+        assertEquals(1, live.reviews);
 
         Engine quiet = engine();
         quiet.startCustom("Vorkath", T0);
-        quiet.getActiveSession().addTransaction(unpriced(T0 + 1_000L), 100, false);
+        quiet.session().addTransaction(unpriced(T0 + 1_000L), 100, false);
         LiveSnapshot quietLive = LiveSnapshot.capture(quiet, T0 + 2_000L, null);
         LedgerData quietLedger = captureLedger(quiet, T0 + 2_000L);
-        assertEquals("unpriced alone is never Review", 0, quietLive.reviewCount);
-        assertEquals(quietLedger.review.scopeCount, quietLive.reviewCount);
+        assertEquals("unpriced alone is never Review", 0, quietLive.reviews);
+        assertEquals(quietLedger.review.total, quietLive.reviews);
     }
 
     @Test
@@ -155,8 +155,8 @@ public class CrossSurfaceConsistencyTest
     {
         Engine engine = engine();
         engine.startCustom("Vorkath", T0);
-        engine.getActiveSession().addTransaction(gain(T0 + 1_000L, "Dragon bones", 536, 3_200L), 100, false);
-        engine.getActiveSession().addTransaction(food(T0 + 2_000L, "Shark", 950L), 100, false);
+        engine.session().addTransaction(gain(T0 + 1_000L, "Dragon bones", 536, 3_200L), 100, false);
+        engine.session().addTransaction(food(T0 + 2_000L, "Shark", 950L), 100, false);
 
         LiveSnapshot live = LiveSnapshot.capture(engine, T0 + 3_000L, null);
         LedgerData ledger = captureLedger(engine, T0 + 3_000L);
@@ -178,7 +178,7 @@ public class CrossSurfaceConsistencyTest
     {
         Engine engine = engine();
         engine.startCustom("Vorkath", T0);
-        engine.getActiveSession().addTransaction(gain(T0 + 1_000L, "Dragon bones", 536, 3_200L), 100, false);
+        engine.session().addTransaction(gain(T0 + 1_000L, "Dragon bones", 536, 3_200L), 100, false);
         LedgerData data = captureLedger(engine, T0 + 2_000L);
 
         LedgerPage page = onEdt(() ->
@@ -246,7 +246,7 @@ public class CrossSurfaceConsistencyTest
             Context.GENERIC, "", "Vorkath", true,
             Collections.singletonList(new Flow(SHARK, name, -1L, (int) value, -value,
                 PriceSource.GRAND_EXCHANGE)), Confidence.CONFIRMED, "Food", null);
-        transaction.setActionKind(ActionKind.EAT);
+        transaction.setAction(ActionKind.EAT);
         return transaction;
     }
 
@@ -256,7 +256,7 @@ public class CrossSurfaceConsistencyTest
             Context.GENERIC, "", "Vorkath", true,
             Collections.singletonList(new Flow(SHARK, "Shark", -1L, 0, 0L,
                 PriceSource.UNPRICED)), Confidence.CONFIRMED, "Unpriced food", null);
-        transaction.setActionKind(ActionKind.EAT);
+        transaction.setAction(ActionKind.EAT);
         return transaction;
     }
 
@@ -281,7 +281,7 @@ public class CrossSurfaceConsistencyTest
         {
             // Known coverage for the sold quantity at the observed quote, so the sale realizes a
             // proven result.
-            engine.getActiveSession().addTransaction(new Transaction(now - 1_000L,
+            engine.session().addTransaction(new Transaction(now - 1_000L,
                 TransactionType.GAIN, Context.GENERIC, "", "Vorkath", true,
                 Collections.singletonList(new Flow(item, "Rune " + item, 10L, 7, 70L,
                     PriceSource.GRAND_EXCHANGE)),

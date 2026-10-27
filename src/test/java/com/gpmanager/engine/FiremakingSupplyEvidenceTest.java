@@ -23,14 +23,14 @@ public class FiremakingSupplyEvidenceTest
     public void unexplainedLossAndArbitraryUseRemainLosses()
     {
         Transaction unexplained = transaction("Logs");
-        assertNull(ActionReader.resolve(null, unexplained.getFlows(), unexplained.getType(), "Firemaking"));
-        assertEquals(CostKind.LOSS, CostKind.of(unexplained, unexplained.getFlows().get(0)));
+        assertNull(ActionReader.resolve(null, unexplained.flows(), unexplained.type(), "Firemaking"));
+        assertEquals(CostKind.LOSS, CostKind.of(unexplained, unexplained.flows().get(0)));
 
         ActionKind arbitraryUse = ActionReader.verbOf("Use");
         assertNull(arbitraryUse);
-        assertNull(ActionReader.resolve(arbitraryUse, unexplained.getFlows(),
-            unexplained.getType(), "Firemaking"));
-        assertEquals(CostKind.LOSS, CostKind.of(unexplained, unexplained.getFlows().get(0)));
+        assertNull(ActionReader.resolve(arbitraryUse, unexplained.flows(),
+            unexplained.type(), "Firemaking"));
+        assertEquals(CostKind.LOSS, CostKind.of(unexplained, unexplained.flows().get(0)));
 
         ActionKind mismatchedFuelIntent = ActionReader.resolve(ActionReader.verbOf("Light"),
             Collections.singletonList(new Flow(946, "Knife", -1L, 1, -1L)),
@@ -42,10 +42,10 @@ public class FiremakingSupplyEvidenceTest
     {
         Transaction transaction = transaction(name);
         ActionKind resolved = ActionReader.resolve(ActionReader.verbOf(menuOption),
-            transaction.getFlows(), transaction.getType(), "Firemaking");
+            transaction.flows(), transaction.type(), "Firemaking");
         assertEquals(ActionKind.SUPPLIES, resolved);
-        transaction.setActionKind(resolved);
-        assertEquals(CostKind.SUPPLIES, CostKind.of(transaction, transaction.getFlows().get(0)));
+        transaction.setAction(resolved);
+        assertEquals(CostKind.SUPPLIES, CostKind.of(transaction, transaction.flows().get(0)));
     }
 
     private static Transaction transaction(String name)

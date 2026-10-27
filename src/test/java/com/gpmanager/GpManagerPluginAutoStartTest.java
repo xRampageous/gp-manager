@@ -45,12 +45,12 @@ public class GpManagerPluginAutoStartTest
         set(plugin, "client", client);
         set(plugin, "config", config);
         set(plugin, "engine", engine);
-        set(plugin, "snapshotFactory", new ContainerSnapshotFactory(client, null));
+        set(plugin, "containers", new ContainerSnapshotFactory(client, null));
 
         Method start = GpManagerPlugin.class.getDeclaredMethod("markGameplayActivity", boolean.class);
         start.setAccessible(true);
         start.invoke(plugin, true);
-        assertNotNull(engine.getActiveSession());
+        assertNotNull(engine.session());
 
         long now = System.currentTimeMillis();
         engine.markDirty();
@@ -59,8 +59,8 @@ public class GpManagerPluginAutoStartTest
         Transaction gain = engine.processIfDirty(potato, now + 1_200L, null);
 
         assertNotNull(gain);
-        assertEquals(TransactionType.GAIN, gain.getType());
-        assertEquals(50L, engine.getMetrics(now + 1_200L).revenue);
+        assertEquals(TransactionType.GAIN, gain.type());
+        assertEquals(50L, engine.metrics(now + 1_200L).income);
     }
 
     /** Owner live 2026-10-13: an option starts tracking at the first login itself. */
@@ -72,11 +72,11 @@ public class GpManagerPluginAutoStartTest
             @Override public int stabilizationTicks() { return 1; }
         };
         GpManagerPlugin plugin = loginPlugin(on);
-        set(plugin, "firstLoginAutoStart", true);
+        set(plugin, "autoStart", true);
         init(plugin);
         Engine engine = (Engine) get(plugin, "engine");
-        assertNotNull("the login option starts tracking at login", engine.getActiveSession());
-        assertFalse("the login offer is spent", (Boolean) get(plugin, "firstLoginAutoStart"));
+        assertNotNull("the login option starts tracking at login", engine.session());
+        assertFalse("the login offer is spent", (Boolean) get(plugin, "autoStart"));
 
         // Option off: login stays passive (gameplay still starts tracking).
         GpManagerConfig off = new GpManagerConfig()
@@ -85,17 +85,17 @@ public class GpManagerPluginAutoStartTest
             @Override public boolean autoStartOnLogin() { return false; }
         };
         GpManagerPlugin silent = loginPlugin(off);
-        set(silent, "firstLoginAutoStart", true);
+        set(silent, "autoStart", true);
         init(silent);
         assertNull("option off keeps login passive",
-            ((Engine) get(silent, "engine")).getActiveSession());
+            ((Engine) get(silent, "engine")).session());
 
         // A later login (offer already spent) does not start on its own either.
         GpManagerPlugin later = loginPlugin(on);
-        set(later, "firstLoginAutoStart", false);
+        set(later, "autoStart", false);
         init(later);
         assertNull("only the first login may start",
-            ((Engine) get(later, "engine")).getActiveSession());
+            ((Engine) get(later, "engine")).session());
     }
 
     /** The login option also resumes the pauses gameplay would (Idle/Recovery), never Manual. */
@@ -109,18 +109,18 @@ public class GpManagerPluginAutoStartTest
         GpManagerPlugin idle = loginPlugin(on);
         Engine idleEngine = (Engine) get(idle, "engine");
         idleEngine.startCustom("Vorkath", System.currentTimeMillis());
-        idleEngine.getActiveSession().pause(System.currentTimeMillis(), PauseReason.IDLE);
-        set(idle, "firstLoginAutoStart", true);
+        idleEngine.session().pause(System.currentTimeMillis(), PauseReason.IDLE);
+        set(idle, "autoStart", true);
         init(idle);
-        assertFalse("an Idle pause comes back at login", idleEngine.getActiveSession().paused);
+        assertFalse("an Idle pause comes back at login", idleEngine.session().paused);
 
         GpManagerPlugin manual = loginPlugin(on);
         Engine manualEngine = (Engine) get(manual, "engine");
         manualEngine.startCustom("Vorkath", System.currentTimeMillis());
-        manualEngine.getActiveSession().pause(System.currentTimeMillis(), PauseReason.MANUAL);
-        set(manual, "firstLoginAutoStart", true);
+        manualEngine.session().pause(System.currentTimeMillis(), PauseReason.MANUAL);
+        set(manual, "autoStart", true);
         init(manual);
-        assertTrue("a Manual pause always holds", manualEngine.getActiveSession().paused);
+        assertTrue("a Manual pause always holds", manualEngine.session().paused);
     }
 
     private static GpManagerPlugin loginPlugin(GpManagerConfig config) throws Exception
@@ -138,7 +138,7 @@ public class GpManagerPluginAutoStartTest
         set(plugin, "client", client);
         set(plugin, "config", config);
         set(plugin, "engine", engine);
-        set(plugin, "snapshotFactory", new ContainerSnapshotFactory(client, null));
+        set(plugin, "containers", new ContainerSnapshotFactory(client, null));
         set(plugin, "activity", new ActivityDetector(config, engine));
         return plugin;
     }
