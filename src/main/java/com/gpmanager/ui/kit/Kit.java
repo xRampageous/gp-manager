@@ -3583,7 +3583,8 @@ class LedgerPage extends Shell.Page {
         var facts = new KeyValue(null);
         if (trade == null) {
             panel.add(note(row.why, LABEL));
-            if (data.detail.group.death) panel.add(note("Corrections apply to the whole entry.", LABEL));
+            if (data.detail.group.death || pendingCorrection == Correction.IGNORE)
+                panel.add(note("Corrections apply to the whole entry.", LABEL));
             if (!row.tradedItems.isEmpty()) panel.add(note(row.tradedItems, LABEL));
             // Owner 2026-10-01 (F11): a Charges receipt discloses its captured unit price and
             // source.
@@ -4092,6 +4093,9 @@ class LivePage extends Shell.Page {
 
         default void hideRecent(String name, boolean supply) {}
 
+        /** Prepare a correction shortcut fenced to the menu's owner and running Grind. */
+        default Runnable exclude(Entry entry) { return null; }
+
         /** Clicking the running Grind's name renames it. */
         default void renameGrind() {}
 
@@ -4370,6 +4374,11 @@ class LivePage extends Shell.Page {
         Entry entry = entryFor(row);
         var menu = new ArrayList<Table.Menu>();
         menu.add(new Table.Menu("Open in Ledger", () -> actions.openLedger(entry)));
+        if (!row.open && !row.ledgerReview) {
+            var exclude = actions.exclude(entry);
+            if (exclude != null)
+                menu.add(new Table.Menu(row.entries > 1 ? "Exclude latest booking…" : "Exclude booking…", exclude));
+        }
         // A finished trade is one item too (owner 2026-10-08: a sold Fire rune had no Hide).
         if (!row.open && row.item > 0 && (!row.composite || row.market))
             menu.add(new Table.Menu("Hide item from recent", () -> actions.hideRecent(row.name, false)));
@@ -4975,6 +4984,20 @@ class SidebarPanel extends PluginPanel {
             openEntry(entry);
         }
 
+        public Runnable exclude(Entry entry) {
+            Object owner = ownerToken;
+            Session target;
+            synchronized (engine) { target = engine.session(); }
+            return () -> {
+                synchronized (engine) {
+                    if (suspended || owner != ownerToken || target != engine.session()) return;
+                }
+                openEntry(entry);
+                ledger.corrections(entry.transaction, entry.highlightContributionId, false)
+                        .get(LedgerPage.correctionLabel(Correction.IGNORE)).run();
+            };
+        }
+
         public void openCategory(Semantics.Table table) {
             if (category != null && category.table == table) {
                 categoryPage.actions.recent();
@@ -5446,13 +5469,19 @@ class GrindsPage extends Shell.Page {
         else if (detail.closed) buttons.add(button("Restore", true, () -> actions.restoreFreePlay(detail.session)));
         buttons.add(button("Open in Ledger", false, () -> actions.openLedger(detail.session)));
         if (detail.closed) {
-            var menu = List.of(new Menu("Delete…", () -> actions.deleteHistorical(detail.session)));
+            var menu = detailMenu(detail.session);
             JButton more = button("···", false, () -> {});
             more.addActionListener(e -> menuOf(menu).show(more, 0, more.getHeight()));
             buttons.add(more);
         }
         this.detail.add(buttons);
         this.detail.add(note(msg("open-ledger"), LABEL));
+    }
+
+    /** Edits available inside a closed session's detail view. */
+    List<Menu> detailMenu(String id) {
+        return List.of(new Menu("Rename…", () -> actions.renameSession(id)),
+                new Menu("Delete…", () -> actions.deleteHistorical(id)));
     }
 
     /** A row's right-click menu, shown as a ⋯ popup. */
@@ -5808,11 +5837,11 @@ class GrindsController implements GrindsPage.Actions {
     }
 
     public void renameSession(String id) {
-        var saved = engine.savedSession(id);
-        if (saved == null) return;
-        shell.prompt("Rename session", "Name", saved.session.name(), name -> mutate(() -> {
-            if (engine.savedSession(id) != saved) return;
-            saved.session.rename(name);
+        var session = engine.historySession(id);
+        if (session == null) return;
+        shell.prompt("Rename session", "Name", session.name(), name -> mutate(() -> {
+            if (engine.historySession(id) != session) return;
+            session.rename(name);
             engine.changed();
         }));
     }

@@ -4515,9 +4515,10 @@ class LedgerData {
 
     static String scopeName(Engine engine, Entry entry) {
         if (entry.scope == HISTORY) {
-            if (!empty(entry.historyName)) return entry.historyName;
+            if (!empty(entry.historyName) && (entry.session == null || entry.session.startsWith("raid:")))
+                return entry.historyName;
             var history = entry.session == null ? null : engine.historySession(entry.session);
-            return history == null ? "Recent Grind" : history.name();
+            return history == null ? fallback(entry.historyName, "Recent Grind") : history.name();
         }
         return entry.scope == TODAY ? "Runs today" : "Current Grind";
     }

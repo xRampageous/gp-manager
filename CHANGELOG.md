@@ -2,9 +2,10 @@
 
 ## 1.7.0 - 2026-10-27
 
+- Right-click Recent to preview and exclude a booking, with Undo available. Grouped rows offer the latest booking.
 - Track CoX, ToB, ToA and The Fractured Archive in Raids, with loot, paid death fees and All raids totals. Raid entry unlocks the tab; you always open it manually. Attempts show a completed clear, a terminal failure or the actual Death Fee; abandoned and retry-only attempts stay out of the list.
-- Open KILLS for recorded PK loot, or DEATHS for death losses and looting-bag contents. PvP skull colours show the booked loss tier.
-- View a session recap, save it in Grinds and rename saved sessions.
+- Open KILLS for recorded PK loot, or DEATHS for PvP death losses and looting-bag contents. PvP skull colours show the booked loss tier.
+- View a session recap, save it in Grinds and rename saved sessions or finished runs from their ⋯ menu.
 - Improve raid rewards, borrowed supplies, blighted potion doses, armour repairs and G.E. collections after hops or restarts. Live tables match Recent's width and row sizing; Supply counts use doses.
 - The Obligator, Zorya's tome and the archivist's folio count the runes and ascension shards their charges use. Loading charges and uncharging the two weapons stay neutral.
 - Count Cowbell amulet teleports as air runes used; filling or emptying a bottomless milk bucket stays neutral.
@@ -14,7 +15,7 @@
 - Clearer save warnings, safer loading when a save file is busy, and more reliable Ledger corrections and Undo.
 - Cannonballs left in a deployed cannon no longer count as fresh income when you pick it up; a tracked load shrinks when those balls come back.
 - Hardcore Worlds pause tracking and automatic market prices until dedicated support; main-game history is never mixed with them.
-- Historical grave claims no longer count as income: only auto-classified gains made entirely of items held at death are ignored, while mixed loot stays.
+- Recovered gear stays neutral; only the death fee counts. Genuine loot is kept. Wrong entries in the current run can be excluded.
 - OSRS already shows your grave, so GP Manager no longer adds a gravestone icon, reclaim-pending row or death-reclaim hero line. Recoverable gear stays neutral; only the fee is booked.
 
 ## 1.6.0 - 2026-10-20

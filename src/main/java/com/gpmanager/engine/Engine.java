@@ -272,9 +272,11 @@ class Engine {
      * Ongoing load-time repricing and GE audit-row cleanup. The bounded worker owns missing-price
      * Drink pairs; historical spell and GE compatibility repairs have been retired. Owner
      * corrections stay unchanged, and an unchanged second pass does not advance the revision.
+     * Historical grave-looking rows are never rewritten: item overlap cannot prove a recovery, so
+     * ambiguous old income waits for the owner's explicit correction.
      */
     synchronized void recheck(IntUnaryOperator alchPrice) {
-        boolean changed = repairLegacyGraves();
+        boolean changed = false;
         var drops = new ArrayList<Runnable>();
         for (var session : sessions()) {
             for (var row : session.transactions()) {
@@ -319,27 +321,6 @@ class Engine {
                 && msg("consumed-dose").equals(row.explanation());
     }
 
-    /** One-time repair of historical gear booked as income after a grave claim. */
-    boolean repairLegacyGraves() {
-        boolean repaired = false;
-        for (var session : sessions()) {
-            var held = session.transactions().stream()
-                    .filter(row -> row.type() == TransactionType.PK_DEATH_LOSS
-                            || row.note().equals(msg("death-items"))
-                            || row.note().equals(msg("death-reclaim-items"))
-                            || row.note().equals(msg("pvm-loss")))
-                    .flatMap(row -> row.flows().stream()).map(flow -> flow.item).collect(
-                            java.util.stream.Collectors.toSet());
-            if (session.pk().deaths > 0) held.addAll(PVP_GRAVE);
-            for (var row : session.transactions())
-                if (row.correction() == AUTO
-                        && (row.type() == TransactionType.GAIN || row.type() == TransactionType.LOOT)
-                        && !row.flows().isEmpty()
-                        && row.flows().stream().allMatch(flow -> flow.gain() && held.contains(flow.item)))
-                    repaired |= session.correctTransaction(row.id(), IGNORE, msg("death-reclaim-items"));
-        }
-        return repaired;
-    }
     Set<String> decisions(Session session) {
         if (session.correctionHistory == null) return null;
         var decided = new HashSet<String>();
