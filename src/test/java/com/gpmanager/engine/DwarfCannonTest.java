@@ -233,6 +233,34 @@ public class DwarfCannonTest
         assertEquals(-(15L * 30L) - (3L * 300L), engine.metrics(5_000L).net);
     }
 
+    @Test
+    public void aCannonAlreadyDeployedBeforeTrackingReturnsUnspentBallsNeutrally()
+    {
+        Engine engine = new Engine(valuator, new TransactionClassifier(), CONFIG);
+        engine.ensureSession(1_000L);
+        engine.setBaseline(snapshot(false, 0));
+        engine.syncCannon(4, 30, false);
+        engine.moveCannon();
+        settle(engine, snapshot(true, 30), 2_000L);
+        assertEquals("pre-observation balls are not fresh income", 0L, engine.metrics(10_000L).net);
+    }
+
+    @Test
+    public void resetAfterALoadStillShrinksTheOriginalCannonSupply()
+    {
+        Engine engine = new Engine(valuator, new TransactionClassifier(), CONFIG);
+        engine.ensureSession(1_000L);
+        engine.setBaseline(snapshot(false, 90));
+        engine.loadCannon(6);
+        settle(engine, snapshot(false, 60), 2_000L);
+        assertEquals(-6_000L, engine.metrics(5_000L).net);
+        engine.resetTracking(true);
+        engine.setBaseline(snapshot(false, 60));
+        engine.moveCannon();
+        settle(engine, snapshot(true, 70), 10_000L);
+        assertEquals(-4_000L, engine.metrics(20_000L).net);
+    }
+
     private static ContainerSnapshot snapshot(boolean parts, long balls)
     {
         Map<Integer, Long> held = new HashMap<>();

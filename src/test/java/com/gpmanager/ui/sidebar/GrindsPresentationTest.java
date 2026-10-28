@@ -661,7 +661,7 @@ public class GrindsPresentationTest
             return null;
         });
         assertEquals("the recap opens the ended run", id, panel.selection);
-        assertEquals(Shell.GRINDS, panel.shell.currentPage());
+        assertEquals(Shell.GRINDS, panel.shell.current);
     }
 
     /** Returns the fabricated backups the test chooses; the real service is never involved. */

@@ -125,7 +125,7 @@ public class LiveCategoryLayoutTest {
         onEdt(()->{
             var e=engine();for(int i=0;i<40;i++)gain(e,i,1000+i);
             var panel=SavedSessionTest.panel(e);String before=new Gson().toJson(e.exportState());
-            open(panel,"GAINS");assertEquals(Shell.LIVE,panel.shell.currentPage());
+            open(panel,"GAINS");assertEquals(Shell.LIVE,panel.shell.current);
             var page=focused(panel);assertEquals(40,page.income.rows.size());assertEquals(15,page.income.body.getComponentCount());
             assertFalse(((javax.swing.JButton)field(LedgerPage.class,"more").get(page)).isVisible());
             assertEquals(3,page.income.pages());page.income.showPage(2);assertEquals(10,page.income.body.getComponentCount());

@@ -81,8 +81,13 @@ public class RaidClaimPolishTest {
             for(int page=0;page<3;page++){
                 panel.raids.open(page==2?2:null,page==0?null:page==1?"all":f.id());panel.refreshNow();
                 var labels=new java.util.ArrayList<String>();RaidHistoryUiTest.labels(panel.raids.body,labels);
-                // 1.7.0 layout: Net total is the first line of the shared money card on every Raids page.
-                assertTrue(labels.stream().anyMatch(label->label.equals("Net total")));
+                // The prominent value and compact breakdown appear on every Raids page.
+                assertFalse("only the literal Net wording is removed",
+                        labels.stream().anyMatch(label->label.startsWith("Net ")));
+                assertTrue(labels.stream().anyMatch(label->label.startsWith("LOOT ·")));
+                assertNull(RaidHistoryUiTest.button(panel.raids.body,"Loot "));
+                assertTrue(labels.stream().anyMatch(label->label.equals("Death fees:")));
+                assertFalse(labels.stream().anyMatch(label->label.startsWith("Loot ")&&label.contains("Death fees")));
                 assertFalse(labels.stream().anyMatch(label->label.contains("Loot − fees")));
                 // Owner 2026-10-23: the "Confirmed loot and paid death fees" line is removed from every page.
                 assertFalse(labels.stream().anyMatch(label->label.contains("Confirmed loot and paid death fees")));

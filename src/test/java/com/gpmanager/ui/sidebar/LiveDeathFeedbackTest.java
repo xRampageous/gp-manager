@@ -56,7 +56,7 @@ public class LiveDeathFeedbackTest {
     @Test public void moneyAndPvpFitInTwoRowsAndBadgesFollowHero() throws Exception {
         SwingTestSupport.onEdt(()->{
             var e=DeathViewTest.populated();e.session().addTransaction(SavedSessionTest.trade(7000),2000,false);
-            var s=LiveSnapshot.capture(e,NOW,null);s.possible=true;s.reviews=3;s.returns=1;
+            var s=LiveSnapshot.capture(e,NOW,null);s.possible=true;s.reviews=3;
             s.income=16_400_000;s.supplies=2_110_000;s.loss=12_200_000;s.market=-2300;
             var page=MilestoneTest.page();page.apply(s);
             assertEquals(2,page.strips(s).size());
@@ -98,23 +98,14 @@ public class LiveDeathFeedbackTest {
         });
     }
 
-    @Test public void graveItemsStayNeutralAndHistoricalDrillsStayReadOnly() throws Exception {
+    @Test public void graveGearNeverAppearsInRecentOrLedger() throws Exception {
         SwingTestSupport.onEdt(()->{
             var e=engine();var grave=DeathViewTest.grave(false);
             e.session().addTransaction(grave,2000,false);
-            var panel=SavedSessionTest.panel(e);panel.scope=LedgerData.Entry.current().withSelection(grave.id(),null,null);
-            panel.shell.show(Shell.LEDGER);SidebarPanelProbe.refresh(panel);var page=panel.ledger;
-            var row=page.items(page.data.detail.group).get(0);
-            assertNotNull(row.open);assertEquals(Fmt.worth(0),row.value);
-            row.open.run();SidebarPanelProbe.refresh(panel);
-            assertEquals(grave.id(),page.data.detail.exact.transaction);
-            assertTrue(page.data.detail.exact.neutral);assertEquals(0,e.metrics(NOW).net);
-            ((LedgerController)page.actions).selectScope(LedgerData.Scope.TODAY,null,null);
-            page.actions.selectionChanged(grave.id(),null,null);SidebarPanelProbe.refresh(panel);
-            assertTrue(page.data.readonly);
-            page.items(page.data.detail.group).get(0).open.run();SidebarPanelProbe.refresh(panel);
-            assertTrue(page.data.readonly);assertEquals(grave.id(),page.data.detail.exact.transaction);
-            assertNull(DirectHeaderControlsTest.find(page.detail,"Correct ⌄"));
+            var panel=SavedSessionTest.panel(e);panel.shell.show(Shell.LEDGER);SidebarPanelProbe.refresh(panel);
+            assertTrue(panel.ledger.data.cost.groups.isEmpty());
+            assertEquals(0,e.metrics(NOW).net);
+            assertTrue(LedgerData.capture(e,NOW,LedgerData.Entry.current()).cost.groups.isEmpty());
             return null;
         });
     }
@@ -133,7 +124,7 @@ public class LiveDeathFeedbackTest {
                     frame.add(panel);frame.pack();frame.setSize(width,760);frame.setVisible(true);
                     SidebarPanelProbe.refresh(panel);
                     var s=panel.snapshot;s.income=16_400_000;s.supplies=2_110_000;s.loss=12_200_000;s.market=-2300;
-                    s.net=s.income-s.supplies-s.loss+s.market;s.reviews=3;s.returns=1;s.deaths=2;s.bestKill=24000;s.streak=1;
+                    s.net=s.income-s.supplies-s.loss+s.market;s.reviews=3;s.deaths=2;s.bestKill=24000;s.streak=1;
                     panel.live.apply(s);frame.validate();
                     var image=new java.awt.image.BufferedImage(width,760,java.awt.image.BufferedImage.TYPE_INT_RGB);
                     var g=image.createGraphics();panel.printAll(g);g.dispose();

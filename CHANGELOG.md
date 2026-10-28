@@ -3,7 +3,7 @@
 ## 1.7.0 - 2026-10-27
 
 - Track CoX, ToB, ToA and The Fractured Archive in Raids, with loot, paid death fees and All raids totals. Raid entry unlocks the tab; you always open it manually. Attempts show a completed clear, a terminal failure or the actual Death Fee; abandoned and retry-only attempts stay out of the list.
-- Open KILLS for recorded PK loot, or DEATHS for death losses and looting-bag contents. PvP skull colours show the booked loss tier; gravestone recovery stays neutral.
+- Open KILLS for recorded PK loot, or DEATHS for death losses and looting-bag contents. PvP skull colours show the booked loss tier.
 - View a session recap, save it in Grinds and rename saved sessions.
 - Improve raid rewards, borrowed supplies, blighted potion doses, armour repairs and G.E. collections after hops or restarts. Live tables match Recent's width and row sizing; Supply counts use doses.
 - The Obligator, Zorya's tome and the archivist's folio count the runes and ascension shards their charges use. Loading charges and uncharging the two weapons stay neutral.
@@ -11,7 +11,11 @@
 - Items worth more than 2.147B, such as the Obligator, count at their full G.E. price. Platinum tokens count as cash, so G.E. trades paid in tokens settle normally and swapping coins for tokens books nothing.
 - The Include equipment and Include rune pouch settings are gone: gear swaps and rune-pouch moves always stay neutral. Player chat cannot trigger accounting, and undecided Reviews stay available until you decide.
 - The Save history setting is gone: your history is always kept on your computer. Use ⚙ › Delete Profile to remove it.
-- Clearer save warnings and more reliable Ledger corrections and Undo.
+- Clearer save warnings, safer loading when a save file is busy, and more reliable Ledger corrections and Undo.
+- Cannonballs left in a deployed cannon no longer count as fresh income when you pick it up; a tracked load shrinks when those balls come back.
+- Hardcore Worlds pause tracking and automatic market prices until dedicated support; main-game history is never mixed with them.
+- Historical grave claims no longer count as income: only auto-classified gains made entirely of items held at death are ignored, while mixed loot stays.
+- OSRS already shows your grave, so GP Manager no longer adds a gravestone icon, reclaim-pending row or death-reclaim hero line. Recoverable gear stays neutral; only the fee is booked.
 
 ## 1.6.0 - 2026-10-20
 

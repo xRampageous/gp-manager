@@ -1,64 +1,71 @@
 # GP Manager
 
-See what you actually make while you play. GP Manager tracks your gains, supplies, losses and Grand Exchange trades for every trip, keeps recent receipts plus retained totals and records your raids. You just play.
+See what you make after costs. GP Manager tracks your loot, supplies, losses and Grand Exchange trades as you play. Keep everything in Free play, or start a Grind for an activity you want to follow.
 
 Works on normal, Ironman and Hardcore Ironman accounts. Ultimate Ironman isn't supported.
 
-## Screenshots
-
-Illustrative sample data in the current UI.
-
-| Live | Raids | PvP |
-|:--:|:--:|:--:|
-| ![Live](docs/screenshots/live.png) | ![The Raids tab with All raids totals](docs/screenshots/raids.png) | ![PvP](docs/screenshots/pvp.png) |
-| Net, GP/h and your latest drops, with a target if you set one | Loot and death fees for each raid, plus All raids totals | Kills, deaths, the victim's loot key and what a death would risk |
-
-| Grinds | Loot key claim |
-|:--:|:--:|
-| ![Grinds](docs/screenshots/grinds.png) | ![A loot key's ledger entry](docs/screenshots/ledger-key.png) |
-| Your Grinds with average GP/h, targets and All time | A key opens into one entry — the looted setup listed beneath it |
-
-| HUD+ at a target | HUD+ on a raid streak |
-|:--:|:--:|
-| ![HUD+ with a target](docs/screenshots/hud-grind.png) | ![HUD+ on a raid streak](docs/screenshots/hud-raid.png) |
-| Net, GP/h, a target bar and the streak's loot | KC, Net per kill and the drop that made it |
-
-## Features
-
-- **Live** – your Net, GP/h, gains, supplies and losses as you play, plus your latest drops. Click Net to set a GP or time target. Click the ACTIVE clock to restart GP/h or start a fresh session; your Free play or Grind keeps its whole total.
-- **Ledger** – recent gains, losses, trades and deaths, with the reason they counted. Open an entry to see its retained receipts. Older details are compacted; totals remain. Anything GP Manager wasn't sure about waits in Review for you, and **Correct › Exclude** takes an entry out of your totals (you can undo it).
-- **Grinds** – start one by name (Vorkath, Zulrah, a skilling spot). It remembers your targets, best run and average GP/h, so you can compare runs, including loot by the monster that dropped it.
-- **Free play** – everything you make outside Grinds, with an optional milestone (say 1B). **⚙ › Reset free-play** starts it over and keeps the old run under Grinds › FREE PLAY, where you can restore it.
-- **Raids** – entering Chambers of Xeric, Theatre of Blood, Tombs of Amascut or The Fractured Archive unlocks this account's Raids tab, including logging in mid-raid. Your recorded attempts stay available after restarting, even if you died or failed. Open the tab manually to see loot, death fees and All raids totals. With RuneLite's Loot Tracker on, unclaimed rewards show as a pending preview; loot counts once, when you take or bank it.
-- **PvP** – kills, deaths, your best kill and streak in dangerous areas, plus estimated Risk. Stored charges, including bracelet ether and the new Fractured Archive items' contents, aren't in Risk. Click KILLS for retained PK loot this Grind, or DEATHS for losses and fees; BEST is a read-only best-kill figure. Choose **Always** under Loot display to see these stats anywhere.
-- **Saved sessions** – **⚙ › View recap** shows the session so far; **Save session** keeps a copy in Grinds without stopping your clock or changing your totals. Rename it or copy a summary from its row menu.
-- **All time** – your total Net and GP/h and your best Grinds.
-- **HUD+** – an optional box in the game window with your Net, GP/h and a loot tray for the current kill streak. **Compact item rows** shows each item as an icon with a short value and quantity, such as **200M ×1**.
-
 ## Getting started
 
-1. Install **GP Manager** from the Plugin Hub.
-2. Open it from its icon in the RuneLite sidebar.
-3. Play. Tracking starts on its own; to name what you're doing, press **Start Grind** on the Grinds tab.
-4. New to it? **⚙ › Getting started** has a short guide.
+1. Install **GP Manager** from RuneLite's Plugin Hub.
+2. Open its icon on the right sidebar and start playing. Tracking starts automatically.
+3. To track an activity separately, open **Grinds → Start Grind**.
 
-Settings open from the wrench next to GP Manager in RuneLite's plugin list.
+Use **⚙ → Getting started** for the in-plugin guide. Settings are behind the wrench beside GP Manager in RuneLite's plugin list.
+
+## Screenshots
+
+Screenshots use illustrative sample data.
+
+| Live | Grinds |
+|:--:|:--:|
+| ![Live](docs/screenshots/live.png) | ![Grinds](docs/screenshots/grinds.png) |
+| Net, GP/h, supplies and recent receipts | Named activities, previous runs and All time |
+
+| Raids | PvP |
+|:--:|:--:|
+| ![All Time Raids totals and saved loot](docs/screenshots/raids.png) | ![PvP stats and death losses](docs/screenshots/pvp.png) |
+| Collected loot, paid fees and All raids totals | PvP death losses, separate from PvE and raid fees |
+
+| Ledger detail |
+|:--:|
+| ![A loot key's ledger entry](docs/screenshots/ledger-key.png) |
+| Items and booked values inside a receipt |
+
+## What you can track
+
+- **Live:** Net after costs, GP/h and recent receipts. Click GAINS, SUPPLY, LOSS or TRADE to inspect that session's entries. Click Net to set a target; ACTIVE opens the session controls. Restarting a session keeps the full run's totals recorded.
+- **Ledger:** see why an entry counted and open its retained receipts. Uncertain entries wait in Review for your decision. **Correct → Exclude** removes an entry from your totals, with Undo available.
+- **Grinds and saved sessions:** name an activity, set targets and compare finished runs. **⚙ → View recap → Save session** keeps a session copy in Grinds without counting its money twice. All time brings your runs together.
+- **Free play:** tracks activity outside Grinds. Set an optional milestone, or use **⚙ → Reset free-play** to start again and keep the previous run in Grinds.
+- **Raids:** entering CoX, ToB, ToA or The Fractured Archive unlocks the account's tab; you always open it manually. Browse saved loot from every raid in one collapsible table. The tab shows completed raids, failed runs and actual paid death fees. Abandoned attempts and deaths with lives remaining stay out of the list. Rewards count when collected or sent to the bank, once. RuneLite's Loot Tracker can provide an unclaimed reward preview.
+- **PvP:** KILLS opens retained PK loot; DEATHS opens PvP death losses and looting-bag details. PvE death records stay in Ledger, and raid fees also appear in Raids. BEST is a read-only figure. Choose **Loot display → PvP hero view → Always** to see the stats anywhere. Estimated RISK appears only in dangerous PvP areas and excludes stored charges, including bracelet ether and Fractured Archive item contents.
+
+## HUD+
+
+An optional in-game overlay shows Net, GP/h, targets and a loot tray. Compact item rows can show an item's icon, value and quantity together.
+
+| With a target | On a raid streak |
+|:--:|:--:|
+| ![HUD+ with a target](docs/screenshots/hud-grind.png) | ![HUD+ on a raid streak](docs/screenshots/hud-raid.png) |
+| Progress towards your target and recent loot | Kill count, Net per kill and the streak's loot |
 
 ## What it counts
 
-- **Supplies** you use: food, potions, runes, ammo, cannonballs and weapon charges (blowpipe, tridents, the Toxic staff of the dead, Bryophyta's staff, the Eye of Ayak, the Obligator, Zorya's tome and more). Picking up what you dropped or fired cancels it out.
-- **Loot** once collected into your inventory or bank. Opening a chest, key, casket or clue reward preview doesn't count its contents.
-- **Grand Exchange** trades at the real tax, including partly filled offers and trades above max cash paid in platinum tokens. Offers placed on another device count when you collect them here. Banking, storage and gear swaps are neutral moves, not gains or losses.
-- **Deaths**, reclaim fees and repair costs. Items you get back from a gravestone stay neutral, and Barrows gear wearing down is not a loss.
-- **Prices** come from RuneLite's Grand Exchange prices or your own overrides; items with no Grand Exchange price count at their alch value, and ironmen can value items at high alch instead.
-- **Separate worlds** – Leagues, Deadman, beta and tournament worlds pause tracking, so they never skew your regular GP/h.
+- **Supplies used:** food, potion doses, runes, ammunition, cannonballs and supported item charges.
+- **Loot collected:** chest, key, casket and clue previews do not book their contents just by opening.
+- **Grand Exchange:** observed collections, partly filled offers, tax and platinum payments above max cash.
+- **Death and repair costs:** reclaimed gear stays neutral; observed fees and repairs count as costs. Barrows wear alone is not a loss.
 
-If it isn't sure what happened, it doesn't guess: the entry waits in Review with a reason, and you decide.
+Banking, storage and gear swaps stay neutral. Prices use RuneLite's G.E. prices, your overrides or an alch fallback; ironmen can choose high-alch values. Leagues, Deadman, beta and tournament worlds pause regular tracking.
+
+When a change needs your decision, the Ledger explains it in Review.
 
 ## Your data
 
-Everything stays on your computer, in one profile per account. The **⚙** menu backs up your profile, shows where it's kept and has **Delete Profile** (with or without a backup first); to restore a backup, copy it over the profile file while RuneLite is closed. Very large histories can make saving slower; a future update will compact older runs. Keep a backup. GP Manager makes no network calls of its own and never plays the game for you.
+Data stays on your computer, separately for each account. Use **⚙** to back up your profile, find its location or **Delete Profile**. Restore a backup while RuneLite is closed.
+
+Recent receipts are retained alongside run totals; older item details may be compacted. Very large histories can make saving slower, so keep a backup. GP Manager makes no network calls of its own and never plays the game for you.
 
 ## Feedback
 
-GP Manager is in beta. Found a bug or have an idea? Use **⚙ › Report a bug**, open an [issue](https://github.com/xRampageous/gp-manager/issues), or ask in [Discussions](https://github.com/xRampageous/gp-manager/discussions). A screenshot of the Ledger entry helps a lot.
+Found a bug or have an idea? Use **⚙ → Report a bug**, open an [issue](https://github.com/xRampageous/gp-manager/issues), or ask in [Discussions](https://github.com/xRampageous/gp-manager/discussions). A screenshot of the relevant Ledger entry helps.

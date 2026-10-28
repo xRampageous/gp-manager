@@ -29,7 +29,7 @@ import static org.junit.Assert.assertTrue;
  * scope generation) committed. Up to three attempts per accepted snapshot, 50 and 200 ms apart on
  * the writer's own worker; an exhausted snapshot stays queued for a newer snapshot, a retry or a
  * restart, and lifecycle steps that would replace the owner wait for that acknowledgement.
- * Retry waits go through the writer's pause seam, so no test sleeps through them.
+ * Retry waits go through the writer's retry seam, so no test sleeps through them.
  */
 public class DurableSaveAckTest
 {
@@ -76,14 +76,26 @@ public class DurableSaveAckTest
 
         Rig(Path root)
         {
-            this(root, null);
+            this(root, null, false);
+        }
+
+        Rig(Path root, boolean production)
+        {
+            this(root, null, production);
         }
 
         Rig(Path root, java.util.concurrent.ExecutorService executor)
         {
+            this(root, executor, false);
+        }
+
+        Rig(Path root, java.util.concurrent.ExecutorService executor, boolean production)
+        {
             this.root = root;
             repository = new FlakyRepository(root);
-            writer = executor == null ? new PausingWriter(repository, pauses) : new PausingWriter(repository, executor, pauses);
+            writer = production ? new OrderedPersistenceWriter(repository)
+                : executor == null ? new PausingWriter(repository, pauses)
+                : new PausingWriter(repository, executor, pauses);
             coordinator = new Persistence(null, null, repository, writer, engine)
             {
                 @Override
@@ -117,7 +129,7 @@ public class DurableSaveAckTest
         return state.currentSession() == null ? null : state.currentSession().name();
     }
 
-    /** Records each retry wait instead of sleeping through it. */
+    /** Records each retry delay and lets the drain reschedule immediately. */
     private static final class PausingWriter extends OrderedPersistenceWriter
     {
         final List<Long> pauses;
@@ -134,12 +146,13 @@ public class DurableSaveAckTest
             this.pauses = pauses;
         }
 
-        @Override // PAUSE-SEAM
-        boolean pause(long millis) // PAUSE-SEAM
-        { // PAUSE-SEAM
-            pauses.add(millis); // PAUSE-SEAM
-            return true; // PAUSE-SEAM
-        } // PAUSE-SEAM
+        @Override // RETRY-SEAM
+        boolean retryLater(long millis) // RETRY-SEAM
+        { // RETRY-SEAM
+            pauses.add(millis); // RETRY-SEAM
+            drain(); // RETRY-SEAM
+            return true; // RETRY-SEAM
+        } // RETRY-SEAM
     }
 
     /** Runs queued writer tasks only when the test says so. */
@@ -229,6 +242,52 @@ public class DurableSaveAckTest
             rig.writer.start();
             assertTrue("a restart retries the retained snapshot", rig.writer.flush(Duration.ofSeconds(5)));
             assertEquals("Kept", rig.disk(ALICE));
+        }
+        finally
+        {
+            rig.writer.shutdown(Duration.ofSeconds(5));
+        }
+    }
+
+    @Test
+    public void productionSchedulerCommitsDelayedRetriesOnTheWriterWorker() throws Exception
+    {
+        Rig rig = new Rig(temporary.newFolder().toPath(), true);
+        try
+        {
+            rig.seed("Seed");
+            rig.engine.session().rename("Scheduled");
+            int before = rig.repository.calls.get();
+            rig.repository.failures.set(2);
+
+            assertTrue(rig.coordinator.saveNow());
+            assertEquals("two delayed retries then the commit", 3, rig.repository.calls.get() - before);
+            assertEquals("Scheduled", rig.disk(ALICE));
+            assertEquals(SaveStatus.State.OK, rig.writer.status().state);
+        }
+        finally
+        {
+            rig.writer.shutdown(Duration.ofSeconds(5));
+        }
+    }
+
+    @Test
+    public void productionShutdownFinalizesScheduledRetriesOnItsOwnWorker() throws Exception
+    {
+        Rig rig = new Rig(temporary.newFolder().toPath(), true);
+        try
+        {
+            rig.seed("Seed");
+            rig.engine.session().rename("Final");
+            int before = rig.repository.calls.get();
+            rig.repository.failures.set(2);
+
+            rig.coordinator.shutdown();
+            assertTrue("the writer worker owns the retry window",
+                rig.writer.executor.awaitTermination(5, TimeUnit.SECONDS));
+            assertEquals("the final snapshot still uses both retries", 3, rig.repository.calls.get() - before);
+            assertEquals("Final", rig.disk(ALICE));
+            assertTrue(rig.writer.flush(Duration.ofSeconds(1)));
         }
         finally
         {
@@ -462,11 +521,11 @@ public class DurableSaveAckTest
         repository.failures.set(Integer.MAX_VALUE);
         OrderedPersistenceWriter writer = new OrderedPersistenceWriter(repository, executor)
         {
-            @Override boolean pause(long millis)
+            @Override boolean retryLater(long millis)
             {
                 if (alreadyClosing) until = System.nanoTime() - 1;
                 else shutdown(Duration.ZERO);
-                return true;
+                return false;
             }
         };
         SavedState state = new SavedState();

@@ -53,7 +53,7 @@ public class Schema105ActionLabelPersistenceTest
         SavedState loaded = new Gson().fromJson(json, SavedState.class);
         Transaction restored = loaded.currentSession().transactions().get(0);
         assertNotNull(restored.actionLabel());
-        assertEquals("Ice Burst", restored.actionLabel().value());
+        assertEquals("Ice Burst", restored.actionLabel().value);
         assertEquals("the reloaded receipt keeps its money", labelled.net(), restored.net());
         assertNull("an unlabelled receipt stays generic",
             loaded.currentSession().transactions().get(1).actionLabel());
@@ -76,8 +76,8 @@ public class Schema105ActionLabelPersistenceTest
         Transaction sanitized = normalizedWire("\"<col=ff9040>Ice Burst</col>\"", false);
         assertNotNull(sanitized.actionLabel());
         assertEquals("markup is stripped, never displayed", "Ice Burst",
-            sanitized.actionLabel().value());
-        assertFalse(sanitized.actionLabel().value().contains("<"));
+            sanitized.actionLabel().value);
+        assertFalse(sanitized.actionLabel().value.contains("<"));
 
         Transaction nonCast = normalizedWire("\"Ice Burst\"", true);
         assertNull("a non-CAST receipt cannot keep a stale spell label",
@@ -122,7 +122,7 @@ public class Schema105ActionLabelPersistenceTest
 
         assertNotNull("booked labels survive the presentation owner fence",
             cast.actionLabel());
-        assertEquals("Ice Burst", cast.actionLabel().value());
+        assertEquals("Ice Burst", cast.actionLabel().value);
         assertEquals("the fence never touches money", net, engine.metrics(T0 + 200L).net);
     }
 
@@ -157,13 +157,13 @@ public class Schema105ActionLabelPersistenceTest
         source.session().addTransaction(genericCast(now + 4_000L), 100, false);
         SavedState detached = source.savedState();
         assertEquals("detach keeps the bounded label", "Ice Burst",
-            detached.currentSession().transactions().get(0).actionLabel().value());
+            detached.currentSession().transactions().get(0).actionLabel().value);
 
         Engine restored = engine();
         restored.restore(detached, now + 5_000L);
         Session session = restored.session();
         List<Transaction> restoredTransactions = session.transactions();
-        assertEquals("Ice Burst", restoredTransactions.get(0).actionLabel().value());
+        assertEquals("Ice Burst", restoredTransactions.get(0).actionLabel().value);
 
         Semantics.Result before = SemanticProbe.capture(
             restoredTransactions, null, session.id(), null);
@@ -208,7 +208,7 @@ public class Schema105ActionLabelPersistenceTest
         assertEquals(labelled.id(), restored.id());
         assertEquals(labelled.flows().size(), restored.flows().size());
         assertEquals(labelled.net(), restored.net());
-        assertEquals("Ice Burst", restored.actionLabel().value());
+        assertEquals("Ice Burst", restored.actionLabel().value);
         assertTrue("backup rotation does not strip the field",
             Files.readString(directory.resolve("sessions.backup.json")).contains("Ice Burst"));
     }

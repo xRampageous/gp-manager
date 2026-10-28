@@ -80,12 +80,8 @@ public class PvpDeathSkullTest {
                 List.of(new Flow(995, "Coins", -9_000_000, 1, -9_000_000, PriceSource.FACE_VALUE)),
                 Confidence.CONFIRMED, GameData.msg("pvm-loss"), null);
         assertEquals(-100000, group(pve).item);
-        for (boolean recovered : new boolean[]{false, true}) {
-            var grave = group(DeathViewTest.grave(recovered));
-            assertEquals(-1, grave.item);
-            assertEquals(0, grave.value);
-            assertTrue(grave.neutral);
-        }
+        for (boolean recovered : new boolean[]{false, true})
+            assertTrue(DeathRowGroupingTest.capture(DeathViewTest.grave(recovered)).groups.isEmpty());
     }
 
     @Test public void allSixSpritesAreCachedAndRespectTheIconsSetting() throws Exception {

@@ -315,11 +315,11 @@ public class ProfitSessionTest
         assertEquals(0, ModelProbe.activeCorrections(session).size());
         assertEquals(1, session.correctionHistory.size());
         CorrectionRecord record = session.correctionHistory.get(0);
-        assertTrue(record.isUndone());
+        assertTrue(record.undone);
 
         Session restored = new Gson().fromJson(new Gson().toJson(session), Session.class);
         assertEquals(1, restored.correctionHistory.size());
-        assertTrue(restored.correctionHistory.get(0).isUndone());
+        assertTrue(restored.correctionHistory.get(0).undone);
         assertFalse("an undone decision is never undone twice", restored.undoCorrection());
     }
 

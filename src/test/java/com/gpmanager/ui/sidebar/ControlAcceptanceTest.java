@@ -35,7 +35,7 @@ public class ControlAcceptanceTest {
             assertNull("Recent has no duplicate Ledger shortcut", find(panel.live.recent, "Ledger"));
             panel.shell.show(Shell.LEDGER);
             SidebarPanelProbe.refresh(panel);
-            assertEquals(Shell.LEDGER, panel.shell.currentPage());
+            assertEquals(Shell.LEDGER, panel.shell.current);
             assertEquals(LedgerData.Entry.current().scope, panel.scope.scope);
             assertEquals("", panel.ledgerSearch);
             assertEquals(1_500L, panel.ledger.data.net);

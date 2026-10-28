@@ -61,16 +61,12 @@ public class DeathRowGroupingTest {
         assertEquals(-76437, Semantics.summarize(groups).cost);
     }
 
-    @Test public void graveMovementsHaveOneNeutralRowAndNoInventedMoney() {
+    @Test public void graveMovementsNeverBecomeRows() {
         var row = new Transaction(1000, TransactionType.TRANSFER, Context.TRANSFER,
                 GameData.msg("death-items"), "Death reclaim", false,
                 List.of(new Flow(10499, "Ava's accumulator", -1, 600, -600),
                         new Flow(19564, "Royal seed pod", -1, 12, -12)), Confidence.LIKELY, "Owned items", null);
-        var group = capture(row).groups.get(0);
-        assertEquals(1, capture(row).groups.size());
-        assertEquals("Gravestone", group.name);
-        assertTrue(group.neutral);
-        assertEquals(0, group.value);
-        assertEquals(2, group.entries.size());
+        assertTrue(capture(row).groups.isEmpty());
+        assertEquals(0, capture(row).groups.size());
     }
 }

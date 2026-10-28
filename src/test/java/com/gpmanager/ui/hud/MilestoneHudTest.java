@@ -17,12 +17,12 @@ public class MilestoneHudTest {
         HudBuilder hud = new HudBuilder(HudBuilderTest.config(false, 4), null);
         SidebarPanel panel = onEdt(() -> new SidebarPanel(engine, PresentationLifecycleTest.config(), null, null, null));
         onEdt(() -> { panel.active = false; panel.bindHud(hud); panel.refreshNow(); return null; });
-        assertEquals("", hud.current().context);
+        assertEquals("", hud.current.context);
         coins(engine, now - 5_000L, 10_000L);
         onEdt(() -> { panel.refreshNow(); return null; });
-        assertEquals("Milestone reached · 100k", hud.current().context);
-        assertEquals(Kit.Tone.GAIN.color, hud.current().contextColor);
-        assertFalse("a milestone adds no progress bar", hud.current().progress >= 0d);
+        assertEquals("Milestone reached · 100k", hud.current.context);
+        assertEquals(Kit.Tone.GAIN.color, hud.current.contextColor);
+        assertFalse("a milestone adds no progress bar", hud.current.progress >= 0d);
     }
 
     @Test public void changingOwnersTargetsAndNetCannotLeaveAStaleReachedLine() {
@@ -50,11 +50,9 @@ public class MilestoneHudTest {
         coins(engine, 5L, 100_000L); engine.setMilestone(100_000L);
         LiveSnapshot snapshot = live(engine, 10L);
         HudBuilder hud = new HudBuilder(HudBuilderTest.config(false, 4), null);
-        snapshot.reviews = 1; snapshot.returns = 2;
+        snapshot.reviews = 1;
         assertEquals("(!) 1 item needs review", hud.contextLine(snapshot));
         snapshot.reviews = 0;
-        assertEquals("Reclaim waiting · 2 items", hud.contextLine(snapshot));
-        snapshot.returns = 0;
         assertEquals("Milestone reached · 100k", hud.contextLine(snapshot));
         HudBuilder hidden = new HudBuilder(new GpManagerConfig() {
             public boolean showHud() { return false; }

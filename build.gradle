@@ -168,7 +168,7 @@ def shortRevision = {
 // The single source of truth for the durable schema, read at build time so the DEV footer can
 // never disagree with SavedState.
 def currentSchemaVersion = {
-    def match = (file('src/main/java/com/gpmanager/persistence/Persistence.java').getText('UTF-8')
+    def match = (file('src/main/java/com/gpmanager/model/Transaction.java').getText('UTF-8')
         =~ /CURRENT_SCHEMA_VERSION = (\d+)/)
     return match.find() ? match.group(1) : ''
 }
@@ -213,6 +213,55 @@ tasks.named('jar') {
     from('LICENSE') { into 'META-INF' }
     manifest {
         attributes('Implementation-Title': 'GP Manager', 'Implementation-Version': project.version)
+    }
+}
+
+def internalReleaseCopy = ~/(?ix)
+    \b\d[\d,]*\s+(?:passing\s+)?(?:main\s+|dev\s+)?(?:tests|suites)\b
+    |\b(?:zero|0)\s+(?:failures|errors)\b
+    |\b(?:all\s+)?tests?\s+(?:passed|pass|green)\b
+    |\bnative\s+(?:in-game\s+)?coverage\b
+    |\b(?:simulations?|release\s+audits|strict\s+replay|JUnit|cleanTest|releaseCheck|file-aware)\b
+    |\b(?:DEV|development)\s*(?:build|[·:]|\d)
+/
+
+def checkPlayerCopy = { String name, String text ->
+    if ((text =~ internalReleaseCopy).find()) {
+        throw new GradleException("${name} contains internal validation or development wording. Keep it in release evidence, not player-facing copy.")
+    }
+}
+
+tasks.register('publicCopyCheck') {
+    group = 'verification'
+    description = 'Keeps internal validation and development markings out of public release copy.'
+    doLast {
+        checkPlayerCopy('README.md', file('README.md').getText('UTF-8'))
+        def sections = file('CHANGELOG.md').getText('UTF-8').split(/(?m)^## /, 3)
+        if (sections.length < 2) throw new GradleException('CHANGELOG.md has no release section.')
+        checkPlayerCopy('Current changelog section', sections[1])
+        def update = providers.gradleProperty('hubUpdateFile').orNull
+        if (update != null) checkPlayerCopy('Hub update', file(update).getText('UTF-8'))
+        println 'Player-facing release copy check passed.'
+    }
+}
+
+tasks.register('publicCopyGateTest') {
+    group = 'verification'
+    description = 'Rejects the historical verification paragraph and development labels in player copy.'
+    doLast {
+        checkPlayerCopy('Player example', 'Track loot and supplies. Review uncertain receipts. Screenshots use illustrative sample data.')
+        [
+            'Local source and public release checks passed: 1,843 tests, zero failures/errors, one skipped, plus simulations and release audits.',
+            'Native in-game coverage is recorded separately and is not implied by these checks.',
+            '2,413 main tests / 343 suites passed.',
+            'DEV · 1.7.0'
+        ].each { text ->
+            boolean rejected = false
+            try { checkPlayerCopy('Negative fixture', text) }
+            catch (GradleException expected) { rejected = true }
+            if (!rejected) throw new GradleException('Public copy gate accepted internal release wording.')
+        }
+        println 'Player-facing release copy negative tests passed.'
     }
 }
 
@@ -360,8 +409,9 @@ tasks.register('releaseResourceGateTest') {
 }
 
 tasks.named('check') {
-    dependsOn 'safetyAudit', 'simulationCheck', 'configurationStabilityAudit',
-        'brandingCompatibilityAudit', 'releaseMetadataCheck', 'releaseResourceGateTest', 'publicSnapshotCheck'
+    dependsOn 'safetyAudit', 'safetyAuditGateTest', 'simulationCheck', 'configurationStabilityAudit',
+        'brandingCompatibilityAudit', 'releaseMetadataCheck', 'releaseResourceGateTest', 'publicSnapshotCheck',
+        'publicCopyCheck', 'publicCopyGateTest'
 }
 
 tasks.register('releaseCheck') {
@@ -463,7 +513,8 @@ def forbiddenSafetyPatterns = [
     'setKeyboardIdleTicks',
     'setMouseIdleTicks',
     'writeChatbox',
-    'insecure-write-credentials'
+    'insecure-write-credentials',
+    'Thread.sleep'
 ]
 
 // Broader patterns that false-positive on Swing sidebar UI input only.
@@ -528,6 +579,18 @@ tasks.register('safetyAudit') {
         }
 
         println 'Passive-only safety audit passed: no automation, input injection, direct networking, reflection, JNI, or subprocess APIs detected.'
+    }
+}
+
+tasks.register('safetyAuditGateTest') {
+    group = 'verification'
+    description = 'Rejects a forbidden blocking-wait fixture before the production audit is trusted.'
+    doLast {
+        def sample = 'class BlockingRetry { void waitForRetry() throws Exception { Thread.sleep(1); } }'
+        if (!forbiddenSafetyPatterns.any { sample.contains(it) }) {
+            throw new GradleException('Safety audit accepted Thread.sleep.')
+        }
+        println 'Safety audit negative test passed: Thread.sleep was rejected.'
     }
 }
 
@@ -642,7 +705,7 @@ tasks.register('configurationStabilityAudit') {
                 throw new GradleException("config audit failed: deleted visible setting remains: ${marker}")
             }
         }
-        def savedStateSource = file('src/main/java/com/gpmanager/persistence/Persistence.java').getText('UTF-8')
+        def savedStateSource = file('src/main/java/com/gpmanager/model/Transaction.java').getText('UTF-8')
         if (!savedStateSource.contains('CURRENT_SCHEMA_VERSION = 110')
             || !savedStateSource.contains('return schemaVersion == CURRENT_SCHEMA_VERSION;')) {
             throw new GradleException('data schema audit failed: the 1.3.4 SavedState schema 110 (reading only 110) is missing.')
@@ -662,8 +725,8 @@ tasks.register('brandingCompatibilityAudit') {
         file('runelite-plugin.properties').withInputStream { metadata.load(it) }
         def pluginSource = file('src/main/java/com/gpmanager/GpManagerPlugin.java').getText('UTF-8')
         def configSource = file('src/main/java/com/gpmanager/GpManagerConfig.java').getText('UTF-8')
-        def repositorySource = file('src/main/java/com/gpmanager/persistence/Persistence.java').getText('UTF-8')
-        def savedStateSource = file('src/main/java/com/gpmanager/persistence/Persistence.java').getText('UTF-8')
+        def repositorySource = file('src/main/java/com/gpmanager/model/Transaction.java').getText('UTF-8')
+        def savedStateSource = file('src/main/java/com/gpmanager/model/Transaction.java').getText('UTF-8')
         def pluginFile = file('src/main/java/com/gpmanager/GpManagerPlugin.java').canonicalFile
 
         def descriptor = (pluginSource =~ /(?s)@PluginDescriptor\((.*?)\)\s*public class GpManagerPlugin/)

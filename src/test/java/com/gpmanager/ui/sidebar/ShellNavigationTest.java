@@ -19,7 +19,7 @@ public class ShellNavigationTest
             PresentationLifecycleTest.config(), null, null, null));
         Shell shell = panel.shell;
         assertEquals(3, ShellProbe.tabLabels(shell).length);
-        assertEquals("live", shell.currentPage());
+        assertEquals("live", shell.current);
         assertEquals(List.of("Live", "Ledger", "Grinds"), List.of(ShellProbe.tabLabels(shell)));
         for (String label : ShellProbe.tabLabels(shell))
         {
@@ -96,11 +96,11 @@ public class ShellNavigationTest
         Shell shell = panel.shell;
 
         shell.show(Shell.LEDGER);
-        assertEquals("ledger", shell.currentPage());
+        assertEquals("ledger", shell.current);
         shell.show(Shell.GRINDS);
-        assertEquals("grinds", shell.currentPage());
+        assertEquals("grinds", shell.current);
         shell.show(Shell.LIVE);
-        assertEquals("live", shell.currentPage());
+        assertEquals("live", shell.current);
         assertEquals("live", ShellProbe.selectedTab(shell));
     }
 }

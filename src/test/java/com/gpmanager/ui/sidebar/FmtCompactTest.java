@@ -1,5 +1,7 @@
 package com.gpmanager;
 
+import java.util.*;
+import java.util.concurrent.*;
 import org.junit.Test;
 
 import static org.junit.Assert.assertEquals;
@@ -15,6 +17,45 @@ public class FmtCompactTest
         assertEquals("0", Fmt.exactSigned(0L));
         assertEquals("−1,234", Fmt.exactSigned(-1_234L));
         assertEquals("+1,234", Fmt.exactSigned(1_234L));
+    }
+
+    @Test
+    public void quantityMarkersUseTheSharedExactFormatter()
+    {
+        assertEquals("×0", Fmt.times(0L));
+        assertEquals("×1,234", Fmt.times(1_234L));
+        assertEquals("×1,234", Fmt.times(-1_234L));
+        assertEquals("×9,223,372,036,854,775,807", Fmt.times(Long.MAX_VALUE));
+        assertEquals("×-9,223,372,036,854,775,808", Fmt.times(Long.MIN_VALUE));
+    }
+
+    @Test
+    public void fourThreadsKeepTheExactCorpusStable() throws Exception
+    {
+        long[] values = {0L, 1L, -1L, 1_234L, -1_234L, 1_234_567L, -1_234_567L,
+                Long.MAX_VALUE, Long.MIN_VALUE};
+        String[] exact = new String[values.length];
+        String[] times = new String[values.length];
+        for (int i = 0; i < values.length; i++) {
+            exact[i] = Fmt.exact(values[i]);
+            times[i] = "×" + Fmt.exact(Math.abs(values[i]));
+        }
+        ExecutorService pool = Executors.newFixedThreadPool(4);
+        try {
+            List<Future<?>> tasks = new ArrayList<>();
+            for (int thread = 0; thread < 4; thread++)
+                tasks.add(pool.submit(() -> {
+                    for (int round = 0; round < 100; round++)
+                        for (int i = 0; i < values.length; i++) {
+                            assertEquals("exact " + values[i], exact[i], Fmt.exact(values[i]));
+                            assertEquals("times " + values[i], times[i], Fmt.times(values[i]));
+                        }
+                    return null;
+                }));
+            for (Future<?> task : tasks) task.get(20, TimeUnit.SECONDS);
+        } finally {
+            pool.shutdownNow();
+        }
     }
 
     @Test

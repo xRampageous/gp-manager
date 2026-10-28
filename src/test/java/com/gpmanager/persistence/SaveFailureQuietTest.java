@@ -64,11 +64,10 @@ public class SaveFailureQuietTest
         // Each failed request has used its three bounded attempts; only the request counts.
         OrderedPersistenceWriter writer = new OrderedPersistenceWriter(repository)
         {
-            @Override // PAUSE-SEAM
-            boolean pause(long millis) // PAUSE-SEAM
-            { // PAUSE-SEAM
-                return true; // PAUSE-SEAM
-            } // PAUSE-SEAM
+            @Override boolean retryLater(long millis)
+            {
+                return true;
+            }
         };
         try
         {

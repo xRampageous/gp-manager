@@ -49,7 +49,8 @@ public class LootDisplayModesTest
     public void mainGameWorldsPriceDrops()
     {
         for (WorldType flag : EnumSet.complementOf(EnumSet.of(WorldType.DEADMAN, WorldType.SEASONAL,
-            WorldType.QUEST_SPEEDRUNNING, WorldType.BETA_WORLD, WorldType.TOURNAMENT_WORLD, WorldType.NOSAVE_MODE)))
+            WorldType.HARDCORE_MAIN, WorldType.QUEST_SPEEDRUNNING, WorldType.BETA_WORLD,
+            WorldType.TOURNAMENT_WORLD, WorldType.NOSAVE_MODE)))
         {
             Valuation valuation = new Valuation(new GpManagerConfig() {}, id -> null,
                 (id, active) -> 52, id -> false,

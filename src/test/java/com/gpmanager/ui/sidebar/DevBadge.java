@@ -26,7 +26,7 @@ public final class DevBadge
         JLabel label = null;
         if (!badge.isEmpty())
         {
-            label = Kit.label(badge, Kit.small(), Kit.OFF);
+            label = Kit.label(badge, Kit.smallFont, Kit.OFF);
             label.setToolTipText(resolved.tooltipText());
             label.getAccessibleContext().setAccessibleName("Build identity");
             label.getAccessibleContext().setAccessibleDescription(resolved.tooltipText());

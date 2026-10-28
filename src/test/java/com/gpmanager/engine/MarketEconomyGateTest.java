@@ -54,11 +54,14 @@ public class MarketEconomyGateTest
     public void specialEconomiesFailClosed()
     {
         for (WorldType blocked : new WorldType[] {
-            WorldType.DEADMAN, WorldType.SEASONAL, WorldType.QUEST_SPEEDRUNNING,
-            WorldType.BETA_WORLD, WorldType.NOSAVE_MODE, WorldType.TOURNAMENT_WORLD})
+            WorldType.DEADMAN, WorldType.SEASONAL, WorldType.HARDCORE_MAIN,
+            WorldType.QUEST_SPEEDRUNNING, WorldType.BETA_WORLD, WorldType.NOSAVE_MODE,
+            WorldType.TOURNAMENT_WORLD})
         {
             assertState(Valuation.Economy.UNSUPPORTED_SPECIAL, blocked);
         }
+        assertState(Valuation.Economy.UNSUPPORTED_SPECIAL,
+            WorldType.MEMBERS, WorldType.HARDCORE_MAIN);
         assertState(Valuation.Economy.UNSUPPORTED_SPECIAL,
             WorldType.MEMBERS, WorldType.DEADMAN);
     }

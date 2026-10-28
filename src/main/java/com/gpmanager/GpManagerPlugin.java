@@ -247,7 +247,7 @@ public class GpManagerPlugin extends Plugin {
     void samplePvpState() {
         var local = client.getLocalPlayer();
         int skull = local == null ? SkullIcon.NONE : local.getSkullIcon();
-        boolean possible = pvp.context().isDangerous(), skulled = skull != SkullIcon.NONE;
+        boolean possible = pvp.context.isDangerous(), skulled = skull != SkullIcon.NONE;
         boolean protect = client.getVarbitValue(PRAYER_PROTECTITEM) == 1;
         if (!possible) held = bagHeld = emptyList();
         else if (client.getTickCount() % 2 == 0 && valuation != null && containers != null) {
@@ -355,7 +355,6 @@ public class GpManagerPlugin extends Plugin {
     /** Owner live 2026-10-13: the login-start option is offered once per client run. */
     boolean autoStart;
 
-    @Override
     protected void startUp() {
         boot = true;
         autoStart = true;
@@ -386,7 +385,6 @@ public class GpManagerPlugin extends Plugin {
         pulse();
     }
 
-    @Override
     protected void shutDown() {
         charges.clearCheck();
         // The durable General tracker and any custom session are saved in
@@ -1001,6 +999,8 @@ public class GpManagerPlugin extends Plugin {
         if ("revert".equals(option) || "dismantle".equals(option))
             engine.dismantle(identifier);
         if (target.contains("multicannon") || target.startsWith("cannon ")) {
+            engine.syncCannon(client.getVarpValue(DROPCANNON), client.getVarpValue(ROCKTHROWER),
+                            client.getVarbitValue(MCANNON_DECAYED) == 1);
             // A dwarf multicannon (OSRS Wiki): Fire or Load takes balls from the pack, Set-up
             // places its parts and auto-loads the balls it finds with them, and using a ball on
             // it loads too. Every one of those ball moves is a load (owner 1.3.4 live: the
@@ -1244,7 +1244,7 @@ public class GpManagerPlugin extends Plugin {
             // when PK accounting is disabled. That evidence prevents a lingering
             // NPC target from turning a PvP death into an ownership-neutral reclaim.
             combat = 20;
-            if (config.enablePkTracking() && !pvp.context().isSafe()) {
+            if (config.enablePkTracking() && !pvp.context.isSafe()) {
                 markActivity();
                 activity.observe("PKing", true);
             }
@@ -1284,7 +1284,7 @@ public class GpManagerPlugin extends Plugin {
         // PvM or PK: drop the NPC/activity soft-stick so the killer cannot title the next owner.
         targets.clear();
         idle.clear();
-        activity.clearOnDeath();
+        activity.resetToGeneral(true);
         refreshPresentation();
         if (disposition == DeathOutcome.TRACK_PK) {
             markActivity();
@@ -1942,9 +1942,6 @@ class ActivityDetector {
     }
 
     /** Local death drops the detected activity so the killer cannot title the next session. */
-    void clearOnDeath() {
-        resetToGeneral(true);
-    }
 
     void resetToGeneral(boolean resetHold) {
         if (!GENERAL.equalsIgnoreCase(detected) || resetHold) {
@@ -2225,9 +2222,6 @@ class PvpContextReader {
      * The context sampled on the latest tick (or by {@link #sample}); presentation and disposition
      * input only.
      */
-    PvpContext context() {
-        return context;
-    }
 
     /** Re-reads the client signals now (death/loot events may precede the next tick sample). */
     PvpContext sample(Player player) {
@@ -3871,7 +3865,7 @@ class ChargeCheck {
                 if (eye.matches())
                     components.put(ItemID.DEMON_TEAR, digits(eye.group(1))); else if (runes.matches()) {
                     long charges = digits(runes.group(1));
-                    components.put(ItemID.DEATHRUNE, multiplyExact(charges, 2L));
+                    components.put(ItemID.DEATHRUNE, multiplyExact(charges, 2));
                     components.put(ItemID.CHAOSRUNE, charges);
                 }
             } else if (surface.check != null) {

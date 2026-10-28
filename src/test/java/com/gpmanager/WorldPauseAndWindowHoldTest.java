@@ -71,6 +71,20 @@ public class WorldPauseAndWindowHoldTest
     }
 
     @Test
+    public void hardcoreWorldsPauseLikeOtherSeparateEconomies()
+    {
+        Engine engine = engine();
+        ReviewFixesTest.Plugin p = plugin(engine, new int[] {11});
+        p.client = clientOn(WorldType.HARDCORE_MAIN);
+        assertTrue("a Hardcore world is a separate economy", p.onUnsupportedWorld());
+        p.onGameTick(null);
+        assertTrue(engine.separate);
+        assertEquals(PauseReason.WORLD, engine.session().pauseReason());
+        p.client = clientOn(WorldType.MEMBERS);
+        assertFalse("a members world still tracks", p.onUnsupportedWorld());
+    }
+
+    @Test
     public void anExchangeOrTradeWindowHoldsTheActivityLabel()
     {
         ReviewFixesTest.Plugin p = plugin(engine(), new int[] {11});

@@ -78,7 +78,7 @@ public class HudTrayTest
             bones.state.tag.isEmpty());
         LiveContext hideCheap = new LiveContext(false, null, 1_000L, PvpState.NONE, "", false, "", false);
         assertFalse("below the minimum shown value, the dropped Bones stay hidden",
-            hideCheap.flowVisible(HudBuilder.flowOf(bones)));
+            hideCheap.flowVisible(new Flow(bones.item, bones.name, bones.quantity, bones.unitPrice, bones.value)));
         HudTray looting = new HudTray();
         looting.booked(receipt(T0, TransactionType.LOOT, flow(536, "Dragon bones", 1L, 2_000)), T0, false, T0);
         looting.booked(drop, T0 + 600L, false, T0 + 600L);

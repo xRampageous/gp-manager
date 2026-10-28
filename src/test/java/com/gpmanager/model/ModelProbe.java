@@ -29,7 +29,7 @@ public final class ModelProbe
         List<CorrectionRecord> active = new ArrayList<>();
         for (CorrectionRecord record : session.correctionHistory)
         {
-            if (record != null && !record.isUndone())
+            if (record != null && !record.undone)
             {
                 active.add(record);
             }

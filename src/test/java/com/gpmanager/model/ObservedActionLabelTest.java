@@ -23,7 +23,7 @@ public class ObservedActionLabelTest
             ActionLabel label = ActionLabel.fromSpellMenu("Cast", widgetId,
                 SPELLBOOK_GROUP, "<col=ff9040>  " + spell + "  </col>", "Cast");
             assertNotNull(spell, label);
-            assertEquals(spell, label.value());
+            assertEquals(spell, label.value);
         }
     }
 
@@ -70,7 +70,7 @@ public class ObservedActionLabelTest
             json.contains("\"observedActionLabel\":\"Ice Burst\""));
         Transaction loaded = gson.fromJson(json, Transaction.class);
         assertNotNull("a schema-105 receipt keeps its exact label", loaded.actionLabel());
-        assertEquals("Ice Burst", loaded.actionLabel().value());
+        assertEquals("Ice Burst", loaded.actionLabel().value);
         assertEquals(netBefore, loaded.net());
         assertEquals(countedBefore, loaded.counts());
         assertEquals(typeBefore, loaded.type());

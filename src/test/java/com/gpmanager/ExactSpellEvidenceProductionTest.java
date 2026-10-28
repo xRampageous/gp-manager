@@ -235,7 +235,7 @@ public class ExactSpellEvidenceProductionTest
         assertTrue(cast.counts());
         assertEquals(ActionKind.CAST, cast.action());
         assertNotNull("the two-stage interaction keeps its exact spell", cast.actionLabel());
-        assertEquals("Ice Burst", cast.actionLabel().value());
+        assertEquals("Ice Burst", cast.actionLabel().value);
         assertEquals(-180L, cast.net());
         assertEquals("rune accounting is untouched", 3, cast.flows().size());
         assertEquals("the spell spend stays a supply",
@@ -255,7 +255,7 @@ public class ExactSpellEvidenceProductionTest
 
         assertNotNull(cast);
         assertNotNull(cast.actionLabel());
-        assertEquals("Ice Barrage", cast.actionLabel().value());
+        assertEquals("Ice Barrage", cast.actionLabel().value);
         assertEquals("Ice Barrage", recentFor(harness, cast.id()).name);
     }
 
@@ -271,7 +271,7 @@ public class ExactSpellEvidenceProductionTest
         assertNotNull(cast);
         assertNotNull(cast.actionLabel());
         assertEquals("a later selection replaces the earlier evidence",
-            "Ice Barrage", cast.actionLabel().value());
+            "Ice Barrage", cast.actionLabel().value);
     }
 
     @Test
@@ -299,7 +299,7 @@ public class ExactSpellEvidenceProductionTest
         Transaction burst = harness.cast("Ice Burst", "Vengeance", ICE_BURST_RUNES, T0 + 100L);
         assertNotNull(burst);
         assertEquals("the NPC name is not spell evidence",
-            "Ice Burst", burst.actionLabel().value());
+            "Ice Burst", burst.actionLabel().value);
 
         Harness plain = harness("Vorkath");
         plain.targetNamed("Ice Burst");
@@ -332,7 +332,7 @@ public class ExactSpellEvidenceProductionTest
 
         assertNotNull(cast);
         assertNotNull(cast.actionLabel());
-        assertEquals("Vengeance", cast.actionLabel().value());
+        assertEquals("Vengeance", cast.actionLabel().value);
     }
 
     @Test
@@ -345,7 +345,7 @@ public class ExactSpellEvidenceProductionTest
 
         assertNotNull(cast);
         assertNotNull(cast.actionLabel());
-        assertEquals("High Level Alchemy", cast.actionLabel().value());
+        assertEquals("High Level Alchemy", cast.actionLabel().value);
     }
 
     @Test
@@ -364,7 +364,7 @@ public class ExactSpellEvidenceProductionTest
 
         assertNotNull("booked schema-105 labels survive the presentation owner fence",
             cast.actionLabel());
-        assertEquals("Ice Burst", cast.actionLabel().value());
+        assertEquals("Ice Burst", cast.actionLabel().value);
         assertEquals(net, cast.net());
         assertEquals(flows, cast.flows().size());
         assertEquals(TransactionType.CONSUMPTION, cast.type());

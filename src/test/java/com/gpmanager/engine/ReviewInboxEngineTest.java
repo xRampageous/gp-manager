@@ -67,9 +67,9 @@ public class ReviewInboxEngineTest
         assertEquals(Correction.AUTO, find(restored, second.id()).correction());
         assertEquals(Correction.COST, find(restored, handCorrected.id()).correction());
         assertEquals(-50L, restored.metrics(now + 1L).net);
-        assertTrue(restored.correctionHistory.get(restored.correctionHistory.size() - 1).isUndone());
+        assertTrue(restored.correctionHistory.get(restored.correctionHistory.size() - 1).undone);
         assertTrue(engine.undoCorrection());
-        assertTrue(latestDecision(engine).isUndone());
+        assertTrue(latestDecision(engine).undone);
     }
 
     @Test

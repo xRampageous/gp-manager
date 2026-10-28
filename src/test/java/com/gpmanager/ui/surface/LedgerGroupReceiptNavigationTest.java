@@ -168,6 +168,55 @@ public class LedgerGroupReceiptNavigationTest
     // ── metadata and honesty ──────────────────────────────────────────────────────────────────
 
     @Test
+    public void claimedLootKeyKeepsItsEntryAndOriginalFlowsButOnlyShowsReceivedItems() throws Exception
+    {
+        java.util.function.LongSupplier clock = SafeMath.clock;
+        SafeMath.clock = () -> T0 + 2000;
+        try {
+        for (int lootKinds : new int[]{1, 2}) {
+            Engine engine = new Engine(delta -> Collections.emptyList(), new TransactionClassifier(), new GpManagerConfig() {});
+            engine.ensureSession(T0);
+            List<Flow> flows = new ArrayList<>();
+            flows.add(new Flow(26651, "Loot key", -1, 0, 0, PriceSource.DEFERRED_CLAIM));
+            flows.add(new Flow(26219, "Osmumten's fang", 1, 20_000, 20_000));
+            if (lootKinds == 2) flows.add(new Flow(6737, "Berserker ring", 1, 5_000, 5_000));
+            Transaction receipt = Tx.of(T0 + 1000, TransactionType.PK_LOOT, Context.PK_LOOT, "Looted key", true, flows);
+            engine.session().addTransaction(receipt, 2000, false);
+            String before = new com.google.gson.Gson().toJson(engine.exportState());
+            LedgerData overview = LedgerData.capture(engine, T0 + 2000, LedgerData.Entry.current());
+            assertEquals(1, overview.income.groups.size());
+            Semantics.Group group = overview.income.groups.get(0);
+            assertEquals("Loot key", group.name);
+            assertEquals(lootKinds == 1 ? 20_000 : 25_000, group.value);
+            LedgerData detail = LedgerData.capture(engine, T0 + 2000,
+                LedgerData.Entry.current().withSelection(null, null, group.id));
+            LedgerPage page = page(detail);
+            assertEquals(lootKinds, page.detailItems.rows.size());
+            assertTrue("a single received item still has its item list", page.detailItems.getParent() == page.detail);
+            assertTrue(page.detailItems.rows.stream().noneMatch(row -> row.name.equals("Loot key")));
+            assertTrue(receipt.flows().stream().anyMatch(flow -> flow.item == 26651 && flow.quantity == -1));
+            assertEquals(before, new com.google.gson.Gson().toJson(engine.exportState()));
+        }
+        } finally { SafeMath.clock = clock; }
+    }
+
+    @Test
+    public void anUnclaimedLootKeyStillOpensItsNeutralItem() throws Exception
+    {
+        Engine engine = KillViewTest.nativeEngine();
+        String encounter = engine.session().addEncounter(true, T0);
+        Transaction key = KillViewTest.key(engine, encounter, 26651);
+        LedgerData.Entry query = LedgerData.Entry.current().live(Semantics.Table.KILL);
+        LedgerData overview = LedgerData.capture(engine, T0 + 2000, query);
+        Semantics.Group group = overview.income.groups.get(0);
+        assertTrue(group.incomplete());
+        LedgerPage page = page(LedgerData.capture(engine, T0 + 2000, query.withSelection(null, null, group.id)));
+        assertEquals(1, page.detailItems.rows.size());
+        assertTrue(page.detailItems.rows.get(0).name.contains("Loot key"));
+        assertFalse(key.counts());
+    }
+
+    @Test
     public void marketGroupMetadataHasNoResourceTypeNoise() throws Exception
     {
         Market market = new Market();

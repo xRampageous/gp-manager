@@ -85,7 +85,9 @@ public class PvmBagRecoveryTest {
         assertEquals(-6,e.metrics(4000).net);
         assertFalse(e.death.items.containsKey(11941));
         assertEquals(697,e.deathStatus().items);
-        var view=LedgerData.capture(e,4000,LiveCategoryLayoutTest.category(DeathViewTest.death()));
+        assertTrue(LedgerData.capture(e,4000,LiveCategoryLayoutTest.category(DeathViewTest.death()))
+                .cost.groups.isEmpty());
+        var view=LedgerData.capture(e,4000,LedgerData.Entry.current().withCostView(LedgerData.CostView.LOSS));
         assertEquals(-6,view.cost.total);
         assertEquals("Death: PvE",view.cost.groups.get(0).name);
         PvpGravestoneTest.settle(e,BAG,5000);

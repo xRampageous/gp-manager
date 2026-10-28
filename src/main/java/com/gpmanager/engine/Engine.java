@@ -274,7 +274,7 @@ class Engine {
      * corrections stay unchanged, and an unchanged second pass does not advance the revision.
      */
     synchronized void recheck(IntUnaryOperator alchPrice) {
-        boolean changed = false;
+        boolean changed = repairLegacyGraves();
         var drops = new ArrayList<Runnable>();
         for (var session : sessions()) {
             for (var row : session.transactions()) {
@@ -318,6 +318,28 @@ class Engine {
         return needsReview(row) && row.action() == DRINK && !Contribution.isSplit(row)
                 && msg("consumed-dose").equals(row.explanation());
     }
+
+    /** One-time repair of historical gear booked as income after a grave claim. */
+    boolean repairLegacyGraves() {
+        boolean repaired = false;
+        for (var session : sessions()) {
+            var held = session.transactions().stream()
+                    .filter(row -> row.type() == TransactionType.PK_DEATH_LOSS
+                            || row.note().equals(msg("death-items"))
+                            || row.note().equals(msg("death-reclaim-items"))
+                            || row.note().equals(msg("pvm-loss")))
+                    .flatMap(row -> row.flows().stream()).map(flow -> flow.item).collect(
+                            java.util.stream.Collectors.toSet());
+            if (session.pk().deaths > 0) held.addAll(PVP_GRAVE);
+            for (var row : session.transactions())
+                if (row.correction() == AUTO
+                        && (row.type() == TransactionType.GAIN || row.type() == TransactionType.LOOT)
+                        && !row.flows().isEmpty()
+                        && row.flows().stream().allMatch(flow -> flow.gain() && held.contains(flow.item)))
+                    repaired |= session.correctTransaction(row.id(), IGNORE, msg("death-reclaim-items"));
+        }
+        return repaired;
+    }
     Set<String> decisions(Session session) {
         if (session.correctionHistory == null) return null;
         var decided = new HashSet<String>();
@@ -332,7 +354,7 @@ class Engine {
     }
     /** Publishes a verified dose pair atomically from the bounded pending queue. */
     boolean recoverDose(Session session, Transaction row, long at) {
-        if (!delayedDose(row) || row.original() != UNCERTAIN || row.autoCounted() || row.context() != GENERIC
+        if (!delayedDose(row) || row.original() != UNCERTAIN || row.counted || row.context() != GENERIC
                 || !row.note().isEmpty() || row.onGround() || !row.claimId().isEmpty()
                 || !row.encounterId().isEmpty() || row.flows().size() != 2) return false;
         var decided = decisions(session);
@@ -869,6 +891,21 @@ class Engine {
                 || id == TWPART4;
     }
 
+    /** Balls already inside a deployed cannon before this window; their return is neutral. */
+    int cannonSeed;
+
+    /** Seeds deployed parts/ammo from the native counters on a cannon interaction. */
+    synchronized void syncCannon(int parts, int balls, boolean decayed) {
+        if (decayed) {
+            cannonSeed = 0;
+            events.drop(DROPPED, e -> !cannonball(e.item));
+            return;
+        }
+        if (parts != 4) return;
+        long loaded = events.all(DROPPED).stream().filter(e -> cannonball(e.item)).mapToLong(e -> e.qty).sum();
+        cannonSeed = max(cannonSeed, balls - (int) loaded);
+    }
+
     /** Money evidence is owner-checked and consumed under the booking monitor. */
     synchronized void bagged(Observation e, long qty) {
         if (e.owner != events.owner) return;
@@ -1360,7 +1397,7 @@ class Engine {
             pieceNet.merge(part, quantity, SafeMath::sum);
         }
         // Unrecognized families default to a nonzero net and cannot be paired.
-        var stepped = claim(flows, flow -> pieceNet.getOrDefault(piece(flow), 1L) == 0,
+        var stepped = claim(flows, flow -> pieceNet.getOrDefault(piece(flow), 1L) == 0L,
                         (flow, quantity) -> flow.gain() ? quantity - take(keep, flow.item, quantity) : quantity);
         return stepped.isEmpty() ? null : bookNeutral(
                         now, msg("barrows-wear"), "Equipment", stepped, msg("barrows-gear"), null);
@@ -1376,7 +1413,7 @@ class Engine {
                 || gains(flows, id -> id == KRAKEN_TENTACLE).isEmpty()) return null;
         var pair = claim(flows, flow -> flow.item == ABYSSAL_TENTACLE ? flow.cost()
                                         : flow.item == KRAKEN_TENTACLE && flow.gain(),
-                        (flow, quantity) -> 1L);
+                        (flow, quantity) -> 1);
         return bookCharge(now, msg("tentacle-used"), CONFIRMED, msg("tentacle-whip"), pair, null, false);
     }
 
@@ -1385,6 +1422,12 @@ class Engine {
         if (events.peek(CANNON) == null) return null;
         var parts = claim(flows, flow -> pattern("cannon").matcher(flow.name).matches(),
                         (flow, quantity) -> quantity);
+        var seeded = claim(flows, flow -> flow.gain() && cannonball(flow.item), (flow, quantity) -> {
+            long take = min(quantity, cannonSeed);
+            cannonSeed -= take;
+            return take;
+        });
+        parts.addAll(seeded);
         return parts.isEmpty() ? null : bookNeutral(now, msg("cannon-parts"), "Cannon", parts, msg("cannon-why"), null);
     }
 
@@ -2156,7 +2199,7 @@ class Engine {
 
         DecisionPreview(Decision decision, List<String> ids, long net, long revision) {
             this.decision = decision;
-            transactionIds = unmodifiableList(new ArrayList<>(ids));
+            transactionIds = frozenList(ids);
             netDelta = net;
             this.revision = revision;
         }
@@ -2277,8 +2320,8 @@ class Engine {
         var spell = cast == null ? null : cast.label;
         var previous = this.cast == null ? null : this.cast.label;
         if (pending != null && !pending.equals(current) && cast != null && cast != this.cast
-                && !Objects.equals(previous == null ? null : previous.value(),
-                        spell == null ? null : spell.value())) {
+                && !Objects.equals(previous == null ? null : previous.value,
+                        spell == null ? null : spell.value)) {
             // The previous complete tick belongs to the earlier spell. Settle it before
             // accepting the new cast's snapshot, even inside the stabilization window.
             var prior = settle(pending, now, additional);
@@ -2458,7 +2501,7 @@ class Engine {
                 || batch.context == MARKET || batch.context == PRODUCTION || batch.context == TRANSFER
                 || kind == FIRE && batch.intent == CAST
                 || kind == CAST && (batch.label != null
-                                && !product(named(batch.label.value())).isEmpty()
+                                && !product(named(batch.label.value)).isEmpty()
                         || batch.intent == CAST && batch.flows.stream().anyMatch(flow -> flow.cost()
                                         && !isRune(flow.name) && !isAmmo(flow.name))))
             return null;
@@ -2491,7 +2534,7 @@ class Engine {
      */
     Transaction settleSpell(Settle batch) {
         Set<Integer> product = batch.used && batch.label != null
-                        ? product(named(batch.label.value())) : emptySet();
+                        ? product(named(batch.label.value)) : emptySet();
         var legs = new ArrayList<Flow>();
         for (Flow flow : batch.flows)
             if (flow.cost() || product.contains(flow.item)) legs.add(flow);
@@ -3077,7 +3120,7 @@ class Engine {
             if (transaction.action() == CAST && batch.label != null)
                 transaction.setActionLabel(batch.label);
             if (transaction.action() == CAST && batch.spell != null)
-                transaction.observedSpellName = named(batch.spell.value());
+                transaction.observedSpellName = named(batch.spell.value);
         }
         if (type == CONSUMPTION && !batch.destroy && transaction.action() == null && !batch.flows.isEmpty()
                 && batch.flows.stream().allMatch(flow -> flow.cost() && cannonball(flow.item)))
@@ -3276,8 +3319,9 @@ class Engine {
         clearPriming();
         clearContext();
         resetHelpers();
-        events.drop(PRIVATE_LOOT, LOOT_RESERVE, DISMANTLE_CLICK, CONSUME, SPENT_CONSUME, DROP_CLICK, DROPPED,
+        events.drop(PRIVATE_LOOT, LOOT_RESERVE, DISMANTLE_CLICK, CONSUME, SPENT_CONSUME, DROP_CLICK,
                 CAST_SPELL, MANUAL_SPELL);
+        events.drop(DROPPED, e -> cannonball(e.item));
     }
 
     static boolean groundDart(Flow flow) {
@@ -3398,6 +3442,7 @@ class Engine {
     synchronized void clearEphemera() {
         clearCollect();
         resetHelpers();
+        cannonSeed = 0;
         death.ticks = 0;
         death.service = null;
     }
@@ -3595,7 +3640,7 @@ class Engine {
     }
 
     synchronized List<Session> history() {
-        return unmodifiableList(new ArrayList<>(history));
+        return frozenList(history);
     }
 
     synchronized Session historySession(String id) {
@@ -3978,7 +4023,7 @@ class Engine {
 @AllArgsConstructor
 class LootMatch {
     static final LootMatch NONE = new LootMatch(false, "", "General", GENERIC, null,
-                    Collections.<Integer, Long>emptyMap(), emptyList());
+                    emptyMap(), emptyList());
     boolean matched;
     String note, activityName;
     Context context;
@@ -4158,6 +4203,10 @@ class Inbox {
 
     synchronized void drop(int... kinds) {
         for (int kind : kinds) open.removeIf(e -> e.kind == kind);
+    }
+
+    synchronized void drop(int kind, Predicate<Observation> keep) {
+        open.removeIf(e -> e.kind == kind && !keep.test(e));
     }
 
     synchronized void tick(int tick) {
@@ -4621,10 +4670,10 @@ class DeathReclaimLifecycle {
             held.merge(item.itemId, item.quantity(), SafeMath::sum);
         held.keySet().removeIf(MinigameItems::isMinigameOnly);
         held = new HashMap<>(cash(held));
-        wipe = min(DEATH_WIPE_WINDOW_TICKS, pending.wipeTicksRemaining());
+        wipe = min(DEATH_WIPE_WINDOW_TICKS, max(0, pending.wipeTicksRemaining));
         this.held = wipe > 0 && !held.isEmpty() ? held : null;
         wipe = this.held == null ? 0 : wipe;
-        age = pending.gravestoneAgeTicks();
+        age = max(0, pending.gravestoneAgeTicks);
         awaitingReclaim = this.held != null || !items.isEmpty() && age < AWAIT_TICKS;
     }
 
@@ -5424,7 +5473,7 @@ class TrackedBasisLedger {
     /** The contribution the transaction would have under {@code correction} with {@code flows}. */
     Map<Integer, long[]> contribution(Transaction transaction, Correction decision, List<Flow> flows) {
         return flows == null || financialDose(transaction) ? new LinkedHashMap<>() : contribution(transaction.original(),
-                        effectiveCounted(transaction.autoCounted(), decision), decision, flows);
+                        effectiveCounted(transaction.counted, decision), decision, flows);
     }
 
     /** The row's sinks as it is booked now. */
@@ -5436,7 +5485,7 @@ class TrackedBasisLedger {
         // A drop or a shot still on the ground is not a use yet: picking it up shrinks the row. It
         // depletes the pool when its pickup window closes (Engine#settleGround).
         if (transaction.onGround() || financialDose(transaction)) return new LinkedHashMap<>();
-        return sinks(transaction.original(), effectiveCounted(transaction.autoCounted(), decision),
+        return sinks(transaction.original(), effectiveCounted(transaction.counted, decision),
                 decision, flows);
     }
 
@@ -6840,7 +6889,7 @@ class GeCustodyLedger {
     }
 
     synchronized List<GeOffer> records() {
-        return unmodifiableList(new ArrayList<>(records));
+        return frozenList(records);
     }
 
     /**

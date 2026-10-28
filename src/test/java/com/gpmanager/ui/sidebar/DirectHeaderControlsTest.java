@@ -185,7 +185,7 @@ public class DirectHeaderControlsTest {
             panel.shell.show(Shell.GRINDS);
             SidebarPanelProbe.refresh(panel);
             click(panel.plans.caption);
-            assertEquals("the running name opens Live", Shell.LIVE, panel.shell.currentPage());
+            assertEquals("the running name opens Live", Shell.LIVE, panel.shell.current);
             panel.engine.togglePause(NOW + 2L);
             panel.shell.show(Shell.GRINDS);
             SidebarPanelProbe.refresh(panel);

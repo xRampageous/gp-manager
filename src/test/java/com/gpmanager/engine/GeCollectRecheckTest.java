@@ -81,7 +81,7 @@ public class GeCollectRecheckTest
             assertSame(TransactionType.UNCERTAIN, row.original());
             assertEquals("Grand Exchange", row.note());
             assertEquals(msg("ge-movement"), row.explanation());
-            assertFalse(row.autoCounted());
+            assertFalse(row.counted);
         }
         assertSame("the owner's Count stays theirs", Correction.REVENUE, counted.correction());
         assertEquals("nothing changed", revision, engine.revision());

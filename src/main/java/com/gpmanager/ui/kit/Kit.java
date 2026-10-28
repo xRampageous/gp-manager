@@ -29,6 +29,7 @@ import static com.gpmanager.Kit.*;
 import static com.gpmanager.Phrases.*;
 import static java.lang.Math.*;
 import static java.util.Collections.*;
+import static java.util.Arrays.*;
 import java.awt.*;
 import java.awt.event.*;
 import java.awt.image.BufferedImage;
@@ -173,22 +174,13 @@ class Kit {
     }
 
     /** Text is Inter (GE Uncut direction); the bundled OFL files fall back to RuneLite's fonts. */
-    static Font small() {
-        return SMALL_TXT;
-    }
 
-    static Font body() {
-        return BODY_TXT;
-    }
 
-    static Font bold() {
-        return BOLD_TXT;
-    }
 
-    private static final Font BODY_TXT =
+    static final Font bodyFont =
             loaded("/com/gpmanager/fonts/Inter-Regular.ttf", 12.5f, FontManager.getRunescapeFont());
-    private static final Font SMALL_TXT = BODY_TXT.deriveFont(11f);
-    private static final Font BOLD_TXT = loaded("/com/gpmanager/fonts/Inter-SemiBold.ttf", 12.5f,
+    static final Font smallFont = bodyFont.deriveFont(11f);
+    static final Font boldFont = loaded("/com/gpmanager/fonts/Inter-SemiBold.ttf", 12.5f,
                     FontManager.getRunescapeBoldFont());
 
     /** A bundled resource face when the build ships it; else the RuneLite font. */
@@ -220,7 +212,7 @@ class Kit {
 
     /** The empty table line, with the existing font, tone and inset dimensions. */
     static JLabel emptyLine(String text) {
-        var label = label(text, small(), LABEL);
+        var label = label(text, smallFont, LABEL);
         pad(label, 3, 6, 3, 6);
         return label;
     }
@@ -351,7 +343,7 @@ class Kit {
     /** Wrapped small text; a sheet's narrower box uses a smaller width so nothing is cut. */
     static JLabel note(String text, Color color, int width) {
         String safe = (string(text)).replace("&", "&amp;").replace("<", "&lt;");
-        var label = label("<html><div style='width:" + width + "px'>" + safe + "</div></html>", small(), color);
+        var label = label("<html><div style='width:" + width + "px'>" + safe + "</div></html>", smallFont, color);
         pad(label, 0, GAP, 0, GAP);
         return label;
     }
@@ -486,7 +478,7 @@ class Kit {
     /** A flat text button; {@code primary} draws the brand-orange border. */
     static JButton button(String text, boolean primary, Runnable action) {
         var button = new JButton(text);
-        button.setFont(small());
+        button.setFont(smallFont);
         button.setForeground(TEXT);
         button.setBackground(CARD);
         button.setBorder(createCompoundBorder(createLineBorder(primary ? ACCENT : LINE),
@@ -556,7 +548,7 @@ class KeyValue extends JPanel {
         super(new BorderLayout());
         setBackground(CARD);
         if (title != null) {
-            var header = label(title, small(), LABEL);
+            var header = label(title, smallFont, LABEL);
             header.setBorder(createCompoundBorder(createMatteBorder(0, 0, 1, 0, LINE),
                             createEmptyBorder(0, 6, 0, 6)));
             header.setPreferredSize(new Dimension(0, HEADER));
@@ -583,10 +575,10 @@ class KeyValue extends JPanel {
         line.setPreferredSize(new Dimension(0, ROW));
         line.setMaximumSize(new Dimension(Integer.MAX_VALUE, ROW));
         // The key keeps its width; a value too long for the rest ends in "…" and hovers in full.
-        line.add(label(key, small(), LABEL), WEST);
+        line.add(label(key, smallFont, LABEL), WEST);
         char first = value.isEmpty() ? ' ' : value.charAt(0);
         boolean numeral = Character.isDigit(first) || first == '−' || first == '-' || first == '+';
-        var shown = label(value, numeral ? numbers(11.5f) : body(), (tone == null ? PLAIN : tone).color);
+        var shown = label(value, numeral ? numbers(11.5f) : bodyFont, (tone == null ? PLAIN : tone).color);
         shown.setHorizontalAlignment(SwingConstants.RIGHT);
         shown.setToolTipText(exact == null ? value : exact);
         line.add(shown, CENTER);
@@ -626,13 +618,13 @@ class Hero extends JPanel {
 
     }
 
-    JLabel dot = label("●", body(), OFF), name = label("", bold(), Color.WHITE), word = label("", small(), LABEL);
+    JLabel dot = label("●", bodyFont, OFF), name = label("", boldFont, Color.WHITE), word = label("", smallFont, LABEL);
     JPanel icons = transparent(new FlowLayout(FlowLayout.RIGHT, 0, 0));
 
     /** Net in the GP/h face at its own size: RuneLite's pixel fonts blur when scaled. */
-    JLabel net = label("", bold(), TEXT);
+    JLabel net = label("", boldFont, TEXT);
 
-    JLabel rate = label("", bold(), TEXT), clock = label("", small(), LABEL);
+    JLabel rate = label("", boldFont, TEXT), clock = label("", smallFont, LABEL);
 
     /**
      * A slim line under the Net: the run's whole total while Live counts fresh, and Risk where you
@@ -658,7 +650,7 @@ class Hero extends JPanel {
         left.add(dot, WEST);
         left.add(name, CENTER);
         status.add(left, CENTER);
-        word.setFont(small().deriveFont(10f));
+        word.setFont(smallFont.deriveFont(10f));
         word.setBorder(createCompoundBorder(createLineBorder(LINE),
                         createEmptyBorder(2, 3, 2, 3)));
         statusRight.add(icons);
@@ -701,7 +693,7 @@ class Hero extends JPanel {
         word.setText(state.isEmpty() ? "" : state.substring(0, 1) + state.substring(1).toLowerCase(ROOT));
         word.setVisible(!word.getText().isEmpty());
         String text = string(title);
-        name.setText(fitShrinking(name, text, bold(), nameBudget()));
+        name.setText(fitShrinking(name, text, boldFont, nameBudget()));
         name.setToolTipText(text.isEmpty() ? null : text);
         return this;
     }
@@ -735,7 +727,7 @@ class Hero extends JPanel {
         var previous = focused(icons);
         icons.removeAll();
         for (Cell cell : next) {
-            var icon = label(cell.value, small(), cell.tone.color);
+            var icon = label(cell.value, smallFont, cell.tone.color);
             // Keep the quiet status counts separated without widening the activity header.
             pad(icon, 0, 4, 0, 0);
             icon.setToolTipText(cell.tip);
@@ -812,7 +804,7 @@ class Hero extends JPanel {
         var box = new JPanel(new BorderLayout());
         box.setBackground(CARD);
         pad(box, 2, 5, 3, 5);
-        box.add(label(cell.label, small(), LABEL), NORTH);
+        box.add(label(cell.label, smallFont, LABEL), NORTH);
         box.add(label(cell.value, numbers(11f), cell.tone.color), CENTER);
         box.setToolTipText(cell.tip);
         clickable(box, "View " + cell.label, cell.open);
@@ -879,7 +871,7 @@ class Table extends JPanel {
     }
 
     JPanel header = new JPanel(new BorderLayout(GAP, 0));
-    JLabel arrow = label("▾", small(), LABEL), title = label("", small(), LABEL);
+    JLabel arrow = label("▾", smallFont, LABEL), title = label("", smallFont, LABEL);
     JLabel total = label("", numbers(10.5f), LABEL);
     JButton previous = glyphButton("‹"), next = glyphButton("›");
     JLabel counter = label("", numbers(10f), LABEL);
@@ -1115,7 +1107,7 @@ class Table extends JPanel {
             applyPager(counter, previous, next, page, pages(), (page + 1) + "/" + pages());
             addAll(parts, previous, counter, next);
         }
-        if (!parts.equals(Arrays.asList(right.getComponents()))) {
+        if (!parts.equals(asList(right.getComponents()))) {
             right.removeAll();
             for (Component part : parts) {
                 var gap = new GridBagConstraints();
@@ -1140,7 +1132,7 @@ class Table extends JPanel {
             icon.setPreferredSize(new Dimension(ICON_WIDTH, ICON_ROW));
             line.add(icon, WEST);
         }
-        line.add(label(row.name, body().deriveFont(11.5f), row.color == null ? TEXT : row.color), CENTER);
+        line.add(label(row.name, bodyFont.deriveFont(11.5f), row.color == null ? TEXT : row.color), CENTER);
         var numbers = transparent(new BorderLayout(row.qty.isEmpty() ? 0 : 4, 0));
         if (!row.qty.isEmpty()) {
             int qty = min(70, line.getFontMetrics(numbers(10.5f)).stringWidth(row.qty) + 2);
@@ -1179,7 +1171,7 @@ class Table extends JPanel {
 
     static JButton glyphButton(String glyph) {
         var button = new JButton(glyph);
-        button.setFont(small());
+        button.setFont(smallFont);
         button.setForeground(TEXT);
         pad(button, 0, 3, 0, 3);
         button.setContentAreaFilled(false);
@@ -1196,22 +1188,23 @@ class Table extends JPanel {
  */
 class Shell extends JPanel {
     /** A page contributes an optional toolbar and a scrolling body. */
-    interface Page {
-        String id();
+    static abstract class Page {
+        JPanel body = stack(PANEL, GAP);
+        public abstract String id();
 
         /** The row under the tabs; null when the page has none. */
-        JComponent pageBar();
+        public JComponent pageBar() { return null; }
 
-        JComponent body();
+        public JComponent body() { return body; }
 
         /** Account loading hides each page until its next snapshot is ready. */
-        default void visible(boolean shown) {
+        public void visible(boolean shown) {
             body().setVisible(shown);
             body().revalidate();
             if (pageBar() != null) pageBar().setVisible(shown);
         }
 
-        default void onShown() {}
+        public void onShown() {}
     }
 
     /** One button on a sheet. */
@@ -1244,7 +1237,7 @@ class Shell extends JPanel {
     Map<String, JScrollPane> scrolls = new LinkedHashMap<>();
     Map<String, Integer> scrollMemory = new LinkedHashMap<>();
     JPanel notice = new JPanel(new BorderLayout(GAP, 0));
-    JLabel message = label("", small(), TEXT);
+    JLabel message = label("", smallFont, TEXT);
     JPanel noticeAction = transparent(new BorderLayout());
     Timer timer = new Timer(4000, e -> {
         if (focused(notice) == null) dismiss();
@@ -1282,7 +1275,7 @@ class Shell extends JPanel {
                         return true;
                     });
             material.setHorizontalAlignment(SwingConstants.CENTER);
-            material.setFont(body());
+            material.setFont(bodyFont);
             buttons.put(tab[0], material);
             tabs.addTab(material);
         }
@@ -1416,9 +1409,6 @@ class Shell extends JPanel {
         repaint();
     }
 
-    String currentPage() {
-        return current;
-    }
 
     /** A plain notification from any thread; it shows on the Swing thread. */
     void tell(String title, String detail, boolean warning) {
@@ -1501,7 +1491,7 @@ class Shell extends JPanel {
         heading = title;
         sheet.setBorder(createCompoundBorder(createMatteBorder(1, 0, 0, 0, ACCENT),
                         createEmptyBorder(GAP, GAP, GAP, GAP)));
-        sheet.add(label(title, bold(), Color.WHITE));
+        sheet.add(label(title, boldFont, Color.WHITE));
         if (!empty(message)) {
             var note = note(message, LABEL, SHEET_TEXT);
             note.setBorder(null);
@@ -1529,7 +1519,7 @@ class Shell extends JPanel {
     void prompt(String title, String label, String initial, Consumer<String> onOk) {
         var field = new JTextField(string(initial));
         var content = stack(CARD, 2);
-        content.add(label(label, small(), LABEL));
+        content.add(label(label, smallFont, LABEL));
         content.add(field);
         Runnable ok = () -> {
                     String value = field.getText().trim();
@@ -1638,7 +1628,7 @@ class Fmt {
         long multiplier = 1;
         if (text.endsWith("k") || text.endsWith("m") || text.endsWith("b")) {
             char suffix = text.charAt(text.length() - 1);
-            multiplier = suffix == 'k' ? 1000 : suffix == 'm' ? 1_000_000L : 1_000_000_000L;
+            multiplier = suffix == 'k' ? 1000 : suffix == 'm' ? 1_000_000 : 1_000_000_000;
             text = text.substring(0, text.length() - 1).trim();
         }
         try {
@@ -1684,7 +1674,7 @@ class Fmt {
         return (value > 0 ? "+" : "") + exact(value).replace('-', '−');
     }
 
-    static String exact(long value) {
+    static synchronized String exact(long value) {
         return EXACT.format(value);
     }
 
@@ -1754,7 +1744,7 @@ class Fmt {
 
     /** {@code ×27} quantity marker. */
     static String times(long quantity) {
-        return "×" + EXACT.format(abs(quantity));
+        return "×" + exact(abs(quantity));
     }
 
     /** {@code 62%} clamped. */
@@ -1826,9 +1816,6 @@ class HudBuilder {
     volatile String interaction = "";
     volatile HudFrame current = HudFrame.HIDDEN;
 
-    HudFrame current() {
-        return current;
-    }
 
     /**
      * A factory reset replaced the bound profile: every presentation trace of the old trip is
@@ -1857,9 +1844,6 @@ class HudBuilder {
     }
 
     /** The fight target; the shared activity label reads only whether there is one. */
-    String target() {
-        return interaction;
-    }
 
     /** The panel's display filter, for highlighted names; null highlights nothing. */
     RecentFilter filter;
@@ -1932,7 +1916,7 @@ class HudBuilder {
         long shownAt = 0;
         int hidden = 0;
         for (HudTray.Entry entry : tray.entries()) {
-            if (visible.test(flowOf(entry))) {
+            if (visible.test(new Flow(entry.item, entry.name, entry.quantity, entry.unitPrice, entry.value))) {
                 listed.add(entry);
                 shownAt = max(shownAt, entry.seen);
             } else if (entry.state != TRADED)
@@ -1960,7 +1944,7 @@ class HudBuilder {
         if (open && hidden > 0)
             footer = (footer.isEmpty() ? "" : footer + " · ") + "+" + hidden + " hidden";
         String context = contextLine(snapshot);
-        if (snapshot.reviews == 0 && snapshot.returns == 0 && snapshot.targetUntil > 0
+        if (snapshot.reviews == 0 && snapshot.targetUntil > 0
                 && snapshot.milestone != null) {
             long left = snapshot.targetUntil - now;
             if (left <= 0) context = "";
@@ -1990,8 +1974,8 @@ class HudBuilder {
     }
 
     /**
-     * Needs review, else Reclaim waiting. Pace, PvP streak, skull and risk live in the sidebar
-     * (owner 2026-09-28, 1.1); the PvP gem marks danger. Sets {@link #lineColor}.
+     * Needs review, else the current milestone state. Pace, PvP streak, skull and risk live in the
+     * sidebar (owner 2026-09-28, 1.1); the PvP gem marks danger. Sets {@link #lineColor}.
      */
     String contextLine(LiveSnapshot snapshot) {
         color = DIM.color;
@@ -2000,8 +1984,6 @@ class HudBuilder {
             return "(!) " + snapshot.reviews
                     + (snapshot.reviews == 1 ? " item needs review" : " items need review");
         }
-        if (snapshot.returns > 0)
-            return "Reclaim waiting · " + snapshot.returns + (snapshot.returns == 1 ? " item" : " items");
         if (snapshot.milestoneReached() || snapshot.milestone != null && snapshot.targetUntil > 0) {
             color = GAIN.color;
             return "Milestone reached · " + compact(snapshot.milestone);
@@ -2014,12 +1996,6 @@ class HudBuilder {
         return entry.state != PENDING && entry.state != TRADED;
     }
 
-    static Flow flowOf(HudTray.Entry entry) {
-        // A hidden item stays off the tray whichever way it moved (owner 2026-09-28: a dropped one
-        // too).
-        return new Flow(entry.item, entry.name, entry.quantity, entry.unitPrice,
-                entry.value);
-    }
 
     HudFrame.Row row(HudTray.Entry entry) {
         // "(u)" is the game's own short form for uncharged, as in "Craw's bow (u)" (owner 1.2).
@@ -2038,7 +2014,7 @@ class HudBuilder {
                 value = (entry.value < 0 ? exactSigned(entry.value) : exact(entry.value)) + " " + quantity;
             }
         }
-        var row = new HudFrame.Row(icon, name, entry.state.tag, value, name.isEmpty() && highlight != null ? highlight : color(entry),
+        var row = new HudFrame.Row(icon, name, entry.state.tag, value, name.isEmpty() && highlight != null ? highlight : (entry.gold ? GOLD : entry.state == LOST ? LOSS.color : entry.state == TRADED ? MARKET.color : counted(entry) ? GAIN.color : DIM.color),
                 entry.gold, entry.born, highlight);
         row.narrow = narrow;
         return row;
@@ -2052,10 +2028,6 @@ class HudBuilder {
                 : counted(entry) || entry.state == TRADED ? signed(entry.value) : compact(entry.value);
     }
 
-    static Color color(HudTray.Entry entry) {
-        return entry.gold ? GOLD : entry.state == LOST ? LOSS.color : entry.state == TRADED ? MARKET.color
-                                : counted(entry) ? GAIN.color : DIM.color;
-    }
 
     /**
      * The tray heading; a kill streak adds its Net per kill (owner 1.1: the hover panel is gone).
@@ -2082,8 +2054,8 @@ class HudBuilder {
     String timer(long ms) {
         if (config.hudTimer() == GpManagerConfig.HudTimer.Full) return clock(ms);
         long total = positive(ms) / 1000, hours = total / 3600, minutes = total % 3600 / 60;
-        return hours > 0 ? String.format(ROOT, "%dh%02dm", hours, minutes)
-                : String.format(ROOT, "%dm%02ds", minutes, total % 60);
+        return hours > 0 ? format(ROOT, "%dh%02dm", hours, minutes)
+                : format(ROOT, "%dm%02ds", minutes, total % 60);
     }
 
     static Color tone(long value) {
@@ -2241,7 +2213,7 @@ class HudOverlay extends Overlay {
     }
 
     public Dimension render(Graphics2D g) {
-        var frame = builder.current();
+        var frame = builder.current;
         if (!frame.visible) return null;
         fonts();
         var fb = g.getFontMetrics(body);
@@ -2758,7 +2730,7 @@ class HudTray {
             if (kills > 0) {
                 // The new target's first kill refreshes the tray to its own streak; loot already
                 // booked before any kill stays (owner 2026-10-01).
-                boolean back = has(previous, name) && now - prevEventAt < quietMillis();
+                boolean back = has(previous, name) && now - prevEventAt < keepMillis;
                 var rows = new LinkedHashMap<>(entries);
                 var previous = new LinkedHashSet<>(counts);
                 int had = kills, trip = tripId;
@@ -2795,7 +2767,7 @@ class HudTray {
      * The live kill streak ("Guard & Man", 5), or null before a kill or once the streak went quiet.
      */
     synchronized Map.Entry<String, Integer> streak(long now) {
-        return kills == 0 || now - eventAt >= quietMillis() ? null
+        return kills == 0 || now - eventAt >= keepMillis ? null
                 : new AbstractMap.SimpleImmutableEntry<>(names(), kills);
     }
 
@@ -2871,7 +2843,7 @@ class HudTray {
      * rows keep for the whole session. Folding only hides the tray; it never ends a streak.
      */
     void event(long now, boolean xy, String kind, String npc) {
-        if (eventAt > 0 && now - eventAt >= quietMillis() || kind != null && !kind.equals(label)
+        if (eventAt > 0 && now - eventAt >= keepMillis || kind != null && !kind.equals(label)
                 || npc != null && !counts.isEmpty() && !has(counts, npc))
             restart(xy);
         if (kind != null) label = kind;
@@ -2907,9 +2879,6 @@ class HudTray {
         keepMillis = max(10000, min(3_600_000, ms));
     }
 
-    long quietMillis() {
-        return keepMillis;
-    }
 
     long take(State from, int id, long quantity) {
         Entry source = entries.get(key(from, id));
@@ -3020,7 +2989,7 @@ class HudTray {
  * them with its short facts and one Correct ▾ menu. Corrections always target one exact canonical
  * receipt id.
  */
-class LedgerPage implements Shell.Page {
+class LedgerPage extends Shell.Page {
     enum CorrectionOutcome {
         APPLIED, REFUSED, STALE
     }
@@ -3070,11 +3039,11 @@ class LedgerPage implements Shell.Page {
     boolean raid;
     JLabel note(String text, Color color) { return Kit.note(text, color, noteWidth); }
     Actions actions;
+    Function<Runnable, Runnable> protect = Function.identity();
     Function<Integer, BufferedImage> sprites;
     Map<Integer, ImageIcon> icons = new HashMap<>();
     JPanel bar = new JPanel(new BorderLayout(4, 0));
     JButton scope, more;
-    JPanel body = stack(PANEL, GAP);
     IconTextField search = new IconTextField();
     Table income = new Table("GAINS"), cost = new Table("LOSSES"), market = new Table("TRADE");
     Table pending = new Table("PENDING"), review = new Table("REVIEW");
@@ -3151,9 +3120,6 @@ class LedgerPage implements Shell.Page {
         return bar;
     }
 
-    public JComponent body() {
-        return body;
-    }
 
     /** Reset presentation-only state before another owner is shown. */
     void resetOwner() {
@@ -3185,7 +3151,7 @@ class LedgerPage implements Shell.Page {
         data = next;
         more.setVisible(!liveCategory());
         bar.setVisible(!liveCategory());
-        int size = liveCategory() ? 15 : ROWS;
+        int size = liveCategory() && !raid ? 15 : ROWS;
         for (var table : new Table[] {income, cost, market})
             if (table.size != size) table.setPageSize(size);
         String selection = next.entry.scope.name() + "|" + next.entry.group + "|"
@@ -3295,7 +3261,7 @@ class LedgerPage implements Shell.Page {
      */
     JButton costPicker(CostView selected, int[] counts) {
         var pick = new JButton(selected.label + " ⌄");
-        pick.setFont(small());
+        pick.setFont(smallFont);
         pick.setForeground(selected == CostView.ALL ? LABEL : ACCENT);
         pick.setBorder(BorderFactory.createEmptyBorder());
         pick.setContentAreaFilled(false);
@@ -3355,7 +3321,7 @@ class LedgerPage implements Shell.Page {
             else if (group.quantity == 1) qty = times(1);
         }
         if (group.failed > 0) tip = group.name + " · " + group.failedTip();
-        Runnable open = () -> openGroup(group.id);
+        Runnable open = protect.apply(() -> openGroup(group.id));
         return new Row(group.id, icon(group.item), group.name
                         + (group.failed > 0 && group.failedOf().isEmpty() ? " (failed)" : "")
                         + (group.corrected ? " •" : ""), qty, value, shown, tip,
@@ -3369,7 +3335,7 @@ class LedgerPage implements Shell.Page {
     }
 
     Row receiptRow(Receipt receipt) {
-        Runnable open = () -> actions.selectionChanged(receipt.transaction, receipt.id, null);
+        Runnable open = protect.apply(() -> actions.selectionChanged(receipt.transaction, receipt.id, null));
         return new Row(receipt.id, icon(receipt.item), receipt.name,
                 receipt.quantity > 1 && receipt.item != 995 ? times(receipt.quantity) : "",
                 receipt.unknown ? "?" : worth(receipt.value), receipt.unknown ? DIM : of(receipt.category),
@@ -3421,7 +3387,7 @@ class LedgerPage implements Shell.Page {
 
     /** What Net becomes under a gain or a cost decision; nothing counts until the owner decides. */
     static String netPreview(ReviewRow row, long net) {
-        long size = Math.abs(row.value);
+        long size = abs(row.value);
         if (size == 0) return "";
         var text = new StringBuilder();
         if (row.decisions.contains(Decision.GAIN))
@@ -3452,7 +3418,7 @@ class LedgerPage implements Shell.Page {
         detail.removeAll();
         var open = data.detail;
         Group group = open.group;
-        detail.add(back(raid ? data.entry.session.equals("raid:all") ? "All raids" : "Attempt" : !liveCategory() ? "Ledger" : data.entry.table.label, () -> actions.selectionChanged(null, null, null)));
+        detail.add(back(raid ? data.entry.session.equals("raid:all") ? "All Time Raids" : "Attempt" : !liveCategory() ? "Ledger" : data.entry.table.label, () -> actions.selectionChanged(null, null, null)));
         long latest = group.at;
         for (var receipt : open.entries) latest = max(latest, receipt.at);
         int count = group.market ? open.entries.size() : group.count;
@@ -3467,7 +3433,7 @@ class LedgerPage implements Shell.Page {
         // A charged weapon always lists what it spent, even one rune type (owner 1.2).
         boolean bagOpen = group.ids.contains(bagDetail);
         if (bagOpen) detail.add(back(group.name, () -> bagDetail = ""));
-        if (!group.market && (items.size() > 1 || group.charge || (group.death || group.table == KILL) && !items.isEmpty())) {
+        if (!group.market && (items.size() > 1 || group.claim < 0 || group.charge || (group.death || group.table == KILL) && !items.isEmpty())) {
             detailItems.setTitle((bagOpen ? "LOOTING BAG · " : group.death && !group.neutral ? "LOST · " : group.charge || group.value < 0 ? "USED · " : "ITEMS · ") + items.size())
                     .setRows(items);
             detail.add(detailItems);
@@ -3520,7 +3486,8 @@ class LedgerPage implements Shell.Page {
                                         a.knownSubtotal + b.knownSubtotal, a.incomplete || b.incomplete));
         var rows = new ArrayList<Row>();
         for (var item : totals.values())
-            rows.add(new Row("item|" + item.item + "|" + item.name, icon(item.item), item.name,
+            if (group.claim >= 0 || !KeyClaims.lootKey(item.item))
+                rows.add(new Row("item|" + item.item + "|" + item.name, icon(item.item), item.name,
                             item.item == 995 ? "" : times(item.quantity), item.incomplete ? "?" : worth(item.value),
                             item.incomplete ? DIM : sign(item.value), "",
                             item.incomplete ? "" : exactSigned(item.value) + " gp", false, null, null));
@@ -3779,9 +3746,9 @@ class LedgerPage implements Shell.Page {
         var card = new JPanel(new BorderLayout(GAP, 2));
         card.setBackground(CARD);
         pad(card, 5, GAP, 5, GAP);
-        card.add(label(name, bold(), Color.WHITE), CENTER);
+        card.add(label(name, boldFont, Color.WHITE), CENTER);
         card.add(label(value, numbers(12.5f), tone.color), EAST);
-        card.add(label(sub, small(), LABEL), SOUTH);
+        card.add(label(sub, smallFont, LABEL), SOUTH);
         return card;
     }
 
@@ -3904,7 +3871,6 @@ class LedgerController implements LedgerPage.Actions {
         refresh();
     }
 
-    @Override
     public void selectionChanged(String identifier, String id, String groupId) {
         if (live && entry() == null) return;
         String transaction = empty(identifier) ? null : identifier, entry = empty(id) ? null : id;
@@ -3939,8 +3905,7 @@ class LedgerController implements LedgerPage.Actions {
         Runnable shown = () -> {
                     if (owner == panel.ownerToken) feedback.run();
                 };
-        if (isEventDispatchThread()) shown.run();
-        else invokeLater(shown);
+        SidebarPanel.onEdt(shown);
     }
 
     public void split(String identifier,
@@ -4041,7 +4006,6 @@ class LedgerController implements LedgerPage.Actions {
     String menuTarget = "";
 
     /** Pins an open mutation menu; the callback re-checks it against the live session. */
-    @Override
     public String pinMenuTarget() {
         var active = engine.session();
         menuTarget = active == null ? "" : active.id();
@@ -4068,23 +4032,20 @@ class LedgerController implements LedgerPage.Actions {
         mutate(() -> { if (target.equals(menuTarget) && undoAllowed()) action.run(); });
     }
 
-    @Override
     public void undoLast() {
         undo(engine::undoTransaction);
     }
 
-    @Override
     public void restoreUndo() {
         undo(engine::restoreUndo);
     }
 
-    @Override
     /** Previews one Review decision, confirms it with its Net change, then applies it undoably. */
     public void decide(String id, Decision decision) {
         Engine.DecisionPreview preview = engine.previewDecision(decision,
                         row -> row != null && id.equals(row.transaction), now());
         if (preview.rowCount() != 1) return;
-        String message = correctionLabel(decision.correction) + " for this entry. Net changes by "
+        String message = LedgerPage.correctionLabel(decision.correction) + " for this entry. Net changes by "
                         + signed(preview.netDelta) + " gp.";
         Object owner = panel.ownerToken;
         panel.shell.confirm("Review decision", message, "Apply", () -> mutate(() -> {
@@ -4098,9 +4059,6 @@ class LedgerController implements LedgerPage.Actions {
         panel.refresh();
     }
 
-    static String correctionLabel(Correction decision) {
-        return LedgerPage.correctionLabel(decision);
-    }
 }
 
 /**
@@ -4108,7 +4066,7 @@ class LedgerController implements LedgerPage.Actions {
  * the plain Recent list and optional category view. Components are retained between ticks so hover
  * and menus survive. The page renders a {@link LiveSnapshot} and holds no engine.
  */
-class LivePage implements Shell.Page {
+class LivePage extends Shell.Page {
     interface Actions {
         void togglePause();
 
@@ -4149,16 +4107,15 @@ class LivePage implements Shell.Page {
 
     /** The hero Net pair keeps its spaces up to this many characters (owner live 2026-10-14). */
     static final int HERO_PAIR_SPACED_MAX = 12;
-    JPanel body = stack(PANEL, GAP);
     Hero hero = new Hero();
     JPanel target = new JPanel(new BorderLayout(0, 3));
-    JLabel heading = label("", small(), LABEL), value = label("", numbers(12f), TEXT);
-    JLabel pace = label("", small(), LABEL), targetTime = label("", small(), LABEL);
+    JLabel heading = label("", smallFont, LABEL), value = label("", numbers(12f), TEXT);
+    JLabel pace = label("", smallFont, LABEL), targetTime = label("", smallFont, LABEL);
 
     /** Under the Net while Live counts fresh: the run's whole total, "Free play +420M". */
-    JLabel total = label("", small(), LABEL);
+    JLabel total = label("", smallFont, LABEL);
 
-    JLabel risk = label("", small(), LOSS.color);
+    JLabel risk = label("", smallFont, LOSS.color);
     JPanel targetActions = transparent(new FlowLayout(FlowLayout.LEFT, 3, 0));
     /** The header's right cluster: the aim icons, single row (owner live 2026-10-14). */
     JPanel top = transparent(new FlowLayout(FlowLayout.RIGHT, 3, 0));
@@ -4175,12 +4132,11 @@ class LivePage implements Shell.Page {
     Table recent = new Table("RECENT").plain();
     JPanel breakdown = stack(PANEL, GAP);
 
-    /** Pending counts as small icons: loot keys, GE offers, grave reclaim. */
+    /** Pending counts as small icons: loot keys and GE offers. */
     JPanel counts = transparent(new FlowLayout(FlowLayout.RIGHT, 4, 0));
     JPanel signals = transparent(new FlowLayout(FlowLayout.RIGHT, 4, 0));
 
     ImageIcon geIcon = icon(() -> ImageUtil.loadImageResource(GrandExchangePlugin.class, "ge_icon.png"));
-    ImageIcon graveIcon = new ImageIcon(grave(LOSS.color));
     String drawnCounts = "";
 
     /** The RECENT empty sentence currently set; only a change forces a table rebuild. */
@@ -4212,7 +4168,7 @@ class LivePage implements Shell.Page {
         doneButton = button("✓", false, actions::doneTarget);
         editButton = button("…", false, actions::editTarget);
         pause = button("||", false, actions::toggleTimerPause);
-        againButton.setToolTipText("Again: a new session with the same target");
+        againButton.setToolTipText(msg("again-session-tip"));
         doneButton.setToolTipText("Done: clear the goal");
         editButton.setToolTipText("Edit targets");
         pause.setToolTipText("Pause or resume the timer");
@@ -4244,13 +4200,7 @@ class LivePage implements Shell.Page {
         return LIVE;
     }
 
-    public JComponent pageBar() {
-        return null;
-    }
 
-    public JComponent body() {
-        return body;
-    }
 
     void category(LedgerPage page) {
         recent.setVisible(page == null);
@@ -4280,7 +4230,7 @@ class LivePage implements Shell.Page {
         // Clicking it shows the whole run again; a running target keeps its own session.
         total.setToolTipText((snapshot.goal == null ? msg("run-total") : msg("run-total-target"))
                         + (snapshot.milestone == null ? "" : " Milestone " + compact(snapshot.milestone) + ": "
-                                        + percent(Math.max(0d, Math.min(1d, (double) snapshot.run / snapshot.milestone)))
+                                        + percent(max(0d, min(1d, (double) snapshot.run / snapshot.milestone)))
                                         + "."));
         total.setText((snapshot.general ? "Free play " : "Grind ") + signed(snapshot.run));
         risk.setVisible(snapshot.possible && snapshot.risk > 0);
@@ -4407,10 +4357,10 @@ class LivePage implements Shell.Page {
         // The title shrinks before it is cut beside the icons; hover keeps it whole (owner 1.5.2).
         int room = target.getWidth() - 14
                         - (top.isVisible() ? top.getPreferredSize().width : 0);
-        String fitted = fitShrinking(heading, title, small(), room);
+        String fitted = fitShrinking(heading, title, smallFont, room);
         // Still too long: the card says it is a target, so the label and progress go first.
         if (!fitted.equals(title))
-            fitted = fitShrinking(heading, title.replace("TARGET · ", ""), small(), room);
+            fitted = fitShrinking(heading, title.replace("TARGET · ", ""), smallFont, room);
         heading.setText(fitted);
         heading.setToolTipText(title);
     }
@@ -4439,7 +4389,7 @@ class LivePage implements Shell.Page {
 
     List<List<Cell>> strips(LiveSnapshot snapshot) {
         if (!snapshot.present)
-            return singletonList(Arrays.asList(new Cell("GAINS", "—", DIM, "", null),
+            return singletonList(asList(new Cell("GAINS", "—", DIM, "", null),
                             new Cell("SUPPLY", "—", DIM, "", null), new Cell("LOSS", "—", DIM, "", null)));
         Runnable ledger = () -> actions.openLedger(Entry.current());
         var money = money(snapshot.income, snapshot.supplies, snapshot.loss, snapshot.cost,
@@ -4479,8 +4429,7 @@ class LivePage implements Shell.Page {
 
     /** Rebuilds the count icons only when a count changes, so hover survives a tick. */
     void counts(LiveSnapshot snapshot) {
-        String key = snapshot.keys + "|" + snapshot.keyValue + "|" + snapshot.pendingMarket + "|"
-                        + snapshot.returns;
+        String key = snapshot.keys + "|" + snapshot.keyValue + "|" + snapshot.pendingMarket;
         if (key.equals(drawnCounts)) return;
         drawnCounts = key;
         var previous = focused(counts);
@@ -4492,8 +4441,6 @@ class LivePage implements Shell.Page {
         count(snapshot.keys, keyImage == null ? null : new ImageIcon(keyImage), "key", DIM, keyTip, pending);
         count(snapshot.pendingMarket, geIcon, "GE", MARKET, msg("ge-offers") + snapshot.pendingMarket,
                 pending);
-        count(snapshot.returns, graveIcon, "grave", LOSS,
-                msg("grave-expired") + snapshot.returns, pending);
         counts.setVisible(counts.getComponentCount() > 0);
         counts.revalidate();
         restoreFocus(counts, previous);
@@ -4504,7 +4451,7 @@ class LivePage implements Shell.Page {
         if (n <= 0) return;
         // A borderless button, not a mouse listener: the safety audit bans mouse-event names.
         var label = new JButton(image == null ? fallback + " " + n : valueOf(n));
-        label.setFont(small());
+        label.setFont(smallFont);
         label.setForeground(tone.color);
         label.setIcon(image == null || image.getIconHeight() <= 12 ? image : new ImageIcon(
                                 image.getImage().getScaledInstance(-1, 12, Image.SCALE_SMOOTH)));
@@ -4529,26 +4476,6 @@ class LivePage implements Shell.Page {
         } catch (RuntimeException ex) {
             return null;
         }
-    }
-
-    /** The design's 11px outline headstone with a cross; RuneLite ships no grave icon. */
-    static BufferedImage grave(Color color) {
-        var image = new BufferedImage(11, 11, BufferedImage.TYPE_INT_ARGB);
-        var g = image.createGraphics();
-        g.setRenderingHint(KEY_ANTIALIASING, VALUE_ANTIALIAS_ON);
-        g.setColor(color);
-        g.setStroke(new BasicStroke(1.2f));
-        var stone = new Path2D.Float();
-        stone.moveTo(2.5f, 10f);
-        stone.lineTo(2.5f, 4.5f);
-        stone.append(new Arc2D.Float(2.5f, 1.5f, 6f, 6f, 180f, -180f, Arc2D.OPEN), true);
-        stone.lineTo(8.5f, 10f);
-        stone.closePath();
-        g.draw(stone);
-        g.draw(new Line2D.Float(5.5f, 4f, 5.5f, 7.5f));
-        g.draw(new Line2D.Float(4f, 5.5f, 7f, 5.5f));
-        g.dispose();
-        return image;
     }
 
     static Color dotColor(LiveSnapshot snapshot) {
@@ -4853,7 +4780,7 @@ class SidebarPanel extends PluginPanel {
         long now = now();
         var pvp = pvpSource.get();
         if (pvp == null) pvp = PvpState.NONE;
-        String page = shell.currentPage();
+        String page = shell.current;
         long minute = now / 60000;
         String key;
         LiveSnapshot snapshot;
@@ -4871,7 +4798,7 @@ class SidebarPanel extends PluginPanel {
             var boundHud = hud;
             context = new LiveContext(engine.isIdlePaused(), filter, parseGp(config.minimumDisplayedLootValue()),
                             pvp, activityLabel(), !loggedInSource.getAsBoolean(),
-                            boundHud == null ? "" : boundHud.target(), hoppingSource.getAsBoolean());
+                            boundHud == null ? "" : boundHud.interaction, hoppingSource.getAsBoolean());
             snapshot = LiveSnapshot.capture(engine, now, context);
             if (pageForced)
                 // A setting, search or scope change can alter a page without a new revision.
@@ -4891,11 +4818,13 @@ class SidebarPanel extends PluginPanel {
             } else if (pageDue && LEDGER.equals(page))
                 ledgerData = LedgerData.capture(engine, now, scope); else if (pageDue && RAIDS.equals(page)) {
                 if (raids.selected != null && !raids.selected.equals("all") && engine.raids.find(raids.selected) == null) raids.selected = null;
-                engine.raids.read(raids.selected);
+                // One scope for the overview and its Ledger capture: the derived view is reused
+                // within a revision instead of being rebuilt as null and then all.
+                engine.raids.read(fallback(raids.selected, "all"));
                 raidState = engine.raids.snapshot();
                 for (var run : raidState.runs) run.partial |= engine.raids.missing.contains(run.id);
                 raidMoney = engine.raids.totals;
-                if (raids.selected != null) ledgerData = LedgerData.capture(engine, now, raids.entry);
+                if (raids.kind == null || raids.selected != null) ledgerData = LedgerData.capture(engine, now, raids.entry);
             } else if (pageDue && GRINDS.equals(page))
                 data = GrindsData.capture(engine, now, archived, selection);
         }
@@ -5076,12 +5005,10 @@ class SidebarPanel extends PluginPanel {
             mutate(() -> engine.toggleTimeTargetPause(now()));
         }
 
-        @Override
         public boolean autoStartArmed() {
             return config.autoStartSession();
         }
 
-        @Override
         public void hideRecent(String name, boolean charge) {
             if (filter != null) {
                 filter.hideRecent(name, charge);
@@ -5090,14 +5017,12 @@ class SidebarPanel extends PluginPanel {
             refresh();
         }
 
-        @Override
         public void renameGrind() {
             if (engine.customActive())
                 shell.prompt("Rename Grind", "Grind name", engine.session().name(),
                         name -> mutate(() -> engine.renameActive(name)));
         }
 
-        @Override
         public void showWholeRun() {
             actions.saveSessionPrompt();
         }
@@ -5205,7 +5130,7 @@ class NavButton {
  * with the selected row's panel, and Recent grinds opening Grind detail (hero, highlights, vs
  * previous, personal bests). The page renders a {@link GrindsData} and holds no engine.
  */
-class GrindsPage implements Shell.Page {
+class GrindsPage extends Shell.Page {
     interface Actions {
         /** Shows Live. */
         void back();
@@ -5248,9 +5173,9 @@ class GrindsPage implements Shell.Page {
     }
 
     Actions actions;
-    JPanel body = stack(PANEL, GAP), bar = new JPanel(new BorderLayout(4, 0)), list = stack(PANEL, GAP);
+    JPanel bar = new JPanel(new BorderLayout(4, 0)), list = stack(PANEL, GAP);
     JPanel detail = stack(PANEL, GAP), running = new JPanel(new BorderLayout(GAP, 0));
-    JLabel caption = label("", bold(), TEXT), runningNet = label("", numbers(11.5f), TEXT);
+    JLabel caption = label("", boldFont, TEXT), runningNet = label("", numbers(11.5f), TEXT);
     Table mine = new Table("MY GRINDS");
     JPanel selectedPanel = stack(CARD, 0);
     Table recent = new Table("RECENT GRINDS"), saved = new Table("SAVED SESSIONS");
@@ -5271,7 +5196,7 @@ class GrindsPage implements Shell.Page {
         JButton start = button("Start Grind", true, actions::newGrind);
         focus(archived);
         archived.setOpaque(false);
-        archived.setFont(small());
+        archived.setFont(smallFont);
         archived.setForeground(LABEL);
         archived.setToolTipText("Include archived Grinds");
         archived.addActionListener(e -> actions.showArchived(archived.isSelected()));
@@ -5309,9 +5234,6 @@ class GrindsPage implements Shell.Page {
         return bar;
     }
 
-    public JComponent body() {
-        return body;
-    }
 
     void apply(GrindsData next) {
         data = next;
@@ -5344,7 +5266,7 @@ class GrindsPage implements Shell.Page {
 
     void runningTitle() {
         if (data != null && data.hasActive) caption.setText(fitShrinking(caption,
-                        "● " + data.activeName, bold(), caption.getWidth() > 0 ? caption.getWidth() : 201));
+                        "● " + data.activeName, boldFont, caption.getWidth() > 0 ? caption.getWidth() : 201));
     }
 
     /** Every retained session, Free play included; bests are finished Grinds only. */
@@ -5361,7 +5283,7 @@ class GrindsPage implements Shell.Page {
         String best = overall.bestName == null ? ""
                         : "Best · " + overall.bestName + " " + signed(overall.bestNet);
         this.overall.removeAll();
-        var title = label("ALL TIME · " + overall.plans, small(), LABEL);
+        var title = label("ALL TIME · " + overall.plans, smallFont, LABEL);
         pad(title, 3, 6, 3, 6);
         this.overall.add(title);
         this.overall.add(strip(List.of(new Cell("NET", signed(overall.net), sign(overall.net),
@@ -5370,7 +5292,7 @@ class GrindsPage implements Shell.Page {
                                 new Cell("ACTIVE", durationShort(overall.activeMillis), PLAIN,
                                         duration(overall.activeMillis), null))));
         if (!best.isEmpty()) {
-            var bestLine = label(best, small(), sign(overall.bestNet).color);
+            var bestLine = label(best, smallFont, sign(overall.bestNet).color);
             pad(bestLine, 3, 6, 4, 6);
             this.overall.add(bestLine);
         }
@@ -5441,7 +5363,7 @@ class GrindsPage implements Shell.Page {
     List<Menu> grindMenu(MyGrind plan) {
         var def = plan.definition;
         String id = def.id();
-        return Arrays.asList(new Menu("Start", () -> actions.startGrind(id, null)),
+        return asList(new Menu("Start", () -> actions.startGrind(id, null)),
                 new Menu("Edit…", () -> actions.editSavedGrind(id)), new Menu(
                         def.favorite ? "Unfavourite" : "★ Favourite",
                         () -> actions.favoriteSavedGrind(id, !def.favorite)), new Menu(
@@ -5460,7 +5382,7 @@ class GrindsPage implements Shell.Page {
             boolean current = run.general && id.equals(data.activeSessionId);
             var zone = data.zone == null ? ZoneId.systemDefault() : data.zone;
             String when = dayLabel(Instant.ofEpochMilli(run.startedAt).atZone(zone).toLocalDate(), now, zone);
-            var menus = new ArrayList<>(Arrays.asList(new Menu("Open in Ledger", () -> actions.openLedger(id)),
+            var menus = new ArrayList<>(asList(new Menu("Open in Ledger", () -> actions.openLedger(id)),
                     new Menu("Copy summary", () -> actions.copySummary(id))));
             if (!current) {
                 if (id.startsWith("saved:")) menus.add(new Menu("Rename…", () -> actions.renameSession(id)));
@@ -5487,7 +5409,7 @@ class GrindsPage implements Shell.Page {
         JButton back = button("‹ Grinds", false, () -> actions.openDetail(null));
         var top = transparent(new BorderLayout());
         top.add(back, WEST);
-        top.add(label(when(detail.startedAt, now()).toUpperCase(ROOT), small(), LABEL),
+        top.add(label(when(detail.startedAt, now()).toUpperCase(ROOT), smallFont, LABEL),
                 EAST);
         pad(top, 0, 0, 0, 6);
         this.detail.add(top);
@@ -5619,8 +5541,7 @@ class GrindsController implements GrindsPage.Actions {
                                     refresh();
                                 });
                     };
-                    if (SwingUtilities.isEventDispatchThread()) recap.run();
-                    else SwingUtilities.invokeLater(recap);
+                    SidebarPanel.onEdt(recap);
                 });
     }
 
@@ -5632,10 +5553,10 @@ class GrindsController implements GrindsPage.Actions {
         content.add(help);
         var keep = new JCheckBox("Keep previous clock", true);
         keep.setOpaque(false);
-        keep.setFont(small());
+        keep.setFont(smallFont);
         keep.setForeground(TEXT);
         focus(keep);
-        keep.setToolTipText("Freeze this clock for Restore time; leave unchecked to keep any older backup.");
+        keep.setToolTipText(msg("restore-clock-tip"));
         content.add(keep);
         var pair = transparent(new GridLayout(1, 2, 4, 0));
         var compact = BorderFactory.createCompoundBorder(BorderFactory.createLineBorder(LINE),
@@ -5762,7 +5683,7 @@ class GrindsController implements GrindsPage.Actions {
         // Free play's milestone counts all of Free play; a target counts fresh (owner 1.5.2).
         boolean general = !engine.customActive();
         if (general) {
-            form.add(label("Milestone · all of Free play", small(), LABEL));
+            form.add(label("Milestone · all of Free play", smallFont, LABEL));
             picks(form, inline(form, "milestoneField", "Net",
                             active.milestoneGp == null ? "" : targetNet(active.milestoneGp)), "100m", "500m", "1b",
                     "2b", "5b", "Clear=");
@@ -5805,7 +5726,7 @@ class GrindsController implements GrindsPage.Actions {
                                 box.add(start);
                             }
                         }).build(content);
-        if (!saved.isEmpty()) content.add(label("Or a new one", small(), LABEL));
+        if (!saved.isEmpty()) content.add(label("Or a new one", smallFont, LABEL));
         // What you are doing now names a new Grind, unless it already is one (listed first).
         var form = grindForm(playing == null ? doing : "", null, null);
         form.add(content, 0);
@@ -5835,7 +5756,7 @@ class GrindsController implements GrindsPage.Actions {
         RowFill fill;
         int page;
         JButton prev = button("‹", false, () -> turn(-1)), next = button("›", false, () -> turn(1));
-        JLabel range = label("", small(), LABEL);
+        JLabel range = label("", smallFont, LABEL);
         JPanel bar = transparent(new FlowLayout(FlowLayout.LEFT, 4, 0));
 
         Paged(int total, RowFill fill) {
@@ -5942,7 +5863,7 @@ class GrindsController implements GrindsPage.Actions {
                     mutate(() -> engine.restoreFreePlay(id, now()));
                     panel.selection = null;
                     shell.show(LIVE);
-                    shell.tell("Free play restored", "The other run is under Grinds › FREE PLAY.", false);
+                    shell.tell(msg("free-play-restored"), msg("free-play-other"), false);
                 });
     }
 
@@ -5995,7 +5916,7 @@ class GrindsController implements GrindsPage.Actions {
     /** A label beside its field (owner 1.5.0: a short, sleek target sheet). */
     static JTextField inline(JPanel form, String key, String label, String value) {
         var field = new JTextField(value);
-        var name = label(label, small(), LABEL);
+        var name = label(label, smallFont, LABEL);
         name.setPreferredSize(new Dimension(34, name.getPreferredSize().height));
         var line = transparent(new BorderLayout());
         line.add(name, WEST);
@@ -6105,14 +6026,14 @@ class GrindsController implements GrindsPage.Actions {
     static String liveSummary(LiveSnapshot live) {
         return summary(live.general ? "Free play" : live.ownerLabel, live.net, live.income, live.cost,
                 live.supplies, live.loss, live.split, live.elapsed)
-                + (live.market==0 ? "" : String.format(ROOT,msg("summary-market"),exactSigned(live.market)));
+                + (live.market==0 ? "" : format(ROOT,msg("summary-market"),exactSigned(live.market)));
     }
 
     static String summary(String name, long net, long income, long cost, long supplies, long lost,
             boolean split, long elapsed) {
-        return String.format(ROOT, msg("session-summary"), name, exactSigned(net), clock(elapsed),
+        return format(ROOT, msg("session-summary"), name, exactSigned(net), clock(elapsed),
                 RateReadiness.isEstablished(elapsed) ? exact(Session.hourly(net, elapsed)) : "Calculating…",
-                exact(income), exact(cost)) + (split ? String.format(ROOT, msg("summary-costs"),
+                exact(income), exact(cost)) + (split ? format(ROOT, msg("summary-costs"),
                         exact(supplies), exact(lost)) : "");
     }
 
@@ -6162,7 +6083,7 @@ class GrindsController implements GrindsPage.Actions {
 
     void backUpProfile() {
         off(() -> storage.writeBackup(now()), backup -> shell.tell(
-                                "Profile backed up", valueOf(backup.getFileName()), false), "Backup failed");
+                                msg("profile-backed"), valueOf(backup.getFileName()), false), msg("backup-failed"));
     }
 
     void copyDataPath() {
@@ -6742,7 +6663,7 @@ class RaidHistory {
     }
 
     boolean unlocked() {
-        return state.seen != 0 || !state.runs.isEmpty() || Arrays.stream(state.clears).anyMatch(n -> n > 0);
+        return state.seen != 0 || !state.runs.isEmpty() || stream(state.clears).anyMatch(n -> n > 0);
     }
 
     void death() {
@@ -6763,7 +6684,7 @@ class RaidHistory {
     /** A source-confirmed dose allowance, spent first when borrowed and owned stock mix. */
     boolean supplies(List<Flow> flows, boolean use, Map<Integer, Long> loot) {
         if (!use) claim(flows, f -> PICKAXES.containsKey(f.item), (f, q) -> engine.events.take(Inbox.RAID_STORE, -1,
-                q - (f.gain() ? min(q, loot.getOrDefault(f.item, 0L)) : 0),
+                q - (f.gain() ? min(q, loot.getOrDefault(f.item, 0L)) : 0L),
                 e -> e.data == state && e.x == Long.signum(f.quantity)));
         if (state.supplies.isEmpty() && engine.events.peek(Inbox.LOAN) == null) return false;
         if (!use) {
@@ -6852,7 +6773,7 @@ class RaidHistory {
         state.claims.removeIf(claim -> claim == null || kind(claim.id) < 0 || claim.epoch == null || claim.remaining == null
                 || claim.chest != Integer.parseInt(RULES.get(kind(claim.id))[2]));
         for (var claim : state.claims) claim.remaining = cash(claim.remaining);
-        state.clears = state.clears == null ? new long[RULES.size()] : Arrays.copyOf(state.clears, RULES.size());
+        state.clears = state.clears == null ? new long[RULES.size()] : copyOf(state.clears, RULES.size());
         for (int i = 0; i < RULES.size(); i++) state.clears[i] = max(0, state.clears[i]);
         prune();
         changed();
@@ -7029,7 +6950,7 @@ class RaidHistory {
                                 : kind == 2 ? client.isInInstancedRegion() && client.getVarbitValue(number(row, 8)) == 1
                                 : client.getVarbitValue(number(row, 8)) == 2 || client.getVarbitValue(number(row, 8)) == 3);
             }
-            int[] counters = Arrays.stream(row[11].split(",")).mapToInt(Integer::parseInt).map(client::getVarpValue).toArray();
+            int[] counters = stream(row[11].split(",")).mapToInt(Integer::parseInt).map(client::getVarpValue).toArray();
             return new Sample(kind, inside, kind == 0 ? client.getVarbitValue(number(row, 12)) > 0 ? "Challenge" : "Normal"
                     : kind == 2 ? "Level " + client.getVarbitValue(number(row, 12)) : "Observed mode", counters);
         }
@@ -7213,12 +7134,12 @@ class RaidHistory {
 }
 
 /** Existing paged Ledger tables embedded in the selected raid, with read-only receipt details. */
-class RaidsPage implements Shell.Page {
+class RaidsPage extends Shell.Page {
     SidebarPanel panel;
-    JPanel body = stack(PANEL, GAP), overview = stack(PANEL, GAP), detail = stack(PANEL, GAP);
+    JPanel overview = stack(PANEL, GAP), detail = stack(PANEL, GAP);
     Table history = new Table("ATTEMPTS");
     LedgerPage ledger;
-    Entry entry = Entry.current();
+    Entry entry = Entry.current().withScope(HISTORY, "raid:all", "Raid receipts").live(GAINS);
     Integer kind;
     String selected;
 
@@ -7236,6 +7157,12 @@ class RaidsPage implements Shell.Page {
         ledger = new LedgerPage(actions, panel::sprite);
         ledger.noteWidth = 112;
         ledger.raid = true;
+        ledger.income.title.setToolTipText("Saved loot entries");
+        ledger.protect = action -> {
+            Object owner = panel.ownerToken;
+            return () -> { if (owner == panel.ownerToken && !panel.suspended) action.run(); };
+        };
+        pad(ledger.body, 0, 0, 0, 0);
         history.setPageSize(15);
         pad(body, 0, GAP, GAP, GAP);
         body.add(overview);
@@ -7247,18 +7174,17 @@ class RaidsPage implements Shell.Page {
         return RAIDS;
     }
 
-    public JComponent pageBar() {
-        return null;
-    }
 
-    public JComponent body() {
-        return body;
-    }
 
     void open(Integer kind, String id) {
+        open(kind, id, null);
+    }
+
+    void open(Integer kind, String id, Semantics.Table table) {
         this.kind = kind;
         selected = id;
-        entry = Entry.current().withScope(LedgerData.Scope.HISTORY, "raid:" + id, "Raid receipts");
+        entry = Entry.current().withScope(LedgerData.Scope.HISTORY, "raid:" + fallback(id, "all"), "Raid receipts")
+                        .live(id == null ? GAINS : table);
         ledger.resetOwner();
         history.resetPage();
         panel.refresh();
@@ -7268,11 +7194,15 @@ class RaidsPage implements Shell.Page {
         return subtract(money[0], money[1]);
     }
 
-    /** Net, Loot and Death fees as one card, each in its tone; hovering Net shows it in full. */
+    /** Loot lives in the table below; the summary keeps its signed total and actual death fees. */
     static KeyValue card(String title, long[] money) {
         long net = net(money);
-        return new KeyValue(title).put("Net total", signed(net), sign(net), exactSigned(net) + " gp")
-                .put("Loot", signed(money[0]), sign(money[0])).put("Death fees", signed(-money[1]), sign(-money[1]));
+        var card = new KeyValue(title);
+        var value = label(signed(net), numbers(18), sign(net).color);
+        value.setToolTipText(exactSigned(net) + " gp");
+        card.body.add(Kit.row(value));
+        card.body.add(Kit.row(label("Death fees:", smallFont, LABEL), label(signed(-money[1]), smallFont, Tone.LOSS.color)));
+        return card;
     }
 
     /** One raid or attempt row: Net on the right in its tone, the exact amount on hover. */
@@ -7294,8 +7224,8 @@ class RaidsPage implements Shell.Page {
             totals.forEach((id, money) -> {
                 if (id.length() == 1) for (int i = 0; i < 2; i++) all[i] = sum(all[i], money[i]);
             });
-            overview.add(card("ALL RAIDS · ALL TIME", all));
-            if (selected == null) overview.add(button("View all receipts", false, () -> open(null, "all")));
+            if (data != null) data.income.total = all[0];
+            overview.add(card("All Time Raids", all));
         }
         for (int i = 0; i < RaidHistory.RULES.size(); i++) if ((state.seen & 1 << i) != 0
                 && (kind == null && selected == null || kind != null && kind == i)) {
@@ -7319,8 +7249,8 @@ class RaidsPage implements Shell.Page {
                 String title = RaidHistory.RULES.get(kind)[1];
                 detail.add(note(title + " · " + run.mode, TEXT, 128));
                 detail.add(note(caption, LABEL, 128));
-                detail.add(card(null, money));
                 Object owner = panel.ownerToken;
+                detail.add(card(null, money));
                 detail.add(button("Copy summary", false, () -> {
                     if (owner != panel.ownerToken || panel.suspended) return;
                     panel.actions.shareSummary(() -> GrindsController.summary(title + " · " + caption, net(money),
@@ -7328,9 +7258,9 @@ class RaidsPage implements Shell.Page {
                 }));
             }
         }
-        if (selected != null && data != null) {
+        if (data != null) {
             ledger.apply(data);
-            detail.add(ledger.body());
+            (selected == null ? overview : detail).add(ledger.body());
         }
         history.rowTitle(kind == null ? "RAIDS" : "ATTEMPTS", rows);
         detail.setVisible(selected != null);

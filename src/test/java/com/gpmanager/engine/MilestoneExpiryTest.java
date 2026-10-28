@@ -13,7 +13,7 @@ public class MilestoneExpiryTest {
         engine.tickMilestone(100L);
         HudBuilder hud = new HudBuilder(HudBuilderTest.config(false, 4), null);
         assertEquals("Milestone reached · 400k", hud.update(live(engine, 100L), f -> true, 100L).context);
-        assertEquals(255, hud.current().contextColor.getAlpha());
+        assertEquals(255, hud.current.contextColor.getAlpha());
         engine.tickMilestone(7_600L);
         int alpha = hud.update(live(engine, 7_600L), f -> true, 7_600L).contextColor.getAlpha();
         assertTrue("last second fades", alpha > 0 && alpha < 255);

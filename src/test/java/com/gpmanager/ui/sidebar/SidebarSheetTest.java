@@ -41,7 +41,7 @@ public class SidebarSheetTest
         SavedState.SavedGrind saved = engine.plans(true).get(0);
         assertEquals("the name is trimmed", "Vorkath", saved.name());
         assertEquals("the run is that Grind", saved.id(), engine.session().grindId());
-        assertEquals("starting shows it on Live", Shell.LIVE, onEdt(shell::currentPage));
+        assertEquals("starting shows it on Live", Shell.LIVE, onEdt(() -> shell.current));
         engine.finishCustom(System.currentTimeMillis());
 
         // What Free play is doing now is offered first.

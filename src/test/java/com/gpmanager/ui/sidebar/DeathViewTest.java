@@ -6,12 +6,14 @@ import org.junit.*;
 import static org.junit.Assert.*;
 import static com.gpmanager.LiveCategoryLayoutTest.*;
 
-/** Death is a read-only subset: its receipts still belong to their financial tables. */
+/** PvP DEATHS is a read-only PvP subset; other death records stay in their financial tables. */
 public class DeathViewTest {
     java.util.function.LongSupplier previous;
     @Before public void clock() { previous=SafeMath.clock;SafeMath.clock=()->NOW; }
     @After public void restoreClock() { SafeMath.clock=previous; }
     static Semantics.Table death() { return Semantics.Table.valueOf("DEATH"); }
+    static LedgerData.Entry ledgerLoss() { return LedgerData.Entry.current().withCostView(LedgerData.CostView.LOSS); }
+    static LedgerData.Entry ledgerAll() { return LedgerData.Entry.current(); }
     static Transaction grave(boolean recovered) {
         return new Transaction(3000, TransactionType.TRANSFER, Context.TRANSFER,
                 GameData.msg(recovered ? "death-reclaim-items" : "death-items"), "Death reclaim", false,
@@ -29,6 +31,38 @@ public class DeathViewTest {
         gain(e,1,6000);
         return e;
     }
+    static Engine pvpPopulated() {
+        var e=engine();
+        var death=e.session().addEncounter(false,1500);
+        e.session().addTransaction(DeathRowGroupingTest.gear(death),2000,false);
+        e.session().addTransaction(DeathRowGroupingTest.bag(death),2000,false);
+        e.session().addTransaction(grave(false),2000,false);
+        e.session().addTransaction(grave(true),2000,false);
+        e.bookDeathFee(100_000,"Zulrah retrieval",4000);
+        e.bookCofferDrain(72,5000);
+        gain(e,1,6000);
+        return e;
+    }
+    static void assertNoPvp(Engine e,long now) {
+        assertTrue(LedgerData.capture(e,now,category(death())).cost.groups.isEmpty());
+        var pk=e.session()==null?new PkTally():e.session().pk();
+        assertEquals(0,pk.deaths);assertEquals(0,pk.streak);
+        var snapshot=LiveSnapshot.capture(e,now,null);
+        assertEquals(0,snapshot.deaths);assertEquals(0,snapshot.streak);
+    }
+    static RaidHistoryTest mixedRaid() {
+        var f=new RaidHistoryTest();
+        f.start();f.engine.raids.death();
+        var fee=f.engine.bookDeathFee(500_000,null,f.now());
+        assertNotNull(fee);assertEquals(f.id(),fee.flows().get(0).raid);
+        f.engine.raids.read(f.id());f.exit();
+        var death=f.engine.session().addEncounter(false,f.now()+1000);
+        var row=Tx.of(f.now()+1000,TransactionType.PK_DEATH_LOSS,Context.PK_DEATH,"PvP death",true,
+                List.of(new Flow(995,"Coins",-322_000,1,-322_000,PriceSource.FACE_VALUE)));
+        f.engine.session().addTransaction(row,2000,false);
+        f.engine.session().attachToEncounter(row.id(),death,false);
+        return f;
+    }
     @Test public void reclaimFeesRemainLossWithoutChangingOtherFees() {
         var e=engine();var fee=e.bookDeathFee(100_000,"Zulrah retrieval",4000);
         e.bookCofferDrain(72,5000);
@@ -37,35 +71,44 @@ public class DeathViewTest {
         assertEquals(100_072,money.other);assertEquals(0,money.supplies);
         assertEquals(-100_072,money.net);
     }
-    @Test public void viewContainsOnlyDeathsAndNeutralGravesWithoutChangingMoney() {
-        var e=populated();String before=new Gson().toJson(e.exportState());
-        var data=LedgerData.capture(e,NOW,category(death()));
-        assertEquals(4,data.cost.groups.size());
-        assertEquals(-177_158,data.cost.total);
-        assertEquals(2,data.cost.groups.stream().filter(g->g.neutral&&g.value==0).count());
-        assertEquals(-177_230,LedgerData.capture(e,NOW,category(Semantics.Table.COSTS_LOSS)).cost.total);
-        assertEquals(177_230,LiveSnapshot.capture(e,NOW,null).loss);
-        assertEquals(before,new Gson().toJson(e.exportState()));
-        var group=data.cost.groups.stream().filter(g->g.name.equals("Death: PvP")).findFirst().orElseThrow();
+    @Test public void pvpViewIsPvpOnlyWhileOrdinaryLedgerKeepsEveryRecord() {
+        var e=pvpPopulated();String before=new Gson().toJson(e.exportState());
+        var pvp=LedgerData.capture(e,NOW,category(death()));
+        assertEquals(1,pvp.cost.groups.size());assertEquals(-77_158,pvp.cost.total);
+        var group=pvp.cost.groups.get(0);
+        assertEquals("Death: PvP",group.name);assertTrue(group.pvpDeath);
         var selected=LedgerData.capture(e,NOW,category(death()).withSelection(null,null,group.id));
         assertEquals(4,selected.detail.entries.size());
+        var loss=LedgerData.capture(e,NOW,ledgerLoss());
+        assertEquals(3,loss.cost.groups.size());assertEquals(-177_230,loss.cost.total);
+        var all=LedgerData.capture(e,NOW,ledgerAll());
+        assertEquals(3,all.cost.groups.size());assertEquals(-177_230,all.cost.total);
+        assertTrue(all.cost.groups.stream().anyMatch(g->g.name.equals("Zulrah retrieval")));
+        assertEquals(0,all.cost.groups.stream().filter(g->g.name.equals("Gravestone")).count());
+        assertEquals(177_230,e.metrics(NOW).other);assertEquals(0,e.metrics(NOW).supplies);
+        assertEquals(-177_130,e.metrics(NOW).net);
+        assertEquals(177_230,LiveSnapshot.capture(e,NOW,null).loss);
+        assertEquals(1,e.session().pk().deaths);assertEquals(-1,e.session().pk().streak);
+        assertEquals(0,LiveSnapshot.capture(e,NOW,null).streak);
+        assertEquals(before,new Gson().toJson(e.exportState()));
     }
     @Test public void categoryTogglesAndDoesNotReplaceDeathTotalWithSupplyTotal() throws Exception {
         MilestoneTest.onEdt(()->{
-            var panel=SavedSessionTest.panel(populated());
+            var panel=SavedSessionTest.panel(pvpPopulated());
             panel.bindPvp(()->new PvpState(true,false,false,0));SidebarPanelProbe.refresh(panel);
             var cell=panel.live.strips(panel.snapshot).stream().flatMap(Collection::stream)
                     .filter(c->c.label.equals("DEATHS")).findFirst().orElseThrow();
-            assertNotNull(cell.open);cell.open.run();SidebarPanelProbe.refresh(panel);
+            assertEquals("1",cell.value);assertNotNull(cell.open);cell.open.run();SidebarPanelProbe.refresh(panel);
             assertEquals(death(),panel.category.table);
-            assertEquals(-177_158,focused(panel).data.cost.total);
+            assertEquals(1,focused(panel).data.cost.groups.size());
+            assertEquals(-77_158,focused(panel).data.cost.total);
             assertTrue(focused(panel).cost.title.getText().startsWith("DEATH"));
             var page=focused(panel);
             page.cost.rows.stream().filter(r->r.name.equals("Death: PvP")).findFirst().orElseThrow().open.run();
             SidebarPanelProbe.refresh(panel);assertNotNull(page.data.detail);
             assertEquals(death(),page.data.entry.table);
             page.actions.selectionChanged(null,null,null);SidebarPanelProbe.refresh(panel);
-            assertNull(page.data.detail);assertEquals(-177_158,page.data.cost.total);
+            assertNull(page.data.detail);assertEquals(-77_158,page.data.cost.total);
             cell.open.run();SidebarPanelProbe.refresh(panel);
             assertNull(panel.category);assertTrue(panel.live.recent.isVisible());return null;
         });
@@ -76,20 +119,30 @@ public class DeathViewTest {
         e.session().addTransaction(row,2000,false);
         var fee=e.bookDeathFee(100_000,"Zulrah retrieval",4000);
         e.correctTransaction(fee.id(),Correction.IGNORE,"test");
-        var data=LedgerData.capture(e,NOW,category(death()));
-        assertEquals(2,data.cost.groups.size());assertEquals(0,data.cost.total);
-        assertTrue(data.cost.groups.stream().anyMatch(Semantics.Group::incomplete));
+        var pvp=LedgerData.capture(e,NOW,category(death()));
+        assertEquals(1,pvp.cost.groups.size());assertEquals(0,pvp.cost.total);
+        assertTrue(pvp.cost.groups.stream().anyMatch(Semantics.Group::incomplete));
         assertEquals(1,LedgerData.capture(e,NOW,category(death()).withSearch("Unknown gear")).cost.groups.size());
+        var loss=LedgerData.capture(e,NOW,ledgerLoss());
+        assertEquals(1,loss.cost.groups.size());
+        var all=LedgerData.capture(e,NOW,ledgerAll());
+        assertTrue(all.corrected.stream().anyMatch(r->r.transaction.equals(fee.id())));
         var gson=new Gson();var next=engine();next.restore(gson.fromJson(gson.toJson(e.savedState()),SavedState.class),NOW);
-        assertEquals(2,LedgerData.capture(next,NOW,category(death())).cost.groups.size());
+        assertEquals(1,LedgerData.capture(next,NOW,category(death())).cost.groups.size());
+        assertTrue(LedgerData.capture(next,NOW,ledgerAll()).corrected.stream()
+                .anyMatch(r->r.transaction.equals(fee.id())));
     }
-    @Test public void emptyAndGrindWideDeathTableStayBoundedWithoutInventingDeaths() {
+    @Test public void emptyAndGrindWidePvpTableStayBoundedWithoutInventingDeaths() {
         var e=engine();assertTrue(LedgerData.capture(e,NOW,category(death())).cost.groups.isEmpty());
         e.session().addTransaction(grave(false),2000,false);
-        var before=LedgerData.capture(e,NOW,category(death()));assertEquals(1,before.cost.groups.size());
-        e.newLive(60_000);var after=LedgerData.capture(e,NOW,category(death()));
-        assertEquals(1,after.cost.groups.size());assertEquals(before.cost.total,after.cost.total);
-        assertEquals(1,DeathRowGroupingTest.capture(grave(false)).groups.size());
+        assertTrue(LedgerData.capture(e,NOW,category(death())).cost.groups.isEmpty());
+        assertTrue(LedgerData.capture(e,NOW,ledgerLoss()).cost.groups.isEmpty());
+        assertTrue(LedgerData.capture(e,NOW,ledgerAll()).cost.groups.isEmpty());
+        e.newLive(60_000);
+        assertTrue(LedgerData.capture(e,NOW,category(death())).cost.groups.isEmpty());
+        assertTrue(LedgerData.capture(e,NOW,ledgerAll()).cost.groups.isEmpty());
+        assertEquals(0,e.session().pk().deaths);assertEquals(0,e.session().pk().streak);
+        assertTrue(DeathRowGroupingTest.capture(grave(false)).groups.isEmpty());
     }
     @Test public void anUnrelatedCoinLossInANamedGrindIsNotADeathFee() {
         var e=engine();var row=new Transaction(3000,TransactionType.CONSUMPTION,Context.GENERIC,
@@ -99,22 +152,89 @@ public class DeathViewTest {
         assertTrue(LedgerData.capture(e,NOW,category(death())).cost.groups.isEmpty());
         assertEquals(-100,e.metrics(NOW).net);
     }
-    @Test public void expiryIsVisibleAtZeroAndReclassificationDoesNotDoubleCount() {
+    @Test public void expiredGraveGearIsNotARowAndReclassificationDoesNotDoubleCount() {
         var e=engine();var expiry=new Transaction(3000,TransactionType.TRANSFER,Context.TRANSFER,
                 GameData.msg("reclaim-expired"),"Death reclaim",false,List.of(),Confidence.CONFIRMED,"Still owned",null);
         e.session().addTransaction(expiry,2000,false);
         var fee=e.bookDeathFee(100_000,"Zulrah retrieval",4000);
         assertTrue(e.correctTransaction(fee.id(),Correction.REVENUE,"Owner correction"));
-        var data=LedgerData.capture(e,NOW,category(death()));
-        assertEquals(2,data.cost.groups.size());assertEquals(100_000,data.cost.total);
+        assertTrue(LedgerData.capture(e,NOW,category(death())).cost.groups.isEmpty());
+        assertTrue(LedgerData.capture(e,NOW,ledgerLoss()).cost.groups.isEmpty());
+        assertTrue(LedgerData.capture(e,NOW,ledgerAll()).cost.groups.isEmpty());
         assertEquals(100_000,e.metrics(NOW).income);assertEquals(0,e.metrics(NOW).cost);
     }
-
+    @Test public void raidFeeAloneStaysOutOfPvpDeathsWhileLedgerAndRaidKeepIt() {
+        var f=new RaidHistoryTest();f.start();f.engine.raids.death();
+        var fee=f.engine.bookDeathFee(500_000,null,f.now());assertNotNull(fee);
+        assertEquals(f.id(),fee.flows().get(0).raid);
+        f.engine.raids.read(f.id());assertEquals(500_000,f.engine.raids.money(f.id())[1]);
+        f.engine.raids.read("all");assertEquals(500_000,f.engine.raids.money(f.id())[1]);
+        var now=f.now()+2000;
+        assertNoPvp(f.engine,now);
+        assertEquals(-500_000,LedgerData.capture(f.engine,now,ledgerLoss()).cost.total);
+        assertEquals(500_000,LiveSnapshot.capture(f.engine,now,null).loss);
+    }
+    @Test public void mixedPvpDeathAndRaidFeeSplitViewsWithoutLosingCanonicalCost() {
+        var f=mixedRaid();var now=f.now()+2000;
+        f.engine.raids.read(f.id());assertEquals(500_000,f.engine.raids.money(f.id())[1]);
+        var pvp=LedgerData.capture(f.engine,now,category(death()));
+        assertEquals(1,pvp.cost.groups.size());assertEquals(-322_000,pvp.cost.total);
+        assertTrue(pvp.cost.groups.get(0).pvpDeath);
+        var loss=LedgerData.capture(f.engine,now,ledgerLoss());
+        assertEquals(2,loss.cost.groups.size());assertEquals(-822_000,loss.cost.total);
+        assertEquals(822_000,f.engine.metrics(now).other);
+        var snapshot=LiveSnapshot.capture(f.engine,now,null);
+        assertEquals(822_000,snapshot.loss);assertEquals(1,snapshot.deaths);assertEquals(0,snapshot.streak);
+        assertEquals(1,f.engine.session().pk().deaths);assertEquals(-1,f.engine.session().pk().streak);
+    }
+    @Test public void pveGraveRetryAndFinalRaidFeeNeverBecomePvpDeaths() {
+        var pve=engine();pve.markPvmDeath(10,Map.of(4151,1L),Map.of(),pve.events.owner);
+        assertNoPvp(pve,NOW);
+        var grave=engine();grave.session().addTransaction(grave(false),2000,false);
+        assertNoPvp(grave,NOW);
+        assertTrue(LedgerData.capture(grave,NOW,ledgerAll()).cost.groups.isEmpty());
+        var retry=new RaidHistoryTest();retry.start();retry.engine.setBaseline(new ContainerSnapshot(Map.of(4151,1L)));
+        retry.engine.markPvmDeath(10,Map.of(4151,1L),Map.of(),retry.engine.events.owner);
+        assertNoPvp(retry.engine,retry.now()+2000);
+        assertTrue(retry.engine.session().transactions().isEmpty());
+        var finalRaid=new RaidHistoryTest();finalRaid.start();finalRaid.engine.raids.death();
+        var fee=finalRaid.engine.bookDeathFee(500_000,null,finalRaid.now());assertNotNull(fee);
+        assertNoPvp(finalRaid.engine,finalRaid.now()+2000);
+        assertEquals(-500_000,LedgerData.capture(finalRaid.engine,finalRaid.now()+2000,ledgerLoss()).cost.total);
+    }
+    @Test public void reloadNewSessionAndOwnerChangePreserveThePvpOnlyScope() {
+        var f=mixedRaid();var now=f.now()+2000;
+        assertEquals(1,LedgerData.capture(f.engine,now,category(death())).cost.groups.size());
+        assertEquals(-822_000,LedgerData.capture(f.engine,now,ledgerLoss()).cost.total);
+        f.engine.newLive(60_000);
+        assertEquals(1,LedgerData.capture(f.engine,now+60_000,category(death())).cost.groups.size());
+        assertEquals(-822_000,LedgerData.capture(f.engine,now+60_000,ledgerLoss()).cost.total);
+        assertEquals(1,f.engine.session().pk().deaths);assertEquals(-1,f.engine.session().pk().streak);
+        var saved=new Gson().fromJson(new Gson().toJson(f.engine.savedState()),SavedState.class);
+        var restored=engine();restored.restore(saved,now+60_000);
+        assertEquals(1,LedgerData.capture(restored,now+60_000,category(death())).cost.groups.size());
+        assertEquals(-822_000,LedgerData.capture(restored,now+60_000,ledgerLoss()).cost.total);
+        assertEquals(1,restored.session().pk().deaths);assertEquals(-1,restored.session().pk().streak);
+        restored.restoreProfile("rsprofile.other",null,now+60_000);
+        assertTrue(LedgerData.capture(restored,now+60_000,category(death())).cost.groups.isEmpty());
+        assertEquals(0,LiveSnapshot.capture(restored,now+60_000,null).deaths);
+    }
+    @Test public void recentHidingIsPresentationOnlyForPvpDeaths() {
+        var f=mixedRaid();var now=f.now()+2000;
+        var before=LiveSnapshot.capture(f.engine,now,null);
+        var filter=new RecentFilter(){public boolean isFlowIncluded(Flow flow){return false;}};
+        var hidden=LiveSnapshot.capture(f.engine,now,new LiveContext(false,filter,0L,PvpState.NONE,"",false,"",false));
+        assertEquals(before.recent.size(),hidden.recent.size());
+        assertEquals(before.deaths,hidden.deaths);assertEquals(before.streak,hidden.streak);
+        assertEquals(before.loss,hidden.loss);assertEquals(before.net,hidden.net);
+        assertEquals(1,LedgerData.capture(f.engine,now,category(death())).cost.groups.size());
+        assertEquals(-322_000,LedgerData.capture(f.engine,now,category(death())).cost.total);
+    }
     static void previews(java.io.File out) throws java.io.IOException {
         var previous=SafeMath.clock;
         try {
         for(int width:new int[]{213,225,300}) {
-            var e=populated();e.session().addTransaction(SavedSessionTest.trade(7000),2000,false);
+            var e=pvpPopulated();e.session().addTransaction(SavedSessionTest.trade(7000),2000,false);
             var panel=SavedSessionTest.panel(e);
             panel.bindPvp(()->new PvpState(true,false,false,0));SidebarPanelProbe.refresh(panel);
             var frame=new javax.swing.JFrame("Offline DEATH view preview");

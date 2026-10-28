@@ -51,7 +51,7 @@ public class KillViewTest {
             assertNotNull("KILLS beside DEATHS",kill);assertNotNull(kill.open);assertEquals("2",kill.value);
             assertNull(Arrays.stream(cells).filter(cell->cell.label.equals("BEST")).findFirst().orElseThrow().open);
             kill.open.run();SidebarPanelProbe.refresh(panel);
-            assertEquals(kills(),panel.category.table);assertEquals(Shell.LIVE,panel.shell.currentPage());
+            assertEquals(kills(),panel.category.table);assertEquals(Shell.LIVE,panel.shell.current);
             assertEquals(700,focused(panel).data.income.total);
             assertTrue(focused(panel).income.title.getText().startsWith("KILLS"));
             assertEquals(2,focused(panel).income.rows.size());kill.open.run();SidebarPanelProbe.refresh(panel);

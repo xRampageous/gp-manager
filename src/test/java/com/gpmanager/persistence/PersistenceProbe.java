@@ -42,6 +42,29 @@ public final class PersistenceProbe
         }
     }
 
+    /** Use production's bounded scheduled retries; a raw repository commit may refuse a busy file. */
+    public static boolean saveThroughWriter(SessionRepository repository, SavedState state) throws InterruptedException
+    {
+        var writer = new OrderedPersistenceWriter(repository);
+        var timeout = java.time.Duration.ofSeconds(5);
+        try
+        {
+            WriteIntent intent;
+            synchronized (repository)
+            {
+                intent = intentFromDisk(repository, state);
+                writer.resetRevision(repository.revision);
+            }
+            return writer.submit(intent) && writer.flush(timeout);
+        }
+        finally
+        {
+            writer.shutdown(timeout);
+            if (writer.executor != null && !writer.executor.awaitTermination(5, java.util.concurrent.TimeUnit.SECONDS))
+                throw new AssertionError("The production save writer did not terminate");
+        }
+    }
+
     /** A destructive replacement based on the disk revision observed now. */
     public static SessionRepository.ReplaceOutcome replaceStateDetailed(SessionRepository repository, SavedState state)
     {
@@ -55,27 +78,38 @@ public final class PersistenceProbe
         }
     }
 
+    /**
+     * Expected base from the authoritative save header. Read I/O is a refusal that preserves the
+     * good file; only a payload the header rejects as invalid data is healed like production.
+     */
     private static WriteIntent intentFromDisk(SessionRepository repository, SavedState state)
     {
         SessionRepository.ScopeFiles files = repository.bound;
-        if (files.state.exists())
+        long base;
+        try
         {
-            try
+            if (files.state.exists())
             {
-                repository.readState(files.state);
+                try
+                {
+                    base = repository.readState(files.state).revision;
+                }
+                catch (SessionRepository.InvalidSaveException ex)
+                {
+                    repository.setAside(files);
+                    base = SessionRepository.revisionOf(repository.header(files.backup));
+                }
             }
-            catch (Exception ex)
+            else
             {
-                repository.setAside(files);
-                repository.revision = repository.backupRevision(files.backup).orElse(0L);
+                base = SessionRepository.revisionOf(repository.header(files.backup));
             }
         }
-        if (repository.revision <= 0L)
+        catch (java.io.IOException ex)
         {
-            repository.revision = repository.peekRevision(files.state)
-                .orElse(repository.backupRevision(files.backup).orElse(0L));
+            throw new java.io.UncheckedIOException(ex);
         }
-        long base = repository.revision;
+        repository.revision = SafeMath.positive(base);
         return repository.owner == null
             ? new WriteIntent(null, repository.generation, base, state, null)
             : new WriteIntent(repository.owner, repository.generation, base, state, null);

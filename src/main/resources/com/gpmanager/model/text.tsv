@@ -65,7 +65,6 @@ items-restored	Items restored after leaving the neutral zone; ownership never ch
 saved-grinds	Grinds you start appear here
 entries-changed	Entries changed while the preview was open · check again
 session-changed	The session changed while this was open · nothing was saved
-grave-pending	Items waiting to be reclaimed after death · a reclaimed item stays neutral apart from the fee
 another-client-changed	another client changed this account after the flush; nothing was overwritten.
 resets-gp	Deletes this account's runs, Ledger, My Grinds and totals. Back up & delete saves a safety copy first; without a backup it cannot be undone. Only want fresh numbers? Click the ACTIVE clock for a new session, or Reset free-play in this menu.
 review.COST	Count as cost
@@ -124,7 +123,7 @@ excluded-because	Excluded because a bank or deposit interface was active.
 ignoring-late	Ignoring late save success for abandoned scope gen {} (live gen {})
 tracking-paused-back	 Tracking is paused. Back up your current history, then restart RuneLite to load the saved history.
 refusing-account-switch	Refusing account switch: previous scope flush did not complete
-switch-save-paused	Tracking for this account is paused because the previous account could not be saved. Close other RuneLite clients, if any, then log out and back in to retry.
+switch-save-paused	Tracking for this account is paused because GP Manager could not save the previous account or load this account. Close other RuneLite clients, if any, then log out and back in to retry.
 switch-profile-conflict	Refusing account switch: profile restore could not be prepared
 account-clear	Account clear held: the previous account's latest save did not complete
 current-runescape	The current RuneScape profile is not safely bound
@@ -156,7 +155,6 @@ awaiting-collection	 · Awaiting collection
 canceled-returned	Canceled; the returned principal is ownership-neutral.
 food-potions	Food, potions, runes, ammo and charges · 
 deaths-tax	Deaths, tax, fees and drops · 
-grave-expired	Items waiting to be reclaimed after death: 
 gp-manager-icon	GP Manager icon resource missing or unreadable; using a placeholder sidebar icon
 gp-manager-icon-resource	GP Manager icon resource failed to load; using a placeholder sidebar icon
 jsoncodec-bind	JsonCodec.bind(gson) must run at plugin start-up before any JSON work
@@ -385,7 +383,7 @@ cannon-parts	Cannon set up or picked up
 cannon-why	A dwarf multicannon's parts stay yours wherever it stands; Nulodion replaces a lost one free.
 new-session	Restart GP/h starts Active Time at zero and uses displayed Net after one minute. New session also clears Live Net and Recent; every booking stays in the run and Ledger. Saving or continuing returns to the full run clock. Keep previous clock freezes the clock before restarting; Restore time resumes it, or uses the original run time if none was saved.
 save-session	Keep this Live session as a separate entry under Saved sessions in Grinds? Your totals are counted once.
-guide	Live: tracks as you play. Net is what you make after costs. Click Gains, Supply, Loss or Trade for entries. KILLS shows recorded PK loot; DEATHS shows losses and fees. | What counts: loot you collect, supplies you use, lost items and fees you pay. Banking and recovered gear stay neutral. | Grinds: start one to track an activity. Free play keeps everything outside Grinds. | Raids: loot, death fees and All raids totals. Entering a raid unlocks the tab; open it manually. | Ledger: see why entries counted. Check Review when GP Manager needs your decision. | Save: gear → View recap shows this session. Save session keeps a copy in Saved sessions. | Prices: GE, otherwise alch. — means no value; ? means no price yet.
+guide	Live: tracks as you play. Net is what you make after costs. Click Gains, Supply, Loss or Trade for entries. KILLS shows retained PK loot; DEATHS shows PvP losses. | What counts: loot you collect, supplies you use, lost items and fees you pay. Banking and recovered gear stay neutral. | Grinds: start one to track an activity. Free play keeps everything outside Grinds. | Raids: loot, death fees and All raids totals. Entering a raid unlocks the tab; open it manually. | Ledger: see why entries counted. Check Review when GP Manager needs your decision. | Save: gear → View recap shows this session. Save session keeps a copy in Saved sessions. | Prices: GE, otherwise alch. — means no value; ? means no price yet.
 bf-coffer	Blast Furnace coffer
 free-play-kept	Free play is kept.
 bag-reward	Agility dispenser · looting bag
@@ -408,3 +406,10 @@ bag-loss-proof	Remembered contents of the carried looting bag were lost on this 
 captured-dose	Recovered from original blighted dose prices; later tracked item values are unchanged.
 
 raid-supply-credit	Raid-provided supplies excluded; only the paid portion counts
+
+restore-clock-tip	Freeze this clock for Restore time; leave unchecked to keep any older backup.
+again-session-tip	Again: a new session with the same target
+free-play-other	The other run is under Grinds › FREE PLAY.
+free-play-restored	Free play restored
+profile-backed	Profile backed up
+backup-failed	Backup failed

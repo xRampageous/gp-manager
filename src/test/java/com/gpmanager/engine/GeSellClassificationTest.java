@@ -244,7 +244,7 @@ public class GeSellClassificationTest
         inventory.put(ItemID.NATURERUNE, 4L);
         Transaction cast = settleStable(engine, inventory, now);
         assertNotNull(cast);
-        assertEquals("Ice Burst", cast.actionLabel().value());
+        assertEquals("Ice Burst", cast.actionLabel().value);
 
         inventory.put(ItemID.NATURERUNE, 3L);
         Transaction laterLoss = settleStable(engine, inventory, now + 5_000L);

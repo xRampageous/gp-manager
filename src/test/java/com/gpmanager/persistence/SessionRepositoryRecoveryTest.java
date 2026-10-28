@@ -106,7 +106,8 @@ public class SessionRepositoryRecoveryTest
                     Collections.singletonList(new Flow(995, "Coins", 1, 1, 1))), 100, false);
             }
             SessionRepository writer = new SessionRepository(new Gson(), FilepathTestSupport.root(directory), false);
-            PersistenceProbe.save(writer, new SavedState(session, null, Collections.emptyList()));
+            assertTrue("durable save cycle " + i, PersistenceProbe.saveThroughWriter(writer,
+                new SavedState(session, null, Collections.emptyList())));
             SavedState reloaded = new SessionRepository(new Gson(), FilepathTestSupport.root(directory), false).load();
             session = reloaded.currentSession();
             assertEquals((i + 1L) * 50L, session.metrics(20_000L).net);
