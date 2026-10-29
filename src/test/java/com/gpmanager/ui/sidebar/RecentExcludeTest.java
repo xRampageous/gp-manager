@@ -172,7 +172,7 @@ public class RecentExcludeTest {
         assertEquals(0, f.saves.get());
     }
 
-    @Test public void aBasisLockedEntryRetainsTheLedgersRefusal() throws Exception {
+    @Test public void aBasisLockedEntryCanBeRemovedFinanciallyAndUndone() throws Exception {
         var f = new Fixture();
         var gain = f.book(NOW + 1_000,
                 new Flow(536, "Dragon bones", 10, 100, 1_000, PriceSource.GRAND_EXCHANGE));
@@ -186,11 +186,67 @@ public class RecentExcludeTest {
             return f.panel.live.rowOf(recent).menu.stream().filter(item -> item.label.startsWith("Remove"))
                     .findFirst().orElseThrow();
         });
+        var gson = new com.google.gson.Gson();
+        String stock = gson.toJson(f.engine.basis.stock), flows = gson.toJson(gain.flows());
         f.open(menu);
-        f.press("Confirm");
-        assertTrue("Recent must not bypass the existing ownership fence", gain.counts());
+        assertNotNull(onEdt(() -> button(f.panel.ledger.detail, "Confirm")));
+        assertTrue(gain.counts());
         assertEquals(600, f.engine.metrics(NOW + 4_000).net);
-        assertTrue(onEdt(() -> ShellProbe.noticeText(f.panel.shell)).contains("Not applied"));
+        f.press("Confirm");
+        assertEquals(Correction.IGNORE, gain.correction());
+        assertEquals(-400, f.engine.metrics(NOW + 4_000).net);
+        assertEquals(stock, gson.toJson(f.engine.basis.stock));
+        assertEquals(flows, gson.toJson(gain.flows()));
+        assertEquals(1, f.saves.get());
+        assertTrue(f.engine.undoCorrection());
+        assertEquals(600, f.engine.metrics(NOW + 4_000).net);
+        assertEquals(stock, gson.toJson(f.engine.basis.stock));
+    }
+
+    @Test public void aLegacyToaPickaxeCanBeRemovedWithoutRemovingItsSeparateReturnCost() throws Exception {
+        var f = new Fixture();
+        var gain = f.book(NOW - 4 * 86_400_000L,
+                new Flow(1275, "Rune pickaxe", 1, 18_635, 18_635, PriceSource.GRAND_EXCHANGE));
+        f.engine.session().addTransaction(Tx.of(NOW - 3 * 86_400_000L, TransactionType.CONSUMPTION,
+                Context.GENERIC, "", true,
+                List.of(new Flow(1275, "Rune pickaxe", -1, 18_635, -18_635, PriceSource.GRAND_EXCHANGE))),
+                2_000, false);
+        var gson = new com.google.gson.Gson();
+        String before = gson.toJson(gain), stock = gson.toJson(f.engine.basis.stock);
+        var menu = onEdt(() -> {
+            var recent = LiveSnapshot.capture(f.engine, NOW, LiveContext.NONE).recent.stream()
+                    .filter(row -> row.receiptId.equals(gain.id())).findFirst().orElseThrow();
+            return f.panel.live.rowOf(recent).menu.stream().filter(item -> item.label.startsWith("Remove"))
+                    .findFirst().orElseThrow();
+        });
+        f.open(menu);
+        assertNotNull(onEdt(() -> button(f.panel.ledger.detail, "Confirm")));
+        assertEquals(before, gson.toJson(gain));
+        assertEquals(0, f.saves.get());
+        assertEquals(0, f.engine.metrics(NOW).net);
+        f.press("Confirm");
+        assertEquals(Correction.IGNORE, gain.correction());
+        assertEquals(-18_635, f.engine.metrics(NOW).net);
+        assertEquals(stock, gson.toJson(f.engine.basis.stock));
+        assertEquals(18_635, gain.flows().get(0).unitPrice);
+        assertEquals(1, f.saves.get());
+        assertTrue(f.engine.undoCorrection());
+        assertEquals(0, f.engine.metrics(NOW).net);
+        assertEquals(stock, gson.toJson(f.engine.basis.stock));
+    }
+
+    @Test public void genericOldPickaxeGainsAreNeverGuessedToBeRaidReturns() throws Exception {
+        var f = new Fixture();
+        var first = f.book(NOW - 4 * 86_400_000L,
+                new Flow(1275, "Rune pickaxe", 1, 18_635, 18_635, PriceSource.GRAND_EXCHANGE));
+        var second = f.book(NOW - 3 * 86_400_000L,
+                new Flow(1275, "Rune pickaxe", 1, 18_635, 18_635, PriceSource.GRAND_EXCHANGE));
+        f.engine.recheck();
+        assertEquals(Correction.AUTO, first.correction());
+        assertEquals(Correction.AUTO, second.correction());
+        assertEquals(37_270, f.engine.metrics(NOW).net);
+        assertEquals(18_635, first.flows().get(0).unitPrice);
+        assertEquals(18_635, second.flows().get(0).unitPrice);
     }
 
     @Test public void thePreviewKeepsConfirmationVisibleAtNarrowWidths() throws Exception {

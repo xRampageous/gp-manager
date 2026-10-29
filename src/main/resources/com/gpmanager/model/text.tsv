@@ -281,6 +281,7 @@ lifecycle-thread	gp-manager-lifecycle
 backup-suffix	sessions.backup.json
 config-edit	config_edit_icon.png
 undo-tip	Undo latest correction
+undo-removal	Undo last removal
 correct-entry	Correct this entry
 undo-reason	Undo latest correction
 waiting-activity	Waiting for activity
@@ -349,7 +350,8 @@ empty-session	Empty session state
 gp-h	GP/h over active time
 previously-counted	Previously counted|
 received-proven	Received|not proven
-correction-applied	That correction was not applied
+correction-applied	This change was refused to protect related entries. Nothing changed.
+correction-blocked	This entry cannot be changed safely because its item value is tied to later entries or older tracking data. Nothing changed.
 confirm-correction	Confirm correction
 result-corrected	 · Result includes a manual correction.
 if-counted-cost	If counted as a cost: Net 

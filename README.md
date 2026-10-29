@@ -34,7 +34,7 @@ Screenshots use illustrative sample data.
 ## What you can track
 
 - **Live:** Net after costs, GP/h and recent receipts. Right-click a Recent booking and choose **Remove entry…** to preview and confirm a correction. Grouped rows offer **Remove latest entry…**. Click GAINS, SUPPLY, LOSS or TRADE to inspect that session's entries. Click Net to set a target; ACTIVE opens the session controls. Restarting a session keeps the full run's totals recorded.
-- **Ledger:** see why an entry counted and open its retained receipts. Uncertain entries wait in Review for your decision. In the current run, **Correct → Remove entry** removes a booking from tables and totals. Undo restores it at its original prices; the separate Corrected audit keeps the original receipt. Historical and saved-session receipts are read-only.
+- **Ledger:** see why an entry counted and open its retained receipts. Uncertain entries wait in Review for your decision. In the current run, **Correct → Remove entry** removes a booking from tables and totals, even if you later used or sold the item. After a removal, **⚙ → Undo last removal** restores it at its original prices; the separate Corrected audit keeps the receipt. Other corrections can be refused when an item's value is tied to other entries; the panel explains why. Historical and saved-session receipts stay read-only.
 - **Grinds and saved sessions:** name an activity, set targets and compare finished runs. **Save session** keeps a session copy in Grinds without counting its money twice. Inside a finished session, use **⋯ → Rename…** to change its name. All time brings your runs together.
 - **Free play:** tracks activity outside Grinds. Set an optional milestone, or use **⚙ → Reset free-play** to start again and keep the previous run in Grinds.
 - **Raids:** entering CoX, ToB, ToA or The Fractured Archive unlocks the account's tab; you always open it manually. Browse saved loot from every raid in one collapsible table. The tab shows completed raids, failed runs and actual paid death fees. Abandoned attempts and deaths with lives remaining stay out of the list. Rewards count when collected or sent to the bank, once. RuneLite's Loot Tracker can provide an unclaimed reward preview.
@@ -62,7 +62,7 @@ When a change needs your decision, the Ledger explains it in Review.
 
 ## Your data
 
-Data stays on your computer, separately for each account. Use **⚙** to back up your profile, find its location or **Delete Profile**. Restore a backup while RuneLite is closed.
+Data stays on your computer, separately for each account. Use **⚙** to back up your profile, find its location or **Delete Profile**. Restore a backup while RuneLite is closed. Keep GP Manager up to date: an older version may not read newer corrections the same way, so back up before switching back.
 
 Recent receipts are retained alongside run totals; older item details may be compacted. Very large histories can make saving slower, so keep a backup. GP Manager makes no network calls of its own and never plays the game for you.
 

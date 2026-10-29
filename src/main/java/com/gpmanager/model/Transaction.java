@@ -1,6 +1,5 @@
 package com.gpmanager;
 import static com.gpmanager.LedgerData.Scope.*;
-import java.util.concurrent.ConcurrentHashMap;
 import static com.gpmanager.Accounting.Amounts.*;
 import static java.lang.Integer.parseInt;
 import static com.gpmanager.Semantics.Table.*;
@@ -58,12 +57,9 @@ import org.slf4j.*;
 import static java.nio.file.StandardCopyOption.*;
 import static java.nio.file.StandardOpenOption.*;
 import static com.gpmanager.SaveStatus.State.*;
-import static com.gpmanager.GameData.msg;
 import com.gpmanager.SessionRepository.ReplaceOutcome;
 import java.util.concurrent.*;
 import java.util.concurrent.atomic.*;
-import net.runelite.api.Client;
-import net.runelite.client.util.Filepath;
 import com.google.gson.*;
 import com.gpmanager.SaveStatus.State;
 import java.nio.channels.*;
@@ -92,6 +88,8 @@ class Transaction extends SaveCopies {
     Confidence confidence;
     String explanation;
     Correction correction;
+    /** Original physical attribution retained by an explicit value-only removal, absent on old rows. */
+    Correction ownershipCorrection;
     String correctionReason, encounterId;
 
     /**
@@ -157,6 +155,11 @@ class Transaction extends SaveCopies {
             if (flow.value > 0) revenue = sum(revenue, flow.value);
             else if (flow.value < 0) costs = sum(costs, abs(flow.value));
 
+    }
+
+    /** The physical decision: a financial removal keeps the decision it replaced. */
+    Correction physical(Correction decision) {
+        return decision == IGNORE && ownershipCorrection != null ? ownershipCorrection : decision;
     }
 
     void applyCorrection(Correction newCorrection, String reason) {
@@ -1242,6 +1245,8 @@ class Session extends SaveCopies {
         transactionChanged(transaction);
         if (ownedValueObserver != null)
             ownedValueObserver.onChanged(transaction, previous, previousFlows);
+        // A removal's retained ownership ends when the row stops being removed.
+        if (transaction.correction() != IGNORE) transaction.ownershipCorrection = null;
     }
 
     void log(String reason, Change... changes) {
@@ -1622,20 +1627,18 @@ class Session extends SaveCopies {
         return true;
     }
 
-    /**
-     * Reverts the most recent correction/split when a flow snapshot is present, or restores the
-     * previous correction enum otherwise.
-     */
-    boolean undoCorrection() {
-        if (correctionHistory.isEmpty()) return false;
-        CorrectionRecord last = null;
+    /** Latest applied decision; shared by Undo and its current cog label. */
+    CorrectionRecord latestCorrection() {
         for (int index = correctionHistory.size() - 1; index >= 0; index--) {
             var candidate = correctionHistory.get(index);
-            if (candidate != null && !candidate.undone) {
-                last = candidate;
-                break;
-            }
+            if (candidate != null && !candidate.undone) return candidate;
         }
+        return null;
+    }
+
+    /** Revert the latest decision using its original flow snapshot and ownership validation. */
+    boolean undoCorrection() {
+        var last = latestCorrection();
         if (last == null) return false;
         var changes = last.changes();
         if (changes.isEmpty()) return false;
@@ -1705,13 +1708,16 @@ class Session extends SaveCopies {
      */
     long pickUp(String dropId, int id, long quantity) {
         var drop = findTransaction(dropId);
-        if (drop == null || !drop.counts() || drop.correction() != AUTO) return 0;
+        // A removed or excluded drop still reconciles its own pickup; other corrections keep theirs.
+        var physical = drop == null ? null : drop.physical(drop.correction());
+        if (physical != AUTO && physical != IGNORE || !drop.counted) return 0;
         long taken = min(quantity, drop.quantity(id, false));
         if (taken <= 0) return 0;
+        var previous = drop.correction();
         var flows = new ArrayList<>(drop.flows());
         drop.takeQuantity(id, false, taken);
         if (!drop.spends()) drop.applyCorrection(IGNORE, "Picked back up");
-        changed(drop, AUTO, flows);
+        changed(drop, previous, flows);
         return taken;
     }
 
@@ -4557,11 +4563,12 @@ class LedgerData {
         synchronized (engine) {
             var session = engine.session();
             long net = engine.metrics(now).net;
-            if (session == null || id == null || decision == null)
-                return new CorrectionPreview(net, net, engine.revision());
-            var transaction = session.findTransaction(id);
+            var transaction = session == null || decision == null ? null : session.findTransaction(id);
             if (transaction == null)
                 return new CorrectionPreview(net, net, engine.revision());
+            // Explicit removal changes only financial inclusion; physical edits retain their guard.
+            if (decision != IGNORE && !session.canEditValue(transaction, transaction.correction(),
+                    transaction.flows(), decision, transaction.flows())) return null;
             long before = transaction.counts() ? transaction.net() : 0, after = transaction.netUnder(decision);
             return new CorrectionPreview(net, net - before + after, engine.revision());
         }

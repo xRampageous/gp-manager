@@ -1,8 +1,8 @@
 # GP Manager changelog
 
-## 1.7.0 - 2026-10-27
+## 1.7.0 - 2026-10-30
 
-- Right-click Recent to preview and remove an entry from tables and totals, with Undo available. Grouped rows offer the latest booking.
+- Right-click Recent to preview and remove an entry from tables and totals, even if the item was later used or sold. Undo last removal is under ⚙; grouped rows offer the latest booking. Other protected changes explain why they cannot be applied.
 - Track CoX, ToB, ToA and The Fractured Archive in Raids, with loot, paid death fees and All raids totals. Raid entry unlocks the tab; you always open it manually. Attempts show a completed clear, a terminal failure or the actual Death Fee; abandoned and retry-only attempts stay out of the list.
 - Open KILLS for recorded PK loot, or DEATHS for PvP death losses and looting-bag contents. PvP skull colours show the booked loss tier.
 - Save a session in Grinds and rename saved sessions or finished runs from their ⋯ menu.
@@ -17,7 +17,7 @@
 - Cannonballs left in a deployed cannon no longer count as fresh income when you pick it up; a tracked load shrinks when those balls come back.
 - Hardcore Worlds pause tracking and automatic market prices until dedicated support; main-game history is never mixed with them.
 - Recovered gear stays neutral; only the death fee counts. Genuine loot is kept. Wrong entries in the current run can be removed with Undo available.
-- OSRS already shows your grave, so GP Manager no longer adds a gravestone icon, reclaim-pending row or death-reclaim hero line. Recoverable gear stays neutral; only the fee is booked.
+- OSRS already shows your grave, so GP Manager no longer adds a gravestone icon, reclaim-pending row or death-reclaim hero line.
 
 ## 1.6.0 - 2026-10-20
 

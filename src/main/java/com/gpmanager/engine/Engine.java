@@ -2085,6 +2085,15 @@ class Engine {
         return transaction;
     }
 
+    /** Explicit ledger removal may change money while preserving already-accounted physical value. */
+    synchronized boolean removeEntry(String id, String reason) {
+        var row = current == null ? null : current.findTransaction(id);
+        if (row == null || row.correction() == IGNORE) return false;
+        // Both physical projections now match, so the existing validator accepts this decision.
+        row.ownershipCorrection = row.correction();
+        return current.correctTransaction(id, IGNORE, reason);
+    }
+
     synchronized boolean correctTransaction(String id, Correction decision, String reason) {
         return current != null && current.correctTransaction(id, decision, reason);
     }
@@ -2330,6 +2339,16 @@ class Engine {
             snapshot = committed;
             this.now = now;
         }
+
+        /** Moves {@code moved} out of this change into a fresh generic slice of its snapshot. */
+        Settle slice(List<Flow> moved) {
+            var slice = new Settle(new Clue(), snapshot, now);
+            slice.flows = moved;
+            slice.activity = activity;
+            flows = new ArrayList<>(flows);
+            flows.removeAll(moved);
+            return slice;
+        }
     }
 
     /**
@@ -2463,14 +2482,10 @@ class Engine {
         if (lost.isEmpty() || lost.size() == batch.flows.size() || kind == CAST && batch.spell == null
                         && batch.intent != CAST
                         && lost.stream().allMatch(flow -> elemental(flow.name))) return null;
-        var slice = new Settle(new Clue(), batch.snapshot, batch.now);
-        slice.flows = lost;
-        slice.activity = batch.activity;
+        var slice = batch.slice(lost);
         slice.intent = kind;
         slice.label = batch.intent == kind ? batch.label : null;
         slice.spell = kind == CAST ? batch.spell : null;
-        batch.flows = new ArrayList<>(batch.flows);
-        batch.flows.removeAll(lost);
         if (batch.intent == kind) {
             batch.used = false;
             batch.intent = null;
@@ -2490,14 +2505,10 @@ class Engine {
         for (Flow flow : batch.flows)
             if (flow.cost() || product.contains(flow.item)) legs.add(flow);
         if (product.isEmpty() || legs.size() == batch.flows.size()) return null;
-        var slice = new Settle(new Clue(), batch.snapshot, batch.now);
-        slice.flows = legs;
-        slice.activity = batch.activity;
+        var slice = batch.slice(legs);
         slice.intent = batch.intent;
         slice.label = batch.label;
         slice.used = true;
-        batch.flows = new ArrayList<>(batch.flows);
-        batch.flows.removeAll(legs);
         batch.used = false;
         batch.intent = null;
         batch.label = null;
@@ -2528,13 +2539,9 @@ class Engine {
                 return null;
 
         if (lost.isEmpty() || pickedBack) return null;
-        var slice = new Settle(new Clue(), batch.snapshot, batch.now);
+        var slice = batch.slice(lost);
         slice.context = batch.context;
         slice.fight = batch.fight;
-        slice.activity = batch.activity;
-        slice.flows = lost;
-        batch.flows = new ArrayList<>(batch.flows);
-        batch.flows.removeAll(lost);
         settleActions(slice);
         return book(slice);
     }
@@ -2567,14 +2574,10 @@ class Engine {
         if (!pure && !toppedUp) return null;
         // The bite is a player action of its own, never part of the transfer or loot batch it
         // landed with: a fresh generic slice books it as the counted Supplies row.
-        var slice = new Settle(new Clue(), batch.snapshot, batch.now);
-        slice.activity = batch.activity;
+        var slice = batch.slice(bites);
         slice.intent = intent.action;
         slice.label = intent.label;
         slice.used = true;
-        slice.flows = bites;
-        batch.flows = new ArrayList<>(batch.flows);
-        batch.flows.removeAll(bites);
         // The bite owns the intent: take it so no later flow wears its verb or spell label.
         events.take(CONSUME, intent.item, 1, e -> true);
         return book(slice);
@@ -5399,16 +5402,18 @@ class TrackedBasisLedger {
 
     /** The contribution the transaction would have under {@code correction} with {@code flows}. */
     Map<Integer, long[]> contribution(Transaction transaction, Correction decision, List<Flow> flows) {
+        decision = transaction.physical(decision);
         return flows == null || financialDose(transaction) ? new LinkedHashMap<>() : contribution(transaction.original(),
                         effectiveCounted(transaction.counted, decision), decision, flows);
     }
 
-    /** The row's sinks as it is booked now. */
+    /** The row's physical sinks, retaining ownership when its financial booking was removed. */
     Map<Integer, Long> sinks(Transaction transaction) {
         return sinks(transaction, transaction.correction(), transaction.flows());
     }
 
     Map<Integer, Long> sinks(Transaction transaction, Correction decision, List<Flow> flows) {
+        decision = transaction.physical(decision);
         // A drop or a shot still on the ground is not a use yet: picking it up shrinks the row. It
         // depletes the pool when its pickup window closes (Engine#settleGround).
         return transaction.onGround() || financialDose(transaction) ? new LinkedHashMap<>() : sinks(transaction.original(), effectiveCounted(transaction.counted, decision),

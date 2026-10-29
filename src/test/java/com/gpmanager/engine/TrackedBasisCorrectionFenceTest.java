@@ -26,6 +26,7 @@ import static org.junit.Assert.assertTrue;
 public class TrackedBasisCorrectionFenceTest
 {
     private static final int LOGS = ItemID.LOGS;
+    private static final int OAK = ItemID.OAK_LOGS;
     private static final int COINS = ItemID.COINS;
     private static final long T0 = 1_000_000_000_000L;
 
@@ -254,12 +255,426 @@ public class TrackedBasisCorrectionFenceTest
         assertEquals(Correction.AUTO, gain.correction());
     }
 
+    @Test public void manualRemovalOfAUsedPickaxeChangesOnlyItsBookingAndUndo() throws Exception {
+        Harness h = new Harness(18_635);
+        String gain = h.gain(1275, 1, 18_635, h.now - 60_000);
+        h.sink(1275, 1, h.now);
+        long before = h.net();
+        String stock = stock(h.engine);
+        removeInLedger(h.engine, gain);
+        assertEquals(Correction.IGNORE, h.transaction(gain).correction());
+        assertEquals(before - 18_635, h.net());
+        assertEquals(stock, stock(h.engine));
+        assertTrue(h.engine.undoCorrection());
+        assertEquals(before, h.net());
+        assertEquals(stock, stock(h.engine));
+        assertEquals(18_635, h.transaction(gain).flows().get(0).unitPrice);
+    }
+
+    @Test public void manualRemovalBeforeSaleKeepsOwnershipAndLaterUndoCannotDoubleIt() throws Exception {
+        Harness h = new Harness(159);
+        String gain = h.gain(LOGS, 5, 775, h.now - 60_000);
+        String stock = stock(h.engine);
+        removeInLedger(h.engine, gain);
+        assertEquals(0, h.net());
+        assertEquals(stock, stock(h.engine));
+        h.sell(0, LOGS, 5, 159, 790);
+        assertEquals(15, h.net());
+        assertEquals(0, EngineProbe.availableQty(h.engine, LOGS));
+        assertTrue(h.engine.undoCorrection());
+        assertEquals(790, h.net());
+        assertEquals(0, EngineProbe.availableQty(h.engine, LOGS));
+        assertEquals(0, EngineProbe.availableBasisGp(h.engine, LOGS));
+    }
+
+    @Test public void manualRemovalAfterSaleNeverRewritesTheTradeOrRecreatesStock() throws Exception {
+        Harness h = new Harness(159);
+        String gain = h.gain(LOGS, 5, 775, h.now - 60_000);
+        h.sell(0, LOGS, 5, 159, 790);
+        long before = h.net(), result = h.rows().get(0).realizedResultGp;
+        String trades = new com.google.gson.Gson().toJson(h.engine.exchange.records());
+        String stock = stock(h.engine);
+        removeInLedger(h.engine, gain);
+        assertEquals(Correction.IGNORE, h.transaction(gain).correction());
+        assertEquals(before - 775, h.net());
+        assertEquals(result, h.rows().get(0).realizedResultGp);
+        assertEquals(trades, new com.google.gson.Gson().toJson(h.engine.exchange.records()));
+        assertEquals(stock, stock(h.engine));
+        assertTrue(h.engine.undoCorrection());
+        assertEquals(before, h.net());
+        assertEquals(stock, stock(h.engine));
+    }
+
+    @Test public void manualRemovalSurvivesReloadAndCancelledReservationWithoutDuplicatingBasis() throws Exception {
+        Harness h = new Harness(159);
+        String gain = h.gain(LOGS, 5, 775, h.now - 60_000);
+        h.inventory = with(h.inventory, LOGS, 5L);
+        h.engine.setBaseline(new ContainerSnapshot(h.inventory));
+        h.offer(0, SELLING, LOGS, 5, 0, 159, 0);
+        h.inventory = with(h.inventory, LOGS, 0L);
+        h.settle(h.inventory);
+        long before = h.net();
+        String stock = stock(h.engine);
+        removeInLedger(h.engine, gain);
+        assertEquals(before - 775, h.net());
+        assertEquals(stock, stock(h.engine));
+        var gson = new com.google.gson.Gson();
+        var state = gson.fromJson(gson.toJson(h.engine.exportState()), SavedState.class);
+        Engine restored = engine(new int[] {159});
+        restored.restore(state, h.now + 1);
+        assertEquals(stock, stock(restored));
+        h.engine = restored;
+        h.engine.setBaseline(new ContainerSnapshot(h.inventory));
+        h.engine.session().resume(h.now);
+        h.engine.seedGeSlots(Collections.singletonMap(0,
+                new OfferSlots.Snapshot(0, SELLING, LOGS, 5, 0, 159, 0)), h.now + 500);
+        h.offer(0, CANCELLED_SELL, LOGS, 5, 0, 159, 0);
+        h.inventory = with(h.inventory, LOGS, 5L);
+        h.settle(h.inventory);
+        assertEquals(5, EngineProbe.availableQty(restored, LOGS));
+        assertTrue(restored.undoCorrection());
+        assertEquals(5, EngineProbe.availableQty(restored, LOGS));
+        assertEquals(775, EngineProbe.availableBasisGp(restored, LOGS));
+        assertEquals(before, restored.metrics(h.now + 2).net);
+    }
+
+    @Test public void manualRemovalOfPreTrackingHistoryNeverBackfillsOwnedValue() throws Exception {
+        Harness h = new Harness(159);
+        String gain = h.gain(LOGS, 5, 775, h.now - 60_000);
+        var legacy = h.engine.exportState();
+        legacy.setSchemaVersion(105);
+        legacy.setTrackedBasis(null);
+        Engine restored = engine(new int[] {159});
+        restored.restore(legacy, h.now + 1_000);
+        String stock = stock(restored);
+        long before = restored.metrics(h.now + 1_000).net;
+        removeInLedger(restored, gain);
+        assertEquals(before - 775, restored.metrics(h.now + 2_000).net);
+        assertEquals(stock, stock(restored));
+        assertTrue(restored.undoCorrection());
+        assertEquals(before, restored.metrics(h.now + 2_000).net);
+        assertEquals(stock, stock(restored));
+    }
+
+    @Test public void financialRemovalDoesNotBypassOtherOwnershipCorrections() throws Exception {
+        Harness h = new Harness(159);
+        String gain = h.gain(LOGS, 5, 775, h.now - 60_000);
+        h.sink(LOGS, 2, h.now);
+        String stock = stock(h.engine);
+        removeInLedger(h.engine, gain);
+        assertFalse(h.engine.correctTransaction(gain, Correction.COST, "owner"));
+        assertFalse(h.engine.correctTransaction(gain, Correction.TRANSFER, "owner"));
+        assertEquals(Correction.IGNORE, h.transaction(gain).correction());
+        assertEquals(stock, stock(h.engine));
+        assertTrue(h.engine.undoCorrection());
+        assertEquals(Correction.AUTO, h.transaction(gain).correction());
+        assertEquals(stock, stock(h.engine));
+        assertFalse(h.engine.correctTransaction(gain, Correction.COST, "owner"));
+        assertFalse(h.engine.correctTransaction(gain, Correction.TRANSFER, "owner"));
+        assertEquals(stock, stock(h.engine));
+    }
+
+    @Test public void financialRemovalDoesNotUnlockQuantityEdits() throws Exception {
+        Harness h = new Harness(159);
+        String gain = h.gain(LOGS, 5, 775, h.now - 60_000);
+        h.sink(LOGS, 2, h.now);
+        removeInLedger(h.engine, gain);
+        assertTrue(h.engine.undoCorrection());
+        assertFalse(h.engine.splitItem(gain, LOGS, 2, "owner"));
+        assertEquals(5, h.transaction(gain).flows().get(0).quantity);
+        assertEquals(3, EngineProbe.availableQty(h.engine, LOGS));
+    }
+
+    @Test public void removedDropStillDepletesOwnershipOnceWhenItsPickupWindowEnds() throws Exception {
+        Harness h = new Harness(159);
+        h.gain(LOGS, 5, 775, h.now - 60_000);
+        var drop = Tx.of(h.now, TransactionType.CONSUMPTION, Context.GENERIC, "", true,
+                List.of(new Flow(LOGS, "Logs", -2, 155, -310, PriceSource.GRAND_EXCHANGE)));
+        drop.setOnGround(true);
+        h.engine.session().addTransaction(drop, 500, false);
+        assertEquals(5, EngineProbe.availableQty(h.engine, LOGS));
+        removeInLedger(h.engine, drop.id());
+        assertEquals(775, h.net());
+        assertEquals(5, EngineProbe.availableQty(h.engine, LOGS));
+        h.engine.session().usedUp(drop);
+        assertEquals(3, EngineProbe.availableQty(h.engine, LOGS));
+        assertEquals(465, EngineProbe.availableBasisGp(h.engine, LOGS));
+        assertTrue(h.engine.undoCorrection());
+        assertEquals(465, h.net());
+        assertEquals(3, EngineProbe.availableQty(h.engine, LOGS));
+        assertEquals(465, EngineProbe.availableBasisGp(h.engine, LOGS));
+    }
+
+    @Test public void removalMarkerIsOptionalAndRoundTripsWithoutChangingSavedNames() throws Exception {
+        Harness h = new Harness(159);
+        String gain = h.gain(LOGS, 5, 775, h.now - 60_000);
+        var gson = new com.google.gson.Gson();
+        var oldJson = gson.toJson(h.engine.exportState());
+        assertFalse(oldJson.contains("ownershipCorrection"));
+        Engine old = engine(new int[] {159});
+        old.restore(gson.fromJson(oldJson, SavedState.class), h.now);
+        assertEquals(h.net(), old.metrics(h.now).net);
+        assertEquals(stock(h.engine), stock(old));
+        removeInLedger(h.engine, gain);
+        var json = gson.toJson(h.engine.exportState());
+        assertTrue(json.contains("\"ownershipCorrection\":\"AUTO\""));
+        var saved = gson.fromJson(json, SavedState.class);
+        assertEquals(110, saved.schemaVersion);
+        Engine restored = engine(new int[] {159});
+        restored.restore(saved, h.now);
+        assertEquals(0, restored.metrics(h.now).net);
+        assertEquals(stock(h.engine), stock(restored));
+        assertTrue(restored.undoCorrection());
+        assertEquals(775, restored.metrics(h.now).net);
+        assertEquals(stock(h.engine), stock(restored));
+        var unknown = gson.fromJson(json.replace("\"ownershipCorrection\":\"AUTO\"",
+                "\"ownershipCorrection\":\"FUTURE_VALUE\""), SavedState.class);
+        Engine tolerant = engine(new int[] {159});
+        tolerant.restore(unknown, h.now);
+        assertEquals(0, tolerant.metrics(h.now).net);
+        assertEquals(stock(h.engine), stock(tolerant));
+    }
+
+    @Test public void refusedOrRepeatedRemovalLeavesAllStateUnchanged() throws Exception {
+        Harness h = new Harness(159);
+        String gain = h.gain(LOGS, 5, 775, h.now - 60_000);
+        String before = stableState(h.engine);
+        assertFalse(h.engine.removeEntry("missing", "owner"));
+        assertEquals(before, stableState(h.engine));
+        removeInLedger(h.engine, gain);
+        before = stableState(h.engine);
+        assertFalse(h.engine.removeEntry(gain, "owner"));
+        assertEquals(before, stableState(h.engine));
+    }
+
+    @Test public void undoneRemovalRetainsNoOwnershipForALaterGiveAwayOrSale() throws Exception {
+        Harness h = new Harness(159);
+        String gain = h.gain(LOGS, 5, 775, h.now - 60_000);
+        removeInLedger(h.engine, gain);
+        assertTrue(h.engine.undoCorrection());
+        assertTrue(h.engine.splitItem(gain, LOGS, 0, "owner"));
+        assertEquals(0, EngineProbe.availableQty(h.engine, LOGS));
+        assertEquals(0, EngineProbe.availableBasisGp(h.engine, LOGS));
+        h.sell(0, LOGS, 5, 159, 790);
+        assertEquals(0, h.net());
+        assertNull(h.transaction(gain).ownershipCorrection);
+    }
+
+    // ---- removed own drops (G2/G3): quote 159 each; known logs basis 155 each, oak 100 each ----
+
+    @Test public void removedOwnDropRecoveryIsNeutralAndKeepsKnownBasisForTheTaxedSale() throws Exception {
+        Harness h = new Harness(159);
+        String gain = h.gain(LOGS, 5, 775, h.now - 60_000);
+        h.hold(LOGS, 5L);
+        Transaction drop = h.drop(LOGS, 5);
+        assertEquals("Dropped", drop.note());
+        assertEquals(159, drop.flows().get(0).unitPrice);
+        assertEquals(775 - 795, h.net());
+        removeInLedger(h.engine, drop.id());
+        assertEquals(775, h.net());
+        Transaction back = h.pickUp(LOGS, 5L);
+        assertEquals(TransactionType.TRANSFER, back.type());
+        assertEquals("Picked back up", back.note());
+        assertEquals("recovery adds no income", 775, h.net());
+        assertEquals(0, drop.quantity(LOGS, false));
+        assertEquals(Correction.IGNORE, drop.correction());
+        assertEquals(1, h.engine.session().correctionHistory.size());
+        h.expire();
+        assertEquals(5, EngineProbe.availableQty(h.engine, LOGS));
+        assertEquals(775, EngineProbe.availableBasisGp(h.engine, LOGS));
+        assertEquals(155, h.transaction(gain).flows().get(0).unitPrice);
+        // 5 x 159 = 795 gross, 5 x (159 / 50 = 3) = 15 tax, 780 received; 780 - 775 basis = +5.
+        h.sellTaxed(0, LOGS, 5, 159, 780);
+        assertEquals(780, h.net());
+        assertEquals(0, EngineProbe.availableQty(h.engine, LOGS));
+    }
+
+    @Test public void removedOwnDropOfUnknownStockInventsNoIncomeOrBasis() throws Exception {
+        Harness h = new Harness(159);
+        h.hold(LOGS, 5L);
+        assertEquals(0, EngineProbe.availableQty(h.engine, LOGS));
+        Transaction drop = h.drop(LOGS, 5);
+        assertEquals(-795, h.net());
+        removeInLedger(h.engine, drop.id());
+        assertEquals(0, h.net());
+        assertEquals(TransactionType.TRANSFER, h.pickUp(LOGS, 5L).type());
+        assertEquals(0, h.net());
+        h.expire();
+        assertEquals(0, EngineProbe.availableQty(h.engine, LOGS));
+        assertEquals(0, EngineProbe.availableBasisGp(h.engine, LOGS));
+        // Unknown basis with a proven 15 GP tax books exactly the tax as the trade cost.
+        h.sellTaxed(0, LOGS, 5, 159, 780);
+        assertEquals(-15, h.net());
+    }
+
+    @Test public void partlyRecoveredRemovedDropDepletesOnlyTheUnrecoveredItems() throws Exception {
+        Harness h = new Harness(159);
+        h.gain(LOGS, 5, 775, h.now - 60_000);
+        h.hold(LOGS, 5L);
+        Transaction drop = h.drop(LOGS, 5);
+        removeInLedger(h.engine, drop.id());
+        assertEquals(TransactionType.TRANSFER, h.pickUp(LOGS, 2L).type());
+        assertEquals(775, h.net());
+        assertEquals(3, drop.quantity(LOGS, false));
+        h.expire();
+        assertEquals(2, EngineProbe.availableQty(h.engine, LOGS));
+        assertEquals(310, EngineProbe.availableBasisGp(h.engine, LOGS));
+        assertEquals(775, h.net());
+        // 2 x 159 = 318 gross, 6 tax, 312 received; 312 - 310 basis = +2.
+        h.sellTaxed(0, LOGS, 2, 159, 312);
+        assertEquals(777, h.net());
+    }
+
+    @Test public void mixedRecoveryKeepsGenuineExcessAndShrinksEachOwnDrop() throws Exception {
+        Harness h = new Harness(159);
+        h.gain(LOGS, 5, 775, h.now - 60_000);
+        h.gain(OAK, 3, 300, h.now - 60_000);
+        h.hold(LOGS, 5L, OAK, 3L);
+        Transaction logs = h.drop(LOGS, 5), oak = h.drop(OAK, 3);
+        assertEquals(1_075 - 795 - 477, h.net());
+        removeInLedger(h.engine, logs.id());
+        assertEquals(1_075 - 477, h.net());
+        h.pickUp(LOGS, 7L, OAK, 1L);
+        assertEquals(0, logs.quantity(LOGS, false));
+        assertEquals(2, oak.quantity(OAK, false));
+        assertEquals(Correction.AUTO, oak.correction());
+        // Two genuine extra logs count once (+318); the unrecovered oak stays a -318 loss.
+        assertEquals(1_075, h.net());
+        h.expire();
+        assertEquals(1_075, h.net());
+        assertEquals(7, EngineProbe.availableQty(h.engine, LOGS));
+        assertEquals(1_093, EngineProbe.availableBasisGp(h.engine, LOGS));
+        assertEquals(1, EngineProbe.availableQty(h.engine, OAK));
+        assertEquals(100, EngineProbe.availableBasisGp(h.engine, OAK));
+    }
+
+    @Test public void ordinaryOwnDropStillShrinksAndDepletesItsRemainder() throws Exception {
+        Harness h = new Harness(159);
+        h.gain(LOGS, 5, 775, h.now - 60_000);
+        h.hold(LOGS, 5L);
+        Transaction drop = h.drop(LOGS, 5);
+        assertEquals(TransactionType.TRANSFER, h.pickUp(LOGS, 2L).type());
+        assertEquals(Correction.AUTO, drop.correction());
+        assertEquals(775 - 477, h.net());
+        h.expire();
+        assertEquals(298, h.net());
+        assertEquals(2, EngineProbe.availableQty(h.engine, LOGS));
+        assertEquals(310, EngineProbe.availableBasisGp(h.engine, LOGS));
+    }
+
+    @Test public void legacyExcludedDropWithoutMarkerReconcilesItsPickup() throws Exception {
+        Harness h = new Harness(159);
+        h.gain(LOGS, 5, 775, h.now - 60_000);
+        h.hold(LOGS, 5L);
+        Transaction drop = h.drop(LOGS, 5);
+        assertTrue(h.engine.correctTransaction(drop.id(), Correction.IGNORE, "older exclusion"));
+        assertNull(drop.ownershipCorrection);
+        assertEquals(TransactionType.TRANSFER, h.pickUp(LOGS, 5L).type());
+        assertEquals(775, h.net());
+        h.expire();
+        assertEquals(5, EngineProbe.availableQty(h.engine, LOGS));
+        assertEquals(775, EngineProbe.availableBasisGp(h.engine, LOGS));
+    }
+
+    @Test public void otherDropCorrectionsKeepTheirExistingPickupRule() throws Exception {
+        Harness h = new Harness(159);
+        h.hold(LOGS, 5L);
+        Transaction drop = h.drop(LOGS, 5);
+        assertTrue(h.engine.correctTransaction(drop.id(), Correction.TRANSFER, "owner transfer"));
+        assertEquals(TransactionType.GAIN, h.pickUp(LOGS, 5L).type());
+        assertEquals(Correction.TRANSFER, drop.correction());
+        assertEquals(5, drop.quantity(LOGS, false));
+    }
+
+    @Test public void undoAfterRecoveryRecreatesNoIncomeStockOrBasis() throws Exception {
+        Harness full = new Harness(159);
+        full.gain(LOGS, 5, 775, full.now - 60_000);
+        full.hold(LOGS, 5L);
+        Transaction all = full.drop(LOGS, 5);
+        removeInLedger(full.engine, all.id());
+        full.pickUp(LOGS, 5L);
+        assertTrue(full.engine.undoCorrection());
+        assertEquals(Correction.AUTO, all.correction());
+        assertNull(all.ownershipCorrection);
+        assertEquals(775, full.net());
+        full.expire();
+        assertEquals(775, full.net());
+        assertEquals(5, EngineProbe.availableQty(full.engine, LOGS));
+        assertEquals(775, EngineProbe.availableBasisGp(full.engine, LOGS));
+
+        Harness part = new Harness(159);
+        part.gain(LOGS, 5, 775, part.now - 60_000);
+        part.hold(LOGS, 5L);
+        Transaction some = part.drop(LOGS, 5);
+        removeInLedger(part.engine, some.id());
+        part.pickUp(LOGS, 2L);
+        assertTrue(part.engine.undoCorrection());
+        assertEquals("the 3 still on the ground count as lost again", 775 - 477, part.net());
+        part.expire();
+        assertEquals(298, part.net());
+        assertEquals(2, EngineProbe.availableQty(part.engine, LOGS));
+        assertEquals(310, EngineProbe.availableBasisGp(part.engine, LOGS));
+    }
+
+    @Test public void completedRecoverySurvivesJsonButPendingDropMemoryDoesNot() throws Exception {
+        Harness done = new Harness(159);
+        done.gain(LOGS, 5, 775, done.now - 60_000);
+        done.hold(LOGS, 5L);
+        Transaction drop = done.drop(LOGS, 5);
+        removeInLedger(done.engine, drop.id());
+        done.pickUp(LOGS, 5L);
+        done.reload();
+        var restored = done.transaction(drop.id());
+        assertEquals(Correction.IGNORE, restored.correction());
+        assertEquals(Correction.AUTO, restored.ownershipCorrection);
+        assertEquals(0, restored.quantity(LOGS, false));
+        done.expire();
+        assertEquals(775, done.net());
+        assertEquals(5, EngineProbe.availableQty(done.engine, LOGS));
+        assertEquals(775, EngineProbe.availableBasisGp(done.engine, LOGS));
+
+        Harness pending = new Harness(159);
+        pending.gain(LOGS, 5, 775, pending.now - 60_000);
+        pending.hold(LOGS, 5L);
+        Transaction left = pending.drop(LOGS, 5);
+        removeInLedger(pending.engine, left.id());
+        pending.reload();
+        pending.expire();
+        assertFalse(pending.transaction(left.id()).onGround());
+        assertEquals(0, EngineProbe.availableQty(pending.engine, LOGS));
+        assertEquals("no drop memory is invented after a reload", TransactionType.GAIN,
+                pending.pickUp(LOGS, 5L).type());
+        assertEquals(5, pending.transaction(left.id()).quantity(LOGS, false));
+    }
+
+    private static String stableState(Engine engine) {
+        var state = engine.exportState();
+        state.savedAtEpochMillis = 0; // Compare durable facts, not the time a copy was requested.
+        return new com.google.gson.Gson().toJson(state);
+    }
+
+    private static String stock(Engine engine) {
+        return new com.google.gson.Gson().toJson(engine.exportState().trackedBasis());
+    }
+
+    private static void removeInLedger(Engine engine, String id) throws Exception {
+        MilestoneTest.onEdt(() -> {
+            var panel = new SidebarPanel(engine, new GpManagerConfig() {}, null, null, null);
+            var controller = new LedgerController(panel, false);
+            var preview = controller.preview(id, Correction.IGNORE);
+            assertNotNull("explicit removal must have a usable preview", preview);
+            controller.correct(id, Correction.IGNORE, preview.revision);
+            assertEquals(Correction.IGNORE, engine.session().findTransaction(id).correction());
+            return null;
+        });
+    }
+
     // ---- harness ----------------------------------------------------------------------------
 
     private static final class Harness
     {
         final int[] quote;
-        final Engine engine;
+        Engine engine;
         final OfferSlots ledger = new OfferSlots();
         long now = T0;
         Map<Integer, Long> inventory = new HashMap<>();
@@ -334,6 +749,63 @@ public class TrackedBasisCorrectionFenceTest
                 now += 600L;
             }
             return result;
+        }
+
+        void hold(Object... pairs)
+        {
+            inventory = with(inventory, pairs);
+            engine.setBaseline(new ContainerSnapshot(inventory));
+        }
+
+        Transaction drop(int item, long qty)
+        {
+            engine.noteDrop(item, 6);
+            return settle(with(inventory, item, inventory.getOrDefault(item, 0L) - qty));
+        }
+
+        Transaction pickUp(Object... pairs)
+        {
+            Map<Integer, Long> next = new HashMap<>(inventory);
+            for (int i = 0; i < pairs.length; i += 2)
+            {
+                next.merge((Integer) pairs[i], (Long) pairs[i + 1], Long::sum);
+            }
+            return settle(next);
+        }
+
+        /** Ages every remembered drop past its 300-tick pickup window. */
+        void expire()
+        {
+            for (int i = 0; i < 300; i++)
+            {
+                now += 600L;
+                engine.processIfDirty(new ContainerSnapshot(inventory), now, null);
+            }
+        }
+
+        /** A sale whose G.E. gross is qty x price and whose collected cash is the taxed amount. */
+        void sellTaxed(int slot, int item, long qty, int price, long received)
+        {
+            inventory = with(inventory, item, qty);
+            engine.setBaseline(new ContainerSnapshot(inventory));
+            offer(slot, SELLING, item, (int) qty, 0, price, 0);
+            inventory = with(inventory, item, 0L);
+            settle(inventory);
+            offer(slot, SOLD, item, (int) qty, (int) qty, price, (int) (qty * price));
+            inventory = with(inventory, COINS, inventory.getOrDefault(COINS, 0L) + received);
+            settle(inventory);
+        }
+
+        /** Saved JSON into a fresh engine: durable rows survive, transient drop memory does not. */
+        void reload()
+        {
+            var gson = new com.google.gson.Gson();
+            var state = gson.fromJson(gson.toJson(engine.exportState()), SavedState.class);
+            Engine restored = engine(quote);
+            restored.restore(state, now + 1);
+            engine = restored;
+            engine.setBaseline(new ContainerSnapshot(inventory));
+            engine.session().resume(now);
         }
 
         Transaction transaction(String id)

@@ -3865,7 +3865,9 @@ class LedgerController implements LedgerPage.Actions {
     }
 
     public CorrectionPreview preview(String id, Correction decision) {
-        return LedgerData.preview(engine, id, decision, now());
+        var preview = LedgerData.preview(engine, id, decision, now());
+        if (preview == null) panel.shell.tell("Not applied", msg("correction-blocked"), true);
+        return preview;
     }
 
     /**
@@ -3878,7 +3880,8 @@ class LedgerController implements LedgerPage.Actions {
         mutate(() -> {
                     boolean stale = engine.revision() != previewRevision;
                     // A toast, not a page note: the refresh after this edit rebuilds the page.
-                    if (stale || !engine.correctTransaction(id, decision, "Ledger correction"))
+                    if (stale || !(decision == Correction.IGNORE ? engine.removeEntry(id, "Ledger correction")
+                            : engine.correctTransaction(id, decision, "Ledger correction")))
                         later(owner, () -> panel.shell.tell("Not applied",
                                         stale ? msg("entries-changed") : msg("correction-applied"), true));
                 });
@@ -5857,6 +5860,23 @@ class GrindsController implements GrindsPage.Actions {
         menu.add(item("Report a bug", () -> LinkBrowser.browse(msg("bug-report"))));
         menu.add(item("Changelog", () -> LinkBrowser.browse(msg("changelog"))));
         menu.addSeparator();
+        Session current;
+        CorrectionRecord correction;
+        synchronized (engine) {
+            current = engine.session();
+            correction = current == null ? null : current.latestCorrection();
+        }
+        Object owner = panel.ownerToken;
+        menu.add(item(correction == null || correction.changes().stream()
+                        .allMatch(change -> change.newCorrection == Correction.IGNORE)
+                        ? msg("undo-removal") : msg("undo-tip"), correction != null, () -> mutate(() -> {
+                            if (owner == panel.ownerToken && engine.session() == current
+                                    && current.latestCorrection() == correction && !engine.undoCorrection())
+                                SidebarPanel.onEdt(() -> {
+                                    if (owner == panel.ownerToken)
+                                        shell.tell("Not applied", msg("correction-blocked"), true);
+                                });
+                        })));
         menu.add(item("Reset free-play…", !engine.customActive(), this::startFreePlayOver));
         menu.add(item(msg("factory-reset"), storage != null, () -> factoryReset()));
         return menu;
