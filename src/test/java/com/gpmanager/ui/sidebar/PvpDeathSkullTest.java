@@ -67,8 +67,9 @@ public class PvpDeathSkullTest {
     @Test public void ignoredAndReclassifiedEntriesNeverColourAnUnbookedLoss() {
         var row = loss(9_000_000, "death:one");
         row.applyCorrection(Correction.IGNORE, "Owner correction");
-        assertEquals(0, group(row).value);
-        assertEquals(-100000, group(row).item);
+        assertTrue("a removed loss has no visible skull or row",
+                DeathRowGroupingTest.capture(row).groups.isEmpty());
+        assertEquals(Correction.IGNORE, row.correction());
         row.applyCorrection(Correction.REVENUE, "Owner correction");
         assertTrue(group(row).value > 0);
         assertEquals(-100000, group(row).item);

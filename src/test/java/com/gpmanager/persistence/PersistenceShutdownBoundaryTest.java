@@ -54,7 +54,7 @@ public class PersistenceShutdownBoundaryTest {
             assertTrue(writer.flush(Duration.ofSeconds(5)));
             assertEquals("exactly one final snapshot", 1, snapshots.get());
             assertTrue(persistence.closed.get()); assertFalse(persistence.needsSnapshot);
-            var saved = repository.load().currentSession();
+            var saved = FixtureReads.currentSession(repository.load());
             assertEquals("Final paused snapshot", saved.name()); assertTrue(saved.paused);
         } finally {
             release.countDown();

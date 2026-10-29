@@ -220,7 +220,7 @@ public class GameDataTablesTest
     public void keyChestEntriesKeepTheirOrder()
     {
         List<String> loaded = new ArrayList<>();
-        for (KeyChestCatalogue.Entry entry : KeyChestCatalogue.entries())
+        for (KeyChestCatalogue.Entry entry : FixtureReads.entries())
         {
             loaded.add(entry.getKeyItemId() + "|" + entry.getChestName() + "|" + entry.isTradeable());
         }

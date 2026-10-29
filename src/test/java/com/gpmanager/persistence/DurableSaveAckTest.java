@@ -126,7 +126,7 @@ public class DurableSaveAckTest
         SessionRepository reader = new SessionRepository(new Gson(), FilepathTestSupport.root(root), true);
         reader.bindIdentity(owner);
         SavedState state = reader.load();
-        return state.currentSession() == null ? null : state.currentSession().name();
+        return FixtureReads.currentSession(state) == null ? null : FixtureReads.currentSession(state).name();
     }
 
     /** Records each retry delay and lets the drain reschedule immediately. */
@@ -216,7 +216,7 @@ public class DurableSaveAckTest
             assertEquals(0, rig.writer.failed);
             SessionRepository reader = new SessionRepository(new Gson(), FilepathTestSupport.root(rig.root), true);
             reader.bindIdentity(ALICE);
-            assertEquals("the receipt is saved once", 1, reader.load().currentSession().transactions().size());
+            assertEquals("the receipt is saved once", 1, FixtureReads.currentSession(reader.load()).transactions().size());
         }
         finally
         {
@@ -592,7 +592,7 @@ public class DurableSaveAckTest
             assertTrue(Files.exists(root.resolve("profiles").resolve(ALICE.folderName()).resolve("sessions.json")));
             SessionRepository reader = new SessionRepository(new Gson(), FilepathTestSupport.root(root), true);
             reader.bindIdentity(ALICE);
-            assertEquals("Committed", reader.load().currentSession().name());
+            assertEquals("Committed", FixtureReads.currentSession(reader.load()).name());
             assertEquals(Collections.emptyList(), pauses);
         }
         finally

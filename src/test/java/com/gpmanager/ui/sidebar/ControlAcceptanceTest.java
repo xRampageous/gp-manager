@@ -59,7 +59,7 @@ public class ControlAcceptanceTest {
             String before = new Gson().toJson(panel.engine.exportState());
             for (String name : new String[]{"Rune kiteshield", "Prayer potion", "Ice Burst"}) {
                 panel.new LiveActions().hideRecent(name, name.equals("Prayer potion"));
-                assertEquals("Hidden from Recent · " + name + " · Booked totals unchanged.", ShellProbe.noticeText(panel.shell));
+                assertEquals("Hidden from Recent · " + name + " · Totals unchanged.", ShellProbe.noticeText(panel.shell));
                 assertEquals(before, new Gson().toJson(panel.engine.exportState()));
             }
             assertEquals(3, hidden.get());

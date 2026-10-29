@@ -78,7 +78,7 @@ public class WriterLineageAndIdentityTest
                 latest, null));
             release.countDown();
             assertTrue(writer.flush(Duration.ofSeconds(5)));
-            assertEquals("Latest", repository.load().currentSession().name());
+            assertEquals("Latest", FixtureReads.currentSession(repository.load()).name());
         }
         finally
         {
@@ -100,7 +100,7 @@ public class WriterLineageAndIdentityTest
             writer.submit(new WriteIntent(null, generation, 0L, named("B", 2L), null));
             writer.submit(new WriteIntent(null, generation, 0L, named("C", 3L), null));
             assertTrue(writer.flush(Duration.ofSeconds(5)));
-            assertEquals("C", repository.load().currentSession().name());
+            assertEquals("C", FixtureReads.currentSession(repository.load()).name());
             assertEquals(3L, repository.load().revision);
         }
         finally
@@ -135,8 +135,7 @@ public class WriterLineageAndIdentityTest
             assertFalse("1.7.0: a refused write is never acknowledged", writer.flush(Duration.ofSeconds(5)));
             assertTrue(writer.status().isFailure()
                 || writer.status().state == SaveStatus.State.CONFLICT);
-            assertEquals("External", new SessionRepository(new Gson(), FilepathTestSupport.root(directory), false).load()
-                .currentSession().name());
+            assertEquals("External", FixtureReads.currentSession(new SessionRepository(new Gson(), FilepathTestSupport.root(directory), false).load()).name());
         }
         finally
         {

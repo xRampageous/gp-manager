@@ -20,7 +20,7 @@ public class RaidSupplyLoanTest {
             @Override public int stabilizationTicks(){return 0;}
             @Override public boolean keepTransferAuditRows(){return true;}
         });
-        e.ensureSession(ReviewFixesTest.T0);e.setBaseline(ContainerSnapshot.empty());return e;
+        e.ensureSession(ReviewFixesTest.T0);e.setBaseline(FixtureReads.empty());return e;
     }
     static RaidHistoryTest fixture(int kind) {
         var f=new RaidHistoryTest(engine());f.instance=true;
@@ -170,7 +170,7 @@ public class RaidSupplyLoanTest {
         var f=fixture(1);f.nativeRaids.menu(click(1,FOOD,"Take-1"),f.now());settle(f,Map.of(FOOD,1L));
         f.engine.add(new Transaction(f.now(),TransactionType.PK_DEATH_LOSS,Context.PK_DEATH,"Death","PKing",true,
                 List.of(new Flow(FOOD,"Manta ray",-1,100,-100)),Confidence.CONFIRMED,"",null),false);
-        f.engine.setBaseline(ContainerSnapshot.empty());settle(f,Map.of(FOOD,1L));
+        f.engine.setBaseline(FixtureReads.empty());settle(f,Map.of(FOOD,1L));
         long before=f.engine.metrics(f.now()).cost;
         f.engine.noteConsume(FOOD,6,false,ActionKind.EAT,null);settle(f,Map.of());assertEquals(before+100,f.engine.metrics(f.now()).cost);
     }

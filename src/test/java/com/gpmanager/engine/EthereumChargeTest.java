@@ -186,7 +186,7 @@ public class EthereumChargeTest
 
         engine.markPvmDeath(1, carried.items, Map.of(), engine.events.owner);
         engine.markDirty();
-        Transaction wipe = settle(engine, ContainerSnapshot.empty(), start + 3_000L);
+        Transaction wipe = settle(engine, FixtureReads.empty(), start + 3_000L);
 
         assertNotNull(wipe);
         assertEquals(TransactionType.TRANSFER, wipe.type());

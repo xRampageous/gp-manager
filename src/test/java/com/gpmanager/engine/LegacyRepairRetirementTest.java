@@ -29,7 +29,7 @@ public class LegacyRepairRetirementTest {
         }
         String before = new Gson().toJson(engine.session().transactions());
         long net = engine.session().metrics(START + 10001).net;
-        engine.recheck(id -> 0);
+        engine.recheck();
         assertEquals(before, new Gson().toJson(engine.session().transactions()));
         assertEquals(net, engine.session().metrics(START + 10002).net);
         assertEquals(3, engine.session().transactions().size());
@@ -45,7 +45,7 @@ public class LegacyRepairRetirementTest {
                 Confidence.LIKELY, "Historical receipt", null);
         engine.session().addTransaction(old, 2000, false);
         String before = new Gson().toJson(old);
-        engine.recheck(id -> 0);
+        engine.recheck();
         assertEquals(before, new Gson().toJson(old));
         assertEquals(1, engine.session().transactions().size());
     }

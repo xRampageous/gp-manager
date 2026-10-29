@@ -42,7 +42,7 @@ public class RecentExcludeTest {
                 var snapshot = LiveSnapshot.capture(engine, NOW + 10_000, LiveContext.NONE);
                 var recent = snapshot.recent.stream().filter(row -> row.item == item).findFirst().orElseThrow();
                 return panel.live.rowOf(recent).menu.stream()
-                        .filter(menu -> menu.label.startsWith("Exclude")).findFirst()
+                        .filter(menu -> menu.label.startsWith("Remove")).findFirst()
                         .orElseThrow(() -> new AssertionError("Recent must offer Exclude for a booked entry"));
             });
         }
@@ -66,7 +66,7 @@ public class RecentExcludeTest {
         var f = new Fixture();
         var row = f.book(NOW + 1_000, new Flow(10499, "Ava's accumulator", 1, 600, 600));
         var menu = f.exclude(10499);
-        assertEquals("Exclude booking…", menu.label);
+        assertEquals("Remove entry…", menu.label);
         f.open(menu);
         assertEquals(Correction.IGNORE, f.panel.ledger.pendingCorrection);
         assertEquals(row.id(), f.panel.ledger.transaction);
@@ -84,6 +84,16 @@ public class RecentExcludeTest {
         assertEquals("the normal mutation path saves the decision", 1, f.saves.get());
         assertEquals(600, row.flows().get(0).unitPrice);
         assertEquals(600, row.flows().get(0).value);
+        assertTrue("removed bookings leave the ordinary table", f.panel.ledger.data.income.groups.isEmpty());
+        onEdt(() -> {
+            LedgerPageProbe.toggleCorrected(f.panel.ledger);
+            assertEquals("the separate audit remains available", 1, f.panel.ledger.corrected.rows.size());
+            f.panel.ledger.corrected.rows.get(0).open.run();
+            f.panel.refreshNow();
+            assertNotNull("the audit still opens the removed receipt", f.panel.ledger.data.detail);
+            assertEquals(row.id(), f.panel.ledger.data.detail.exact.transaction);
+            return null;
+        });
         onEdt(() -> { f.panel.ledger.actions.undoCorrection(); return null; });
         assertEquals(600, f.engine.metrics(NOW + 2_000).net);
         assertEquals(2, f.saves.get());
@@ -94,7 +104,7 @@ public class RecentExcludeTest {
         var first = f.book(NOW + 1_000, new Flow(536, "Dragon bones", 1, 100, 100));
         var latest = f.book(NOW + 2_000, new Flow(536, "Dragon bones", 2, 100, 200));
         var menu = f.exclude(536);
-        assertEquals("Exclude latest booking…", menu.label);
+        assertEquals("Remove latest entry…", menu.label);
         f.open(menu);
         assertEquals(latest.id(), f.panel.ledger.transaction);
         assertEquals(-200, f.panel.ledger.preview.change);
@@ -173,7 +183,7 @@ public class RecentExcludeTest {
         var menu = onEdt(() -> {
             var recent = LiveSnapshot.capture(f.engine, NOW + 3_000, LiveContext.NONE).recent.stream()
                     .filter(row -> row.receiptId.equals(gain.id())).findFirst().orElseThrow();
-            return f.panel.live.rowOf(recent).menu.stream().filter(item -> item.label.startsWith("Exclude"))
+            return f.panel.live.rowOf(recent).menu.stream().filter(item -> item.label.startsWith("Remove"))
                     .findFirst().orElseThrow();
         });
         f.open(menu);
@@ -214,11 +224,11 @@ public class RecentExcludeTest {
         onEdt(() -> {
             var row = LiveSnapshot.capture(f.engine, NOW + 2_000, LiveContext.NONE).recent.get(0);
             row.open = true;
-            assertFalse(f.panel.live.rowOf(row).menu.stream().anyMatch(menu -> menu.label.startsWith("Exclude")));
+            assertFalse(f.panel.live.rowOf(row).menu.stream().anyMatch(menu -> menu.label.startsWith("Remove")));
             row.open = false;
             row.ledgerReview = true;
             var menu = f.panel.live.rowOf(row).menu;
-            assertFalse(menu.stream().anyMatch(item -> item.label.startsWith("Exclude")));
+            assertFalse(menu.stream().anyMatch(item -> item.label.startsWith("Remove")));
             assertTrue(menu.stream().anyMatch(item -> item.label.equals("Open in Ledger")));
             return null;
         });

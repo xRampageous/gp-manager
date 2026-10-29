@@ -167,8 +167,8 @@ public class DeathViewTest {
         var f=new RaidHistoryTest();f.start();f.engine.raids.death();
         var fee=f.engine.bookDeathFee(500_000,null,f.now());assertNotNull(fee);
         assertEquals(f.id(),fee.flows().get(0).raid);
-        f.engine.raids.read(f.id());assertEquals(500_000,f.engine.raids.money(f.id())[1]);
-        f.engine.raids.read("all");assertEquals(500_000,f.engine.raids.money(f.id())[1]);
+        f.engine.raids.read(f.id());assertEquals(500_000,FixtureReads.money(f.engine.raids, f.id())[1]);
+        f.engine.raids.read("all");assertEquals(500_000,FixtureReads.money(f.engine.raids, f.id())[1]);
         var now=f.now()+2000;
         assertNoPvp(f.engine,now);
         assertEquals(-500_000,LedgerData.capture(f.engine,now,ledgerLoss()).cost.total);
@@ -176,7 +176,7 @@ public class DeathViewTest {
     }
     @Test public void mixedPvpDeathAndRaidFeeSplitViewsWithoutLosingCanonicalCost() {
         var f=mixedRaid();var now=f.now()+2000;
-        f.engine.raids.read(f.id());assertEquals(500_000,f.engine.raids.money(f.id())[1]);
+        f.engine.raids.read(f.id());assertEquals(500_000,FixtureReads.money(f.engine.raids, f.id())[1]);
         var pvp=LedgerData.capture(f.engine,now,category(death()));
         assertEquals(1,pvp.cost.groups.size());assertEquals(-322_000,pvp.cost.total);
         assertTrue(pvp.cost.groups.get(0).pvpDeath);

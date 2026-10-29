@@ -897,7 +897,7 @@ public class GeCustodyEngineTest
             GameData.msg("ge-collect"),"Trading",false,List.of(new Flow(COINS,"Coins",5928,1,5928,PriceSource.FACE_VALUE)),
             Confidence.UNCERTAIN,GameData.msg("ge-movement"),null);
         h.engine.session().addTransaction(old,2000,false);
-        h.engine.recheck(item->0);assertEquals(TransactionType.UNCERTAIN,old.type());
+        h.engine.recheck();assertEquals(TransactionType.UNCERTAIN,old.type());
     }
 
     @Test public void bankPaidFinishedBuyCanReturnChangeWithItsItemsBeforeSlotClear() {

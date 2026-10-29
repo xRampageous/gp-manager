@@ -26,12 +26,12 @@ public class BankVisibilityRegressionTest
             }, new TransactionClassifier(), config);
             engine.ensureSession(1000);
             ContainerSnapshot held = new ContainerSnapshot(Collections.singletonMap(itemId, 1L));
-            engine.setBaseline(consuming ? held : ContainerSnapshot.empty());
+            engine.setBaseline(consuming ? held : FixtureReads.empty());
             // The same bank visibility decision used by the production tick adapter.
             if (bankOpen(false)) engine.bankOpened(6);
             else engine.bankClosed();
             engine.markDirty();
-            ContainerSnapshot next = consuming ? ContainerSnapshot.empty() : held;
+            ContainerSnapshot next = consuming ? FixtureReads.empty() : held;
             engine.processIfDirty(next, 1600, null);
             assertEquals(consuming ? TransactionType.CONSUMPTION : TransactionType.GAIN,
                 engine.processIfDirty(next, 2200, null).type());

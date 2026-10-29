@@ -53,7 +53,7 @@ public final class EngineTestFixtures
 
     public static Engine engine(GpManagerConfig config)
     {
-        if (!JsonCodec.isBound())
+        if (!FixtureReads.isBound())
         {
             JsonCodec.bind(new Gson());
         }

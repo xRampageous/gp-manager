@@ -33,11 +33,11 @@ public class LedgerCorrectMenuTest
 
         List<String> menu = onEdt(() -> LedgerPageProbe.correctMenu(page));
         assertEquals("a gain can be split; Undo is always the latest correction", Arrays.asList("Count as Revenue",
-            "Count as Cost", "Mark as Transfer", "Exclude", "Split…", "Undo latest correction"), menu);
+            "Count as Cost", "Mark as Transfer", "Remove entry", "Split…", "Undo latest correction"), menu);
 
         onEdt(() ->
         {
-            LedgerPageProbe.chooseCorrection(page, "Exclude");
+            LedgerPageProbe.chooseCorrection(page, "Remove entry");
             return null;
         });
         List<String> preview = onEdt(() -> LedgerPageProbe.detailTexts(page));

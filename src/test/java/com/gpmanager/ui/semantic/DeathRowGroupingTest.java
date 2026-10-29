@@ -56,8 +56,10 @@ public class DeathRowGroupingTest {
         var bag = bag("death:1"); var gear = gear("death:1");
         gear.applyCorrection(Correction.IGNORE, "Manual correction");
         var groups = capture(bag, gear).groups;
-        assertEquals(2, groups.size());
-        assertEquals(1, groups.stream().filter(group -> group.corrected).count());
+        assertEquals(1, groups.size());
+        assertTrue(groups.stream().noneMatch(group -> group.ids.contains(gear.id())));
+        assertTrue(groups.get(0).ids.contains(bag.id()));
+        assertEquals(Correction.IGNORE, gear.correction());
         assertEquals(-76437, Semantics.summarize(groups).cost);
     }
 

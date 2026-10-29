@@ -271,17 +271,17 @@ public class LedgerAtomicActionTest
         Transaction receipt = fixture.book(loot);
         Engine engine = fixture.engine;
         engine.raids.read("all");
-        assertEquals(4_000L, engine.raids.money("0")[0]);
+        assertEquals(4_000L, FixtureReads.money(engine.raids, "0")[0]);
         long net = engine.metrics(NOW + 2_000L).net;
 
         assertTrue(engine.correctTransaction(receipt.id(), Correction.IGNORE, "test"));
         engine.raids.read("all");
-        assertEquals("All raids follows the correction", 0L, engine.raids.money("0")[0]);
+        assertEquals("All raids follows the correction", 0L, FixtureReads.money(engine.raids, "0")[0]);
         assertEquals(net - 4_000L, engine.metrics(NOW + 2_000L).net);
 
         assertTrue(engine.undoCorrection());
         engine.raids.read("all");
-        assertEquals("and the Undo, without a second booking", 4_000L, engine.raids.money("0")[0]);
+        assertEquals("and the Undo, without a second booking", 4_000L, FixtureReads.money(engine.raids, "0")[0]);
         assertEquals(net, engine.metrics(NOW + 2_000L).net);
         assertEquals(1, engine.session().transactions().size());
     }

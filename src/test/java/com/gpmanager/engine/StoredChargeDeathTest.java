@@ -23,7 +23,7 @@ public class StoredChargeDeathTest {
             var before = factory.capture(true, false);
             engine.setBaseline(before);
             engine.markPvmDeath(20, owned(factory).items, Map.of(), engine.events.owner);
-            settle(engine, ContainerSnapshot.empty(), NOW + 1000);
+            settle(engine, FixtureReads.empty(), NOW + 1000);
             assertEquals("death cost for " + family.charged, 0, engine.metrics(NOW + 10_000).cost);
             var retrieval = BossRetrievalCatalogue.serviceFor(service.equals("Grave") ? "Loot" : "Collect", service);
             assertNotNull(service, retrieval);
@@ -32,7 +32,7 @@ public class StoredChargeDeathTest {
             assertEquals(0, engine.metrics(NOW + 30_000).income);
             assertEquals(0, engine.metrics(NOW + 30_000).net);
             assertEquals(0, reviews(engine));
-            assertFalse(engine.deathStatus().pending);
+            assertFalse(FixtureReads.deathStatus(engine).pending);
             assertNull(engine.savedState().pendingDeathReclaim);
         }
     }
@@ -54,7 +54,7 @@ public class StoredChargeDeathTest {
             engine.setBaseline(before);
             engine.markPkDeath(NOW + 1000, Map.of(), owned(factory).items, engine.events.owner);
             ContainerSnapshot after = disposition == 0 ? before : disposition == 1
-                    ? snapshot(family.empty, family.varbit, 0, Map.of()) : ContainerSnapshot.empty();
+                    ? snapshot(family.empty, family.varbit, 0, Map.of()) : FixtureReads.empty();
             settle(engine, after, NOW + 2000);
             long contents = family.recipe.values().stream().mapToLong(Long::longValue).sum() * 100;
             long expected = disposition == 0 ? 0 : contents + (disposition == 2 ? 100 : 0);

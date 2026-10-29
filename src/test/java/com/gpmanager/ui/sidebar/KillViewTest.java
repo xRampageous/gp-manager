@@ -161,7 +161,11 @@ public class KillViewTest {
         var data=LedgerData.capture(engine,NOW,category(kills()));
         assertEquals(3,data.income.groups.size());assertEquals(600,data.income.total);
         assertTrue(data.income.groups.stream().anyMatch(Semantics.Group::incomplete));
-        assertTrue(data.income.groups.stream().flatMap(group->group.entries.stream()).anyMatch(entry->entry.corrected));
+        assertTrue(data.income.groups.stream().flatMap(group->group.entries.stream())
+                .noneMatch(entry->entry.transaction.equals(loot.id())));
+        assertTrue(data.corrected.stream().anyMatch(entry->entry.transaction.equals(loot.id())));
+        assertTrue(engine.undoCorrection());
+        assertEquals(700,LedgerData.capture(engine,NOW,category(kills())).income.total);
     }
     @Test public void keyOnlyKillStaysVisibleAndOpensItsExactNeutralReceipt()throws Exception{
         MilestoneTest.onEdt(()->{
@@ -215,7 +219,7 @@ public class KillViewTest {
         var engine=new Engine(deltas->{var flows=new ArrayList<Flow>();
             deltas.forEach((id,quantity)->flows.add(new Flow(id,"Item "+id,quantity,100,quantity*100)));
             return flows;},new TransactionClassifier(),config);
-        engine.ensureSession(1000);engine.setBaseline(ContainerSnapshot.empty());
+        engine.ensureSession(1000);engine.setBaseline(FixtureReads.empty());
         return engine;
     }
     static void settle(Engine engine,Map<Integer,Long> items,long at){

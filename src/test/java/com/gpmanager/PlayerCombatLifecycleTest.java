@@ -77,7 +77,7 @@ public class PlayerCombatLifecycleTest
         assertFalse(held.counts());
         assertEquals(100L, held.flows().get(0).value);
         assertEquals(1_200L, held.timestamp);
-        assertEquals(1, plugin.engine.savedState().currentSession().transactions().size());
+        assertEquals(1, FixtureReads.currentSession(plugin.engine.savedState()).transactions().size());
     }
 
     @Test

@@ -51,12 +51,12 @@ public class Schema105ActionLabelPersistenceTest
             json.contains("\"observedActionLabel\":\"Ice Burst\""));
 
         SavedState loaded = new Gson().fromJson(json, SavedState.class);
-        Transaction restored = loaded.currentSession().transactions().get(0);
+        Transaction restored = FixtureReads.currentSession(loaded).transactions().get(0);
         assertNotNull(restored.actionLabel());
         assertEquals("Ice Burst", restored.actionLabel().value);
         assertEquals("the reloaded receipt keeps its money", labelled.net(), restored.net());
         assertNull("an unlabelled receipt stays generic",
-            loaded.currentSession().transactions().get(1).actionLabel());
+            FixtureReads.currentSession(loaded).transactions().get(1).actionLabel());
     }
 
     @Test
@@ -157,7 +157,7 @@ public class Schema105ActionLabelPersistenceTest
         source.session().addTransaction(genericCast(now + 4_000L), 100, false);
         SavedState detached = source.savedState();
         assertEquals("detach keeps the bounded label", "Ice Burst",
-            detached.currentSession().transactions().get(0).actionLabel().value);
+            FixtureReads.currentSession(detached).transactions().get(0).actionLabel().value);
 
         Engine restored = engine();
         restored.restore(detached, now + 5_000L);
@@ -204,7 +204,7 @@ public class Schema105ActionLabelPersistenceTest
 
         SavedState reloaded = new SessionRepository(new Gson(), FilepathTestSupport.root(directory), false).load();
         assertEquals(110, reloaded.schemaVersion);
-        Transaction restored = reloaded.currentSession().transactions().get(0);
+        Transaction restored = FixtureReads.currentSession(reloaded).transactions().get(0);
         assertEquals(labelled.id(), restored.id());
         assertEquals(labelled.flows().size(), restored.flows().size());
         assertEquals(labelled.net(), restored.net());
@@ -222,7 +222,7 @@ public class Schema105ActionLabelPersistenceTest
         engine.session().addTransaction(cast("Ice Burst", old + 1_000L), 100, false);
         String sessionId = engine.session().id();
         engine.finishCustom(old + 2_000L);
-        engine.compactOlderThan(1, T0);
+        FixtureReads.compactOlderThan(engine, 1, T0);
 
         Session compacted = engine.historySession(sessionId);
         assertNotNull(compacted);
@@ -265,7 +265,7 @@ public class Schema105ActionLabelPersistenceTest
         String json = new Gson().toJson(stateWith(source))
             .replace("\"observedActionLabel\":\"Ice Burst\"", "\"observedActionLabel\":" + rawJsonValue);
         SavedState loaded = new Gson().fromJson(json, SavedState.class);
-        return loaded.currentSession().transactions().get(0);
+        return FixtureReads.currentSession(loaded).transactions().get(0);
     }
 
     private static Transaction cast(String label, long at)

@@ -40,7 +40,7 @@ public class GpManagerPluginResumeBaselineTest
     {
         Harness harness = new Harness();
         harness.engine.ensureSession(1_000L);
-        harness.engine.setBaseline(ContainerSnapshot.empty());
+        harness.engine.setBaseline(FixtureReads.empty());
         harness.engine.session().pause(2_000L, PauseReason.IDLE);
         assertTrue("the session is idle-paused", harness.engine.isIdlePaused());
 

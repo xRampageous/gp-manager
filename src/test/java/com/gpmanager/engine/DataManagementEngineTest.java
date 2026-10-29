@@ -45,7 +45,7 @@ public class DataManagementEngineTest
             java.util.List.of(new Flow(995, "Coins", 430L, 1, 430L, PriceSource.FACE_VALUE)),
             Confidence.CONFIRMED, GameData.msg("ge-neutral"), null);
         engine.session().addTransaction(change, 2_000, false);
-        engine.recheck(id -> 0);
+        engine.recheck();
         assertTrue(engine.session().transactions().isEmpty());
     }
 
@@ -57,7 +57,7 @@ public class DataManagementEngineTest
             new java.util.ArrayList<>(java.util.List.of(new Flow(7220, "Half a summer pie", -1L, 0, 0L, PriceSource.UNPRICED))),
             Confidence.LIKELY, "", null);
         engine.session().addTransaction(ate, 2_000, false);
-        engine.recheck(id -> 0);
+        engine.recheck();
         Flow pie = engine.session().transactions().get(0).flows().get(0);
         assertNotSame(PriceSource.UNPRICED, pie.source());
         assertEquals(-100L, pie.value);
@@ -78,7 +78,7 @@ public class DataManagementEngineTest
             var closed = engine.history().get(0);
             assertEquals(0, MoneySnapshot.of(engine).metrics(closed, start + 5000).net);
 
-            engine.recheck(id -> 0);
+            engine.recheck();
 
             var refreshed = MoneySnapshot.of(engine);
             assertEquals(counted ? 100 : 0, closed.metrics(start + 5000).net);
@@ -91,7 +91,7 @@ public class DataManagementEngineTest
             assertEquals(counted, copy.counts());
             assertEquals(!counted, ReviewRules.needsReview(copy));
             long revision = engine.revision();
-            engine.recheck(id -> 0);
+            engine.recheck();
             assertEquals("an unchanged retry is a no-op", revision, engine.revision());
             assertSame(refreshed, MoneySnapshot.of(engine));
         }

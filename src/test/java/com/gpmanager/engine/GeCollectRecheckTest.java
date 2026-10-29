@@ -35,7 +35,7 @@ public class GeCollectRecheckTest
         assertTrue("it starts in Review", ReviewRules.needsReview(old));
         long revision = engine.revision();
 
-        engine.recheck(item -> 0);
+        engine.recheck();
 
         Transaction today = pickup(19_911L);
         assertNotNull("today's code books the same coins", today);
@@ -54,7 +54,7 @@ public class GeCollectRecheckTest
         assertEquals(revision, engine.revision());
 
         revision = engine.revision();
-        engine.recheck(item -> 0);
+        engine.recheck();
         assertEquals("a second pass changes nothing", revision, engine.revision());
     }
 
@@ -74,7 +74,7 @@ public class GeCollectRecheckTest
         for (Transaction row : List.of(market, withLoss, withItem, counted)) session.addTransaction(row, 2_000, false);
         long revision = engine.revision();
 
-        engine.recheck(item -> 0);
+        engine.recheck();
 
         for (Transaction row : List.of(market, withLoss, withItem, counted))
         {

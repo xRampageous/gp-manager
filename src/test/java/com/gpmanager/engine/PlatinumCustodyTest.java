@@ -30,12 +30,12 @@ public class PlatinumCustodyTest {
         engine.rememberBag(Map.of(TOKENS, 2L));
         engine.markPvmDeath(20, before.items, engine.bagStock(), engine.events.owner);
         engine.rememberBag(Map.of());
-        settle(engine, ContainerSnapshot.empty(), NOW + 1000);
+        settle(engine, FixtureReads.empty(), NOW + 1000);
         assertTrue(engine.noteReclaimIntent(BossRetrievalCatalogue.serviceFor("Loot", "Grave"), 20));
         settle(engine, cash(2), NOW + 20_000);
         assertEquals(0, engine.metrics(NOW + 30_000).income);
         assertEquals(100, engine.metrics(NOW + 30_000).cost); // only the destroyed empty bag
-        assertFalse(engine.deathStatus().pending);
+        assertFalse(FixtureReads.deathStatus(engine).pending);
         assertEquals(0, reviews(engine));
     }
 
@@ -58,7 +58,7 @@ public class PlatinumCustodyTest {
 
     @Test public void tokenKeyManifestKeepsItsOriginalKeyReceiptLink() {
         Engine engine = engine(); int key = ItemID.WILDY_LOOT_KEY0;
-        engine.setBaseline(ContainerSnapshot.empty());
+        engine.setBaseline(FixtureReads.empty());
         engine.markPkLoot(Map.of(key, 1L), 50, NOW);
         settle(engine, new ContainerSnapshot(Map.of(key, 1L)), NOW + 600);
         var receipt = engine.session().transactions().get(0);
@@ -84,7 +84,7 @@ public class PlatinumCustodyTest {
         assertTrue(engine.noteReclaimIntent(BossRetrievalCatalogue.serviceFor("Loot", "Grave"), 20));
         settle(engine, cash(3), NOW + 20_000);
         assertEquals(0, engine.metrics(NOW + 30_000).income);
-        assertFalse(engine.deathStatus().pending);
+        assertFalse(FixtureReads.deathStatus(engine).pending);
         assertNull(engine.savedState().pendingDeathReclaim);
     }
 

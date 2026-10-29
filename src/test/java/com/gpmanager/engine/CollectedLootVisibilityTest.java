@@ -22,7 +22,7 @@ public class CollectedLootVisibilityTest
         engine.setContributionEligibility(new LootPresentationFilterService(new GroundItemsPrefs(
             true, "Feather", "Bones", false)));
         engine.ensureSession(1000);
-        engine.setBaseline(ContainerSnapshot.empty());
+        engine.setBaseline(FixtureReads.empty());
         engine.markLoot(Collections.singletonMap(526, 2L), 20, "Loot from Chicken", "Chicken");
         assertEquals(0, engine.metrics(1600).net);
         ContainerSnapshot picked = new ContainerSnapshot(Collections.singletonMap(526, 1L));
@@ -32,8 +32,8 @@ public class CollectedLootVisibilityTest
         assertEquals(500, engine.metrics(2800).net);
         engine.bankOpened(6);
         engine.markDirty();
-        engine.processIfDirty(ContainerSnapshot.empty(), 3400, null);
-        engine.processIfDirty(ContainerSnapshot.empty(), 4000, null);
+        engine.processIfDirty(FixtureReads.empty(), 3400, null);
+        engine.processIfDirty(FixtureReads.empty(), 4000, null);
         assertEquals(500, engine.metrics(4000).net);
     }
 }

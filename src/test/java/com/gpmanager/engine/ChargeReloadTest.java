@@ -47,7 +47,7 @@ public class ChargeReloadTest
     {
         Engine engine = new Engine(valuator, new TransactionClassifier(), CONFIG);
         engine.ensureSession(1_000L);
-        engine.setBaseline(ContainerSnapshot.empty());
+        engine.setBaseline(FixtureReads.empty());
         engine.observeCheck(read(100), PIPE, 1_000L);
         for (int shot = 0; shot < shots; shot++)
         {

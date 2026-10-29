@@ -50,7 +50,7 @@ public class AccountingDepthTest
     public void rewardChestsAndNeutralStorageAndCrates()
     {
         assertTrue(RewardChestCatalogue.isRewardChest("Barrows chest"));
-        for (KeyChestCatalogue.Entry chest : KeyChestCatalogue.entries())
+        for (KeyChestCatalogue.Entry chest : FixtureReads.entries())
         {
             assertTrue(chest.getChestName(), RewardChestCatalogue.isRewardChest(chest.getChestName()));
         }

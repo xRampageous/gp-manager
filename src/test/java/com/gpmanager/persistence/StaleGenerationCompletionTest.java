@@ -172,7 +172,7 @@ public class StaleGenerationCompletionTest
             // Bob's own first save then starts a fresh lineage at revision 1.
             assertTrue(rig.coordinator.saveNow());
             assertEquals(1L, rig.repository.load().revision);
-            assertEquals("Bob general", rig.repository.load().currentSession().name());
+            assertEquals("Bob general", FixtureReads.currentSession(rig.repository.load()).name());
         }
         finally
         {

@@ -55,7 +55,7 @@ public class ChestConsumeOwnerTest
                 return result;
             }, new TransactionClassifier(), new GpManagerConfig() {});
             engine.ensureSession(T0);
-            engine.setBaseline(ContainerSnapshot.empty());
+            engine.setBaseline(FixtureReads.empty());
             persistence = new Persistence(null, null, null, null, engine);
             persistence.activeIdentity = new TrackingIdentity("rsprofile.alice", 1L);
             persistence.fence();

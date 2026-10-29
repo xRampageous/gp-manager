@@ -77,7 +77,7 @@ public class LedgerDetailDisclosureTest
         assertTrue("one Correct menu", exactLabels.stream().anyMatch(label -> label.startsWith("Correct ⌄")));
         assertFalse("no technical or raw panels remain",
             exactLabels.stream().anyMatch(label -> label.startsWith("Technical details") || label.startsWith("Raw evidence")));
-        assertEquals(Arrays.asList("Count as Revenue", "Count as Cost", "Mark as Transfer", "Exclude",
+        assertEquals(Arrays.asList("Count as Revenue", "Count as Cost", "Mark as Transfer", "Remove entry",
             "Undo latest correction"), onEdt(() -> LedgerPageProbe.correctMenu(page)));
 
         // Single-resource group: the row shows the group's contribution, never the transaction net.

@@ -47,7 +47,7 @@ public class SnapshotDetachCostTest
         for (int i = 0; i < 8; i++)
         {
             long started = System.nanoTime();
-            WriteIntent captured = persistence.currentIntent(false);
+            WriteIntent captured = persistence.currentIntent();
             long elapsed = System.nanoTime() - started;
             org.junit.Assert.assertNull("capture leaves JSON encoding to the writer", captured.json);
             org.junit.Assert.assertEquals(txs.size(), captured.state.generalSession.transactions.size());

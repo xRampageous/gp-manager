@@ -38,9 +38,9 @@ public class ManualPauseDeathReclaimTest
         engine.processIfDirty(gear, 1_200L, null);
         engine.markPvmDeath(20, gear.items, Map.of(), engine.events.owner);
         engine.markDirty();
-        for (int i = 0; i < 3; i++) engine.processIfDirty(ContainerSnapshot.empty(), 1_600L + i * 600L, null);
+        for (int i = 0; i < 3; i++) engine.processIfDirty(FixtureReads.empty(), 1_600L + i * 600L, null);
         engine.togglePause(4_000L);
-        engine.setBaseline(ContainerSnapshot.empty());
+        engine.setBaseline(FixtureReads.empty());
         assertTrue(engine.noteReclaimIntent(BossRetrievalCatalogue.serviceFor("Talk-to", "Torfinn"), 40));
         engine.markDirty();
         Transaction returned = null;
@@ -64,7 +64,7 @@ public class ManualPauseDeathReclaimTest
         engine.setBaseline(gear);
         engine.markPvmDeath(20, gear.items, Map.of(), engine.events.owner);
         engine.markDirty();
-        for (int i = 0; i < 3; i++) engine.processIfDirty(ContainerSnapshot.empty(), 1_600L + i * 600L, null);
+        for (int i = 0; i < 3; i++) engine.processIfDirty(FixtureReads.empty(), 1_600L + i * 600L, null);
         assertTrue(engine.noteReclaimIntent(BossRetrievalCatalogue.serviceFor("Talk-to", "Torfinn"), 40));
         engine.markDirty();
         for (int i = 0; i < 3; i++) engine.processIfDirty(gear, 5_000L + i * 600L, null);

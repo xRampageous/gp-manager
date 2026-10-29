@@ -109,9 +109,9 @@ public class ReleasePerfTest
             FilepathTestSupport.root(java.nio.file.Files.createTempDirectory("gp-perf")), false);
         Persistence coordinator = new Persistence(null, null, repository,
             new OrderedPersistenceWriter(repository, null), engine);
-        report("save intent (client thread)", () -> coordinator.currentIntent(false).base);
+        report("save intent (client thread)", () -> coordinator.currentIntent().base);
         // 1.1: the periodic gameplay save reuses closed sessions' JSON; every 10th is full.
-        report("quick save intent (client thread)", () -> coordinator.currentIntent(true).base);
+        report("quick save intent (client thread)", () -> coordinator.currentIntent().base);
         System.out.println("PERF quick save identical to one toJson: "
             + PersistenceProbe.snapshotJson(coordinator, null, true).replaceFirst("\"savedAtEpochMillis\":\\d+", "")
                 .equals(gson.toJson(engine.savedState()).replaceFirst("\"savedAtEpochMillis\":\\d+", "")));

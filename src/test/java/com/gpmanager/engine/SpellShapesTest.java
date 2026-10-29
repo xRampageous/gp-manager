@@ -134,7 +134,7 @@ public class SpellShapesTest
         decided.applyCorrection(Correction.IGNORE, "Manual correction");
         for (Transaction row : List.of(ate, shards, review, high, low, dropped, decided)) session.addTransaction(row, 2_000, false);
 
-        engine.recheck(id -> id == PLATESKIRT ? 38_400 : 0);
+        engine.recheck();
 
         assertSame("an old peach reads as worth nothing", PriceSource.NO_VALUE, ate.flows().get(0).source());
         assertSame("an old untradeable takes its alch value", PriceSource.HIGH_ALCHEMY, shards.flows().get(0).source());
@@ -150,7 +150,7 @@ public class SpellShapesTest
         assertNull("an owner decision is never rewritten", decided.action());
 
         long revision = engine.revision();
-        engine.recheck(id -> id == PLATESKIRT ? 38_400 : 0);
+        engine.recheck();
         assertEquals("a second pass changes nothing", revision, engine.revision());
     }
 

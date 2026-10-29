@@ -72,7 +72,7 @@ public class CommitInterruptionTest
 
     private static String activeName(SessionRepository repository)
     {
-        return repository.load().currentSession().name();
+        return FixtureReads.currentSession(repository.load()).name();
     }
 
     @Test

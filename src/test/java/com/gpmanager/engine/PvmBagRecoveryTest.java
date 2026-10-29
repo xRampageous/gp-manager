@@ -9,7 +9,7 @@ import static org.junit.Assert.*;
 public class PvmBagRecoveryTest {
     static final Map<Integer,Long> BAG=Map.of(1079,2L,995,693L,24595,2L);
     static Engine engine() {
-        var e=PvpGravestoneTest.engine();e.setBaseline(ContainerSnapshot.empty());return e;
+        var e=PvpGravestoneTest.engine();e.setBaseline(FixtureReads.empty());return e;
     }
     static void mark(Engine e,Map<Integer,Long> held,Map<Integer,Long> bag,long owner) {
         try { Engine.class.getDeclaredMethod("markPvmDeath",int.class,Map.class,Map.class,long.class)
@@ -25,10 +25,10 @@ public class PvmBagRecoveryTest {
         e.setBaseline(new ContainerSnapshot(held));mark(e,held,Map.of());
         for(int i=0;i<3;i++)e.bankClosed();
         PvpGravestoneTest.settle(e,Map.of(8013,3L),3000);
-        assertEquals(33,e.deathStatus().items);
+        assertEquals(33,FixtureReads.deathStatus(e).items);
         assertTrue(e.noteReclaimIntent(BossRetrievalCatalogue.serviceFor("Loot","Grave"),20));
         PvpGravestoneTest.settle(e,Map.of(8013,9L),4000);
-        assertEquals(27,e.deathStatus().items);
+        assertEquals(27,FixtureReads.deathStatus(e).items);
         for(int i=1;i<=27;i++){
             e.bankClosed();PvpGravestoneTest.settle(e,Map.of(8013,9L,7946,(long)i),5000+i*10);
         }
@@ -38,7 +38,7 @@ public class PvmBagRecoveryTest {
     }
     @Test public void bagOnlySuppliesCoinsAndEquipmentReturnAtZero() {
         var e=engine();mark(e,Map.of(),BAG);
-        assertEquals(697,e.deathStatus().items);assertTrue(e.deathStatus().pending);
+        assertEquals(697,FixtureReads.deathStatus(e).items);assertTrue(FixtureReads.deathStatus(e).pending);
         PvpGravestoneTest.settle(e,BAG,3000);
         assertEquals(0,e.metrics(4000).net);assertEquals(0,e.metrics(4000).income);
         assertNull(e.savedState().pendingDeathReclaim);
@@ -49,7 +49,7 @@ public class PvmBagRecoveryTest {
         var e=engine();e.setBaseline(new ContainerSnapshot(Map.of(1079,1L)));
         mark(e,Map.of(1079,1L),BAG);PvpGravestoneTest.settle(e,Map.of(),3000);
         PvpGravestoneTest.settle(e,Map.of(1079,2L),4000);
-        assertEquals(696,e.deathStatus().items);
+        assertEquals(696,FixtureReads.deathStatus(e).items);
         var gson=new Gson();var state=gson.fromJson(gson.toJson(e.savedState()),SavedState.class);
         var next=engine();next.restore(state,5000);next.resume(5100,PauseReason.IDLE,PauseReason.RECOVERY);
         next.setBaseline(new ContainerSnapshot(Map.of(1079,2L)));
@@ -84,7 +84,7 @@ public class PvmBagRecoveryTest {
         mark(e,Map.of(11941,1L),BAG);PvpGravestoneTest.settle(e,Map.of(),3000);
         assertEquals(-6,e.metrics(4000).net);
         assertFalse(e.death.items.containsKey(11941));
-        assertEquals(697,e.deathStatus().items);
+        assertEquals(697,FixtureReads.deathStatus(e).items);
         assertTrue(LedgerData.capture(e,4000,LiveCategoryLayoutTest.category(DeathViewTest.death()))
                 .cost.groups.isEmpty());
         var view=LedgerData.capture(e,4000,LedgerData.Entry.current().withCostView(LedgerData.CostView.LOSS));
@@ -96,9 +96,9 @@ public class PvmBagRecoveryTest {
     @Test public void aNewPvmDeathCannotDiscardOwnedItemsAlreadyAtDeathsOffice() {
         var e=engine();mark(e,Map.of(),Map.of(1079,2L));
         for(int i=0;i<DeathReclaimLifecycle.AWAIT_TICKS;i++)e.death.tick(false);
-        assertFalse(e.deathStatus().pending);
+        assertFalse(FixtureReads.deathStatus(e).pending);
         mark(e,Map.of(),Map.of(24595,2L));
-        assertEquals(4,e.deathStatus().items);
+        assertEquals(4,FixtureReads.deathStatus(e).items);
         assertTrue(e.noteReclaimIntent(BossRetrievalCatalogue.serviceFor("Loot","Grave"),20));
         PvpGravestoneTest.settle(e,Map.of(1079,2L,24595,2L),3000);
         assertEquals(0,e.metrics(4000).income);
@@ -109,12 +109,12 @@ public class PvmBagRecoveryTest {
             f.plugin.targets.ready();f.plugin.targets.npc=true;f.engine.rememberBag(BAG);
             f.engine.setBaseline(new ContainerSnapshot(Map.of(f.bagId,1L)));
             f.die();
-            assertEquals(wilderness?697:0,f.engine.deathStatus().items);
+            assertEquals(wilderness?697:0,FixtureReads.deathStatus(f.engine).items);
             assertTrue(f.engine.bagStock().isEmpty());
             assertEquals(0,f.engine.session().pk().deaths);
             if(wilderness) {
                 f.plugin.targets.ready();f.plugin.targets.npc=true;f.die();
-                assertEquals("cleared bag stock cannot be seeded twice",697,f.engine.deathStatus().items);
+                assertEquals("cleared bag stock cannot be seeded twice",697,FixtureReads.deathStatus(f.engine).items);
             }
         }
     }
@@ -122,7 +122,7 @@ public class PvmBagRecoveryTest {
         var e=engine();mark(e,Map.of(),Map.of(1079,2L));
         for(int i=0;i<DeathReclaimLifecycle.AWAIT_TICKS;i++)e.death.tick(false);
         e.markPkDeath(3000,Map.of(),Map.of(),e.events.owner);
-        assertEquals(2,e.deathStatus().items);
+        assertEquals(2,FixtureReads.deathStatus(e).items);
         assertTrue(e.noteReclaimIntent(BossRetrievalCatalogue.serviceFor("Loot","Grave"),20));
         PvpGravestoneTest.settle(e,Map.of(1079,2L),4000);
         assertEquals(0,e.metrics(5000).income);assertEquals(1,e.session().pk().deaths);

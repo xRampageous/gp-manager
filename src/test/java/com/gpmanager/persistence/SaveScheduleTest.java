@@ -25,12 +25,12 @@ public class SaveScheduleTest {
         var engine=ReviewFixesTest.engine();
         var storage=new Persistence(null,null,null,null,engine){
             boolean accepted;
-            @Override boolean scheduleSave(boolean quick){return accepted;}
+            @Override boolean scheduleSave(){return accepted;}
             @Override SaveStatus saveStatus(){return SaveStatus.neverSaved();}
         };
         var plugin=new GpManagerPlugin();plugin.engine=engine;plugin.storage=storage;plugin.savedRevision=-1;
-        plugin.persist(true);assertEquals(-1,plugin.savedRevision);
-        storage.accepted=true;plugin.persist(true);assertEquals(engine.revision(),plugin.savedRevision);
+        plugin.persist();assertEquals(-1,plugin.savedRevision);
+        storage.accepted=true;plugin.persist();assertEquals(engine.revision(),plugin.savedRevision);
         assertTrue(GpManagerPlugin.saveDue(50,engine.revision(),engine.revision()-1));
         assertFalse(GpManagerPlugin.saveDue(50,engine.revision(),engine.revision()));
         assertTrue(GpManagerPlugin.saveDue(500,engine.revision(),engine.revision()));

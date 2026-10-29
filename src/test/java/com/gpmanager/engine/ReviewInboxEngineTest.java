@@ -53,7 +53,7 @@ public class ReviewInboxEngineTest
         engine.session().addTransaction(handCorrected, 20, false);
         assertTrue(engine.correctTransaction(handCorrected.id(), Correction.COST, "Single decision"));
 
-        assertEquals(2, engine.applyDecision(engine.previewDecision(Decision.GAIN, row -> true, now), now));
+        assertEquals(2, engine.applyDecision(engine.previewDecision(Decision.GAIN, row -> true, now)));
         assertEquals(2, latestDecision(engine).changes().size());
         assertEquals(250L, engine.metrics(now).net);
         assertEquals(Correction.COST, handCorrected.correction());
@@ -98,14 +98,14 @@ public class ReviewInboxEngineTest
         long before = engine.revision();
         engine.session().addTransaction(uncertain("Review", now - 100L, 5L), 20, false);
         assertTrue(engine.revision() != before);
-        assertEquals(-1, engine.applyDecision(gain, now));
+        assertEquals(-1, engine.applyDecision(gain));
         assertEquals(Correction.AUTO, first.correction());
         assertEquals(-50L, engine.metrics(now).net);
 
         Engine.DecisionPreview fresh = engine.previewDecision(Decision.GAIN, row -> true, now);
         assertEquals(3, fresh.rowCount());
         assertEquals(305L, fresh.netDelta);
-        assertEquals(3, engine.applyDecision(fresh, now));
+        assertEquals(3, engine.applyDecision(fresh));
         assertEquals("applied delta equals the previewed delta", -50L + 305L, engine.metrics(now).net);
         assertEquals("one undo unit for the whole batch", 3, latestDecision(engine).changes().size());
         assertTrue(engine.undoCorrection());

@@ -65,8 +65,8 @@ public class AtomicSaveRetryTest {
             assertEquals(base + 1, writer.appliedRevision());
             var restored = new SessionRepository(new Gson(), FilepathTestSupport.root(directory), false).load();
             assertEquals(base + 1, restored.revision);
-            assertEquals(4_650, restored.currentSession().metrics(20_000L).net);
-            assertEquals(4_550, restored.currentSession().compactedTransactionCount);
+            assertEquals(4_650, FixtureReads.currentSession(restored).metrics(20_000L).net);
+            assertEquals(4_550, FixtureReads.currentSession(restored).compactedTransactionCount);
         } finally { writer.close(); }
     }
 
@@ -88,7 +88,7 @@ public class AtomicSaveRetryTest {
             assertEquals(base, repository.revision);
             assertEquals(base, writer.appliedRevision());
             assertArrayEquals(primary, Files.readAllBytes(directory.resolve("sessions.json")));
-            assertEquals(4_600, repository.load().currentSession().metrics(20_000L).net);
+            assertEquals(4_600, FixtureReads.currentSession(repository.load()).metrics(20_000L).net);
         } finally { writer.close(); }
     }
 }

@@ -87,7 +87,7 @@ public final class SidebarPreview
         for (String title : new String[]{"Wilderness Agility Course", "Chambers of Xeric: Challenge Mode"}) {
             Engine activity = PresentationLifecycleTest.engine();
             activity.ensureSession(at);
-            activity.session().setActivityHint(title, at);
+            activity.session().setActivityHint(title);
             SidebarPanel panel = panel(activity, PvpState.NONE);
             paint(panel,new File(out,"header-"+title.substring(0,title.indexOf(' ')).toLowerCase()+".png"));
             if (title.equals("Wilderness Agility Course")) {
@@ -175,7 +175,7 @@ public final class SidebarPreview
         long hour = 3_600_000L;
         Engine engine = PresentationLifecycleTest.engine();
         engine.ensureSession(now - hour);
-        engine.session().setActivityHint("Wilderness Agility Course", now - hour);
+        engine.session().setActivityHint("Wilderness Agility Course");
         TargetFreshStartTest.coins(engine, now - hour + 5L, 500_000L);
         SidebarPanel controls = panel(engine, PvpState.NONE);
         new GrindsController(controls).newSession();
@@ -819,12 +819,9 @@ public final class SidebarPreview
         paintComponent(menu, new File(out, "g-f-data-recovery-menu.png"));
     }
 
-    /** The Getting started, New session and Reset free-play sheets at sidebar width. */
+    /** The New session and Reset free-play sheets at sidebar width. */
     private static void sheets(File out) throws IOException
     {
-        SidebarPanel guide = panel(grindsFixture(), PvpState.NONE);
-        new GrindsController(guide).guide();
-        paint(guide, new File(out, "g-g-getting-started.png"));
         Engine free = engine();
         free.ensureSession(SafeMath.now() - 60_000L);
         SidebarPanel fresh = panel(free, PvpState.NONE);

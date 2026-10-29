@@ -54,7 +54,7 @@ import static com.gpmanager.Fmt.*;
 import static com.gpmanager.Kit.Tone.*;
 import static com.gpmanager.SafeMath.*;
 import com.gpmanager.HudFrame.*;
-import com.gpmanager.GpManagerConfig.TextSize;
+import com.gpmanager.GpManagerConfig.*;
 import net.runelite.client.ui.overlay.*;
 import static com.gpmanager.TransactionType.*;
 import static com.gpmanager.Kit.Tone.GAIN;
@@ -118,7 +118,7 @@ class Kit {
     static final int SHEET_TEXT = 165, VALUE_WIDTH = 46;
 
     /** What a value is, which decides its colour. */
-    @RequiredArgsConstructor
+    @AllArgsConstructor
     enum Tone {
         GAIN(GRAND_EXCHANGE_PRICE), SUPPLY(GRAND_EXCHANGE_ALCH), LOSS(new Color(255, 122, 107)),
         MARKET(new Color(90, 180, 255)), REVIEW(PROGRESS_INPROGRESS_COLOR), PLAIN(Color.WHITE),
@@ -307,13 +307,13 @@ class Kit {
             public Dimension preferredLayoutSize(Container parent) {
                 var in = parent.getInsets();
                 int width = 0, height = 0;
-                for (var child : parent.getComponents()) {
+                for (var child : parent.getComponents())
                     if (child.isVisible()) {
                         var size = child.getPreferredSize();
                         width = max(width, size.width);
                         height += (height == 0 ? 0 : gap) + size.height;
                     }
-                }
+
                 return new Dimension(width + in.left + in.right, height + in.top + in.bottom);
             }
 
@@ -324,13 +324,13 @@ class Kit {
             public void layoutContainer(Container parent) {
                 var in = parent.getInsets();
                 int y = in.top, width = parent.getWidth() - in.left - in.right;
-                for (var child : parent.getComponents()) {
+                for (var child : parent.getComponents())
                     if (child.isVisible()) {
                         int height = child.getPreferredSize().height;
                         child.setBounds(in.left, y, width, height);
                         y += height + gap;
                     }
-                }
+
             }
         };
     }
@@ -342,7 +342,7 @@ class Kit {
 
     /** Wrapped small text; a sheet's narrower box uses a smaller width so nothing is cut. */
     static JLabel note(String text, Color color, int width) {
-        String safe = (string(text)).replace("&", "&amp;").replace("<", "&lt;");
+        String safe = string(text).replace("&", "&amp;").replace("<", "&lt;");
         var label = label("<html><div style='width:" + width + "px'>" + safe + "</div></html>", smallFont, color);
         pad(label, 0, GAP, 0, GAP);
         return label;
@@ -498,14 +498,14 @@ class Kit {
         int w = image.getWidth(), h = image.getHeight();
         int[] argb = image.getRGB(0, 0, w, h, null, 0, w);
         int left = w, top = h, right = -1, bottom = -1;
-        for (int i = 0; i < argb.length; i++) {
+        for (int i = 0; i < argb.length; i++)
             if (argb[i] >>> 24 != 0) {
                 left = min(left, i % w);
                 right = max(right, i % w);
                 top = min(top, i / w);
                 bottom = i / w;
             }
-        }
+
         return right < 0 ? new Rectangle(w, h) : new Rectangle(left, top, right - left + 1, bottom - top + 1);
     }
 
@@ -557,12 +557,7 @@ class KeyValue extends JPanel {
         add(body, CENTER);
     }
 
-    KeyValue clear() {
-        body.removeAll();
-        revalidate();
-        repaint();
-        return this;
-    }
+
 
     KeyValue put(String key, String value, Tone tone) {
         return put(key, value, tone, null);
@@ -772,15 +767,15 @@ class Hero extends JPanel {
      */
     static List<Cell> money(long income, long supplies, long lost, long cost, boolean split, Runnable open) {
         var cells = new ArrayList<Cell>();
-        cells.add(new Cell("GAINS", signed(income), GAIN, msg("loot-other") + exact(income) + " gp",
+        cells.add(new Cell("GAINS", signed(income), GAIN, msg("loot-other") + exact(income) + GP_UNIT,
                         open));
         if (split) {
             cells.add(new Cell("SUPPLY", signed(-supplies), SUPPLY,
-                            msg("food-potions") + exact(supplies) + " gp"
+                            msg("food-potions") + exact(supplies) + GP_UNIT
                                     + (income > 0 && supplies >= 0 ? format(ROOT,
                                             " · %.1f%% of booked Gains", 100d * supplies / income) : ""), open));
             cells.add(new Cell("LOSS", signed(-lost), LOSS,
-                            msg("deaths-tax") + exact(lost) + " gp", open));
+                            msg("deaths-tax") + exact(lost) + GP_UNIT, open));
         } else
             cells.add(new Cell("COSTS", signed(-cost), LOSS, msg("everything-spent"), open));
         return cells;
@@ -1022,9 +1017,9 @@ class Table extends JPanel {
 
     /** One height for every row of a table: icon rows when any row carries an icon. */
     int rowHeight() {
-        for (Row row : rows) {
+        for (Row row : rows)
             if (row.icon != null) return ICON_ROW;
-        }
+
         return ROW;
     }
 
@@ -1059,7 +1054,7 @@ class Table extends JPanel {
 
     /** A counted page table title; empty lists keep the original bare title. */
     Table rowTitle(String title, List<Row> list) {
-        return setTitle(list.isEmpty() ? title : title + " · " + list.size()).setRows(list);
+        return setTitle(list.isEmpty() ? title : title + SEPARATOR + list.size()).setRows(list);
     }
 
     void resetPage() {
@@ -1104,7 +1099,7 @@ class Table extends JPanel {
         if (!total.getText().isEmpty()) parts.add(total);
         if (action != null) parts.add(action);
         else if (!plain && !folded && !rows.isEmpty()) {
-            applyPager(counter, previous, next, page, pages(), (page + 1) + "/" + pages());
+            applyPager(counter, previous, next, page, pages(), page + 1 + "/" + pages());
             addAll(parts, previous, counter, next);
         }
         if (!parts.equals(asList(right.getComponents()))) {
@@ -1413,7 +1408,8 @@ class Shell extends JPanel {
     /** A plain notification from any thread; it shows on the Swing thread. */
     void tell(String title, String detail, boolean warning) {
         if (isEventDispatchThread())
-            notify(title, detail, warning, null, null); else
+            notify(title, detail, warning, null, null);
+        else
             invokeLater(() -> notify(title, detail, warning, null, null));
     }
 
@@ -1434,7 +1430,7 @@ class Shell extends JPanel {
 
     /** Keeps a save failure visible until the backend recovers; no timer and no click dismiss. */
     void notifySticky(String title, String detail, String action, Runnable onAction) {
-        String tip = title + (detail == null ? "" : " · " + detail);
+        String tip = title + (detail == null ? "" : SEPARATOR + detail);
         if (noticeSticky && notice.isVisible() && tip.equals(message.getToolTipText())) return;
         noticeSticky = true;
         render(title, detail, true, action, onAction, true);
@@ -1456,10 +1452,10 @@ class Shell extends JPanel {
         Color color = warning ? REVIEW.color : GAIN.color;
         notice.setBorder(createCompoundBorder(createMatteBorder(1, 3, 0, 0, color),
                         createEmptyBorder(4, GAP, 4, GAP)));
-        String safe = (title + (empty(detail) ? "" : " · " + detail)).replace("&", "&amp;")
+        String safe = (title + (empty(detail) ? "" : SEPARATOR + detail)).replace("&", "&amp;")
                         .replace("<", "&lt;");
         message.setText(msg("div-style") + (action == null ? 190 : 130) + "px'>" + safe + "</div></html>");
-        message.setToolTipText(title + (detail == null ? "" : " · " + detail));
+        message.setToolTipText(title + (detail == null ? "" : SEPARATOR + detail));
         noticeAction.removeAll();
         if (action != null && onAction != null) {
             JButton button = button(action, true, () -> {
@@ -1470,7 +1466,8 @@ class Shell extends JPanel {
         }
         notice.setVisible(true);
         if (sticky)
-            timer.stop(); else {
+            timer.stop();
+        else {
             timer.setInitialDelay(action == null ? 4000 : 8000);
             timer.restart();
         }
@@ -1607,9 +1604,9 @@ class Fmt {
      */
     static String activity(String name) {
         String value = name == null ? "" : name.trim();
-        for (String[] row : SHORT) {
+        for (String[] row : SHORT)
             if (row[0].equalsIgnoreCase(value)) return row[1];
-        }
+
         for (String[] row : PHRASES)
             value = value.replaceAll("(?i)" + java.util.regex.Pattern.quote(row[0]), row[1]);
         int open = value.lastIndexOf(" (");
@@ -1641,8 +1638,7 @@ class Fmt {
 
     /** {@code +1.2k}, {@code −36.0k}, {@code 0}. Uses a true minus sign. */
     static String signed(long value) {
-        if (value == 0) return "0";
-        return (value > 0 ? "+" : "−") + compact(value);
+        return value == 0 ? "0" : (value > 0 ? "+" : "−") + compact(value);
     }
 
     /** An item row's worth: a dash when it is worth nothing (owner live 2026-10-16). */
@@ -1664,14 +1660,12 @@ class Fmt {
         if (abs < 10_000_000) return format(ROOT, "%.2fM", abs / 10000 / 100d);
         if (abs < 100_000_000) return format(ROOT, "%.1fM", abs / 100000 / 10d);
         if (abs < 1_000_000_000) return abs / 1_000_000 + "M";
-        if (abs < 10_000_000_000L) return format(ROOT, "%.2fB", abs / 10_000_000 / 100d);
-        return format(ROOT, "%.1fB", abs / 100_000_000 / 10d);
+        return abs < 10_000_000_000L ? format(ROOT, "%.2fB", abs / 10_000_000 / 100d) : format(ROOT, "%.1fB", abs / 100_000_000 / 10d);
     }
 
     /** {@code +124,318} with grouping and a true minus sign. */
     static String exactSigned(long value) {
-        if (value == 0) return "0";
-        return (value > 0 ? "+" : "") + exact(value).replace('-', '−');
+        return value == 0 ? "0" : (value > 0 ? "+" : "") + exact(value).replace('-', '−');
     }
 
     static synchronized String exact(long value) {
@@ -1685,7 +1679,7 @@ class Fmt {
 
     /** {@code h:mm:ss} for the session clock; {@code m:ss} under an hour. */
     static String clock(long ms) {
-        long total = positive(ms) / 1000, h = total / 3600, m = (total % 3600) / 60, s = total % 60;
+        long total = positive(ms) / 1000, h = total / 3600, m = total % 3600 / 60, s = total % 60;
         return h > 0 ? format(ROOT, "%d:%02d:%02d", h, m, s) : format(ROOT, "%d:%02d", m, s);
     }
 
@@ -1715,11 +1709,10 @@ class Fmt {
     }
 
     static String duration(long ms, boolean seconds) {
-        long total = positive(ms) / 1000, d = total / 86400, h = (total % 86400) / 3600, m = (total % 3600) / 60;
+        long total = positive(ms) / 1000, d = total / 86400, h = total % 86400 / 3600, m = total % 3600 / 60;
         long s = total % 60;
         if (d > 0) return d + "d " + h + "h";
-        if (h > 0) return h + "h " + format(ROOT, "%02d", m) + "m";
-        return m + "m" + (seconds ? format(ROOT, " %02ds", s) : "");
+        return h > 0 ? h + "h " + format(ROOT, "%02d", m) + "m" : m + "m" + (seconds ? format(ROOT, " %02ds", s) : "");
     }
 
     /**
@@ -1728,8 +1721,7 @@ class Fmt {
      */
     static String targetTime(long ms) {
         long minutes = positive(ms) / 60000;
-        if (minutes < 60) return minutes + "m";
-        return minutes / 60 + "h" + (minutes % 60 > 0 ? " " + minutes % 60 + "m" : "");
+        return minutes < 60 ? minutes + "m" : minutes / 60 + "h" + (minutes % 60 > 0 ? " " + minutes % 60 + "m" : "");
     }
 
     /** A Net target the field reads back exactly: {@code 5m}, {@code 9.12m}, {@code 750k}. */
@@ -1737,9 +1729,7 @@ class Fmt {
         // "1b", not "1000m", so the 1b pick lights up (owner 1.5.2 milestone).
         if (gp >= 1_000_000_000 && gp % 10_000_000 == 0)
             return BigDecimal.valueOf(gp, 9).stripTrailingZeros().toPlainString() + "b";
-        if (gp >= 1_000_000 && gp % 10000 == 0)
-            return BigDecimal.valueOf(gp, 6).stripTrailingZeros().toPlainString() + "m";
-        return gp < 1_000_000 && gp % 1000 == 0 ? gp / 1000 + "k" : exact(gp);
+        return gp >= 1_000_000 && gp % 10000 == 0 ? BigDecimal.valueOf(gp, 6).stripTrailingZeros().toPlainString() + "m" : gp < 1_000_000 && gp % 1000 == 0 ? gp / 1000 + "k" : exact(gp);
     }
 
     /** {@code ×27} quantity marker. */
@@ -1769,8 +1759,7 @@ class Fmt {
         long s = positive(ageMillis) / 1000;
         if (s < 45) return "just now";
         if (s < 3600) return s / 60 + "m ago";
-        if (s < 86400) return s / 3600 + "h ago";
-        return s / 86400 + "d ago";
+        return s < 86400 ? s / 3600 + "h ago" : s / 86400 + "d ago";
     }
 }
 
@@ -1835,7 +1824,7 @@ class HudBuilder {
     }
 
     boolean keepSession() {
-        return config.hudTrayKeeps() == GpManagerConfig.HudTrayKeeps.SESSION;
+        return config.hudTrayKeeps() == HudTrayKeeps.SESSION;
     }
 
     /** The NPC the player is fighting; empty when released or not a fight. */
@@ -1915,13 +1904,13 @@ class HudBuilder {
         var listed = new ArrayList<HudTray.Entry>();
         long shownAt = 0;
         int hidden = 0;
-        for (HudTray.Entry entry : tray.entries()) {
+        for (HudTray.Entry entry : tray.entries())
             if (visible.test(new Flow(entry.item, entry.name, entry.quantity, entry.unitPrice, entry.value))) {
                 listed.add(entry);
                 shownAt = max(shownAt, entry.seen);
             } else if (entry.state != TRADED)
                 hidden++;
-        }
+
         boolean open = !listed.isEmpty() && (always || now - shownAt < stayMillis() + FADE_MILLIS);
         openedAt = !open ? 0 : openedAt == 0 ? now : openedAt;
         var rows = new ArrayList<HudFrame.Row>();
@@ -1935,14 +1924,14 @@ class HudBuilder {
         // A big drop keeps its row however much cheaper loot follows it; "+N more" takes the rest.
         int plain = config.hudTrayRows();
         for (HudTray.Entry entry : listed) if (entry.gold) plain--;
-        for (HudTray.Entry entry : listed) {
+        for (HudTray.Entry entry : listed)
             if (open && rows.size() < config.hudTrayRows() && (entry.gold || plain-- > 0))
                 rows.add(row(entry));
-        }
+
         int more = open ? listed.size() - rows.size() : 0;
         String footer = more > 0 ? "+" + more + " more" : "";
         if (open && hidden > 0)
-            footer = (footer.isEmpty() ? "" : footer + " · ") + "+" + hidden + " hidden";
+            footer = (footer.isEmpty() ? "" : footer + SEPARATOR) + "+" + hidden + " hidden";
         String context = contextLine(snapshot);
         if (snapshot.reviews == 0 && snapshot.targetUntil > 0
                 && snapshot.milestone != null) {
@@ -1968,9 +1957,7 @@ class HudBuilder {
      */
     String title(LiveSnapshot snapshot, long now) {
         var streak = tray.streak(now);
-        if (streak != null && snapshot.present && !interaction.isEmpty())
-            return "KC: " + streak.getValue();
-        return "";
+        return streak != null && snapshot.present && !interaction.isEmpty() ? "KC: " + streak.getValue() : "";
     }
 
     /**
@@ -1988,8 +1975,7 @@ class HudBuilder {
             color = GAIN.color;
             return "Milestone reached · " + compact(snapshot.milestone);
         }
-        if (snapshot.warming) return "Calibrating…";
-        return "";
+        return snapshot.warming ? "Calibrating…" : "";
     }
 
     static boolean counted(HudTray.Entry entry) {
@@ -2014,7 +2000,7 @@ class HudBuilder {
                 value = (entry.value < 0 ? exactSigned(entry.value) : exact(entry.value)) + " " + quantity;
             }
         }
-        var row = new HudFrame.Row(icon, name, entry.state.tag, value, name.isEmpty() && highlight != null ? highlight : (entry.gold ? GOLD : entry.state == LOST ? LOSS.color : entry.state == TRADED ? MARKET.color : counted(entry) ? GAIN.color : DIM.color),
+        var row = new HudFrame.Row(icon, name, entry.state.tag, value, name.isEmpty() && highlight != null ? highlight : entry.gold ? GOLD : entry.state == LOST ? LOSS.color : entry.state == TRADED ? MARKET.color : counted(entry) ? GAIN.color : DIM.color,
                 entry.gold, entry.born, highlight);
         row.narrow = narrow;
         return row;
@@ -2035,7 +2021,7 @@ class HudBuilder {
     String trayLabel(LiveSnapshot snapshot, long now) {
         var streak = tray.streak(now);
         return streak == null || streak.getValue() < 2 || !snapshot.present ? tray.label() : tray.label()
-                        + " · " + signed((snapshot.net + snapshot.netBase - base) / streak.getValue())
+                        + SEPARATOR + signed((snapshot.net + snapshot.netBase - base) / streak.getValue())
                         + "/kill";
     }
 
@@ -2045,14 +2031,14 @@ class HudBuilder {
     }
 
     static int stack(long quantity) {
-        for (int stack : STACKS) {
+        for (int stack : STACKS)
             if (quantity >= stack) return stack;
-        }
+
         return 1;
     }
 
     String timer(long ms) {
-        if (config.hudTimer() == GpManagerConfig.HudTimer.Full) return clock(ms);
+        if (config.hudTimer() == HudTimer.Full) return clock(ms);
         long total = positive(ms) / 1000, hours = total / 3600, minutes = total % 3600 / 60;
         return hours > 0 ? format(ROOT, "%dh%02dm", hours, minutes)
                 : format(ROOT, "%dm%02ds", minutes, total % 60);
@@ -2067,7 +2053,7 @@ class HudBuilder {
  * Everything HUD+ paints, built once per game tick by {@link HudBuilder}. Strings are already
  * formatted and colours already chosen, so painting only reads fields.
  */
-@RequiredArgsConstructor
+@AllArgsConstructor
 class HudFrame {
     static final HudFrame HIDDEN = new HudFrame(false, Gem.OFF, "", "", "", WHITE, "", -1d, false, false, "",
                     WHITE, 0, "", "", WHITE, "", emptyList(), "", 0, 0, 0, 0);
@@ -2311,7 +2297,7 @@ class HudOverlay extends Overlay {
                 // (owner live 2026-10-13).
                 Color targetColor = LABEL;
                 if (frame.warning) {
-                    boolean dim = !config.reducedMotion() && (now / WARNING_BLINK_MILLIS) % 2 == 0;
+                    boolean dim = !config.reducedMotion() && now / WARNING_BLINK_MILLIS % 2 == 0;
                     targetColor = dim ? LABEL : LOSS.color;
                 }
                 text(g, body, frame.target, right - width(fb, frame.target), y + fb.getAscent(), targetColor);
@@ -2485,15 +2471,9 @@ class HudOverlay extends Overlay {
         }
     }
 
-    Font body() {
-        fonts();
-        return body;
-    }
 
-    Font bold() {
-        fonts();
-        return bold;
-    }
+
+
 
     static Color gemColor(Gem gem, boolean motion, long now) {
         switch (gem) {
@@ -2544,7 +2524,7 @@ class HudTray {
 
     long big = BIG_DROP;
 
-    @RequiredArgsConstructor
+    @AllArgsConstructor
     enum State {
         // A tray row always reads icon, name ×count and value; the state stays internal
         // (owner 2026-10-13: no "claimed"/"pending"/"recovered" words on loot rows).
@@ -2655,17 +2635,16 @@ class HudTray {
         // or brought when it is the one item; its coins never get a row of their own.
         long coins = 0;
         int items = 0;
-        for (Flow flow : transaction.flows()) {
+        for (Flow flow : transaction.flows())
             if (flow.item == 995) coins += flow.value;
             else items++;
-        }
+
         for (Flow flow : transaction.flows()) {
             if (flow.quantity == 0 || market && flow.item == 995) continue;
             boolean gain = flow.quantity > 0;
             // Routine rune/ammo/charge use never rides the tray, but a pickup is a drop
             // like any other (owner 2026-09-29).
-            if (!gain && !market && routine(flow.name)) continue;
-            if (!gain && !market && !lost) continue;
+            if (!gain && !market && routine(flow.name) || !gain && !market && !lost) continue;
             if (!any) {
                 // A drop or a GE or player trade joins the running trip; on an empty tray it reads
                 // "Dropped", "Traded" (owners 2026-09-28, 2026-10-09) or "Exchanged" for a shop.
@@ -2781,9 +2760,9 @@ class HudTray {
     }
 
     static boolean has(Set<String> names, String name) {
-        for (String each : names) {
+        for (String each : names)
             if (each.equalsIgnoreCase(name)) return true;
-        }
+
         return false;
     }
 
@@ -2975,9 +2954,9 @@ class HudTray {
 
     static String labelFor(String activity) {
         String lower = lower(activity);
-        for (String[] row : VERBS) {
+        for (String[] row : VERBS)
             if (lower.contains(row[0])) return row[1];
-        }
+
         return "Looted";
     }
 }
@@ -3165,11 +3144,11 @@ class LedgerPage extends Shell.Page {
         scopeTitle();
         // Owner 2026-10-01 (F03): Runs today is whole runs that started today, never calendar-day
         // money.
-        scope.setToolTipText(next.scopeName + (next.entry.scope == TODAY ? " · " + msg("current-run") : ""));
-        if (scopeChanged) {
+        scope.setToolTipText(next.scopeName + (next.entry.scope == TODAY ? SEPARATOR + msg("current-run") : ""));
+        if (scopeChanged)
             for (var table : new Table[] {income, cost, market, pending, review, corrected})
                 table.resetPage();
-        }
+
         searching = !liveCategory() && (searching || !next.entry.search.isEmpty());
         for (var part : body.getComponents())
             if (part != search || !searching) body.remove(part);
@@ -3230,7 +3209,7 @@ class LedgerPage extends Shell.Page {
                 boolean valued = item.value > 0;
                 rows.add(new Row("pending|" + item.name + "|" + item.item, icon(item.item), item.name,
                                 "×" + exact(item.quantity), valued ? signed(item.value) : "", DIM, item.tip,
-                                valued ? exactSigned(item.value) + " gp" : "", false, null, emptyList()));
+                                valued ? exactSigned(item.value) + GP_UNIT : "", false, null, emptyList()));
             }
             pending.setTitle("PENDING · " + rows.size()).setTotal("", DIM).setMinRows(rows.size() > ROWS ? ROWS : 0)
                     .setRows(rows);
@@ -3251,7 +3230,7 @@ class LedgerPage extends Shell.Page {
         for (Group group : groups)
             // Under All, loss rows keep their own colour beside supplies.
             rows.add(groupRow(group, tone == SUPPLY && group.table == COSTS_LOSS ? LOSS : tone));
-        table.setTitle(title + " · " + groups.size())
+        table.setTitle(title + SEPARATOR + groups.size())
                 .setTotal(groups.isEmpty() && !liveCategory() || tone == DIM ? "" : signed(total), tone)
                 .setMinRows(liveCategory() ? 0 : min(ROWS, rows.size())).setRows(rows);
     }
@@ -3286,7 +3265,7 @@ class LedgerPage extends Shell.Page {
         String value;
         Tone shown = tone;
         String meta = groupLead(group);
-        String tip = group.name + " · " + (group.count > 1 ? (meta.isEmpty() ? "" : meta + " · ")
+        String tip = group.name + SEPARATOR + (group.count > 1 ? (meta.isEmpty() ? "" : meta + SEPARATOR)
                                         + group.count + " entries" : meta);
         if (group.review) {
             value = "?";
@@ -3298,12 +3277,12 @@ class LedgerPage extends Shell.Page {
                 shown = DIM;
             } else if (settled(group, row)) {
                 value = signed(marketPrimary(data, group));
-                tip = group.name + " · " + marketLead(data, group)
+                tip = group.name + SEPARATOR + marketLead(data, group)
                                 + msg("settlement-profit");
             } else {
                 value = stateWord(row);
                 shown = DIM;
-                tip = group.name + " · " + group.context;
+                tip = group.name + SEPARATOR + group.context;
             }
         } else if (group.incomplete()) {
             value = "?";
@@ -3315,17 +3294,17 @@ class LedgerPage extends Shell.Page {
                                 ? group.failedOf() : group.quantity > 1 && group.item != 995
                                                 && (!group.actionGroup() || group.charge) ? times(group.quantity)
                                         : "";
-        if (liveCategory() && group.item != 995 && group.claim >= 0 && group.failedOf().isEmpty()) {
+        if (liveCategory() && group.item != 995 && group.claim >= 0 && group.failedOf().isEmpty())
             if (group.dose) qty = LiveSnapshot.quantityText(group);
             else if (group.actionGroup() && !group.charge) qty = times(max(1, group.count));
             else if (group.quantity == 1) qty = times(1);
-        }
-        if (group.failed > 0) tip = group.name + " · " + group.failedTip();
+
+        if (group.failed > 0) tip = group.name + SEPARATOR + group.failedTip();
         Runnable open = protect.apply(() -> openGroup(group.id));
         return new Row(group.id, icon(group.item), group.name
                         + (group.failed > 0 && group.failedOf().isEmpty() ? " (failed)" : "")
                         + (group.corrected ? " •" : ""), qty, value, shown, tip,
-                group.incomplete() || group.market ? "" : exactSigned(group.value) + " gp", false, open,
+                group.incomplete() || group.market ? "" : exactSigned(group.value) + GP_UNIT, false, open,
                 singletonList(new Menu("Open", open)));
     }
 
@@ -3335,12 +3314,15 @@ class LedgerPage extends Shell.Page {
     }
 
     Row receiptRow(Receipt receipt) {
-        Runnable open = protect.apply(() -> actions.selectionChanged(receipt.transaction, receipt.id, null));
+        Runnable open = protect.apply(() -> {
+            data.entry.focusAudit = Audit.CORRECTED;
+            actions.selectionChanged(receipt.transaction, receipt.id, null);
+        });
         return new Row(receipt.id, icon(receipt.item), receipt.name,
                 receipt.quantity > 1 && receipt.item != 995 ? times(receipt.quantity) : "",
                 receipt.unknown ? "?" : worth(receipt.value), receipt.unknown ? DIM : of(receipt.category),
-                receipt.name + " · " + receipt.correction + " · " + receipt.why,
-                receipt.unknown ? "" : exactSigned(receipt.value) + " gp",
+                receipt.name + SEPARATOR + receipt.correction + SEPARATOR + receipt.why,
+                receipt.unknown ? "" : exactSigned(receipt.value) + GP_UNIT,
                 data.detail != null && data.detail.exact == receipt, open,
                 singletonList(new Menu("Open", open)));
     }
@@ -3356,8 +3338,8 @@ class LedgerPage extends Shell.Page {
                         reviewSelected = selected ? "" : row.transaction;
                         apply(this.data);
                     };
-            rows.add(new Row(row.transaction, null, name, "", "?", REVIEW, name + " · " + row.why,
-                            exactSigned(row.value) + " gp", selected, open, singletonList(new Menu("Decide…", open))));
+            rows.add(new Row(row.transaction, null, name, "", "?", REVIEW, name + SEPARATOR + row.why,
+                            exactSigned(row.value) + GP_UNIT, selected, open, singletonList(new Menu("Decide…", open))));
         }
         review.setTitle("(!) REVIEW · " + data.review.total).setAction(null).setEmpty(data.readonly
                                 ? msg("review-read") : data.review.total == 0 ? msg("nothing-needs")
@@ -3374,13 +3356,13 @@ class LedgerPage extends Shell.Page {
         String preview = netPreview(row, data == null ? 0 : data.net);
         if (!preview.isEmpty()) panel.add(note(preview, TEXT));
         var buttons = row();
-        for (var decision : Decision.values()) {
+        for (var decision : Decision.values())
             if (row.decisions.contains(decision))
                 buttons.add(button(reviewLabel(decision), false, () -> {
                                     reviewSelected = "";
                                     actions.decide(row.transaction, decision);
                                 }));
-        }
+
         panel.add(buttons);
         return panel;
     }
@@ -3422,7 +3404,7 @@ class LedgerPage extends Shell.Page {
         long latest = group.at;
         for (var receipt : open.entries) latest = max(latest, receipt.at);
         int count = group.market ? open.entries.size() : group.count;
-        var heading = title(group.name, group.incomplete() ? "—" : exactSigned(group.value) + " gp",
+        var heading = title(group.name, group.incomplete() ? "—" : exactSigned(group.value) + GP_UNIT,
                         group.incomplete() ? DIM : sign(group.value), (count == 0 ? "" : count + (group.market
                                                         ? count == 1 ? " trade · " : " trades · "
                                                         : count == 1 ? " entry · " : " entries · ")) + "Latest "
@@ -3459,10 +3441,10 @@ class LedgerPage extends Shell.Page {
             var rows = new ArrayList<Row>();
             var contents = new ArrayList<Receipt>();
             boolean bag = group.entries.stream().anyMatch(entry -> entry.bag);
-            for (var entry : group.entries) {
+            for (var entry : group.entries)
                 if (entry.bag || bag && Engine.destroyedBag(entry.item)) contents.add(entry);
                 else rows.add(receiptRow(entry));
-            }
+
             if (bag) {
                 if (group.ids.contains(bagDetail)) {
                     rows.clear();
@@ -3473,7 +3455,7 @@ class LedgerPage extends Shell.Page {
                 boolean missing = contents.stream().anyMatch(entry -> entry.unknown);
                 String selectedBag = contents.stream().filter(entry -> entry.bag).findFirst().orElseThrow().transaction;
                 rows.add(new Row("bag", icon(ItemID.LOOTING_BAG), "Looting bag", "", missing ? "?" : worth(value),
-                                missing ? DIM : sign(value), "View contents", missing ? "" : exactSigned(value) + " gp", false,
+                                missing ? DIM : sign(value), "View contents", missing ? "" : exactSigned(value) + GP_UNIT, false,
                                 () -> { bagDetail = selectedBag; apply(data); }, null));
             }
             return rows;
@@ -3490,7 +3472,7 @@ class LedgerPage extends Shell.Page {
                 rows.add(new Row("item|" + item.item + "|" + item.name, icon(item.item), item.name,
                             item.item == 995 ? "" : times(item.quantity), item.incomplete ? "?" : worth(item.value),
                             item.incomplete ? DIM : sign(item.value), "",
-                            item.incomplete ? "" : exactSigned(item.value) + " gp", false, null, null));
+                            item.incomplete ? "" : exactSigned(item.value) + GP_UNIT, false, null, null));
         return rows;
     }
 
@@ -3511,7 +3493,7 @@ class LedgerPage extends Shell.Page {
                                         : stateWord(receipt.market), realized ? MARKET : DIM,
                                 receiptSub(receipt, data.at) + (receipt.corrected
                                                 ? msg("result-corrected") : ""),
-                                realized ? exactSigned(primary) + " gp" : "", splittable(receipt)));
+                                realized ? exactSigned(primary) + GP_UNIT : "", splittable(receipt)));
             }
         } else {
             // A multi-item group's entries say what each use spent ("Blood rune ×2"), not the group
@@ -3530,9 +3512,9 @@ class LedgerPage extends Shell.Page {
                 rows.add(receiptRow(data, group, card.transaction, card.id,
                                 chosen != null && chosen.transaction.equals(card.transaction), rowName,
                                 card.incomplete ? "?" : signed(card.value), card.incomplete ? DIM : sign(card.value),
-                                card.summaryText() + " · " + age(positive(data.at - card.at)) + (card.incomplete
-                                                ? " · known value " + exactSigned(card.knownSubtotal) + " gp" : ""),
-                                card.incomplete ? "" : exactSigned(card.value) + " gp", split));
+                                card.summaryText() + SEPARATOR + age(positive(data.at - card.at)) + (card.incomplete
+                                                ? " · known value " + exactSigned(card.knownSubtotal) + GP_UNIT : ""),
+                                card.incomplete ? "" : exactSigned(card.value) + GP_UNIT, split));
             }
         }
         receipts.setTitle("ENTRIES · " + rows.size()).setRows(rows);
@@ -3559,7 +3541,8 @@ class LedgerPage extends Shell.Page {
         var chosen = open.exact;
         if (chosen != null && (open.group.market ? chosen.id.equals(id)
                         : chosen.transaction.equals(identifier)))
-            actions.selectionChanged(null, null, open.group.id); else
+            actions.selectionChanged(null, null, open.group.id);
+        else
             actions.selectionChanged(identifier, id, null);
     }
 
@@ -3578,13 +3561,13 @@ class LedgerPage extends Shell.Page {
                                         ? trade.settlementAtEpochMillis : row.at;
         String what = realized ? trade.side == GeOffer.Side.SELL ? "Sold" : "Bought" : trade != null
                                 ? orderStateText(trade) : row.verb + (row.action.isEmpty() ? ""
-                                                : " · " + row.action);
-        panel.add(note(what + " · " + age(positive(data.at - at)), TEXT));
+                                                : SEPARATOR + row.action);
+        panel.add(note(what + SEPARATOR + age(positive(data.at - at)), TEXT));
         var facts = new KeyValue(null);
         if (trade == null) {
             panel.add(note(row.why, LABEL));
             if (data.detail.group.death || pendingCorrection == Correction.IGNORE)
-                panel.add(note("Corrections apply to the whole entry.", LABEL));
+                panel.add(note("Applies to the whole entry.", LABEL));
             if (!row.tradedItems.isEmpty()) panel.add(note(row.tradedItems, LABEL));
             // Owner 2026-10-01 (F11): a Charges receipt discloses its captured unit price and
             // source.
@@ -3593,20 +3576,21 @@ class LedgerPage extends Shell.Page {
         } else
             facts = marketFacts(trade, row, clean ? null : realized ? row.why : orderWhy(trade));
         if (row.corrected || row.split) {
-            facts.put("Originally", "automatic · " + exactSigned(row.automaticValue) + " gp", DIM);
+            facts.put("Originally", "automatic · " + exactSigned(row.automaticValue) + GP_UNIT, DIM);
             facts.put("Corrected to", row.correction, PLAIN);
         }
         if (facts.lines() > 0) panel.add(facts);
         if (data.readonly)
-            panel.add(note(msg("correction-rules"), LABEL)); else if (preview != null && row.transaction.equals(transaction)) {
+            panel.add(note(msg("correction-rules"), LABEL));
+        else if (preview != null && row.transaction.equals(transaction)) {
             var preview = new KeyValue("PREVIEW");
             if (share != null)
                 preview.put("Keep", "×" + exact(share[1]), PLAIN)
                         .put("Others", "×" + exact(share[2] - share[1]), PLAIN);
-            panel.add(preview.put("Current Net", exactSigned(this.preview.currentNet) + " gp", PLAIN).put(
+            panel.add(preview.put("Current Net", exactSigned(this.preview.currentNet) + GP_UNIT, PLAIN).put(
                                     share != null ? "After split" : "After correction",
-                                    exactSigned(this.preview.afterNet) + " gp", PLAIN).put("Change",
-                                    exactSigned(this.preview.change) + " gp", sign(this.preview.change)));
+                                    exactSigned(this.preview.afterNet) + GP_UNIT, PLAIN).put("Change",
+                                    exactSigned(this.preview.change) + GP_UNIT, sign(this.preview.change)));
             panel.add(note(this.preview.note(), LABEL));
             JButton confirm = button("Confirm", true, this::confirm);
             confirm.getAccessibleContext().setAccessibleName(msg("confirm-correction"));
@@ -3722,7 +3706,7 @@ class LedgerPage extends Shell.Page {
     }
 
     static String reviewLabel(Decision decision) {
-        return msg("review." + decision, "Exclude");
+        return msg("review." + decision, "Remove entry");
     }
 
     void showNotice(String text) {
@@ -4050,7 +4034,7 @@ class LedgerController implements LedgerPage.Actions {
                         + signed(preview.netDelta) + " gp.";
         Object owner = panel.ownerToken;
         panel.shell.confirm("Review decision", message, "Apply", () -> mutate(() -> {
-                                            if (engine.applyDecision(preview, now()) < 0)
+                                            if (engine.applyDecision(preview) < 0)
                                                 later(owner, () -> panel.shell.tell("Not applied",
                                                                         msg("entries-changed"), true));
                                         }));
@@ -4173,9 +4157,9 @@ class LivePage extends Shell.Page {
         editButton = button("…", false, actions::editTarget);
         pause = button("||", false, actions::toggleTimerPause);
         againButton.setToolTipText(msg("again-session-tip"));
-        doneButton.setToolTipText("Done: clear the goal");
+        doneButton.setToolTipText("Clear goal");
         editButton.setToolTipText("Edit targets");
-        pause.setToolTipText("Pause or resume the timer");
+        pause.setToolTipText("Pause/resume timer");
         var head = transparent(new BorderLayout());
         head.add(heading, CENTER);
         head.add(top, EAST);
@@ -4265,7 +4249,7 @@ class LivePage extends Shell.Page {
                                     : " · costs " + exact(snapshot.cost) + msg("split-unavailable"))
                             + (snapshot.goal == null ? msg("click-set") : snapshot.goal.time ? "" : " · aim "
                                                     + exactSigned(snapshot.goal.current) + " of "
-                                                    + exact(snapshot.goal.target) + " gp"),
+                                                    + exact(snapshot.goal.target) + GP_UNIT),
                     rateText(snapshot.ready, snapshot.rate), snapshot.ready,
                     clock(snapshot.elapsed) + " ACTIVE");
         } else
@@ -4305,7 +4289,7 @@ class LivePage extends Shell.Page {
         hero.name.setFocusable(!snapshot.general && snapshot.present);
         hero.name.setToolTipText(snapshot.general ? null : "Click to rename"
                                 + (identityOf(snapshot).equals(hero.name.getText()) ? ""
-                                        : " · " + identityOf(snapshot)));
+                                        : SEPARATOR + identityOf(snapshot)));
         target.setVisible(goal != null);
         if (goal == null) return;
         String title;
@@ -4317,7 +4301,7 @@ class LivePage extends Shell.Page {
             value.setVisible(true);
             targetTime.setVisible(false);
         } else {
-            title = "TARGET · " + goal.label + " · " + goal.progress;
+            title = "TARGET · " + goal.label + SEPARATOR + goal.progress;
             // The hero owns the live Net pair; the card never repeats it (owner live 2026-10-13).
             value.setText("");
             value.setToolTipText(null);
@@ -4343,9 +4327,9 @@ class LivePage extends Shell.Page {
         pause.setText(timerPaused ? "▶" : "||");
         var shown = new ArrayList<JButton>();
         for (var action : completed ? new JButton[] {againButton, doneButton, editButton, pause}
-                        : new JButton[] {pause, againButton, doneButton, editButton}) {
+                        : new JButton[] {pause, againButton, doneButton, editButton})
             if (action.isVisible()) shown.add(action);
-        }
+
         List<Object> shape = List.of(completed, shown);
         if (!shape.equals(actionsShape)) {
             actionsShape = shape;
@@ -4377,7 +4361,7 @@ class LivePage extends Shell.Page {
         if (!row.open && !row.ledgerReview) {
             var exclude = actions.exclude(entry);
             if (exclude != null)
-                menu.add(new Table.Menu(row.entries > 1 ? "Exclude latest booking…" : "Exclude booking…", exclude));
+                menu.add(new Table.Menu(row.entries > 1 ? "Remove latest entry…" : "Remove entry…", exclude));
         }
         // A finished trade is one item too (owner 2026-10-08: a sold Fire rune had no Hide).
         if (!row.open && row.item > 0 && (!row.composite || row.market))
@@ -4390,7 +4374,7 @@ class LivePage extends Shell.Page {
         // Ore a failed smelt lost sits beside the ore the bars used: say which is which.
         String name = msg("failed").equals(row.label) ? row.name + " (failed)" : row.name;
         Row drawn = new Row(row.id + "|" + row.receiptId, icon, name, row.qty, valueText(row), toneOf(row),
-                tipOf(row), numeric(row) ? exactSigned(row.value) + " gp" : "", false, () -> actions.openLedger(entry),
+                tipOf(row), numeric(row) ? exactSigned(row.value) + GP_UNIT : "", false, () -> actions.openLedger(entry),
                 menu);
         drawn.color = row.highlight;
         return drawn;
@@ -4417,7 +4401,7 @@ class LivePage extends Shell.Page {
             pvp.add(new Cell("KILLS", valueOf(snapshot.kills), GAIN, msg("kt"),
                             () -> actions.openCategory(KILL)));
             pvp.add(new Cell("DEATHS", valueOf(snapshot.deaths), LOSS,
-                            "PvP deaths this Grind. " + msg("death-view"), () -> actions.openCategory(DEATH)));
+                            "PvP deaths. " + msg("death-view"), () -> actions.openCategory(DEATH)));
             pvp.add(new Cell("BEST", snapshot.bestKill == 0 ? "—" : signed(snapshot.bestKill), GAIN,
                                         "Best kill · " + snapshot.kills + " kills · " + snapshot.deaths + " deaths", null));
             pvp.add(new Cell("STREAK", valueOf(snapshot.streak), snapshot.streak > 0 ? GAIN : DIM,
@@ -4490,16 +4474,14 @@ class LivePage extends Shell.Page {
     static Color dotColor(LiveSnapshot snapshot) {
         if (snapshot.offline) return OFF;
         if (snapshot.paused && !snapshot.idle) return REVIEW.color;
-        if (!snapshot.present || snapshot.idle) return OFF;
-        return GAIN.color;
+        return !snapshot.present || snapshot.idle ? OFF : GAIN.color;
     }
 
     static Tone toneOf(Recent row) {
         if ("review".equals(row.tag)) return REVIEW;
         if (!numeric(row)) return DIM;
         if (row.market) return MARKET;
-        if (row.value >= 0) return GAIN;
-        return row.cost == CostView.LOSS ? LOSS : SUPPLY;
+        return row.value >= 0 ? GAIN : row.cost == CostView.LOSS ? LOSS : SUPPLY;
     }
 
     static boolean numeric(Recent row) {
@@ -4513,7 +4495,7 @@ class LivePage extends Shell.Page {
     }
 
     static String tipOf(Recent row) {
-        var tip = new StringBuilder(row.name).append(" · ").append(metaOf(row));
+        var tip = new StringBuilder(row.name).append(SEPARATOR).append(metaOf(row));
         if ("review".equals(row.tag)) tip.append(" · needs review");
         if (row.unknown) tip.append(msg("value-incomplete"));
         if (row.market && !row.known && !row.amount)
@@ -4521,7 +4503,7 @@ class LivePage extends Shell.Page {
         if (row.market && row.amount)
             tip.append(row.known ? msg("primary-value") : msg("settlement-result"));
         if (row.entries > 1 && !metaOf(row).contains("entries"))
-            tip.append(" · ").append(row.entries).append(" entries");
+            tip.append(SEPARATOR).append(row.entries).append(" entries");
         return tip.toString();
     }
 
@@ -4530,19 +4512,15 @@ class LivePage extends Shell.Page {
         if (row.neutral) return "—";
         if (row.unknown) return "?";
         if ("canceled".equals(row.tag)) return "Canceled";
-        if (row.market && !row.amount && !row.known)
-            return "review".equals(row.tag) ? "?" : row.marketSide.isEmpty() ? "Pending" : row.marketSide;
-        return row.market ? signed(row.value) : worth(row.value);
+        return row.market && !row.amount && !row.known ? "review".equals(row.tag) ? "?" : row.marketSide.isEmpty() ? "Pending" : row.marketSide : row.market ? signed(row.value) : worth(row.value);
     }
 
     /** What the row is: its state for review / unpriced rows, else action and quantity. */
     static String metaOf(Recent row) {
         if ("review".equals(row.tag)) return "Needs review";
         if ("unpriced".equals(row.tag)) return "Unpriced";
-        String qty = row.qty == null ? "" : " · " + row.qty;
-        if (!row.market && (row.label.isEmpty() || row.composite && row.name.equalsIgnoreCase(row.label)))
-            return string(row.qty);
-        return row.label + qty;
+        String qty = row.qty == null ? "" : SEPARATOR + row.qty;
+        return !row.market && (row.label.isEmpty() || row.composite && row.name.equalsIgnoreCase(row.label)) ? string(row.qty) : row.label + qty;
     }
 
     /** Stable receipt identity drives Live navigation; search text stays a user-owned filter. */
@@ -4562,8 +4540,7 @@ class LivePage extends Shell.Page {
             return "RESUMING " + snapshot.resumeSeconds + "s";
         if (!snapshot.present) return "";
         if (snapshot.paused && !snapshot.idle) return "PAUSED";
-        if (snapshot.idle) return "AWAY";
-        return snapshot.warming ? "CALIBRATING" : "";
+        return snapshot.idle ? "AWAY" : snapshot.warming ? "CALIBRATING" : "";
     }
 
     /**
@@ -4825,7 +4802,8 @@ class SidebarPanel extends PluginPanel {
                     ledgerData.market.total = snapshot.market;
                 }
             } else if (pageDue && LEDGER.equals(page))
-                ledgerData = LedgerData.capture(engine, now, scope); else if (pageDue && RAIDS.equals(page)) {
+                ledgerData = LedgerData.capture(engine, now, scope);
+            else if (pageDue && RAIDS.equals(page)) {
                 if (raids.selected != null && !raids.selected.equals("all") && engine.raids.find(raids.selected) == null) raids.selected = null;
                 // One scope for the overview and its Ledger capture: the derived view is reused
                 // within a revision instead of being rebuilt as null and then all.
@@ -4845,12 +4823,14 @@ class SidebarPanel extends PluginPanel {
         shell.raidsAvailable(raidProgress);
         pageForced = false;
         this.snapshot = snapshot;
-        live.alwaysPvp = config.pvpView() == GpManagerConfig.PvpView.Always;
+        live.alwaysPvp = config.pvpView() == PvpView.Always;
         live.apply(snapshot);
         live.category(category == null ? null : categoryPage);
         if (raidState != null)
-            raids.apply(raidState,raidMoney,ledgerData,now); else if (ledgerData != null)
-            (LIVE.equals(page) ? categoryPage : ledger).apply(ledgerData); else if (data != null)
+            raids.apply(raidState,raidMoney,ledgerData,now);
+        else if (ledgerData != null)
+            (LIVE.equals(page) ? categoryPage : ledger).apply(ledgerData);
+        else if (data != null)
             plans.apply(data);
         shell.pages.get(page).visible(true);
         if (ledgerData != null || data != null || raidState != null) pageKeys.put(page, key);
@@ -4876,7 +4856,7 @@ class SidebarPanel extends PluginPanel {
     String activityLabel() {
         var active = engine.session();
         String hint = active == null ? "" : active.activityHint();
-        return "General".equalsIgnoreCase(hint) || "Magic".equalsIgnoreCase(hint) ? "" : hint;
+        return GENERAL.equalsIgnoreCase(hint) || "Magic".equalsIgnoreCase(hint) ? "" : hint;
     }
 
     BufferedImage sprite(int id) {
@@ -5035,7 +5015,7 @@ class SidebarPanel extends PluginPanel {
         public void hideRecent(String name, boolean charge) {
             if (filter != null) {
                 filter.hideRecent(name, charge);
-                shell.tell("Hidden from Recent", name + " · Booked totals unchanged.", false);
+                shell.tell("Hidden from Recent", name + " · Totals unchanged.", false);
             }
             refresh();
         }
@@ -5114,8 +5094,7 @@ class NavButton {
     }
 
     static NavigationHost toolbarHost(ClientToolbar toolbar) {
-        if (toolbar == null) return null;
-        return new NavigationHost() {
+        return toolbar == null ? null : new NavigationHost() {
             public void add(NavigationButton navigationButton) {
                 toolbar.addNavigation(navigationButton);
             }
@@ -5143,9 +5122,7 @@ class NavButton {
         button = null;
     }
 
-    synchronized NavigationButton button() {
-        return button;
-    }
+
 }
 
 /**
@@ -5221,7 +5198,7 @@ class GrindsPage extends Shell.Page {
         archived.setOpaque(false);
         archived.setFont(smallFont);
         archived.setForeground(LABEL);
-        archived.setToolTipText("Include archived Grinds");
+        archived.setToolTipText("Include archived");
         archived.addActionListener(e -> actions.showArchived(archived.isSelected()));
         // Owner 2026-10-01: the same toolbar band as the Ledger; the controls live in the header.
         headerBand(bar, start, archived);
@@ -5241,7 +5218,7 @@ class GrindsPage extends Shell.Page {
         recent.setEmpty(msg("finished-grinds")).setFill(true);
         pad(selectedPanel, 0, 0, 4, 0);
         // Owner 2026-09-28: My Grinds and Recent grinds first; All time closes the page.
-        saved.setEmpty("Save a Live session to keep it here.");
+        saved.setEmpty("Save a Live session.");
         for (var part : new JComponent[] {running, mine, selectedPanel, recent, saved, general, overall})
             list.add(part);
         pad(body, 0, GAP, GAP, 0);
@@ -5263,7 +5240,8 @@ class GrindsPage extends Shell.Page {
         list.setVisible(next.detail == null);
         detail.setVisible(next.detail != null);
         if (next.detail != null)
-            buildDetail(next); else {
+            buildDetail(next);
+        else {
             applyRunning(next);
             applyAllTime(next.overall);
             applyMine(next);
@@ -5281,10 +5259,10 @@ class GrindsPage extends Shell.Page {
         caption.setToolTipText("Open Live · " + data.activeName);
         runningNet.setText(signed(data.activeNet));
         runningNet.setForeground(sign(data.activeNet).color);
-        running.setToolTipText(rateLine(data.ready, data.rate) + " · "
+        running.setToolTipText(rateLine(data.ready, data.rate) + SEPARATOR
                         + duration(data.activeMillis) + " active · "
                         + targetsLine(data.activeNetTarget, data.activeTimeTarget));
-        runningNet.setToolTipText(exactSigned(data.activeNet) + " gp");
+        runningNet.setToolTipText(exactSigned(data.activeNet) + GP_UNIT);
     }
 
     void runningTitle() {
@@ -5302,7 +5280,7 @@ class GrindsPage extends Shell.Page {
             tip.append("<br>Supplies ").append(signed(-overall.supplies)).append(" · Losses ")
                     .append(signed(-overall.losses));
         if (overall.rateName != null)
-            tip.append("<br>Best GP/h ").append(overall.rateName).append(" · ").append(rate(overall.bestRate));
+            tip.append("<br>Best GP/h ").append(overall.rateName).append(SEPARATOR).append(rate(overall.bestRate));
         String best = overall.bestName == null ? ""
                         : "Best · " + overall.bestName + " " + signed(overall.bestNet);
         this.overall.removeAll();
@@ -5310,7 +5288,7 @@ class GrindsPage extends Shell.Page {
         pad(title, 3, 6, 3, 6);
         this.overall.add(title);
         this.overall.add(strip(List.of(new Cell("NET", signed(overall.net), sign(overall.net),
-                                        exactSigned(overall.net) + " gp", null), new Cell("GP/H",
+                                        exactSigned(overall.net) + GP_UNIT, null), new Cell("GP/H",
                                         overall.rate == null ? "—" : rate(overall.rate), PLAIN, null, null),
                                 new Cell("ACTIVE", durationShort(overall.activeMillis), PLAIN,
                                         duration(overall.activeMillis), null))));
@@ -5320,10 +5298,10 @@ class GrindsPage extends Shell.Page {
             this.overall.add(bestLine);
         }
         this.overall.setToolTipText(tip.append("</html>").toString());
-        for (var child : this.overall.getComponents()) {
+        for (var child : this.overall.getComponents())
             if (child instanceof JComponent && ((JComponent) child).getToolTipText() == null)
                 ((JComponent) child).setToolTipText(this.overall.getToolTipText());
-        }
+
         this.overall.revalidate();
     }
 
@@ -5341,9 +5319,9 @@ class GrindsPage extends Shell.Page {
             rows.add(new Row(id, null, (def.favorite ? "★ " : "") + def.name(), plan.linkedCount == 0 ? "NEW"
                                     : plan.hasRate ? rate(plan.rate) + "/h" : runs,
                             plan.hasLast ? signed(plan.lastNet) : "—", plan.hasLast ? sign(plan.lastNet) : DIM,
-                            def.name() + " · " + runs + " · " + targetsLine(
+                            def.name() + SEPARATOR + runs + SEPARATOR + targetsLine(
                                             def.targetGp(), def.timeTargetMillis()),
-                            plan.hasLast ? "Last run " + exactSigned(plan.lastNet) + " gp" : "", isSelected,
+                            plan.hasLast ? "Last run " + exactSigned(plan.lastNet) + GP_UNIT : "", isSelected,
                             () -> select(isSelected ? null : id), grindMenu(plan)));
         }
         mine.rowTitle("MY GRINDS", rows);
@@ -5377,7 +5355,7 @@ class GrindsPage extends Shell.Page {
         buttons.add(start);
         buttons.add(button("Edit", false, () -> actions.editSavedGrind(def.id())));
         JButton more = button("···", false, () -> {});
-        more.setToolTipText("More for this Grind");
+        more.setToolTipText("More");
         more.addActionListener(e -> menuOf(grindMenu(plan)).show(more, 0, more.getHeight()));
         buttons.add(more);
         selectedPanel.add(buttons);
@@ -5415,8 +5393,8 @@ class GrindsPage extends Shell.Page {
             }
             (id.startsWith("saved:") ? saved : run.general ? free : rows).add(new Row(id, null, run.name,
                                     current ? fallback(data.target, "Now") : when, valueText(run.net), sign(run.net),
-                                    run.name + " · " + contextLine(run, now, data.zone),
-                                    exactSigned(run.net) + " gp", false,
+                                    run.name + SEPARATOR + contextLine(run, now, data.zone),
+                                    exactSigned(run.net) + GP_UNIT, false,
                                     current ? actions::back : () -> actions.openDetail(id), menus));
         }
         recent.rowTitle("RECENT GRINDS", rows);
@@ -5438,7 +5416,7 @@ class GrindsPage extends Shell.Page {
         this.detail.add(top);
         hero.status(detail.closed ? OFF : GAIN.color, detail.closed ? "Finished" : "Running", detail.name,
                 detail.closed ? "COMPLETE" : "", null);
-        hero.big(signed(detail.net), sign(detail.net), exactSigned(detail.net) + " gp",
+        hero.big(signed(detail.net), sign(detail.net), exactSigned(detail.net) + GP_UNIT,
                 detail.ready ? rate(detail.rate) + "/h" : "—", detail.ready,
                 duration(detail.activeMillis) + " ACTIVE");
         // Owner 2026-10-01 (F12): a completed run's rate is the whole-run basis.
@@ -5490,7 +5468,7 @@ class GrindsPage extends Shell.Page {
     /** Date and duration context: Today/Yesterday/date plus Active Time, never internal ids. */
     static String contextLine(GrindsData.Recent recent, long now, ZoneId zone) {
         var z = zone == null ? ZoneId.systemDefault() : zone;
-        return dayLabel(Instant.ofEpochMilli(recent.startedAt).atZone(z).toLocalDate(), now, z) + " · "
+        return dayLabel(Instant.ofEpochMilli(recent.startedAt).atZone(z).toLocalDate(), now, z) + SEPARATOR
                 + durationShort(recent.activeMillis);
     }
 
@@ -5507,7 +5485,7 @@ class GrindsPage extends Shell.Page {
         var parts = new ArrayList<String>();
         if (profit != null) parts.add(targetNet(profit) + " Net");
         if (active != null) parts.add(targetTime(active));
-        return parts.isEmpty() ? "No targets" : String.join(" · ", parts);
+        return parts.isEmpty() ? "No targets" : join(SEPARATOR, parts);
     }
 }
 
@@ -5547,7 +5525,8 @@ class GrindsController implements GrindsPage.Actions {
     public void openLedger(String id) {
         var active = engine.session();
         if (active != null && active.id().equals(id))
-            openEntry(Entry.current()); else {
+            openEntry(Entry.current());
+        else {
             var history = id == null ? null : engine.historySession(id);
             openEntry(new Entry(LedgerData.Scope.HISTORY, id, history == null ? null : history.name()));
         }
@@ -5561,16 +5540,11 @@ class GrindsController implements GrindsPage.Actions {
         mutate(() -> {
                     if (engine.session() != ending || !engine.finishCustom(now())) return;
                     var ended = engine.historyMetrics(endedId, now());
-                    Runnable recap = () -> {
+                    Runnable done = () -> {
                         if (panel.suspended || panel.ownerToken != owner) return;
-                        shell.notify(endedName + " ended", ended == null ? "" : signed(ended.net), false, "View recap",
-                                () -> {
-                                    panel.selection = endedId;
-                                    shell.show(GRINDS);
-                                    refresh();
-                                });
+                        shell.notify(endedName + " ended", ended == null ? "" : signed(ended.net), false, null, null);
                     };
-                    SidebarPanel.onEdt(recap);
+                    SidebarPanel.onEdt(done);
                 });
     }
 
@@ -5609,32 +5583,6 @@ class GrindsController implements GrindsPage.Actions {
                 new Shell.Choice("Restart GP/h", true, () -> mutate(() -> engine.restartRate(now(), keep.isSelected()))));
     }
 
-    void viewRecap() {
-        Session source;
-        Long start;
-        SavedSession copy;
-        String text;
-        synchronized (engine) {
-            source=engine.session();
-            if (source==null) return;
-            start=source.sessionStartAt;
-            long at=now();
-            copy=engine.captureLiveSession(source,start,at);
-            text=liveSummary(LiveSnapshot.capture(engine,at,null));
-        }
-        Object owner=panel.ownerToken;
-        var content=stack(CARD,2);
-        content.add(note("Snapshot · Not saved",LABEL,110));
-        for (String line:text.split("\\R"))
-            content.add(note(line,TEXT,110));
-        content.add(button("Save session",true,()->{
-            if (owner!=panel.ownerToken || panel.suspended) return;
-            shell.closeSheet();
-            mutate(()->savedNotice(engine.saveLiveSession(source,start,copy)!=null));
-        }));
-        shell.sheet("Session recap",null,content);
-    }
-
     /** Save session's answer; a session that changed while its sheet was open saves nothing. */
     void savedNotice(boolean saved) {
         shell.tell(saved ? "Session saved" : "Not saved", saved ? "Grinds › Saved sessions" : msg("session-changed"), !saved);
@@ -5661,19 +5609,8 @@ class GrindsController implements GrindsPage.Actions {
         shell.confirm("Reset free-play?", msg("free-play-over"), "Reset", () -> {
                     mutate(() -> engine.startFreePlayOver(now()));
                     shell.show(LIVE);
-                    shell.tell("Free play reset", "The old run is in Grinds.", false);
+                    shell.tell("Free play reset", "Old run saved in Grinds.", false);
                 });
-    }
-
-    /** A short getting-started guide; its words live in text.tsv (owner 2026-10-16). */
-    void guide() {
-        var content = stack(CARD, 4);
-        for (String part : msg("guide").split(" \\| ")) {
-            var line = note(part, TEXT, SHEET_TEXT);
-            line.setBorder(null);
-            content.add(line);
-        }
-        shell.sheet("Getting started", null, content);
     }
 
     public void startGrind(String id, String nameOverride) {
@@ -5817,7 +5754,7 @@ class GrindsController implements GrindsPage.Actions {
             box.removeAll();
             fill.fill(box, page);
             int from = page * CHOICE_ROWS;
-            applyPager(range, prev, next, page, pages(), total == 0 ? "" : (from + 1) + "–"
+            applyPager(range, prev, next, page, pages(), total == 0 ? "" : from + 1 + "–"
                                     + min(total, from + CHOICE_ROWS) + " of " + total);
             box.revalidate();
         }
@@ -5878,7 +5815,8 @@ class GrindsController implements GrindsPage.Actions {
         var plan = engine.plan(session.grindId());
         if (plan == null) plan = engine.grindNamed(session.name());
         if (plan != null)
-            startGrind(plan.id(), null); else
+            startGrind(plan.id(), null);
+        else
             startGrind(session.name(), null, session.targetGp(), session.timeTargetMillis());
     }
 
@@ -5913,9 +5851,7 @@ class GrindsController implements GrindsPage.Actions {
     /** The gear menu beside the tabs: profile-wide data actions, from any page. */
     JPopupMenu dataMenu() {
         var menu = new JPopupMenu();
-        menu.add(item("View recap", engine.session() != null, this::viewRecap));
         menu.add(item("Copy Live summary", engine.session() != null, () -> copySummary(null)));
-        menu.add(item("Getting started", this::guide));
         menu.add(item("Back up profile", storage != null, () -> backUpProfile()));
         menu.add(item(msg("copy-data"), () -> copyDataPath()));
         menu.add(item("Report a bug", () -> LinkBrowser.browse(msg("bug-report"))));
@@ -5999,7 +5935,8 @@ class GrindsController implements GrindsPage.Actions {
                             String net = field(form, "netField"), time = field(form, "timeField");
                             if (GrindsData.inputsValid(net, time) && GrindsData.parseNet(field(form, "milestoneField"))
                                             != GrindsData.INVALID)
-                                save.save(field(form, "nameField"), net, time); else {
+                                save.save(field(form, "nameField"), net, time);
+                            else {
                                 shell.tell("Targets not saved", msg("use-number"), true);
                                 targetSheet(title, form, action, save);
                             }
@@ -6143,7 +6080,8 @@ class GrindsController implements GrindsPage.Actions {
         if (result.isApplied()) panel.resetProfile();
         if (result.isApplied())
             // The safety copy is one click from its folder (owner 2026-10-16).
-            shell.notify("Profile reset", msg("fresh-profile"), false, "Copy folder path", this::copyDataPath); else
+            shell.notify("Profile reset", msg("fresh-profile"), false, "Copy folder path", this::copyDataPath);
+        else
             shell.tell("Reset refused", result.getDetail(), true);
     }
 }
@@ -6423,7 +6361,7 @@ class GrindsData {
         }
         plans.sort(Comparator.comparing((MyGrind plan) -> !plan.definition.favorite)
                         .thenComparing(grind -> -grind.lastStartedAt).thenComparing(
-                                grind -> grind.definition.name(), String.CASE_INSENSITIVE_ORDER)
+                                grind -> grind.definition.name(), CASE_INSENSITIVE_ORDER)
                         .thenComparing(grind -> grind.definition.id()));
         var recent = new ArrayList<Recent>();
         var runs = new ArrayList<>(engine.history());
@@ -6474,7 +6412,7 @@ class GrindsData {
         Long gp = general == null ? null : general.milestoneGp;
         if (gp == null) return "";
         long net = general.metrics(now).net;
-        return compact(gp) + " · " + (net >= gp ? "✓" : percent(max(0d, (double) net / gp)));
+        return compact(gp) + SEPARATOR + (net >= gp ? "✓" : percent(max(0d, (double) net / gp)));
     }
 }
 
@@ -6509,16 +6447,14 @@ class GrindHistory {
     /** Factual target wording; never "Failed". Shared with the Grinds detail. */
     static String netOutcome(Long profit, long net, boolean closed) {
         if (profit == null) return "No Net target";
-        if (net >= profit) return "Reached " + compact(profit) + " Net";
-        return closed ? msg("ended-before") + signed(profit - net) + " remaining"
+        return net >= profit ? "Reached " + compact(profit) + " Net" : closed ? msg("ended-before") + signed(profit - net) + " remaining"
                 : msg("reached") + signed(profit - net) + " remaining";
     }
 
     /** Factual Active-Time target wording; never "Failed". Shared with the Grinds detail. */
     static String timeOutcome(Long active, long activeMillis) {
         if (active == null) return msg("time-paused");
-        if (activeMillis >= active) return msg("time-target");
-        return duration(active - activeMillis) + msg("active-time-remaining");
+        return activeMillis >= active ? msg("time-target") : duration(active - activeMillis) + msg("active-time-remaining");
     }
 
     /** Full-session rate: Net over canonical Active Time; zero Active Time has no rate. */
@@ -6605,8 +6541,7 @@ class RaidHistory {
     }
 
     Run find(String id) {
-        for (var run : state.runs) if (Objects.equals(id, run.id)) return run;
-        return null;
+        return firstMatch(state.runs, run -> Objects.equals(id, run.id));
     }
 
     String activeId() {
@@ -6713,13 +6648,13 @@ class RaidHistory {
     /** A source-confirmed dose allowance, spent first when borrowed and owned stock mix. */
     boolean supplies(List<Flow> flows, boolean use, Map<Integer, Long> loot) {
         if (!use) claim(flows, f -> PICKAXES.containsKey(f.item), (f, q) -> engine.events.take(Inbox.RAID_STORE, -1,
-                q - (f.gain() ? min(q, loot.getOrDefault(f.item, 0L)) : 0L),
+                q - (f.gain() ? min(q, amount(loot, f.item)) : 0L),
                 e -> e.data == state && e.x == Long.signum(f.quantity)));
         if (state.supplies.isEmpty() && engine.events.peek(Inbox.LOAN) == null) return false;
         if (!use) {
             claim(flows, Flow::gain, (flow, quantity) -> {
                 long n = engine.events.take(Inbox.LOAN, flow.item,
-                        quantity - min(quantity, loot.getOrDefault(flow.item, 0L)), e -> e.data == state);
+                        quantity - min(quantity, amount(loot, flow.item)), e -> e.data == state);
                 if (n > 0) {
                     state.supplies.merge(ItemVariationMapping.map(flow.item),
                             multiply(n, max(1, ActionReader.dose(flow.name))), SafeMath::sum);
@@ -6917,9 +6852,7 @@ class RaidHistory {
         return view;
     }
 
-    long[] money(String id) {
-        return totals.getOrDefault(id, new long[2]);
-    }
+
 
     static Map<Integer, Long> positive(Map<Integer, Long> values) {
         return FlowFilters.quantities(values, item -> item > 0);
@@ -6953,9 +6886,7 @@ class RaidHistory {
         }
 
         boolean live(Request request) {
-            if (request == null || request.owner != history.state || !history.state.claims.contains(request.claim))
-                return false;
-            if (!ready()) return false;
+            if (request == null || request.owner != history.state || !history.state.claims.contains(request.claim) || !ready()) return false;
             int tick = plugin.client.getTickCount();
             return tick >= request.tick && (long) tick - request.tick <= 10;
         }
@@ -7067,8 +6998,7 @@ class RaidHistory {
                 // Only an executed reward disposition ends the current request.
                 if (rule != null && ActionSignals.rule("chest-action", option))
                     request = null;
-                if (!option.startsWith("take") && !option.equals("bank-all")) return;
-                if (rule == null || !ready()) return;
+                if (!option.startsWith("take") && !option.equals("bank-all") || rule == null || !ready()) return;
                 var claim = preview(rule);
                 if (claim == null || claim.remaining.isEmpty()) return;
                 boolean bank = option.equals("bank-all");
@@ -7099,7 +7029,7 @@ class RaidHistory {
                     return;
                 }
                 request.last.forEach((item, qty) -> {
-                    long gone = qty - next.getOrDefault(item, 0L);
+                    long gone = qty - amount(next, item);
                     if (gone > 0) request.proof.merge(item, gone, SafeMath::sum);
                 });
                 request.last = next;
@@ -7110,7 +7040,7 @@ class RaidHistory {
 
         void booked(Transaction row, boolean bank, int chest) {
             synchronized (history.engine) {
-                if (row == null || row.isTransfer() || row.original() == TransactionType.TRADE
+                if (row == null || row.isTransfer() || row.original() == TRADE
                         || requests.stream().anyMatch(value -> value.rows.containsKey(row))) return;
                 var owner = history.engine.sessionHolding(row.id());
                 if (owner == null) return;
@@ -7135,7 +7065,7 @@ class RaidHistory {
                 var before = Accounting.transaction(row);
                 for (var flow : old) {
                     long qty = flow == null || flow.quantity <= 0 || flow.raid != null ? 0
-                            : min(flow.quantity, proof.getOrDefault(flow.item, 0L));
+                            : min(flow.quantity, amount(proof, flow.item));
                     if (qty == 0) {
                         next.add(flow);
                         continue;
@@ -7228,7 +7158,7 @@ class RaidsPage extends Shell.Page {
         long net = net(money);
         var card = new KeyValue(title);
         var value = label(signed(net), numbers(18), sign(net).color);
-        value.setToolTipText(exactSigned(net) + " gp");
+        value.setToolTipText(exactSigned(net) + GP_UNIT);
         card.body.add(Kit.row(value));
         card.body.add(Kit.row(label("Death fees:", smallFont, LABEL), label(signed(-money[1]), smallFont, Tone.LOSS.color)));
         return card;
@@ -7237,7 +7167,7 @@ class RaidsPage extends Shell.Page {
     /** One raid or attempt row: Net on the right in its tone, the exact amount on hover. */
     static Table.Row row(String id, String name, String detail, long[] money, String tip, Runnable open) {
         long net = net(money);
-        return new Table.Row(id, null, name, detail, signed(net), sign(net), tip, exactSigned(net) + " gp", false,
+        return new Table.Row(id, null, name, detail, signed(net), sign(net), tip, exactSigned(net) + GP_UNIT, false,
                 open, List.of());
     }
 
@@ -7264,7 +7194,7 @@ class RaidsPage extends Shell.Page {
                     .filter(run -> RaidHistory.kind(run.id) == raid && run.complete).count();
             String name = RaidHistory.RULES.get(i)[1], count = "Clears " + clears;
             if (kind == null) rows.add(row(Integer.toString(i), name, "", money, count, () -> open(raid, null)));
-            else if (selected == null) overview.add(note(name + " · " + count + " · Net " + signed(net(money)), TEXT, 128));
+            else if (selected == null) overview.add(note(name + SEPARATOR + count + " · Net " + signed(net(money)), TEXT, 128));
         }
         for (var run : state.runs) if (kind != null && RaidHistory.kind(run.id) == kind) {
             long[] money = totals.getOrDefault(run.id, new long[2]);
@@ -7276,13 +7206,13 @@ class RaidsPage extends Shell.Page {
             rows.add(row(run.id, status, durationShort(took), money, caption, () -> open(kind, run.id)));
             if (Objects.equals(run.id, selected)) {
                 String title = RaidHistory.RULES.get(kind)[1];
-                detail.add(note(title + " · " + run.mode, TEXT, 128));
+                detail.add(note(title + SEPARATOR + run.mode, TEXT, 128));
                 detail.add(note(caption, LABEL, 128));
                 Object owner = panel.ownerToken;
                 detail.add(card(null, money));
                 detail.add(button("Copy summary", false, () -> {
                     if (owner != panel.ownerToken || panel.suspended) return;
-                    panel.actions.shareSummary(() -> GrindsController.summary(title + " · " + caption, net(money),
+                    panel.actions.shareSummary(() -> GrindsController.summary(title + SEPARATOR + caption, net(money),
                             money[0], money[1], 0, money[1], true, took));
                 }));
             }

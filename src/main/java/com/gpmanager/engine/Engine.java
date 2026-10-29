@@ -206,10 +206,10 @@ class Engine {
         claims.clear();
         // Known-basis coverage restores before any session can notify the observer; a pre-106
         // state starts with no known coverage (existing holdings are unknown, never zero).
-        if (state != null) {
+        if (state != null)
             // Saved GE records are clamped once here, so their accessors read fields directly.
             for (var record : state.geCustody()) if (record != null) record.sanitize();
-        }
+
         basis.restore(state, now);
         general = null;
         custom = null;
@@ -222,13 +222,13 @@ class Engine {
                     saved.session.sanitize();
                     this.saved.add(saved);
                 }
-            for (var plan : state.savedGrinds()) {
+            for (var plan : state.savedGrinds())
                 if (plan != null && !plan.id().isEmpty() && !plan.name().isEmpty())
                     plans.add(plan);
-            }
-            for (var session : state.history()) {
+
+            for (var session : state.history())
                 if (session != null) history.add(session);
-            }
+
             general = state.generalSession;
             custom = state.customSession;
             if (general != null) general.grind = false;
@@ -239,13 +239,13 @@ class Engine {
                 for (var row : session.transactions()) queueDose(session, row);
             }
             current = custom != null && !custom.isClosed() ? custom : general;
-            if (current != null && !current.isClosed()) {
+            if (current != null && !current.isClosed())
                 if (!current.paused) {
                     long savedAt = state.savedAtEpochMillis;
                     current.pause(savedAt > 0 ? min(now, savedAt) : now, RECOVERY);
                 } else
                     current.pauseReason = RECOVERY;
-            }
+
         }
         // Reclaim evidence is ephemeral and belongs to the identity being replaced;
         // never carry one account's lost-item whitelist into another account's rows.
@@ -275,10 +275,10 @@ class Engine {
      * Historical grave-looking rows are never rewritten: item overlap cannot prove a recovery, so
      * ambiguous old income waits for the owner's explicit correction.
      */
-    synchronized void recheck(IntUnaryOperator alchPrice) {
+    synchronized void recheck() {
         boolean changed = false;
         var drops = new ArrayList<Runnable>();
-        for (var session : sessions()) {
+        for (var session : sessions())
             for (var row : session.transactions()) {
                 if (row.correction() != AUTO || Contribution.isSplit(row)) continue;
                 // Neutral GE change stays only as an audit row, like a live custody move.
@@ -294,14 +294,14 @@ class Engine {
                     if (flow.source() != UNPRICED) continue;
                     // An item that had no price now has one: its alch value, worth nothing, or a share
                     // of the whole (half a pie, owner 1.5.1).
-                    for (Flow now : valuation.value(Map.of(flow.item, flow.quantity))) {
+                    for (Flow now : valuation.value(Map.of(flow.item, flow.quantity)))
                         if (now.source() != UNPRICED) {
                             flow.unitPrice = now.unitPrice;
                             flow.value = now.value;
                             flow.priceSource = now.source();
                             priced = true;
                         }
-                    }
+
                 }
                 if (priced) {
                     // A new list, so the row's derived views are rebuilt.
@@ -311,7 +311,7 @@ class Engine {
                     changed = true;
                 }
             }
-        }
+
         drops.forEach(Runnable::run);
         if (changed || !drops.isEmpty()) changed();
     }
@@ -586,8 +586,7 @@ class Engine {
      * @return true when a new General session was created
      */
     synchronized boolean autoStart(long now) {
-        if (!config.autoStartSession() || separate) return false;
-        if (custom != null && !custom.isClosed()) return false;
+        if (!config.autoStartSession() || separate || custom != null && !custom.isClosed()) return false;
         if (general != null && !general.isClosed()) return false;
         ensureSession(now);
         arm(now);
@@ -614,7 +613,7 @@ class Engine {
 
     synchronized void setDetectedActivity(String activity, long now) {
         if (current != null && current.mode() == SessionMode.AUTO)
-            current.setActivityHint(activity, now);
+            current.setActivityHint(activity);
     }
 
     synchronized void togglePause(long now) {
@@ -653,15 +652,7 @@ class Engine {
         return now < warmUntil;
     }
 
-    /**
-     * Compacts closed sessions strictly older than {@code days}; a zero window means forever and
-     * performs no compaction.
-     *
-     * @return receipt rows compacted
-     */
-    synchronized int compactOlderThan(int days, long now) {
-        return archive.compactOlderThan(days, now);
-    }
+
 
     /** Configured UTC retention maintenance used by the game-tick lifecycle. */
     synchronized int maintainRetention(long now) {
@@ -922,7 +913,7 @@ class Engine {
             var e = events.peek(CHEST, v -> v.item == -1 && v.x == id);
             if (e == null || owner != events.owner || tick - e.at > 10) return rows;
             for (var event : events.all(CHEST)) {
-                long gone = event.qty - counts.getOrDefault(event.item, 0L);
+                long gone = event.qty - amount(counts, event.item);
                 if (event.item >= 0 && gone > 0) rows.add(banked(event, gone, now));
             }
             events.open.removeIf(v -> v.kind == CHEST && v.item >= 0);
@@ -1130,7 +1121,7 @@ class Engine {
         counts.forEach((item, qty) -> {
                     var e = events.add(PRIVATE_LOOT, item, qty, 99, string(note));
                     e.at = events.now + max(1, ticks) - 1;
-                    e.name = fallback(name, "General");
+                    e.name = fallback(name, GENERAL);
                     e.context = context;
                     e.id = id;
                 });
@@ -1170,8 +1161,7 @@ class Engine {
     }
 
     synchronized void markPkLoot(Map<Integer, Long> expectedLoot, int ticks, long now) {
-        if (current == null && !autoStart(now)) return;
-        if (!live()) return;
+        if (current == null && !autoStart(now) || !live()) return;
         var expected = positive(expectedLoot);
         String fight = current.addEncounter(true, now);
         if (current.mode() != SessionMode.GENERAL)
@@ -1238,15 +1228,11 @@ class Engine {
     }
 
     /** Current presentation read model for the local death-reclaim indicator. */
-    synchronized DeathReclaimStatus deathStatus() {
-        return new DeathReclaimStatus(death.isAwaitingReclaim(), death.armed(),
-                death.outstanding(), death.age);
-    }
 
     static Transaction first(Transaction... options) {
-        for (var candidate : options) {
+        for (var candidate : options)
             if (candidate != null) return candidate;
-        }
+
         return null;
     }
 
@@ -1338,8 +1324,7 @@ class Engine {
         if (owner != events.owner) return null;
         raids.state.death = null;
         claims.cancelChest();
-        if (current == null && !autoStart(now)) return null;
-        if (!live()) return null;
+        if (current == null && !autoStart(now) || !live()) return null;
         var grave = positive(held);
         grave.keySet().retainAll(PVP_GRAVE);
         death.onPvmDeath(grave);
@@ -1448,11 +1433,11 @@ class Engine {
     synchronized void clearPendingEstimates(String target, Set<Integer> unchanged) {
         if (current == null) return;
         String id = current.id();
-        for (int identifier : unchanged) {
+        for (int identifier : unchanged)
             for (var receipt :
                     estimate.receipts(id, target, identifier))
                 forfeit(receipt);
-        }
+
         estimate.clearTarget(id, target);
     }
 
@@ -1489,12 +1474,12 @@ class Engine {
         var options = new ArrayList<Flow>();
         var left = new ArrayList<Flow>();
         boolean selected = false;
-        for (Flow flow : e == null || flows == null ? Collections.<Flow>emptyList() : flows) {
+        for (Flow flow : e == null || flows == null ? Collections.<Flow>emptyList() : flows)
             if (flow.cost() && ChargeCheck.isLoadComponent(e.variant, flow.item, flow.name)) {
                 options.add(flow);
                 selected |= flow.item == e.item;
             } else left.add(flow);
-        }
+
         return selected ? new LoadTarget(e.variant, e.id, left, options, e.at)
                 : new LoadTarget(null, null, flows == null ? emptyList() : flows, emptyList(), 0);
     }
@@ -1508,9 +1493,9 @@ class Engine {
         if (current == null || empty(id)) return;
         String target = fallback(identity, null);
         if (target == null) return;
-        for (var receipt : estimate.receiptsFor(current.id(), target)) {
+        for (var receipt : estimate.receiptsFor(current.id(), target))
             if (id.equals(receipt.transaction)) forfeit(receipt);
-        }
+
     }
 
     /** Clear a pending charge-load intent when another action supersedes its evidence. */
@@ -1699,17 +1684,11 @@ class Engine {
      */
     Session sessionHolding(String id) {
         if (holders != null) return holders.get(id);
-        for (var session : sessions()) {
-            if (findTransaction(session, id) != null) return session;
-        }
-        return null;
+        return firstMatch(sessions(), session -> findTransaction(session, id) != null);
     }
 
     Session sessionById(String id) {
-        for (var session : sessions()) {
-            if (session != null && session.id().equals(id)) return session;
-        }
-        return null;
+        return firstMatch(sessions(), session -> session != null && session.id().equals(id));
     }
 
     /** Effective correction-aware canonical settlement lookup for the derived Market projection. */
@@ -1724,10 +1703,7 @@ class Engine {
 
     static Transaction findTransaction(Session session, String id) {
         if (session == null) return null;
-        for (var transaction : session.transactions()) {
-            if (transaction != null && id.equals(transaction.id())) return transaction;
-        }
-        return null;
+        return firstMatch(session.transactions(), transaction -> transaction != null && id.equals(transaction.id()));
     }
 
     /** Native per-slot collection evidence, kept in the same owner as custody. */
@@ -1866,7 +1842,7 @@ class Engine {
     private Transaction bookCharge(long now, String note, Confidence confidence, String reason, List<Flow> flows,
             ActionKind kind, boolean estimate) {
         Transaction transaction = bookTransaction(now, CONSUMPTION, GENERIC, note,
-                        fallback(current.activityHint(), "General"), true, flows, confidence, reason,
+                        fallback(current.activityHint(), GENERAL), true, flows, confidence, reason,
                         null);
         transaction.setAction(kind);
         // An estimated blowpipe dart lands by the target like a fired bolt; its scales are used up.
@@ -1905,11 +1881,11 @@ class Engine {
         Transaction transaction = bookCharge(now, msg("estimated-charge") + label, Confidence.LIKELY, "Estimated",
                         removed, kind == null ? CAST : kind, true);
         String id = current.id();
-        for (Flow flow : transaction.flows()) {
+        for (Flow flow : transaction.flows())
             if (flow.cost() && flow.unitPrice > 0)
                 estimate.record(id, target, transaction.id(), flow.item,
                         abs(flow.quantity));
-        }
+
         if (transaction.onGround()) rememberDrop(transaction, Engine::groundDart);
         return transaction;
     }
@@ -2117,21 +2093,15 @@ class Engine {
     synchronized List<ReviewRow> getReviewRows(long now) {
         var rows = new ArrayList<ReviewRow>();
         if (current == null) return rows;
-        for (var transaction : current.transactions()) {
+        for (var transaction : current.transactions())
             if (needsReview(transaction))
                 rows.add(reviewRow(current, transaction, now));
-        }
+
         rows.sort(Comparator.comparingLong((ReviewRow itemDataValue) -> itemDataValue.at).reversed());
         return rows;
     }
 
-    /**
-     * Current world/economy permission for ordinary automatic market quotes (presentation reads
-     * it).
-     */
-    boolean automaticMarketQuotesAvailable() {
-        return valuation.automaticMarketQuotesAvailable();
-    }
+
 
     /** Domain revision: every canonical mutation advances it; derived previews bind to it. */
     synchronized long revision() {
@@ -2163,10 +2133,9 @@ class Engine {
      * Applies a preview as one atomic batch with one undo. Returns {@code -1} without touching
      * anything when the domain revision moved since the preview (stale row ids never apply).
      */
-    synchronized int applyDecision(DecisionPreview preview, long now) {
+    synchronized int applyDecision(DecisionPreview preview) {
         if (preview == null || current == null || preview.transactionIds.isEmpty()) return 0;
-        if (preview.revision != revision()) return -1;
-        return current.correctAll(preview.transactionIds, preview.decision.correction,
+        return preview.revision != revision() ? -1 : current.correctAll(preview.transactionIds, preview.decision.correction,
                         "Review decision: " + preview.decision.name());
     }
 
@@ -2221,7 +2190,7 @@ class Engine {
     }
 
     synchronized void recordAction(String activity) {
-        if (live()) current.recordAction(activity, now());
+        if (live()) current.recordAction(activity);
     }
 
     /** Additional source receipts are published after canonical booking has completed. */
@@ -2424,12 +2393,12 @@ class Engine {
         }
         for (var neutral : new Transaction[] {
                     servant(batch.flows, now), wear(batch.flows, now, batch.lootItems), cannon(batch.flows, now)
-                }) {
+                })
             if (neutral != null) {
                 audit(neutral);
                 if (batch.flows.isEmpty()) return neutral;
             }
-        }
+
         var gear = wornOut(batch.flows, now);
         if (gear != null && batch.flows.isEmpty()) return gear;
         var sources = bookLootSources(batch);
@@ -2456,14 +2425,15 @@ class Engine {
         if (cast == null) cast = settleSpell(batch);
         Transaction result;
         if (!sources.isEmpty() && batch.flows.isEmpty())
-            result = sources.get(sources.size() - 1); else {
+            result = sources.get(sources.size() - 1);
+        else {
             var custody = settleCustody(batch);
             result = custody != null ? custody : book(batch);
         }
         if (additional != null) {
-            for (var row : sources) {
+            for (var row : sources)
                 if (row != result) additional.accept(row);
-            }
+
             if (cast != null) additional.accept(cast);
             if (fired != null) additional.accept(fired);
             if (dropSlice != null) additional.accept(dropSlice);
@@ -2487,9 +2457,9 @@ class Engine {
                                         && !isRune(flow.name) && !isAmmo(flow.name))))
             return null;
         var lost = new ArrayList<Flow>();
-        for (Flow flow : batch.flows) {
+        for (Flow flow : batch.flows)
             if (flow.cost() && names.test(flow.name)) lost.add(flow);
-        }
+
         if (lost.isEmpty() || lost.size() == batch.flows.size() || kind == CAST && batch.spell == null
                         && batch.intent != CAST
                         && lost.stream().allMatch(flow -> elemental(flow.name))) return null;
@@ -2542,23 +2512,21 @@ class Engine {
      * evidence or a Market/PK context cancels the split, leaving the change to settle as before.
      */
     Transaction settleDropSlice(Settle batch) {
-        if (batch.hard || batch.soft() || batch.transfer) return null;
-        if (batch.context == TRANSFER || batch.context == MARKET || batch.context == PK_DEATH
-                || batch.context == PK_LOOT)
-            return null;
+        if (batch.hard || batch.soft() || batch.transfer || batch.context == TRANSFER || batch.context == MARKET || batch.context == PK_DEATH
+                || batch.context == PK_LOOT) return null;
         if (events.peek(DROP_CLICK) == null || intent() != null) return null;
         int id = events.item(DROP_CLICK);
         if (id <= 0) return null;
         var lost = new ArrayList<Flow>();
         boolean pickedBack = false;
-        for (Flow flow : batch.flows) {
+        for (Flow flow : batch.flows)
             if (flow.item == id) {
                 if (flow.quantity > 0) pickedBack = true;
                 else if (flow.quantity < 0) lost.add(flow);
             } else if (flow.quantity <= 0)
                 // Any second loss (or a zero flow) makes the change ambiguous again.
                 return null;
-        }
+
         if (lost.isEmpty() || pickedBack) return null;
         var slice = new Settle(new Clue(), batch.snapshot, batch.now);
         slice.context = batch.context;
@@ -2580,8 +2548,7 @@ class Engine {
      */
     Transaction settleConsumeSlice(Settle batch) {
         var intent = intent();
-        if (intent == null || intent.item < 0 || intent.flag) return null;
-        if (batch.death || batch.suppress) return null;
+        if (intent == null || intent.item < 0 || intent.flag || batch.death || batch.suppress) return null;
         if (batch.context == PK_DEATH) return null;
         int id = intent.item;
         var bites = new ArrayList<Flow>();
@@ -2620,7 +2587,7 @@ class Engine {
         for (var source : batch.loot.sources) {
             var remaining = new HashMap<>(source.items);
             List<Flow> parts = claim(batch.flows, flow -> flow.quantity > 0, (flow, quantity) -> {
-                                long take = min(quantity, remaining.getOrDefault(flow.item, 0L));
+                                long take = min(quantity, amount(remaining, flow.item));
                                 remaining.computeIfPresent(flow.item, (id, wanted) -> wanted - take);
                                 return take;
                             });
@@ -2928,9 +2895,12 @@ class Engine {
             batch.fight = batch.loot.fight;
         } else if ((batch.context == LOOT || batch.context == PK_LOOT)
                 && !matchesExpectedLoot(batch.flows, batch.expected))
-            batch.generic(); else if (batch.context == LOOT)
-            batch.activity = activityFromNote(batch.note); else if (batch.context == PK_LOOT || batch.context == PK_DEATH)
-            batch.activity = "PKing"; else if (batch.context == PRODUCTION && ActionSignals.TRANSFORM.containsValue(batch.note))
+            batch.generic();
+        else if (batch.context == LOOT)
+            batch.activity = activityFromNote(batch.note);
+        else if (batch.context == PK_LOOT || batch.context == PK_DEATH)
+            batch.activity = "PKing";
+        else if (batch.context == PRODUCTION && ActionSignals.TRANSFORM.containsValue(batch.note))
             // A run names its own skill: the session hint waits for a second XP drop, so a first
             // item would carry the last activity (or none).
             batch.activity = "Smelting".equals(batch.note) ? "Smithing" : batch.note;
@@ -3020,7 +2990,8 @@ class Engine {
         } else if (batch.used && type != TransactionType.TRANSFER && type != TRADE)
             // Dose leftovers / empty vials are mixed inventory deltas; confirmed
             // consume intent still books Used/lost rather than uncertain exclusion.
-            type = CONSUMPTION; else if (!batch.asTransfer && type == UNCERTAIN && !batch.combine && (doseStep(batch.flows)
+            type = CONSUMPTION;
+        else if (!batch.asTransfer && type == UNCERTAIN && !batch.combine && (doseStep(batch.flows)
                         || batch.soft() && hasLoss(batch.flows))) {
             // The classifier still sees mixed value: a dose shape alone is enough once soft
             // transfer has been refused, and a refused soft bank latch in a mixed Drink/Pick/Bury
@@ -3035,7 +3006,8 @@ class Engine {
             // 2026-09-28).
             // An opened claim (a coin pouch) is income too: its neutral claim leg is not a cost
             // (owner 2026-09-29).
-            type = GAIN; else if (uncertain && batch.combine && !dismantle) {
+            type = GAIN;
+        else if (uncertain && batch.combine && !dismantle) {
             // Combining or decanting keeps every dose, so it is neutral like a bank move, never a
             // Review row (owner 1.2); the doses keep their value until they are drunk. The bracelet
             // of ethereum's dismantle is not value-preserving, so it stays fail-closed Review
@@ -3144,7 +3116,8 @@ class Engine {
     void observePriming(ContainerSnapshot current) {
         warmTicks++;
         if (sample != null && sample.equals(current))
-            stable++; else {
+            stable++;
+        else {
             sample = current;
             stable = 1;
         }
@@ -3190,7 +3163,7 @@ class Engine {
             if (e.kind != PRIVATE_LOOT && e.kind != LOOT_RESERVE || !events.live(e)
                     || events.now > e.source().at) continue;
             var source = e.source();
-            long qty = events.take(e.kind, e.item, available.getOrDefault(e.item, 0L), v -> v == e);
+            long qty = events.take(e.kind, e.item, amount(available, e.item), v -> v == e);
             if (qty <= 0) continue;
             take(available, e.item, qty);
             matched.merge(e.item, qty, SafeMath::sum);
@@ -3209,7 +3182,7 @@ class Engine {
     }
 
     String activityFromNote(String note) {
-        if (blank(note)) return current == null ? "General" : current.activityHint();
+        if (blank(note)) return current == null ? GENERAL : current.activityHint();
         String text = note.trim(), prefix = "Loot from ";
         return text.startsWith(prefix) && text.length() > prefix.length()
                 ? text.substring(prefix.length()).trim() : text;
@@ -3261,10 +3234,10 @@ class Engine {
 
     /** Only catalogued key losses and non-key gains: the shape of a chest open. */
     static boolean gainsAndKeys(List<Flow> flows) {
-        for (Flow flow : flows == null ? Collections.<Flow>emptyList() : flows) {
+        for (Flow flow : flows == null ? Collections.<Flow>emptyList() : flows)
             if (flow.quantity != 0 && flow.cost() != (forKey(flow.item) != null))
                 return false;
-        }
+
         return !empty(flows);
     }
 
@@ -3358,11 +3331,11 @@ class Engine {
      */
     void rememberDrop(Transaction drop, Predicate<Flow> onGround) {
         if (ground != null) remember(drop);
-        for (Flow flow : drop.flows()) {
+        for (Flow flow : drop.flows())
             if (onGround.test(flow))
                 events.add(DROPPED, flow.item, abs(flow.quantity), cannonball(flow.item) ? 2099 : 299, null)
                                 .id = drop.id();
-        }
+
     }
 
     /** A Drop's note; balls loaded into a cannon say so. */
@@ -3399,7 +3372,7 @@ class Engine {
         for (var e : events.all(DROPPED)) {
             long take = min(left, e.qty);
             if (e.item != id || take <= 0) continue;
-            long given = current.pickUp(e.id, e.item, take, now);
+            long given = current.pickUp(e.id, e.item, take);
             // A row that gave back less holds no more of the item: forget the rest.
             events.take(DROPPED, e.item, given < take ? e.qty : given, v -> v == e);
             left -= given;
@@ -3470,16 +3443,14 @@ class Engine {
         if (onlyCosts(flows)) {
             // Named intent for a different item + hard bank deposit must stay TRANSFER
             // (stale bury of bones must not book oak-log deposit as Used/lost).
-            if (hardTransfer && intent().item >= 0) return false;
-            return true;
+            return !(hardTransfer && intent().item >= 0);
         }
         // Live potato-field sequence: Drink + Pick + Bury often share one stabilization
         // window. Any armed consume intent (named or open) must win so Used/lost books
         // instead of UNCERTAIN exclusion — wrong/stale named ids previously skipped
         // this path because it required itemId < 0 only.
         // Hard bank-container/menu evidence: do not let mixed any-cost swallow a deposit.
-        if (hardTransfer) return false;
-        return hasLoss(flows);
+        return !hardTransfer && hasLoss(flows);
     }
 
     /**
@@ -3515,8 +3486,7 @@ class Engine {
         if (context == TRANSFER || context == MARKET || context == LOOT
                 || context == PK_LOOT || context == PK_DEATH)
             return CONFIRMED;
-        if (type == UNCERTAIN) return Confidence.UNCERTAIN;
-        return Confidence.LIKELY;
+        return type == UNCERTAIN ? Confidence.UNCERTAIN : Confidence.LIKELY;
     }
 
     /** Loss ids claimed by exact consume/drop intent are excluded from the death wipe. */
@@ -3582,8 +3552,7 @@ class Engine {
      * piece keeps no Check baseline to reconcile.
      */
     Transaction recordCommittedLoad(LoadTarget partition, long now) {
-        if (partition == null || partition.unknown.isEmpty() || !live()) return null;
-        return bookCharge(now, msg("committed-load") + fallback(partition.variant.getDisplayName(), "Crystal charges"),
+        return partition == null || partition.unknown.isEmpty() || !live() ? null : bookCharge(now, msg("committed-load") + fallback(partition.variant.getDisplayName(), "Crystal charges"),
                 CONFIRMED, msg("committed-proof") + partition.variant.getDisplayName() + ".",
                 partition.unknown, partition.variant.action, false);
     }
@@ -3607,8 +3576,7 @@ class Engine {
     }
 
     synchronized Metrics metrics(long now) {
-        if (current == null) return Metrics.none();
-        return current.metrics(now);
+        return current == null ? Metrics.none() : current.metrics(now);
     }
 
     /** Correction-aware metrics of one owner; Hub v1 counts every booked row (charter D). */
@@ -3707,8 +3675,7 @@ class Engine {
         if (id != null && id.startsWith("raid:") && (id.equals("raid:all") || raids.find(id.substring(5)) != null))
             return raids.read(id.substring(5));
         if (id == null || !id.startsWith("saved:")) return null;
-        for (var saved : saved) if (saved.id.equals(id)) return saved;
-        return null;
+        return firstMatch(saved, saved -> saved.id.equals(id));
     }
 
     synchronized boolean sameLiveWindow(Session expected, Long start) {
@@ -3756,10 +3723,7 @@ class Engine {
 
     /** Saved-Grind lookup by stable id; null when unknown. */
     synchronized SavedGrind plan(String id) {
-        for (var plan : plans) {
-            if (plan.id().equals(id)) return plan;
-        }
-        return null;
+        return firstMatch(plans, plan -> plan.id().equals(id));
     }
 
     /** Creates a reusable My Grind from reusable setup only; runs link to it as they start. */
@@ -3797,10 +3761,7 @@ class Engine {
 
     /** The My Grind with this name, ignoring case; null when there is none. */
     synchronized SavedGrind grindNamed(String name) {
-        for (var plan : plans) {
-            if (plan.name().equalsIgnoreCase(fallback(name, "").trim())) return plan;
-        }
-        return null;
+        return firstMatch(plans, plan -> plan.name().equalsIgnoreCase(fallback(name, "").trim()));
     }
 
     synchronized boolean archiveGrind(String id, boolean archived) {
@@ -3824,9 +3785,9 @@ class Engine {
         if (empty(id)) return result;
         var active = current;
         if (active != null && id.equals(active.grindId())) result.add(active);
-        for (var session : history) {
+        for (var session : history)
             if (session != null && id.equals(session.grindId())) result.add(session);
-        }
+
         return result;
     }
 
@@ -3908,8 +3869,7 @@ class Engine {
 
     /** Toggles the timer's own pause; the run keeps tracking (owner live 2026-10-14). */
     synchronized boolean toggleTimeTargetPause(long now) {
-        if (current == null || current.timeTargetMillis() == null) return false;
-        return current.pauseTimeTarget(now) || current.resumeTimeTarget(now);
+        return !(current == null || current.timeTargetMillis() == null) && (current.pauseTimeTarget(now) || current.resumeTimeTarget(now));
     }
 
     /** Every session the engine opens follows the detected activity (AUTO). */
@@ -4003,7 +3963,7 @@ class Engine {
 /** Source-backed quantities and their distinct source/encounter owners, in observation order. */
 @AllArgsConstructor
 class LootMatch {
-    static final LootMatch NONE = new LootMatch(false, "", "General", GENERIC, null,
+    static final LootMatch NONE = new LootMatch(false, "", GENERAL, GENERIC, null,
                     emptyMap(), emptyList());
     boolean matched;
     String note, activityName;
@@ -4031,8 +3991,7 @@ class TransactionClassifier {
         if (gain && hasCost)
             return context == PRODUCTION ? PROCESSING : UNCERTAIN;
         if (gain) return GAIN;
-        if (hasCost) return CONSUMPTION;
-        return ADJUSTMENT;
+        return hasCost ? CONSUMPTION : ADJUSTMENT;
     }
 }
 
@@ -4095,9 +4054,7 @@ class Inbox {
         return e == null ? 0 : e.at;
     }
 
-    boolean has(int kind, int item) {
-        return peek(kind, e -> e.item == item) != null;
-    }
+
 
     Engine.Clue clue(int kind) {
         var e = peek(kind);
@@ -4119,8 +4076,7 @@ class Inbox {
     }
 
     synchronized Observation peek(int kind, Predicate<Observation> match) {
-        for (var e : open) if (e.kind == kind && live(e) && match.test(e)) return e;
-        return null;
+        return firstMatch(open, e -> e.kind == kind && live(e) && match.test(e));
     }
 
     Observation peek(int kind) {
@@ -4248,6 +4204,16 @@ class Observation {
 
 /** Ordered mutable selections and null-tolerant predicates/projections over settled item flows. */
 class FlowFilters {
+    /** The first match, including a matched null; preserve the source order. */
+    static <T> T firstMatch(Iterable<T> values, Predicate<? super T> match) {
+        for (T value : values) if (match.test(value)) return value;
+        return null;
+    }
+
+    static Long amount(Map<?, Long> counts, Object item) {
+        return counts.getOrDefault(item, 0L);
+    }
+
     /** A fresh mutable selection, in source order; null sources are empty. */
     static <T> List<T> matching(Collection<T> source, Predicate<? super T> include) {
         var selected = new ArrayList<T>();
@@ -4266,8 +4232,7 @@ class FlowFilters {
 
     /** Flows minus those whose item matches (positive-only when {@code gainsOnly}). */
     static List<Flow> without(List<Flow> flows, IntPredicate item, boolean gainsOnly) {
-        if (flows == null) return emptyList();
-        return matching(flows, flow -> !item.test(flow.item) || gainsOnly && flow.quantity <= 0);
+        return flows == null ? emptyList() : matching(flows, flow -> !item.test(flow.item) || gainsOnly && flow.quantity <= 0);
     }
 
     /** Positive entries of {@code quantities} whose item does not match. */
@@ -4320,31 +4285,31 @@ class FlowFilters {
     /** Positive remainders of {@code a} minus {@code b}: what left between two observations. */
     static Map<Integer, Long> minus(Map<Integer, Long> base, Map<Integer, Long> subtract) {
         var out = new LinkedHashMap<Integer, Long>();
-        if (base != null) {
+        if (base != null)
             for (var e : base.entrySet()) {
                 Long less = subtract == null ? null : subtract.get(e.getKey());
                 long left = (e.getValue() == null ? 0 : e.getValue()) - (less == null ? 0 : SafeMath.positive(less));
                 if (e.getKey() != null && left > 0) out.put(e.getKey(), left);
             }
-        }
+
         return out;
     }
 
     /** True when every wanted quantity fits inside {@code available}. */
     static boolean covers(Map<Integer, Long> available, Map<Integer, Long> wanted) {
         if (empty(wanted) || empty(available)) return false;
-        for (var e : wanted.entrySet()) {
+        for (var e : wanted.entrySet())
             if (e.getKey() == null || e.getValue() == null || e.getValue() <= 0
                     || available.getOrDefault(e.getKey(), 0L) < e.getValue())
                 return false;
-        }
+
         return true;
     }
 
     /** Removes up to {@code max} of one item and returns the quantity taken. */
     static long take(Map<Integer, Long> counts, int id, long max) {
         if (counts == null || max <= 0) return 0;
-        long held = counts.getOrDefault(id, 0L), taken = min(SafeMath.positive(held), max);
+        long held = amount(counts, id), taken = min(SafeMath.positive(held), max);
         if (held - taken <= 0) counts.remove(id);
         else counts.put(id, held - taken);
         return taken;
@@ -4362,7 +4327,7 @@ class FlowFilters {
 
     static Map<Integer, Long> quantities(List<Flow> flows, IntPredicate item, boolean income) {
         var out = new HashMap<Integer, Long>();
-        if (flows != null) {
+        if (flows != null)
             for (Flow flow : flows) {
                 if (!item.test(flow.item)) continue;
                 long delta = flow.quantity;
@@ -4371,7 +4336,7 @@ class FlowFilters {
                     out.merge(flow.item, size, SafeMath::sum);
                 }
             }
-        }
+
         return out;
     }
 
@@ -4401,9 +4366,9 @@ class FlowFilters {
             }
         }
         var result = new ArrayList<Flow>();
-        for (int i = 0; i < flows.size(); i++) {
+        for (int i = 0; i < flows.size(); i++)
             if (!drop[i]) result.add(flows.get(i));
-        }
+
         return result;
     }
 
@@ -4418,11 +4383,11 @@ class FlowFilters {
     }
 
     static boolean hasLoss(List<Flow> flows, IntPredicate item) {
-        if (flows != null) {
-            for (Flow flow : flows) {
+        if (flows != null)
+            for (Flow flow : flows)
                 if (flow.quantity < 0 && item.test(flow.item)) return true;
-            }
-        }
+
+
         return false;
     }
 
@@ -4641,10 +4606,10 @@ class DeathReclaimLifecycle {
     void restore(PendingDeath pending) {
         reset();
         if (pending == null || pending.isEmpty()) return;
-        for (var item : pending.outstandingItems()) {
+        for (var item : pending.outstandingItems())
             if (item.quantity() > 0 && !MinigameItems.isMinigameOnly(item.itemId))
                 items.merge(item.itemId, item.quantity(), SafeMath::sum);
-        }
+
         items = cash(items);
         var held = new HashMap<Integer, Long>();
         for (var item : pending.heldAtDeath())
@@ -4686,17 +4651,6 @@ class DeathReclaimLifecycle {
  * Read-only state for the local PvM death-reclaim indicator. The item count is the sum of measured
  * outstanding stack quantities, and age is measured in active engine game ticks.
  */
-class DeathReclaimStatus {
-    boolean pending, armed;
-    long items, age;
-
-    DeathReclaimStatus(boolean awaiting, boolean armed, long outstandingCount, long ageTicks) {
-        pending = awaiting;
-        this.armed = awaiting && armed;
-        items = positive(outstandingCount);
-        age = positive(ageTicks);
-    }
-}
 
 /**
  * Item Retrieval Services and their published flat fees. Source: OSRS Wiki "Item Retrieval Service"
@@ -4766,12 +4720,11 @@ class BossRetrievalCatalogue {
         if (lower.isEmpty()) return null;
         var exact = BY_INTERACTABLE.get(lower);
         if (exact != null) return exact;
-        for (var entry : BY_INTERACTABLE.entrySet()) {
+        for (var entry : BY_INTERACTABLE.entrySet())
             if (!entry.getValue().ambiguous && lower.contains(entry.getKey()))
                 return entry.getValue();
-        }
-        if (GRAVE.matcher(lower).matches()) return BY_INTERACTABLE.get("gravestone");
-        return null;
+
+        return GRAVE.matcher(lower).matches() ? BY_INTERACTABLE.get("gravestone") : null;
     }
 }
 
@@ -4831,7 +4784,7 @@ class ActionReader {
         boolean onePotion = oneLossFamily(flows, name -> dose(name) > 0 ? doseBase(name) : null);
         boolean oneItem = oneLossFamily(flows, name -> name.isEmpty() ? null : name)
                         && all(flows, -1, name -> dose(name) <= 0);
-        if (matchedIntent != null && hasLoss) {
+        if (matchedIntent != null && hasLoss)
             switch (matchedIntent) {
                 case DRINK:
                     return onePotion ? DRINK : SUPPLIES;
@@ -4850,7 +4803,7 @@ class ActionReader {
                 default:
                     return matchedIntent;
             }
-        }
+
         // Consumption is known from the leftover shape; the verb is not.
         return type == CONSUMPTION && doseStep ? SUPPLIES : null;
     }
@@ -4926,12 +4879,12 @@ class ActionReader {
 
     static boolean addDoseLosses(Map<Integer, Long> target, List<Flow> flows) {
         boolean matched = false;
-        for (Flow loss : flows) {
+        for (Flow loss : flows)
             if (!stepPartners(flows, loss, true).isEmpty()) {
                 target.put(loss.item, -loss.quantity);
                 matched = true;
             }
-        }
+
         return matched;
     }
 
@@ -4971,13 +4924,13 @@ class ActionReader {
     /** A cooking row must pair raw food inputs with only their cooked/burnt products. */
     static boolean isCooking(List<Flow> flows) {
         var rawBases = new ArrayList<String>();
-        for (Flow flow : flows) {
+        for (Flow flow : flows)
             if (flow.quantity < 0) {
                 String name = lower(flow.name);
                 rawBases.add(name.startsWith("raw ") && name.length() > 4 ? name.substring(4).trim()
                                 : name.startsWith("uncooked ") && name.length() > 9 ? name.substring(9).trim() : null);
             }
-        }
+
         return !rawBases.isEmpty() && !rawBases.contains(null) && all(flows, 1, output -> rawBases.stream().anyMatch(
                                                 raw -> output.equals(raw) || output.equals("cooked " + raw)
                                                                 || output.equals("burnt " + raw)));
@@ -5008,9 +4961,9 @@ class ActionReader {
     /** First matching verb wins, before the explicit fuel fallback. */
     static ActionKind verbOf(String raw) {
         String name = lower(raw);
-        for (int index = 0; index < VERBS.length; index += 2) {
+        for (int index = 0; index < VERBS.length; index += 2)
             if (rule((String) VERBS[index], name)) return (ActionKind) VERBS[index + 1];
-        }
+
         return rule("supplies", name) ? SUPPLIES : null;
     }
 
@@ -5116,14 +5069,14 @@ class ActionSignals {
         return TRANSFORM.getOrDefault(lower(option), "");
     }
 
-    /** Activity hint for object gather verbs; "General" when the verb is not a gather. */
+    /** Activity hint for object gather verbs; GENERAL when the verb is not a gather. */
     static String gatherActivity(String option) {
-        return GATHER.getOrDefault(string(option), "General");
+        return GATHER.getOrDefault(string(option), GENERAL);
     }
 
     /** Rake and plant still name the activity, but do not arm gather ownership evidence. */
     static boolean namesActivityOnly(String option) {
-        return option != null && !"General".equals(gatherActivity(option)) && !rule("gather.exclude", option);
+        return option != null && !GENERAL.equals(gatherActivity(option)) && !rule("gather.exclude", option);
     }
 }
 
@@ -5176,24 +5129,20 @@ class TrackedBasisLedger {
     /** Validate restoring a previously removed transaction; false blocks the restore. */
     synchronized boolean canAdd(Transaction transaction) {
         if (transaction == null) return false;
-        if (transaction.timestamp >= epoch && !sinks(transaction).isEmpty())
-            return false;
-        return canApplyAll(contribution(transaction), 1, transaction.timestamp);
+        return !(transaction.timestamp >= epoch && !sinks(transaction).isEmpty()) && canApplyAll(contribution(transaction), 1, transaction.timestamp);
     }
 
     /** Validate removing a retained transaction (undo); false blocks the canonical removal. */
     synchronized boolean canRemove(Transaction transaction) {
         if (transaction == null || transaction.timestamp < epoch) return true;
-        if (!sinks(transaction).isEmpty())
-            return false;
-        return canApplyAll(contribution(transaction), -1, transaction.timestamp);
+        return !(!sinks(transaction).isEmpty()) && canApplyAll(contribution(transaction), -1, transaction.timestamp);
     }
 
     boolean canApplyAll(Map<Integer, long[]> changes, long sign, long timestamp) {
-        for (var entry : changes.entrySet()) {
+        for (var entry : changes.entrySet())
             if (!canApply(entry.getKey(), sign * entry.getValue()[0], sign * entry.getValue()[1], timestamp))
                 return false;
-        }
+
         return true;
     }
 
@@ -5220,10 +5169,8 @@ class TrackedBasisLedger {
         var after = contribution(transaction, nextCorrection, next);
         var beforeSinks = sinks(transaction, previous, previousFlows);
         var afterSinks = sinks(transaction, nextCorrection, next);
-        if (transaction.timestamp >= epoch && !beforeSinks.equals(afterSinks)
-                && !canIntroduceSink(beforeSinks, afterSinks, transaction.timestamp))
-            return false;
-        return canApplyAll(deltas(before, after), 1, transaction.timestamp);
+        return !(transaction.timestamp >= epoch && !beforeSinks.equals(afterSinks)
+                && !canIntroduceSink(beforeSinks, afterSinks, transaction.timestamp)) && canApplyAll(deltas(before, after), 1, transaction.timestamp);
     }
 
     /** Apply the exact effective delta after a permitted correction/split/undo. */
@@ -5242,7 +5189,7 @@ class TrackedBasisLedger {
     /**
      * Reserve the tracked-first known-coverage share for a quantity entering proven SELL custody.
      */
-    synchronized Reservation reserve(int id, long quantity, long now) {
+    synchronized Reservation reserve(int id, long quantity) {
         long requested = positive(quantity);
         var pool = stock.get(id);
         long available = pool == null ? 0 : pool.availableQty;
@@ -5403,10 +5350,10 @@ class TrackedBasisLedger {
             // Result corrections must remain available without touching physical basis.
             return counts;
         for (Flow flow : flows) {
-            if (flow.quantity >= 0 || (flow.item == COINS || flow.item == PLATINUM)) continue;
+            if (flow.quantity >= 0 || flow.item == COINS || flow.item == PLATINUM) continue;
             long quantity = flow.quantity == Long.MIN_VALUE ? Long.MAX_VALUE : -flow.quantity;
             int id = flow.item;
-            counts.put(id, sum(counts.getOrDefault(id, 0L), quantity));
+            counts.put(id, sum(amount(counts, id), quantity));
         }
         return counts;
     }
@@ -5427,8 +5374,7 @@ class TrackedBasisLedger {
         if (fence > 0 && fence >= timestamp) return false;
         long available = pool == null ? 0 : pool.availableQty;
         long availableBasis = pool == null ? 0 : pool.availableBasisGp;
-        if (available + quantity < 0 || availableBasis + basisDelta < 0) return false;
-        return true;
+        return !(available + quantity < 0 || availableBasis + basisDelta < 0);
     }
 
     Map<Integer, long[]> deltas(Map<Integer, long[]> before, Map<Integer, long[]> after) {
@@ -5440,10 +5386,10 @@ class TrackedBasisLedger {
             if (quantity != 0 || deltaBasis != 0)
                 out.put(entry.getKey(), new long[] {quantity, deltaBasis});
         }
-        for (var entry : after.entrySet()) {
+        for (var entry : after.entrySet())
             if (!before.containsKey(entry.getKey()))
                 out.put(entry.getKey(), new long[] {entry.getValue()[0], entry.getValue()[1]});
-        }
+
         return out;
     }
 
@@ -5465,8 +5411,7 @@ class TrackedBasisLedger {
     Map<Integer, Long> sinks(Transaction transaction, Correction decision, List<Flow> flows) {
         // A drop or a shot still on the ground is not a use yet: picking it up shrinks the row. It
         // depletes the pool when its pickup window closes (Engine#settleGround).
-        if (transaction.onGround() || financialDose(transaction)) return new LinkedHashMap<>();
-        return sinks(transaction.original(), effectiveCounted(transaction.counted, decision),
+        return transaction.onGround() || financialDose(transaction) ? new LinkedHashMap<>() : sinks(transaction.original(), effectiveCounted(transaction.counted, decision),
                 decision, flows);
     }
 
@@ -5490,7 +5435,7 @@ class TrackedBasisLedger {
                 || flows == null)
             return out;
         for (Flow flow : flows) {
-            if (flow.quantity <= 0 || (flow.item == COINS || flow.item == PLATINUM)) continue;
+            if (flow.quantity <= 0 || flow.item == COINS || flow.item == PLATINUM) continue;
             var source = flow.source();
             if (source == null || source == UNPRICED || source == UNKNOWN || source == PriceSource.DEFERRED_CLAIM) continue;
             long income = effective == REVENUE ? SafeMath.abs(flow.value)
@@ -5755,8 +5700,7 @@ class GeCustodyLedger {
     synchronized long latestReservationTime(int id) {
         long latest = 0;
         for (var record : records) {
-            if (record.side != SELL || record.itemId != id) continue;
-            if (record.reservedQty() <= 0 && record.reservedBasis() <= 0) continue;
+            if (record.side != SELL || record.itemId != id || record.reservedQty() <= 0 && record.reservedBasis() <= 0) continue;
             long captured = record.basisCapturedAtEpochMillis > 0 ? record.basisCapturedAtEpochMillis
                             : record.placedAtEpochMillis;
             latest = max(latest, captured);
@@ -5850,7 +5794,8 @@ class GeCustodyLedger {
                             priceOnly ? current.price : base.price, base.spent));
             var record = touch(slot, base);
             if (record != null && priceOnly)
-                record.listedPrice = positive(current.price); else if (record != null) {
+                record.listedPrice = positive(current.price);
+            else if (record != null) {
                 record.offeredQty = positive(current.quantity);
                 record.quantityModified = true;
             }
@@ -6019,12 +5964,12 @@ class GeCustodyLedger {
     synchronized boolean explains(List<Flow> flows, long now) {
         this.now = now;
         boolean moved = false;
-        for (Flow flow : flows) {
+        for (Flow flow : flows)
             if (flow.quantity != 0) {
                 moved = true;
                 if (explaining(flow) == null) return false;
             }
-        }
+
         return moved;
     }
 
@@ -6095,9 +6040,9 @@ class GeCustodyLedger {
         // A hold created by this settle retries immediately: a batch whose evidence is complete
         // fails closed at once instead of waiting invisibly for a later event.
         reconcilePending();
-        for (var open : records) {
+        for (var open : records)
             if (open.stage == OPEN && open.reconciled()) open.stage = CLOSED;
-        }
+
         return new Partition(residual, rows, transfers, claimed);
     }
 
@@ -6113,9 +6058,9 @@ class GeCustodyLedger {
 
     void prune() {
         int closed = 0;
-        for (var record : records) {
+        for (var record : records)
             if (record.stage == CLOSED) closed++;
-        }
+
         // Settled history is bounded: the oldest closed lifecycles leave first.
         for (; closed > MAX_CLOSED_RECORDS; closed--) {
             var first = oldestClosed();
@@ -6167,13 +6112,13 @@ class GeCustodyLedger {
     /** Offers one side's trusted lifecycles a gain or loss of coins or items, oldest first. */
     void claimFlows(Side side, boolean gain, boolean coins, ClaimStep step) {
         claim(residual, flow -> (gain ? flow.gain() : flow.cost())
-                                && (flow.item == COINS) == coins && (coins || allowed.test(flow.item)),
+                                && flow.item == COINS == coins && (coins || allowed.test(flow.item)),
                 (flow, size) -> {
                     long remaining = size;
-                    for (var record : byPlacement()) {
+                    for (var record : byPlacement())
                         if (remaining > 0 && trusted(record, side) && (coins || record.itemId == flow.item))
                             remaining -= positive(step.claim(record, flow, remaining));
-                    }
+
                     return size - remaining;
                 });
     }
@@ -6192,7 +6137,7 @@ class GeCustodyLedger {
                         return 0;
                     captureBasis(record, flow);
                     if (basis != null) {
-                        var reservation = basis.reserve(record.itemId, claim, now);
+                        var reservation = basis.reserve(record.itemId, claim);
                         record.reservedTrackedQty = positive(sum(record.reservedTrackedQty, reservation.trackedQty));
                         record.reservedTrackedBasisGp =
                                 positive(sum(record.reservedTrackedBasisGp, reservation.basisGp));
@@ -6238,7 +6183,7 @@ class GeCustodyLedger {
                     long refundRoom = positive((terminal ? record.offeredQty : record.filledQty)
                                     * record.listedPrice - record.spentGp) - record.refundedGp;
                     boolean collected = collection && !record.quantityModified
-                                    && (items.getOrDefault(record.itemId, 0L) >= record.reserved()
+                                    && (amount(items, record.itemId) >= record.reserved()
                                             && record.reserved() > 0 || remaining == refundRoom
                                             && record.collectedQty == record.filledQty
                                             && abs(now - record.lastSeenAtEpochMillis) <= 2 * SLOT_WINDOW_MILLIS);
@@ -6291,7 +6236,8 @@ class GeCustodyLedger {
                     claimed.add(flow.part(claim));
                     if (record.collectedQty < record.filledQty)
                         // Partial collection: execution chunks are not attributable; fail closed.
-                        record.collectionAmbiguous = true; else
+                        record.collectionAmbiguous = true;
+                    else
                         bookBuySettlement(record);
                     return claim;
                 });
@@ -6599,13 +6545,13 @@ class GeCustodyLedger {
         for (int mask = 1; mask < 1 << size && matches.size() < limit; mask++) {
             long least = 0, most = 0;
             var subset = new ArrayList<Integer>();
-            for (int index = 0; index < size && least >= 0; index++) {
+            for (int index = 0; index < size && least >= 0; index++)
                 if ((mask & 1 << index) != 0) {
                     subset.add(index);
                     least = nets[index] == null ? -1 : sum(least, nets[index][0]);
                     most = nets[index] == null ? most : sum(most, nets[index][1]);
                 }
-            }
+
             if (least >= 0 && least <= cash && cash <= most) matches.add(subset);
         }
         return matches;
@@ -6632,11 +6578,11 @@ class GeCustodyLedger {
 
     /** True while an observed sell lifecycle can still receive execution/terminal evidence. */
     boolean pendingSell() {
-        for (var record : records) {
+        for (var record : records)
             if (record.side == SELL && record.capturedQty > 0 && !record.unbased() && !record.isTerminal()
                     && !record.cleared)
                 return true;
-        }
+
         return false;
     }
 
@@ -6898,28 +6844,25 @@ class GeCustodyLedger {
 
     /** The slot's live lifecycle; settled (CLOSED) history never owns a slot. */
     GeOffer forSlot(int slot) {
-        for (var record : records) {
-            if (record.slot == slot && record.stage != CLOSED) return record;
-        }
-        return null;
+        return firstMatch(records, record -> record.slot == slot && record.stage != CLOSED);
     }
 
     GeOffer latestClosed(int slot) {
         GeOffer latest = null;
-        for (var record : records) {
+        for (var record : records)
             if (record.slot == slot && record.stage == CLOSED && (latest == null
                             || record.placedAtEpochMillis >= latest.placedAtEpochMillis))
                 latest = record;
-        }
+
         return latest;
     }
 
     GeOffer oldestClosed() {
         GeOffer first = null;
-        for (var record : records) {
+        for (var record : records)
             if (record.stage == CLOSED && (first == null || record.placedAtEpochMillis < first.placedAtEpochMillis))
                 first = record;
-        }
+
         return first;
     }
 
@@ -7082,10 +7025,8 @@ class OfferSlots {
     synchronized Optional<Transition> observe(Snapshot current) {
         Objects.requireNonNull(current, "current");
         var previous = bySlot.put(current.slot, current);
-        if (loginSeed || current.equals(previous) || current.state == GrandExchangeOfferState.EMPTY
-                        && (previous == null || previous.state == GrandExchangeOfferState.EMPTY))
-            return Optional.empty();
-        return Optional.of(new Transition(previous, current));
+        return loginSeed || current.equals(previous) || current.state == GrandExchangeOfferState.EMPTY
+                        && (previous == null || previous.state == GrandExchangeOfferState.EMPTY) ? Optional.empty() : Optional.of(new Transition(previous, current));
     }
 
     /**
@@ -7408,9 +7349,7 @@ class GeOffer extends SaveCopies {
 
     /** True when custody is fully reconciled and the record may be retired after a durable save. */
     boolean reconciled() {
-        if (side == SELL)
-            return reserved() == 0 && heldQty() == 0 && (isTerminal() || cleared);
-        return reserved() == 0 && positive(filledQty - collectedQty) == 0 && reserveOutstanding() == 0
+        return side == SELL ? reserved() == 0 && heldQty() == 0 && (isTerminal() || cleared) : reserved() == 0 && positive(filledQty - collectedQty) == 0 && reserveOutstanding() == 0
                 && (isTerminal() || cleared);
     }
 
@@ -7452,8 +7391,7 @@ class GeTaxRule {
     static long provableTax(int id, long gross, long quantity) {
         if (gross <= 0 || quantity <= 0) return UNPROVABLE_TAX;
         if (EXEMPT_IDS.contains(id)) return 0;
-        if (gross % quantity != 0) return UNPROVABLE_TAX;
-        return min(5_000_000, gross / quantity / 50) * quantity;
+        return gross % quantity != 0 ? UNPROVABLE_TAX : min(5_000_000, gross / quantity / 50) * quantity;
     }
 
     /**

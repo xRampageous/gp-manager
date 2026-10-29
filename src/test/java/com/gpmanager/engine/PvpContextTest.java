@@ -97,7 +97,7 @@ public class PvpContextTest
     {
         Engine engine = engine();
         engine.ensureSession(1_000L);
-        engine.setBaseline(ContainerSnapshot.empty());
+        engine.setBaseline(FixtureReads.empty());
 
         engine.markPkLoot(Collections.singletonMap(4151, 1L), 10, 2_000L);
         Transaction loot = settle(engine, Collections.singletonMap(4151, 1L), 2_600L);

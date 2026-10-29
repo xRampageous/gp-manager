@@ -23,12 +23,12 @@ vyre-well	Vyre well
 detailed-entries	Detailed entries unavailable for older compacted history. Retained totals still reconcile.
 summary-detailed	Summary only · detailed entries were compacted; totals still reconcile.
 correct-to.COST	Count as Cost
-correct-to.IGNORE	Exclude
+correct-to.IGNORE	Remove entry
 correct-to.REVENUE	Count as Revenue
 correct-to.TRANSFER	Mark as Transfer
 everything-spent	Everything spent or lost · supply and loss split unavailable
 counted-as.COST	Counted as Cost
-counted-as.IGNORE	Excluded
+counted-as.IGNORE	Removed
 counted-as.REVENUE	Counted as Revenue
 counted-as.TRANSFER	Transfer
 death-items	Death: items held by gravestone / retrieval service
@@ -90,7 +90,7 @@ verb.TRADE	Traded
 verb.TRANSFER	Transferred
 verb.UNCERTAIN	Needs Review
 why-correction.COST	Counted as a cost by you.
-why-correction.IGNORE	Excluded by you.
+why-correction.IGNORE	Removed from tables and totals. Undo restores the entry.
 why-correction.REVENUE	Counted as a gain by you.
 why-correction.TRANSFER	Marked as a transfer by you.
 stable-stock	Stable inventory/equipment value decreased without a stronger context.
@@ -383,7 +383,6 @@ cannon-parts	Cannon set up or picked up
 cannon-why	A dwarf multicannon's parts stay yours wherever it stands; Nulodion replaces a lost one free.
 new-session	Restart GP/h starts Active Time at zero and uses displayed Net after one minute. New session also clears Live Net and Recent; every booking stays in the run and Ledger. Saving or continuing returns to the full run clock. Keep previous clock freezes the clock before restarting; Restore time resumes it, or uses the original run time if none was saved.
 save-session	Keep this Live session as a separate entry under Saved sessions in Grinds? Your totals are counted once.
-guide	Live: tracks as you play. Net is what you make after costs. Click Gains, Supply, Loss or Trade for entries. KILLS shows retained PK loot; DEATHS shows PvP losses. | What counts: loot you collect, supplies you use, lost items and fees you pay. Banking and recovered gear stay neutral. | Grinds: start one to track an activity. Free play keeps everything outside Grinds. | Raids: loot, death fees and All raids totals. Entering a raid unlocks the tab; open it manually. | Ledger: see why entries counted. Check Review when GP Manager needs your decision. | Save: gear → View recap shows this session. Save session keeps a copy in Saved sessions. | Prices: GE, otherwise alch. — means no value; ? means no price yet.
 bf-coffer	Blast Furnace coffer
 free-play-kept	Free play is kept.
 bag-reward	Agility dispenser · looting bag

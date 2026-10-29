@@ -47,7 +47,7 @@ public class ReviewRetentionTest {
         var review = row(2, true);
         session.addTransaction(review, 2000, false);
         session.addTransaction(row(3, false), 2000, false);
-        assertEquals(1, engine.compactOlderThan(30, 100L * 86_400_000));
+        assertEquals(1, FixtureReads.compactOlderThan(engine, 30, 100L * 86_400_000));
         assertEquals(Collections.singletonList(review), session.transactions());
         var restored = gson.fromJson(gson.toJson(session), Session.class);
         assertTrue(ReviewRules.needsReview(restored.transactions().get(0)));

@@ -14,6 +14,12 @@ import net.runelite.client.util.Filepath;
 
 final class SimulationSupport
 {
+    static ContainerSnapshot empty() { return new ContainerSnapshot(java.util.Collections.emptyMap()); }
+
+    static Session currentSession(SavedState state) {
+        return state.customSession != null ? state.customSession : state.generalSession;
+    }
+
     private static final Map<Integer, Integer> PRICES = new LinkedHashMap<>();
     private static final Map<Integer, String> NAMES = new LinkedHashMap<>();
 

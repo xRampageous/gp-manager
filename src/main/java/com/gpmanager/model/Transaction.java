@@ -24,7 +24,7 @@ import static java.util.Collections.*;
 import java.util.*;
 import lombok.*;
 import com.gpmanager.ActionReader.PartialUse;
-import static com.gpmanager.FlowFilters.matching;
+import static com.gpmanager.FlowFilters.*;
 import com.gpmanager.GpManagerConfig.Retention;
 import static com.gpmanager.Accounting.*;
 import static com.gpmanager.PauseReason.*;
@@ -153,10 +153,10 @@ class Transaction extends SaveCopies {
     void recalculate() {
         revenue = 0;
         costs = 0;
-        for (Flow flow : flows) {
+        for (Flow flow : flows)
             if (flow.value > 0) revenue = sum(revenue, flow.value);
             else if (flow.value < 0) costs = sum(costs, abs(flow.value));
-        }
+
     }
 
     void applyCorrection(Correction newCorrection, String reason) {
@@ -179,7 +179,8 @@ class Transaction extends SaveCopies {
             amount -= take;
             long left = size - take;
             if (take <= 0)
-                next.add(flow); else if (left > 0) {
+                next.add(flow);
+            else if (left > 0) {
                 long unit = flow.unitPrice, signed = income ? left : -left;
                 next.add(flow.raid(new Flow(id, flow.name, signed, flow.unitPrice,
                                 unit == 0 ? flow.value / size * left : signed * unit, flow.source(),
@@ -193,9 +194,9 @@ class Transaction extends SaveCopies {
 
     /** True while any flow still spends an item; a blowpipe shot keeps its scales after a dart. */
     boolean spends() {
-        for (Flow flow : flows()) {
+        for (Flow flow : flows())
             if (flow.cost()) return true;
-        }
+
         return false;
     }
 
@@ -214,7 +215,8 @@ class Transaction extends SaveCopies {
         correctionReason = normalizeReason(mark);
         String current = explanation();
         if (!ItemSplits.splitReason(current))
-            explanation = current.isEmpty() ? mark : current + " — " + mark; else if (!current.contains(mark))
+            explanation = current.isEmpty() ? mark : current + " — " + mark;
+        else if (!current.contains(mark))
             explanation = current + " — " + mark;
     }
 
@@ -225,10 +227,10 @@ class Transaction extends SaveCopies {
     /** Total gained ({@code gains}) or lost quantity of one item across the remaining flows. */
     long quantity(int id, boolean income) {
         long total = 0;
-        for (Flow flow : flows) {
+        for (Flow flow : flows)
             if (flow.item == id && (income ? flow.gain() : flow.cost()))
                 total = sum(total, abs(flow.quantity));
-        }
+
         return total;
     }
 
@@ -283,7 +285,7 @@ class Transaction extends SaveCopies {
         if (!blank(activityName)) return activityName.trim();
         String safeNote = note(), prefix = "Loot from ";
         return safeNote.startsWith(prefix) && safeNote.length() > prefix.length()
-                ? safeNote.substring(prefix.length()).trim() : "General";
+                ? safeNote.substring(prefix.length()).trim() : GENERAL;
     }
 
     boolean counts() {
@@ -447,8 +449,7 @@ class Transaction extends SaveCopies {
      * failing.
      */
     String labelWire() {
-        if (empty(observedActionLabel)) return null;
-        if (action() != CAST && action() != DRINK) return null;
+        if (empty(observedActionLabel) || action() != CAST && action() != DRINK) return null;
         var normalized = ActionLabel.of(observedActionLabel);
         return normalized == null ? null : normalized.value;
     }
@@ -479,12 +480,12 @@ class ItemSplits {
 
     static String reason(long keepQuantity, long quantity, String note) {
         long total = positive(quantity), keep = positive(min(keepQuantity, total));
-        var sb = new StringBuilder(SPLIT_KEEP_PREFIX).append(keep).append('/').append(total).append(" · ")
+        var sb = new StringBuilder(SPLIT_KEEP_PREFIX).append(keep).append('/').append(total).append(SEPARATOR)
                         .append(SPLIT_SHARE_MARK);
         if (note != null) {
             String text = note.trim();
             if (!text.isEmpty())
-                sb.append(" · ").append(text.length() > 80 ? text.substring(0, 80) : text);
+                sb.append(SEPARATOR).append(text.length() > 80 ? text.substring(0, 80) : text);
         }
         String value = sb.toString();
         return value.length() > 200 ? value.substring(0, 200) : value;
@@ -563,9 +564,9 @@ class CorrectionRecord extends SaveCopies {
 
     /** True when any change in this record targets one of the given transaction ids. */
     boolean touchesAny(Set<String> ids) {
-        for (Change change : changes()) {
+        for (Change change : changes())
             if (ids.contains(change.transactionId())) return true;
-        }
+
         return false;
     }
 
@@ -757,8 +758,7 @@ class ActionLabel {
     }
 
     static String useful(String text) {
-        if (text.isEmpty() || text.length() > MAX_LENGTH) return null;
-        if ("cast".equalsIgnoreCase(text) || "autocast".equalsIgnoreCase(text)
+        if (text.isEmpty() || text.length() > MAX_LENGTH || "cast".equalsIgnoreCase(text) || "autocast".equalsIgnoreCase(text)
                 || "cancel".equalsIgnoreCase(text)) return null;
         for (int i = 0; i < text.length(); i++) {
             char c = text.charAt(i);
@@ -838,13 +838,13 @@ class Spells {
 
     /** The item ids a spell makes (an alch's coins, Bones to Peaches' fruit); empty for others. */
     static Set<Integer> product(String name) {
-        for (String[] row : cached("spells")) {
+        for (String[] row : cached("spells"))
             if (row[0].equals(name) && row.length > 2) {
                 var ids = new HashSet<Integer>();
                 for (String id : row[2].split(",")) ids.add(parseInt(id));
                 return ids;
             }
-        }
+
         return emptySet();
     }
 
@@ -912,24 +912,24 @@ class Spells {
             if (!name.endsWith(" rune") || flow.quantity >= 0) return 0;
             String rune = name.substring(0, name.length() - 5);
             boolean used = false;
-            for (String element : COMBINATIONS.getOrDefault(rune, rune).split(" ")) {
+            for (String element : COMBINATIONS.getOrDefault(rune, rune).split(" "))
                 // A combination rune pays only the elements this spell uses (steam is water for Ice
                 // Barrage).
                 if (recipe.containsKey(element) || !COMBINATIONS.containsKey(rune)) {
                     paid.merge(element, -flow.quantity, Long::sum);
                     used = true;
                 }
-            }
+
             if (!used) return 0;
         }
         long casts = 0;
-        for (var resource : recipe.entrySet()) {
+        for (var resource : recipe.entrySet())
             if (!ELEMENTS.contains(" " + resource.getKey() + " ")) {
                 long got = paid.getOrDefault(resource.getKey(), 0L);
                 if (got == 0 || got % resource.getValue() != 0 || casts != 0 && got / resource.getValue() != casts) return 0;
                 casts = got / resource.getValue();
             }
-        }
+
         boolean full = true;
         for (var rune : recipe.entrySet()) {
             long got = paid.getOrDefault(rune.getKey(), 0L);
@@ -945,8 +945,7 @@ class Spells {
 /** Shared correction-aware projection for accounting read models and exports. */
 class Accounting {
     static Amounts transaction(Transaction transaction) {
-        if (transaction == null) return unavailable();
-        return transaction.memo(8, () -> amounts(transaction));
+        return transaction == null ? unavailable() : transaction.memo(8, () -> amounts(transaction));
     }
 
     static Amounts amounts(Transaction transaction) {
@@ -972,10 +971,10 @@ class Accounting {
             default:
                 long[] steps = cachedSteps(transaction);
                 long step = 0;
-                for (int i = 0; i < flows.size(); i++) {
+                for (int i = 0; i < flows.size(); i++)
                     if (flows.get(i) != null && flows.get(i).value > 0)
                         step = sum(step, steps[i]);
-                }
+
                 step = min(step, min(transaction.revenue(), transaction.costs()));
                 return included(subtract(transaction.revenue(), step),
                         subtract(transaction.costs(), step));
@@ -1017,10 +1016,10 @@ class Accounting {
                         && action != DRINK && action != EAT && action != SUPPLIES
                 || ActionReader.isDecant(flows)) return emptyList();
         var pairs = new ArrayList<PartialUse>();
-        for (var pair : ActionReader.partialUses(flows)) {
+        for (var pair : ActionReader.partialUses(flows))
             if (flows.get(pair.lossIndex).source()
                     == flows.get(pair.remainder).source()) pairs.add(pair);
-        }
+
         return pairs;
     }
 
@@ -1040,9 +1039,9 @@ class Accounting {
             default:
                 var flows = transaction.flows();
                 long step = 0;
-                for (int i = 0; i < flows.size(); i++) {
+                for (int i = 0; i < flows.size(); i++)
                     if (flows.get(i) == flow) step = cachedSteps(transaction)[i];
-                }
+
                 return included(subtract(autoRevenue, value > 0 ? step : 0),
                         subtract(autoCosts, value < 0 ? step : 0));
         }
@@ -1196,10 +1195,8 @@ enum CostKind {
         // inputs), which the engine evidences with an action kind or a supply-shaped type. A plain
         // "value decreased" consumption with no evidence is an item gone, i.e. a loss.
         // A production run's input is a supply even when that action made nothing (a failed smelt).
-        if (type == PK_SUPPLY_COST || type == PROCESSING || transaction.action() != null
-                || transaction.context() == Context.PRODUCTION)
-            return SUPPLIES;
-        return LOSS;
+        return type == PK_SUPPLY_COST || type == PROCESSING || transaction.action() != null
+                || transaction.context() == Context.PRODUCTION ? SUPPLIES : LOSS;
     }
 }
 
@@ -1298,12 +1295,10 @@ class Session extends SaveCopies {
 
     long liveElapsed(long now) {
         long elapsed = elapsed(now), from = sessionStartAt == null ? 0 : sessionStartMillis;
-        if (rateStartAt != null && rateSetMillis >= 0 && rateSetMillis <= elapsed && rateStartAt <= now
+        return rateStartAt != null && rateSetMillis >= 0 && rateSetMillis <= elapsed && rateStartAt <= now
                 && (rateSetMillis >= from && rateStartAt >= (sessionStartAt == null ? startedAt : sessionStartAt)
                     || rateSetMillis == 0 && rateStartAt == startedAt)
-                && (restoredRateMillis == null || restoredRateMillis >= 0 && restoredRateMillis <= rateSetMillis))
-            return elapsed - rateSetMillis + (restoredRateMillis == null ? 0 : restoredRateMillis);
-        return positive(elapsed - from);
+                && (restoredRateMillis == null || restoredRateMillis >= 0 && restoredRateMillis <= rateSetMillis) ? elapsed - rateSetMillis + (restoredRateMillis == null ? 0 : restoredRateMillis) : positive(elapsed - from);
     }
 
     /** Free play's Net milestone: it counts Free play's whole Net (owner 1.5.2); null with none. */
@@ -1361,11 +1356,11 @@ class Session extends SaveCopies {
         pruneHistories(ids);
     }
 
-    void recordAction(String hint, long now) {
-        setActivityHint(normalizeActivity(hint), now);
+    void recordAction(String hint) {
+        setActivityHint(normalizeActivity(hint));
     }
 
-    void setActivityHint(String hint, long now) {
+    void setActivityHint(String hint) {
         if (blank(hint)) return;
         String next = normalizeActivity(hint), current = activityHint();
         if (next.equalsIgnoreCase(current)) return;
@@ -1463,9 +1458,7 @@ class Session extends SaveCopies {
 
     /** Freezes the timer's window where it stands; an ended window has nothing to stop. */
     boolean pauseTimeTarget(long now) {
-        if (activeTimeTargetMillis == null || activeTimeTargetPauseMillis != null) return false;
-        if (timeWindowMillis(elapsed(now)) >= activeTimeTargetMillis)
-            return false;
+        if (activeTimeTargetMillis == null || activeTimeTargetPauseMillis != null || timeWindowMillis(elapsed(now)) >= activeTimeTargetMillis) return false;
         activeTimeTargetPauseMillis = elapsed(now);
         return true;
     }
@@ -1520,8 +1513,7 @@ class Session extends SaveCopies {
     }
 
     PauseReason pauseReason() {
-        if (!paused) return NONE;
-        return pauseReason == null || pauseReason == NONE ? MANUAL : pauseReason;
+        return !paused ? NONE : pauseReason == null || pauseReason == NONE ? MANUAL : pauseReason;
     }
 
     /** A closed run carries on: the time it was closed counts as paused (owner 1.5.2, Restore). */
@@ -1685,12 +1677,12 @@ class Session extends SaveCopies {
         for (int index = correctionHistory.indexOf(undone) - 1; index >= 0; index--) {
             var record = correctionHistory.get(index);
             if (record == null || record.undone) continue;
-            for (Change change : record.changes()) {
+            for (Change change : record.changes())
                 if (id.equals(change.transactionId()) && (!change.hasFlowSnapshot()
                                 || change.previousCorrection() != change.newCorrection
                                 || ItemSplits.splitReason(record.reason())))
                     return record.reason();
-            }
+
         }
         return "";
     }
@@ -1711,7 +1703,7 @@ class Session extends SaveCopies {
      * spends nothing, so the drop and its pickup never show as a loss and a gain. Returns how many
      * the row still held to give back.
      */
-    long pickUp(String dropId, int id, long quantity, long now) {
+    long pickUp(String dropId, int id, long quantity) {
         var drop = findTransaction(dropId);
         if (drop == null || !drop.counts() || drop.correction() != AUTO) return 0;
         long taken = min(quantity, drop.quantity(id, false));
@@ -1769,17 +1761,14 @@ class Session extends SaveCopies {
 
     Transaction findTransaction(String id) {
         if (empty(id)) return null;
-        for (var transaction : transactions) {
-            if (id.equals(transaction.id())) return transaction;
-        }
-        return null;
+        return firstMatch(transactions, transaction -> id.equals(transaction.id()));
     }
 
     /** Counts one kill or death on this Grind and returns the id its receipts carry. */
     String addEncounter(boolean kill, long now) {
         String id = pk().record(kill);
         notifyChanged();
-        recordAction("PKing", now);
+        recordAction("PKing");
         return id;
     }
 
@@ -1903,7 +1892,7 @@ class Session extends SaveCopies {
 
     static long hourly(long value, long elapsed) {
         if (elapsed <= 0) return 0;
-        // Math.round saturates at the long range by itself.
+        // round saturates at the long range by itself.
         return round(value * (3_600_000.0d / elapsed));
     }
 
@@ -1976,8 +1965,7 @@ class Session extends SaveCopies {
         if (transactions.isEmpty()) return 0;
         var folded = new ArrayList<Transaction>();
         for (var transaction : transactions) {
-            if (transaction == null) continue;
-            if (transaction.timestamp >= cutoffEpochMillis) continue;
+            if (transaction == null || transaction.timestamp >= cutoffEpochMillis) continue;
             if (keep != null && keep.test(transaction)) continue;
             folded.add(transaction);
         }
@@ -2035,7 +2023,7 @@ class Metrics {
     boolean split;
 
     static Metrics none() {
-        return new Metrics("General", false, 0, 0, 0, 0, 0, 0, 0, false);
+        return new Metrics(GENERAL, false, 0, 0, 0, 0, 0, 0, 0, false);
     }
 
     Metrics(String activity, boolean paused, long elapsed, long income, long cost, long net,
@@ -2129,9 +2117,9 @@ class SessionArchive {
         String id = transaction.id();
         if (claims.contains(id)) return true;
         String derivedPrefix = id + "#";
-        for (String claimId : claims) {
+        for (String claimId : claims)
             if (claimId != null && claimId.startsWith(derivedPrefix)) return true;
-        }
+
         return false;
     }
 
@@ -2149,10 +2137,7 @@ class SessionArchive {
 
     Session historySession(String id) {
         if (empty(id)) return null;
-        for (var session : engine.history) {
-            if (id.equals(session.id())) return session;
-        }
-        return null;
+        return firstMatch(engine.history, session -> id.equals(session.id()));
     }
 
     Metrics historyMetrics(String id, long now) {
@@ -2197,8 +2182,11 @@ class SessionArchive {
  * </ul>
  */
 class Semantics {
+    static final Comparator<Group> NEWEST_GROUP = comparingLong((Group group) -> group.at).reversed()
+            .thenComparing(group -> group.id);
+
     /** Financial table destination for the future stacked Ledger and the Live consumer. */
-    @RequiredArgsConstructor
+    @AllArgsConstructor
     enum Table {
         GAINS("GAINS"), COSTS_SUPPLIES("SUPPLY"), COSTS_LOSS("LOSS"), MARKET("TRADE"), AUDIT("Review"), DEATH("DEATH"), KILL("KILLS");
         final String label;
@@ -2386,20 +2374,19 @@ class Semantics {
         boolean containsContribution(String id) {
             if (empty(id)) return false;
             if (this.id.equals(id)) return true;
-            for (var receipt : entries) {
+            for (var receipt : entries)
                 if (id.equals(receipt.id)) return true;
-            }
+
             return false;
         }
 
         /** True when this group represents the given canonical transaction identity. */
         boolean containsTransaction(String id) {
             if (empty(id)) return false;
-            if (id.equals(transaction)) return true;
-            if (ids.contains(id)) return true;
-            for (var receipt : entries) {
+            if (id.equals(transaction) || ids.contains(id)) return true;
+            for (var receipt : entries)
                 if (id.equals(receipt.transaction)) return true;
-            }
+
             return false;
         }
 
@@ -2416,9 +2403,9 @@ class Semantics {
             if (query == null) return true;
             String needle = lower(query);
             if (needle.isEmpty()) return true;
-            for (String term : terms) {
+            for (String term : terms)
                 if (term != null && term.toLowerCase(ROOT).contains(needle)) return true;
-            }
+
             return false;
         }
     }
@@ -2426,6 +2413,7 @@ class Semantics {
     /** The full derived read: the groups, newest first. */
     static class Result {
         List<Group> groups;
+        Result audit;
 
         Result(List<Group> groups) {
             this.groups = unmodifiableList(groups);
@@ -2473,16 +2461,22 @@ class Semantics {
     /** Multi-session scope: Today and future period consumers merge compatible activity. */
     static Result capture(List<Transaction> transactions, List<Row> rows, Set<String> sessionIds,
             Predicate<Flow> td) {
+        return capture(transactions, rows, sessionIds, td, false);
+    }
+
+    /** The explicit Corrected audit can still inspect removals and restore their original facts. */
+    static Result capture(List<Transaction> transactions, List<Row> rows, Set<String> sessionIds,
+            Predicate<Flow> td, boolean includeRemoved) {
         Predicate<Flow> visibility = td == null ? flow -> true : td;
         var units = new ArrayList<Group>();
         var representedSettlements = new LinkedHashSet<String>();
         var receipts = new LinkedHashMap<String, Transaction>();
-        if (transactions != null) {
-            for (var transaction : transactions) {
+        if (transactions != null)
+            for (var transaction : transactions)
                 if (transaction != null) receipts.put(transaction.id(), transaction);
-            }
-        }
-        if (rows != null) {
+
+
+        if (rows != null)
             for (Row market : rows) {
                 if (market == null || sessionIds == null || !sessionIds.contains(market.scopeSessionId)) continue;
                 // Every collect of the offer folds into its one market row (owner 2026-10-09).
@@ -2491,10 +2485,13 @@ class Semantics {
                     representedSettlements.add(id);
                     if (receipts.containsKey(id)) settlements.add(receipts.get(id));
                 }
+                if (!includeRemoved && market.realized() && !settlements.isEmpty()
+                        && settlements.stream().allMatch(row -> row.correction() == IGNORE)) continue;
+                if (!includeRemoved) settlements.removeIf(row -> row.correction() == IGNORE);
                 units.add(marketUnit(market, settlements));
             }
-        }
-        if (transactions != null) {
+
+        if (transactions != null)
             for (var transaction : transactions) {
                 // An uncounted trade is custody's audit copy: its market row already shows the sale
                 // (owner 2026-09-28: a second fill read "Bones ×2 · 0").
@@ -2502,9 +2499,10 @@ class Semantics {
                         || transaction.type() == TRADE && !transaction.counts()
                         || graveGear(transaction))
                     continue;
-                units.addAll(transactionUnits(transaction, visibility));
+                units.addAll(includeRemoved ? receiptUnits(transaction, visibility)
+                        : transactionUnits(transaction, visibility));
             }
-        }
+
         units.sort(comparingLong((Group unit) -> unit.at).reversed()
                         .thenComparing(unit -> unit.contributionId));
         var buckets = new LinkedHashMap<String, Group>();
@@ -2513,8 +2511,7 @@ class Semantics {
         for (var group : groups)
             if (group.pvpDeath && group.value < 0 && !group.incomplete() && !group.review)
                 for (int cap : SKULL_TIERS) if (abs(group.value) > cap) group.item--;
-        groups.sort(comparingLong((Group group) -> group.at).reversed()
-                        .thenComparing(group -> group.id));
+        groups.sort(Semantics.NEWEST_GROUP);
         return new Result(groups);
     }
 
@@ -2537,8 +2534,10 @@ class Semantics {
                 }
                 marketTotal = sum(marketTotal, group.value);
             } else if (group.table == GAINS)
-                income = sum(income, group.value); else if (group.table == COSTS_SUPPLIES || group.table == COSTS_LOSS)
-                cost = sum(cost, group.value); else
+                income = sum(income, group.value);
+            else if (group.table == COSTS_SUPPLIES || group.table == COSTS_LOSS)
+                cost = sum(cost, group.value);
+            else
                 continue;
             if (group.coverage == INCOMPLETE) complete = false;
             if (!group.corrected) {
@@ -2565,6 +2564,10 @@ class Semantics {
     }
 
     static List<Group> transactionUnits(Transaction transaction, Predicate<Flow> td) {
+        return transaction.correction() == IGNORE ? emptyList() : receiptUnits(transaction, td);
+    }
+
+    static List<Group> receiptUnits(Transaction transaction, Predicate<Flow> td) {
         var flows = transaction.flows();
         boolean neutral = transaction.isTransfer(), review = needsReview(transaction);
         boolean fixed = transaction.correction() != AUTO, split = Contribution.isSplit(transaction);
@@ -2709,9 +2712,7 @@ class Semantics {
             boolean review, boolean corrected, boolean split, boolean claimLinked) {
         if (neutral || review || corrected || split || claimLinked || transaction.action() != CAST
                         && transaction.action() != FIRE
-                        && transaction.action() != DRINK)
-            return false;
-        if (entries.size() < 2) return false;
+                        && transaction.action() != DRINK || entries.size() < 2) return false;
         // A named spell with a product (an alch's coins, Bones to Peaches' fruit) is one row by
         // its spell; a gain it does not make (a pickup) keeps the rows apart (owner live
         // 2026-10-16). Any other action keeps one shared cost category.
@@ -2772,7 +2773,7 @@ class Semantics {
                         ? Long.signum(entry.quantityDelta) : 0;
         long value = neutral || claimSign != 0 || entry.auditOnly ? 0 : entry.value;
         String verb = verbOf(transaction), label = entry.action;
-        String actionLabel = weapon.isEmpty() ? label.isEmpty() ? verb : verb + " · " + label : "";
+        String actionLabel = weapon.isEmpty() ? label.isEmpty() ? verb : verb + SEPARATOR + label : "";
         String context = weapon.isEmpty() ? actionLabel : "Used by " + weapon;
         // Owner 1.1: a production run's input and the same item its failures lost are one row.
         boolean run = transaction.context() == Context.PRODUCTION && weapon.isEmpty()
@@ -2799,7 +2800,7 @@ class Semantics {
                         entry.dose, false, neutral || claimSign != 0, false, review, corrected, "",
                         transaction.id(), entry.id, claimSign);
         unit.entries.add(receipt(transaction, entry, weapon, null));
-        if (run && verb.equals(msg("failed", "Failed"))) unit.failed = positive(unit.quantity);
+        if (run && verb.equals(msg("failed"))) unit.failed = positive(unit.quantity);
         unit.search(entry.name, context, verb, label, weapon, source, transaction.id());
         return unit;
     }
@@ -2848,12 +2849,12 @@ class Semantics {
         if (!market.settlementId.isEmpty()) unit.terms.add(market.settlementId);
         // D2: a market group owns only its sale item's receipt. Its settlement's Coins leg is never
         // listed as a separate receipt or grouped with an unclaimed row.
-        for (var batch : settlements) {
-            for (var entry : Contribution.project(batch)) {
+        for (var batch : settlements)
+            for (var entry : Contribution.project(batch))
                 if (entry.item == market.itemId)
                     unit.entries.add(receipt(batch, entry, null, market));
-            }
-        }
+
+
         return unit;
     }
 
@@ -2877,8 +2878,7 @@ class Semantics {
     }
 
     static long semanticQuantity(Contribution entry) {
-        if (entry.dose) return entry.normalizedQuantity;
-        return abs(entry.quantityDelta);
+        return entry.dose ? entry.normalizedQuantity : abs(entry.quantityDelta);
     }
 
     /** Display verb for a transaction: action kind first, then split/type direction. */
@@ -2888,9 +2888,8 @@ class Semantics {
         if (Contribution.isSplit(transaction) && transaction.correction() == AUTO)
             return "Split";
         if (transaction.type() == CONSUMPTION && transaction.context() == Context.PRODUCTION)
-            return msg("failed", "Failed");
-        if (shopExchange(transaction)) return msg("verb-exchanged", "Exchanged");
-        return msg("verb." + transaction.type(), transaction.net() < 0 ? "Used" : "Received");
+            return msg("failed");
+        return shopExchange(transaction) ? msg("verb-exchanged") : msg("verb." + transaction.type(), transaction.net() < 0 ? "Used" : "Received");
     }
 
     static String actionVerb(ActionKind kind) {
@@ -2913,9 +2912,7 @@ class Semantics {
         if (note.startsWith(msg("measured-charge")))
             return msg("measured-exact");
         if (needsReview(transaction)) return msg("awaiting-decision");
-        if (transaction.type() == CONSUMPTION && transaction.context() == Context.PRODUCTION)
-            return msg("failed-inputs");
-        return msg("why-type." + transaction.type(),
+        return transaction.type() == CONSUMPTION && transaction.context() == Context.PRODUCTION ? msg("failed-inputs") : msg("why-type." + transaction.type(),
                 transaction.counts() ? msg("automatic-count") : "Not counted.");
     }
 
@@ -2927,8 +2924,7 @@ class Semantics {
         if (transaction == null || transaction.type() != TRADE) return "";
         String note = lower(transaction.note());
         if (note.startsWith("buy")) return "buy";
-        if (note.startsWith("sell")) return "sell";
-        return "";
+        return note.startsWith("sell") ? "sell" : "";
     }
 
     /** A shop trade paid in a currency other than coins (tokkul, spirit flakes, …). */
@@ -2973,12 +2969,12 @@ class Semantics {
         if (counts.isEmpty()) return null;
         var text = new StringBuilder();
         for (var entry : counts.entrySet()) {
-            if (text.length() > 0) text.append(" · ");
+            if (text.length() > 0) text.append(SEPARATOR);
             text.append(names.get(entry.getKey()));
             if (entry.getValue() > 1) text.append(' ').append(times(entry.getValue()));
         }
-        String label = buying ? gain && !anyCost ? msg("purchase-label", "Bought") : msg("traded-paid", "Paid")
-                        : gain && !anyCost ? msg("sale-unbased", "Sold for") : msg("sale-label", "Sold");
+        String label = buying ? gain && !anyCost ? msg("purchase-label") : msg("traded-paid")
+                        : gain && !anyCost ? msg("sale-unbased") : msg("sale-label");
         return new String[] {label, text.toString()};
     }
 
@@ -3052,9 +3048,7 @@ class Semantics {
             if (!name.endsWith(" rune")) allRunes = false;
             else runeTypes.add(entry.item);
         }
-        if (transaction.action() == CAST && allRunes)
-            return runeTypes.size() + " rune types";
-        return entries.size() + (transaction.action() == CAST ? " components" : " items");
+        return transaction.action() == CAST && allRunes ? runeTypes.size() + " rune types" : entries.size() + (transaction.action() == CAST ? " components" : " items");
     }
 
     /**
@@ -3110,10 +3104,8 @@ class Semantics {
         if (quantity == 0) return Category.AUDIT;
         var type = transaction.original();
         if (type == TRADE) return Category.MARKET;
-        if (type == PK_DEATH_LOSS || type == PK_SUPPLY_COST || type == PROCESSING
-                || transaction.action() != null)
-            return type == PK_DEATH_LOSS ? Category.LOSS : Category.SUPPLY;
-        return Category.LOSS;
+        return type == PK_DEATH_LOSS || type == PK_SUPPLY_COST || type == PROCESSING
+                || transaction.action() != null ? type == PK_DEATH_LOSS ? Category.LOSS : Category.SUPPLY : Category.LOSS;
     }
 
     static Table tableFor(Category category) {
@@ -3283,10 +3275,10 @@ class Contribution {
         String doseBase = ActionReader.doseBase(name);
         if (!doseBase.equals(name.trim())) return doseBase;
         String lower = lower(name);
-        if (has(lower, "pizza", "cake", "pie")) {
+        if (has(lower, "pizza", "cake", "pie"))
             for (String prefix : new String[] {"whole ", "full ", "half ", "1/2 "})
                 if (lower.startsWith(prefix)) return name.trim().substring(prefix.length()).trim();
-        }
+
         return name.trim();
     }
 
@@ -3312,17 +3304,16 @@ class Contribution {
                 || ItemSplits.splitReason(transaction.explanation());
     }
 
-    /** The receipt's activity as a display source; the default "General" reads as no source. */
+    /** The receipt's activity as a display source; the default GENERAL reads as no source. */
     static String sourceOf(Transaction transaction) {
         String activity = transaction.activityName();
-        return empty(activity) || "General".equalsIgnoreCase(activity) ? "" : activity;
+        return empty(activity) || GENERAL.equalsIgnoreCase(activity) ? "" : activity;
     }
 
     /** Category of a flow-less note receipt: its own included Net decides the direction. */
     static Category noteCategory(Transaction transaction, Amounts money, boolean neutral) {
         if (neutral || !money.included) return Category.AUDIT;
-        if (money.net() > 0) return Category.GAIN;
-        return transaction.original() == TRADE ? Category.MARKET : Category.LOSS;
+        return money.net() > 0 ? Category.GAIN : transaction.original() == TRADE ? Category.MARKET : Category.LOSS;
     }
 
     static boolean reviewState(Transaction transaction, Flow flow) {
@@ -3341,9 +3332,9 @@ class Contribution {
     }
 
     boolean itemUnitPriceUnavailable() {
-        for (Flow flow : flows) {
+        for (Flow flow : flows)
             if (flow != null && flow.unitPrice > 0) return false;
-        }
+
         return true;
     }
 }
@@ -3377,9 +3368,7 @@ class MoneySnapshot {
             parts.add(plan.id());
         var rows = engine.marketRows();
         var cached = engine.snapshot;
-        if (cached != null && cached.key.equals(parts) && cached.market.equals(rows))
-            return cached;
-        return engine.snapshot = new MoneySnapshot(engine, sessions, parts, rows, cached);
+        return cached != null && cached.key.equals(parts) && cached.market.equals(rows) ? cached : (engine.snapshot = new MoneySnapshot(engine, sessions, parts, rows, cached));
     }
 
     MoneySnapshot(Engine engine, List<Session> sessions, List<Object> parts, List<Row> rows,
@@ -3779,30 +3768,27 @@ class MarketRows {
             Engine sessions) {
         if (empty(records)) return emptyList();
         var rows = new ArrayList<Row>(records.size());
-        for (var record : records) {
+        for (var record : records)
             if (record != null && !record.offerId.isEmpty())
                 rows.add(new Row(record, settlementLookup, sessions));
-        }
+
         return unmodifiableList(rows);
     }
 
     /** Behavioural lifecycle for one durable record. Pending edge is never realized here. */
     static Lifecycle lifecycleOf(GeOffer record) {
-        if (record == null) return UNAVAILABLE;
-        if (record.unbased()) return UNAVAILABLE;
+        if (record == null || record.unbased()) return UNAVAILABLE;
         if (record.confidence == GeOffer.CustodyConfidence.AMBIGUOUS || record.quantityModified
                 || record.collectionAmbiguous)
             return AMBIGUOUS;
         if (record.filledQty <= 0) {
-            if (record.isCancelled() || record.cleared) return CANCELLED_RETURNED;
-            return PENDING;
+            return record.isCancelled() || record.cleared ? CANCELLED_RETURNED : PENDING;
         }
         if (record.settledQty > 0 && record.settledQty < record.filledQty)
             return PARTIALLY_REALIZED;
         if (record.settledQty >= record.filledQty && record.settledQty > 0)
             return REALIZED;
-        if (record.filledQty >= record.offeredQty) return EXECUTED_UNSETTLED;
-        return PARTIALLY_EXECUTED;
+        return record.filledQty >= record.offeredQty ? EXECUTED_UNSETTLED : PARTIALLY_EXECUTED;
     }
 }
 
@@ -3826,8 +3812,7 @@ class MarketText {
     /** The Market row's primary signed value: observed settlement, else the canonical result. */
     static long marketPrimary(LedgerData data, Group group) {
         Row market = data.marketRow(group.marketId);
-        if (data.entry.table != null || !settled(group, market)) return group.value;
-        return settlementCash(market, "SELL".equals(market.side.name()));
+        return data.entry.table != null || !settled(group, market) ? group.value : settlementCash(market, "SELL".equals(market.side.name()));
     }
 
     /** The Market row's secondary line: explicit side + Result, or the lifecycle context. */
@@ -3837,8 +3822,7 @@ class MarketText {
         if (settled(group, market))
             return ("SELL".equals(market.side.name()) ? "Sold" : "Bought") + " · Result "
                     + (group.coverage == COMPLETE ? signed(group.value) : "—");
-        if (group.coverage != COMPLETE) return group.context;
-        return "Result " + signed(group.value);
+        return group.coverage != COMPLETE ? group.context : "Result " + signed(group.value);
     }
 
     static boolean realized(Receipt receipt) {
@@ -3849,15 +3833,12 @@ class MarketText {
     /** Signed observed settlement cash for the collected quantity (SELL positive, BUY negative). */
     static long receiptPrimary(Receipt receipt) {
         Row market = receipt.market;
-        if (!realized(receipt)) return 0;
-        return settlementCash(market, market.side == SELL);
+        return !realized(receipt) ? 0 : settlementCash(market, market.side == SELL);
     }
 
     static String receiptTitle(Receipt receipt) {
         Row market = receipt.market;
-        if (realized(receipt) && market.settledQty > 1)
-            return receipt.name + "  " + times(market.settledQty);
-        return receipt.name;
+        return realized(receipt) && market.settledQty > 1 ? receipt.name + "  " + times(market.settledQty) : receipt.name;
     }
 
     /**
@@ -3870,12 +3851,12 @@ class MarketText {
             boolean resultAvailable = market.realizedResultCorrectionAware && (market.side != SELL
                                     || market.coverage != MarketRows.Coverage.FULLY_UNKNOWN
                                     || market.manualFinancialResult);
-            String result = resultAvailable ? "Result " + exactSigned(market.realizedResultGp) + " gp"
+            String result = resultAvailable ? "Result " + exactSigned(market.realizedResultGp) + GP_UNIT
                             : "Result —";
-            sub = (market.side == SELL ? "Sold" : "Bought") + " · " + result;
+            sub = (market.side == SELL ? "Sold" : "Bought") + SEPARATOR + result;
         } else
             sub = market == null ? receipt.verb : orderStateText(market);
-        return sub + " · " + age(positive(captured - receipt.at));
+        return sub + SEPARATOR + age(positive(captured - receipt.at));
     }
 
     /**
@@ -3911,7 +3892,7 @@ class MarketText {
     static List<String> humanLines(Row market, boolean corrected) {
         var lines = new ArrayList<String>();
         if (market.savedNet != null) {
-            lines.add("Saved session|" + exactSigned(market.savedNet) + " gp");
+            lines.add("Saved session|" + exactSigned(market.savedNet) + GP_UNIT);
             lines.add("Offer context|At save time");
         }
         String fillState = fillStateText(market);
@@ -3928,31 +3909,31 @@ class MarketText {
                 lines.add(msg("received-proven"));
             return lines;
         }
-        lines.add((sell ? "Received" : "Spent") + "|" + exact(Math.abs(market.observedSettlementGp)) + " gp");
+        lines.add((sell ? "Received" : "Spent") + "|" + exact(Math.abs(market.observedSettlementGp)) + GP_UNIT);
         boolean unknown = sell && market.coverage == MarketRows.Coverage.FULLY_UNKNOWN;
         if (sell) {
             if (market.receivedEachGp > 0)
                 // The actual after-tax settled unit value; shown only when exactly divisible.
-                lines.add("Received each|" + exact(market.receivedEachGp) + " gp");
-            lines.add(msg("previously-counted") + (unknown ? "Unknown" : exact(market.trackedBasisConsumedGp) + " gp"));
+                lines.add("Received each|" + exact(market.receivedEachGp) + GP_UNIT);
+            lines.add(msg("previously-counted") + (unknown ? "Unknown" : exact(market.trackedBasisConsumedGp) + GP_UNIT));
             lines.add("Result|" + (unknown && !market.manualFinancialResult ? "—"
                                     : market.realizedResultCorrectionAware ? exactSigned(market.realizedResultGp)
-                                                    + " gp" + (market.coverage == MarketRows.Coverage.PARTIALLY_KNOWN
+                                                    + GP_UNIT + (market.coverage == MarketRows.Coverage.PARTIALLY_KNOWN
                                                             ? " · Partial" : "")
                                                     + (corrected ? msg("corrected") : "") : "—"));
             if (market.knownCostOnly)
                 // Only the BOOKED state with an AUTO correction earns this row: the tax is a real
                 // market cost here. Uncounted/pre-change, corrected and fully known sales never
                 // show it (a full Result already has the tax inside Received).
-                lines.add("GE tax|" + exactSigned(-market.inferredGeTaxGp) + " gp");
+                lines.add("GE tax|" + exactSigned(-market.inferredGeTaxGp) + GP_UNIT);
         } else {
-            lines.add("Tracked value|" + exact(market.trackedBasisConsumedGp) + " gp");
-            lines.add("Result|" + (market.realizedResultCorrectionAware ? exactSigned(market.realizedResultGp) + " gp"
+            lines.add("Tracked value|" + exact(market.trackedBasisConsumedGp) + GP_UNIT);
+            lines.add("Result|" + (market.realizedResultCorrectionAware ? exactSigned(market.realizedResultGp) + GP_UNIT
                                             + (corrected ? msg("corrected") : "") : "0 gp"));
         }
         if (market.settlementAdjustmentGp != 0 && market.inferredGeTaxGp <= 0)
             // An unexplained gap is the receipt's own answer and must stay visible.
-            lines.add("Adjustment|" + exactSigned(market.settlementAdjustmentGp) + " gp");
+            lines.add("Adjustment|" + exactSigned(market.settlementAdjustmentGp) + GP_UNIT);
         return lines;
     }
 
@@ -3960,8 +3941,7 @@ class MarketText {
     static String fillStateText(Row market) {
         long offered = market.offeredQty, filled = market.filledQty, collected = market.settledQty;
         if (offered <= 0 || filled == collected && collected == offered) return "";
-        if (filled == collected) return "Filled " + exact(collected) + " / " + exact(offered);
-        return "Filled " + exact(filled) + " / " + exact(offered) + " · collected " + exact(collected);
+        return filled == collected ? "Filled " + exact(collected) + " / " + exact(offered) : "Filled " + exact(filled) + " / " + exact(offered) + " · collected " + exact(collected);
     }
 
     /** Order-state wording that never mislabels placement time as settlement time. */
@@ -4001,8 +3981,7 @@ class MarketText {
 
     static String groupLead(Group group) {
         if (group.market) return group.context;
-        if (!group.uses.isEmpty()) return "Used by " + group.uses;
-        return group.label;
+        return !group.uses.isEmpty() ? "Used by " + group.uses : group.label;
     }
 }
 
@@ -4017,7 +3996,7 @@ class MarketText {
  */
 @AllArgsConstructor
 class LedgerData {
-    @RequiredArgsConstructor
+    @AllArgsConstructor
     enum Scope {
         CURRENT_GRIND("Current Grind"), TODAY("Runs today"), HISTORY("Recent Grind");
         final String label;
@@ -4031,7 +4010,7 @@ class LedgerData {
      * The Losses table's chips (owner 2026-09-28): LOSS is shown as Items; Charges are measured
      * charge use.
      */
-    @RequiredArgsConstructor
+    @AllArgsConstructor
     enum CostView {
         ALL("All"), SUPPLIES("Supplies"), LOSS("Items"), CHARGES("Charges");
         final String label;
@@ -4054,7 +4033,7 @@ class LedgerData {
     }
 
     /** Compact audit subsections; never peer financial tabs. */
-    @RequiredArgsConstructor
+    @AllArgsConstructor
     enum Audit {
         REVIEW("Review"), CORRECTED("Corrected");
         final String label;
@@ -4182,7 +4161,7 @@ class LedgerData {
         String summaryText() {
             var text = new StringBuilder();
             for (var resource : resources) {
-                if (text.length() > 0) text.append(" · ");
+                if (text.length() > 0) text.append(SEPARATOR);
                 text.append(resource.name);
                 if (resource.quantity > 1) text.append(' ').append(times(resource.quantity));
             }
@@ -4305,12 +4284,12 @@ class LedgerData {
         if (e.table == KILL) result = kills(transactions);
         var tables = new EnumMap<Table, List<Group>>(Table.class);
         for (var table : Table.values()) tables.put(table, new ArrayList<>());
-        for (Group group : result.groups) {
+        for (Group group : result.groups)
             if (!group.review && group.matchesText(e.search)) {
                 tables.get(group.death && group.neutral ? COSTS_LOSS : group.table).add(group);
                 if (group.pvpDeath) tables.get(DEATH).add(group);
             }
-        }
+
         var gainsAll = tables.get(GAINS);
         var suppliesAll = tables.get(COSTS_SUPPLIES);
         var lossAll = tables.get(COSTS_LOSS);
@@ -4326,8 +4305,7 @@ class LedgerData {
             // All is every list together, newest first like every other table (owner 1.3.3).
             costs.addAll(charges);
             costs.addAll(lossAll);
-            costs.sort(comparingLong((Group group) -> group.at).reversed()
-                            .thenComparing(group -> group.id));
+            costs.sort(Semantics.NEWEST_GROUP);
         }
         var income = tableData(e.table == KILL ? tables.get(KILL) : gainsAll, false);
         var cost = tableData(costs, false);
@@ -4341,20 +4319,24 @@ class LedgerData {
         // ── audit ────────────────────────────────────────────────────────────────────────────
         var reviewRows = new ArrayList<ReviewRow>();
         int reviewScopeCount = 0;
-        for (var reviewRow : engine.getReviewRows(now)) {
+        for (var reviewRow : engine.getReviewRows(now))
             if (reviewRow != null && ids.contains(reviewRow.session)) {
                 reviewScopeCount++;
                 if (!readOnly(e) && matchesSearch(reviewRow, e.search)) reviewRows.add(reviewRow);
             }
-        }
+
         var review = new ReviewData(reviewRows, saved == null ? reviewScopeCount : summary.fact(saved.session).review);
         var fixed = new ArrayList<Receipt>();
-        for (Group group : result.groups) {
-            for (var receipt : group.entries) {
+        if (result.audit == null)
+            result.audit = transactions.stream().anyMatch(row -> row.correction() == IGNORE)
+                    ? Semantics.capture(transactions, rows, ids, null, true) : result;
+        var audit = result.audit;
+        for (Group group : audit.groups)
+            for (var receipt : group.entries)
                 if ((receipt.corrected || receipt.split) && receipt.matchesSearch(e.search))
                     fixed.add(receipt);
-            }
-        }
+
+
         fixed.sort(comparingLong((Receipt receipt) -> receipt.at).reversed()
                         .thenComparing(receipt -> receipt.id));
         // ── selected detail ──────────────────────────────────────────────────────────────────
@@ -4362,18 +4344,19 @@ class LedgerData {
         String anchorContribution = e.highlightContributionId, anchorTransaction = e.transaction;
         String anchorGroup = e.group;
         if (anchorGroup != null || anchorContribution != null || anchorTransaction != null) {
-            Group group = findGroup(result.groups, anchorGroup, anchorContribution, anchorTransaction);
+            Group group = findGroup(e.focusAudit == Audit.CORRECTED ? audit.groups : result.groups,
+                    anchorGroup, anchorContribution, anchorTransaction);
             if (group != null) {
                 var records = group.entries;
                 Receipt exact = null;
-                if (anchorContribution != null) {
-                    for (var receipt : records) {
+                if (anchorContribution != null)
+                    for (var receipt : records)
                         if (receipt.id.equals(anchorContribution)) {
                             exact = receipt;
                             break;
                         }
-                    }
-                }
+
+
                 if (exact == null && anchorTransaction != null)
                     exact = firstReceipt(records, anchorTransaction);
                 // A one-entry group opens on its entry: a list of one only repeated the header.
@@ -4383,7 +4366,7 @@ class LedgerData {
         }
         long net = scopeNet;
         boolean detailedHistoryAvailable = !compacted || total.entries > 0;
-        boolean reconciled = total.coverageComplete && sum(sum(total.income, total.cost), total.market) == net;
+        boolean reconciled = total.coverageComplete && total.net() == net;
         return new LedgerData(e, scopeName, readOnly(e), compacted, detailedHistoryAvailable, net, now, income, cost,
                 market, review, fixed, total, reconciled, detail, markets,
                 new int[] {0, supplies.size(), lossAll.size(), charges.size()}, pendingItems(engine, e, now));
@@ -4421,7 +4404,7 @@ class LedgerData {
             }
         }
         var result = new ArrayList<>(groups.values());
-        result.sort(comparingLong((Group group) -> group.at).reversed().thenComparing(group -> group.id));
+        result.sort(Semantics.NEWEST_GROUP);
         return new Result(result);
     }
 
@@ -4462,20 +4445,17 @@ class LedgerData {
     static Group findGroup(List<Group> groups, String groupId, String id, String identifier) {
         // Most specific anchor first: a receipt's own contribution must win over the transaction
         // it came from, or a shop drill lands on the wrong side of the trade (one rune's group).
-        for (Group group : groups) {
+        for (Group group : groups)
             if (!group.review && group.containsContribution(groupId)) return group;
-        }
-        for (Group group : groups) {
+
+        for (Group group : groups)
             if (!group.review && group.containsContribution(id)) return group;
-        }
-        for (Group group : groups) {
+
+        for (Group group : groups)
             if (!group.review && group.containsTransaction(identifier)) return group;
-        }
+
         // Review-required groups are still openable from the audit list detail.
-        for (Group group : groups) {
-            if (group.containsContribution(id) || group.containsTransaction(identifier)) return group;
-        }
-        return null;
+        return firstMatch(groups, (Group group) -> group.containsContribution(id) || group.containsTransaction(identifier));
     }
 
     /** True when every receipt belongs to one entry: a group whose list would hold one row. */
@@ -4485,10 +4465,10 @@ class LedgerData {
 
     static Receipt firstReceipt(List<Receipt> records, String id) {
         Receipt found = null;
-        for (var receipt : records) {
+        for (var receipt : records)
             if (receipt.transaction.equals(id) && (found == null || receipt.at >= found.at))
                 found = receipt;
-        }
+
         return found;
     }
 
@@ -4531,9 +4511,9 @@ class LedgerData {
         if (blank(query)) return true;
         String needle = lower(query);
         if (containsFolded(needle, row.why)) return true;
-        for (var item : row.items) {
+        for (var item : row.items)
             if (containsFolded(needle, item.name)) return true;
-        }
+
         return false;
     }
 
@@ -4865,12 +4845,12 @@ class LiveSnapshot {
         long marketResult = market.net();
         int marketPending = 0;
         var markets = new HashMap<String, Row>();
-        for (Row row : marketRows) {
+        for (Row row : marketRows)
             if (row != null) {
                 markets.put(row.presentationId, row);
                 marketPending += LedgerData.isPending(row.lifecycle) ? 1 : 0;
             }
-        }
+
         var pk = active == null ? new PkTally() : active.pk();
         boolean pvpSession = pk.encounters() > 0;
         return new LiveSnapshot(active == null ? "" : active.id(), active != null, owner, since, metrics.paused,
@@ -4947,8 +4927,7 @@ class LiveSnapshot {
      * the time is said once).
      */
     static String timeDetail(long elapsed, long duration) {
-        if (elapsed >= duration) return "Time target reached";
-        return durationCount(duration - elapsed) + " left of " + durationShort(duration) + " · "
+        return elapsed >= duration ? "Time target reached" : durationCount(duration - elapsed) + " left of " + durationShort(duration) + SEPARATOR
                 + percent(max(0d, elapsed / (double) duration));
     }
 
@@ -5068,7 +5047,7 @@ class LiveSnapshot {
             // narrow quantity column leaves every name readable.
             String casts = group.count > 1 ? times(group.count) : null;
             qty = !group.name.equalsIgnoreCase(group.label) ? casts
-                            : casts == null ? group.context : group.context + " · " + casts;
+                            : casts == null ? group.context : group.context + SEPARATOR + casts;
             label = group.label;
         } else if (!group.failedOf().isEmpty()) {
             qty = group.failedOf();
@@ -5108,8 +5087,7 @@ class LiveSnapshot {
         String unit = has(name, "pizza", "cake", "pie") ? "portion"
                         : group.label.equals("Drank") ? "dose" : null;
         if (group.dose && unit != null) {
-            if (group.quantity == 1) return "1 " + unit;
-            return group.quantity > 1 ? times(group.quantity) + " " + unit + "s" : null;
+            return group.quantity == 1 ? "1 " + unit : group.quantity > 1 ? times(group.quantity) + " " + unit + "s" : null;
         }
         if (group.claim < 0)
             // A claim spend reads as its own signed count ("-1 pouch"); a pickup stays "×N".
@@ -5175,8 +5153,7 @@ class LiveContext {
         if (filter != null && filter.alwaysShows(flow)) return true;
         // Unknown / unpriced gains remain discoverable for Review; the minimum is
         // compared against the unit price so quantity cannot defeat it.
-        if (flow.unitPrice > 0 && flow.unitPrice < minimumLoot) return false;
-        return filter == null || filter.isFlowIncluded(flow);
+        return !(flow.unitPrice > 0 && flow.unitPrice < minimumLoot) && (filter == null || filter.isFlowIncluded(flow));
     }
 }
 
@@ -5297,9 +5274,8 @@ class LootPresentationFilterService {
         if (!current.pluginEnabled) return true;
         int state = listState(current.highlights, current.hiddenCsv, flow.name,
                         positive(Math.abs(flow.quantity)));
-        if (state == HIDDEN) return false;
-        return effective != LootFilter.HIGHLIGHTED_LIST_ONLY ? !current.highlightedOnly || state == HIGHLIGHTED
-                : state == HIGHLIGHTED;
+        return !(state == HIDDEN) && (effective != LootFilter.HIGHLIGHTED_LIST_ONLY ? !current.highlightedOnly || state == HIGHLIGHTED
+                : state == HIGHLIGHTED);
     }
 
     /** Ground Items' highlight colour for an item on its highlighted list, unless filters are off. */
@@ -5335,15 +5311,14 @@ class LootPresentationFilterService {
         exact = listMatch(hiddenCsv, name, quantity, false);
         if (exact != NONE) return HIDDEN;
         int wildcard = listMatch(highlights, name, quantity, true);
-        if (wildcard != NONE) return HIGHLIGHTED;
-        return listMatch(hiddenCsv, name, quantity, true) == NONE ? NONE : HIDDEN;
+        return wildcard != NONE ? HIGHLIGHTED : listMatch(hiddenCsv, name, quantity, true) == NONE ? NONE : HIDDEN;
     }
 
     static int listMatch(String csv, String title, long quantity, boolean wildcard) {
         String name = string(title);
-        for (Rule rule : rules(csv)) {
+        for (Rule rule : rules(csv))
             if (rule.wildcard == wildcard && rule.matches(name, quantity)) return 1;
-        }
+
         return NONE;
     }
 
@@ -5380,20 +5355,19 @@ class LootPresentationFilterService {
             }
             int quantity = 0;
             boolean less = false;
-            if (split >= 0 && split + 1 < text.length()) {
+            if (split >= 0 && split + 1 < text.length())
                 try {
                     quantity = parseInt(text.substring(split + 1).trim());
                     less = text.charAt(split) == '<';
                     text = text.substring(0, split).trim();
                 } catch (NumberFormatException ignored) {
                 }
-            }
+
             return new Rule(text, max(0, quantity), less, text.contains("*"));
         }
 
         boolean matches(String title, long count) {
-            if (wildcard ? !WildcardMatcher.matches(name, title) : !name.equalsIgnoreCase(title)) return false;
-            return lessThan ? count < quantity : count > quantity;
+            return !(wildcard ? !WildcardMatcher.matches(name, title) : !name.equalsIgnoreCase(title)) && (lessThan ? count < quantity : count > quantity);
         }
     }
 }
@@ -5403,7 +5377,7 @@ class LootPresentationFilterService {
  * reflects into private Ground Items fields or package-private matchers.
  */
 @Singleton
-@RequiredArgsConstructor(onConstructor_ = @Inject)
+@AllArgsConstructor(onConstructor_ = @Inject)
 class GroundItemsConfigReader {
     static final Logger log = LoggerFactory.getLogger(GroundItemsConfigReader.class);
     final ConfigManager config;
@@ -5429,9 +5403,9 @@ class GroundItemsConfigReader {
 
     boolean isGroundItemsEnabled() {
         if (pluginManager == null) return false;
-        for (var plugin : pluginManager.getPlugins()) {
+        for (var plugin : pluginManager.getPlugins())
             if (plugin instanceof GroundItemsPlugin) return pluginManager.isPluginEnabled(plugin);
-        }
+
         return false;
     }
 }
@@ -5488,6 +5462,10 @@ class GroundItemsPrefs {
  * checks every table against RuneLite's named constants.
  */
 class GameData {
+    static final String GENERAL = "General", GP_UNIT = " gp";
+
+    static final String SEPARATOR = " · ";
+
     /** Rule tables alone are cached: callers of legacy rows still receive independent arrays. */
     static final Map<String, List<String[]>> ROWS = new HashMap<>();
 
@@ -5508,9 +5486,9 @@ class GameData {
         if (stream == null) throw new IllegalStateException("Missing game data table " + name);
         var rows = new ArrayList<String[]>();
         try (BufferedReader reader = new BufferedReader(new InputStreamReader(stream, StandardCharsets.UTF_8))) {
-            for (String line = reader.readLine(); line != null; line = reader.readLine()) {
+            for (String line = reader.readLine(); line != null; line = reader.readLine())
                 if (!line.isEmpty() && !line.startsWith("#")) rows.add(line.split("\t", -1));
-            }
+
         } catch (IOException e) {
             throw new UncheckedIOException(e);
         }
@@ -5664,7 +5642,7 @@ class Phrases {
 
     /** Blank activity names fall back to the General bucket. */
     static String normalizeActivity(String value) {
-        return fallback(value, "General");
+        return fallback(value, GENERAL);
     }
 
     static String string(String text) {
@@ -5710,17 +5688,17 @@ class Phrases {
 
     /** True when the text contains any of the words. */
     static boolean has(String text, String... words) {
-        for (String word : words) {
+        for (String word : words)
             if (text.contains(word)) return true;
-        }
+
         return false;
     }
 
     /** True when any non-null term contains the already lower-case needle. */
     static boolean containsFolded(String lowerNeedle, String... terms) {
-        for (String term : terms) {
+        for (String term : terms)
             if (term != null && term.toLowerCase(Locale.ROOT).contains(lowerNeedle)) return true;
-        }
+
         return false;
     }
 
@@ -5869,11 +5847,11 @@ class Valuation implements FlowValuator {
         // assigning either one; an unsupported basis returns null and leaves the caller's
         // original captured list untouched for Review.
         var normalized = new ArrayList<>(flows);
-        for (var pair : pairs) {
+        for (var pair : pairs)
             if (!normalizePotionPair(normalized, pair.lossIndex, pair.remainder, prices,
                     at))
                 return null;
-        }
+
         return normalized;
     }
 
@@ -5938,8 +5916,7 @@ class Valuation implements FlowValuator {
         }
         if (anchor <= 0 || anchorPrice <= 0) return null;
         long scaled = anchorPrice * dose / anchor;
-        if (scaled <= 0) return null;
-        return new Flow(identifier, name, 1, scaled, scaled, manual ? MANUAL_OVERRIDE : GRAND_EXCHANGE, 0);
+        return scaled <= 0 ? null : new Flow(identifier, name, 1, scaled, scaled, manual ? MANUAL_OVERRIDE : GRAND_EXCHANGE, 0);
     }
 
     /** One variation family member's display name, "" when the definition is unavailable. */
@@ -5987,9 +5964,7 @@ class Valuation implements FlowValuator {
 
     private static boolean compatibleWithAuthority(Flow flow, Flow authority) {
         if (flow == null || authority == null) return false;
-        if (authority.source() == GRAND_EXCHANGE)
-            return flow.source() == GRAND_EXCHANGE && flow.unitPrice > 0;
-        return authority.source() == MANUAL_OVERRIDE
+        return authority.source() == GRAND_EXCHANGE ? flow.source() == GRAND_EXCHANGE && flow.unitPrice > 0 : authority.source() == MANUAL_OVERRIDE
                 && (flow.source() == GRAND_EXCHANGE && flow.unitPrice > 0
                         || flow.source() == MANUAL_OVERRIDE);
     }
@@ -6171,8 +6146,7 @@ class Valuation implements FlowValuator {
 
     static int faceValueOf(int id) {
         if (id == COINS) return 1;
-        if (id == PLATINUM) return 1000;
-        return 0;
+        return id == PLATINUM ? 1000 : 0;
     }
 
     /**
@@ -6191,10 +6165,10 @@ class Valuation implements FlowValuator {
 
     static boolean hasUnsupportedMapping(Collection<ItemMapping> mappings) {
         if (mappings == null) return false;
-        for (var mapping : mappings) {
+        for (var mapping : mappings)
             if (mapping.getQuantity() != 1 || mapping.getTradeableItem() == COINS)
                 return true;
-        }
+
         return false;
     }
 
@@ -6311,14 +6285,14 @@ class CurrencyProxyCatalogue {
     static final Map<Integer, Integer> GLOVES_UNITS = new HashMap<>();
 
     static {
-        for (String[] row : rows("currencies")) {
+        for (String[] row : rows("currencies"))
             if (row.length > 2) {
                 String[] units = row[2].split("/");
                 PROXIES.put(parseInt(row[0]), new int[] {parseInt(row[1]), parseInt(units[0])});
                 if (units.length > 1)
                     GLOVES_UNITS.put(parseInt(row[0]), parseInt(units[1]));
             }
-        }
+
     }
 
     static boolean isMapped(int id) {
@@ -6443,16 +6417,14 @@ class Persistence {
         if (config == null) return null;
         String profile = config.getRSProfileKey();
         long accountHash = TrackingIdentity.ACCOUNT_HASH_INVALID;
-        if (client != null) {
+        if (client != null)
             try {
                 accountHash = client.getAccountHash();
             } catch (RuntimeException ex) {
                 // Client may not expose hash before login.
             }
-        }
-        if (!blank(profile))
-            return new TrackingIdentity(profile.trim(), accountHash);
-        return null;
+
+        return !blank(profile) ? new TrackingIdentity(profile.trim(), accountHash) : null;
     }
 
     /**
@@ -6499,12 +6471,12 @@ class Persistence {
             executor.execute(() -> {
                         boolean ready = false;
                         try {
-                            if (!captureOnCaller) {
+                            if (!captureOnCaller)
                                 synchronized (this) {
                                     if (!closing && activeIdentity != null)
-                                        scheduleSaveLocked(false);
+                                        scheduleSaveLocked();
                                 }
-                            }
+
                             if (!closing) ready = job.getAsBoolean();
                         } catch (RuntimeException ex) {
                             log.warn(msg("unable-complete") + what, ex);
@@ -6616,7 +6588,7 @@ class Persistence {
         }
         fence();
         synchronized (this) {
-            if (!loading && activeIdentity != null) scheduleSaveLocked(false);
+            if (!loading && activeIdentity != null) scheduleSaveLocked();
         }
     }
 
@@ -6630,7 +6602,7 @@ class Persistence {
 
     synchronized void onHashInvalidated() {
         if (activeIdentity != null) {
-            scheduleSaveLocked(false);
+            scheduleSaveLocked();
             // An unsaved owner is kept, fenced, rather than cleared; the next bind retries its save.
             if (!flush(Duration.ofSeconds(5))) {
                 log.warn(msg("account-clear"));
@@ -6647,12 +6619,8 @@ class Persistence {
         switchBlocked = false;
     }
 
+    /** Capture a save; unchanged closed sessions may reuse their cached JSON. */
     boolean scheduleSave() {
-        return scheduleSave(false);
-    }
-
-    /** {@code quick}: a gameplay save, which may reuse unchanged closed sessions' JSON. */
-    boolean scheduleSave(boolean quick) {
         // A lifecycle worker may hold this monitor while it waits for a disk
         // flush or loads the next account scope. Gameplay ingestion is already
         // fenced at this point, so a callback request must return without
@@ -6660,18 +6628,18 @@ class Persistence {
         // explicit snapshot path.
         if (loading) return false;
         synchronized (this) {
-            return !loading && scheduleSaveLocked(quick);
+            return !loading && scheduleSaveLocked();
         }
     }
 
     /** Caller holds this coordinator monitor; used by lifecycle boundary snapshots. */
-    boolean scheduleSaveLocked(boolean quick) {
-        var intent = currentIntent(quick);
+    boolean scheduleSaveLocked() {
+        var intent = currentIntent();
         return intent != null && writer.submit(intent);
     }
 
     synchronized boolean saveNow() {
-        var intent = currentIntent(false);
+        var intent = currentIntent();
         if (intent == null) return false;
         writer.submit(intent);
         return writer.flush(Duration.ofSeconds(5));
@@ -6683,9 +6651,7 @@ class Persistence {
     }
 
     String scopeRefusal() {
-        if (activeIdentity == null || !repository.isBound() || !identityMatches())
-            return msg("current-runescape");
-        return writer.conflicted(repository.generation) ? writer.status().detail : reason;
+        return activeIdentity == null || !repository.isBound() || !identityMatches() ? msg("current-runescape") : writer.conflicted(repository.generation) ? writer.status().detail : reason;
     }
 
     /** Outcome of a reset: whether it was applied, and why not when refused. */
@@ -6723,13 +6689,13 @@ class Persistence {
     ResetOutcome replaceLocked(long now, boolean backup) {
         if (!saveNow()) return new ResetOutcome(false, msg("current-profile"));
         SavedState protectedState = null;
-        if (backup) {
+        if (backup)
             try {
                 protectedState = SessionRepository.parseBackup(JsonCodec.gson(), writeBackup(now));
             } catch (IOException | RuntimeException ex) {
                 return new ResetOutcome(false, msg("pre-restore") + ex.getMessage());
             }
-        }
+
         SavedState before;
         synchronized (engine) {
             // Sidebar edits use the engine lock, but are not ingestion. Refuse a stale safety copy
@@ -6831,9 +6797,8 @@ class Persistence {
     }
 
     synchronized ReplaceOutcome replaceNow() {
-        var intent = currentIntent(false);
-        if (intent == null) return ReplaceOutcome.unchanged(msg("account-identity-bound"));
-        return writer.replaceNow(intent);
+        var intent = currentIntent();
+        return intent == null ? ReplaceOutcome.unchanged(msg("account-identity-bound")) : writer.replaceNow(intent);
     }
 
     synchronized boolean flush(Duration timeout) {
@@ -6919,7 +6884,7 @@ class Persistence {
         return snapshotState(null);
     }
 
-    WriteIntent currentIntent(boolean quick) {
+    WriteIntent currentIntent() {
         if (!repository.isBound() || reason != null || writer.conflicted(repository.generation))
             return null;
         // Prefer the writer's verified lineage when a prior save is still
@@ -6977,9 +6942,7 @@ class JsonCodec {
         gson = clientGson;
     }
 
-    static boolean isBound() {
-        return gson != null;
-    }
+
 
     static Gson gson() {
         Gson bound = gson;
@@ -7022,7 +6985,8 @@ class TrackingIdentity {
             char c = rsProfileKey.charAt(i);
             if (c >= 'a' && c <= 'z' || c >= 'A' && c <= 'Z' || c >= '0' && c <= '9' || c == '-' || c == '_'
                     || c == '.')
-                out.append(c); else
+                out.append(c);
+            else
                 out.append('_');
         }
         String name = out.toString();
@@ -7160,11 +7124,11 @@ class SavedState extends SaveCopies {
 
     void setGeCustody(List<GeOffer> values) {
         geCustody = new ArrayList<>();
-        if (values != null) {
-            for (var value : values) {
+        if (values != null)
+            for (var value : values)
                 if (value != null && !value.getOfferId().isEmpty()) geCustody.add(value);
-            }
-        }
+
+
     }
 
     TrackedBasisState trackedBasis() {
@@ -7222,10 +7186,7 @@ class SavedState extends SaveCopies {
         return schemaVersion == CURRENT_SCHEMA_VERSION;
     }
 
-    /** The owner that was tracking when this state was saved. */
-    Session currentSession() {
-        return customSession != null ? customSession : generalSession;
-    }
+
 
     List<Session> history() {
         if (history == null) history = new ArrayList<>();
@@ -7289,9 +7250,9 @@ class SavedState extends SaveCopies {
         static List<DeathItem> copyItems(List<DeathItem> values) {
             if (empty(values)) return null;
             var copy = new ArrayList<DeathItem>();
-            for (var value : values) {
+            for (var value : values)
                 if (value != null && value.isValid()) copy.add(value);
-            }
+
             return copy.isEmpty() ? null : copy;
         }
     }
@@ -7411,7 +7372,8 @@ class SessionRepository {
         if (accounts)
             // Production starts unbound: do not write shared root history until
             // an RS profile identity is available and explicitly bound.
-            bindScope(root.joinSegment(UNASSIGNED_MARKER), null); else
+            bindScope(root.joinSegment(UNASSIGNED_MARKER), null);
+        else
             // Single-scope / test mode: the provided directory is the store.
             bindScope(rooted, null);
     }
@@ -7443,9 +7405,7 @@ class SessionRepository {
     /** Directory for an account identity without changing the live bind. */
     Filepath scopeDir(TrackingIdentity identity) {
         requireInit();
-        if (identity == null)
-            return accounts ? root.joinSegment(UNASSIGNED_MARKER) : root;
-        return root.joinSegment(ACCOUNTS_DIRECTORY).joinSegment(identity.folderName());
+        return identity == null ? accounts ? root.joinSegment(UNASSIGNED_MARKER) : root : root.joinSegment(ACCOUNTS_DIRECTORY).joinSegment(identity.folderName());
     }
 
     /**
@@ -7482,7 +7442,7 @@ class SessionRepository {
         recovery = "";
         // A save from an older schema starts fresh: it is kept beside the profile, never read.
         retireOlder(bound);
-        if (bound.state.exists()) {
+        if (bound.state.exists())
             try {
                 SavedState state;
                 try {
@@ -7502,8 +7462,8 @@ class SessionRepository {
                 if (!(ex instanceof InvalidSaveException)) throw new UncheckedIOException(ex);
                 setAside(bound);
             }
-        }
-        if (bound.backup.exists()) {
+
+        if (bound.backup.exists())
             try {
                 var i = readState(bound.backup);
                 log.warn(msg("recovered-gp"), bound.backup.getFileName());
@@ -7514,7 +7474,7 @@ class SessionRepository {
                 log.warn(msg("unable-read"), bound.backup, j);
                 if (!(j instanceof InvalidSaveException)) throw new UncheckedIOException(j);
             }
-        }
+
         revision = 0;
         return new SavedState();
     }
@@ -7565,9 +7525,7 @@ class SessionRepository {
      * prevent.
      */
     synchronized ReplaceOutcome replaceStateDetailed(WriteIntent intent) {
-        if (intent == null || intent.state == null)
-            return ReplaceOutcome.unchanged("state was null");
-        return commit(intent, true);
+        return intent == null || intent.state == null ? ReplaceOutcome.unchanged("state was null") : commit(intent, true);
     }
 
     /**
@@ -7624,7 +7582,8 @@ class SessionRepository {
                 return ReplaceOutcome.conflict(msg("disk-revision"));
             }
             if (state.revision <= 0)
-                state.setRevision(revision + 1); else if (state.revision <= revision) {
+                state.setRevision(revision + 1);
+            else if (state.revision <= revision) {
                 log.warn(msg("refusing-non"), state.revision, revision);
                 return ReplaceOutcome.unchanged(
                         msg("advance-disk"));
@@ -7643,9 +7602,9 @@ class SessionRepository {
                 } catch (InvalidSaveException ex) {
                     preserve(target, ex);
                 }
-            } else if (target.state.exists()) {
+            } else if (target.state.exists())
                 preserve(target, null);
-            }
+
             // Both guards above used this parsed primary, read under the account lock.
             if (!reset && previous != null) replaceBackup(target, msg("backup-prefix"));
             primaryAttempted = true;
@@ -7685,8 +7644,7 @@ class SessionRepository {
     }
 
     boolean sameScope(TrackingIdentity target) {
-        if (owner == null && target == null) return true;
-        return owner != null && owner.equals(target);
+        return owner == null && target == null || owner != null && owner.equals(target);
     }
 
     @AllArgsConstructor
@@ -7752,7 +7710,7 @@ class SessionRepository {
      * unreadable header or a failed move is never a destructive action.
      */
     void retireOlder(ScopeFiles files) {
-        for (var path : new Filepath[] {files.state, files.backup}) {
+        for (var path : new Filepath[] {files.state, files.backup})
             try {
                 var object = header(path);
                 int schema = object == null ? SavedState.CURRENT_SCHEMA_VERSION : schemaOf(object);
@@ -7764,7 +7722,7 @@ class SessionRepository {
             } catch (IOException ex) {
                 log.warn(msg("unable-preserve"), ex);
             }
-        }
+
     }
 
     /** A payload's stored revision; 0 when it names none or is null. */
@@ -7961,7 +7919,7 @@ class OrderedPersistenceWriter {
         asked = new long[] {intent.generation, next.revision};
         if (conflicted(intent.generation)) return false;
         if (!accept) {
-            status.set(new SaveStatus(FAILED, "Saving has stopped. Restart RuneLite to try again.", true, ""));
+            status.set(new SaveStatus(FAILED, "Saving stopped; restart RuneLite.", true, ""));
             return false;
         }
         while (true) {
@@ -8062,8 +8020,7 @@ class OrderedPersistenceWriter {
     }
 
     boolean scheduleDrain() {
-        if (retryQueued) return true;
-        if (!scheduled.compareAndSet(false, true)) return true;
+        if (retryQueued || !scheduled.compareAndSet(false, true)) return true;
         ExecutorService active;
         synchronized (lock) {
             if (!external && (executor == null || executor.isShutdown())) {
@@ -8117,7 +8074,8 @@ class OrderedPersistenceWriter {
                     // the live applied revision or OK status for the new scope.
                     failed = 0;
                     if (intent.generation == repository.generation)
-                        publish(work.revision, "", repository.recovery); else
+                        publish(work.revision, "", repository.recovery);
+                    else
                         log.debug(msg("ignoring-late"), intent.generation, repository.generation);
                     continue;
                 }
@@ -8179,11 +8137,9 @@ class OrderedPersistenceWriter {
     WriteIntent rebase(WriteIntent intent) {
         if (intent == null) return null;
         long own = written.get();
-        if (own <= 0 || intent.base >= own) return intent;
-        if (intent.generation != repository.generation) return intent;
+        if (own <= 0 || intent.base >= own || intent.generation != repository.generation) return intent;
         long disk = repository.revision;
-        if (disk != own) return intent;
-        return new WriteIntent(intent.identity, intent.generation, own, intent.state, intent.json);
+        return disk != own ? intent : new WriteIntent(intent.identity, intent.generation, own, intent.state, intent.json);
     }
 
     static class PendingWrite {

@@ -64,7 +64,7 @@ public class AccountingGuardTest {
         var engine=ReviewFixesTest.engine();long now=ReviewFixesTest.T0;
         var held=new HashMap<Integer,Long>();held.put(4151,1L);
         engine.setBaseline(new ContainerSnapshot(held));engine.markPvmDeath(20,held, Map.of(), engine.events.owner);held.clear();
-        var empty=ContainerSnapshot.empty();engine.processIfDirty(empty,now+600,null);engine.processIfDirty(empty,now+1200,null);
-        assertEquals(0,engine.session().metrics(now+1200).net);assertTrue(engine.deathStatus().pending);
+        var empty=FixtureReads.empty();engine.processIfDirty(empty,now+600,null);engine.processIfDirty(empty,now+1200,null);
+        assertEquals(0,engine.session().metrics(now+1200).net);assertTrue(FixtureReads.deathStatus(engine).pending);
     }
 }

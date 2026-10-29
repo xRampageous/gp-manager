@@ -131,7 +131,7 @@ public class DwarfCannonTest
         // shrinks them instead of booking a gain, and only what never comes back books.
         Engine engine = new Engine(valuator, new TransactionClassifier(), CONFIG);
         engine.ensureSession(1_000L);
-        engine.setBaseline(ContainerSnapshot.empty());
+        engine.setBaseline(FixtureReads.empty());
         settle(engine, held(ItemID.MCANNONBALL, 90L), 2_000L);
         assertEquals(18_000L, engine.metrics(10_000L).net);
 

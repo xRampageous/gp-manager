@@ -61,7 +61,7 @@ public class RaidHistoryTest {
     void inv(){nativeRaids.container(net.runelite.api.gameval.InventoryID.INV,chest(0));}
     void deplete(){containers.put(811,chest(0));nativeRaids.container(811,containers.get(811));}
     String id(){return engine.raids.state.runs.get(0).id;}
-    long net(String id) {engine.raids.read(id);long[] value=engine.raids.money(id);return value[0]-value[1];}
+    long net(String id) {engine.raids.read(id);long[] value=FixtureReads.money(engine.raids, id);return value[0]-value[1];}
     Transaction claimed(){start();complete();take();inv();var row=receipt();nativeRaids.booked(row,false,0);deplete();return row;}
     void exit(){bits.put(14345,0);for(int i=0;i<3;i++){tick++;nativeRaids.pulse(now());}}
 

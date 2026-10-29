@@ -107,7 +107,7 @@ public class GpManagerEngineTest
         engine.ensureSession(now);
         engine.beginPriming();
 
-        assertNull(engine.processIfDirty(ContainerSnapshot.empty(), now + 600L, null));
+        assertNull(engine.processIfDirty(FixtureReads.empty(), now + 600L, null));
         assertNull(engine.processIfDirty(snapshot(1205, 1L), now + 1_200L, null));
         assertNull(engine.processIfDirty(snapshot(1205, 1L), now + 1_800L, null));
         assertNull(engine.processIfDirty(snapshot(1205, 1L), now + 2_400L, null));
@@ -116,7 +116,7 @@ public class GpManagerEngineTest
         assertTrue(engine.session().transactions().isEmpty());
 
         engine.markDirty();
-        Transaction cost = settle(engine, ContainerSnapshot.empty(), now + 3_000L);
+        Transaction cost = settle(engine, FixtureReads.empty(), now + 3_000L);
         assertEquals(TransactionType.CONSUMPTION, cost.type());
         assertEquals(-100L, cost.net());
     }
@@ -131,7 +131,7 @@ public class GpManagerEngineTest
         Engine engine = new Engine(service, new TransactionClassifier(), config);
         long settleAt = 20_600L;
         engine.ensureSession(20_000L);
-        engine.setBaseline(ContainerSnapshot.empty());
+        engine.setBaseline(FixtureReads.empty());
         engine.markDirty();
 
         assertNull(engine.processIfDirty(snapshot(1942, 2L), 20_000L, null));
@@ -153,8 +153,8 @@ public class GpManagerEngineTest
 
         // Equipment disappears first.
         engine.markDirty();
-        assertNull(engine.processIfDirty(ContainerSnapshot.empty(), now + 600L, null));
-        assertNull(engine.processIfDirty(ContainerSnapshot.empty(), now + 1_200L, null));
+        assertNull(engine.processIfDirty(FixtureReads.empty(), now + 600L, null));
+        assertNull(engine.processIfDirty(FixtureReads.empty(), now + 1_200L, null));
 
         // Loot arrives while the equipment is restored. The pending transaction
         // is recalculated from the original baseline, so the pickaxe nets to zero.
@@ -187,8 +187,8 @@ public class GpManagerEngineTest
 
         engine.markContext(Context.TRANSFER, 6, "Bank transfer");
         engine.markDirty();
-        assertNull(engine.processIfDirty(ContainerSnapshot.empty(), now + 600L, null));
-        assertNull(engine.processIfDirty(ContainerSnapshot.empty(), now + 1_200L, null));
+        assertNull(engine.processIfDirty(FixtureReads.empty(), now + 600L, null));
+        assertNull(engine.processIfDirty(FixtureReads.empty(), now + 1_200L, null));
 
         engine.markDirty();
         assertNull(engine.processIfDirty(snapshot(2309, 1L), now + 1_800L, null));
@@ -298,7 +298,7 @@ public class GpManagerEngineTest
         Engine engine = engine();
         long now = 45_000L;
         engine.ensureSession(now);
-        engine.setBaseline(ContainerSnapshot.empty());
+        engine.setBaseline(FixtureReads.empty());
 
         engine.markLoot(Collections.singletonMap(526, 1L), 6, "Loot from Goblin", "Goblin");
         engine.markDirty();
@@ -322,7 +322,7 @@ public class GpManagerEngineTest
             unpricedValuator, new TransactionClassifier(), config);
         long now = 48_000L;
         engine.ensureSession(now);
-        engine.setBaseline(ContainerSnapshot.empty());
+        engine.setBaseline(FixtureReads.empty());
         engine.markDirty();
 
         Transaction transaction = settle(engine, snapshot(1942, 1L), now + 600L);
@@ -355,7 +355,7 @@ public class GpManagerEngineTest
         Engine engine = engine();
         long now = 12_000L;
         engine.ensureSession(now);
-        engine.setBaseline(ContainerSnapshot.empty());
+        engine.setBaseline(FixtureReads.empty());
 
         // Normal gameplay calls this check even when there was no lifecycle pause.
         engine.resume(now + 100L, PauseReason.LIFECYCLE);
@@ -393,7 +393,7 @@ public class GpManagerEngineTest
         Engine engine = engine();
         long now = 50_000L;
         engine.ensureSession(now);
-        engine.setBaseline(ContainerSnapshot.empty());
+        engine.setBaseline(FixtureReads.empty());
 
         Map<Integer, Long> expected = new HashMap<>();
         expected.put(526, 1L);
@@ -403,7 +403,7 @@ public class GpManagerEngineTest
 
         for (int tick = 0; tick < 10; tick++)
         {
-            assertNull(engine.processIfDirty(ContainerSnapshot.empty(), now + 600L * (tick + 1), null));
+            assertNull(engine.processIfDirty(FixtureReads.empty(), now + 600L * (tick + 1), null));
         }
 
         engine.markDirty();
@@ -457,7 +457,7 @@ public class GpManagerEngineTest
         Engine engine = engine();
         long now = 70_000L;
         engine.ensureSession(now);
-        engine.setBaseline(ContainerSnapshot.empty());
+        engine.setBaseline(FixtureReads.empty());
 
         engine.markPkLoot(
             Collections.singletonMap(526, 1L),
@@ -521,7 +521,7 @@ public class GpManagerEngineTest
 
         engine.markPkDeath(now + 600L, java.util.Collections.emptyMap(), null, engine.events.owner);
         engine.markDirty();
-        Transaction loss = settle(engine, ContainerSnapshot.empty(), now + 1_200L);
+        Transaction loss = settle(engine, FixtureReads.empty(), now + 1_200L);
 
         assertEquals(TransactionType.PK_DEATH_LOSS, loss.type());
         assertEquals(Confidence.CONFIRMED, loss.confidence());

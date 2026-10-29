@@ -61,7 +61,7 @@ public class GroundBasisTest
     {
         Engine engine = new Engine(valuator, new TransactionClassifier(), CONFIG);
         engine.ensureSession(now);
-        engine.setBaseline(ContainerSnapshot.empty());
+        engine.setBaseline(FixtureReads.empty());
         settle(engine, pack(BOLTS, 10L));
         assertEquals(10L, EngineProbe.knownCoverageQty(engine, BOLTS));
         engine.noteDrop(BOLTS, 6);
@@ -138,7 +138,7 @@ public class GroundBasisTest
     {
         Engine engine = new Engine(valuator, new TransactionClassifier(), CONFIG);
         engine.ensureSession(now);
-        engine.setBaseline(ContainerSnapshot.empty());
+        engine.setBaseline(FixtureReads.empty());
         settle(engine, pack(DART, 10L));
         assertEquals(10L, EngineProbe.knownCoverageQty(engine, DART));
         ChargeDelta delta = new ChargeDelta(ChargeCheck.ChargedItem.BLOWPIPE,

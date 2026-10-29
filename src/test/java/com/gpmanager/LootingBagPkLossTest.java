@@ -128,7 +128,7 @@ public class LootingBagPkLossTest {
             assertEquals(1, f.engine.session().pk().deaths);
             assertFalse(row.encounterId().isEmpty());
             assertTrue(f.engine.bagStock().isEmpty());
-            assertEquals(-600L, f.plugin.saved.currentSession().metrics(T0 + 5_000).net);
+            assertEquals(-600L, FixtureReads.currentSession(f.plugin.saved).metrics(T0 + 5_000).net);
             assertNull(f.plugin.saved.lootingBag);
         }
     }
@@ -239,7 +239,7 @@ public class LootingBagPkLossTest {
                 PriceSource.UNPRICED)));
             return result;
         }, new TransactionClassifier(), ReviewFixesTest.CONFIG);
-        engine.ensureSession(T0); engine.setBaseline(ContainerSnapshot.empty());
+        engine.ensureSession(T0); engine.setBaseline(FixtureReads.empty());
         Fixture f = new Fixture(engine); f.die();
         assertNotNull(f.loss());
         assertEquals(Map.of(RUNE, -3L), quantities(f.loss()));

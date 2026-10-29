@@ -62,7 +62,7 @@ public class DelayedPriceRetryTest {
  }
  @Test public void exhaustedReviewsWaitForTheNextProfileLoad(){
   var h=new DelayedPriceFixture();var row=h.sip();freshQueue(h,row);while(!h.engine.doseRetries.isEmpty())h.engine.retryDose(Math.max(START,h.engine.doseRetries.peek().at));
-  h.ready();SafeMath.clock=()->START+2000000;h.engine.recheck(id->0);assertTrue(ReviewRules.needsReview(row));
+  h.ready();SafeMath.clock=()->START+2000000;h.engine.recheck();assertTrue(ReviewRules.needsReview(row));
   h.engine.restore(SaveCopies.copy(h.engine.savedState()),START+2000000);h.engine.retryDose(START+2000000);assertFalse(ReviewRules.needsReview(h.engine.session().transactions.get(0)));assertEquals(-1000,h.engine.metrics(START+2000000).net);
  }
  @Test public void normalizerIsTheSinglePairAuthority(){
@@ -80,7 +80,7 @@ public class DelayedPriceRetryTest {
  }
  @Test public void theLoginScanDoesNotBypassTheOneRowTickBudget(){
   var h=new DelayedPriceFixture();var first=h.sip();freshQueue(h,first);var second=SaveCopies.copy(first);second.id=Phrases.uuid();second.timestamp++;h.engine.add(second,false);h.ready();
-  h.engine.recheck(id->0);assertTrue(ReviewRules.needsReview(first));assertTrue(ReviewRules.needsReview(second));
+  h.engine.recheck();assertTrue(ReviewRules.needsReview(first));assertTrue(ReviewRules.needsReview(second));
   tick(h,START+60000);assertEquals(1,sessionReviews(h));tick(h,START+60600);assertEquals(0,sessionReviews(h));assertEquals(-2000,h.engine.metrics(START+60600).net);
  }
  long sessionReviews(DelayedPriceFixture h){return h.engine.session().transactions.stream().filter(ReviewRules::needsReview).count();}

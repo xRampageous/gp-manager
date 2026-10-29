@@ -33,7 +33,7 @@ public class LegacyGraveRepairTest
         session.addTransaction(grave(T0 + 5_000L, WHIP, "Abyssal whip", VALUE), 2_000, false);
         assertEquals(VALUE, session.metrics(T0 + MINUTE).net);
 
-        engine.recheck(id -> 0);
+        engine.recheck();
 
         assertEquals("a later grave cannot erase earlier NPC loot", VALUE,
                 session.metrics(T0 + MINUTE).net);
@@ -51,7 +51,7 @@ public class LegacyGraveRepairTest
         session.addTransaction(loot, 2_000, false);
         assertEquals(VALUE, session.metrics(T0 + 31L * MINUTE).net);
 
-        engine.recheck(id -> 0);
+        engine.recheck();
 
         assertEquals("a new confirmed NPC drop is not a grave recovery", VALUE,
                 session.metrics(T0 + 31L * MINUTE).net);
@@ -71,14 +71,14 @@ public class LegacyGraveRepairTest
         assertEquals("loot and its later PK loss offset each other", 0,
                 session.metrics(T0 + MINUTE).net);
 
-        engine.recheck(id -> 0);
+        engine.recheck();
 
         assertEquals(0, session.metrics(T0 + MINUTE).net);
         assertEquals(Correction.AUTO, loot.correction());
 
         engine.restoreProfile("grave-reload", engine.savedState(), T0 + 2L * MINUTE);
         assertEquals("reload keeps the same booked offset", 0, engine.metrics(T0 + 3L * MINUTE).net);
-        engine.recheck(id -> 0);
+        engine.recheck();
         assertEquals(0, engine.metrics(T0 + 4L * MINUTE).net);
         assertEquals(Correction.AUTO, engine.session().findTransaction(loot.id()).correction());
     }
@@ -100,7 +100,7 @@ public class LegacyGraveRepairTest
                         new Flow(AVA, "Ava's accumulator", -1, 12L, -12L),
                         new Flow(SEED_POD, "Royal seed pod", -1, 600L, -600L))), 2_000, false);
 
-        engine.recheck(id -> 0);
+        engine.recheck();
 
         assertEquals(1_000_612L, session.metrics(T0 + MINUTE).net);
         assertEquals(Correction.AUTO, raid.correction());
@@ -117,7 +117,7 @@ public class LegacyGraveRepairTest
         session.addTransaction(recovery(T0 + 2_000L, WHIP, "Abyssal whip", VALUE), 2_000, false);
         assertEquals(0, session.metrics(T0 + 3_000L).net);
 
-        engine.recheck(id -> 0);
+        engine.recheck();
 
         assertEquals("the gear return stays ownership-neutral", 0,
                 session.metrics(T0 + 3_000L).net);
@@ -130,7 +130,7 @@ public class LegacyGraveRepairTest
         engine.bookDeathFee(500_000L, null, T0 + 1_000L);
         assertEquals(-500_000L, engine.metrics(T0 + 2_000L).net);
 
-        engine.recheck(id -> 0);
+        engine.recheck();
 
         assertEquals(-500_000L, engine.metrics(T0 + 3_000L).net);
         assertEquals("the observed fee stays one counted row", 1,
@@ -148,7 +148,7 @@ public class LegacyGraveRepairTest
         var ambiguous = gain(T0 + 2_000L, WHIP, "Abyssal whip", VALUE);
         session.addTransaction(ambiguous, 2_000, false);
 
-        engine.recheck(id -> 0);
+        engine.recheck();
 
         assertEquals("item overlap alone cannot prove a recovery", VALUE,
                 session.metrics(T0 + MINUTE).net);
@@ -156,7 +156,7 @@ public class LegacyGraveRepairTest
 
         assertTrue(session.correctTransaction(ambiguous.id(), Correction.IGNORE, "not income"));
         assertEquals(0, session.metrics(T0 + MINUTE).net);
-        engine.recheck(id -> 0);
+        engine.recheck();
         assertEquals("an explicit decision is never re-derived", 0, session.metrics(T0 + MINUTE).net);
         assertEquals(Correction.IGNORE, ambiguous.correction());
         assertEquals(1, session.correctionHistory.size());
@@ -172,7 +172,7 @@ public class LegacyGraveRepairTest
         assertTrue(session.correctTransaction(legacyIgnored.id(), Correction.IGNORE, "old cleanup"));
         var loot = loot(T0 + 2_000L, AVA, "Ava's accumulator", 12L);
 
-        engine.recheck(id -> 777);
+        engine.recheck();
 
         assertEquals("an old IGNORE is never bulk-reversed", Correction.IGNORE, legacyIgnored.correction());
         assertEquals(Correction.AUTO, loot.correction());
@@ -190,14 +190,14 @@ public class LegacyGraveRepairTest
         session.addTransaction(loot, 2_000, false);
         session.addTransaction(grave(T0 + 5_000L, WHIP, "Abyssal whip", VALUE), 2_000, false);
 
-        engine.recheck(id -> 0);
-        engine.recheck(id -> 0);
+        engine.recheck();
+        engine.recheck();
         assertEquals(VALUE, session.metrics(T0 + MINUTE).net);
         assertEquals(0, session.correctionHistory.size());
 
         engine.restoreProfile("grave-reload", engine.savedState(), T0 + 2L * MINUTE);
-        engine.recheck(id -> 0);
-        engine.recheck(id -> 0);
+        engine.recheck();
+        engine.recheck();
 
         assertEquals(VALUE, engine.metrics(T0 + 3L * MINUTE).net);
         assertEquals(0, engine.session().correctionHistory.size());

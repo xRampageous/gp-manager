@@ -141,7 +141,7 @@ public class DeathReclaimLifecycleTest
         engine.markPvmDeath(20, null, Map.of(), engine.events.owner);
         engine.markDirty();
 
-        Transaction loss = settle(engine, ContainerSnapshot.empty(), 1_600L);
+        Transaction loss = settle(engine, FixtureReads.empty(), 1_600L);
 
         assertNotNull(loss);
         assertEquals(TransactionType.CONSUMPTION, loss.type());
@@ -163,25 +163,25 @@ public class DeathReclaimLifecycleTest
             assertNull(engine.processIfDirty(carried, 1_100L + i * 600L, null));
         }
         engine.markDirty();
-        Transaction wipe = settle(engine, ContainerSnapshot.empty(), 5_000L);
+        Transaction wipe = settle(engine, FixtureReads.empty(), 5_000L);
 
         assertNotNull(wipe);
         assertEquals(TransactionType.TRANSFER, wipe.type());
         assertFalse(wipe.counts());
         assertEquals("Death: items held by gravestone / retrieval service", wipe.note());
-        assertEquals(2L, engine.deathStatus().items);
-        assertTrue(engine.deathStatus().pending);
-        assertTrue(engine.deathStatus().age >= 5L);
+        assertEquals(2L, FixtureReads.deathStatus(engine).items);
+        assertTrue(FixtureReads.deathStatus(engine).pending);
+        assertTrue(FixtureReads.deathStatus(engine).age >= 5L);
 
         // A direct gravestone Loot needs no still-live reclaim menu window.
-        engine.setBaseline(ContainerSnapshot.empty());
+        engine.setBaseline(FixtureReads.empty());
         engine.markDirty();
         Transaction returned = settle(engine, carried, 8_000L);
         assertNotNull(returned);
         assertEquals(TransactionType.TRANSFER, returned.type());
         assertFalse(returned.counts());
         assertEquals("Death reclaim: items recovered", returned.note());
-        assertFalse(engine.deathStatus().pending);
+        assertFalse(FixtureReads.deathStatus(engine).pending);
         assertEquals(0L, engine.metrics(12_000L).net);
     }
 
@@ -192,14 +192,14 @@ public class DeathReclaimLifecycleTest
         Engine engine = started(baseline);
         engine.markPvmDeath(1, gear(1L, 0L, 0L, 0L).items, Map.of(), engine.events.owner);
         engine.markDirty();
-        Transaction residualLoss = settle(engine, ContainerSnapshot.empty(), 1_600L);
+        Transaction residualLoss = settle(engine, FixtureReads.empty(), 1_600L);
 
         assertNotNull(residualLoss);
         assertEquals("unobserved ownership follows ordinary accounting", TransactionType.CONSUMPTION,
             residualLoss.type());
         assertTrue(residualLoss.counts());
         assertEquals(-15_000_000L, residualLoss.net());
-        assertEquals(1L, engine.deathStatus().items);
+        assertEquals(1L, FixtureReads.deathStatus(engine).items);
         Transaction deathTransfer = sw(engine,
             "Death: items held by gravestone / retrieval service");
         assertNotNull(deathTransfer);
@@ -218,17 +218,17 @@ public class DeathReclaimLifecycleTest
         Transaction firstWipe = settle(engine, gear(0L, 1L, 0L, 0L), 1_600L);
         assertNotNull(firstWipe);
         assertEquals(TransactionType.TRANSFER, firstWipe.type());
-        assertTrue(engine.deathStatus().pending);
+        assertTrue(FixtureReads.deathStatus(engine).pending);
         assertEquals("only the still-held item remains outstanding", 1L,
-            engine.deathStatus().items);
+            FixtureReads.deathStatus(engine).items);
 
         engine.setBaseline(gear(0L, 1L, 0L, 0L));
         engine.markDirty();
-        Transaction secondWipe = settle(engine, ContainerSnapshot.empty(), 3_000L);
+        Transaction secondWipe = settle(engine, FixtureReads.empty(), 3_000L);
         assertNotNull(secondWipe);
         assertEquals(TransactionType.TRANSFER, secondWipe.type());
         assertFalse(secondWipe.counts());
-        assertEquals(2L, engine.deathStatus().items);
+        assertEquals(2L, FixtureReads.deathStatus(engine).items);
     }
 
     @Test
@@ -243,7 +243,7 @@ public class DeathReclaimLifecycleTest
         }
 
         engine.markDirty();
-        Transaction wipe = settle(engine, ContainerSnapshot.empty(), 5_000L);
+        Transaction wipe = settle(engine, FixtureReads.empty(), 5_000L);
 
         assertNotNull(wipe);
         assertEquals(TransactionType.TRANSFER, wipe.type());
@@ -304,7 +304,7 @@ public class DeathReclaimLifecycleTest
         assertFalse("without custody, the GE movement waits for owner review", movement.counts());
         assertEquals(0L, engine.metrics(1_600L).net);
         assertFalse("the stronger market evidence closes the stale wipe whitelist",
-            engine.deathStatus().pending);
+            FixtureReads.deathStatus(engine).pending);
     }
 
     @Test
@@ -320,12 +320,12 @@ public class DeathReclaimLifecycleTest
         engine.noteConsume(WHIP, 20, false, null, null);
         engine.markDirty();
 
-        Transaction consumed = settle(engine, ContainerSnapshot.empty(), 3_000L);
+        Transaction consumed = settle(engine, FixtureReads.empty(), 3_000L);
 
         assertNotNull(consumed);
         assertEquals(TransactionType.CONSUMPTION, consumed.type());
         assertTrue(consumed.counts());
-        assertFalse(engine.deathStatus().pending);
+        assertFalse(FixtureReads.deathStatus(engine).pending);
     }
 
     @Test
@@ -337,7 +337,7 @@ public class DeathReclaimLifecycleTest
         engine.noteConsume(SHARK, 30, false, null, null);
         engine.markDirty();
 
-        Transaction consumption = settle(engine, ContainerSnapshot.empty(), 1_600L);
+        Transaction consumption = settle(engine, FixtureReads.empty(), 1_600L);
 
         assertNotNull(consumption);
         assertEquals(TransactionType.CONSUMPTION, consumption.type());
@@ -347,7 +347,7 @@ public class DeathReclaimLifecycleTest
         assertNotNull("unrelated whip loss remains an ownership-neutral death transfer", deathTransfer);
         assertFalse(deathTransfer.counts());
         assertEquals(WHIP, deathTransfer.flows().get(0).item);
-        assertEquals(1L, engine.deathStatus().items);
+        assertEquals(1L, FixtureReads.deathStatus(engine).items);
     }
 
     @Test
@@ -357,13 +357,13 @@ public class DeathReclaimLifecycleTest
         Engine engine = started(carried);
         engine.markPvmDeath(1, carried.items, Map.of(), engine.events.owner);
         engine.markDirty();
-        assertNotNull(settle(engine, ContainerSnapshot.empty(), 1_600L));
-        engine.setBaseline(ContainerSnapshot.empty());
+        assertNotNull(settle(engine, FixtureReads.empty(), 1_600L));
+        engine.setBaseline(FixtureReads.empty());
 
-        while (engine.deathStatus().age
+        while (FixtureReads.deathStatus(engine).age
             < DeathReclaimLifecycle.AWAIT_TICKS - 1L)
         {
-            assertNull(engine.processIfDirty(ContainerSnapshot.empty(), 4_000L, null));
+            assertNull(engine.processIfDirty(FixtureReads.empty(), 4_000L, null));
         }
         // The final return can be observed before a delayed/missed dirty callback.
         Transaction returned = settle(engine, carried, 5_000L);
@@ -371,7 +371,7 @@ public class DeathReclaimLifecycleTest
         assertNotNull(returned);
         assertEquals(TransactionType.TRANSFER, returned.type());
         assertEquals("Death reclaim: items recovered", returned.note());
-        assertFalse(engine.deathStatus().pending);
+        assertFalse(FixtureReads.deathStatus(engine).pending);
         assertNull(sw(engine, "Death reclaim expired"));
     }
 
@@ -412,11 +412,11 @@ public class DeathReclaimLifecycleTest
         Engine engine = started(carried, changingConfig);
         engine.markPvmDeath(1, carried.items, Map.of(), engine.events.owner);
         engine.markDirty();
-        assertNotNull(settle(engine, ContainerSnapshot.empty(), 1_600L));
-        assertEquals(2L, engine.deathStatus().items);
+        assertNotNull(settle(engine, FixtureReads.empty(), 1_600L));
+        assertEquals(2L, FixtureReads.deathStatus(engine).items);
 
         stabilization[0] = DeathReclaimLifecycle.AWAIT_TICKS + 100;
-        engine.setBaseline(ContainerSnapshot.empty());
+        engine.setBaseline(FixtureReads.empty());
         engine.markDirty();
         ContainerSnapshot changing = new ContainerSnapshot(
             java.util.Collections.singletonMap(99_999, 1L));
@@ -441,7 +441,7 @@ public class DeathReclaimLifecycleTest
         assertNotNull("an unrelated settled change still books normally", unrelatedGain);
         assertTrue(unrelatedGain.counts());
         assertTrue(expired.flows().isEmpty());
-        assertFalse(engine.deathStatus().pending);
+        assertFalse(FixtureReads.deathStatus(engine).pending);
         engine.processIfDirty(changing, 4_000L + maxWait * 600L, null);
     }
 
@@ -452,7 +452,7 @@ public class DeathReclaimLifecycleTest
         Engine engine = started(carried);
         engine.markPvmDeath(1, carried.items, Map.of(), engine.events.owner);
         engine.markDirty();
-        assertNotNull(settle(engine, ContainerSnapshot.empty(), 1_600L));
+        assertNotNull(settle(engine, FixtureReads.empty(), 1_600L));
         // Observe the kept cash returning after the fixture's all-items wipe; do not bypass
         // outstanding ownership by replacing its baseline before the return can settle.
         Transaction keptCash = settle(engine, gear(0L, 0L, 150_000L, 0L), 2_500L);
@@ -462,7 +462,7 @@ public class DeathReclaimLifecycleTest
 
         assertTrue(engine.noteReclaimIntent(
             BossRetrievalCatalogue.serviceFor("Loot", "Gravestone"), 1));
-        assertTrue(engine.deathStatus().armed);
+        assertTrue(FixtureReads.deathStatus(engine).armed);
         engine.markDirty();
         Transaction fee = settle(engine, gear(1L, 0L, 50_000L, 0L), 4_000L);
 
@@ -470,7 +470,7 @@ public class DeathReclaimLifecycleTest
         assertEquals(TransactionType.CONSUMPTION, fee.type());
         assertEquals(-100_000L, fee.net());
         assertTrue(fee.explanation().contains("Gravestone"));
-        assertFalse(engine.deathStatus().pending);
+        assertFalse(FixtureReads.deathStatus(engine).pending);
         Transaction recovered = engine.session().transactions().stream()
             .filter(row -> "Death reclaim: items recovered".equals(row.note()))
             .filter(row -> row.flows().stream().anyMatch(flow -> flow.item == WHIP))
@@ -502,11 +502,11 @@ public class DeathReclaimLifecycleTest
         Engine engine = started(carried, minimum);
         engine.markPvmDeath(1, carried.items, Map.of(), engine.events.owner);
         engine.markDirty();
-        Transaction wipe = settle(engine, ContainerSnapshot.empty(), 1_600L);
+        Transaction wipe = settle(engine, FixtureReads.empty(), 1_600L);
 
         assertNotNull(wipe);
         assertEquals(TransactionType.TRANSFER, wipe.type());
-        engine.setBaseline(ContainerSnapshot.empty());
+        engine.setBaseline(FixtureReads.empty());
         engine.markDirty();
         Transaction returned = settle(engine, carried, 4_000L);
 
@@ -514,7 +514,7 @@ public class DeathReclaimLifecycleTest
         assertEquals(TransactionType.TRANSFER, returned.type());
         assertFalse(returned.counts());
         assertEquals("Death reclaim: items recovered", returned.note());
-        assertFalse(engine.deathStatus().pending);
+        assertFalse(FixtureReads.deathStatus(engine).pending);
         assertEquals(0L, engine.metrics(8_000L).net);
     }
 
@@ -525,15 +525,15 @@ public class DeathReclaimLifecycleTest
         Engine engine = started(carried);
         engine.markPvmDeath(1, carried.items, Map.of(), engine.events.owner);
         engine.markDirty();
-        assertNotNull(settle(engine, ContainerSnapshot.empty(), 1_600L));
-        engine.setBaseline(ContainerSnapshot.empty());
+        assertNotNull(settle(engine, FixtureReads.empty(), 1_600L));
+        engine.setBaseline(FixtureReads.empty());
         engine.markDirty();
         Transaction firstReturn = settle(engine, gear(1L, 0L, 0L, 0L), 4_000L);
 
         assertNotNull(firstReturn);
         assertEquals(TransactionType.TRANSFER, firstReturn.type());
-        assertTrue(engine.deathStatus().pending);
-        assertEquals(1L, engine.deathStatus().items);
+        assertTrue(FixtureReads.deathStatus(engine).pending);
+        assertEquals(1L, FixtureReads.deathStatus(engine).items);
 
         Transaction expired = null;
         ContainerSnapshot afterPartialReturn = gear(1L, 0L, 0L, 0L);
@@ -553,7 +553,7 @@ public class DeathReclaimLifecycleTest
         assertTrue(expired.flows().isEmpty());
         assertTrue(expired.explanation().contains("Amulet of torture"));
         assertTrue(expired.explanation().contains("No item loss or fee was inferred"));
-        assertFalse(engine.deathStatus().pending);
+        assertFalse(FixtureReads.deathStatus(engine).pending);
         assertEquals(0L, engine.metrics(1_000_000L).net);
 
         // Review 2026-10-09: the expired items wait at Death's Office, so collecting them there
@@ -574,23 +574,23 @@ public class DeathReclaimLifecycleTest
         Engine engine = started(firstHeld);
         engine.markPvmDeath(1, firstHeld.items, Map.of(), engine.events.owner);
         engine.markDirty();
-        assertNotNull(settle(engine, ContainerSnapshot.empty(), 1_600L));
+        assertNotNull(settle(engine, FixtureReads.empty(), 1_600L));
 
         ContainerSnapshot secondHeld = gear(0L, 1L, 0L, 0L);
         engine.setBaseline(secondHeld);
         engine.markPvmDeath(1, secondHeld.items, Map.of(), engine.events.owner);
         engine.markDirty();
-        assertNotNull(settle(engine, ContainerSnapshot.empty(), 4_000L));
-        assertTrue(engine.deathStatus().pending);
-        assertEquals(2L, engine.deathStatus().items);
+        assertNotNull(settle(engine, FixtureReads.empty(), 4_000L));
+        assertTrue(FixtureReads.deathStatus(engine).pending);
+        assertEquals(2L, FixtureReads.deathStatus(engine).items);
 
-        engine.setBaseline(ContainerSnapshot.empty());
+        engine.setBaseline(FixtureReads.empty());
         engine.markDirty();
         Transaction recovered = settle(engine, gear(1L, 1L, 0L, 0L), 6_000L);
         assertNotNull(recovered);
         assertEquals(TransactionType.TRANSFER, recovered.type());
         assertEquals("Death reclaim: items recovered", recovered.note());
-        assertFalse(engine.deathStatus().pending);
+        assertFalse(FixtureReads.deathStatus(engine).pending);
         assertEquals(0L, engine.metrics(10_000L).net);
     }
 
@@ -603,7 +603,7 @@ public class DeathReclaimLifecycleTest
         // Death: everything leaves the inventory in one settle.
         engine.markPvmDeath(20, gear(1L, 1L, 150_000L, 0L).items, Map.of(), engine.events.owner);
         engine.markDirty();
-        Transaction wipe = settle(engine, ContainerSnapshot.empty(), 1_600L);
+        Transaction wipe = settle(engine, FixtureReads.empty(), 1_600L);
         assertNotNull(wipe);
         assertEquals(TransactionType.TRANSFER, wipe.type());
         assertFalse(wipe.counts());
@@ -657,7 +657,7 @@ public class DeathReclaimLifecycleTest
         Engine engine = started(gear(0L, 0L, 0L, 2L));
         engine.markPvmDeath(20, gear(0L, 0L, 0L, 2L).items, Map.of(), engine.events.owner);
         engine.markDirty();
-        Transaction wipe = settle(engine, ContainerSnapshot.empty(), 1_600L);
+        Transaction wipe = settle(engine, FixtureReads.empty(), 1_600L);
         assertNotNull(wipe);
         engine.setBaseline(gear(0L, 0L, 0L, 2L));
         assertTrue(engine.noteReclaimIntent(BossRetrievalCatalogue.serviceFor("Talk-to", "Torfinn"), 40));
@@ -720,7 +720,7 @@ public class DeathReclaimLifecycleTest
         Engine engine = started(gear(1L, 0L, 0L, 0L));
         engine.markPvmDeath(20, gear(1L, 0L, 0L, 0L).items, Map.of(), engine.events.owner);
         engine.markDirty();
-        Transaction wipe = settle(engine, ContainerSnapshot.empty(), 1_600L);
+        Transaction wipe = settle(engine, FixtureReads.empty(), 1_600L);
         assertNotNull(wipe);
         assertTrue(engine.noteReclaimIntent(
             BossRetrievalCatalogue.serviceFor("Talk-to", "Torfinn"), 40));
@@ -744,7 +744,7 @@ public class DeathReclaimLifecycleTest
         Engine engine = started(gear(1L, 0L, 0L, 0L));
         engine.markPvmDeath(20, gear(1L, 0L, 0L, 0L).items, Map.of(), engine.events.owner);
         engine.markDirty();
-        assertNotNull(settle(engine, ContainerSnapshot.empty(), 1_600L));
+        assertNotNull(settle(engine, FixtureReads.empty(), 1_600L));
         assertTrue(engine.noteReclaimIntent(
             BossRetrievalCatalogue.serviceFor("Talk-to", "Torfinn"), 40));
 
@@ -803,7 +803,7 @@ public class DeathReclaimLifecycleTest
         engine.markContext(Context.MARKET, 20, "Market sale");
         engine.markDirty();
 
-        Transaction sale = settle(engine, ContainerSnapshot.empty(), 1_600L);
+        Transaction sale = settle(engine, FixtureReads.empty(), 1_600L);
 
         assertNotNull(sale);
         assertEquals("the explicit market evidence owns this loss", Context.MARKET,
@@ -909,13 +909,13 @@ public class DeathReclaimLifecycleTest
         Engine engine = started(gear(1L, 0L, 0L, 0L));
         engine.markPvmDeath(20, gear(1L, 0L, 0L, 0L).items, Map.of(), engine.events.owner);
         engine.markDirty();
-        Transaction wipe = settle(engine, ContainerSnapshot.empty(), 1_600L);
+        Transaction wipe = settle(engine, FixtureReads.empty(), 1_600L);
         assertNotNull(wipe);
         assertTrue(EngineProbe.isAwaitingDeathReclaim(engine));
 
         engine.restore(new SavedState(), SafeMath.now());
         engine.ensureSession(4_000L);
-        engine.setBaseline(ContainerSnapshot.empty());
+        engine.setBaseline(FixtureReads.empty());
 
         assertFalse("account restore cannot retain another owner's death whitelist",
             EngineProbe.isAwaitingDeathReclaim(engine));
@@ -935,14 +935,14 @@ public class DeathReclaimLifecycleTest
         Engine engine = started(gear(1L, 0L, 0L, 0L));
         engine.markPvmDeath(20, gear(1L, 0L, 0L, 0L).items, Map.of(), engine.events.owner);
         engine.markDirty();
-        Transaction wipe = settle(engine, ContainerSnapshot.empty(), 1_600L);
+        Transaction wipe = settle(engine, FixtureReads.empty(), 1_600L);
         assertNotNull(wipe);
         assertTrue(EngineProbe.isAwaitingDeathReclaim(engine));
 
         engine.pauseForLifecycle(3_000L);
         assertNull("paused inventory churn is ignored", engine.processIfDirty(gear(0L, 0L, 0L, 1L), 3_200L, null));
         engine.resume(4_000L, PauseReason.LIFECYCLE);
-        engine.setBaseline(ContainerSnapshot.empty());
+        engine.setBaseline(FixtureReads.empty());
         assertTrue("pause must not discard same-owner death ownership evidence",
             EngineProbe.isAwaitingDeathReclaim(engine));
         assertTrue(engine.noteReclaimIntent(
@@ -963,7 +963,7 @@ public class DeathReclaimLifecycleTest
         Engine first = started(gear(1L, 0L, 0L, 0L));
         first.markPvmDeath(20, gear(1L, 0L, 0L, 0L).items, Map.of(), first.events.owner);
         first.markDirty();
-        assertNotNull(settle(first, ContainerSnapshot.empty(), 1_600L));
+        assertNotNull(settle(first, FixtureReads.empty(), 1_600L));
         assertTrue(EngineProbe.isAwaitingDeathReclaim(first));
 
         SavedState direct = first.savedState();
@@ -976,7 +976,7 @@ public class DeathReclaimLifecycleTest
         Engine restarted = new Engine(valuator, new TransactionClassifier(), CONFIG);
         restarted.restore(persisted, 10_000L);
         restarted.resume(11_000L, PauseReason.IDLE, PauseReason.RECOVERY);
-        restarted.setBaseline(ContainerSnapshot.empty());
+        restarted.setBaseline(FixtureReads.empty());
         assertTrue("a restart restores the pending reclaim", EngineProbe.isAwaitingDeathReclaim(restarted));
         assertTrue(restarted.noteReclaimIntent(
             BossRetrievalCatalogue.serviceFor("Talk-to", "Torfinn"), 40));
@@ -1008,7 +1008,7 @@ public class DeathReclaimLifecycleTest
         restarted.resume(11_000L, PauseReason.IDLE, PauseReason.RECOVERY);
         restarted.setBaseline(carried);
         restarted.markDirty();
-        Transaction wipe = settle(restarted, ContainerSnapshot.empty(), 12_000L);
+        Transaction wipe = settle(restarted, FixtureReads.empty(), 12_000L);
 
         assertNotNull(wipe);
         assertEquals(TransactionType.TRANSFER, wipe.type());
@@ -1022,14 +1022,14 @@ public class DeathReclaimLifecycleTest
         Engine first = started(gear(1L, 1L, 0L, 0L));
         first.markPvmDeath(20, gear(1L, 1L, 0L, 0L).items, Map.of(), first.events.owner);
         first.markDirty();
-        assertNotNull(settle(first, ContainerSnapshot.empty(), 1_600L));
+        assertNotNull(settle(first, FixtureReads.empty(), 1_600L));
         assertTrue(first.noteReclaimIntent(
             BossRetrievalCatalogue.serviceFor("Talk-to", "Torfinn"), 40));
         first.markDirty();
         Transaction partial = settle(first, gear(1L, 0L, 0L, 0L), 3_000L);
         assertNotNull(partial);
         assertEquals(TransactionType.TRANSFER, partial.type());
-        assertEquals("one item remains outstanding", 1L, first.deathStatus().items);
+        assertEquals("one item remains outstanding", 1L, FixtureReads.deathStatus(first).items);
 
         SavedState persisted = roundTrip(first.savedState());
         assertNotNull(persisted.pendingDeathReclaim);
@@ -1039,7 +1039,7 @@ public class DeathReclaimLifecycleTest
         restarted.restore(persisted, 10_000L);
         restarted.resume(11_000L, PauseReason.IDLE, PauseReason.RECOVERY);
         restarted.setBaseline(gear(1L, 0L, 0L, 0L));
-        assertEquals(1L, restarted.deathStatus().items);
+        assertEquals(1L, FixtureReads.deathStatus(restarted).items);
         assertTrue(restarted.noteReclaimIntent(
             BossRetrievalCatalogue.serviceFor("Talk-to", "Torfinn"), 40));
         restarted.markDirty();
@@ -1058,7 +1058,7 @@ public class DeathReclaimLifecycleTest
         Engine first = started(gear(1L, 0L, 0L, 0L));
         first.markPvmDeath(20, gear(1L, 0L, 0L, 0L).items, Map.of(), first.events.owner);
         first.markDirty();
-        assertNotNull(settle(first, ContainerSnapshot.empty(), 1_600L));
+        assertNotNull(settle(first, FixtureReads.empty(), 1_600L));
         assertTrue(first.noteReclaimIntent(
             BossRetrievalCatalogue.serviceFor("Talk-to", "Torfinn"), 40));
         first.markDirty();
@@ -1068,7 +1068,7 @@ public class DeathReclaimLifecycleTest
         Engine restarted = new Engine(valuator, new TransactionClassifier(), CONFIG);
         restarted.restore(roundTrip(first.savedState()), 10_000L);
         restarted.resume(11_000L, PauseReason.IDLE, PauseReason.RECOVERY);
-        restarted.setBaseline(ContainerSnapshot.empty());
+        restarted.setBaseline(FixtureReads.empty());
         assertFalse(EngineProbe.isAwaitingDeathReclaim(restarted));
         assertFalse("closed reclaim evidence cannot arm again", restarted.noteReclaimIntent(
             BossRetrievalCatalogue.serviceFor("Talk-to", "Torfinn"), 40));
@@ -1087,7 +1087,7 @@ public class DeathReclaimLifecycleTest
         Engine engine = started(gear(1L, 0L, 0L, 0L));
         engine.markPvmDeath(20, gear(1L, 0L, 0L, 0L).items, Map.of(), engine.events.owner);
         engine.markDirty();
-        assertNotNull(settle(engine, ContainerSnapshot.empty(), 1_600L));
+        assertNotNull(settle(engine, FixtureReads.empty(), 1_600L));
         assertNotNull(engine.savedState().pendingDeathReclaim);
 
         // Another owner's state carries no pending record and must not inherit this one.
@@ -1098,7 +1098,7 @@ public class DeathReclaimLifecycleTest
         Engine reset = started(gear(1L, 0L, 0L, 0L));
         reset.markPvmDeath(20, gear(1L, 0L, 0L, 0L).items, Map.of(), reset.events.owner);
         reset.markDirty();
-        assertNotNull(settle(reset, ContainerSnapshot.empty(), 1_600L));
+        assertNotNull(settle(reset, FixtureReads.empty(), 1_600L));
         reset.resetData(3_000L);
         assertFalse(EngineProbe.isAwaitingDeathReclaim(reset));
         assertNull(reset.savedState().pendingDeathReclaim);
@@ -1110,7 +1110,7 @@ public class DeathReclaimLifecycleTest
         Engine first = started(gear(1L, 0L, 150_000L, 0L));
         first.markPvmDeath(20, gear(1L, 0L, 150_000L, 0L).items, Map.of(), first.events.owner);
         first.markDirty();
-        assertNotNull(settle(first, ContainerSnapshot.empty(), 1_600L));
+        assertNotNull(settle(first, FixtureReads.empty(), 1_600L));
 
         Engine restarted = new Engine(valuator, new TransactionClassifier(), CONFIG);
         restarted.restore(roundTrip(first.savedState()), 10_000L);

@@ -108,13 +108,13 @@ public class PrimaryReadFailureTest {
         assertTrue("the header fault was exercised", stale.primaryHeaders > 0);
         assertArrayEquals("the newer primary stays byte-identical", newer,
                 Files.readAllBytes(directory.resolve("sessions.json")));
-        assertEquals(4_600, new SessionRepository(new Gson(), FilepathTestSupport.root(directory), false)
-                .load().currentSession().metrics(20_000L).net);
+        assertEquals(4_600, FixtureReads.currentSession(new SessionRepository(new Gson(), FilepathTestSupport.root(directory), false)
+                .load()).metrics(20_000L).net);
         stale.fail = false;
         var conflict = stale.commit(new WriteIntent(null, stale.generation, observed, money(4_575), null), false);
         assertEquals("an actual competing commit still conflicts", SessionRepository.ReplaceOutcome.Kind.CONFLICT, conflict.kind);
-        assertEquals(4_600, new SessionRepository(new Gson(), FilepathTestSupport.root(directory), false)
-                .load().currentSession().metrics(20_000L).net);
+        assertEquals(4_600, FixtureReads.currentSession(new SessionRepository(new Gson(), FilepathTestSupport.root(directory), false)
+                .load()).metrics(20_000L).net);
     }
 
     @Test public void anUnavailableHeaderCannotReplaceANewerSchemaPrimary() throws Exception {
@@ -159,8 +159,8 @@ public class PrimaryReadFailureTest {
             assertTrue("the bounded retry clears a transient header refusal", writer.flush(Duration.ofSeconds(5)));
             assertEquals(base + 1, writer.appliedRevision());
             assertTrue("the header fault was exercised", repository.primaryHeaders >= 2);
-            assertEquals(4_650, new SessionRepository(new Gson(), FilepathTestSupport.root(directory), false)
-                    .load().currentSession().metrics(20_000L).net);
+            assertEquals(4_650, FixtureReads.currentSession(new SessionRepository(new Gson(), FilepathTestSupport.root(directory), false)
+                    .load()).metrics(20_000L).net);
         } finally {
             writer.shutdown(Duration.ofSeconds(5));
             if (writer.executor != null) assertTrue(writer.executor.awaitTermination(5, java.util.concurrent.TimeUnit.SECONDS));
@@ -188,8 +188,8 @@ public class PrimaryReadFailureTest {
             assertTrue("a later snapshot is accepted once the header is readable",
                     writer.submit(new WriteIntent(null, repository.generation, base, money(4_650), null)));
             assertTrue(writer.flush(Duration.ofSeconds(5)));
-            assertEquals(4_650, new SessionRepository(new Gson(), FilepathTestSupport.root(directory), false)
-                    .load().currentSession().metrics(20_000L).net);
+            assertEquals(4_650, FixtureReads.currentSession(new SessionRepository(new Gson(), FilepathTestSupport.root(directory), false)
+                    .load()).metrics(20_000L).net);
         } finally {
             writer.shutdown(Duration.ofSeconds(5));
             if (writer.executor != null) assertTrue(writer.executor.awaitTermination(5, java.util.concurrent.TimeUnit.SECONDS));
@@ -235,7 +235,7 @@ public class PrimaryReadFailureTest {
         assertArrayEquals(backup, Files.readAllBytes(directory.resolve("sessions.backup.json")));
         var restored = new SessionRepository(new Gson(), FilepathTestSupport.root(directory), false).load();
         assertEquals(3, restored.revision);
-        assertEquals(4_650, restored.currentSession().metrics(20_000L).net);
+        assertEquals(4_650, FixtureReads.currentSession(restored).metrics(20_000L).net);
     }
 
     @Test public void aResetCannotBypassADamagedBodyNewerRevision() throws Exception {
@@ -294,8 +294,8 @@ public class PrimaryReadFailureTest {
                     writer.flush(Duration.ofSeconds(5)));
             assertTrue("the backup fault was exercised", repository.deniedBackupHeaders > 0);
             assertEquals(base + 1, writer.appliedRevision());
-            assertEquals(4_650, new SessionRepository(new Gson(), FilepathTestSupport.root(directory), false)
-                    .load().currentSession().metrics(20_000L).net);
+            assertEquals(4_650, FixtureReads.currentSession(new SessionRepository(new Gson(), FilepathTestSupport.root(directory), false)
+                    .load()).metrics(20_000L).net);
             assertEquals("a missing primary creates no corrupt copy", 0, corruptCopies(directory));
         } finally {
             writer.shutdown(Duration.ofSeconds(5));
@@ -328,8 +328,8 @@ public class PrimaryReadFailureTest {
             assertTrue("a later snapshot is accepted once the backup is readable",
                     writer.submit(new WriteIntent(null, repository.generation, base, money(4_650), null)));
             assertTrue(writer.flush(Duration.ofSeconds(5)));
-            assertEquals(4_650, new SessionRepository(new Gson(), FilepathTestSupport.root(directory), false)
-                    .load().currentSession().metrics(20_000L).net);
+            assertEquals(4_650, FixtureReads.currentSession(new SessionRepository(new Gson(), FilepathTestSupport.root(directory), false)
+                    .load()).metrics(20_000L).net);
         } finally {
             writer.shutdown(Duration.ofSeconds(5));
             if (writer.executor != null) assertTrue(writer.executor.awaitTermination(5, java.util.concurrent.TimeUnit.SECONDS));
@@ -353,8 +353,8 @@ public class PrimaryReadFailureTest {
             assertTrue(writer.flush(Duration.ofSeconds(5)));
             assertTrue("the backup fault was exercised", repository.deniedBackupHeaders > 0);
             assertEquals("the crash copy from load survived", 1, corruptCopies(directory));
-            assertEquals(4_650, new SessionRepository(new Gson(), FilepathTestSupport.root(directory), false)
-                    .load().currentSession().metrics(20_000L).net);
+            assertEquals(4_650, FixtureReads.currentSession(new SessionRepository(new Gson(), FilepathTestSupport.root(directory), false)
+                    .load()).metrics(20_000L).net);
         } finally {
             writer.shutdown(Duration.ofSeconds(5));
             if (writer.executor != null) assertTrue(writer.executor.awaitTermination(5, java.util.concurrent.TimeUnit.SECONDS));
@@ -379,7 +379,7 @@ public class PrimaryReadFailureTest {
         assertTrue(PersistenceProbe.saveThroughWriter(repository, money(4_650)));
         var restored = new SessionRepository(new Gson(), FilepathTestSupport.root(directory), false).load();
         assertEquals("a successful helper save advances exactly once", base + 1, restored.revision);
-        assertEquals(4_650, restored.currentSession().metrics(20_000L).net);
+        assertEquals(4_650, FixtureReads.currentSession(restored).metrics(20_000L).net);
     }
 
     @Test public void aPresentUnreadablePrimaryIsAlwaysPreservedBeforeReplacement() throws Exception {
@@ -399,7 +399,7 @@ public class PrimaryReadFailureTest {
                     Files.readAllBytes(directory.resolve("sessions.backup.json")));
             var restored = new SessionRepository(new Gson(), FilepathTestSupport.root(directory), false).load();
             assertEquals(2, restored.revision);
-            assertEquals(4_650, restored.currentSession().metrics(20_000L).net);
+            assertEquals(4_650, FixtureReads.currentSession(restored).metrics(20_000L).net);
         }
     }
 
@@ -423,8 +423,8 @@ public class PrimaryReadFailureTest {
         assertTrue(repository.commit(new WriteIntent(null, repository.generation, 1, money(4_650), null), false)
                 .isCommitted());
         assertEquals(1, corruptCopies(directory));
-        assertEquals(4_650, new SessionRepository(new Gson(), FilepathTestSupport.root(directory), false)
-                .load().currentSession().metrics(20_000L).net);
+        assertEquals(4_650, FixtureReads.currentSession(new SessionRepository(new Gson(), FilepathTestSupport.root(directory), false)
+                .load()).metrics(20_000L).net);
     }
 
     @Test public void theStressHelperPreservesAGoodPrimaryOnReadIo() throws Exception {
@@ -449,7 +449,7 @@ public class PrimaryReadFailureTest {
         assertTrue(PersistenceProbe.saveThroughWriter(repository, money(4_650)));
         var restored = new SessionRepository(new Gson(), FilepathTestSupport.root(directory), false).load();
         assertEquals("a successful helper save advances exactly once", base + 1, restored.revision);
-        assertEquals(4_650, restored.currentSession().metrics(20_000L).net);
+        assertEquals(4_650, FixtureReads.currentSession(restored).metrics(20_000L).net);
     }
 
     @Test public void twoDeniedReadsCannotRollBackTheLastFiftyCompactedGains() throws Exception {
@@ -466,15 +466,15 @@ public class PrimaryReadFailureTest {
         assertArrayEquals(primary, Files.readAllBytes(directory.resolve("sessions.json")));
         assertArrayEquals(backup, Files.readAllBytes(directory.resolve("sessions.backup.json")));
         assertEquals("no recovery notice for a good primary", "", repository.recovery);
-        assertEquals(4_600, repository.load().currentSession().metrics(20_000L).net);
-        assertEquals(4_500, repository.load().currentSession().compactedTransactionCount);
+        assertEquals(4_600, FixtureReads.currentSession(repository.load()).metrics(20_000L).net);
+        assertEquals(4_500, FixtureReads.currentSession(repository.load()).compactedTransactionCount);
     }
 
     @Test public void oneDeniedReadStillRetriesAndLoadsTheCurrentSave() throws Exception {
         var repository = new ReadFailures(temporary.newFolder().toPath(), false);
         seed(repository);
         repository.remaining = 1;
-        assertEquals(4_600, repository.load().currentSession().metrics(20_000L).net);
+        assertEquals(4_600, FixtureReads.currentSession(repository.load()).metrics(20_000L).net);
         assertEquals(0, repository.backupReads);
         assertEquals("", repository.recovery);
     }
@@ -491,7 +491,7 @@ public class PrimaryReadFailureTest {
         try (var files = Files.list(directory)) {
             assertFalse(files.anyMatch(path -> path.getFileName().toString().startsWith("sessions.corrupt-")));
         }
-        assertEquals(4_600, repository.load().currentSession().metrics(20_000L).net);
+        assertEquals(4_600, FixtureReads.currentSession(repository.load()).metrics(20_000L).net);
     }
 
     @Test public void jsonReadersIoCauseIsPreservedInsteadOfRecoveringAnOlderBackup() throws Exception {
@@ -505,8 +505,7 @@ public class PrimaryReadFailureTest {
         var repository = new SessionRepository(codec, root, false);
         var failure = assertThrows(UncheckedIOException.class, repository::load);
         assertEquals("Injected streaming read failure", failure.getCause().getMessage());
-        assertEquals(4_600, new SessionRepository(new Gson(), root, false).load()
-                .currentSession().metrics(20_000L).net);
+        assertEquals(4_600, FixtureReads.currentSession(new SessionRepository(new Gson(), root, false).load()).metrics(20_000L).net);
     }
 
     @Test public void aReadFailureWhileSavingCannotMoveTheGoodPrimaryOrOverwriteIt() throws Exception {
@@ -523,7 +522,7 @@ public class PrimaryReadFailureTest {
         assertArrayEquals(primary, Files.readAllBytes(directory.resolve("sessions.json")));
         assertArrayEquals(backup, Files.readAllBytes(directory.resolve("sessions.backup.json")));
         assertTrue(repository.save(new WriteIntent(null, repository.generation, base, money(4_650), null)));
-        assertEquals(4_650, repository.load().currentSession().metrics(20_000L).net);
+        assertEquals(4_650, FixtureReads.currentSession(repository.load()).metrics(20_000L).net);
     }
 
     @Test public void anUnreadableNewAccountStaysFencedUntilItsCurrentSaveCanLoad() throws Exception {
@@ -573,7 +572,6 @@ public class PrimaryReadFailureTest {
         };
         assertThrows(UncheckedIOException.class, repository::load);
         assertArrayEquals(backup, Files.readAllBytes(directory.resolve("sessions.backup.json")));
-        assertEquals(4_550, new SessionRepository(new Gson(), root, false).load()
-                .currentSession().metrics(20_000L).net);
+        assertEquals(4_550, FixtureReads.currentSession(new SessionRepository(new Gson(), root, false).load()).metrics(20_000L).net);
     }
 }

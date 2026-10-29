@@ -68,7 +68,7 @@ public class NeutralZoneTrackerTest
         engine.beginNeutralZone();
         engine.markTransfer("Neutral zone instance", config.stabilizationTicks() + 4);
         engine.markDirty();
-        Transaction stored = settle(engine, ContainerSnapshot.empty(), 1_600L);
+        Transaction stored = settle(engine, FixtureReads.empty(), 1_600L);
         assertEquals(TransactionType.TRANSFER, stored.type());
         assertFalse(stored.counts());
         assertEquals("Neutral zone instance", stored.note());

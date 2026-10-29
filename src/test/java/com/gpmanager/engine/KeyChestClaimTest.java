@@ -24,7 +24,7 @@ public class KeyChestClaimTest
     @Test
     public void brimstoneClaimUsesOnlySettledInventoryContentsAndClosesAuditRow()
     {
-        Engine engine = engine(ContainerSnapshot.empty());
+        Engine engine = engine(FixtureReads.empty());
         Transaction received = settle(engine,
             snapshot(ItemID.KONAR_KEY, 1L), 1_000L);
 
@@ -66,7 +66,7 @@ public class KeyChestClaimTest
         stale.add(new PendingClaim(received.id(), ItemID.KONAR_KEY, 1L,
             1_000L));
         saved.setPendingClaims(stale);
-        Engine reloaded = engine(ContainerSnapshot.empty());
+        Engine reloaded = engine(FixtureReads.empty());
         reloaded.restore(saved, 6_000L);
         assertTrue("the settled sourceClaimId removes the stale claim on load", reloaded.pendingClaims().isEmpty());
         assertEquals(CONTENTS_PRICE, reloaded.metrics(6_000L).net);
@@ -76,7 +76,7 @@ public class KeyChestClaimTest
     @Test
     public void observedChestClickAndContentsWithoutKeyLossLeaveClaimPending()
     {
-        Engine engine = engine(ContainerSnapshot.empty());
+        Engine engine = engine(FixtureReads.empty());
         Transaction received = settle(engine,
             snapshot(ItemID.KONAR_KEY, 1L), 1_000L);
         engine.observeChest("Unlock", "Brimstone chest");
@@ -99,7 +99,7 @@ public class KeyChestClaimTest
     @Test
     public void unresolvedClaimSurvivesSaveReloadAndSettlesInTheActiveSession()
     {
-        Engine engine = engine(ContainerSnapshot.empty());
+        Engine engine = engine(FixtureReads.empty());
         Transaction received = settle(engine, snapshot(ItemID.KONAR_KEY, 1L), 1_000L);
         Engine reloaded = engine(snapshot(ItemID.KONAR_KEY, 1L));
         reloaded.restore(engine.savedState(), 2_000L);
@@ -145,7 +145,7 @@ public class KeyChestClaimTest
     @Test
     public void tradeableKeyReceiptKeepsGeValueAndHasNoDeferredAuditMetadata()
     {
-        Engine engine = engine(ContainerSnapshot.empty());
+        Engine engine = engine(FixtureReads.empty());
 
         Transaction receipt = settle(engine, snapshot(ItemID.CRYSTAL_KEY, 1L), 1_000L);
 
@@ -159,11 +159,11 @@ public class KeyChestClaimTest
     @Test
     public void untradeableKeyLossOnDeathClosesWithoutBookingKeyCost()
     {
-        Engine engine = engine(ContainerSnapshot.empty());
+        Engine engine = engine(FixtureReads.empty());
         Transaction received = settle(engine, snapshot(ItemID.KONAR_KEY, 1L), 1_000L);
         engine.markUnknownDeath();
 
-        Transaction closed = settle(engine, ContainerSnapshot.empty(), 2_800L);
+        Transaction closed = settle(engine, FixtureReads.empty(), 2_800L);
 
         assertNull("the deferred token itself is never booked as a cost", closed);
         assertTrue("a key lost on death closes its claim without a key cost", engine.pendingClaims().isEmpty());
@@ -174,7 +174,7 @@ public class KeyChestClaimTest
     @Test
     public void partialChestSettlementKeepsTheRemainderAcrossRestart()
     {
-        Engine engine = engine(ContainerSnapshot.empty());
+        Engine engine = engine(FixtureReads.empty());
         Transaction audit = settle(engine, snapshot(ItemID.KONAR_KEY, 2L), 1_000L);
         assertNotNull(audit);
         PendingClaim claim = engine.pendingClaims().get(0);
@@ -199,7 +199,7 @@ public class KeyChestClaimTest
         SavedState saved = engine.savedState();
         SavedState savedCopy = gson.fromJson(gson.toJson(saved), SavedState.class);
 
-        Engine reloaded = engine(ContainerSnapshot.empty());
+        Engine reloaded = engine(FixtureReads.empty());
         reloaded.restore(saved, 4_000L);
         assertEquals("the unresolved remainder survives restart", 1, reloaded.pendingClaims().size());
         PendingClaim restored = reloaded.pendingClaims().get(0);
@@ -207,7 +207,7 @@ public class KeyChestClaimTest
         assertEquals(1L, restored.quantity());
         assertEquals(CONTENTS_PRICE, reloaded.metrics(4_600L).net);
 
-        Engine reloadedAgain = engine(ContainerSnapshot.empty());
+        Engine reloadedAgain = engine(FixtureReads.empty());
         reloadedAgain.restore(savedCopy, 4_000L);
         assertEquals("repeated restore converges on the same claim", 1, reloadedAgain.pendingClaims().size());
         assertEquals(1L, reloadedAgain.pendingClaims().get(0).quantity());
@@ -229,7 +229,7 @@ public class KeyChestClaimTest
             settle(reloaded, new ContainerSnapshot(afterSecondOpen), 6_600L));
 
         SavedState closedCopy = gson.fromJson(gson.toJson(reloaded.savedState()), SavedState.class);
-        Engine afterClose = engine(ContainerSnapshot.empty());
+        Engine afterClose = engine(FixtureReads.empty());
         afterClose.restore(closedCopy, 7_200L);
         assertTrue("a settled claim never comes back", afterClose.pendingClaims().isEmpty());
         assertEquals(2L * CONTENTS_PRICE, afterClose.metrics(7_800L).net);
@@ -315,7 +315,7 @@ public class KeyChestClaimTest
     @Test
     public void heldKeyRowCarriesNoProvenanceAndTheClaimRoundTripsThroughSavedState()
     {
-        Engine engine = engine(ContainerSnapshot.empty());
+        Engine engine = engine(FixtureReads.empty());
         Transaction received = settle(engine, snapshot(ItemID.KONAR_KEY, 1L), 1_000L);
         Gson gson = new Gson();
         String row = gson.toJson(received);

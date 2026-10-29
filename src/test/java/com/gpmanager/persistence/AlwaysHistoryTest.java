@@ -41,12 +41,12 @@ public class AlwaysHistoryTest {
             TargetFreshStartTest.coins(h.engine, NOW + 1, 200);
             h.plugin.persist();
             assertTrue(h.writer.flush(Duration.ofSeconds(5)));
-            assertEquals(700, h.repository.load().currentSession().metrics(NOW + 2).net);
+            assertEquals(700, FixtureReads.currentSession(h.repository.load()).metrics(NOW + 2).net);
             SidebarPanel panel = onEdt(() -> new SidebarPanel(h.engine, h.config, null, h.repository, h.disk));
             onEdt(() -> { panel.mutate(() -> h.engine.session().rename("Edited here")); return null; });
             assertTrue(h.writer.flush(Duration.ofSeconds(5)));
-            assertEquals("Edited here", h.repository.load().currentSession().name());
-            assertEquals(700, h.repository.load().currentSession().metrics(NOW + 2).net);
+            assertEquals("Edited here", FixtureReads.currentSession(h.repository.load()).name());
+            assertEquals(700, FixtureReads.currentSession(h.repository.load()).metrics(NOW + 2).net);
         }
     }
 
@@ -55,7 +55,7 @@ public class AlwaysHistoryTest {
             h.plugin.onAccountHashChanged(null);
             assertTrue(h.disk.factoryReset(NOW, false).applied);
             assertEquals(0, h.engine.metrics(NOW).net);
-            assertNull("Delete Profile leaves no stored current session", h.repository.load().currentSession());
+            assertNull("Delete Profile leaves no stored current session", FixtureReads.currentSession(h.repository.load()));
             assertTrue(h.repository.load().history().isEmpty());
         }
     }

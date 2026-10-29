@@ -48,7 +48,7 @@ public final class GeneralProfitSimulation
         engine.ensureSession(start);
         engine.beginPriming();
 
-        SimulationSupport.equal(null, engine.processIfDirty(ContainerSnapshot.empty(), start + 600L, null), "warm-up tick 1");
+        SimulationSupport.equal(null, engine.processIfDirty(SimulationSupport.empty(), start + 600L, null), "warm-up tick 1");
         SimulationSupport.equal(null, engine.processIfDirty(SimulationSupport.snapshot(1265, 1L), start + 1_200L, null), "warm-up tick 2");
         SimulationSupport.equal(null, engine.processIfDirty(SimulationSupport.snapshot(1265, 1L), start + 1_800L, null), "warm-up tick 3");
         SimulationSupport.equal(null, engine.processIfDirty(SimulationSupport.snapshot(1265, 1L), start + 2_400L, null), "warm-up tick 4");
@@ -57,7 +57,7 @@ public final class GeneralProfitSimulation
         SimulationSupport.equal(0, engine.session().transactions().size(), "opening inventory transactions");
 
         engine.markDirty();
-        Transaction consumed = SimulationSupport.settle(engine, ContainerSnapshot.empty(), start + 3_000L);
+        Transaction consumed = SimulationSupport.settle(engine, SimulationSupport.empty(), start + 3_000L);
         SimulationSupport.equal(TransactionType.CONSUMPTION, consumed.type(), "post-baseline removal type");
         SimulationSupport.equal(-100L, consumed.net(), "post-baseline removal value");
     }
@@ -71,8 +71,8 @@ public final class GeneralProfitSimulation
 
         engine.markContext(Context.TRANSFER, 8, "Bank transfer");
         engine.markDirty();
-        SimulationSupport.equal(null, engine.processIfDirty(ContainerSnapshot.empty(), start + 600L, null), "temporary removal tick 1");
-        SimulationSupport.equal(null, engine.processIfDirty(ContainerSnapshot.empty(), start + 1_200L, null), "temporary removal tick 2");
+        SimulationSupport.equal(null, engine.processIfDirty(SimulationSupport.empty(), start + 600L, null), "temporary removal tick 1");
+        SimulationSupport.equal(null, engine.processIfDirty(SimulationSupport.empty(), start + 1_200L, null), "temporary removal tick 2");
 
         engine.markDirty();
         SimulationSupport.equal(null, engine.processIfDirty(SimulationSupport.snapshot(1265, 1L), start + 1_800L, null), "restore tick 1");
@@ -230,9 +230,9 @@ public final class GeneralProfitSimulation
             repository.revision, new SavedState(session, null, Collections.emptyList()), null));
 
         SavedState restored = repository.load();
-        SimulationSupport.check(restored.currentSession() != null, "active session should restore");
-        SimulationSupport.equal("Recovered session", restored.currentSession().name(), "restored session name");
-        SimulationSupport.equal(62L, restored.currentSession().metrics(3_000L).net, "restored session net");
+        SimulationSupport.check(SimulationSupport.currentSession(restored) != null, "active session should restore");
+        SimulationSupport.equal("Recovered session", SimulationSupport.currentSession(restored).name(), "restored session name");
+        SimulationSupport.equal(62L, SimulationSupport.currentSession(restored).metrics(3_000L).net, "restored session net");
 
         Engine engine = SimulationSupport.newEngine(SessionMode.GENERAL);
         engine.restore(restored, SafeMath.now());
@@ -383,7 +383,7 @@ public final class GeneralProfitSimulation
     private static void exportGeneralExample(Path output) throws Exception
     {
         Session session = new Session("General-Simulation", 1_000L, SessionMode.GENERAL);
-        session.recordAction("Goblin", System.currentTimeMillis());
+        session.recordAction("Goblin");
         session.addTransaction(
             new Transaction(
                 2_000L,

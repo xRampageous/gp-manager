@@ -71,7 +71,7 @@ public class SaveSnapshotIsolationTest {
         SessionRepository repository = new SessionRepository(gson,
                 FilepathTestSupport.root(Files.createTempDirectory("gp-detached-contract")), false);
         Persistence disk = new Persistence(null, null, repository, new OrderedPersistenceWriter(repository, null), engine);
-        WriteIntent intent = disk.currentIntent(true);
+        WriteIntent intent = disk.currentIntent();
         assertNull("capture must not encode JSON", intent.json);
         return intent.state;
     }

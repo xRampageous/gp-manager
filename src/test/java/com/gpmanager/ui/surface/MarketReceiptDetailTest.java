@@ -299,7 +299,19 @@ public class MarketReceiptDetailTest
         String settlementId = market.engine.marketRows().get(0).settlementId;
         market.engine.correctTransaction(settlementId, Correction.IGNORE, "test");
 
-        LedgerPage page = openExactReceipt(market, receipt -> receipt.item == CHAOS);
+        LedgerData ordinary = LedgerData.capture(market.engine, market.now + 1_000L,
+            LedgerData.Entry.current());
+        assertTrue("a removed settlement leaves the ordinary Market table", ordinary.market.groups.isEmpty());
+        assertTrue("the removed settlement remains in the explicit correction audit",
+            ordinary.corrected.stream().anyMatch(receipt -> receipt.transaction.equals(settlementId)));
+        LedgerData audit = LedgerData.capture(market.engine, market.now + 1_000L,
+            LedgerData.Entry.current(LedgerData.Audit.CORRECTED, settlementId));
+        assertNotNull(audit.detail);
+        LedgerPage page = onEdt(() -> {
+            LedgerPage result = new LedgerPage(new LedgerNoop(), id -> null);
+            result.apply(audit);
+            return result;
+        });
         List<String> texts = LedgerPageProbe.detailTexts(page);
 
         assertTrue("the corrected canonical result is shown",

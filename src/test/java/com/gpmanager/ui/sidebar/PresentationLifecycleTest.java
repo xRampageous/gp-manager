@@ -30,7 +30,7 @@ public class PresentationLifecycleTest
 
         NavButton lifecycle = new NavButton();
         assertTrue(lifecycle.install(navigation, panel, loaded));
-        NavigationButton button = lifecycle.button();
+        NavigationButton button = FixtureReads.button(lifecycle);
         assertNotNull(button);
         assertNotNull("the button must carry the icon", button.getIcon());
         assertNotNull("the button must carry the panel", button.getPanel());
@@ -43,7 +43,7 @@ public class PresentationLifecycleTest
     {
         NavButton lifecycle = new NavButton();
         assertTrue(lifecycle.install(navigation, panel, icon));
-        assertNotNull(lifecycle.button());
+        assertNotNull(FixtureReads.button(lifecycle));
         assertFalse("second install must not register a duplicate",
             lifecycle.install(navigation, panel, icon));
         assertEquals(1, navigation.adds.size());
@@ -54,20 +54,20 @@ public class PresentationLifecycleTest
     {
         NavButton lifecycle = new NavButton();
         assertTrue(lifecycle.install(navigation, panel, icon));
-        NavigationButton first = lifecycle.button();
+        NavigationButton first = FixtureReads.button(lifecycle);
 
         lifecycle.uninstall(navigation);
-        assertNull(lifecycle.button());
+        assertNull(FixtureReads.button(lifecycle));
         assertEquals(first, navigation.removes.get(0));
 
         assertTrue("re-enable installs exactly one fresh button",
             lifecycle.install(navigation, panel, icon));
-        assertNotNull(lifecycle.button());
+        assertNotNull(FixtureReads.button(lifecycle));
         assertEquals(2, navigation.adds.size());
         assertEquals(1, navigation.removes.size());
         lifecycle.uninstall(navigation);
         assertEquals(2, navigation.removes.size());
-        assertNull(lifecycle.button());
+        assertNull(FixtureReads.button(lifecycle));
     }
 
     @Test
@@ -77,7 +77,7 @@ public class PresentationLifecycleTest
         assertFalse(lifecycle.install(null, panel, icon));
         assertFalse(lifecycle.install(navigation, null, icon));
         assertFalse(lifecycle.install(navigation, panel, null));
-        assertNull(lifecycle.button());
+        assertNull(FixtureReads.button(lifecycle));
         assertEquals(0, navigation.adds.size());
     }
 

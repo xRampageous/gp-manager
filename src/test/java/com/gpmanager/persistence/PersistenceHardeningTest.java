@@ -62,18 +62,18 @@ public class PersistenceHardeningTest
         Path backup = dir.resolve("sessions.backup.json");
         assertTrue(Files.exists(backup));
         assertFalse(Files.exists(dir.resolve("sessions.backup.json.1")));
-        assertEquals("Save 5", new Gson().fromJson(Files.readString(backup), SavedState.class).currentSession().name());
+        assertEquals("Save 5", FixtureReads.currentSession(new Gson().fromJson(Files.readString(backup), SavedState.class)).name());
 
         // A damaged primary loads from the crash copy and says so.
         Files.writeString(dir.resolve("sessions.json"), "{not json", StandardCharsets.UTF_8);
         SessionRepository reopened = new SessionRepository(new Gson(), FilepathTestSupport.root(dir), false);
         SavedState loaded = reopened.load();
-        assertEquals("Save 5", loaded.currentSession().name());
+        assertEquals("Save 5", FixtureReads.currentSession(loaded).name());
         assertEquals("sessions.backup.json", reopened.recovery);
 
         // A clean load afterwards clears the marker.
         assertTrue(PersistenceProbe.save(reopened, state("Save 7", 0L)));
-        assertEquals("Save 7", reopened.load().currentSession().name());
+        assertEquals("Save 7", FixtureReads.currentSession(reopened.load()).name());
         assertEquals("", reopened.recovery);
     }
 
@@ -92,7 +92,7 @@ public class PersistenceHardeningTest
         Files.deleteIfExists(dir.resolve("sessions.json"));
         Files.deleteIfExists(dir.resolve("sessions.backup.json"));
         SavedState loaded = new SessionRepository(new Gson(), FilepathTestSupport.root(dir), false).load();
-        assertTrue(loaded == null || loaded.currentSession() == null || !loaded.currentSession().name().startsWith("Before"));
+        assertTrue(loaded == null || FixtureReads.currentSession(loaded) == null || !FixtureReads.currentSession(loaded).name().startsWith("Before"));
     }
 
     @Test
@@ -150,7 +150,7 @@ public class PersistenceHardeningTest
 
         SavedState loaded = repository.load();
         assertTrue(loaded.isSupportedSchema());
-        assertNull(loaded.currentSession());
+        assertNull(FixtureReads.currentSession(loaded));
         Path kept;
         try (java.util.stream.Stream<Path> paths = Files.list(primary.getParent()))
         {

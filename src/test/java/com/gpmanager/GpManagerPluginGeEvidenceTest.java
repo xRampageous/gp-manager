@@ -120,7 +120,7 @@ public class GpManagerPluginGeEvidenceTest
                 return flows;
             }, new TransactionClassifier(), config);
             engine.startCustom("Trading", T0);
-            engine.setBaseline(ContainerSnapshot.empty());
+            engine.setBaseline(FixtureReads.empty());
             GpManagerPlugin plugin = plugin(engine, bankVisibleClient());
             if (observedBankTick) engine.bankOpened(6);
             plugin.onMenuOptionClicked(menu(option, "Law rune"));
@@ -152,7 +152,7 @@ public class GpManagerPluginGeEvidenceTest
     {
         Engine engine = productionEngine();
         engine.startCustom("Gathering", T0);
-        engine.setBaseline(ContainerSnapshot.empty());
+        engine.setBaseline(FixtureReads.empty());
         GpManagerPlugin plugin = plugin(engine, bankVisibleClient());
         engine.bankOpened(6);
         plugin.onMenuOptionClicked(menu("Withdraw-X", "Law rune"));

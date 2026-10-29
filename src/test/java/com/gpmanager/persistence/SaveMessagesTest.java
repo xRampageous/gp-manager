@@ -28,13 +28,10 @@ public class SaveMessagesTest {
         assertEquals(1, repository.load().revision);
     }
 
-    @Test public void stickyResourcesArePlainAndGuideCoversNewViews() {
+    @Test public void stickyResourcesArePlain() {
         for (String key : new String[] {"tracking-paused-back", "disk-revision", "advance-disk",
                 "another-client-holds", "save-failed", "pending-save", "persistence-executor",
                 "disk-state", "reset-did", "save-did", "primary-reset", "primary-already"}) plain(GameData.msg(key));
-        String guide = GameData.msg("guide");
-        for (String view : new String[] {"Raids", "View recap", "Saved sessions", "DEATHS"})
-            assertTrue(view, guide.contains(view));
     }
 
     private static void plain(String message) {

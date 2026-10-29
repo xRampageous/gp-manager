@@ -64,7 +64,7 @@ public class RateRestartTest {
             Engine engine = engine();
             coins(engine, 5L, 500_000L);
             Session run = engine.session();
-            ContainerSnapshot baseline = ContainerSnapshot.empty();
+            ContainerSnapshot baseline = FixtureReads.empty();
             engine.baseline = baseline;
             restart(engine, HOUR);
             assertSame("a rate reset cannot re-prime inventory or lose pending movement", baseline, engine.baseline);

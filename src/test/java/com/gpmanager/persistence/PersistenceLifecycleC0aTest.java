@@ -121,7 +121,7 @@ public class PersistenceLifecycleC0aTest
 
             release.countDown();
             assertTrue(writer.flush(Duration.ofSeconds(5)));
-            assertEquals("pending", repository.load().currentSession().name());
+            assertEquals("pending", FixtureReads.currentSession(repository.load()).name());
         }
         finally
         {
@@ -328,8 +328,8 @@ public class PersistenceLifecycleC0aTest
             assertTrue(writer.flush(Duration.ofSeconds(10)));
             assertEquals(ALICE, coordinator.getActiveIdentity());
             assertTrue(repository.isBound());
-            assertTrue(repository.load().currentSession().paused);
-            assertEquals("Alice", repository.load().currentSession().name());
+            assertTrue(FixtureReads.currentSession(repository.load()).paused);
+            assertEquals("Alice", FixtureReads.currentSession(repository.load()).name());
         }
         finally
         {

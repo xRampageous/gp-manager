@@ -629,9 +629,9 @@ public class GrindsPresentationTest
     }
 
 
-    /** Owner 2026-10-01 (F14): ending offers a recap route to the ended run. */
+    /** Ending closes the run into history and names it in a notice. */
     @Test
-    public void endingOffersAViewRecapRouteToTheEndedRun() throws Exception
+    public void endingClosesTheRunAndNamesIt() throws Exception
     {
         Engine engine = PresentationLifecycleTest.engine();
         long now = System.currentTimeMillis();
@@ -648,20 +648,6 @@ public class GrindsPresentationTest
             engine.historySession(id) != null && engine.historySession(id).isClosed());
         assertTrue("the notice names the ended run: " + ShellProbe.noticeText(panel.shell),
             ShellProbe.noticeText(panel.shell).startsWith("Vorkath ended"));
-
-        onEdt(() ->
-        {
-            for (java.awt.Component component : panel.shell.noticeAction.getComponents())
-            {
-                if (component instanceof javax.swing.JButton)
-                {
-                    ((javax.swing.JButton) component).doClick();
-                }
-            }
-            return null;
-        });
-        assertEquals("the recap opens the ended run", id, panel.selection);
-        assertEquals(Shell.GRINDS, panel.shell.current);
     }
 
     /** Returns the fabricated backups the test chooses; the real service is never involved. */
@@ -816,7 +802,7 @@ public class GrindsPresentationTest
                 gear.add(((javax.swing.JMenuItem) item).getText());
             }
         }
-        assertEquals(java.util.Arrays.asList("View recap", "Copy Live summary", "Getting started", "Back up profile", "Copy data folder path", "Report a bug",
+        assertEquals(java.util.Arrays.asList("Copy Live summary", "Back up profile", "Copy data folder path", "Report a bug",
             "Changelog", "Reset free-play…", "Delete Profile…"), gear);
         assertTrue("no standalone Search page", java.util.Arrays.stream(ShellProbe.tabLabels(panel.shell))
             .noneMatch(label -> label.equalsIgnoreCase("Search") || label.equalsIgnoreCase("Tools")));

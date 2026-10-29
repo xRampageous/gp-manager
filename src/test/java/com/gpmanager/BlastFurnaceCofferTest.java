@@ -171,10 +171,10 @@ public class BlastFurnaceCofferTest
         Rig rig = new Rig();
         rig.work(50);
         SavedState saved = rig.engine.savedState();
-        assertEquals("a save carries the 600 gp observed so far", 600L, drained(saved.currentSession()));
+        assertEquals("a save carries the 600 gp observed so far", 600L, drained(FixtureReads.currentSession(saved)));
         rig.work(25);
         rig.engine.pauseForLifecycle(8_000L);
-        assertEquals("disable pauses only after booking", 900L, drained(rig.engine.savedState().currentSession()));
+        assertEquals("disable pauses only after booking", 900L, drained(FixtureReads.currentSession(rig.engine.savedState())));
     }
 
     @Test
@@ -271,9 +271,9 @@ public class BlastFurnaceCofferTest
 
             SessionRepository reader = new SessionRepository(new Gson(), FilepathTestSupport.root(root), true);
             reader.bindIdentity(alice);
-            assertEquals("Alice's 480 gp saved with Alice, once", 480L, drained(reader.load().currentSession()));
+            assertEquals("Alice's 480 gp saved with Alice, once", 480L, drained(FixtureReads.currentSession(reader.load())));
             reader.bindIdentity(bob);
-            assertEquals("Bob's first reading only set the balance", 228L, drained(reader.load().currentSession()));
+            assertEquals("Bob's first reading only set the balance", 228L, drained(FixtureReads.currentSession(reader.load())));
             assertEquals(480L, drained(rig.engine.session()));
         }
         finally

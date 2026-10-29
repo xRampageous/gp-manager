@@ -129,9 +129,9 @@ public class HudSizingTest
             HudOverlay overlay = new HudOverlay(builder, config);
             Dimension rendered = overlay.render(G);
             assertTrue("empty " + textSize + " HUD fits below the old floor", rendered.width < 120);
-            assertEquals("only one line remains", HudOverlay.PAD * 2 + G.getFontMetrics(overlay.bold()).getHeight(),
+            assertEquals("only one line remains", HudOverlay.PAD * 2 + G.getFontMetrics(FixtureReads.bold(overlay)).getHeight(),
                 rendered.height);
-            FontMetrics metrics = G.getFontMetrics(overlay.body());
+            FontMetrics metrics = G.getFontMetrics(FixtureReads.body(overlay));
             assertTrue("timer and rate retain a gap", HudOverlay.PAD + 11 + HudOverlay.width(metrics, snapshot.timer) + 8
                 <= rendered.width - HudOverlay.PAD - HudOverlay.width(metrics, snapshot.rate));
         }

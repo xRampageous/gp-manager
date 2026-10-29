@@ -50,9 +50,9 @@ public class PresentationFilterAccountingIsolationEngineTest
         engine.processIfDirty(bones, 1000L, null);
         engine.markDirty();
         engine.bankClosed();
-        engine.processIfDirty(ContainerSnapshot.empty(), 1600L, null);
-        engine.processIfDirty(ContainerSnapshot.empty(), 2200L, null);
-        Transaction tx = engine.processIfDirty(ContainerSnapshot.empty(), 2800L, null);
+        engine.processIfDirty(FixtureReads.empty(), 1600L, null);
+        engine.processIfDirty(FixtureReads.empty(), 2200L, null);
+        Transaction tx = engine.processIfDirty(FixtureReads.empty(), 2800L, null);
         assertEquals(TransactionType.CONSUMPTION, tx.type());
     }
 

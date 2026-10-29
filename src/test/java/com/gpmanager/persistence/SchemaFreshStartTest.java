@@ -54,12 +54,12 @@ public class SchemaFreshStartTest
         stamp(directory, olderSchema);
 
         SavedState loaded = repository.load();
-        assertNull("nothing from the older save is read", loaded.currentSession());
+        assertNull("nothing from the older save is read", FixtureReads.currentSession(loaded));
         assertTrue(loaded.isSupportedSchema());
         assertEquals("primary and backup are kept beside the profile", 2L, setAside(directory));
 
         assertTrue("the fresh profile saves normally", PersistenceProbe.save(repository, state("New")));
-        assertEquals("New", repository.load().currentSession().name());
+        assertEquals("New", FixtureReads.currentSession(repository.load()).name());
     }
 
     @Test
@@ -92,7 +92,7 @@ public class SchemaFreshStartTest
         SessionRepository fresh = new SessionRepository(new Gson(), FilepathTestSupport.root(directory), false);
         assertTrue(fresh.save(new WriteIntent(null, fresh.generation, fresh.revision,
             state("New"), null)));
-        assertEquals("New", fresh.load().currentSession().name());
+        assertEquals("New", FixtureReads.currentSession(fresh.load()).name());
         assertEquals(1L, setAside(directory));
     }
 

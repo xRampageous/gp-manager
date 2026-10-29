@@ -101,7 +101,7 @@ public class DropPickupTest
     {
         Engine engine = new Engine(valuator, new TransactionClassifier(), CONFIG);
         engine.ensureSession(1_000L);
-        engine.setBaseline(ContainerSnapshot.empty());
+        engine.setBaseline(FixtureReads.empty());
         Transaction shot = engine.bookEstimatedCharge("pipe", "Toxic blowpipe", ActionKind.CAST,
             Arrays.asList(new Flow(DART, "Iron dart", -1L, 10, -10L),
                 new Flow(SCALES, "Zulrah's scales", -1L, 10, -10L)), 1_100L);

@@ -48,7 +48,7 @@ public class PersistenceConflictFenceTest
         SessionRepository external = repository(root);
         external.bindIdentity(ALICE);
         SavedState state = external.load();
-        state.currentSession().rename("External");
+        FixtureReads.currentSession(state).rename("External");
         long base = state.revision;
         state.setRevision(base + 1L);
         assertTrue(external.save(new WriteIntent(ALICE, external.generation, base, state, null)));
@@ -77,7 +77,7 @@ public class PersistenceConflictFenceTest
             assertEquals(SaveStatus.State.CONFLICT, writer.status().state);
             coordinator.scheduleSave();
             assertFalse("1.7.0: a refused write is never acknowledged", writer.flush(Duration.ofSeconds(5)));
-            assertEquals("External", disk(root).currentSession().name());
+            assertEquals("External", FixtureReads.currentSession(disk(root)).name());
             assertFalse("new gameplay must wait for disk truth to be reloaded", coordinator.isTrackingReady());
             assertFalse(coordinator.saveNow());
             assertNotNull(coordinator.scopeRefusal());
@@ -89,7 +89,7 @@ public class PersistenceConflictFenceTest
             writer.submit(retry);
             assertFalse("1.7.0: a refused write is never acknowledged", writer.flush(Duration.ofSeconds(5)));
             assertFalse("reset cannot bypass the same conflict fence", writer.replaceNow(retry).isCommitted());
-            assertEquals("External", disk(root).currentSession().name());
+            assertEquals("External", FixtureReads.currentSession(disk(root)).name());
             assertEquals(2L, disk(root).revision);
         }
         finally { writer.shutdown(Duration.ofSeconds(5)); }
@@ -112,7 +112,7 @@ public class PersistenceConflictFenceTest
             assertEquals(SaveStatus.State.CONFLICT, writer.status().state);
             assertTrue(writer.status().detail.contains("Back up your current history, then restart RuneLite"));
             assertFalse(coordinator.isTrackingReady());
-            assertEquals("External", disk(root).currentSession().name());
+            assertEquals("External", FixtureReads.currentSession(disk(root)).name());
             assertEquals(2L, disk(root).revision);
         }
         finally { writer.shutdown(Duration.ofSeconds(5)); }
@@ -151,7 +151,7 @@ public class PersistenceConflictFenceTest
             coordinator.scheduleSave();
             release.countDown();
             assertFalse("1.7.0: a refused write is never acknowledged", writer.flush(Duration.ofSeconds(5)));
-            assertEquals("External", disk(root).currentSession().name());
+            assertEquals("External", FixtureReads.currentSession(disk(root)).name());
             assertEquals(SaveStatus.State.CONFLICT, writer.status().state);
         }
         finally { release.countDown(); writer.shutdown(Duration.ofSeconds(5)); }
@@ -183,7 +183,7 @@ public class PersistenceConflictFenceTest
             assertTrue(fresh.isTrackingReady());
             fresh.engine.session().rename("Reloaded local");
             assertTrue(fresh.saveNow());
-            assertEquals("Reloaded local", disk(root).currentSession().name());
+            assertEquals("Reloaded local", FixtureReads.currentSession(disk(root)).name());
         }
         finally { newWriter.shutdown(Duration.ofSeconds(5)); }
     }

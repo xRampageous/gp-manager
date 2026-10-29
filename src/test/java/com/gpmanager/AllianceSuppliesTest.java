@@ -77,7 +77,7 @@ public class AllianceSuppliesTest
         assertEquals(0L, f.engine.metrics(FracturedArchiveReadinessTest.T0).net);
         assertTrue("no Review", f.engine.getReviewRows(FracturedArchiveReadinessTest.T0).isEmpty());
         f.engine.raids.read("all");
-        assertEquals("no raid loot or death fee", 0L, f.engine.raids.money("3")[0] + f.engine.raids.money("3")[1]);
+        assertEquals("no raid loot or death fee", 0L, FixtureReads.money(f.engine.raids, "3")[0] + FixtureReads.money(f.engine.raids, "3")[1]);
         assertTrue("nothing rides the tray", f.plugin.hud.tray.entries().isEmpty());
     }
 }

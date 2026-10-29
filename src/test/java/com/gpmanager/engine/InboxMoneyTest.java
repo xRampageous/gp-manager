@@ -97,15 +97,15 @@ public class InboxMoneyTest
         click.y = 10;
         plugin.onItemDespawned(new ItemDespawned(ReviewFollowupTest.tile(10, 10), ReviewFollowupTest.bones()));
         assertEquals(2L, qty(plugin, Inbox.BAG_GAIN));
-        assertFalse(engine.events.has(Inbox.PRIVATE_LOOT, BONES));
+        assertFalse(FixtureReads.has(engine.events, Inbox.PRIVATE_LOOT, BONES));
         plugin.onItemDespawned(new ItemDespawned(ReviewFollowupTest.tile(10, 10), ReviewFollowupTest.bones()));
         tick[0]++;
         plugin.bagSettle();
-        engine.processIfDirty(ContainerSnapshot.empty(), T0 + 600, null);
-        engine.processIfDirty(ContainerSnapshot.empty(), T0 + 1200, null);
+        engine.processIfDirty(FixtureReads.empty(), T0 + 600, null);
+        engine.processIfDirty(FixtureReads.empty(), T0 + 1200, null);
         assertEquals(200L, engine.metrics(T0 + 1200).income);
         plugin.bagSettle();
-        engine.processIfDirty(ContainerSnapshot.empty(), T0 + 1800, null);
+        engine.processIfDirty(FixtureReads.empty(), T0 + 1800, null);
         assertEquals(200L, engine.metrics(T0 + 1800).income);
     }
 
@@ -128,7 +128,7 @@ public class InboxMoneyTest
         Engine engine = engine();
         engine.markLoot(Map.of(BONES, 1L), 6, "Loot from Guard", "Guard");
         engine.consumeQueuedLoot(List.of(new Flow(BONES, "Bones", 1L, 100, 100L)));
-        assertFalse(engine.events.has(Inbox.PRIVATE_LOOT, BONES));
+        assertFalse(FixtureReads.has(engine.events, Inbox.PRIVATE_LOOT, BONES));
         assertEquals(0L, engine.events.reserve(Inbox.PRIVATE_LOOT, BONES, 1L, Inbox.LOOT_RESERVE));
     }
 }

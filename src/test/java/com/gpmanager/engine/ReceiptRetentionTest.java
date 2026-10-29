@@ -58,15 +58,15 @@ public class ReceiptRetentionTest
         Engine engine = engine();
         engine.restore(new SavedState(null, null, Arrays.asList(boundary, old, old, active)), now);
 
-        assertEquals(2, engine.compactOlderThan(30, now));
+        assertEquals(2, FixtureReads.compactOlderThan(engine, 30, now));
         assertEquals("a row exactly at the cutoff is retained", 1, boundary.transactions().size());
         assertTrue(old.transactions().isEmpty());
         assertEquals(1L, old.compactedTransactionCount);
         assertEquals(200L, old.metrics(now).income);
         assertEquals("only the active owner's overdue row folds", 1, active.transactions().size());
         assertEquals(350L, active.metrics(now).income);
-        assertEquals(0, engine.compactOlderThan(30, now));
-        assertEquals(0, engine.compactOlderThan(0, now));
+        assertEquals(0, FixtureReads.compactOlderThan(engine, 30, now));
+        assertEquals(0, FixtureReads.compactOlderThan(engine, 0, now));
     }
 
     @Test
@@ -89,7 +89,7 @@ public class ReceiptRetentionTest
         assertEquals("a multi-key claim protects the shared origin audit row", 1,
             session.transactions().size());
         assertTrue(engine.pendingClaims().get(0).claimId().endsWith("#2"));
-        assertEquals(0, engine.compactOlderThan(90, now));
+        assertEquals(0, FixtureReads.compactOlderThan(engine, 90, now));
     }
 
     @Test
@@ -111,7 +111,7 @@ public class ReceiptRetentionTest
         engine.restore(new SavedState(null, null, Collections.singletonList(session)), now);
 
         assertEquals("current-schema restore already compacted the overdue rows", 0,
-            engine.compactOlderThan(90, now));
+            FixtureReads.compactOlderThan(engine, 90, now));
 
         assertTrue(session.transactions().isEmpty());
         assertEquals(3L, session.compactedTransactionCount);

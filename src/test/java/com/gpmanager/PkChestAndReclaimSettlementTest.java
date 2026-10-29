@@ -29,7 +29,7 @@ public class PkChestAndReclaimSettlementTest
             return flows;
         }, new TransactionClassifier(), config);
         engine.ensureSession(1_000L);
-        engine.setBaseline(ContainerSnapshot.empty());
+        engine.setBaseline(FixtureReads.empty());
         return engine;
     }
 
@@ -47,7 +47,7 @@ public class PkChestAndReclaimSettlementTest
             return flows;
         }, new TransactionClassifier(), config);
         engine.ensureSession(1_000L);
-        engine.setBaseline(ContainerSnapshot.empty());
+        engine.setBaseline(FixtureReads.empty());
         return engine;
     }
 

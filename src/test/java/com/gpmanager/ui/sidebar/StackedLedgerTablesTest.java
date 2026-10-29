@@ -242,7 +242,7 @@ public class StackedLedgerTablesTest
         engine.finishCustom(old + 2_000L);
         long compactedNet = engine.historySession(sessionId).compactedContribution().net();
         assertTrue(compactedNet == 0L);
-        engine.compactOlderThan(1, T0);
+        FixtureReads.compactOlderThan(engine, 1, T0);
 
         LedgerData data = capture(engine, T0, new LedgerData.Entry(
             LedgerData.Scope.HISTORY, sessionId, "Old Grind"));

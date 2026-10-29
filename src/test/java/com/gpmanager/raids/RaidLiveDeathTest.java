@@ -86,7 +86,7 @@ public class RaidLiveDeathTest {
             if(kind>=0){var run=e.raids.start(kind,"Test",2000,false);e.raids.state.death=run.id;}
             e.setBaseline(new ContainerSnapshot(Map.of(4151,1L)));e.armDeathReclaim(10,Map.of(4151,1L),Map.of());
             LmsBorrowedItemsTest.settle(e,Map.of(),3000);
-            for(int i=0;i<1600;i++)e.processIfDirty(ContainerSnapshot.empty(),4000+i*600L,null);
+            for(int i=0;i<1600;i++)e.processIfDirty(FixtureReads.empty(),4000+i*600L,null);
             assertEquals(1,e.death.outstanding()); // Expired grave gear remains owned at Death's Office.
             assertEquals(kind==1||kind==2,e.death.isAwaitingReclaim());
         }

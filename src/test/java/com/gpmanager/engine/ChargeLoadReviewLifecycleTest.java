@@ -425,14 +425,14 @@ public class ChargeLoadReviewLifecycleTest
         Engine engine = engine();
         long start = 75_000L;
         engine.ensureSession(start);
-        engine.session().setActivityHint("Zulrah", start);
+        engine.session().setActivityHint("Zulrah");
         ChargeOutcomeTest.none(engine.observeCheck(blowpipe(100, 10), TARGET, start));
         ChargeDelta use = engine.observeCheck(blowpipe(98, 10), TARGET, start + 1_000L);
         Transaction spend = engine.bookChargeSpend(use, "Toxic blowpipe",
             Collections.singletonList(new Flow(12934, "Zulrah's scales", -2L, 100, -200L, PriceSource.GRAND_EXCHANGE)), start + 1_000L, null);
         assertTrue(spend != null);
         assertEquals("Zulrah", spend.activityName());
-        engine.session().setActivityHint("Vorkath", start + 2_000L);
+        engine.session().setActivityHint("Vorkath");
         ChargeDelta later = engine.observeCheck(blowpipe(97, 10), TARGET, start + 3_000L);
         Transaction laterSpend = engine.bookChargeSpend(later, "Toxic blowpipe",
             Collections.singletonList(new Flow(12934, "Zulrah's scales", -1L, 100, -100L, PriceSource.GRAND_EXCHANGE)), start + 3_000L, null);

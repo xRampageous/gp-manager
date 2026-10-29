@@ -13,7 +13,7 @@ public class KeyChestCatalogueTest
     /** Exact chest-name lookup, case-insensitive and whitespace-trimmed. */
     private static KeyChestCatalogue.Entry entryForChest(String chestName)
     {
-        for (KeyChestCatalogue.Entry entry : KeyChestCatalogue.entries())
+        for (KeyChestCatalogue.Entry entry : FixtureReads.entries())
         {
             if (normalize(entry.getChestName()).equals(normalize(chestName)))
             {
@@ -37,7 +37,7 @@ public class KeyChestCatalogueTest
 
     @Test public void cataloguesAllRequestedTradeableAndDeferredKeys()
     {
-        assertEquals(35, KeyChestCatalogue.entries().size());
+        assertEquals(35, FixtureReads.entries().size());
         assertTradeable(ItemID.CRYSTAL_KEY, "Crystal chest");
         assertTradeable(ItemID.SLAYER_WILDERNESS_KEY, "Larran's small chest");
         assertNotNull(entryForChest("Larran's big chest"));

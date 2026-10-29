@@ -94,7 +94,7 @@ public class LmsBorrowedItemsTest {
             @Override public int stabilizationTicks() { return 0; }
             @Override public boolean keepTransferAuditRows() { return true; }
         });
-        engine.ensureSession(1000); engine.setBaseline(ContainerSnapshot.empty()); return engine;
+        engine.ensureSession(1000); engine.setBaseline(FixtureReads.empty()); return engine;
     }
     static void settle(Engine engine, Map<Integer,Long> held, long at) {
         engine.markDirty();

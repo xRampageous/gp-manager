@@ -168,9 +168,9 @@ public class LongHistoryPerformanceTest {
         }
         assertEquals(SESSIONS, engine.history.size());
         assertEquals(config.maxTransactionsPerSession(), engine.session().transactions().size());
-        int folded = engine.compactOlderThan(period.days, NOW);
+        int folded = FixtureReads.compactOlderThan(engine, period.days, NOW);
         assertTrue("old details must actually compact", folded > 0);
-        assertEquals("a second sweep does no repeated work", 0, engine.compactOlderThan(period.days, NOW));
+        assertEquals("a second sweep does no repeated work", 0, FixtureReads.compactOlderThan(engine, period.days, NOW));
         engine.raids.prune();
         assertEquals(SESSIONS, engine.raids.state.runs.size());
         assertEquals(expectedNet, GrindsData.allTime(engine, NOW).net);
@@ -219,8 +219,8 @@ public class LongHistoryPerformanceTest {
             var repository = new SessionRepository(GSON, FilepathTestSupport.root(temporary), false);
             var writer = new OrderedPersistenceWriter(repository, null);
             var persistence = new Persistence(null, null, repository, writer, engine);
-            measure(report, prefix + "save intent", 100, () -> persistence.currentIntent(false).base);
-            String json = GSON.toJson(persistence.currentIntent(false).state);
+            measure(report, prefix + "save intent", 100, () -> persistence.currentIntent().base);
+            String json = GSON.toJson(persistence.currentIntent().state);
             report.append(prefix).append("json_bytes=").append(json.getBytes(StandardCharsets.UTF_8).length).append('\n');
             for (int cycle = 0; cycle < 3; cycle++) {
                 engine.restore(GSON.fromJson(json, SavedState.class), NOW);

@@ -64,17 +64,17 @@ public class QuickSaveTest
         Gson gson = new Gson();
         Engine engine = engine();
         Persistence coordinator = coordinator(gson, engine);
-        coordinator.currentIntent(false);
+        coordinator.currentIntent();
         for (int quick = 1; quick <= 12; quick++)
         {
             engine.history.get(0).rename("Renamed " + quick);
-            WriteIntent captured = coordinator.currentIntent(true);
+            WriteIntent captured = coordinator.currentIntent();
             assertNull("encoding belongs to the writer", captured.json);
             assertEquals(plain(gson, engine), strip(gson.toJson(captured.state)));
         }
         engine.history.get(0).rename("Again");
-        assertEquals(plain(gson, engine), strip(gson.toJson(coordinator.currentIntent(false).state)));
-        assertEquals(plain(gson, engine), strip(gson.toJson(coordinator.currentIntent(true).state)));
+        assertEquals(plain(gson, engine), strip(gson.toJson(coordinator.currentIntent().state)));
+        assertEquals(plain(gson, engine), strip(gson.toJson(coordinator.currentIntent().state)));
     }
 
     private static String plain(Gson gson, Engine engine)

@@ -243,7 +243,7 @@ public class TableTest
         KeyValue kv = new KeyValue("WHY").put("How", "Charges used", Kit.Tone.PLAIN)
             .put("Net effect", "−24.2k", Kit.Tone.SUPPLY, "−24,190 gp");
         assertEquals(2, kv.lines());
-        assertEquals(0, kv.clear().lines());
+        assertEquals(0, FixtureReads.clear(kv).lines());
     }
 
 

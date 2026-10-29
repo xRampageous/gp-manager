@@ -180,7 +180,7 @@ public class RetentionCompactionSoakTest
         assertEquals("retained + compacted = every fixture row (" + days + "d)", truth.transactions, retained + compacted);
         assertTrue(days + "d window compacted nothing", compacted > 0L);
         assertEquals("the unresolved claim's audit row survives every window", 1, kept);
-        assertEquals("a second sweep is a no-op", 0, engine.compactOlderThan(days, NOW));
+        assertEquals("a second sweep is a no-op", 0, FixtureReads.compactOlderThan(engine, days, NOW));
         line(String.format(Locale.ROOT, "window_%dd retained_rows=%d compacted_rows=%d restore_ms=%d",
             days, retained, compacted, restoreMs));
     }
@@ -369,7 +369,7 @@ public class RetentionCompactionSoakTest
             long start = BASE + day * DAY + 3_600_000L;
             Session session = new Session(pk ? "PK trip " + day : "Day " + day, start,
                 SessionMode.AUTO);
-            session.setActivityHint(pk ? "PKing" : "Woodcutting", start);
+            session.setActivityHint(pk ? "PKing" : "Woodcutting");
             long logsQuantity = dayLogsQuantity(day);
             String splitTarget = null;
             String ignoreTarget = null;
@@ -381,7 +381,7 @@ public class RetentionCompactionSoakTest
                 session.addTransaction(loot, 100_000, false);
                 if (i == 1) splitTarget = loot.id();
                 if (i == 2) ignoreTarget = loot.id();
-                session.recordAction("Woodcutting", loot.timestamp);
+                session.recordAction("Woodcutting");
             }
             session.addTransaction(row(start + 8 * 60_000L, TransactionType.CONSUMPTION, Context.GENERIC,
                 "Woodcutting", true, Confidence.CONFIRMED,

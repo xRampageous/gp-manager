@@ -34,7 +34,7 @@ public class ReviewFixesTest {
             return result;
         }, new TransactionClassifier(), CONFIG);
         e.ensureSession(T0);
-        e.setBaseline(ContainerSnapshot.empty());
+        e.setBaseline(FixtureReads.empty());
         return e;
     }
 
@@ -54,7 +54,7 @@ public class ReviewFixesTest {
             put("getLocalPlayer", proxy(Player.class, Collections.singletonMap("getWorldLocation", new WorldPoint(100, 100, 0))));
         }});
         p.containers = new ContainerSnapshotFactory(p.client, null) {
-            @Override ContainerSnapshot capture(boolean equipment, boolean pouch) { return ContainerSnapshot.empty(); }
+            @Override ContainerSnapshot capture(boolean equipment, boolean pouch) { return FixtureReads.empty(); }
             @Override boolean bagOpen() { return true; }
         };
         p.storage = new Persistence(p.client, null, null, null, engine);

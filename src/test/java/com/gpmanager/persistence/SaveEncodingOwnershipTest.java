@@ -42,9 +42,9 @@ public class SaveEncodingOwnershipTest {
             }).get(1, TimeUnit.SECONDS);
             release.countDown();
             SavedState saved = SessionRepository.parseBackup(plain, backup.get(3, TimeUnit.SECONDS));
-            org.junit.Assert.assertEquals("Before backup", saved.currentSession().name());
+            org.junit.Assert.assertEquals("Before backup", FixtureReads.currentSession(saved).name());
             org.junit.Assert.assertEquals("rsprofile.backup-probe", saved.ownerKey);
-            org.junit.Assert.assertEquals(500L, saved.currentSession().metrics(3L).net);
+            org.junit.Assert.assertEquals(500L, FixtureReads.currentSession(saved).metrics(3L).net);
             org.junit.Assert.assertEquals(507L, engine.metrics(3L).net);
         } finally {
             release.countDown();
@@ -78,12 +78,12 @@ public class SaveEncodingOwnershipTest {
         OrderedPersistenceWriter writer=new OrderedPersistenceWriter(repository);
         Persistence disk=new Persistence(null,null,repository,writer,engine);
         try {
-            writer.submit(disk.currentIntent(false));
+            writer.submit(disk.currentIntent());
             if(!entered.await(3,TimeUnit.SECONDS))throw new AssertionError("worker did not enter serializer");
             engine.session().rename("Second snapshot");
             java.util.concurrent.ExecutorService captures=java.util.concurrent.Executors.newSingleThreadExecutor();
             WriteIntent second;
-            try { second=captures.submit(()->disk.currentIntent(true)).get(2,TimeUnit.SECONDS); }
+            try { second=captures.submit(()->disk.currentIntent()).get(2,TimeUnit.SECONDS); }
             finally { captures.shutdownNow(); }
             writer.submit(second);
             engine.session().rename("After capture");
@@ -91,8 +91,8 @@ public class SaveEncodingOwnershipTest {
             if(!writer.flush(Duration.ofSeconds(5)))throw new AssertionError("writer did not drain");
             if(failure.get()!=null)throw new AssertionError(failure.get());
             SavedState loaded=repository.load();
-            if(!loaded.currentSession().name().equals("Second snapshot"))throw new AssertionError("snapshot mutated or latest was lost");
-            if(loaded.currentSession().metrics(1L).net!=500L)throw new AssertionError("booked value changed");
+            if(!FixtureReads.currentSession(loaded).name().equals("Second snapshot"))throw new AssertionError("snapshot mutated or latest was lost");
+            if(FixtureReads.currentSession(loaded).metrics(1L).net!=500L)throw new AssertionError("booked value changed");
             if(writer.status().state!=SaveStatus.State.OK)throw new AssertionError(writer.status().detail);
 
         }finally {release.countDown();writer.shutdown(Duration.ofSeconds(5));}
