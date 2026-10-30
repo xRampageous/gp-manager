@@ -9,15 +9,15 @@ import static com.gpmanager.Kit.SELECTED;
 import static com.gpmanager.Shell.*;
 import static java.lang.String.valueOf;
 
-import static javax.swing.SwingUtilities.isDescendingFrom;
-import static javax.swing.SwingUtilities.getAncestorOfClass;
-import static javax.swing.SwingUtilities.invokeLater;
-import static javax.swing.SwingUtilities.convertPoint;
-import static javax.swing.SwingUtilities.isEventDispatchThread;
+import static javax.swing.SwingUtilities.*;
 
 import com.gpmanager.Table.Row;
 import static com.gpmanager.Kit.TEXT;
-import static java.awt.BorderLayout.*;
+import static java.awt.BorderLayout.CENTER;
+import static java.awt.BorderLayout.EAST;
+import static java.awt.BorderLayout.NORTH;
+import static java.awt.BorderLayout.SOUTH;
+import static java.awt.BorderLayout.WEST;
 import static javax.swing.BorderFactory.*;
 import static net.runelite.client.ui.ColorScheme.*;
 import static java.lang.String.*;
@@ -208,13 +208,6 @@ class Kit {
         component.addComponentListener(new ComponentAdapter() {
                     public void componentResized(ComponentEvent event) { resized.run(); }
                 });
-    }
-
-    /** The empty table line, with the existing font, tone and inset dimensions. */
-    static JLabel emptyLine(String text) {
-        var label = label(text, smallFont, LABEL);
-        pad(label, 3, 6, 3, 6);
-        return label;
     }
 
     /** Table and sheet page count; retain the original integer boundary behavior. */
@@ -1077,8 +1070,11 @@ class Table extends JPanel {
             var previous = focused(body);
             drawn = new ArrayList<>(visible);
             body.removeAll();
-            if (visible.isEmpty())
-                body.add(emptyLine(emptyText));
+            if (visible.isEmpty()) {
+                var emptyRow = label(emptyText, smallFont, LABEL);
+                pad(emptyRow, 3, 6, 3, 6);
+                body.add(emptyRow);
+            }
             int rowHeight = rowHeight();
             // The quantity column hugs each row's own text, so one wide "×2 doses" row no longer
             // steals width from every name; right edges stay aligned against the value column.
@@ -2258,6 +2254,7 @@ class HudOverlay extends Overlay {
 
     void paint(Graphics2D g, HudFrame frame, FontMetrics fb, FontMetrics fh, FontMetrics fg, Composite plain, long now,
             float open) {
+        var ascent = fb.getAscent();
         int width = size.width, right = width - PAD;
         boolean motion = !config.reducedMotion();
         g.setColor(background);
@@ -2300,12 +2297,12 @@ class HudOverlay extends Overlay {
                     boolean dim = !config.reducedMotion() && now / WARNING_BLINK_MILLIS % 2 == 0;
                     targetColor = dim ? LABEL : LOSS.color;
                 }
-                text(g, body, frame.target, right - width(fb, frame.target), y + fb.getAscent(), targetColor);
+                text(g, body, frame.target, right - width(fb, frame.target), y + ascent, targetColor);
             }
             y += room == 0 ? 5 : fb.getHeight();
         }
         if (!context.isEmpty()) {
-            text(g, body, context, PAD, y + fb.getAscent(), frame.contextColor);
+            text(g, body, context, PAD, y + ascent, frame.contextColor);
             y += fb.getHeight();
         }
         if (trayHeight == 0) return;
@@ -2313,8 +2310,8 @@ class HudOverlay extends Overlay {
         g.clipRect(0, 0, width, size.height);
         fade(g, plain, open);
         // The heading sits tight on its rows: no leading, no gap (owner 1.1).
-        text(g, body, frame.trayLabel, PAD, y + fb.getAscent(), LABEL);
-        y += fb.getAscent() + fb.getDescent();
+        text(g, body, frame.trayLabel, PAD, y + ascent, LABEL);
+        y += ascent + fb.getDescent();
         for (int i = 0; i < names.length; i++) {
             HudFrame.Row row = frame.rows.get(i);
             fade(g, plain, motion ? min(open, (now - row.born) / (float) FADE_IN_MILLIS) : open);
@@ -2324,7 +2321,7 @@ class HudOverlay extends Overlay {
             }
             // Sprites are fitted once per snapshot: shrunk smoothly, never blown up, centred.
             if (sprites[i] != null) g.drawImage(sprites[i], PAD, y, null);
-            int textY = y + (rowHeight + fb.getAscent()) / 2 - 1;
+            int textY = y + (rowHeight + ascent) / 2 - 1;
             String value = row.narrow != null && right(fb, row) > width - PAD * 2 - indent ? row.narrow : row.value;
             int valueX = row.name.isEmpty() ? PAD + indent : right - width(fb, value);
             text(g, body, names[i], PAD + indent, textY, row.highlight == null ? WHITE : row.highlight);
@@ -2334,7 +2331,7 @@ class HudOverlay extends Overlay {
             y += rowHeight;
         }
         fade(g, plain, open);
-        text(g, body, frame.more, PAD, y + fb.getAscent(), LABEL);
+        text(g, body, frame.more, PAD, y + ascent, LABEL);
     }
 
     static void fade(Graphics2D g, Composite plain, float alpha) {
@@ -3262,6 +3259,7 @@ class LedgerPage extends Shell.Page {
     }
 
     Row groupRow(Group group, Tone tone) {
+        var failed = group.failedOf();
         String value;
         Tone shown = tone;
         String meta = groupLead(group);
@@ -3290,11 +3288,11 @@ class LedgerPage extends Shell.Page {
             tip = group.name + msg("incomplete-value");
         } else
             value = worth(group.value);
-        String qty = group.claim < 0 ? "−" + max(1, group.quantity) : !group.failedOf().isEmpty()
-                                ? group.failedOf() : group.quantity > 1 && group.item != 995
+        String qty = group.claim < 0 ? "−" + max(1, group.quantity) : !failed.isEmpty()
+                                ? failed : group.quantity > 1 && group.item != 995
                                                 && (!group.actionGroup() || group.charge) ? times(group.quantity)
                                         : "";
-        if (liveCategory() && group.item != 995 && group.claim >= 0 && group.failedOf().isEmpty())
+        if (liveCategory() && group.item != 995 && group.claim >= 0 && failed.isEmpty())
             if (group.dose) qty = LiveSnapshot.quantityText(group);
             else if (group.actionGroup() && !group.charge) qty = times(max(1, group.count));
             else if (group.quantity == 1) qty = times(1);
@@ -3302,7 +3300,7 @@ class LedgerPage extends Shell.Page {
         if (group.failed > 0) tip = group.name + SEPARATOR + group.failedTip();
         Runnable open = protect.apply(() -> openGroup(group.id));
         return new Row(group.id, icon(group.item), group.name
-                        + (group.failed > 0 && group.failedOf().isEmpty() ? " (failed)" : "")
+                        + (group.failed > 0 && failed.isEmpty() ? " (failed)" : "")
                         + (group.corrected ? " •" : ""), qty, value, shown, tip,
                 group.incomplete() || group.market ? "" : exactSigned(group.value) + GP_UNIT, false, open,
                 singletonList(new Menu("Open", open)));
@@ -3880,8 +3878,7 @@ class LedgerController implements LedgerPage.Actions {
         mutate(() -> {
                     boolean stale = engine.revision() != previewRevision;
                     // A toast, not a page note: the refresh after this edit rebuilds the page.
-                    if (stale || !(decision == Correction.IGNORE ? engine.removeEntry(id, "Ledger correction")
-                            : engine.correctTransaction(id, decision, "Ledger correction")))
+                    if (stale || !engine.correctEntry(id, decision))
                         later(owner, () -> panel.shell.tell("Not applied",
                                         stale ? msg("entries-changed") : msg("correction-applied"), true));
                 });
@@ -4333,7 +4330,7 @@ class LivePage extends Shell.Page {
                         : new JButton[] {pause, againButton, doneButton, editButton})
             if (action.isVisible()) shown.add(action);
 
-        List<Object> shape = List.of(completed, shown);
+        var shape = List.of(completed, shown);
         if (!shape.equals(actionsShape)) {
             actionsShape = shape;
             targetActions.removeAll();
@@ -4376,7 +4373,7 @@ class LivePage extends Shell.Page {
             menu.add(new Table.Menu("Hide supply from recent", () -> actions.hideRecent(row.name, true)));
         // Ore a failed smelt lost sits beside the ore the bars used: say which is which.
         String name = msg("failed").equals(row.label) ? row.name + " (failed)" : row.name;
-        Row drawn = new Row(row.id + "|" + row.receiptId, icon, name, row.qty, valueText(row), toneOf(row),
+        var drawn = new Row(row.id + "|" + row.receiptId, icon, name, row.qty, valueText(row), toneOf(row),
                 tipOf(row), numeric(row) ? exactSigned(row.value) + GP_UNIT : "", false, () -> actions.openLedger(entry),
                 menu);
         drawn.color = row.highlight;
@@ -6926,8 +6923,8 @@ class RaidHistory {
                 String member = slot < 0 || slot >= number(row, 10) ? null : client.getVarcStrValue(number(row, 9) + slot);
                 inside = name != null && member != null && Text.standardize(name).equals(Text.standardize(member))
                         && Widgets.visible(client, number(row, 5) << 16)
-                        && (kind == 3 ? client.isInInstancedRegion() && client.getVarbitValue(number(row, 12)) == 0
-                                : kind == 2 ? client.isInInstancedRegion() && client.getVarbitValue(number(row, 8)) == 1
+                        && (kind == 3 ? client.getTopLevelWorldView().isInstance() && client.getVarbitValue(number(row, 12)) == 0
+                                : kind == 2 ? client.getTopLevelWorldView().isInstance() && client.getVarbitValue(number(row, 8)) == 1
                                 : client.getVarbitValue(number(row, 8)) == 2 || client.getVarbitValue(number(row, 8)) == 3);
             }
             int[] counters = stream(row[11].split(",")).mapToInt(Integer::parseInt).map(client::getVarpValue).toArray();
@@ -6988,13 +6985,14 @@ class RaidHistory {
         }
 
         void menu(MenuOptionClicked event, long now) {
+            var clicked = event.getMenuAction();
             synchronized (history.engine) {
                 if (event.isConsumed()) return;
                 if (live(request)) container(request.claim.chest, plugin.client.getItemContainer(request.claim.chest));
                 requests.removeIf(value -> !live(value));
                 var rule = RULES.stream().filter(row -> number(row, 3) == event.getParam1() >>> 16).findFirst().orElse(null);
                 String option = lower(Text.removeTags(event.getMenuOption()), false);
-                if (ready() && event.getMenuAction() != null && event.getMenuAction().name().startsWith("GAME_OBJECT_")
+                if (ready() && clicked != null && clicked.name().startsWith("GAME_OBJECT_")
                         && (option.equals("take-pickaxe") || option.equals("deposit-pickaxe")) && PICKAXE_STORES.containsKey(event.getId())) {
                     var move = history.engine.events.put(Inbox.RAID_STORE, -1, 1, plugin.consumeTicks(), null);
                     move.data = history.state;
@@ -7003,7 +7001,7 @@ class RaidHistory {
                 var active = history.active;
                 if (ready() && active != null && sample(RULES.get(kind(active.id))).inside
                         && (option.startsWith("take") || option.startsWith("buy"))) {
-                    String action = event.getMenuAction() == null ? "" : event.getMenuAction().name();
+                    String action = clicked == null ? "" : clicked.name();
                     for (var loan : cached("raid_supplies")) {
                         int item = number(loan, 3), stock = number(loan, 4);
                         if (number(loan, 0) != kind(active.id) || !action.startsWith(loan[1])

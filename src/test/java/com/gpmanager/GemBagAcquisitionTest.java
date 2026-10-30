@@ -18,9 +18,9 @@ public class GemBagAcquisitionTest {
             h.inventory.put(container, 1L);
             for (int i = 0; i < gems.length; i++) {
                 boolean supported = family == 4 || (family == 0 ? i >= 3 : i < 3);
-                assertEquals(container + ":" + gems[i], supported, h.factory.gemBag(gems[i], false));
+                assertEquals(container + ":" + gems[i], supported, h.factory.gemBag(gems[i], 0));
                 assertEquals(container + " open:" + gems[i], supported && container == families[family][1],
-                    h.factory.gemBag(gems[i], true));
+                    h.factory.gemBag(gems[i], 1));
             }
         }
     }

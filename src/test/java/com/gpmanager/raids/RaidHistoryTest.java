@@ -32,7 +32,7 @@ public class RaidHistoryTest {
             switch(m.getName()) {
                 case "getGameState":return gameState;
                 case "isClientThread":return clientThread;
-                case "isInInstancedRegion":return instance;
+                case "getTopLevelWorldView":return proxy(WorldView.class,(q,n,b)->n.getName().equals("isInstance")?instance:null);
                 case "getTickCount":return tick;
                 case "getLocalPlayer":return local;
                 case "getVarbitValue":return bits.getOrDefault((int)a[0],0);

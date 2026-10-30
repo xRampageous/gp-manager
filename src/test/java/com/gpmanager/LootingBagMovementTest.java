@@ -64,7 +64,7 @@ public class LootingBagMovementTest {
             plugin.onItemContainerChanged(new ItemContainerChanged(InventoryID.LOOTING_BAG,box));
         }
         void pickup(int item,long qty,long inventoryPart) {
-            plugin.bagGain(item,qty,pack.getOrDefault(item,0L));
+            plugin.lastPack=new HashMap<>(pack);plugin.bagGain(item,qty,plugin.carries(ItemID.LOOTING_BAG_OPEN));
             if(inventoryPart>0)pack.merge(item,inventoryPart,Long::sum);
             tick++; plugin.bagSettle(); settle();
         }
@@ -156,7 +156,7 @@ public class LootingBagMovementTest {
         }
     }
     @Test public void aFreshSnapshotBetweenPickupAndSettleCannotDoubleTheStock() {
-        Fixture f=new Fixture();f.plugin.bagGain(FOOD,3,0);f.snapshot(Map.of(FOOD,3L));
+        Fixture f=new Fixture();f.plugin.bagGain(FOOD,3,true);f.snapshot(Map.of(FOOD,3L));
         f.tick++;f.plugin.bagSettle();f.settle();
         assertEquals(Map.of(FOOD,3L),f.engine.bagStock());assertEquals(300,f.engine.metrics(T0+100_000).net);
     }

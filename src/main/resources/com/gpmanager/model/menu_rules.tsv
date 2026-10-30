@@ -1,7 +1,7 @@
 # Menu and chat predicates; raw/trimmed normalization is selected by the caller.
 # Clauses: contains, =exact, ^prefix; | is OR, + is AND, @ references text.tsv.
 widget	=WIDGET_TARGET|=WIDGET_TARGET_ON_NPC|=WIDGET_TARGET_ON_PLAYER|=WIDGET_TARGET_ON_WIDGET|=WIDGET_TARGET_ON_GROUND_ITEM|=WIDGET_TARGET_ON_GAME_OBJECT
-spend.raw	bury|scatter|^eat|^drink|=empty|=break|^release|^cast|=activate
+spend.raw	bury|scatter|^eat|^drink|=empty|=break|^release|^cast|=activate|=teleport
 spend.norm	=light|=tend-to|=tend to|=offer|=pray|=pray-at|bury|scatter
 use	=use
 fuel	logs|juniper|redwood|blisterwood|pyre|kindling

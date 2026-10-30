@@ -60,7 +60,7 @@ public class ChargedParentValuationTest {
             assertEquals(2_400_000, flow.unitPrice);
             assertEquals(PriceSource.HIGH_ALCHEMY, flow.source());
         }
-        assertNull(CurrencyProxyCatalogue.proxyOf(ItemID.ARCHIVISTS_FOLIO));
+        assertNull(CurrencyProxyCatalogue.PROXIES.get(ItemID.ARCHIVISTS_FOLIO));
         Flow folio = valuation("", false, false).value(Map.of(ItemID.ARCHIVISTS_FOLIO, 1L)).get(0);
         assertEquals(300, folio.unitPrice);
         assertEquals(PriceSource.HIGH_ALCHEMY, folio.source());

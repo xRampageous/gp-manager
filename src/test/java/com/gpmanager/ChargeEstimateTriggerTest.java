@@ -137,7 +137,7 @@ public class ChargeEstimateTriggerTest
         assertEquals(100, ChargeCheck.ChargedItem.CRYSTAL_BOW.units);
         assertArrayEquals("a shard derives its price from the seed exchange",
             new int[]{ItemID.PRIF_TELEPORT_SEED, 150},
-            CurrencyProxyCatalogue.proxyOf(ItemID.PRIF_CRYSTAL_SHARD));
+            CurrencyProxyCatalogue.PROXIES.get(ItemID.PRIF_CRYSTAL_SHARD));
     }
 
     @Test

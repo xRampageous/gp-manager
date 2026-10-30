@@ -178,9 +178,9 @@ public class GameDataTablesTest
         "jormungand|The Fremennik Exiles (The Jormungand)|Brundt the Chieftain|50000||false",
         "retrieval_chest|Raid / boss retrieval chest|Chest|" + BossRetrievalCatalogue.VARIABLE_FEE
             + "|Nex and Theatre of Blood 100,000; Tombs of Amascut up to 500,000 by raid level|true",
-        "gravestone|Gravestone|Gravestone|" + BossRetrievalCatalogue.TIERED_FEE
+        "gravestone|Gravestone|Gravestone|-2"
             + "|Tiered per item, 500,000 cap; paid from Death's Coffer or bank when carried coins are absent|true",
-        "deaths_office|Death's Office|Death|" + BossRetrievalCatalogue.TIERED_FEE
+        "deaths_office|Death's Office|Death|-2"
             + "|5% of items worth 100,000 or more (2.5% ironman)|true");
 
     static final List<String> REWARD_SOURCES = Arrays.asList(
@@ -212,7 +212,7 @@ public class GameDataTablesTest
     {
         for (int id = -1; id < MAX_ID; id++)
         {
-            assertEquals("item " + id, CURRENCY_PROXIES.contains(id), CurrencyProxyCatalogue.isMapped(id));
+            assertEquals("item " + id, CURRENCY_PROXIES.contains(id), CurrencyProxyCatalogue.CURRENCIES.contains(id));
         }
     }
 
@@ -501,12 +501,21 @@ public class GameDataTablesTest
     @Test public void gemContainersAcceptOnlyThePinnedGemFamilies() throws Exception {
         java.util.Set<Integer> uncut=java.util.Set.of(ItemID.UNCUT_OPAL,ItemID.UNCUT_JADE,ItemID.UNCUT_RED_TOPAZ,
             ItemID.UNCUT_SAPPHIRE,ItemID.UNCUT_EMERALD,ItemID.UNCUT_RUBY,ItemID.UNCUT_DIAMOND,ItemID.UNCUT_DRAGONSTONE);
-        List<String[]> rows=GameData.rows("gem_containers"); assertEquals(5,rows.size());
+        List<String[]> rows=GameData.rows("gem_containers"); assertEquals(13,rows.size());
         for (String[] row:rows) {
             assertEquals(ItemID.class.getField(row[2]).getInt(null),Integer.parseInt(row[0]));
-            for (String gem:row[1].split(",")) assertTrue(uncut.contains(Integer.parseInt(gem)));
+            // The herb sacks take exactly the 15 grimy herbs (OSRS Wiki: Herb sack).
+            java.util.Set<Integer> accepted=row[2].startsWith("SLAYER_HERB_SACK")?java.util.Set.of(ItemID.UNIDENTIFIED_GUAM,
+                ItemID.UNIDENTIFIED_MARENTILL,ItemID.UNIDENTIFIED_TARROMIN,ItemID.UNIDENTIFIED_HARRALANDER,ItemID.UNIDENTIFIED_RANARR,
+                ItemID.UNIDENTIFIED_TOADFLAX,ItemID.UNIDENTIFIED_IRIT,ItemID.UNIDENTIFIED_AVANTOE,ItemID.UNIDENTIFIED_KWUARM,
+                ItemID.UNIDENTIFIED_HUASCA,ItemID.UNIDENTIFIED_SNAPDRAGON,ItemID.UNIDENTIFIED_CADANTINE,ItemID.UNIDENTIFIED_LANTADYME,
+                ItemID.UNIDENTIFIED_DWARF_WEED,ItemID.UNIDENTIFIED_TORSTOL):uncut;
+            if (row[2].equals("SEED_BOX")) { assertEquals(82,row[1].split(",").length); continue; }
+            if (row[2].startsWith("HG_")) { assertEquals(row[2].contains("MEAT")?10:14,row[1].split(",").length); continue; }
+            if (accepted!=uncut) assertEquals(15,row[1].split(",").length);
+            for (String gem:row[1].split(",")) assertTrue(accepted.contains(Integer.parseInt(gem)));
         }
-        assertEquals(4,GameData.rows("gem_messages").size());
+        assertEquals(27,GameData.rows("gem_messages").size());
         for (String[] row:GameData.rows("gem_messages")) assertNotNull(GameData.pattern(row[0]));
     }
 

@@ -1,5 +1,29 @@
-# pattern, name group, quantity group (0 = one), explicit deposit
+# pattern, name group (or the item's own name), quantity group (0 = one), explicit deposit
+# A hunter catch line names its creature; an open pouch takes the items it always drops (OSRS Wiki drop tables).
 gem-thieved	1	0	true
 gem-vyre-batch	1	2	true
 gem-vyre-single	1	0	true
 gem-mined	1	0	false
+seed-picked	2	1	true
+seed-stolen	1	0	true
+seed-stolen-batch	1	2	true
+hunt-polar	Polar kebbit fur	0	false
+hunt-polar	Raw beast meat	0	false
+hunt-common	Common kebbit fur	0	false
+hunt-common	Raw beast meat	0	false
+hunt-feldip	Feldip weasel fur	0	false
+hunt-feldip	Raw beast meat	0	false
+hunt-devil	Desert devil fur	0	false
+hunt-devil	Raw beast meat	0	false
+hunt-razor	Raw beast meat	0	false
+hunt-wild	Raw wild kebbit	0	false
+hunt-barbed	Raw barb-tailed kebbit	0	false
+hunt-fox	Fox fur	0	false
+hunt-fox	Raw pyre fox	0	false
+hunt-larupia	Raw larupia	0	false
+hunt-graahk	Raw graahk	0	false
+hunt-kyatt	Raw kyatt	0	false
+hunt-sunlight	Sunlight antelope fur	0	false
+hunt-sunlight	Raw sunlight antelope	0	false
+hunt-moonlight	Moonlight antelope fur	0	false
+hunt-moonlight	Raw moonlight antelope	0	false

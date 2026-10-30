@@ -128,6 +128,10 @@ class Engine {
     ContainerSnapshot sample;
     int warmTicks, stable;
     boolean dirty;
+
+    /** This opening's last bank counts (null until it is seen) and what moved since the last settle. */
+    ContainerSnapshot bank;
+    final Map<Integer, Long> banked = new HashMap<>();
     ContainerSnapshot pending;
     Observation cast;
     int stableTicks;
@@ -879,14 +883,15 @@ class Engine {
     }
 
     /** Money evidence is owner-checked and consumed under the booking monitor. */
-    synchronized void bagged(Observation e, long qty) {
-        if (e.owner != events.owner) return;
+    synchronized long bagged(Observation e, long qty) {
+        if (e.owner != events.owner) return 0;
         long moved = events.take(e.kind, e.item, qty, v -> v == e);
         if (e.flag && moved > 0) {
             bag.merge(e.item, moved, SafeMath::sum);
             changed();
         }
         bagged(e.item, moved);
+        return moved;
     }
 
     /** A measured Bank-all decrease is received directly; bank callbacks cannot hide it. */
@@ -1019,8 +1024,11 @@ class Engine {
         if (next == TRANSFER || next == MARKET) events.drop(LOAD_TARGET);
         replaceDeathMarker(next, note);
         if (next == TRANSFER) {
-            // Stale Eat/Bury intents must not reclassify bank deposits as Used/lost.
-            events.drop(CONSUME, SPENT_CONSUME, DROP_CLICK);
+            // Stale Eat/Bury intents must not reclassify bank deposits as Used/lost. A Drop click
+            // survives while the bank's own counts are known: it then owns only what the bank
+            // did not receive.
+            events.drop(CONSUME, SPENT_CONSUME);
+            if (bank == null) events.drop(DROP_CLICK);
             noteHardTransfer(max(1, ticks));
         }
         setContext(next, ticks, note, emptyMap(), null);
@@ -1040,10 +1048,27 @@ class Engine {
         // ×0, no harvest rows) whenever bank detection stuck or fluttered.
         boolean newlyOpened = !bankOpen();
         events.ttl(BANK_UI, Integer.MAX_VALUE);
-        if (newlyOpened)
-            events.drop(CONSUME, SPENT_CONSUME, DROP_CLICK);
+        if (newlyOpened) events.drop(CONSUME, SPENT_CONSUME);
         events.ttl(SOFT_TRANSFER, max(events.left(SOFT_TRANSFER), max(1, ticks)));
         setContext(TRANSFER, ticks, "Bank transfer", emptyMap(), null);
+    }
+
+    /**
+     * The bank's own counts. An opening's first sight is a baseline; each later change is exactly
+     * what was deposited or withdrawn.
+     */
+    synchronized void bankContents(Map<Integer, Long> counts, long now, Consumer<Transaction> additional) {
+        if (live() && bank == null && pending != null && !pending().transfer && !pending().hard && pending().context != TRANSFER) {
+            var prior = settle(pending, now, additional);
+            clearContext();
+            additional.accept(prior);
+        }
+        var before = bank;
+        bank = new ContainerSnapshot(cash(counts));
+        if (before != null)
+            bank.diff(before).forEach((id, moved) -> banked.merge(id, moved, Long::sum));
+        // The plugin's six-tick correlation window.
+        markContext(TRANSFER, 6, "Bank transfer");
     }
 
     /**
@@ -1054,6 +1079,7 @@ class Engine {
      * after close.
      */
     synchronized void bankClosed() {
+        bank = null;
         events.drop(BANK_UI);
         // Soft UI-open refresh only. Hard deposit/withdraw TTL must survive close so a
         // GameTick between bank-container evidence and inventory dirty stays TRANSFER.
@@ -1550,9 +1576,7 @@ class Engine {
     synchronized void endNeutralZone(int ticks) {
         boolean zoneWasActive = zoneTransfer;
         zoneTransfer = false;
-        capture = false;
-        storedBaseline = null;
-        captureTicks = 0;
+        stopCapture();
         restoreTicks = stored.isEmpty() ? 0 : max(1, ticks);
         boolean pendingZone = pending().context == TRANSFER && pending().note != null
                         && pending().note.startsWith(msg("neutral-zone-instance"));
@@ -2085,13 +2109,13 @@ class Engine {
         return transaction;
     }
 
-    /** Explicit ledger removal may change money while preserving already-accounted physical value. */
-    synchronized boolean removeEntry(String id, String reason) {
+    /** A Ledger decision; an explicit removal changes money while keeping accounted physical value. */
+    synchronized boolean correctEntry(String id, Correction decision) {
         var row = current == null ? null : current.findTransaction(id);
-        if (row == null || row.correction() == IGNORE) return false;
-        // Both physical projections now match, so the existing validator accepts this decision.
-        row.ownershipCorrection = row.correction();
-        return current.correctTransaction(id, IGNORE, reason);
+        if (row == null || decision == IGNORE && row.correction() == IGNORE) return false;
+        // Both physical projections then match, so the existing validator accepts a removal.
+        if (decision == IGNORE) row.ownershipCorrection = row.correction();
+        return current.correctTransaction(id, decision, "Ledger correction");
     }
 
     synchronized boolean correctTransaction(String id, Correction decision, String reason) {
@@ -2217,11 +2241,7 @@ class Engine {
         // Keep active-time accrual on that event path instead of analytics reads.
         // This window ages once per inventory/game-tick sample, even when the
         // inventory remains dirty across several stabilization samples.
-        if (captureTicks > 0 && --captureTicks <= 0) {
-            captureTicks = 0;
-            capture = false;
-            storedBaseline = null;
-        }
+        if (captureTicks > 0 && --captureTicks <= 0) stopCapture();
         // Death and reclaim windows are real game-tick lifecycles. Advance them before
         // any dirty/stabilization early return so inventory churn cannot pause expiry.
         int retrieval = RaidHistory.kind(raids.state.death);
@@ -2338,6 +2358,13 @@ class Engine {
             hard = claim.hard;
             snapshot = committed;
             this.now = now;
+        }
+
+        /** The matched action moved to its own slice: this change no longer claims it. */
+        void release() {
+            used = false;
+            intent = null;
+            label = null;
         }
 
         /** Moves {@code moved} out of this change into a fresh generic slice of its snapshot. */
@@ -2486,11 +2513,7 @@ class Engine {
         slice.intent = kind;
         slice.label = batch.intent == kind ? batch.label : null;
         slice.spell = kind == CAST ? batch.spell : null;
-        if (batch.intent == kind) {
-            batch.used = false;
-            batch.intent = null;
-            batch.label = null;
-        }
+        if (batch.intent == kind) batch.release();
         return book(slice);
     }
 
@@ -2509,39 +2532,37 @@ class Engine {
         slice.intent = batch.intent;
         slice.label = batch.label;
         slice.used = true;
-        batch.used = false;
-        batch.intent = null;
-        batch.label = null;
+        batch.release();
         return book(slice);
     }
 
     /**
      * A confirmed drop owns its item in a mixed settle (owner 1.3.4): dropping plant pots while a
-     * calquat harvest lands must book the pot loss as its own Dropped row instead of turning the
-     * change into Review. The drop's losses move to their own row; every other flow must be a
-     * gain, and a second loss, a pickup back of the same item, an armed consume intent, bank
-     * evidence or a Market/PK context cancels the split, leaving the change to settle as before.
+     * calquat harvest lands books the pot loss as its own Dropped row, not Review. Outside a bank
+     * every other flow must be a gain; a pickup back, a consume intent, a Market/PK context or bank
+     * evidence without bank counts cancels the split.
      */
     Transaction settleDropSlice(Settle batch) {
-        if (batch.hard || batch.soft() || batch.transfer || batch.context == TRANSFER || batch.context == MARKET || batch.context == PK_DEATH
-                || batch.context == PK_LOOT) return null;
+        // Known bank counts separate a drop from deposits inside the same bank change.
+        boolean bankChange = batch.hard || batch.soft() || batch.transfer || batch.context == TRANSFER,
+                banking = bankChange && (bank != null || !banked.isEmpty());
+        if (batch.context == MARKET || batch.context == PK_DEATH || batch.context == PK_LOOT || bankChange && !banking)
+            return null;
         if (events.peek(DROP_CLICK) == null || intent() != null) return null;
         int id = events.item(DROP_CLICK);
         if (id <= 0) return null;
-        var lost = new ArrayList<Flow>();
-        boolean pickedBack = false;
         for (Flow flow : batch.flows)
-            if (flow.item == id) {
-                if (flow.quantity > 0) pickedBack = true;
-                else if (flow.quantity < 0) lost.add(flow);
-            } else if (flow.quantity <= 0)
-                // Any second loss (or a zero flow) makes the change ambiguous again.
-                return null;
-
-        if (lost.isEmpty() || pickedBack) return null;
-        var slice = batch.slice(lost);
-        slice.context = batch.context;
-        slice.fight = batch.fight;
+            // A pickup back, or (outside a bank) a second loss or zero flow, leaves it ambiguous.
+            if (flow.item == id ? flow.quantity > 0 : flow.quantity <= 0 && !banking) return null;
+        // Only what left both the inventory and the bank was dropped.
+        var lost = claim(batch.flows, flow -> flow.item == id && flow.quantity < 0,
+                        (flow, size) -> min(size, positive(-flow.quantity - amount(banked, id))));
+        if (lost.isEmpty()) {
+            if (banking) events.drop(DROP_CLICK);
+            return null;
+        }
+        var slice = batch.slice(emptyList());
+        slice.flows = lost;
         settleActions(slice);
         return book(slice);
     }
@@ -2589,7 +2610,7 @@ class Engine {
         var rows = new ArrayList<Transaction>();
         for (var source : batch.loot.sources) {
             var remaining = new HashMap<>(source.items);
-            List<Flow> parts = claim(batch.flows, flow -> flow.quantity > 0, (flow, quantity) -> {
+            var parts = claim(batch.flows, flow -> flow.quantity > 0, (flow, quantity) -> {
                                 long take = min(quantity, amount(remaining, flow.item));
                                 remaining.computeIfPresent(flow.item, (id, wanted) -> wanted - take);
                                 return take;
@@ -2651,11 +2672,12 @@ class Engine {
      * cost flow and books Ate/Buried instead of vanishing into the transfer (owner 2026-10-12).
      */
     void splitToppedUpConsume(Settle batch, Map<Integer, Long> changes, ContainerSnapshot committed, long now) {
-        if (intent() == null || intent().item < 0 || intent().held < 0) return;
-        int id = intent().item;
+        var intent = intent();
+        if (intent == null || intent.item < 0 || intent.held < 0) return;
+        int id = intent.item;
         Long net = changes.get(id);
         if (net == null || net <= 0) return;
-        long lost = intent().held - committed.quantity(id);
+        long lost = intent.held - committed.quantity(id);
         if (lost <= 0 || lost > net) return;
         for (int index = 0; index < batch.flows.size(); index++) {
             Flow flow = batch.flows.get(index);
@@ -2819,7 +2841,9 @@ class Engine {
 
     /** A confirmed consume or drop owns its losses; transfer evidence and loot name the rest. */
     void settleOwnActions(Settle batch) {
-        batch.destroy = intent() != null && intent().flag;
+        var intent = intent();
+        var drop = events.peek(DROP_CLICK);
+        batch.destroy = intent != null && intent.flag;
         // Match Drop before consume wipe — consumeMatched used to null dropIntent first.
         batch.disassemble = !batch.hard && !batch.soft() && takenApart(batch.flows);
         batch.combine = batch.disassemble || isDecant(batch.flows);
@@ -2832,14 +2856,13 @@ class Engine {
         // parts custody active, ball losses are loads on their own. The clicked item must itself
         // be lost for the click path, or a lone part settle would eat the ball's intent (owner
         // live 2026-10-13).
-        boolean cannonLoad = events.peek(CANNON) != null && intent() == null && onlyCosts(batch.flows)
+        boolean cannonLoad = events.peek(CANNON) != null && intent == null && onlyCosts(batch.flows)
                         && hasLoss(batch.flows, Engine::cannonball)
                         && !hasLoss(batch.flows, id -> !cannonball(id) && !cannonPart(id));
-        batch.drop = cannonLoad || events.peek(DROP_CLICK) != null && intent() == null
-                                && onlyCosts(batch.flows) && hasLoss(batch.flows, id -> id == events.item(DROP_CLICK))
-                                && !hasLoss(batch.flows, id -> id != events.item(DROP_CLICK) && !cannonPart(id));
+        batch.drop = cannonLoad || drop != null && intent == null
+                                && onlyCosts(batch.flows) && hasLoss(batch.flows, id -> id == drop.item)
+                                && !hasLoss(batch.flows, id -> id != drop.item && !cannonPart(id));
         batch.used = !batch.drop && !batch.combine && matchesConsume(batch.flows, batch.hard);
-        var intent = intent();
         if (batch.used && intent != null) {
             // Only a verb whose intent actually matched these flows may name the action; a stale
             // or unmatched click never upgrades the wording, and a named click names only a change
@@ -2853,7 +2876,7 @@ class Engine {
             batch.label = own ? intent.label : null;
             batch.usedItem = intent.item;
         }
-        batch.dropItem = batch.drop ? events.peek(DROP_CLICK) != null ? events.item(DROP_CLICK)
+        batch.dropItem = batch.drop ? drop != null ? drop.item
                                 : batch.flows.stream().filter(flow -> flow.cost() && cannonball(flow.item))
                                         .mapToInt(flow -> flow.item).findFirst().orElse(-1) : -1;
         if (!batch.used && !batch.drop && !batch.hard && !batch.combine
@@ -3036,8 +3059,10 @@ class Engine {
         }
         // A drop settle is always CONSUMPTION, so picking it back up can shrink it.
         if (batch.drop && type != TransactionType.TRANSFER && type != TRADE) type = CONSUMPTION;
-        if (!batch.loot.matched && !geReview && (type == GAIN || type == TransactionType.LOOT || type == UNCERTAIN)
-                && !batch.death && oneSided(batch.flows, true)) {
+        if (!batch.loot.matched && !geReview && !batch.death && oneSided(batch.flows, true)
+                && (type == GAIN || type == TransactionType.LOOT || type == UNCERTAIN
+                        || type == TransactionType.TRANSFER && batch.flows.stream().allMatch(
+                                f -> events.peek(GROUND_CLICK, e -> e.item == f.item) != null))) {
             var picked = pickUpDrops(batch);
             if (picked != null && batch.flows.isEmpty()) return picked;
         }
@@ -3355,7 +3380,7 @@ class Engine {
         var picked = new ArrayList<Flow>();
         var rest = new ArrayList<Flow>();
         for (Flow flow : batch.flows) {
-            long left = flow.quantity - pickUp(flow.item, flow.quantity, batch.now);
+            long left = flow.quantity - pickUp(flow.item, flow.quantity);
             if (left < flow.quantity) picked.add(flow.part(flow.quantity - left));
             if (left > 0) rest.add(flow.rest(flow.quantity - left));
         }
@@ -3370,7 +3395,7 @@ class Engine {
     /**
      * Shrinks remembered drops and shots of the item by up to {@code quantity}; returns how many.
      */
-    long pickUp(int id, long quantity, long now) {
+    long pickUp(int id, long quantity) {
         long left = quantity;
         for (var e : events.all(DROPPED)) {
             long take = min(left, e.qty);
@@ -3390,7 +3415,7 @@ class Engine {
      */
     synchronized void pickUpIntoPipe(int id, long quantity, long now) {
         if (!live()) return;
-        long given = pickUp(id, quantity, now);
+        long given = pickUp(id, quantity);
         if (given > 0)
             checks.noteLoad(ChargedItem.BLOWPIPE, null, now, id, given);
     }
@@ -3405,14 +3430,20 @@ class Engine {
     }
 
     /** The same non-inbox helpers also reset at an ordinary tracking-window boundary. */
+    void stopCapture() {
+        capture = false;
+        storedBaseline = null;
+        captureTicks = 0;
+    }
+
     void resetHelpers() {
+        bank = null;
+        banked.clear();
         estimate.clear();
         checks.reset();
         stored.clear();
         zoneTransfer = false;
-        capture = false;
-        storedBaseline = null;
-        captureTicks = 0;
+        stopCapture();
         restoreTicks = 0;
         clues.clear();
         claims.clearEvidence();
@@ -3435,9 +3466,10 @@ class Engine {
     }
 
     boolean matchesConsume(List<Flow> flows, boolean hardTransfer) {
-        if (intent() == null || empty(flows)) return false;
+        var intent = intent();
+        if (intent == null || empty(flows)) return false;
         // Match the spent stack even when a dose leftover / empty vial appears as a gain.
-        if (intent().item >= 0 && hasLoss(flows, id -> id == intent().item))
+        if (intent.item >= 0 && hasLoss(flows, id -> id == intent.item))
             return true;
         // Open intent (menu item id missing) or id mismatch after canonicalize: still
         // confirm Drink/Eat when the delta is a dose/partial leftover, or a pure cost
@@ -3446,7 +3478,7 @@ class Engine {
         if (onlyCosts(flows)) {
             // Named intent for a different item + hard bank deposit must stay TRANSFER
             // (stale bury of bones must not book oak-log deposit as Used/lost).
-            return !(hardTransfer && intent().item >= 0);
+            return !(hardTransfer && intent.item >= 0);
         }
         // Live potato-field sequence: Drink + Pick + Bury often share one stabilization
         // window. Any armed consume intent (named or open) must win so Used/lost books
@@ -3461,12 +3493,13 @@ class Engine {
      * intent stores invent qty at arm — synthesize the shortfall loss.
      */
     Map<Integer, Long> consumeDeltas(ContainerSnapshot current) {
-        if (intent() == null || intent().item < 0 || intent().held < 0 || current == null)
+        var intent = intent();
+        if (intent == null || intent.item < 0 || intent.held < 0 || current == null)
             return emptyMap();
-        long nowQty = current.quantity(intent().item), lost = intent().held - nowQty;
+        long nowQty = current.quantity(intent.item), lost = intent.held - nowQty;
         if (lost <= 0) return emptyMap();
         var synthetic = new HashMap<Integer, Long>();
-        synthetic.put(intent().item, -lost);
+        synthetic.put(intent.item, -lost);
         return synthetic;
     }
 
@@ -3483,6 +3516,7 @@ class Engine {
 
     void clearTransfer() {
         events.drop(HARD_TRANSFER);
+        banked.clear();
     }
 
     Confidence confidenceFor(Context context, TransactionType type) {
@@ -4377,7 +4411,7 @@ class FlowFilters {
 
     /** The item's 1:1 proxy base (an imbued variant reduces to its plain item), else itself. */
     static int reducedBase(int id) {
-        int[] proxy = CurrencyProxyCatalogue.proxyOf(id);
+        int[] proxy = CurrencyProxyCatalogue.PROXIES.get(id);
         return proxy != null && proxy[1] == 1 ? proxy[0] : id;
     }
 
@@ -4664,9 +4698,6 @@ class DeathReclaimLifecycle {
 class BossRetrievalCatalogue {
     /** Marker for services whose fee depends on the run (ToA scales with raid level). */
     static final long VARIABLE_FEE = -1;
-
-    /** Marker for tiered / percentage fees (gravestone, Death's Office) — see DeathReclaimFees. */
-    static final long TIERED_FEE = -2;
 
     @AllArgsConstructor
     static class Service {
@@ -5131,14 +5162,12 @@ class TrackedBasisLedger {
 
     /** Validate restoring a previously removed transaction; false blocks the restore. */
     synchronized boolean canAdd(Transaction transaction) {
-        if (transaction == null) return false;
-        return !(transaction.timestamp >= epoch && !sinks(transaction).isEmpty()) && canApplyAll(contribution(transaction), 1, transaction.timestamp);
+        return transaction != null && (transaction.timestamp < epoch || sinks(transaction).isEmpty()) && canApplyAll(contribution(transaction), 1, transaction.timestamp);
     }
 
     /** Validate removing a retained transaction (undo); false blocks the canonical removal. */
     synchronized boolean canRemove(Transaction transaction) {
-        if (transaction == null || transaction.timestamp < epoch) return true;
-        return !(!sinks(transaction).isEmpty()) && canApplyAll(contribution(transaction), -1, transaction.timestamp);
+        return transaction == null || transaction.timestamp < epoch || sinks(transaction).isEmpty() && canApplyAll(contribution(transaction), -1, transaction.timestamp);
     }
 
     boolean canApplyAll(Map<Integer, long[]> changes, long sign, long timestamp) {
@@ -5723,7 +5752,7 @@ class GeCustodyLedger {
         List<Flow> claimedFlows;
 
         Transaction lastBooking() {
-            List<Transaction> rows = counted.isEmpty() ? transferBookings : counted;
+            var rows = counted.isEmpty() ? transferBookings : counted;
             return rows.isEmpty() ? null : rows.get(rows.size() - 1);
         }
     }

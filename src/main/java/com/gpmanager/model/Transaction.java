@@ -1433,8 +1433,7 @@ class Session extends SaveCopies {
             // Re-saving the same aim keeps a running window; a completed one starts over
             // (owner live 2026-10-13: Edit > Save after completion must begin again).
             if (next != null && elapsed(now) - timeSetMillis() >= next) {
-                activeTimeTargetSetMillis = elapsed(now);
-                activeTimeTargetPauseMillis = null;
+                rearmTimeTarget(now);
                 return true;
             }
             return false;
@@ -2574,11 +2573,14 @@ class Semantics {
     }
 
     static List<Group> receiptUnits(Transaction transaction, Predicate<Flow> td) {
+        var type = transaction.original();
+        var id = transaction.id();
+        var action = transaction.action();
         var flows = transaction.flows();
         boolean neutral = transaction.isTransfer(), review = needsReview(transaction);
         boolean fixed = transaction.correction() != AUTO, split = Contribution.isSplit(transaction);
         boolean claimLinked = !transaction.claimId().isEmpty()
-                        || transaction.action() == ActionKind.DEFERRED_CLAIM;
+                        || action == ActionKind.DEFERRED_CLAIM;
         long at = transaction.timestamp;
         String source = Contribution.sourceOf(transaction);
         if (flows.isEmpty()) return noteUnits(transaction, neutral, review, fixed, at, source);
@@ -2625,51 +2627,51 @@ class Semantics {
             if (claimOnly && spent > 0 && net > 0) {
                 String verb = verbOf(transaction), primary = empty(name) ? verb : name;
                 String key = "claim:" + primary + ":" + Long.signum(net) + ":" + coverageKey(unknown) + ":" + verb
-                                + ":" + transaction.original().name();
+                                + ":" + type.name();
                 var unit = new Group(key, icon, GAINS, primary, "", verb, "", false, at, net, coverage(unknown),
-                                spent, false, false, false, false, false, false, "", transaction.id(),
+                                spent, false, false, false, false, false, false, "", id,
                                 visible.get(0).id, -1);
                 for (var contribution : visible)
                     unit.entries.add(receipt(transaction, contribution, null, null));
-                unit.search(primary, verb, source, transaction.id());
+                unit.search(primary, verb, source, id);
                 for (var contribution : visible)
                     unit.terms.add(contribution.name);
                 return singletonList(unit);
             }
         }
-        boolean death = transaction.original() == PK_DEATH_LOSS || transaction.note().equals(msg("pvm-loss"));
+        boolean death = type == PK_DEATH_LOSS || transaction.note().equals(msg("pvm-loss"));
         boolean grave = neutral && (transaction.note().equals(msg("death-items"))
                         || transaction.note().equals(msg("death-reclaim-items")));
         // Legacy reclaim receipts already have this reserved activity and exact coin basis.
-        boolean reclaim = transaction.original() == CONSUMPTION && "Death reclaim".equals(transaction.activityName())
+        boolean reclaim = type == CONSUMPTION && "Death reclaim".equals(transaction.activityName())
                         && transaction.explanation().equals(transaction.note())
                         && flows.stream().allMatch(f -> f.cost() && f.item == 995 && f.source() == FACE_VALUE);
-        if (transaction.action() == FEE || death || grave || reclaim) {
+        if (action == FEE || death || grave || reclaim) {
             long feeValue = 0;
             boolean missingFee = false;
             for (var contribution : visible) {
                 missingFee |= contribution.unpriced();
                 feeValue = sum(feeValue, contribution.value);
             }
-            String feeName = death ? transaction.original() == PK_DEATH_LOSS ? "Death: PvP" : msg("pvm-loss")
+            String feeName = death ? type == PK_DEATH_LOSS ? "Death: PvP" : msg("pvm-loss")
                             : grave ? "Gravestone" : transaction.note();
-            String key = death ? "death:" + (empty(transaction.encounterId()) ? transaction.id() : transaction.encounterId())
+            String key = death ? "death:" + (empty(transaction.encounterId()) ? id : transaction.encounterId())
                             + ":" + transaction.correction() + ":" + review
-                            : grave ? "grave:" + transaction.id()
+                            : grave ? "grave:" + id
                             : "fee:" + reclaim + ":" + feeName + ":" + coverageKey(missingFee) + ":" + Long.signum(feeValue);
             var unit = composite(key,
                             death ? -100000 : grave ? -1 : visible.get(0).item, tableFor(financialCategory(transaction, visible.get(0))), feeName,
                             grave ? transaction.note().equals(msg("death-items")) ? "Stored" : "Recovered" : "",
                             "", false, at, feeValue, missingFee, -1, neutral, review, fixed,
-                            transaction.id(), visible.get(0).id);
+                            id, visible.get(0).id);
             unit.composite = !death && !grave;
             unit.death = death || grave || reclaim;
-            unit.pvpDeath = transaction.original() == PK_DEATH_LOSS;
+            unit.pvpDeath = type == PK_DEATH_LOSS;
             for (var contribution : visible) {
                 unit.entries.add(receipt(transaction, contribution, null, null));
                 unit.terms.add(contribution.name);
             }
-            unit.search(feeName, source, transaction.id());
+            unit.search(feeName, source, id);
             return singletonList(unit);
         }
         // An estimated charge use is one row named by the weapon.
@@ -2695,7 +2697,7 @@ class Semantics {
         }
         // A measured charge spend books its resources as rows "Used by" the weapon, never a
         // composite.
-        String weapon = transaction.action() == FIRE || transaction.action() == CAST
+        String weapon = action == FIRE || action == CAST
                         ? measuredChargeWeaponName(transaction) : "";
         if (ChargeCheck.namedVariant(weapon) == ChargeCheck.ChargedItem.BLOOD_FURY)
             return singletonList(chargeCastUnit(transaction, visible, weapon, source, at, neutral, review, fixed));
@@ -2716,13 +2718,12 @@ class Semantics {
      */
     static boolean isActionComposite(Transaction transaction, List<Contribution> entries, boolean neutral,
             boolean review, boolean corrected, boolean split, boolean claimLinked) {
-        if (neutral || review || corrected || split || claimLinked || transaction.action() != CAST
-                        && transaction.action() != FIRE
-                        && transaction.action() != DRINK || entries.size() < 2) return false;
+        var action = transaction.action();
+        if (neutral || review || corrected || split || claimLinked || action != CAST && action != FIRE && action != DRINK || entries.size() < 2) return false;
         // A named spell with a product (an alch's coins, Bones to Peaches' fruit) is one row by
         // its spell; a gain it does not make (a pickup) keeps the rows apart (owner live
         // 2026-10-16). Any other action keeps one shared cost category.
-        Set<Integer> made = transaction.action() == CAST ? Spells.product(transaction.spellName())
+        Set<Integer> made = action == CAST ? Spells.product(transaction.spellName())
                         : emptySet();
         boolean product = !made.isEmpty();
         var category = financialCategory(transaction, entries.get(0));
@@ -2813,20 +2814,21 @@ class Semantics {
 
     static List<Group> noteUnits(Transaction transaction, boolean neutral, boolean review, boolean corrected, long at,
             String source) {
+        var id = transaction.id();
         var money = transaction(transaction);
         if (!money.included && !review && !neutral) return emptyList();
         long value = neutral ? 0 : money.net();
         var category = Contribution.noteCategory(transaction, money, neutral);
         String name = transaction.note().isEmpty() ? transaction.activityName() : transaction.note();
-        String verb = verbOf(transaction), key = "note:" + transaction.id();
+        String verb = verbOf(transaction), key = "note:" + id;
         var unit = composite(key, -1, tableFor(category), name, verb, verb, false, at, value, false, 0,
-                        neutral, review, corrected, transaction.id(), transaction.id() + ":composite");
+                        neutral, review, corrected, id, id + ":composite");
         unit.death = neutral && name.equals(msg("reclaim-expired"));
-        unit.entries.add(new Receipt(transaction.id() + ":composite", transaction.id(), at, -1, name, 0, value,
+        unit.entries.add(new Receipt(id + ":composite", id, at, -1, name, 0, value,
                         transaction.autoNet(), false, neutral, review, corrected, Contribution.isSplit(transaction),
                         category, verb, transaction.spellName(), why(transaction, false, neutral),
                         correctionLabel(transaction.correction()), source, "", "", null, "", "", false));
-        unit.search(name, verb, source, transaction.id());
+        unit.search(name, verb, source, id);
         return singletonList(unit);
     }
 
@@ -2938,7 +2940,7 @@ class Semantics {
         if (transaction == null) return false;
         var cash = pattern("cash");
         for (Flow flow : transaction.flows()) {
-            if (CurrencyProxyCatalogue.isMapped(flow.item)) return true;
+            if (CurrencyProxyCatalogue.CURRENCIES.contains(flow.item)) return true;
             String name = lower(flow.name);
             if (!"coins".equals(name) && cash.matcher(name).matches()) return true;
         }
@@ -3787,9 +3789,8 @@ class MarketRows {
         if (record.confidence == GeOffer.CustodyConfidence.AMBIGUOUS || record.quantityModified
                 || record.collectionAmbiguous)
             return AMBIGUOUS;
-        if (record.filledQty <= 0) {
+        if (record.filledQty <= 0)
             return record.isCancelled() || record.cleared ? CANCELLED_RETURNED : PENDING;
-        }
         if (record.settledQty > 0 && record.settledQty < record.filledQty)
             return PARTIALLY_REALIZED;
         if (record.settledQty >= record.filledQty && record.settledQty > 0)
@@ -4969,7 +4970,7 @@ class LiveSnapshot {
      */
     static synchronized List<Recent> recent(Engine engine, Session active,
             List<Row> market, Map<String, Row> markets, LiveContext ctx) {
-        List<Object> key = Arrays.asList(engine, engine.revision(), active, market,
+        var key = Arrays.asList(engine, engine.revision(), active, market,
                         ctx.minimumLoot, ctx.filter, ctx.filter == null ? "" : ctx.filter.version(),
                         ctx.filter == null ? RECENT_ROWS : ctx.filter.recentRows(),
                         String.valueOf(active == null ? null : active.sessionStartAt));
@@ -5093,9 +5094,8 @@ class LiveSnapshot {
         String name = group.name.toLowerCase(ROOT);
         String unit = has(name, "pizza", "cake", "pie") ? "portion"
                         : group.label.equals("Drank") ? "dose" : null;
-        if (group.dose && unit != null) {
+        if (group.dose && unit != null)
             return group.quantity == 1 ? "1 " + unit : group.quantity > 1 ? times(group.quantity) + " " + unit + "s" : null;
-        }
         if (group.claim < 0)
             // A claim spend reads as its own signed count ("-1 pouch"); a pickup stays "×N".
             return "−" + max(1, group.quantity);
@@ -6048,7 +6048,7 @@ class Valuation implements FlowValuator {
             // An empty vial is a physical neutral; filled variants remain ordinary items.
             if (id == VIAL_EMPTY) return null;
             boolean manual = prices.containsKey(id);
-            int faceValue = faceValueOf(id);
+            int faceValue = id == COINS ? 1 : id == PLATINUM ? 1000 : 0;
             // For ordinary items, a user override is authoritative even before RuneLite prices
             // load; fixed currencies below retain their face value by policy.
             long quote = 0;
@@ -6058,7 +6058,7 @@ class Valuation implements FlowValuator {
             // Those catalogue entries are non-GP currencies in GP Manager, so their physical
             // identity must not inherit a monetary identity from the platform mapping. An
             // explicit owner override remains authoritative.
-            if (!manual && !claim && faceValue == 0 && !CurrencyProxyCatalogue.isMapped(id)
+            if (!manual && !claim && faceValue == 0 && !CurrencyProxyCatalogue.CURRENCIES.contains(id)
                     && automaticMarketQuotesAvailable() && !unsupportedMapping.test(id))
                 // GP Manager's single automatic market policy: the explicit active route,
                 // gated by the current world/economy and the mapping guard above.
@@ -6066,14 +6066,14 @@ class Valuation implements FlowValuator {
             // A proxy row values the component from a market item and its fixed exchange rate.
             // The proxy's market item is priced only where market quotes are, never on unknown or
             // special worlds (Codex review 1.2).
-            int[] proxy = !manual && quote == 0 && automaticMarketQuotesAvailable() ? CurrencyProxyCatalogue.proxyOf(id)
+            int[] proxy = !manual && quote == 0 && automaticMarketQuotesAvailable() ? CurrencyProxyCatalogue.PROXIES.get(id)
                             : null;
             if (proxy != null) {
                 // Some exchanges improve while Karamja gloves are worn; the proxy row may
                 // carry the improved units after a slash (tokkul: 300,000 or 260,000 per onyx).
                 int units = proxy[1];
                 if (gloves) {
-                    int glovesUnits = CurrencyProxyCatalogue.glovesUnitsOf(id);
+                    int glovesUnits = CurrencyProxyCatalogue.GLOVES_UNITS.getOrDefault(id, 0);
                     if (glovesUnits > 0) units = glovesUnits;
                 }
                 // No proxy quote: the flow stays unpriced for Review.
@@ -6091,7 +6091,7 @@ class Valuation implements FlowValuator {
             // model); a manual override anywhere in the family is authoritative.
             Flow doseQuote = null;
             if (quote == 0 && doseFallback && !manual && !claim && faceValue == 0
-                    && automaticMarketQuotesAvailable() && !CurrencyProxyCatalogue.isMapped(id)
+                    && automaticMarketQuotesAvailable() && !CurrencyProxyCatalogue.CURRENCIES.contains(id)
                     && !unsupportedMapping.test(id))
                 doseQuote = doseFamilyQuote(id, name, prices);
             // Half a pie, a pizza half or a cake slice is its share of the whole one's quote
@@ -6127,7 +6127,7 @@ class Valuation implements FlowValuator {
                 // The derived price follows its family anchor's source so provenance stays honest.
                 price = doseQuote.unitPrice;
                 source = doseQuote.source();
-            } else if (composition != null && !CurrencyProxyCatalogue.isMapped(id)
+            } else if (composition != null && !CurrencyProxyCatalogue.CURRENCIES.contains(id)
                     && !unsupportedMapping.test(id) && (!composition.isTradeable() || automaticMarketQuotesAvailable()
                                     && quote(NATURERUNE) > 0)) {
                 // No market quote (untradeable, or tradeable once prices have loaded): its alch
@@ -6149,11 +6149,6 @@ class Valuation implements FlowValuator {
         } catch (RuntimeException ignored) {
             return new Flow(id, "Item " + id, delta, 0, 0, claim ? PriceSource.DEFERRED_CLAIM : UNPRICED);
         }
-    }
-
-    static int faceValueOf(int id) {
-        if (id == COINS) return 1;
-        return id == PLATINUM ? 1000 : 0;
     }
 
     /**
@@ -6302,19 +6297,6 @@ class CurrencyProxyCatalogue {
 
     }
 
-    static boolean isMapped(int id) {
-        return CURRENCIES.contains(id);
-    }
-
-    /** The proxy price source for this item, or null. */
-    static int[] proxyOf(int id) {
-        return PROXIES.get(id);
-    }
-
-    /** The gloves-worn units for this proxy row, or 0 when its rate does not change. */
-    static int glovesUnitsOf(int id) {
-        return GLOVES_UNITS.getOrDefault(id, 0);
-    }
 }
 
 // Persistence and account ownership.

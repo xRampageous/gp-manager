@@ -13,15 +13,15 @@ public class CurrencyProxyCatalogueTest
     @Test
     public void recognisesNonGpCurrencies()
     {
-        assertTrue(CurrencyProxyCatalogue.isMapped(6529)); // Tokkul
-        assertTrue(CurrencyProxyCatalogue.isMapped(12746)); // BH emblem
+        assertTrue(CurrencyProxyCatalogue.CURRENCIES.contains(6529)); // Tokkul
+        assertTrue(CurrencyProxyCatalogue.CURRENCIES.contains(12746)); // BH emblem
     }
 
     @Test
     public void tokkulReadsAtTheOnyxExchangeAndGlovesImproveIt()
     {
-        assertArrayEquals(new int[]{ItemID.UNCUT_ONYX, 300_000}, CurrencyProxyCatalogue.proxyOf(6529));
-        assertEquals(260_000, CurrencyProxyCatalogue.glovesUnitsOf(6529));
-        assertEquals(0, CurrencyProxyCatalogue.glovesUnitsOf(12746));
+        assertArrayEquals(new int[]{ItemID.UNCUT_ONYX, 300_000}, CurrencyProxyCatalogue.PROXIES.get(6529));
+        assertEquals(260_000, (int) CurrencyProxyCatalogue.GLOVES_UNITS.getOrDefault(6529, 0));
+        assertEquals(0, (int) CurrencyProxyCatalogue.GLOVES_UNITS.getOrDefault(12746, 0));
     }
 }

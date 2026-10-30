@@ -267,9 +267,7 @@ public class GpManagerPlugin extends Plugin {
      * confirmed pickups, deposits and dispenser rewards since.
      */
     Map<Integer, Long> lootingBag() {
-        var pack = client.getItemContainer(INV);
-        if (pack == null || !pack.contains(ItemID.LOOTING_BAG) && !pack.contains(ItemID.LOOTING_BAG_OPEN))
-            return Map.of();
+        if (!carries(ItemID.LOOTING_BAG) && !carries(ItemID.LOOTING_BAG_OPEN)) return Map.of();
         // Only fresh container events replace saved stock; a cached client container can be stale.
         return engine.bagStock();
     }
@@ -294,7 +292,11 @@ public class GpManagerPlugin extends Plugin {
 
     void lootObserved(boolean pending, String source, Collection<ItemStack> items, int multiplicity, long now) {
         var builder = hud;
-        String batch = source + ":" + pending + ":" + multiplicity + ":" + lootKey(items);
+        var key = new StringBuilder();
+        if (items != null)
+            for (var item : items)
+                key.append(item.getId()).append('x').append(item.getQuantity()).append(',');
+        String batch = source + ":" + pending + ":" + multiplicity + ":" + key;
         // Only reward windows ride the tray (ground loot shows once it is picked up). One reward
         // can arrive through several RuneLite events; show it once.
         // A clue casket's rewards reach the inventory at once and ride the tray as one casket row.
@@ -439,45 +441,46 @@ public class GpManagerPlugin extends Plugin {
 
     @Subscribe
     public void onGameStateChanged(GameStateChanged event) {
+        var state = event.getGameState();
         var previous = previousState;
-        previousState = event.getGameState();
-        if (event.getGameState() == LOGGED_IN) {
+        previousState = state;
+        if (state == LOGGED_IN) {
             loggedIn = true;
             // Login or world hop: re-read the economy identity from the client thread.
             refreshEconomyState();
             refreshGloves();
-        } else if (event.getGameState() == LOGIN_SCREEN || event.getGameState() == HOPPING) {
+        } else if (state == LOGIN_SCREEN || state == HOPPING) {
             // Forget the coffer balance: the next reading only sets a baseline.
             engine.coffer(-1, 0, false, 0);
             combat = 0;
-            loggedIn = event.getGameState() == HOPPING;
+            loggedIn = state == HOPPING;
             // No world identity: automatic market quotes fail closed until the next login.
             if (valuation != null) valuation.setEconomy(Valuation.Economy.UNKNOWN);
         }
         // LOGGED_IN -> LOADING -> LOGGED_IN is a region change (teleport, instance, stairs), not a
         // login. Re-priming the baseline there swallowed whatever changed on the way -- a teleport
         // tablet breaking never booked. Only the location-bound trackers reset on a load.
-        if (event.getGameState() == LOADING) {
+        if (state == LOADING) {
             clearLocationState();
             return;
         }
-        if (event.getGameState() == LOGGED_IN && previous == LOADING) {
+        if (state == LOGGED_IN && previous == LOADING) {
             activity.syncSession();
             pulse();
             return;
         }
-        if (event.getGameState() != LOGGED_IN) {
+        if (state != LOGGED_IN) {
             offers.beginSeed();
             seedTicks = 0;
             charges.resetTransient();
             clearLocationState();
             idle.clear();
         }
-        if (event.getGameState() == LOGGED_IN) {
+        if (state == LOGGED_IN) {
             beginOfferSeed();
             storage.syncIdentityAsync();
             pulse();
-        } else if (event.getGameState() == LOGIN_SCREEN || event.getGameState() == HOPPING) {
+        } else if (state == LOGIN_SCREEN || state == HOPPING) {
             experience.clear();
             if (storage.isTrackingReady()) {
                 synchronized (engine) {
@@ -486,7 +489,7 @@ public class GpManagerPlugin extends Plugin {
                 engine.pauseForLifecycle(now());
                 persist();
             }
-            if (event.getGameState() == LOGIN_SCREEN) storage.onLogout();
+            if (state == LOGIN_SCREEN) storage.onLogout();
         }
     }
 
@@ -497,7 +500,8 @@ public class GpManagerPlugin extends Plugin {
     static int caughtItem(String name, List<net.runelite.http.api.item.ItemPrice> found) {
         int plain = -1;
         for (var item : found) {
-            if (item.getName().equalsIgnoreCase("raw " + name)) return item.getId();
+            // A catch names its raw item and a gem line its uncut one (RuneLite's search matches by substring).
+            if (item.getName().equalsIgnoreCase("raw " + name) || item.getName().equalsIgnoreCase("uncut " + name)) return item.getId();
             if (item.getName().equalsIgnoreCase(name)) plain = item.getId();
         }
         return plain;
@@ -561,8 +565,7 @@ public class GpManagerPlugin extends Plugin {
             // Seed current XP rather than swallowing the first real XP drop after enabling.
             experience.clear();
             for (var skill : Skill.values())
-                if (skill != Skill.OVERALL)
-                    experience.put(skill, client.getSkillExperience(skill));
+                experience.put(skill, client.getSkillExperience(skill));
             activity.clearProduction(now);
         }
         if (loginAutoStart)
@@ -631,23 +634,24 @@ public class GpManagerPlugin extends Plugin {
 
     @Subscribe
     public void onItemContainerChanged(ItemContainerChanged event) {
+        var items = event.getItemContainer();
         if (!canIngest()) return;
         int container = event.getContainerId();
-        raidNative().container(container,event.getItemContainer());
-        geBox(container, event.getItemContainer());
+        raidNative().container(container,items);
+        geBox(container, items);
         // The bag's own contents now include what the dispenser added.
-        if (container == LOOTING_BAG && event.getItemContainer() != null) {
+        if (container == LOOTING_BAG && items != null) {
             // One hold: a save or the Risk read never sees the stock half replaced.
             synchronized (engine) {
                 engine.bag.clear();
-                rememberBag(event.getItemContainer());
+                rememberBag(items);
             }
             for (int kind : new int[] {BAG_GAIN, BAG_STORE})
                 for (var e : engine.events.all(kind)) e.flag = false;
         }
-        if (container == INV && event.getItemContainer() != null)
+        if (container == INV && items != null)
             for (var e : engine.events.all(BAG_STORE)) {
-                long held = counts(event.getItemContainer()).getOrDefault(e.item, 0L);
+                long held = counts(items).getOrDefault(e.item, 0L);
                 engine.bagged(e, e.held - held);
                 e.held = held;
                 e.flag = true;
@@ -655,10 +659,12 @@ public class GpManagerPlugin extends Plugin {
         boolean inventory = container == INV || container == WORN;
         if (container == WORN) refreshGloves();
         if (!inventory) markActivity();
-        if (container == BANK)
-            engine.markContext(TRANSFER, CORRELATION_TICKS, "Bank transfer");
-        kit(container, event.getItemContainer());
-        chestChanged(container, event.getItemContainer());
+        if (container == BANK && items != null) {
+            long now = now();
+            engine.bankContents(counts(items), now, row -> inventoryBooked(row, now));
+        }
+        kit(container, items);
+        chestChanged(container, items);
         if (inventory) {
             // Inventory can fire after the bank widget is gone but before the next
             // GameTick. Close soft transfer evidence first so burial is not latched.
@@ -702,27 +708,38 @@ public class GpManagerPlugin extends Plugin {
     }
 
     /**
-     * A tick after a bag pickup, what is still not in the inventory went into the open bag (owner
-     * 1.2).
+     * A tick after a bag receipt, what is still not in the inventory went into an open bag (owner
+     * 1.2). One item's receipts share that shortfall once: catches and sack receipts take it first,
+     * so a looting-bag pickup never inherits another source's quantity as bag stock.
      */
     void bagSettle() {
-        for (var e : engine.events.all(BAG_GAIN)) {
-            if (client.getTickCount() <= e.at) continue;
-            long missing = sum(e.held, e.qty) - inventoryQuantity(e.item);
-            engine.bagged(e, missing);
-            engine.events.take(BAG_GAIN, e.item, e.qty, v -> v == e);
+        var missing = new HashMap<Integer, Long>();
+        var due = engine.events.all(BAG_GAIN);
+        due.removeIf(e -> client.getTickCount() <= e.at);
+        due.sort((a, b) -> Boolean.compare(a.flag, b.flag));
+        for (var e : due) missing.put(e.item, sum(e.qty, missing.getOrDefault(e.item, e.held - inventoryQuantity(e.item))));
+        for (var e : due) {
+            missing.merge(e.item, -engine.bagged(e, positive(missing.get(e.item))), SafeMath::sum);
+            e.qty = 0;
         }
     }
 
-    /** A one-tick bag observation; the source's inventory baseline bounds a split pickup. */
-    void bagGain(int item, long qty, long held) {
-        Observation e = engine.events.peek(BAG_GAIN, row -> row.item == item);
+    /** The pack as the last tick left it: a receipt this tick is measured from it, whichever callback came first. */
+    Map<Integer, Long> lastPack = Map.of();
+
+    /** A one-tick bag observation per item and receiver; only a looting-bag pickup is bag stock. */
+    void bagGain(int item, long qty, boolean looting) {
+        Observation e = engine.events.peek(BAG_GAIN, row -> row.item == item && row.flag == looting);
         if (e != null) { e.qty = sum(e.qty, qty); return; }
         e = engine.events.add(BAG_GAIN, item, qty, 5, null);
         e.at = client.getTickCount();
-        e.held = held;
+        e.held = lastPack.getOrDefault(item, 0L);
+        e.flag = looting;
+    }
+
+    boolean carries(int item) {
         var pack = client.getItemContainer(INV);
-        e.flag = pack != null && pack.contains(ItemID.LOOTING_BAG_OPEN);
+        return pack != null && pack.contains(item);
     }
 
     /** Explicit item-on-bag custody; only its later measured inventory removal proves a move. */
@@ -853,8 +870,7 @@ public class GpManagerPlugin extends Plugin {
         // An Agility dispenser award while a looting bag is open: the bag takes what the pack
         // does not show, so the engine books the difference (owner live 2026-10-16).
         var award = pattern("bag-reward").matcher(message);
-        var pack = award.matches() ? client.getItemContainer(INV) : null;
-        if (pack != null && pack.contains(ItemID.LOOTING_BAG_OPEN)) {
+        if (award.matches() && carries(ItemID.LOOTING_BAG_OPEN)) {
             var items = new HashMap<Integer, Long>();
             bagAward(award.group(1)).forEach((name, quantity) -> {
                                 for (var price : lookup.find(name))
@@ -869,6 +885,10 @@ public class GpManagerPlugin extends Plugin {
         // Each potion a chug drinks prints its own barrel line (Dude Where's My Stuff, GIM Hub).
         var chug = pattern("chug").matcher(message);
         if (chug.matches()) charges.chug(chug.group(1), now);
+        // A banker charges a weapon straight from the bank (GP Per Hour 1.21), so no load is seen:
+        // its next Check starts fresh rather than reading the added charges as unspent.
+        var banker = pattern("banker-charge").matcher(message);
+        if (banker.matches()) engine.resetChecks(ChargeCheck.namedVariant(banker.group(1)));
         if (pattern("ghommal-save").matcher(message).matches()) return;
         if (charges.observeCheck(message, now))
             // Charge Check chat is an explicit measurement, never an activity or title signal.
@@ -897,41 +917,38 @@ public class GpManagerPlugin extends Plugin {
         if (fee.matches()) {
             engine.events.drop(FEE);
             engine.bookDeathFee(digits(fee.group(1)), msg("death-s"), now);
-        } else if (bank.matches() && client.getTickCount() == instanceTick)
-            engine.bookDeathFee(digits(bank.group(1)), msg("instance-fee"), now);
-        else if (bank.matches() && engine.death.isAwaitingReclaim())
-            engine.events.put(FEE, -1, digits(bank.group(1)), 10, "Reclaim fee (bank)").at =
-                    client.getTickCount();
-        else if (bank.matches() && type == ChatMessageType.SPAM && client.getTickCount() - instanceTick > 1)
-            engine.bookDeathFee(digits(bank.group(1)), msg("instance-fee-bank"), now);
-        else if (coffer.matches()) {
+        } else if (bank.matches()) {
+            int tick = client.getTickCount();
+            if (tick == instanceTick)
+                engine.bookDeathFee(digits(bank.group(1)), msg("instance-fee"), now);
+            else if (engine.death.isAwaitingReclaim())
+                engine.events.put(FEE, -1, digits(bank.group(1)), 10, "Reclaim fee (bank)").at = tick;
+            else if (type == ChatMessageType.SPAM && tick - instanceTick > 1)
+                engine.bookDeathFee(digits(bank.group(1)), msg("instance-fee-bank"), now);
+        } else if (coffer.matches()) {
             instanceTick = client.getTickCount();
             engine.bookDeathFee(digits(coffer.group(1)), msg("instance-fee"), now);
         }
         var caught = pattern("bag").matcher(message);
-        if (caught.matches() && lookup != null && engine.baseline != null && containers.bagOpen()) {
+        if (caught.matches() && lookup != null && containers.bagOpen()) {
             // A catch or a cut an open barrel or basket took never reaches the inventory (owner
             // 1.2).
             int found = caughtItem(caught.group(2), lookup.find(caught.group(2)));
-            if (found >= 0)
-                bagGain(found, caught.group(1) == null ? 1 : Long.parseLong(caught.group(1)),
-                        engine.baseline.quantity(found));
+            if (found >= 0) bagGain(found, caught.group(1) == null ? 1 : Long.parseLong(caught.group(1)), false);
         }
-        if (lookup != null && engine.baseline != null)
+        if (lookup != null)
             for (String[] rule : cached("gem_messages")) {
                 var gem = pattern(rule[0]).matcher(message);
                 if (!gem.matches()) continue;
-                String name = "Uncut " + gem.group(parseInt(rule[1]));
+                String name = rule[1].length() > 1 ? rule[1] : gem.group(parseInt(rule[1]));
                 int id = caughtItem(name, lookup.find(name));
                 boolean direct = Boolean.parseBoolean(rule[3]);
-                if (id < 0 || !containers.gemBag(id, !direct)) break;
+                if (id < 0 || !containers.gemBag(id, direct ? 0 : 1)) continue;
                 try {
-                    long qty = "0".equals(rule[2]) ? 1
-                            : digits(gem.group(parseInt(rule[2])));
+                    long qty = "0".equals(rule[2]) ? 1 : digits(gem.group(parseInt(rule[2])));
                     if (direct) engine.bagged(id, qty);
-                    else bagGain(id, qty, containers.capture(false, false).quantity(id));
+                    else bagGain(id, qty, false);
                 } catch (NumberFormatException malformed) { }
-                break;
             }
 
         if (message.contains("accepted trade")) {
@@ -960,23 +977,25 @@ public class GpManagerPlugin extends Plugin {
     @Subscribe
     public void onMenuOptionClicked(MenuOptionClicked event) {
         if (skip(event)) return;
+        var param = event.getParam1();
+        var clicked = event.getMenuAction();
         raidNative().menu(event,now());
         if (event.isConsumed()) return;
         if (bagStore(event)) { markActivity(); return; }
         String option = normalize(event.getMenuOption());
         if (rule("chest-disposition", option)
                 && engine.events.peek(CHEST, v -> v.item < 0
-                        && v.x == CHESTS.getOrDefault(event.getParam1() >>> 16, -1)) != null)
+                        && v.x == CHESTS.getOrDefault(param >>> 16, -1)) != null)
             engine.events.drop(CHEST);
-        if ("bank-all".equals(option)) bankAll(event.getParam1() >>> 16);
+        if ("bank-all".equals(option)) bankAll(param >>> 16);
         boolean consumption = isSpend(option), gather = namesActivityOnly(option);
         if (gather || consumption)
             // A genuine action can produce an item without XP or an animation
             // (field crops). Capture its pre-action inventory on automatic start.
             markGameplayActivity(true);
         targets.onMenuOptionClicked(event);
-        if (worldAction(event.getMenuAction(), event.isItemOp())
-                || event.getParam1() >>> 16 == RUNE_POUCH
+        if (worldAction(clicked, event.isItemOp())
+                || param >>> 16 == RUNE_POUCH
                         && UtilityContainerCatalogue.isCustodyOption(option)) markActivity();
         String target = normalize(event.getMenuTarget()), joined = option + " " + target;
         int identifier = menuItemId(event), ttl = consumeTicks();
@@ -1027,21 +1046,21 @@ public class GpManagerPlugin extends Plugin {
             // evidence and never changes matching, type, counted state or value.
             engine.noteConsume(identifier, ttl, false, ActionReader.verbOf(option), "break".equals(option)
                             ? ActionLabel.of(Spells.named(target)) : spellLabel(event, option));
-            if (event.getMenuAction() != null && event.getMenuAction().name().startsWith("WIDGET_TARGET_ON")) {
+            if (clicked != null && clicked.name().startsWith("WIDGET_TARGET_ON")) {
                 var spell = spellLabel(event, option);
                 if (spell != null) engine.events.put(MANUAL_SPELL, -1, 1, 2, null).label = spell;
             }
         } else if ("drop".equals(option))
             // Match consume TTL so dump-then-settle does not miss power-train drops.
             engine.noteDrop(identifier, ttl);
-        else if ("take".equals(option) && event.getMenuAction() != null
-                && event.getMenuAction().name().startsWith("GROUND_ITEM_")) {
+        else if ("take".equals(option) && clicked != null
+                && clicked.name().startsWith("GROUND_ITEM_")) {
             // A ground item's id is the entry's identifier; a pickup of fired ammo is recovery.
             int id = containers.canonical(event.getId());
             var e = engine.events.put(GROUND_CLICK, id, 1, 5, null);
             e.at = client.getTickCount();
             e.x = event.getParam0();
-            e.y = event.getParam1();
+            e.y = param;
             e.held = inventoryQuantity(id);
         } else if ("destroy".equals(option))
             // Irreversible loss — consume-style intent, never recoverable own-drop.
@@ -1074,7 +1093,7 @@ public class GpManagerPlugin extends Plugin {
             // with no click, and its Make button may come a minute later: the run's own skill XP
             // arms it
             // (owner 2026-10-08, fletching went to Review).
-            else if (event.getMenuAction() == MenuAction.WIDGET_TARGET_ON_WIDGET
+            else if (clicked == MenuAction.WIDGET_TARGET_ON_WIDGET
                     || option.startsWith("make")) activity.clearProduction(now());
         }
         var retrieval = BossRetrievalCatalogue.serviceFor(option, target);
@@ -1233,16 +1252,17 @@ public class GpManagerPlugin extends Plugin {
 
     @Subscribe
     public void onInteractingChanged(InteractingChanged event) {
-        if (event.getSource() == client.getLocalPlayer()) {
+        var self = client.getLocalPlayer();
+        if (event.getSource() == self) {
             if (event.getTarget() instanceof NPC)
                 // Use the existing authorized lifecycle for an actual interaction, never a menu
                 // hover.
                 markGameplayActivity();
             targets.onInteractingChanged(event);
         }
-        if (!canIngest() || client.getLocalPlayer() == null) return;
-        boolean localToPlayer = event.getSource() == client.getLocalPlayer() && event.getTarget() instanceof Player;
-        boolean playerToLocal = event.getTarget() == client.getLocalPlayer() && event.getSource() instanceof Player;
+        if (!canIngest() || self == null) return;
+        boolean localToPlayer = event.getSource() == self && event.getTarget() instanceof Player;
+        boolean playerToLocal = event.getTarget() == self && event.getSource() instanceof Player;
         if (localToPlayer || playerToLocal) {
             // Keep short-lived evidence for death-safety classification even
             // when PK accounting is disabled. That evidence prevents a lingering
@@ -1436,9 +1456,11 @@ public class GpManagerPlugin extends Plugin {
             }
             return;
         }
+        // An open herb sack or seed box names each item it picks up in its own line, which books it.
+        if (containers.gemBag(e.item, 2)) return;
         long qty = engine.events.reserve(PRIVATE_LOOT, e.item, item.getQuantity(), LOOT_RESERVE);
         if (qty > 0 && engine.events.take(GROUND_CLICK, e.item, 1, v -> v == e) > 0)
-            bagGain(e.item, qty, e.held);
+            bagGain(e.item, qty, carries(ItemID.LOOTING_BAG_OPEN));
     }
 
     /** A dart pickup the pack never gained went into the blowpipe: it recovers the shot. */
@@ -1453,6 +1475,7 @@ public class GpManagerPlugin extends Plugin {
 
     @Subscribe
     public void onGameTick(GameTick event) {
+        lastPack = counts(client.getItemContainer(INV));
         if (!canIngest()) {
             // A fenced account (login, switch, restore) drops pending bag evidence untouched (Codex
             // review 1.2).
@@ -1542,7 +1565,7 @@ public class GpManagerPlugin extends Plugin {
                 && !GENERAL.equalsIgnoreCase(activity.detected))
             activity.resetToGeneral(true);
         pulse();
-        if (client.getLocalPlayer() != null && client.getLocalPlayer().getInteracting() instanceof Player)
+        if (player != null && player.getInteracting() instanceof Player)
             // Internal death-safety evidence only. PK transaction and activity
             // accounting still obeys enablePkTracking.
             combat = 20;
@@ -1561,26 +1584,22 @@ public class GpManagerPlugin extends Plugin {
         lootKeys.poll();
         charges.watchReturn();
         raidNative().pulse(now);
-        Transaction transaction = engine.processIfDirty(containers.capture(
-                                true, true), now, row -> {
-                            activity.observeTransaction(row);
-                            transactionBooked(row, now);
-                        });
-        if (transaction != null) {
-            markActivity();
-            activity.observeTransaction(transaction);
-            transactionBooked(transaction, now);
-            // A burst of receipts saves once within 10 ticks, not per receipt: each save copies the
-            // whole
-            // profile under the engine lock (release pass 2026-09-28). Deaths and logout still save
-            // at once.
-            saveTicks = max(saveTicks, SAVE_INTERVAL_TICKS - 10);
-        }
+        inventoryBooked(engine.processIfDirty(containers.capture(true, true), now,
+                row -> inventoryBooked(row, now)), now);
         if (saveDue(++saveTicks, engine.revision(), savedRevision)) {
             saveTicks = 0;
             persist();
         }
         pulse();
+    }
+
+    /** A boundary or tick receipt follows the same notification and coalesced-save path. */
+    void inventoryBooked(Transaction transaction, long now) {
+        if (transaction == null) return;
+        markActivity();
+        activity.observeTransaction(transaction);
+        transactionBooked(transaction, now);
+        saveTicks = max(saveTicks, SAVE_INTERVAL_TICKS - 10);
     }
 
     /**
@@ -1644,15 +1663,6 @@ public class GpManagerPlugin extends Plugin {
     String lastLootBatch = "";
 
     long lastLootAt;
-
-    static String lootKey(Collection<ItemStack> items) {
-        var key = new StringBuilder();
-        if (items != null)
-            for (var item : items)
-                key.append(item.getId()).append('x').append(item.getQuantity()).append(',');
-
-        return key.toString();
-    }
 
     /** Unconfirmed loot goes to presentation only; pickup settles through the engine. */
     void offerReward(boolean pending, String source, Collection<ItemStack> items, int multiplicity) {
@@ -1813,8 +1823,9 @@ public class GpManagerPlugin extends Plugin {
             var widget = event.getWidget();
             if (widget != null) id = widget.getItemId();
         }
-        // CC_OP inventory Eat/Drink often leaves getItemId() == -1; read the clicked slot.
-        if (id < 0) id = slotItemId(event.getParam0());
+        // CC_OP inventory Eat/Drink often leaves getItemId() == -1; read the clicked slot. Only a
+        // widget click carries a slot: NPC, object and ground entries hold scene coordinates.
+        if (id < 0 && event.getParam1() >>> 16 > 0) id = slotItemId(event.getParam0());
         return id < 0 ? -1 : lookup == null ? id : lookup.canon(id);
     }
 
@@ -2556,14 +2567,17 @@ class ContainerSnapshotFactory {
         return false;
     }
 
-    /** The carried gem container must accept this gem; mining also requires it to be open. */
-    boolean gemBag(int gem, boolean open) {
+    /**
+     * A carried container (gem_containers.tsv) accepts this item: need 1 also requires it open, 2
+     * also requires the container to name each ground pickup in its own line (herb sack, seed box).
+     */
+    boolean gemBag(int gem, int need) {
         var inventory = client.getItemContainer(INV);
         if (inventory == null) return false;
         for (Item item : inventory.getItems()) {
-            if (item == null || open && !BAGS.contains(item.getId())) continue;
+            if (item == null || need > 0 && !BAGS.contains(item.getId())) continue;
             for (String[] row : cached("gem_containers"))
-                if (canonical(item.getId()) == parseInt(row[0])
+                if (canonical(item.getId()) == parseInt(row[0]) && row.length > need + 1
                         && Arrays.asList(row[1].split(",")).contains(String.valueOf(gem))) return true;
         }
         return false;
@@ -3176,9 +3190,13 @@ class ChargeIntake {
      * are plumbing.
      */
     static boolean isAtesLocation(String option) {
+        return LOCATIONS.contains(place(option));
+    }
+
+    /** A menu option as a destination name: straight apostrophes, without a leading "the ". */
+    static String place(String option) {
         String name = option == null ? "" : option.replace('’', '\'');
-        if (name.startsWith("the ")) name = name.substring(4);
-        return LOCATIONS.contains(name);
+        return name.startsWith("the ") ? name.substring(4) : name;
     }
 
     /** The pendant's six teleport locations, normalized like menu options. */
@@ -3189,8 +3207,7 @@ class ChargeIntake {
      * options); a click there is a teleport (OSRS Wiki, owner recording 2026-10-14).
      */
     static boolean isAmuletLocation(String option) {
-        String name = option == null ? "" : option.replace('’', '\'');
-        if (name.startsWith("the ")) name = name.substring(4);
+        String name = place(option);
         // The amulet's own teleport dialog lists each destination as a sentence.
         while (name.endsWith(".")) name = name.substring(0, name.length() - 1).trim();
         return AMULET_LOCATIONS.contains(name);
@@ -3252,9 +3269,7 @@ class ChargeIntake {
                 // The eye's cast trigger is pinned in no table: learn it from the magic XP every
                 // cast drops (owner 2026-09-29), then each cast books one tear like a spell.
                 eyeGraphic = graphic;
-                eyeTick = client.getTickCount();
-                eyeWeapon = weapon.getId();
-                eyeTarget = wornIdentity(EYE_OF_AYAK, weapon.getId());
+                eyeCandidate(weapon);
             }
             return;
         }
@@ -3290,7 +3305,7 @@ class ChargeIntake {
         boolean scythe = variant == SCYTHE && damage > 0;
         Actor local = client.getLocalPlayer();
         boolean shot = variant == BLOWPIPE && local != null
-                        && local.getAnimation() == (variant == BLOWPIPE ? 5061 : 0);
+                        && local.getAnimation() == 5061;
         if (!scythe && !shot) return;
         if (shot) {
             int tick = client.getTickCount();
@@ -3301,6 +3316,13 @@ class ChargeIntake {
     }
 
     /** A local attack animation books the pinned per-attack charge for crystal weapons. */
+    /** A candidate eye cast on this tick; the same tick's magic XP proves it. */
+    void eyeCandidate(Item weapon) {
+        eyeTick = client.getTickCount();
+        eyeWeapon = weapon.getId();
+        eyeTarget = wornIdentity(EYE_OF_AYAK, weapon.getId());
+    }
+
     void onAnimation(int animation, long now) {
         Item weapon = wornWeapon();
         var variant = weapon == null ? null : supported(weapon.getId());
@@ -3309,9 +3331,7 @@ class ChargeIntake {
             if (!eyeAnimations.contains(animation)) {
                 // Candidate cast animation; the same tick's magic XP proves it, like the graphic.
                 eyeAnimation = animation;
-                eyeTick = client.getTickCount();
-                eyeWeapon = weapon.getId();
-                eyeTarget = wornIdentity(EYE_OF_AYAK, weapon.getId());
+                eyeCandidate(weapon);
                 return;
             }
         } else if (!isPinnedAttack(variant, animation))
@@ -3451,11 +3471,6 @@ class ChargeIntake {
         return cape.contains("attractor") ? new long[] {2, 5} : new long[] {1, 1};
     }
 
-    String wornCapeName() {
-        Item cape = wornItem(EquipmentInventorySlot.CAPE);
-        return cape == null || cape.getId() <= 0 ? "" : itemName(cape.getId());
-    }
-
     /** Whole units to book now and the remainder to keep, for a fractional component. */
     static long[] accrue(long carry, long amount, long denominator) {
         long total = carry + amount;
@@ -3498,7 +3513,8 @@ class ChargeIntake {
             // Owner 1.1: each shot spends its dart unless an Ava's device saves it; the expected
             // share
             // accrues like the scales, and a Check reconciles it.
-            long[] loss = dartLoss(wornCapeName());
+            Item cape = wornItem(EquipmentInventorySlot.CAPE);
+            long[] loss = dartLoss(cape == null || cape.getId() <= 0 ? "" : itemName(cape.getId()));
             accrueInto(variant, dart, loss[0], loss[1], recipe);
         }
         var flows = new ArrayList<Flow>();
@@ -4898,7 +4914,7 @@ class LootKeyManifestReader {
                 int canonical = lookup == null ? item.getKey() : lookup.canon(item.getKey());
                 long quantity = item.getValue();
                 if (canonical <= 0 || quantity <= 0) continue;
-                manifest.merge(canonical, quantity, LootKeyManifestReader::safeAddPositive);
+                manifest.merge(canonical, quantity, SafeMath::sum);
             }
             // An open chest is evidence only; settled inventory gains carry the financial truth.
             engine.observeKeyContainer(key, manifest);
@@ -4918,14 +4934,6 @@ class LootKeyManifestReader {
                     : composition.getName().toLowerCase(ROOT);
         } catch (RuntimeException unavailable) {
             return null;
-        }
-    }
-
-    static long safeAddPositive(long left, long right) {
-        try {
-            return addExact(left, right);
-        } catch (ArithmeticException overflow) {
-            return Long.MAX_VALUE;
         }
     }
 }

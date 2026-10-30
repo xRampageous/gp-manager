@@ -73,7 +73,7 @@ public class CogRemovalUndoTest {
     @Test public void financialRemovalKeepsCogUndoAvailableAfterLaterUse() throws Exception {
         var fixture = new Fixture();
         var row = fixture.book(1275, 18_635, NOW + 1);
-        assertTrue(fixture.engine.removeEntry(row.id(), "Removed by player"));
+        assertTrue(fixture.engine.correctEntry(row.id(), Correction.IGNORE));
         fixture.engine.session().addTransaction(Tx.of(NOW + 2, TransactionType.CONSUMPTION,
                 Context.GENERIC, "", true,
                 List.of(new Flow(1275, "Rune pickaxe", -1, 18_635, -18_635,

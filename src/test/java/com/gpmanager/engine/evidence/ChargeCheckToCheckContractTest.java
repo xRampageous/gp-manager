@@ -69,6 +69,28 @@ public class ChargeCheckToCheckContractTest
     }
 
 
+    /**
+     * A banker charges a weapon from the bank (GP Per Hour 1.21's "The banker charges your ...
+     * using ..." line): no load is seen, so the next Check seeds instead of reading the bank's
+     * charges as unspent and undoing the casts the estimates already booked.
+     */
+    @Test
+    public void aBankerChargeRestartsTheComparison()
+    {
+        for (String weapon : new String[] {"Trident of the swamp", "<col=ff9040>Trident of the swamp</col>", "Unknown staff"})
+        {
+            Engine engine = engine();
+            ChargeOutcomeTest.none(observe(engine, "Your Trident of the swamp has 2,000 charges.", WEAPON_A, 1_000L));
+            net.runelite.api.events.ChatMessage line = new net.runelite.api.events.ChatMessage();
+            line.setType(net.runelite.api.ChatMessageType.GAMEMESSAGE);
+            line.setMessage("The banker charges your " + weapon
+                + " using 100x Zulrah's scales, 100x Death rune, 100x Chaos rune and 500x Fire rune.");
+            ReviewFixesTest.plugin(engine, new int[] {10}).onChatMessage(line);
+            ChargeOutcomeTest.none(weapon + ": the bank's charges are never read as unspent",
+                observe(engine, "Your Trident of the swamp has 1,800 charges.", WEAPON_A, 2_000L));
+        }
+    }
+
     @Test
     public void aDifferentTargetSeedsInsteadOfComparing()
     {

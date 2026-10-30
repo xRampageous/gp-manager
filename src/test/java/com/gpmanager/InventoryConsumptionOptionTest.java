@@ -12,7 +12,7 @@ public class InventoryConsumptionOptionTest
     @Test
     public void recognisesSupportedInventoryConsumeOptions()
     {
-        for (String option : new String[] {"bury", "scatter", "eat", "drink", "empty", "break", "cast", "release", "eat 1", "drink 1", "light", "offer", "tend-to"})
+        for (String option : new String[] {"bury", "scatter", "eat", "drink", "empty", "break", "cast", "release", "teleport", "eat 1", "drink 1", "light", "offer", "tend-to"})
         {
             assertTrue(option, ActionSignals.isSpend(option));
         }

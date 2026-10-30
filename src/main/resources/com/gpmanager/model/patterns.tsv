@@ -22,7 +22,7 @@ scythe-check	^Your ((?:holy |sanguine |corrupted )?scythe(?: of vitur)?) has (?:
 blood-fury-check	^Your Amulet of blood fury will work for ((\d{1,3}(?:,\d{3})+|\d+)) more hits?\.$	2
 eye-tears-check	^The Eye of Ayak has been charged with demon tears\. It currently has ((\d{1,3}(?:,\d{3})+|\d+)) charges?\.$	2
 eye-runes-check	^The Eye of Ayak has been charged with runes\. It currently has ((\d{1,3}(?:,\d{3})+|\d+)) charges?\.$	2
-bag	^You (?:catch|get) (?:an? |some |(\d+) )?(.+?)[.!]$	2
+bag	^You (?:catch|get|manage to mine|put the(?= .+ into your (?:open )?herb sack\.$)) (?:an? |some |(\d+) )?(.+?)(?: herb)?(?: into your (?:open )?herb sack)?[.!]$	2
 # A treasure trail's scrolls, boxes and caskets are claims on the casket's loot, held at zero.
 # A player-owned house servant's name as his dialogue shows it (OSRS Wiki: Servant).
 servant	rick|maid|cook|butler|demon butler	2
@@ -38,6 +38,7 @@ avernic	avernic defender(?! hilt).*	0
 bag-reward	^you have been awarded (.+) from the agility dispenser\.$	2
 # A chug's line per potion (OSRS Wiki; Dude Where's My Stuff, GIM Hub): the one-dose potion it drank.
 chug	^You have (?:[\d,]+ doses? of|finished all doses of) (.+?)(?: left)? in your barrel\.$	2
+banker-charge	^(?:<[^>]*>)*The banker charges your (.+?) using .+\.(?:<[^>]*>)*$	2
 # Bryophyta's staff Check and load lines (owner recording 2026-10-09).
 bry	^(?:The staff currently has|Your Bryophyta's staff now has) (?:([\d,]+) charges?|(one) charge|no charges)\.$	2
 # Uncharging Bryophyta's staff: the charges it destroys (owner recording 2026-10-09).
@@ -71,6 +72,24 @@ gem-mined	^You just (?:found|mined) (?:a|an) (?:piece of )?([\w ]+)!$	2
 gem-thieved	^You put a gem in your (?:gem )?(?:bag|pouch|satchel|tote|sack): Uncut ([\w ]+)\.?$	2
 gem-vyre-batch	^The following stolen loot gets added to your gem (?:bag|sack): Uncut ([\w ]+) x ([\d,]+)\.?$	2
 gem-vyre-single	^You put the stolen Uncut ([\w ]+) into your gem (?:bag|sack)\.$	2
+# An open seed box takes seeds straight from a drop or a pickpocket (Dude Where's My Stuff, GIM Hub, GP Per Hour).
+seed-picked	^You put ([\d,]+) x (.+) straight into your open seed box\.$	2
+seed-stolen	^You put the stolen (.+) into your seed box\.$	2
+seed-stolen-batch	^The following stolen loot gets added to your seed box: (.+) x ([\d,]+)\.?$	2
+# Hunter catch lines (TicTac7x Item Charges: U_MeatPouch, U_FurPouch). Pitfall cats' fur may be tatty: only their meat counts.
+hunt-polar	^You manage to noose a polar kebbit that is hiding in the snowdrift\.$	2
+hunt-common	^You manage to noose a common kebbit that is hiding in the bush\.$	2
+hunt-feldip	^You manage to noose a Feldip weasel that is hiding in the bush\.$	2
+hunt-devil	^You manage to noose a desert devil that is hiding in the sand\.$	2
+hunt-razor	^You manage to noose a razor-backed kebbit that is hiding in the bush\.$	2
+hunt-wild	^You've caught a wild kebbit\.$	2
+hunt-barbed	^You've caught a barb-tailed kebbit\.$	2
+hunt-fox	^You've caught a pyre fox\.$	2
+hunt-larupia	^You've caught a spined larupia!$	2
+hunt-graahk	^You've caught a horned graahk!$	2
+hunt-kyatt	^You've caught a sabre-?toothed kyatt!$	2
+hunt-sunlight	^You've caught a sunlight antelope!$	2
+hunt-moonlight	^You've caught a moonlight antelope!$	2
 target-net	\d+(?:\.\d+)?[kmb]?	0
 target-minutes	\d+(?:\.\d+)?	0
 target-time	^(?:(\d+(?:\.\d+)?)\s*h)?\s*(?:(\d+(?:\.\d+)?)\s*m)?$	0

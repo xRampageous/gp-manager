@@ -3,6 +3,7 @@
 ## 1.7.0 - 2026-10-30
 
 - Right-click Recent to preview and remove an entry from tables and totals, even if the item was later used or sold. Undo last removal is under ⚙; grouped rows offer the latest booking. Other protected changes explain why they cannot be applied.
+- Fix drops and pickups around banking, including picking a dropped stack back up immediately after closing the bank; keep loot, crafting and food costs from just before the bank opens. Count a teleport tablet used as tracking starts.
 - Track CoX, ToB, ToA and The Fractured Archive in Raids, with loot, paid death fees and All raids totals. Raid entry unlocks the tab; you always open it manually. Attempts show a completed clear, a terminal failure or the actual Death Fee; abandoned and retry-only attempts stay out of the list.
 - Open KILLS for recorded PK loot, or DEATHS for PvP death losses and looting-bag contents. PvP skull colours show the booked loss tier.
 - Save a session in Grinds and rename saved sessions or finished runs from their ⋯ menu.
@@ -15,6 +16,7 @@
 - The Save history setting is gone: your history is always kept on your computer. Use ⚙ › Delete Profile to remove it.
 - Clearer save warnings, safer loading when a save file is busy, and more reliable Ledger corrections and Undo.
 - Cannonballs left in a deployed cannon no longer count as fresh income when you pick it up; a tracked load shrinks when those balls come back.
+- Herbs an open herb sack takes (from a patch, a herbiboar or the ground), seeds an open seed box takes (from a drop or a pickpocket), coal an open coal bag takes, and the meat and fur open Hunter pouches take from a catch now count. A Dizana's quiver, charged or not, and a mangled locked item stay yours when they break, and Perdu's repair books only the fee, and a banker charging a weapon from your bank no longer skews its next Check.
 - Hardcore Worlds pause tracking and automatic market prices until dedicated support; main-game history is never mixed with them.
 - Recovered gear stays neutral; only the death fee counts. Genuine loot is kept. Wrong entries in the current run can be removed with Undo available.
 - OSRS already shows your grave, so GP Manager no longer adds a gravestone icon, reclaim-pending row or death-reclaim hero line.

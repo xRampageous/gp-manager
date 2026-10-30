@@ -116,7 +116,7 @@ public class ArmourRepairTest {
             assertEquals(id,ItemID.class.getField(row[2]).getInt(null));assertTrue(seen.add(id));
             families.computeIfAbsent(row[1],key -> new ArrayList<>()).add(id);
         }
-        assertEquals(381,seen.size());assertEquals(130,families.size());
+        assertEquals(404,seen.size());assertEquals(131,families.size());
         for (var family : families.values()) for (int i = 1; i < family.size(); i++) {
             int a = family.get(0), b = family.get(i);
             var f = new Fixture(a);f.swap(a,b,0);f.feeOnly(0);
@@ -129,6 +129,30 @@ public class ArmourRepairTest {
         f.change(Map.of(ItemID.TZHAAR_CAPE_FIRE_BROKEN,-1L,ItemID.TZHAAR_CAPE_FIRE,1L,
                 ItemID.BARBASSAULT_PENANCE_FIGHTER_TORSO_BROKEN,-1L,ItemID.BARBASSAULT_PENANCE_FIGHTER_TORSO,1L,COINS,-300000L));
         f.feeOnly(300000);
+    }
+
+    @Test public void perduRepairsAMangledLockedPieceForItsFlatFee() {
+        var f = new Fixture(ItemID.INFERNAL_CAPE_TROUVER_MANGLED,ItemID.DIZANAS_QUIVER_TROUVER_BROKEN);
+        f.change(Map.of(ItemID.INFERNAL_CAPE_TROUVER_MANGLED,-1L,ItemID.INFERNAL_CAPE_TROUVER,1L,
+                ItemID.DIZANAS_QUIVER_TROUVER_BROKEN,-1L,ItemID.DIZANAS_QUIVER_UNCHARGED_TROUVER,1L,COINS,-770000L));
+        f.feeOnly(770000);
+    }
+
+    /**
+     * A charged quiver breaks (or, locked, mangles) on a PvP death exactly like an uncharged one
+     * (Wildy-QoL's Items Kept on Death table); Perdu's repair returns the same piece, charged or not.
+     */
+    @Test public void aChargedQuiverBreaksAndIsRepairedAsTheSamePiece() {
+        int[][] cycles = {
+            {ItemID.DIZANAS_QUIVER_CHARGED,ItemID.DIZANAS_QUIVER_BROKEN,ItemID.DIZANAS_QUIVER_UNCHARGED,270000},
+            {ItemID.DIZANAS_QUIVER_CHARGED,ItemID.DIZANAS_QUIVER_BROKEN,ItemID.DIZANAS_QUIVER_CHARGED,270000},
+            {ItemID.DIZANAS_QUIVER_CHARGED_TROUVER,ItemID.DIZANAS_QUIVER_TROUVER_BROKEN,ItemID.DIZANAS_QUIVER_UNCHARGED_TROUVER,270000},
+            {ItemID.DIZANAS_QUIVER_CHARGED_TROUVER,ItemID.DIZANAS_QUIVER_TROUVER_MANGLED,ItemID.DIZANAS_QUIVER_CHARGED_TROUVER,500000}};
+        for (int[] cycle : cycles) {
+            var f = new Fixture(cycle[0]);
+            f.swap(cycle[0],cycle[1],0);f.feeOnly(0);
+            f.swap(cycle[1],cycle[2],cycle[3]);f.feeOnly(cycle[3]);
+        }
     }
 
     @Test public void aFeeCanArriveBeforeOrAfterTheStatePairWithoutDoubleCounting() {

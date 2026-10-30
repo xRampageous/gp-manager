@@ -117,6 +117,23 @@ public class QuiverSupportTest {
         h.charges.resetOwner(); h.progress(102); assertEquals(0L,h.net());
     }
 
+    /** Splinters used on a carried quiver are a load, unlocked or locked: charging it books nothing. */
+    @Test public void chargingACarriedQuiverWithSplintersIsNeutral() throws Exception {
+        for (int[] quiver : new int[][] {{ItemID.DIZANAS_QUIVER_UNCHARGED,ItemID.DIZANAS_QUIVER_CHARGED},
+            {ItemID.DIZANAS_QUIVER_UNCHARGED_TROUVER,ItemID.DIZANAS_QUIVER_CHARGED_TROUVER}}) {
+            Harness h = new Harness();
+            h.inventory.put(quiver[0],1L); h.inventory.put(ItemID.SUNFIRESPLINTER,500L);
+            h.engine.setBaseline(h.capture());
+            ChargeCheck.ChargedItem variant = ChargeCheck.supported(quiver[0]);
+            assertNotNull(variant);
+            h.engine.markChargeLoad(variant,ItemID.SUNFIRESPLINTER,"Sunfire splinter",null,10);
+            h.inventory.clear(); h.inventory.put(quiver[1],1L);
+            h.engine.markDirty(); h.settle(); h.settle();
+            assertEquals(0L,h.net());
+            assertTrue(h.rows().stream().noneMatch(ReviewRules::needsReview));
+        }
+    }
+
     static final class Harness {
         final Map<Integer, Long> inventory = new LinkedHashMap<>();
         final Map<Integer, Item> worn = new LinkedHashMap<>();
@@ -147,7 +164,7 @@ public class QuiverSupportTest {
                 ItemComposition composition(int id) { return Harness.this.composition(id); }
                 List<ItemPrice> find(String query) {
                     List<ItemPrice> found = new ArrayList<>();
-                    for (int id : GEM_NAMES.keySet()) if (GEM_NAMES.get(id).equalsIgnoreCase(query)) {
+                    for (int id : GEM_NAMES.keySet()) if (GEM_NAMES.get(id).toLowerCase().contains(query.toLowerCase())) {
                         ItemPrice item = new ItemPrice(); item.setId(id); item.setName(GEM_NAMES.get(id)); found.add(item);
                     }
                     return found;

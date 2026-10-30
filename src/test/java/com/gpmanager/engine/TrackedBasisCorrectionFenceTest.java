@@ -439,11 +439,11 @@ public class TrackedBasisCorrectionFenceTest
         Harness h = new Harness(159);
         String gain = h.gain(LOGS, 5, 775, h.now - 60_000);
         String before = stableState(h.engine);
-        assertFalse(h.engine.removeEntry("missing", "owner"));
+        assertFalse(h.engine.correctEntry("missing", Correction.IGNORE));
         assertEquals(before, stableState(h.engine));
         removeInLedger(h.engine, gain);
         before = stableState(h.engine);
-        assertFalse(h.engine.removeEntry(gain, "owner"));
+        assertFalse(h.engine.correctEntry(gain, Correction.IGNORE));
         assertEquals(before, stableState(h.engine));
     }
 
