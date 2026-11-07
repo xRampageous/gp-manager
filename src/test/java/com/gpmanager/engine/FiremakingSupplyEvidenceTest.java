@@ -16,7 +16,7 @@ public class FiremakingSupplyEvidenceTest
         assertFuelAction("Tend-to", "Blisterwood logs");
         assertFuelAction("Tend to", "Juniper logs");
         assertTrue("existing Use Tinderbox evidence remains supported",
-            ActionSignals.lightsFire("Use", "Tinderbox -> Willow logs"));
+            FixtureReads.lightsFire("Use", "Tinderbox -> Willow logs"));
     }
 
     @Test

@@ -39,9 +39,9 @@ public class InventoryConsumptionOptionTest
         assertEquals("Herblore", ActionSignals.transformSkill("clean"));
         assertEquals("Fletching", ActionSignals.transformSkill("fletch"));
         assertEquals("", ActionSignals.transformSkill("eat"));
-        assertTrue(ActionSignals.lightsFire("use", "Tinderbox -> Willow logs"));
-        assertFalse(ActionSignals.lightsFire("use", "Willow logs"));
-        assertTrue(ActionSignals.offersBones("use", "Dragon bones -> Altar"));
+        assertTrue(FixtureReads.lightsFire("use", "Tinderbox -> Willow logs"));
+        assertFalse(FixtureReads.lightsFire("use", "Willow logs"));
+        assertTrue(FixtureReads.offersBones("use", "Dragon bones -> Altar"));
         assertTrue(ActionSignals.isOffering("cast", "Sinister Offering"));
     }
 

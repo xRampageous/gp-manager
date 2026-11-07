@@ -1,0 +1,9 @@
+# Descending lower bound, truncation divisor, floating scale (0 = integer), format/suffix.
+# Same thresholds and arithmetic as the original compact GP formatter.
+10000000000	100000000	10	%.1fB
+1000000000	10000000	100	%.2fB
+100000000	1000000	0	M
+10000000	100000	10	%.1fM
+1000000	10000	100	%.2fM
+100000	1000	0	k
+1000	100	10	%.1fk

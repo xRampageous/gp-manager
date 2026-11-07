@@ -313,6 +313,38 @@ public class DropBankBoundaryTest
         assertEquals(30, EngineProbe.availableBasisGp(e, LOGS));
     }
 
+    // Owner recording 20261023-044520: a calquat sapling dropped, then the Tool Leprechaun's
+    // Exchange opened his store while the drop was still settling. No store counts exist there.
+    @Test public void aDropAlreadyShownSurvivesAStoreOpening()
+    {
+        Engine e = engine(3, 0);
+        e.noteDrop(LOGS, 6);
+        e.markDirty();
+        tick(e, held(0, 0));
+        e.markTransfer("Tool Leprechaun store", 6);
+        for (int i = 0; i < 4; i++) tick(e, held(0, 0));
+        assertEquals(1, count(e, "Dropped"));
+        assertEquals(-30, dropped(e).net());
+        for (int i = 0; i < 4; i++) tick(e, held(0, 0));
+        e.markDirty();
+        for (int i = 0; i < 4; i++) tick(e, held(3, 0));
+        assertEquals("the pickup is not new income", 30, e.metrics(now).net);
+        assertEquals(30, e.metrics(now).income);
+        assertEquals(0, e.metrics(now).cost);
+    }
+
+    @Test public void aDropClickBeforeAStoreDepositStaysStorage()
+    {
+        Engine e = engine(3, 0);
+        e.noteDrop(LOGS, 6);
+        e.markTransfer("Seed vault", 6);
+        e.markDirty();
+        for (int i = 0; i < 4; i++) tick(e, held(0, 0));
+        assertEquals("the logs went into the store", 0, count(e, "Dropped"));
+        assertEquals(30, e.metrics(now).net);
+        assertEquals(0, e.metrics(now).cost);
+    }
+
     @Test public void pluginBankCallbackKeepsTheMenuDrop() throws Exception
     {
         Engine e = engine(3, 0);

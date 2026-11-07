@@ -1,5 +1,7 @@
 package com.gpmanager;
 
+import static org.junit.Assert.assertArrayEquals;
+
 import net.runelite.api.Skill;
 
 import java.util.ArrayList;
@@ -61,16 +63,14 @@ public class GameDataTablesTest
 
     static final Set<Integer> CURRENCY_PROXIES = new HashSet<>(Arrays.asList(
         ItemID.TZHAAR_TOKEN, ItemID.GAUNTLET_CRYSTAL_SHARD, ItemID.PRIF_CRYSTAL_SHARD_CRUSHED,
-        21649, ItemID.STAR_DUST, ItemID.MGUILD_MINERALS, ItemID.MOTHERLODE_NUGGET, 26792,
-        ItemID.HALLOWED_MARK_3, ItemID.BH_EMBLEM, ItemID.PRIF_CRYSTAL_SHARD,
+        ItemID.FOSSIL_MERMAID_TEAR, ItemID.STAR_DUST, ItemID.MGUILD_MINERALS, ItemID.MOTHERLODE_NUGGET,
+        ItemID.ABYSSAL_PEARL, ItemID.HALLOWED_MARK_3, ItemID.BH_EMBLEM, ItemID.PRIF_CRYSTAL_SHARD,
         // 2026-10-13 currency pass: spirit flakes read at the soaked-page exchange, Molch pearls
-        // at the golden-tench one; hallowed mark variants, Castle Wars tickets and Soul Wars
-        // spoils are catalogue guards.
+        // at the golden-tench one; hallowed mark variants and Castle Wars tickets are guards.
         ItemID.SPIRIT_FLAKES, ItemID.AERIAL_FISHING_PEARL, ItemID.MOLCH_PEARL_2,
         ItemID.MOLCH_PEARL_3, ItemID.MOLCH_PEARL_4, ItemID.MOLCH_PEARL_5,
         ItemID.HALLOWED_MARK, ItemID.HALLOWED_MARK_2, ItemID.HALLOWED_MARK_4,
         ItemID.HALLOWED_MARK_5, ItemID.HALLOWED_MARK_25, ItemID.CASTLEWARS_TICKET,
-        ItemID.SOUL_WARS_SPOILS,
         // 1.3.0: the degrading Amulet of the damned, imbued black masks and slayer helmets.
         ItemID.DAMNED_AMULET_DEGRADED, ItemID.SLAYER_HELM_I, ItemID.SW_SLAYER_HELM_I, ItemID.PVPA_SLAYER_HELM_I,
         // 1.3.4 review: the sailors' amulet's inert and charged states are the same worth, and the
@@ -296,7 +296,8 @@ public class GameDataTablesTest
     public void itemNamesInTheTablesMatchRuneLiteIds() throws ReflectiveOperationException
     {
         int named = 0;
-        for (String table : new String[]{"tax_exempt", "currencies", "key_chests", "dismantle", "minigame_items"})
+        for (String table : new String[]{"tax_exempt", "currencies", "alch_currencies", "key_chests",
+            "dismantle", "minigame_items"})
         {
             for (String[] row : GameData.rows(table))
             {
@@ -309,7 +310,8 @@ public class GameDataTablesTest
                 }
             }
         }
-        assertEquals(50 + 22 + 35 + 8 + 1031 + 171, named);
+        // minigame_items 2026-11-07: Wintertodt 8, Zalcano 3, Mage Training Arena 16.
+        assertEquals(50 + 13 + 19 + 35 + 8 + 1031 + 171 + 8 + 3 + 16, named);
     }
 
     /** Every msg key the plugin uses has its text, and text.tsv holds nothing the code no longer uses. */
@@ -368,7 +370,11 @@ public class GameDataTablesTest
     {
         assertEquals(Set.of("widget", "spend.raw", "spend.norm", "use", "fuel", "fire", "altar",
             "bones", "cast", "offering", "spared", "spend.chat", "gather.exclude",
-            "chest-disposition", "chest-action"), ActionSignals.RULES.keySet());
+            "chest-disposition", "chest-action", "clue-cost", "custody", "world-click", "chest-open", "market-click",
+            "player-trade", "review-note", "raid-name", "gp-suffix", "cannon", "sawmill", "object-option", "take-out",
+            "ava-cape", "blowpipe-check", "sailors-check", "pickaxe-store", "take-or-buy", "clue-activity",
+            "net-to-hold", "net-take-all", "coffer-sacrifice", "special-world", "spell-reserved"),
+            ActionSignals.RULES.keySet());
         Set<net.runelite.api.MenuAction> expected = Set.of(net.runelite.api.MenuAction.WIDGET_TARGET,
             net.runelite.api.MenuAction.WIDGET_TARGET_ON_NPC, net.runelite.api.MenuAction.WIDGET_TARGET_ON_PLAYER,
             net.runelite.api.MenuAction.WIDGET_TARGET_ON_WIDGET, net.runelite.api.MenuAction.WIDGET_TARGET_ON_GROUND_ITEM,
@@ -377,6 +383,69 @@ public class GameDataTablesTest
         for (net.runelite.api.MenuAction action : net.runelite.api.MenuAction.values())
             assertEquals(action.name(), expected.contains(action), ActionSignals.isWidgetAction(action));
         assertFalse(ActionSignals.isWidgetAction(null));
+    }
+
+    @Test public void movedWorldFlagsKeepTheirExactClassificationAndNullOrdering() {
+        // Owner 2026-11-07: Hardcore Worlds left the list; they track with their own prices.
+        var special = Set.of(net.runelite.api.WorldType.DEADMAN, net.runelite.api.WorldType.SEASONAL,
+            net.runelite.api.WorldType.QUEST_SPEEDRUNNING,
+            net.runelite.api.WorldType.BETA_WORLD, net.runelite.api.WorldType.TOURNAMENT_WORLD,
+            net.runelite.api.WorldType.NOSAVE_MODE);
+        for(var type:net.runelite.api.WorldType.values())
+            assertEquals(type.name(),special.contains(type),ActionSignals.rule("special-world",type.name()));
+        assertEquals(Valuation.Economy.UNKNOWN,Valuation.economyFor(null));
+        assertEquals(Valuation.Economy.UNKNOWN,Valuation.economyFor(java.util.Arrays.asList(null,net.runelite.api.WorldType.DEADMAN)));
+        assertEquals(Valuation.Economy.UNSUPPORTED_SPECIAL,Valuation.economyFor(java.util.Arrays.asList(net.runelite.api.WorldType.DEADMAN,null)));
+        assertEquals(Valuation.Economy.UNKNOWN,Valuation.economyFor(java.util.Arrays.asList(net.runelite.api.WorldType.HARDCORE_MAIN,null)));
+    }
+
+    @Test public void bondQuoteUsesTheNativeAcceptAndRightHandChildIds() {
+        assertArrayEquals(new int[]{net.runelite.api.gameval.InterfaceID.BondConvert.ACCEPT,
+            net.runelite.api.gameval.InterfaceID.BondConvert.RIGHT,7,12,
+            net.runelite.api.gameval.InterfaceID.BondConvert.CANCEL},GpManagerPlugin.BOND_WIDGETS);
+    }
+
+    /** Literal chains moved from code to menu_rules.tsv (2026-11-02) keep their exact matches. */
+    @Test
+    public void movedLiteralChainsMatchWhatTheCodeMatched()
+    {
+        String[][] cases = {
+            {"clue-cost", "dig", "tele ", "a key from a chest", "spade"}, {"clue-cost!", "key", "telegrab", ""},
+            {"custody", "fill", "check", "use", "store", "empty-bank", "withdraw-1", "remove"},
+            {"custody!", "fill-up", "used", "deposit"},
+            {"world-click", "NPC_FIRST_OPTION", "GAME_OBJECT_SECOND_OPTION", "GROUND_ITEM_THIRD_OPTION", "PLAYER_FIRST_OPTION",
+                "WIDGET_TARGET_ON_NPC"}, {"world-click!", "CC_OP", "WIDGET_TARGET", "WALK"},
+            {"chest-open", "open", "open chest", "unlock", "search", "search crate"}, {"chest-open!", "opened", "take", "reopen"},
+            {"market-click", "buy-1", "sell-10", "collect", "collect-to-bank"}, {"market-click!", "collect-from", "trade"},
+            {"player-trade", "accept trade", "trade with bob"}, {"player-trade!", "trade"},
+            {"review-note", "calibrating", "uncertain bag delta", "charge warning"}, {"review-note!", "uncertain", "plank sack"},
+            {"raid-name", "ToB", "CoX normal", "ToA expert"}, {"raid-name!", "tob", "Tomb"},
+            {"gp-suffix", "5k", "1.2m", "3b"}, {"gp-suffix!", "500", "k5"},
+            {"cannon", "dwarf multicannon", "cannon base"}, {"cannon!", "cannonball", "a cannon"},
+            {"sawmill", "the sawmill operator"}, {"sawmill!", "sawmill bank", "mill"},
+            {"object-option", "GAME_OBJECT_FIRST_OPTION"}, {"object-option!", "GAME_OBJECT_", "NPC_FIRST_OPTION"},
+            {"take-out", "withdraw-all", "remove"}, {"take-out!", "empty", "store"},
+            {"ava-cape", "ava's assembler", "dizana's quiver"}, {"ava-cape!", "ava's accumulator"},
+            {"blowpipe-check", "darts: 100 scales: 50"}, {"blowpipe-check!", "scales: 50", "no darts: scales"},
+            {"sailors-check", "the amulet has 5 charges.", "your amulet has 1 charge."}, {"sailors-check!", "amulet has"},
+            {"pickaxe-store", "take-pickaxe", "deposit-pickaxe"}, {"pickaxe-store!", "take", "take-pickaxes"},
+            {"take-or-buy", "take", "take-5", "buy-1"}, {"take-or-buy!", "sell", "bank-all"},
+            {"clue-activity", "clue scroll (hard)", "reward casket", "treasure trail"}, {"clue-activity!", "key"},
+            {"net-to-hold", "you empty the net into the cargo hold."},
+            {"net-take-all", "you take all of the fish from the net."},
+            {"net-take-all!", "you take some of the fish from the net."},
+            {"net-to-hold!", "you empty the net into the cargo hold, but there was not enough space in there to do so entirely."},
+        };
+        for (String[] row : cases)
+        {
+            boolean match = !row[0].endsWith("!");
+            String key = row[0].replace("!", "");
+            for (int i = 1; i < row.length; i++)
+            {
+                assertEquals(key + " " + row[i], match, ActionSignals.rule(key, row[i]));
+            }
+        }
+        assertFalse(ActionSignals.rule("custody", null));
     }
 
     /** d25 uses names, not item ids; each row is a consumed verb or item predicate. */
@@ -400,6 +469,11 @@ public class GameDataTablesTest
         assertEquals(ActionKind.DRINK, ActionReader.verbOf("You drink the prayer potion."));
         assertEquals(ActionKind.BURY, ActionReader.verbOf("You bury the bones."));
         assertEquals(ActionKind.OFFER, ActionReader.verbOf("You offer the bones."));
+        assertTrue(ActionReader.isClaim("Soft clay pack"));
+        assertTrue(ActionReader.isClaim("Bag full of gems"));
+        assertFalse(ActionReader.isClaim("Soft clay"));
+        assertFalse(ActionReader.isClaim("Gem bag"));
+        assertFalse(ActionReader.isClaim("Soft clay backpack"));
         assertEquals(GameData.msg("light-tend"), GameData.pattern("light-tend").pattern());
         assertEquals(GameData.msg("pizza-pie"), GameData.pattern("pizza-pie").pattern());
         assertEquals(".*(pizza|cake|pie).*", GameData.pattern("pizza-cake-pie").pattern());
@@ -408,7 +482,7 @@ public class GameDataTablesTest
     /** d26 contains phrases rather than gameval ids; d13 continues to validate region ids. */
     @Test public void neutralTransferTableRowsAllCompileWithPhrasesAndNotes() {
         List<String[]> rows = GameData.cached("neutral_transfers");
-        assertEquals(25, rows.size());
+        assertEquals("25 rows plus the cargo hold (2026-11-02)", 26, rows.size());
         assertEquals(rows.stream().map(row -> row[0]).collect(java.util.stream.Collectors.toList()),
             new ArrayList<>(NeutralTransfers.RULES.keySet()));
         for (String[] row : rows) {
@@ -419,11 +493,11 @@ public class GameDataTablesTest
     }
 
     @Test public void cataloguePatternsUseExistingVerbKeyAndNamedDispenserFragments() {
-        assertEquals(GameData.msg("claim-reclaim"), BossRetrievalCatalogue.RECLAIM.pattern());
-        assertEquals("grave.*", BossRetrievalCatalogue.GRAVE.pattern());
-        assertEquals(".*(agility dispenser|ticket dispenser).*", AgilityCourses.DISPENSER.pattern());
-        assertEquals(java.util.regex.Pattern.DOTALL, BossRetrievalCatalogue.GRAVE.flags());
-        assertEquals(java.util.regex.Pattern.DOTALL, AgilityCourses.DISPENSER.flags());
+        assertEquals(GameData.msg("claim-reclaim"), GameData.pattern("reclaim").pattern());
+        assertEquals("grave.*", GameData.pattern("grave").pattern());
+        assertEquals(".*(agility dispenser|ticket dispenser).*", GameData.pattern("dispenser").pattern());
+        assertEquals(java.util.regex.Pattern.DOTALL, GameData.pattern("grave").flags());
+        assertEquals(java.util.regex.Pattern.DOTALL, GameData.pattern("dispenser").flags());
     }
 
     @Test public void rewardFragmentsKeepEveryUsedKeyAndCompiledWitness() {
@@ -515,8 +589,15 @@ public class GameDataTablesTest
             if (accepted!=uncut) assertEquals(15,row[1].split(",").length);
             for (String gem:row[1].split(",")) assertTrue(accepted.contains(Integer.parseInt(gem)));
         }
-        assertEquals(27,GameData.rows("gem_messages").size());
+        assertEquals(28,GameData.rows("gem_messages").size());
         for (String[] row:GameData.rows("gem_messages")) assertNotNull(GameData.pattern(row[0]));
+        String gift = "As you complete the golem it leaves a gift ";
+        assertTrue(GameData.matches("gem-golem", gift + "in your gem bag for you: 1 x Uncut diamond."));
+        assertTrue(GameData.matches("gem-golem", gift + "in your gem sack for you: 1 x Uncut sapphire"));
+        assertFalse(GameData.matches("gem-golem", gift + "on the ground for you: 1 x Uncut ruby."));
+        assertFalse(GameData.matches("gem-golem", gift + "in your gem bag for you: 2 x Uncut ruby."));
+        assertFalse(GameData.matches("gem-golem", gift + "in your gem bag for you: 1 x Jeweller's chisel."));
+
     }
 
 }

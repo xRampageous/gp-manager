@@ -135,8 +135,8 @@ public class ChargeEstimateTriggerTest
         assertEquals(Long.valueOf(1L),
             new java.util.LinkedHashMap<>(ChargeCheck.ChargedItem.BOWFA.recipe).get(ItemID.PRIF_CRYSTAL_SHARD));
         assertEquals(100, ChargeCheck.ChargedItem.CRYSTAL_BOW.units);
-        assertArrayEquals("a shard derives its price from the seed exchange",
-            new int[]{ItemID.PRIF_TELEPORT_SEED, 150},
+        assertArrayEquals("a shard costs a thirtieth of a crystal weapon seed (crystal tree route, owner 2026-11-07)",
+            new int[]{ItemID.CRYSTAL_SEED_OLD, 30},
             CurrencyProxyCatalogue.PROXIES.get(ItemID.PRIF_CRYSTAL_SHARD));
     }
 

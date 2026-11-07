@@ -47,6 +47,7 @@ public class GpManagerPluginGeEvidenceTest
         RecordingEngine engine = new RecordingEngine();
         GpManagerPlugin plugin = new GpManagerPluginProbe();
         set(plugin, "engine", engine);
+        set(plugin, "valuation", new Valuation(new GpManagerConfig() {}, id -> null, (id, active) -> 0, id -> false, Valuation.Economy.UNKNOWN));
         set(plugin, "config", new GpManagerConfig() {});
 
         OfferSlots ledger = new OfferSlots();
@@ -69,6 +70,7 @@ public class GpManagerPluginGeEvidenceTest
         RecordingEngine engine = new RecordingEngine();
         GpManagerPlugin plugin = new GpManagerPluginProbe();
         set(plugin, "engine", engine);
+        set(plugin, "valuation", new Valuation(new GpManagerConfig() {}, id -> null, (id, active) -> 0, id -> false, Valuation.Economy.UNKNOWN));
         set(plugin, "config", new GpManagerConfig() {});
         set(plugin, "client", geVisibleClient());
 
@@ -349,6 +351,7 @@ public class GpManagerPluginGeEvidenceTest
         GpManagerConfig config = new GpManagerConfig() {};
         GpManagerPlugin plugin = new GpManagerPluginProbe();
         set(plugin, "engine", engine);
+        set(plugin, "valuation", new Valuation(new GpManagerConfig() {}, id -> null, (id, active) -> 0, id -> false, Valuation.Economy.UNKNOWN));
         set(plugin, "config", config);
         set(plugin, "client", client);
         set(plugin, "targets",

@@ -130,7 +130,9 @@ public class RecentSupplyAndPickupTest {
             if (fence == 0) second.flows().get(0).priceSource = PriceSource.UNPRICED;
             if (fence == 1) second.flows().get(0).priceSource = PriceSource.MANUAL_OVERRIDE;
             if (fence == 2) second.correction = Correction.REVENUE;
-            assertEquals("fence " + fence, 2, LiveProbe.recent(List.of(first, second), null).size());
+            assertEquals("fence " + fence, fence == 0 ? 1 : 2, LiveProbe.recent(List.of(first, second), null).size());
+            assertEquals("both receipts remain distinct in Ledger", 2,
+                    SemanticProbe.capture(List.of(first, second), List.of(), "", null).groups.size());
         }
     }
 }

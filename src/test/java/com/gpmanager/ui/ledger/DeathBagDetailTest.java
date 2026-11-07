@@ -17,7 +17,7 @@ public class DeathBagDetailTest {
             assertTrue(Arrays.asList(page.detail.getComponents()).contains(page.detailItems));
             var row=page.items(group).get(0);
             assertEquals("Looting bag",row.name);
-            assertEquals("?",row.value); assertEquals("",row.exact);
+            assertEquals("Price pending",row.value); assertEquals("",row.exact);
             row.open.run();
             assertEquals("Unknown",page.items(group).get(0).name);
             for (java.awt.Component part : page.detail.getComponents()) {

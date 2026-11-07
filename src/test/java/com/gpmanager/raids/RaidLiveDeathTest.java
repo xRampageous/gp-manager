@@ -37,11 +37,11 @@ public class RaidLiveDeathTest {
     }
     @Test public void savedPhantomRaidOnlyRecoveryIsDroppedWithoutErasingRealOwnedGear() {
         var life=new DeathReclaimLifecycle();
-        life.onPvmDeath(HELD);
+        life.onPvmDeath(HELD, false);
         life.removed(List.of(new Flow(27297,"Neutralising potion",-99,0,0),new Flow(4151,"Whip",-1,100,-100)));
         var restored=new DeathReclaimLifecycle();restored.restore(life.snapshot());
         assertEquals(Map.of(4151,1L),restored.items);assertEquals(1,restored.outstanding());
-        life=new DeathReclaimLifecycle();life.onPvmDeath(Map.of(27297,99L));
+        life=new DeathReclaimLifecycle();life.onPvmDeath(Map.of(27297,99L), false);
         life.removed(List.of(new Flow(27297,"Neutralising potion",-99,0,0)));
         restored.restore(life.snapshot());assertFalse(restored.isAwaitingReclaim());assertEquals(0,restored.outstanding());
     }

@@ -287,6 +287,12 @@ public interface GpManagerConfig extends Config {
         return 2;
     }
 
+    /** Hardcore World GE prices learned from your own fills there, as item=price pairs. */
+    @ConfigItem(keyName = "hardcorePrices", name = "", description = "", hidden = true)
+    default String hardcorePrices() {
+        return "";
+    }
+
     @ConfigItem(keyName = "keepTransferAuditRows", name = "", description = "", hidden = true)
     default boolean keepTransferAuditRows() {
         return false;

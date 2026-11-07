@@ -1,0 +1,7 @@
+# Fixed swaps an NPC makes in conversation: exactly one item out and one item in, at these amounts.
+# While a dialogue is on screen, such a change books as a counted "Exchanged" trade instead of Review;
+# what went out keeps the value it was booked at, so the row counts the difference.
+# item id and quantity out (negative) <TAB> item id and quantity in <TAB> name
+# Minimus (Fortis Colosseum) takes a spare Dizana's quiver (uncharged) for 4,000 sunfire splinters
+# (OSRS Wiki, Transcript:Minimus; Colosseum Profit Tracker 1.3.3).
+28947 -1	28924 4000	Dizana's quiver (uncharged) for sunfire splinters

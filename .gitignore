@@ -23,3 +23,6 @@ replays/
 # Python tooling caches
 __pycache__/
 *.pyc
+
+# Command Code personal overrides
+.commandcode/settings.local.json

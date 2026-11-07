@@ -146,7 +146,7 @@ public class HudBatchPresentationTest
     {
         Fixture unknown = new Fixture(true, true);
         unknown.book(41, NOW, 100, "Unpriced item", 2, 0);
-        assertEquals("? ×2", unknown.frame(NOW + 1).rows.get(0).value);
+        assertEquals("Pending ×2", unknown.frame(NOW + 1).rows.get(0).value);
         Fixture worthless = new Fixture(true, true);
         worthless.plugin.transactionBooked(receipt(NOW, TransactionType.LOOT,
             new Flow(101, "Valueless ticket", 2, 0, 0, PriceSource.NO_VALUE)), NOW);

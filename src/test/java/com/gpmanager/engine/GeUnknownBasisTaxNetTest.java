@@ -127,7 +127,7 @@ public class GeUnknownBasisTaxNetTest
             flow(exemptSettlement, CHICKEN));
         assertEquals(315L, flow(exemptSettlement, COINS));
         assertFalse(exemptSettlement.counts());
-        assertEquals(0L, exemptSettlement.netUnder(Correction.AUTO));
+        assertEquals(0L, FixtureReads.netUnder(exemptSettlement, Correction.AUTO));
 
         Market known = new Market();
         known.prices.put(RUNE, 420L);
@@ -138,7 +138,7 @@ public class GeUnknownBasisTaxNetTest
             flow(knownSettlement, RUNE));
         assertEquals(5_356L, flow(knownSettlement, COINS));
         assertTrue(knownSettlement.counts());
-        assertEquals(356L, knownSettlement.netUnder(Correction.AUTO));
+        assertEquals(356L, FixtureReads.netUnder(knownSettlement, Correction.AUTO));
     }
 
     @Test
@@ -176,15 +176,15 @@ public class GeUnknownBasisTaxNetTest
                 new Flow(COINS, "Coins", 33_128L, 1, 33_128L, PriceSource.FACE_VALUE)),
             Confidence.CONFIRMED, "", null);
 
-        assertEquals("804fa72 REVENUE preview", 33_128L + 34_144L, before.netUnder(Correction.REVENUE));
-        assertEquals("after REVENUE preview", 33_128L + 33_804L, settlement.netUnder(Correction.REVENUE));
+        assertEquals("804fa72 REVENUE preview", 33_128L + 34_144L, FixtureReads.netUnder(before, Correction.REVENUE));
+        assertEquals("after REVENUE preview", 33_128L + 33_804L, FixtureReads.netUnder(settlement, Correction.REVENUE));
         assertEquals("the difference is exactly the §4a flow valuation",
             -(34_144L - 33_804L),
-            settlement.netUnder(Correction.REVENUE)
-                - before.netUnder(Correction.REVENUE));
-        assertEquals("COST", -(33_128L + 33_804L), settlement.netUnder(Correction.COST));
-        assertEquals("TRANSFER is unchanged", 0L, settlement.netUnder(Correction.TRANSFER));
-        assertEquals("IGNORE is unchanged", 0L, settlement.netUnder(Correction.IGNORE));
+            FixtureReads.netUnder(settlement, Correction.REVENUE)
+                - FixtureReads.netUnder(before, Correction.REVENUE));
+        assertEquals("COST", -(33_128L + 33_804L), FixtureReads.netUnder(settlement, Correction.COST));
+        assertEquals("TRANSFER is unchanged", 0L, FixtureReads.netUnder(settlement, Correction.TRANSFER));
+        assertEquals("IGNORE is unchanged", 0L, FixtureReads.netUnder(settlement, Correction.IGNORE));
         assertEquals("the automatic contribution itself is -acknowledged tax",
             -676L, settlement.net());
     }
@@ -201,7 +201,7 @@ public class GeUnknownBasisTaxNetTest
             market.sellUnknown(0, VIAL, 4L, 8_536, 33_804, 33_128);
             String settlementId = market.row(VIAL).settlementId;
             Transaction settlement = market.transaction(settlementId);
-            long expectedAfter = settlement.netUnder(correction);
+            long expectedAfter = FixtureReads.netUnder(settlement, correction);
 
             assertEquals(-676L, market.net());
             assertTrue(market.engine.correctTransaction(settlementId, correction,

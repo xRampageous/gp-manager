@@ -240,7 +240,8 @@ public class StackedLedgerTablesTest
         engine.session().addTransaction(gain(old + 1_000L, "Old bones", 536, 1L, 3_200, 3_200L), 2_000, false);
         String sessionId = engine.session().id();
         engine.finishCustom(old + 2_000L);
-        long compactedNet = engine.historySession(sessionId).compactedContribution().net();
+        var compacted = engine.historySession(sessionId).compactedContribution();
+        long compactedNet = SafeMath.subtract(compacted.income, compacted.cost);
         assertTrue(compactedNet == 0L);
         FixtureReads.compactOlderThan(engine, 1, T0);
 

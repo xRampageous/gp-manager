@@ -134,6 +134,24 @@ public class BankBoundaryEvidenceTest
         e.events.put(Inbox.GROUND_CLICK, item, 1, 5, null);
     }
 
+    /** A Take click on a ground item through the plugin, as the game sends it. */
+    private void takeClick(int item)
+    {
+        MenuEntry entry = (MenuEntry) Proxy.newProxyInstance(MenuEntry.class.getClassLoader(), new Class<?>[] {MenuEntry.class},
+            (proxy, method, args) ->
+            {
+                switch (method.getName())
+                {
+                    case "getOption": return "Take";
+                    case "getTarget": return NAMES.get(item);
+                    case "getIdentifier": return item;
+                    case "getType": return MenuAction.GROUND_ITEM_THIRD_OPTION;
+                    default: return zero(method.getReturnType());
+                }
+            });
+        plugin.onMenuOptionClicked(new MenuOptionClicked(entry));
+    }
+
     /** An inventory (or worn equipment) callback: the engine samples the snapshot on the next tick. */
     private void inventory(int container)
     {
@@ -606,5 +624,167 @@ public class BankBoundaryEvidenceTest
         for (int i = 0; i < 4; i++) tick(0, 0);
         assertEquals("nothing left to drop after the paused deposit", 0, count("Dropped"));
         assertMoney(30, 30, 0);
+    }
+
+    // Owner 1.7.1 drop test (20261102-100655): an iron mace and 7 iron bolts dropped and picked back
+    // up a tick apart, around a bank booth. Here 3 logs and 7 bolts, 100 GP of counted basis.
+    private void startWithBolts() throws Exception
+    {
+        start(3, 0);
+        e.setBaseline(carried(3, 7));
+        e.session().addTransaction(Tx.of(now, TransactionType.GAIN, Context.GENERIC, "Initial bolts", true,
+                List.of(new Flow(BOLTS, "Iron bolts", 7, 10, 70, PriceSource.GRAND_EXCHANGE))), 2_000, false);
+    }
+
+    private static ContainerSnapshot carried(long logs, long bolts)
+    {
+        Map<Integer, Long> items = new HashMap<>();
+        if (logs > 0) items.put(LOGS, logs);
+        if (bolts > 0) items.put(BOLTS, bolts);
+        return new ContainerSnapshot(items);
+    }
+
+    private void carry(long logs, long bolts, int ticks)
+    {
+        for (int i = 0; i < ticks; i++) e.processIfDirty(carried(logs, bolts), now += 600, null);
+    }
+
+    /** Drop the logs, then the bolts on the next tick, before the first drop has settled. */
+    private void dropBothATickApart()
+    {
+        dropClick(LOGS);
+        inventory(InventoryID.INV);
+        carry(0, 7, 1);
+        dropClick(BOLTS);
+        inventory(InventoryID.INV);
+    }
+
+    private void pickUpBothATickApart()
+    {
+        takeClick(LOGS);
+        inventory(InventoryID.INV);
+        carry(3, 0, 1);
+        takeClick(BOLTS);
+        inventory(InventoryID.INV);
+    }
+
+    private long droppedNet()
+    {
+        return e.session().transactions().stream().filter(t -> "Dropped".equals(t.note())).mapToLong(Transaction::net).sum();
+    }
+
+    @Test public void twoItemsDroppedATickApartBookOneDropAndPickUpNeutral() throws Exception
+    {
+        startWithBolts();
+        dropBothATickApart();
+        carry(0, 0, 4);
+        assertEquals("both items in one drop", 1, count("Dropped"));
+        assertEquals(2, dropped().flows().size());
+        assertMoney(0, 100, 100);
+        pickUpBothATickApart();
+        carry(3, 7, 4);
+        assertEquals("no new loot", 0, droppedNet());
+        assertMoney(100, 100, 0);
+        assertKnown(BOLTS, 7, 70);
+    }
+
+    @Test public void twoItemsDroppedJustBeforeTheBankOpensKeepBothDrops() throws Exception
+    {
+        startWithBolts();
+        dropBothATickApart();
+        bankItems(Map.of());
+        for (int i = 0; i < 4; i++)
+        {
+            e.bankOpened(6);
+            carry(0, 0, 1);
+        }
+        close();
+        assertEquals(-100, droppedNet());
+        assertMoney(0, 100, 100);
+        carry(0, 0, 4);
+        pickUpBothATickApart();
+        carry(3, 7, 4);
+        assertEquals(0, droppedNet());
+        assertMoney(100, 100, 0);
+        assertKnown(LOGS, 3, 30);
+        assertKnown(BOLTS, 7, 70);
+    }
+
+    @Test public void twoItemsPickedUpRightAfterTheBankClosesRecoverBothDrops() throws Exception
+    {
+        startWithBolts();
+        dropBothATickApart();
+        carry(0, 0, 4);
+        bankItems(Map.of());
+        for (int i = 0; i < 2; i++)
+        {
+            e.bankOpened(6);
+            carry(0, 0, 1);
+        }
+        close();
+        pickUpBothATickApart();
+        carry(3, 7, 4);
+        assertEquals("both pickups recover the drop", 0, droppedNet());
+        assertMoney(100, 100, 0);
+        assertKnown(BOLTS, 7, 70);
+    }
+
+    @Test public void twoItemsPickedUpJustBeforeTheBankOpensRecoverBothDrops() throws Exception
+    {
+        startWithBolts();
+        dropBothATickApart();
+        carry(0, 0, 4);
+        pickUpBothATickApart();
+        bankItems(Map.of());
+        for (int i = 0; i < 4; i++)
+        {
+            e.bankOpened(6);
+            carry(3, 7, 1);
+        }
+        close();
+        assertEquals(0, droppedNet());
+        assertMoney(100, 100, 0);
+    }
+
+    /** A chatbox option click, carrying the chosen line as its widget text. */
+    private void chatOption(String line)
+    {
+        Widget widget = (Widget) Proxy.newProxyInstance(Widget.class.getClassLoader(), new Class<?>[] {Widget.class},
+            (proxy, method, args) -> "getText".equals(method.getName()) ? line : "getId".equals(method.getName())
+                ? InterfaceID.Chatmenu.OPTIONS : zero(method.getReturnType()));
+        MenuEntry entry = (MenuEntry) Proxy.newProxyInstance(MenuEntry.class.getClassLoader(), new Class<?>[] {MenuEntry.class},
+            (proxy, method, args) ->
+            {
+                switch (method.getName())
+                {
+                    case "getOption": return "Continue";
+                    case "getTarget": return "";
+                    case "getType": return MenuAction.WIDGET_CONTINUE;
+                    case "getWidget": return widget;
+                    case "getParam1": return InterfaceID.Chatmenu.OPTIONS;
+                    default: return zero(method.getReturnType());
+                }
+            });
+        plugin.onMenuOptionClicked(new MenuOptionClicked(entry));
+    }
+
+    // Death Cost Tracker 2.4.2: a large Death's coffer sacrifice closes the coffer window and is
+    // confirmed in the chatbox; the item leaves afterwards. It is still storage, never a loss.
+    @Test public void aLargeCofferSacrificeConfirmedInTheChatboxIsStorage() throws Exception
+    {
+        start(3, 0);
+        chatOption("Yes, sacrifice 3 x Logs.");
+        inventory(InventoryID.INV);
+        for (int i = 0; i < 4; i++) tick(0, 0);
+        assertMoney(30, 30, 0);
+    }
+
+    @Test public void theSameRemovalWithoutTheConfirmationStillCosts() throws Exception
+    {
+        start(3, 0);
+        chatOption("Yes.");
+        inventory(InventoryID.INV);
+        for (int i = 0; i < 4; i++) tick(0, 0);
+        assertEquals("not storage", 30, e.metrics(now).cost);
     }
 }

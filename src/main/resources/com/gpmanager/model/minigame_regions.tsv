@@ -1,5 +1,5 @@
 # Region hints for minigame instances.
-# region id <TAB> lms | neutral
+# region id <TAB> lms | neutral | arena | safe
 # Last Man Standing instances (not exhaustive; menu and chat stay primary).
 13658	lms
 13659	lms
@@ -16,3 +16,9 @@
 10588	arena
 7512	neutral
 7768	neutral
+# Safe PvP arenas beyond LMS: Castle Wars, Soul Wars, TzHaar Fight Pit.
+9520	safe
+8237	safe
+8493	safe
+8749	safe
+9552	safe

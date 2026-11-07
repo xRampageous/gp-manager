@@ -24,3 +24,4 @@ GOTR_DEPOSIT_POOL	deposit-runes+deposit pool	GOTR_DEPOSIT_POOL	@deposit-pool
 IMP_BOX	imp-in-a-box	IMP_BOX	Sent to the bank by an imp-in-a-box
 CHUG_BARREL	chugging barrel	CHUG_BARREL	Put in the chugging barrel
 SCROLL_BOOK	master scroll book	SCROLL_BOOK	Master scroll book
+CARGO_HOLD	cargo hold+deposit|cargo hold+^use	CARGO_HOLD	Cargo hold

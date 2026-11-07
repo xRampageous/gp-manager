@@ -114,7 +114,7 @@ public class ContainerSnapshotFactoryRunePouchTest
     }
 
     @Test
-    public void deathHeldSnapshotReadsInventoryAndOptionalEquipmentButNeverRunePouchVarbits()
+    public void deathHeldSnapshotReadsInventoryAndEquipmentButNeverRunePouchVarbits()
     {
         Map<Integer, Integer> varbits = new HashMap<>();
         varbits.put(VarbitID.RUNE_POUCH_TYPE_1, 4);
@@ -138,14 +138,12 @@ public class ContainerSnapshotFactoryRunePouchTest
         });
         ContainerSnapshotFactory factory = new ContainerSnapshotFactory(client, null);
 
-        ContainerSnapshot withEquipment = factory.captureDeathHeld(true);
-        ContainerSnapshot withoutEquipment = factory.captureDeathHeld(false);
+        ContainerSnapshot withEquipment = factory.captureDeathHeld();
 
         assertEquals(20L, withEquipment.quantity(FIRE_RUNE));
         assertEquals(50L, withEquipment.quantity(995));
         assertEquals(1L, withEquipment.quantity(4151));
         assertEquals(0L, withEquipment.quantity(CHAOS_RUNE));
-        assertEquals(0L, withoutEquipment.quantity(4151));
     }
 
     private static Client client(Map<Integer, Integer> varbits, Map<Integer, Integer> runeEnum, Item... inventory)

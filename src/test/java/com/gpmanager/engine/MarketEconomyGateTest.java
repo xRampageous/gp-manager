@@ -54,13 +54,14 @@ public class MarketEconomyGateTest
     public void specialEconomiesFailClosed()
     {
         for (WorldType blocked : new WorldType[] {
-            WorldType.DEADMAN, WorldType.SEASONAL, WorldType.HARDCORE_MAIN,
+            WorldType.DEADMAN, WorldType.SEASONAL,
             WorldType.QUEST_SPEEDRUNNING, WorldType.BETA_WORLD, WorldType.NOSAVE_MODE,
             WorldType.TOURNAMENT_WORLD})
         {
             assertState(Valuation.Economy.UNSUPPORTED_SPECIAL, blocked);
         }
-        assertState(Valuation.Economy.UNSUPPORTED_SPECIAL,
+        // Owner 2026-11-07: Hardcore Worlds are their own characters and economy, priced by their own fills.
+        assertState(Valuation.Economy.HARDCORE,
             WorldType.MEMBERS, WorldType.HARDCORE_MAIN);
         assertState(Valuation.Economy.UNSUPPORTED_SPECIAL,
             WorldType.MEMBERS, WorldType.DEADMAN);

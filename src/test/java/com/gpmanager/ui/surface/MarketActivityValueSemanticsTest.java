@@ -17,8 +17,7 @@ import static org.junit.Assert.assertNull;
 import static org.junit.Assert.assertTrue;
 
 /**
- * PRE-R5C.2C.1: Market activity presents the observed signed settlement as the primary value and
- * the canonical result as the explicit secondary line, on Live and in the Ledger.
+ * Recent shows Result (owner 2026-11-04); Ledger retains the observed settlement evidence.
  */
 public class MarketActivityValueSemanticsTest
 {
@@ -32,7 +31,7 @@ public class MarketActivityValueSemanticsTest
     }
 
     @Test
-    public void sellShowsObservedProceedsPrimaryAndResultSecondary()
+    public void sellRetainsCashAndShowsResultInRecent()
     {
         Market market = new Market(Collections.singletonMap(DEATH, 186));
         market.gain(DEATH, 200L, 37_200L, market.now - 60_000L);
@@ -41,9 +40,15 @@ public class MarketActivityValueSemanticsTest
         LiveSnapshot snapshot = LiveSnapshot.capture(market.engine, market.now + 1_000L, null);
         LiveSnapshot.Recent row = marketRow(snapshot);
         assertNotNull(row);
-        assertTrue("the primary value is the observed settlement", row.amount);
+        assertTrue("observed cash evidence is retained", row.amount);
         assertEquals("proceeds are positive", 36_000L, row.value);
         assertEquals(-1_200L, row.marketResult);
+        assertEquals(Fmt.signed(-1_200L), LivePage.valueText(row));
+        assertEquals(Kit.Tone.MARKET, LivePage.toneOf(row));
+        Table.Row drawn = new LivePage(new LiveNoop(), id -> null).rowOf(row);
+        assertEquals(Fmt.signed(-1_200L), drawn.value);
+        assertEquals(Fmt.gp(-1_200L), drawn.exact);
+        assertFalse(drawn.tip.contains("primary value is the observed settlement"));
         assertEquals("Sold", row.marketSide);
         String meta = LivePage.metaOf(row);
         assertTrue("secondary line names the side and the Result: " + meta,
@@ -67,7 +72,7 @@ public class MarketActivityValueSemanticsTest
     }
 
     @Test
-    public void unknownBasisSaleShowsSoldCashAndUnavailableResult()
+    public void unknownBasisSaleRetainsCashAndShowsUnavailableResultState()
     {
         Market market = new Market(Collections.singletonMap(DEATH, 12));
         market.sell(0, DEATH, 15L, 12);
@@ -78,13 +83,14 @@ public class MarketActivityValueSemanticsTest
         assertTrue(row.amount);
         assertFalse("automatic Result is unavailable", row.known);
         assertEquals(180L, row.value);
-        assertEquals(Fmt.signed(180L), LivePage.valueText(row));
+        assertEquals("Sold", LivePage.valueText(row));
+        assertFalse(LivePage.numeric(row));
         assertTrue(LivePage.metaOf(row).contains("Sold \u00b7 Result \u2014"));
         assertEquals("unknown liquidation does not inflate Net", 0L, snapshot.net);
     }
 
     @Test
-    public void buyShowsNegativeSpendPrimaryAndPositiveResultSecondary()
+    public void buyRetainsSpendAndShowsKnownZeroResultInRecent()
     {
         Market market = new Market(Collections.singletonMap(DEATH, 186));
         market.buy(0, DEATH, 200L, 180, 200L);
@@ -92,9 +98,11 @@ public class MarketActivityValueSemanticsTest
         LiveSnapshot snapshot = LiveSnapshot.capture(market.engine, market.now + 1_000L, null);
         LiveSnapshot.Recent row = marketRow(snapshot);
         assertNotNull(row);
-        assertTrue("the primary value is the observed settlement", row.amount);
+        assertTrue("observed cash evidence is retained", row.amount);
         assertEquals("spend is negative", -36_000L, row.value);
         assertEquals("a NEW BUY is Net-neutral, so its Result is known zero", 0L, row.marketResult);
+        assertEquals(Fmt.signed(0), LivePage.valueText(row));
+        assertEquals(Kit.Tone.MARKET, LivePage.toneOf(row));
         assertEquals("Bought", row.marketSide);
         assertEquals("owner 2026-10-08: a purchase shows how many were bought", Fmt.times(200L), row.qty);
         String meta = LivePage.metaOf(row);
@@ -108,7 +116,7 @@ public class MarketActivityValueSemanticsTest
         Market buy = new Market(Collections.singletonMap(DEATH, 186));
         buy.buy(0, DEATH, 200L, 180, 200L);
         LiveSnapshot.Recent bought = marketRow(LiveSnapshot.capture(buy.engine, buy.now + 1_000L, null));
-        assertEquals("the row still shows the spend", -36_000L, bought.value);
+        assertEquals("cash evidence retains the spend", -36_000L, bought.value);
         assertEquals("but a buy adds nothing to the Recent total", 0L, bought.net());
 
         Market sell = new Market(Collections.singletonMap(DEATH, 186));
@@ -212,7 +220,7 @@ public class MarketActivityValueSemanticsTest
     }
 
     @Test
-    public void ledgerMarketRowUsesTheSameValueSemantics() throws Exception
+    public void ledgerMarketRowRetainsSettlementAndResultEvidence() throws Exception
     {
         Market market = new Market(Collections.singletonMap(DEATH, 186));
         market.gain(DEATH, 200L, 37_200L, market.now - 60_000L);
@@ -239,6 +247,20 @@ public class MarketActivityValueSemanticsTest
         });
         String semantics = LedgerPageProbe.marketRowSemantics(page, group.id);
         assertEquals(Fmt.signed(36_000L) + "|Sold \u00b7 Result " + Fmt.signed(-1_200L), semantics);
+    }
+
+    @Test public void ownerExampleShowsTheActualLossAndExactHoverInBlue() throws Exception
+    {
+        Market market = new Market(Collections.singletonMap(DEATH, 13_849_471));
+        market.gain(DEATH, 1, 13_849_471, market.now - 60_000L);
+        market.sell(0, DEATH, 1, 12_200_000);
+        LiveSnapshot.Recent row = marketRow(LiveSnapshot.capture(market.engine,market.now+1_000,null));
+        assertEquals(12_200_000,row.value);
+        assertEquals(-1_649_471,row.marketResult);
+        Table.Row drawn = onEdt(()->new LivePage(new LiveNoop(),id->null).rowOf(row));
+        assertEquals(Fmt.signed(-1_649_471),drawn.value);
+        assertEquals(Fmt.gp(-1_649_471),drawn.exact);
+        assertEquals(Kit.Tone.MARKET,drawn.tone);
     }
 
     // ── fixtures ───────────────────────────────────────────────────────────────────────────────

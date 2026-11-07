@@ -99,7 +99,11 @@ public class LivePresentationTest
         engine.session().addTransaction(review(now + 5_000L, "Unidentified mineral", 4, 1L), 2_000, false);
         LiveSnapshot snapshot = LiveSnapshot.capture(engine, now + 6_000L, LiveContext.NONE);
 
-        assertEquals("gain, cost, priced, unpriced and review all stay separate", 5, snapshot.recent.size());
+        assertEquals("the three priced rows stay separate while unpriced rows wait in Ledger", 3, snapshot.recent.size());
+        var ledger = LedgerData.capture(engine, now + 6_000L, LedgerData.Entry.current());
+        assertEquals("the classification decision remains in Review", 1, ledger.review.rows.size());
+        assertTrue("the unpriced acquisition remains in Ledger", ledger.income.groups.stream().anyMatch(Semantics.Group::incomplete));
+        assertEquals(5, engine.session().transactions().size());
         long valueSum = 0L;
         for (LiveSnapshot.Recent row : snapshot.recent)
         {
@@ -110,7 +114,7 @@ public class LivePresentationTest
     }
 
     @Test
-    public void unpricedReceiptIsMarkedUnpricedAndNeverShowsZeroAsValue() throws Exception
+    public void unpricedReceiptWaitsInLedgerAndNeverShowsZeroInRecent() throws Exception
     {
         Engine engine = PresentationLifecycleTest.engine();
         long now = System.currentTimeMillis();
@@ -118,10 +122,11 @@ public class LivePresentationTest
         engine.session().addTransaction(unpriced(now + 1_000L, "Unidentified mineral", 8), 2_000, false);
         LiveSnapshot snapshot = LiveSnapshot.capture(engine, now + 2_000L, LiveContext.NONE);
 
-        assertEquals(1, snapshot.recent.size());
-        assertTrue("the row is marked unpriced", snapshot.recent.get(0).unknown);
-        assertEquals("the booked value stays 0 and the page paints the unknown marker instead",
-            0L, snapshot.recent.get(0).value);
+        assertTrue("unloaded prices wait outside Recent", snapshot.recent.isEmpty());
+        var flow = engine.session().transactions().get(0).flows().get(0);
+        assertEquals("the booked value stays unknown", 0L, flow.value);
+        assertEquals("the legacy source is unchanged", PriceSource.UNKNOWN, flow.source());
+        assertTrue(LedgerData.capture(engine, now + 2000, LedgerData.Entry.current()).income.groups.get(0).incomplete());
     }
 
     @Test
@@ -134,7 +139,8 @@ public class LivePresentationTest
         LiveSnapshot snapshot = LiveSnapshot.capture(engine, now + 2_000L, LiveContext.NONE);
 
         assertEquals(1, snapshot.reviews);
-        assertEquals("review", snapshot.recent.get(0).tag);
+        assertTrue("an unpriced Review waits outside Recent", snapshot.recent.isEmpty());
+        assertEquals(1, LedgerData.capture(engine, now + 2_000L, LedgerData.Entry.current()).review.rows.size());
     }
 
     @Test
@@ -530,27 +536,41 @@ public class LivePresentationTest
             onEdt(() -> page.hero.clock.getToolTipText()).startsWith("Tracked active time"));
     }
 
-    /** Owner 2026-09-28: GE offers still on the exchange sit above Recent, then move into it. */
+    /**
+     * Owner 2026-11-03: a GE offer still on the exchange shows only as the GE count icon, whose
+     * tooltip names it; it moves into Recent once it settles. There is no Offers table.
+     */
     @Test
-    public void openGeOffersListAboveRecentOnlyWhileOnTheExchange() throws Exception
+    public void openGeOffersShowOnlyInTheGeIconWhileOnTheExchange() throws Exception
     {
         Engine engine = PresentationLifecycleTest.engine();
         long now = System.currentTimeMillis();
         engine.startCustom("Flipping", now);
         engine.session().addTransaction(booked(now + 1_000L, "Dragon bones", 1, 2, 2_000, 4_000L), 2_000, false);
         LivePage before = page(engine);
-        assertFalse("no offers, no Offers table", onEdt(() -> before.offers.isVisible()));
+        assertTrue("no offers, no GE icon", onEdt(() -> tips(before.recent.header).stream().noneMatch(tip -> tip.contains("Grand Exchange"))));
 
         OfferSlots ledger = new OfferSlots();
         ledger.observe(new OfferSlots.Snapshot(0, net.runelite.api.GrandExchangeOfferState.EMPTY, 0, 0, 0, 0, 0));
         engine.noteGeOffer(ledger.observe(new OfferSlots.Snapshot(0,
             net.runelite.api.GrandExchangeOfferState.SELLING, 560, 100, 0, 180, 0)).get(), "Death rune", now + 2_000L);
         LivePage open = page(engine);
-        assertTrue("an offer on the exchange shows under Offers", onEdt(() -> open.offers.isVisible()));
-        assertEquals(1, TableRows.of(open.offers, "OFFERS").size());
-        assertTrue(TableRows.of(open.offers, "OFFERS").get(0).startsWith("Death rune"));
+        assertTrue("the GE icon's tooltip names the offer", onEdt(() -> tips(open.recent.header).stream()
+            .anyMatch(tip -> tip.contains("Grand Exchange offers still open: 1") && tip.contains("Death rune"))));
         assertTrue("and not in Recent", TableRows.of(open.recent, "RECENT").stream()
             .noneMatch(row -> row.startsWith("Death rune")));
+    }
+
+    private static java.util.List<String> tips(java.awt.Container root)
+    {
+        var out = new java.util.ArrayList<String>();
+        for (var child : root.getComponents())
+        {
+            if (child instanceof javax.swing.JComponent && ((javax.swing.JComponent) child).getToolTipText() != null)
+                out.add(((javax.swing.JComponent) child).getToolTipText());
+            if (child instanceof java.awt.Container) out.addAll(tips((java.awt.Container) child));
+        }
+        return out;
     }
 
     /** Direct controls: Live retains rename in running/paused Grinds; Start and End are on Grinds. */

@@ -1,0 +1,7 @@
+# Accept / right-hand container / dynamic quantity / dynamic total-cost child / Cancel.
+# Native client scripts 1139/1142, Joshua-F/osrs-dumps@44e1ff8ba278c91009a6ca02f759543d28776fd9.
+56492047	InterfaceID.BondConvert.ACCEPT
+56492040	InterfaceID.BondConvert.RIGHT
+7	quantity child
+12	total cost child
+56492046	InterfaceID.BondConvert.CANCEL

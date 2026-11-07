@@ -26,11 +26,13 @@ correct-to.COST	Count as Cost
 correct-to.IGNORE	Remove entry
 correct-to.REVENUE	Count as Revenue
 correct-to.TRANSFER	Mark as Transfer
+correct-to.BOND	Repair bond
 everything-spent	Everything spent or lost · supply and loss split unavailable
 counted-as.COST	Counted as Cost
 counted-as.IGNORE	Removed
 counted-as.REVENUE	Counted as Revenue
 counted-as.TRANSFER	Transfer
+counted-as.BOND	Bond conversion repair
 death-items	Death: items held by gravestone / retrieval service
 ownership-neutral-transfer	Ownership-neutral transfer: Death: items held by gravestone / retrieval service. Measured inventory/equipment stacks moved while ownership stayed with the player.
 reclaim-fee	Death reclaim fee — observed carried-coin loss with returned death items
@@ -58,9 +60,9 @@ hides-my	Hides it from My Grinds; its history is untouched.
 removes-my	Removes it from My Grinds. Its run history is kept.
 logged-out	Logged out · tracking waits until you log back in
 settled-loot	Settled loot-key pickup retained as a non-counted audit row; key contents are valued only when they enter INV.
-primary-value	 · primary value is the observed settlement; Result is versus basis
+primary-value	 · Result is versus recorded basis; cash movement is in details
 realized-market	Realized trade result versus basis · pending trades never count in Net
-settlement-result	 · observed settlement; Result unavailable because prior basis is unknown
+settlement-result	 · cash movement is in details; Result unavailable because prior basis is unknown
 items-restored	Items restored after leaving the neutral zone; ownership never changed.
 saved-grinds	Grinds you start appear here
 entries-changed	Entries changed while the preview was open · check again
@@ -70,6 +72,7 @@ resets-gp	Deletes this account's runs, Ledger, My Grinds and totals. Back up & d
 review.COST	Count as cost
 review.GAIN	Count
 review.TRANSFER	Transfer
+review.BOND	Repair bond
 removes-run	Removes this run from history. This cannot be undone; the saved Grind is unaffected.
 use-number	use a number like 5m, 5000k, 90m or 3h, or pick Clear
 proven-item	The proven per-item GE sell tax for this sale; it reduces Net as a market trade cost, and the sale's Result stays unavailable.
@@ -80,7 +83,8 @@ result-covered	Result includes only units whose previously counted value GP Mana
 spent-cash	Spent is cash used to acquire owned items; only Result affects Net.
 proven-ge	 A proven GE tax is still counted as a market trade cost.
 price-known	No price known · not in Net until priced.
-no-value	Worth nothing · untradeable, with no alch value.
+price-pending	Price pending
+no-value	Known zero · not a missing price.
 verb.ADJUSTMENT	Adjusted
 verb.CONSUMPTION	Used
 verb.PK_DEATH_LOSS	Lost
@@ -93,6 +97,7 @@ why-correction.COST	Counted as a cost by you.
 why-correction.IGNORE	Removed from tables and totals. Undo restores the entry.
 why-correction.REVENUE	Counted as a gain by you.
 why-correction.TRANSFER	Marked as a transfer by you.
+why-correction.BOND	Bond conversion repair
 stable-stock	Stable inventory/equipment value decreased without a stronger context.
 stable-value	Stable inventory/equipment value increased without a stronger context.
 grand-exchange-shop	Grand Exchange / shop inventory change observed but not counted.
@@ -151,7 +156,6 @@ correction-rules	Read-only · corrections apply to the current grind.
 gp-manager-cannot	GP Manager cannot determine profit for these units because their prior tracked value 
 unknown-received	is unknown. Received cash is liquidation, not automatically counted as profit.
 returned-canceled	Returned · Canceled
-awaiting-collection	 · Awaiting collection
 canceled-returned	Canceled; the returned principal is ownership-neutral.
 food-potions	Food, potions, runes, ammo and charges · 
 deaths-tax	Deaths, tax, fees and drops · 
@@ -205,10 +209,10 @@ review-row	No review row matches the search
 ground-items	Ground Items config unavailable
 unable-save	Unable to save GP Manager state
 nothing-corrected	Nothing corrected in this scope
-fill-check	fill|check|open|view|use|store
 death-reclaim-items	Death reclaim: items recovered
 death-view	Death losses and reclaim fees are included in LOSS. Gravestone storage and recovery remain 0 GP.
 pvm-loss	Death: PvE
+hardcore-deleted	Hardcore Worlds delete gravestone items: this death lost them for good.
 bag-destroyed	The looting bag itself was destroyed on an observed PvM death; its known grave contents remain owned.
 backup-reset	sessions.backup.reset.json.tmp
 live-tracking	Live tracking · click to pause
@@ -414,3 +418,145 @@ free-play-other	The other run is under Grinds › FREE PLAY.
 free-play-restored	Free play restored
 profile-backed	Profile backed up
 backup-failed	Backup failed
+count.a	1
+count.an	1
+count.one	1
+count.two	2
+count.three	3
+count.four	4
+count.five	5
+count.six	6
+count.seven	7
+count.eight	8
+count.nine	9
+count.ten	10
+remove-all	Remove all %d entries. Net changes by %s gp.
+remove-all-menu	Remove all %d entries…
+trawled	Trawled fish
+trawled-proof	The catch message counted these fish into the nets.
+price-source.MANUAL_OVERRIDE	manual
+price-source.CURRENCY_PROXY	currency proxy
+price-source.GRAND_EXCHANGE	RuneLite market
+price-source.FACE_VALUE	face value
+price-source.HIGH_ALCHEMY	high alchemy
+price-source.DEFERRED_CLAIM	Claim on open
+price-source.NO_VALUE	no value
+price-source.UNPRICED	unpriced
+price-source.UNKNOWN	unknown
+table-label.GAINS	GAINS
+table-label.COSTS_SUPPLIES	SUPPLY
+table-label.COSTS_LOSS	LOSS
+table-label.MARKET	TRADE
+table-label.AUDIT	Review
+table-label.DEATH	DEATH
+table-label.KILL	KILLS
+category-table.GAIN	GAINS
+category-table.SUPPLY	COSTS_SUPPLIES
+category-table.LOSS	COSTS_LOSS
+category-table.MARKET	MARKET
+category-table.AUDIT	AUDIT
+scope-label.CURRENT_GRIND	Current Grind
+scope-label.TODAY	Runs today
+scope-label.HISTORY	Recent Grind
+cost-view-label.ALL	All
+cost-view-label.SUPPLIES	Supplies
+cost-view-label.LOSS	Items
+cost-view-label.CHARGES	Charges
+audit-label.REVIEW	Review
+audit-label.CORRECTED	Corrected
+context-proof.TRANSFER	@excluded-because
+context-proof.LOOT	@matched-item-ids
+context-proof.PK_LOOT	@matched-stock
+context-proof.PK_DEATH	@inventory-equipment
+market.state.SELL.PENDING	Selling
+market.state.BUY.PENDING	Buying
+market.state.SELL.PARTIALLY_EXECUTED	Pending
+market.state.BUY.PARTIALLY_EXECUTED	Pending
+market.state.SELL.EXECUTED_UNSETTLED	Sold
+market.state.BUY.EXECUTED_UNSETTLED	Bought
+market.state.SELL.PARTIALLY_REALIZED	Pending
+market.state.BUY.PARTIALLY_REALIZED	Pending
+market.state.SELL.REALIZED	Sold
+market.state.BUY.REALIZED	Bought
+market.state.SELL.CANCELLED_RETURNED	Canceled
+market.state.BUY.CANCELLED_RETURNED	Canceled
+market.state.SELL.AMBIGUOUS	Review
+market.state.BUY.AMBIGUOUS	Review
+market.state.SELL.UNAVAILABLE	Pending
+market.state.BUY.UNAVAILABLE	Pending
+market.label.SELL.PENDING	×%1$s
+market.label.BUY.PENDING	×%1$s
+market.label.SELL.PARTIALLY_EXECUTED	Part sold %2$s/%1$s
+market.label.BUY.PARTIALLY_EXECUTED	Part bought %2$s/%1$s
+market.label.SELL.EXECUTED_UNSETTLED	@sold-collect
+market.label.BUY.EXECUTED_UNSETTLED	@bought-collect
+market.label.SELL.PARTIALLY_REALIZED	@partially-realized
+market.label.BUY.PARTIALLY_REALIZED	@partially-realized
+market.label.SELL.REALIZED	@detail-unavailable
+market.label.BUY.REALIZED	@detail-unavailable
+market.label.SELL.CANCELLED_RETURNED	Returned
+market.label.BUY.CANCELLED_RETURNED	Returned
+market.label.SELL.AMBIGUOUS	Review
+market.label.BUY.AMBIGUOUS	Review
+market.label.SELL.UNAVAILABLE	@detail-unavailable
+market.label.BUY.UNAVAILABLE	@detail-unavailable
+market.order.SELL.CANCELLED_RETURNED	@returned-canceled
+market.order.BUY.CANCELLED_RETURNED	@returned-canceled
+market.order.SELL.AMBIGUOUS	Needs review
+market.order.BUY.AMBIGUOUS	Needs review
+market.order.SELL.UNAVAILABLE	Unavailable
+market.order.BUY.UNAVAILABLE	Unavailable
+market.order.SELL.EXECUTED_UNSETTLED	Sold %1$s/%2$s · Awaiting collection
+market.order.BUY.EXECUTED_UNSETTLED	Bought %1$s/%2$s · Awaiting collection
+market.order.SELL.PARTIALLY_EXECUTED	Part sold %1$s/%2$s · Pending
+market.order.BUY.PARTIALLY_EXECUTED	Part bought %1$s/%2$s · Pending
+market-why.CANCELLED_RETURNED	@canceled-returned
+market-why.AMBIGUOUS	@lifecycle-review
+market-why.EXECUTED_UNSETTLED	@filled-quantity
+market-why.PENDING	@collected-settlement
+old-run-saved	Old run saved in Grinds.
+applies-whole-entry	Applies to the whole entry.
+save-session-run	Save session or show run
+grinds-saved-sessions	Grinds › Saved sessions
+recent-grinds	RECENT GRINDS
+saved-sessions	SAVED SESSIONS
+best-gph	<br>Best GP/h 
+as-cost-net	 · as a cost: Net 
+looting-bag	LOOTING BAG · 
+milestone-free	Milestone · all of Free play
+milestone-reached	Milestone reached · 
+percent-gains	 · %.1f%% of booked Gains
+decision-net	 for this entry. Net changes by 
+saving-stopped	Saving stopped; restart RuneLite.
+offer-context	Offer context|At save time
+lost-dismantled	Lost when it was taken apart.
+tome-charged	your tome has been charged with 
+clue-paired	Clue cost paired to 
+thisg	This Grind ⌄
+grindlist	MY GRINDS
+reviewtag	(!) REVIEW · 
+deathfees	DEATH FEES
+hideitem	Hide item from recent
+hidespell	Hide spell from recent
+hidesupply	Hide supply from recent
+timer	Pause/resume timer
+keepof	Keep how many of 
+losses	Losses filter: 
+savelive	Save a Live session.
+restorefp	Restore this Free play?
+backupdel	Back up & delete
+newone	Or a new one
+prevatt	‹ Attempts
+prevg	‹ Grinds
+prevr	‹ Raids
+start	Start Grind
+target	Set a Target
+open	Open in Ledger
+nothing	Nothing booked yet
+correctedtag	CORRECTED · 
+bond-fee	Bond conversion fee
+state.bond	Bond conversion
+state-why.bond	The same owned bond became tradeable. Only the observed conversion fee counts.
+bond-spent	Bond redeemed or gifted
+bond-spent-why	Buying the bond was neutral; redeeming or gifting it spends what it cost, or a bond's Grand Exchange price when its cost was not seen.
+time-picks	30m 1h 2h 3h 4h 6h Clear=

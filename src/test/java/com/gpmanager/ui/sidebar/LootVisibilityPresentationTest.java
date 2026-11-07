@@ -7,11 +7,12 @@ import static com.gpmanager.SwingTestSupport.onEdt;
 import static org.junit.Assert.assertEquals;
 import static org.junit.Assert.assertFalse;
 import static org.junit.Assert.assertNotNull;
+import static org.junit.Assert.assertNull;
 import static org.junit.Assert.assertTrue;
 
 /**
  * The current loot visibility settings are presentation-only: they change which Live rows
- * appear, never what was booked, and they never hide costs or unpriced gains.
+ * appear, never what was booked. Priced costs stay visible; unpriced gains remain in Ledger.
  */
 public class LootVisibilityPresentationTest
 {
@@ -41,7 +42,7 @@ public class LootVisibilityPresentationTest
     }
 
     @Test
-    public void minimumDisplayedLootValueNeverHidesCostsOrUnpricedGains() throws Exception
+    public void minimumDisplayedLootValueKeepsCostsAndLeavesUnpricedGainsInLedger() throws Exception
     {
         Engine engine = PresentationLifecycleTest.engine();
         long now = System.currentTimeMillis();
@@ -54,7 +55,7 @@ public class LootVisibilityPresentationTest
 
         LiveContext minimum = new LiveContext(false, null, 1_000_000L, PvpState.NONE, "", false, "", false);
         LiveSnapshot filtered = LiveSnapshot.capture(engine, now + 3_000L, minimum);
-        assertEquals("costs stay discoverable and unpriced gains stay reviewable", 2, filtered.recent.size());
+        assertEquals("priced costs stay discoverable", 1, filtered.recent.size());
         LiveSnapshot.Recent mineral = null;
         for (LiveSnapshot.Recent row : filtered.recent)
         {
@@ -63,8 +64,10 @@ public class LootVisibilityPresentationTest
                 mineral = row;
             }
         }
-        assertNotNull("the unpriced gain stays visible", mineral);
-        assertTrue("the unpriced row keeps its unknown marker", mineral.unknown);
+        assertNull("the unpriced gain waits outside Recent", mineral);
+        var ledger = LedgerData.capture(engine, now + 3_000L, LedgerData.Entry.current());
+        assertTrue("the receipt remains available in Ledger", ledger.income.groups.stream()
+                .anyMatch(group -> group.name.equals("Unidentified mineral") && group.incomplete()));
     }
 
     @Test

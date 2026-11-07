@@ -3,6 +3,9 @@
 # Barrows: https://oldschool.runescape.wiki/w/Barrows_equipment
 # Moons: https://oldschool.runescape.wiki/w/Moon_equipment (all nine new/used/broken pieces)
 # Perdu: https://oldschool.runescape.wiki/w/(broken)#PvP_breakable_items
+# Bond conversion additionally requires its accepted native quote and measured transition.
+13190	bond	OSRS_BOND
+13192	bond	OSRS_BOND_UNTRADEABLE
 4508	castlewars_sword_3	CASTLEWARS_SWORD_3
 4509	castlewars_armour_body_3	CASTLEWARS_ARMOUR_BODY_3
 4510	castlewars_armour_legs_3	CASTLEWARS_ARMOUR_LEGS_3
@@ -413,3 +416,24 @@
 34727	zoryas_tome	ZORYAS_TOME_UNCHARGED
 33103	cowbell_amulet	COWBELL_AMULET_EMPTY
 33104	cowbell_amulet	COWBELL_AMULET
+26815	ring_of_elements	RING_OF_ELEMENTS
+26818	ring_of_elements	RING_OF_ELEMENTS_CHARGED
+21387	master_scroll_book	BOOKOFSCROLLS_EMPTY
+21389	master_scroll_book	BOOKOFSCROLLS_CHARGED
+# Charged items from stored_charges.tsv (2026-11-02): each charged and uncharged state is one piece.
+29988	alchemists_amulet	AMULET_OF_CHEMISTRY_IMBUED_UNCHARGED
+29990	alchemists_amulet	AMULET_OF_CHEMISTRY_IMBUED_CHARGED
+28329	ring_of_shadows	RING_OF_SHADOWS_UNCHARGED
+28327	ring_of_shadows	RING_OF_SHADOWS
+30637	giantsoul_amulet	GIANTSOUL_AMULET_UNCHARGED
+30638	giantsoul_amulet	GIANTSOUL_AMULET_CHARGED
+26967	circlet_of_water	WATER_CIRCLET
+26969	circlet_of_water	WATER_CIRCLET_CHARGED
+31243	horn_of_plenty	HORN_OF_PLENTY_UNCHARGED
+31241	horn_of_plenty	HORN_OF_PLENTY
+13392	xerics_talisman	XERIC_TALISMAN_EMPTY
+13393	xerics_talisman	XERIC_TALISMAN
+25539	celestial_ring	CELESTIAL_RING
+25541	celestial_ring	CELESTIAL_RING_CHARGED
+25543	celestial_signet	CELESTIAL_SIGNET
+25545	celestial_signet	CELESTIAL_SIGNET_CHARGED

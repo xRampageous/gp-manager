@@ -402,7 +402,7 @@ public class MarketValuationPolicyTest
     public void fixedCurrencyConstructionCensusFindsNoOtherGrandExchangeStamp()
     {
         assertFalse("the death-reclaim fee no longer claims market provenance",
-            read("src/main/java/com/gpmanager/engine/Engine.java")
+            read("src/main/java/com/gpmanager/model/Transaction.java")
                 .contains("Av.GRAND_EXCHANGE"));
         assertFalse("charge intake no longer prices components itself",
             read("src/main/java/com/gpmanager/GpManagerPlugin.java").contains("getItemPrice("));

@@ -147,7 +147,8 @@ public class ReviewFixesTest {
     @Test public void normalWorldStillPricesCrystalShardProxy() {
         Valuation values = proxyValuation(Valuation.Economy.NORMAL);
         Flow shard = values.value(Collections.singletonMap(23962, 1L), T0).get(0);
-        assertEquals(100, shard.unitPrice);
+        // Owner 2026-11-07: a thirtieth of a crystal weapon seed (crystal tree route), here 15,000 / 30.
+        assertEquals(500, shard.unitPrice);
         assertEquals(PriceSource.CURRENCY_PROXY, shard.source());
     }
 

@@ -1,0 +1,6 @@
+# Karamja gloves 1-4: on the hands slot they pick the improved tokkul rate (currencies.tsv).
+# id <TAB> RuneLite gameval ItemID name
+11136	ATJUN_GLOVES_EASY
+11138	ATJUN_GLOVES_MED
+11140	ATJUN_GLOVES_HARD
+13103	ATJUN_GLOVES_ELITE

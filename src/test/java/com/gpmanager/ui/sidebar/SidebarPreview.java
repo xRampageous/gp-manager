@@ -72,8 +72,10 @@ public final class SidebarPreview
         RaidHistoryUiTest.previews(out);
         savedSessions(out);
         HudPreview.write(out);
-        for (int width : new int[]{213, 225, 300})
+        for (int width : new int[]{213, 225, 300}) {
             paintComponent(GeStatusPresentationTest.preview(width), new File(out, "ge-status-" + width + ".png"));
+            paintComponent(GeRecentHeaderTest.preview(width), new File(out, "ge-recent-header-" + width + ".png"));
+        }
         Engine pickups = PresentationLifecycleTest.engine();
         long at = SafeMath.now() - 60_000L;
         pickups.startCustom("Greater Nechryael", at);

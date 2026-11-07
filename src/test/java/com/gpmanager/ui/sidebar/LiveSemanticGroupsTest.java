@@ -92,15 +92,15 @@ public class LiveSemanticGroupsTest
         LiveSnapshot snapshot = LiveSnapshot.capture(engine, T0 + 3_000L, LiveContext.NONE);
 
         assertEquals("only the canonical review transaction needs a decision", 1, snapshot.reviews);
-        LiveSnapshot.Recent unpriced = rowNamed(snapshot.recent, "Unidentified mineral");
-        assertNotNull(unpriced);
-        assertTrue("the unpriced financial row keeps its incomplete marker", unpriced.unknown);
-        assertFalse("an unpriced financial row is not a review decision", "review".equals(unpriced.tag));
-        assertNull("an unpriced gain opens Gains, not a Costs view", unpriced.cost);
-        LiveSnapshot.Recent review = rowNamed(snapshot.recent, "Unknown rune");
-        assertNotNull(review);
-        assertEquals("review", review.tag);
-        assertTrue(review.ledgerReview);
+        assertNull("unpriced acquisitions wait outside Recent", rowNamed(snapshot.recent, "Unidentified mineral"));
+        assertNull("unpriced decisions also wait outside Recent", rowNamed(snapshot.recent, "Unknown rune"));
+        var ledger = LedgerData.capture(engine, T0 + 3_000L, LedgerData.Entry.current());
+        var unpriced = ledger.income.groups.stream().filter(group -> group.name.equals("Unidentified mineral"))
+                .findFirst().orElseThrow();
+        assertTrue(unpriced.incomplete());
+        assertFalse("an unpriced acquisition is not a classification decision", unpriced.review);
+        assertEquals(Semantics.Table.GAINS, unpriced.table);
+        assertEquals(1, ledger.review.rows.size());
     }
 
     @Test

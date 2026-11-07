@@ -99,7 +99,7 @@ public class DeathReclaimLifecycleTest
         BossRetrievalCatalogue.Service torfinn = BossRetrievalCatalogue.serviceFor("Talk-to", "Torfinn");
         assertFalse("random chest without a death is not a reclaim", lifecycle.noteReclaimIntent(chest, 10));
         assertFalse("a generic Talk-to at a service NPC is not enough", lifecycle.noteReclaimIntent(torfinn, 10));
-        lifecycle.onPvmDeath(java.util.Collections.singletonMap(WHIP, 1L));
+        lifecycle.onPvmDeath(java.util.Collections.singletonMap(WHIP, 1L), false);
         lifecycle.removed(java.util.Collections.singletonList(
             new Flow(WHIP, "Abyssal whip", -1L, 15_000_000, -15_000_000L)));
         assertTrue(lifecycle.isAwaitingReclaim());
@@ -125,7 +125,7 @@ public class DeathReclaimLifecycleTest
     public void missingDeathSnapshotCannotAuthorizeNeutralizingLosses()
     {
         DeathReclaimLifecycle lifecycle = new DeathReclaimLifecycle();
-        lifecycle.onPvmDeath((Map<Integer, Long>) null);
+        lifecycle.onPvmDeath((Map<Integer, Long>) null, false);
 
         assertFalse("no canonical snapshot means no reclaim whitelist",
             lifecycle.wipePending());
@@ -379,7 +379,7 @@ public class DeathReclaimLifecycleTest
     public void deathWipeWhitelistExpiresAtItsOneMinuteEvidenceCap()
     {
         DeathReclaimLifecycle lifecycle = new DeathReclaimLifecycle();
-        lifecycle.onPvmDeath(java.util.Collections.singletonMap(WHIP, 1L));
+        lifecycle.onPvmDeath(java.util.Collections.singletonMap(WHIP, 1L), false);
         for (int i = 0; i < DeathReclaimLifecycle.DEATH_WIPE_WINDOW_TICKS - 1; i++)
         {
             lifecycle.tick(false);

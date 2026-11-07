@@ -27,6 +27,7 @@ public class LmsBorrowedItemsTest {
         var expected = manifest("minigame-prior-20261024.tsv");
         expected.putAll(manifest("lms-loans-20261024.tsv"));
         expected.putAll(manifest("raid-loans-20261025.tsv"));
+        expected.putAll(manifest("minigame-supplies-20261107.tsv"));
         for (var row : expected.entrySet())
             assertEquals(row.getValue(), row.getKey().intValue(), ItemID.class.getField(row.getValue()).getInt(null));
         assertEquals(expected.keySet(), MinigameItems.IDS);

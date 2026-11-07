@@ -18,3 +18,29 @@ gather.exclude	=rake|=plant
 # Executed reward dispositions invalidate an earlier unconfirmed Bank-all window.
 chest-disposition	^take|^destroy|^discard
 chest-action	^take|^destroy|^discard|=bank-all
+# Literal chains moved from code (2026-11-02), same order and meaning as the code they replaced.
+clue-cost	dig|teleport|tele |clue|casket|spade|key+chest
+custody	=fill|=check|=open|=view|=use|=store|^empty|^withdraw|^remove
+world-click	^NPC_|^GAME_OBJECT_|^GROUND_ITEM_|^PLAYER_|^WIDGET_TARGET_ON_
+chest-open	^open |^unlock |^search |=open|=unlock|=search
+market-click	^buy|^sell|^collect+!=collect-from
+player-trade	accept trade|^trade with
+review-note	calibrat|uncertain+plank|uncertain+sack|uncertain+pouch|uncertain+bag|uncertain+container|charge+warn
+raid-name	^ToB|^CoX|^ToA
+gp-suffix	$k|$m|$b
+cannon	multicannon|^cannon 
+sawmill	sawmill+!bank
+object-option	^GAME_OBJECT_+$_OPTION
+take-out	^withdraw|^remove
+ava-cape	assembler|dizana
+blowpipe-check	^darts:+scales:
+sailors-check	^the amulet has |^your amulet has 
+pickaxe-store	=take-pickaxe|=deposit-pickaxe
+take-or-buy	^take|^buy
+clue-activity	clue|casket|treasure trail
+net-to-hold	^you empty the net+!not enough
+net-take-all	^you take all of the fish
+# Death's coffer: a large sacrifice's chatbox confirmation, "Yes, sacrifice 1 x <item>." (Death Cost Tracker 2.4.2).
+coffer-sacrifice	^yes, sacrifice 
+special-world	=DEADMAN|=SEASONAL|=QUEST_SPEEDRUNNING|=BETA_WORLD|=TOURNAMENT_WORLD|=NOSAVE_MODE
+spell-reserved	~cast|~autocast|~cancel

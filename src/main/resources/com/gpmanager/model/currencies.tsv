@@ -1,40 +1,31 @@
-# Untradeable non-GP currencies, unpriced unless a manual override supplies a price.
+# Guarded currencies and item identities. Explicit proxies win, then own alch fallbacks in
+#   alch_currencies.tsv; a missing definition or quote stays pending, never an invented value.
 # item id <TAB> RuneLite gameval ItemID name (or the item's name where no constant is used)
 # Proxy rows instead read: item id <TAB> proxy item id <TAB> units per proxy item or base/with-gloves <TAB> name.
-# A shard is one hundred-and-fiftieth of an enhanced crystal teleport seed, the most
-# efficient seed exchange.
+# A shard costs a thirtieth of a crystal weapon seed: Pennant trades the seed for a crystal acorn,
+# whose ultracomposted tree yields about 30 shards, the OSRS Wiki's own shard cost (owner
+# 2026-11-07; the ultracompost adds well under 1%). The teleport-seed exchange read about 70% high,
+# above every way of turning a shard back into coins.
 # A tokkul reads at the uncut onyx exchange: 300,000 tokkul per onyx, or 260,000 while Karamja gloves are worn.
 6529	6571	300000/260000	TZHAAR_TOKEN
 23866	GAUNTLET_CRYSTAL_SHARD
 23964	PRIF_CRYSTAL_SHARD_CRUSHED
-21649	Mermaid's tear
-25527	STAR_DUST
-21341	MGUILD_MINERALS
-12012	MOTHERLODE_NUGGET
+21656	FOSSIL_MERMAID_TEAR
 # A degrading Amulet of the damned is worth its full self until it turns to dust (OSRS Wiki).
 12853	12851	1	Amulet of the damned
-26792	Abyssal pearl
-24714	HALLOWED_MARK_3
 12746	BH_EMBLEM
-23962	23959	150	PRIF_CRYSTAL_SHARD
+23962	4207	30	PRIF_CRYSTAL_SHARD
 # Spirit flakes read at the retired sailor's exchange: 6,000 flakes buy a barrel or tackle box,
 # swapped for 25 soaked pages, so a page is 240 flakes (OSRS Wiki valuation).
 25588	25578	240	SPIRIT_FLAKES
-# Molch pearls read at Alry's exchange: a golden tench is worth 100 pearls.
+# Alry exchanges a golden tench for 100 Molch pearls; without a quote, use the pearl's own alch value.
 22820	22840	100	AERIAL_FISHING_PEARL
 22822	22840	100	MOLCH_PEARL_2
 22823	22840	100	MOLCH_PEARL_3
 22824	22840	100	MOLCH_PEARL_4
 22825	22840	100	MOLCH_PEARL_5
-# Known-currency guards with no fixed exchange: the hallowed mark counting variants, Castle Wars
-# tickets and Soul Wars spoils stay unpriced rather than mapping to a wrong item.
-24711	HALLOWED_MARK
-24713	HALLOWED_MARK_2
-24715	HALLOWED_MARK_4
-24716	HALLOWED_MARK_5
-24717	HALLOWED_MARK_25
+# Castle Wars tickets have no fixed exchange and use their own known zero.
 4067	CASTLEWARS_TICKET
-25342	SOUL_WARS_SPOILS
 # Imbuing keeps an item's worth: imbued black masks and slayer helmets (NMZ, Soul Wars, PvP Arena)
 # are worth the plain black mask, so an imbue is neutral (owner 2026-10-09).
 11774	8921	1	Black mask (10) (i)

@@ -42,7 +42,7 @@ public class StoredChargeDeathTest {
             var factory = factory(Map.of(family.charged, 1L), Map.of(family.varbit, family.full));
             for (var component : family.recipe.entrySet())
                 assertEquals(component.getValue().longValue(), owned(factory).quantity(component.getKey()));
-            assertEquals(Map.of(family.charged, 1L), factory.captureDeathHeld(true).items);
+            assertEquals(Map.of(family.charged, 1L), factory.captureDeathHeld().items);
         }
     }
 

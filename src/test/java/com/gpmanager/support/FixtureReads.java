@@ -13,6 +13,29 @@ public final class FixtureReads {
         return new ContainerSnapshot(Collections.emptyMap());
     }
 
+    /** Legacy per-receipt scalar for tax fixtures; production uses Session.netAfter. */
+    public static long netUnder(Transaction transaction, Correction hypothetical) {
+        switch (hypothetical == null ? Correction.AUTO : hypothetical) {
+            case REVENUE:
+                return transaction.gross();
+            case COST:
+                return SafeMath.subtract(0, transaction.gross());
+            case TRANSFER:
+            case IGNORE:
+                return 0;
+            default:
+                return transaction.counted ? SafeMath.subtract(transaction.revenue, transaction.costs) : 0;
+        }
+    }
+
+    public static boolean lightsFire(String option, String target) {
+        return ActionSignals.usesOn(option, target, "fuel", "fire");
+    }
+
+    public static boolean offersBones(String option, String target) {
+        return ActionSignals.usesOn(option, target, "altar", "bones");
+    }
+
     public static Session currentSession(SavedState state) {
         return state.customSession != null ? state.customSession : state.generalSession;
     }
@@ -29,7 +52,8 @@ public final class FixtureReads {
     }
 
     public static boolean automaticMarketQuotesAvailable(Engine engine) {
-        return engine.valuation.automaticMarketQuotesAvailable();
+        return !(engine.valuation instanceof Valuation)
+                || ((Valuation) engine.valuation).automaticMarketQuotesAvailable();
     }
 
     public static boolean has(Inbox inbox, int kind, int item) {

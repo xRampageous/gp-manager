@@ -73,4 +73,44 @@ public class FmtCompactTest
         assertEquals("12.4B", Fmt.compact(12_499_999_999L));
         assertEquals("a loss reads toward zero too", "\u2212999k", Fmt.signed(-999_600L));
     }
+
+    @Test public void everyCompactBoundaryAndBothLongBoundsKeepTheirPrecision()
+    {
+        long[] values={0,999,1000,99_999,100_000,999_999,1_000_000,9_999_999,10_000_000,
+            99_999_999,100_000_000,999_999_999,1_000_000_000,9_999_999_999L,10_000_000_000L,
+            Long.MAX_VALUE,Long.MIN_VALUE};
+        String[] expected={"0","999","1.0k","99.9k","100k","999k","1.00M","9.99M","10.0M",
+            "99.9M","100M","999M","1.00B","9.99B","10.0B","9223372036.8B","9223372036.8B"};
+        for(int i=0;i<values.length;i++) assertEquals("value "+values[i],expected[i],Fmt.compact(values[i]));
+    }
+
+    @Test public void actionLabelsRetainTheirUtf16CharacterContract()
+    {
+        for(String value:List.of("Fire Strike","Café ١","漢字, Alpha-Beta's"))
+            assertEquals(value,ActionLabel.useful(value));
+        for(String value:List.of("","Cast","Autocast","Cancel","A_B","A!","A\nB","\ud835\udc00"))
+            assertEquals(value,null,ActionLabel.useful(value));
+    }
+
+    @Test
+    public void fullAndCompactClocksKeepTheirBoundaryFormats()
+    {
+        long[] times = {Long.MIN_VALUE, -1, 0, 999, 1000, 59999, 60000, 3599999, 3600000, 3661000, Long.MAX_VALUE};
+        String[] full = {"0:00", "0:00", "0:00", "0:00", "0:01", "0:59", "1:00", "59:59", "1:00:00", "1:01:01",
+            "2562047788015:12:55"};
+        String[] compact = {"0m00s", "0m00s", "0m00s", "0m00s", "0m01s", "0m59s", "1m00s", "59m59s", "1h00m", "1h01m",
+            "2562047788015h12m"};
+        for (var mode : GpManagerConfig.HudTimer.values())
+        {
+            var builder = new HudBuilder(new GpManagerConfig() {
+                @Override public HudTimer hudTimer() { return mode; }
+            }, null);
+            for (int i = 0; i < times.length; i++)
+            {
+                assertEquals("full " + times[i], full[i], Fmt.clock(times[i]));
+                assertEquals(mode + " " + times[i], mode == GpManagerConfig.HudTimer.Full ? full[i] : compact[i],
+                    builder.timer(times[i]));
+            }
+        }
+    }
 }

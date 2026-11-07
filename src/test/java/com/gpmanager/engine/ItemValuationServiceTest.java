@@ -331,7 +331,8 @@ public class ItemValuationServiceTest
     {
         // RuneLite 1.12.39 ItemManager maps these untradeable currency ids to coal when no
         // direct quote exists. GP Manager must not turn that platform identity normalization into
-        // automatic monetary identity; only an explicit owner override may price them.
+        // automatic monetary identity; the alch rule needs the item's own definition, so an
+        // undefined id still stays unpriced.
         Valuation service = ModelProbe.valuation(new GpManagerConfig() {},
             id -> null, id -> 123);
 
@@ -380,6 +381,45 @@ public class ItemValuationServiceTest
         Valuation quoted = ModelProbe.valuation(new GpManagerConfig() { },
             id -> composition("Unpriced hat", 48_000), id -> id == 1942 ? 50_000 : 0);
         assertEquals(PriceSource.GRAND_EXCHANGE, quoted.value(Collections.singletonMap(1942, 1L)).get(0).source());
+    }
+
+    @Test public void anUnalchableItemWithNoUseLeftIsWorthNothing() throws Exception
+    {
+        // 2026-11-02: RuneLite gives an active blood essence a 60,000 alch value the game never pays.
+        for (String[] row : GameData.rows("no_value"))
+            assertEquals(row[1], Integer.parseInt(row[0]), ItemID.class.getField(row[1]).getInt(null));
+        Valuation service = ModelProbe.valuation(new GpManagerConfig() { },
+            id -> composition("Blood essence (active)", 60_000), id -> 0);
+        Flow essence = service.value(Collections.singletonMap(ItemID.BLOOD_ESSENCE_ACTIVE, 1L)).get(0);
+        assertEquals(PriceSource.NO_VALUE, essence.source());
+        assertEquals(0L, essence.value);
+        service.alch = true;
+        assertEquals("nor for an ironman's alch values", 0L,
+            service.value(Collections.singletonMap(ItemID.BLESSED_BONE_SHARD, 500L)).get(0).value);
+        assertEquals("a crystal shard keeps its alch value (owner rule)", 60_000L,
+            service.value(Collections.singletonMap(ItemID.PRIF_CRYSTAL_SHARD, 1L)).get(0).value);
+    }
+
+    @Test public void minigameCurrenciesTakeTheirAlchValue()
+    {
+        // Owner 2026-11-03: abyssal pearls, stardust, unidentified minerals, golden nuggets and
+        // hallowed marks buy rewards in their own shops, so they keep the alch value the currency
+        // catalogue used to hide; a platform item mapping still never prices them.
+        Map<Integer, Integer> alch = new LinkedHashMap<>();
+        alch.put(ItemID.ABYSSAL_PEARL, 30);
+        alch.put(ItemID.STAR_DUST, 30);
+        alch.put(ItemID.MGUILD_MINERALS, 30);
+        alch.put(ItemID.MOTHERLODE_NUGGET, 60);
+        alch.put(ItemID.HALLOWED_MARK_3, 2_880);
+        Valuation service = ModelProbe.valuation(new GpManagerConfig() { },
+            id -> composition("Minigame currency", alch.getOrDefault(id, 0)),
+            id -> { fail("a currency must never take a market quote"); return 0; });
+        for (Map.Entry<Integer, Integer> entry : alch.entrySet())
+        {
+            Flow flow = service.value(Collections.singletonMap(entry.getKey(), 1L)).get(0);
+            assertEquals(PriceSource.HIGH_ALCHEMY, flow.source());
+            assertEquals(entry.getKey().toString(), entry.getValue().longValue(), flow.unitPrice);
+        }
     }
 
     @Test public void identityMappingNeverManufacturesCrossItemValue()

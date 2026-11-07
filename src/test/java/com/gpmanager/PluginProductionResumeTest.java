@@ -152,6 +152,7 @@ public class PluginProductionResumeTest
             {
                 @Override public int stabilizationTicks() { return 0; }
             };
+            plugin.valuation = new Valuation(new GpManagerConfig() {}, id -> null, (id, active) -> 0, id -> false, Valuation.Economy.UNKNOWN);
             plugin.engine = new Engine(deltas ->
             {
                 List<Flow> flows = new ArrayList<>();

@@ -1,25 +1,42 @@
 # GP Manager changelog
 
-## 1.7.0 - 2026-10-30
+## 1.7.0 - 2026-11-07
 
-- Right-click Recent to preview and remove an entry from tables and totals, even if the item was later used or sold. Undo last removal is under ⚙; grouped rows offer the latest booking. Other protected changes explain why they cannot be applied.
-- Fix drops and pickups around banking, including picking a dropped stack back up immediately after closing the bank; keep loot, crafting and food costs from just before the bank opens. Count a teleport tablet used as tracking starts.
-- Track CoX, ToB, ToA and The Fractured Archive in Raids, with loot, paid death fees and All raids totals. Raid entry unlocks the tab; you always open it manually. Attempts show a completed clear, a terminal failure or the actual Death Fee; abandoned and retry-only attempts stay out of the list.
-- Open KILLS for recorded PK loot, or DEATHS for PvP death losses and looting-bag contents. PvP skull colours show the booked loss tier.
-- Save a session in Grinds and rename saved sessions or finished runs from their ⋯ menu.
-- The Getting started guide and View recap sheet are gone.
-- Improve raid rewards, borrowed supplies, blighted potion doses, armour repairs and G.E. collections after hops or restarts. Live tables match Recent's width and row sizing; Supply counts use doses.
-- The Obligator, Zorya's tome and the archivist's folio count the runes and ascension shards their charges use. Loading charges and uncharging the two weapons stay neutral.
-- Count Cowbell amulet teleports as air runes used; filling or emptying a bottomless milk bucket stays neutral.
-- Items worth more than 2.147B, such as the Obligator, count at their full G.E. price. Platinum tokens count as cash, so G.E. trades paid in tokens settle normally and swapping coins for tokens books nothing.
-- The Include equipment and Include rune pouch settings are gone: gear swaps and rune-pouch moves always stay neutral. Player chat cannot trigger accounting, and undecided Reviews stay available until you decide.
-- The Save history setting is gone: your history is always kept on your computer. Use ⚙ › Delete Profile to remove it.
-- Clearer save warnings, safer loading when a save file is busy, and more reliable Ledger corrections and Undo.
-- Cannonballs left in a deployed cannon no longer count as fresh income when you pick it up; a tracked load shrinks when those balls come back.
-- Herbs an open herb sack takes (from a patch, a herbiboar or the ground), seeds an open seed box takes (from a drop or a pickpocket), coal an open coal bag takes, and the meat and fur open Hunter pouches take from a catch now count. A Dizana's quiver, charged or not, and a mangled locked item stay yours when they break, and Perdu's repair books only the fee, and a banker charging a weapon from your bank no longer skews its next Check.
-- Hardcore Worlds pause tracking and automatic market prices until dedicated support; main-game history is never mixed with them.
-- Recovered gear stays neutral; only the death fee counts. Genuine loot is kept. Wrong entries in the current run can be removed with Undo available.
-- OSRS already shows your grave, so GP Manager no longer adds a gravestone icon, reclaim-pending row or death-reclaim hero line.
+- Preview the Net change before removing one entry or a whole grouped Recent row, with one Undo to restore the removal.
+- Track CoX, ToB, ToA and The Fractured Archive loot and paid death fees in Raids; raid entry or retained raid receipts reveal the tab without opening it automatically.
+- Open KILLS for recorded PK loot and DEATHS for PvP losses, including known looting-bag contents and the booked skull tier.
+- Buying a bond on the Grand Exchange is neutral, like any purchase; converting it counts the conversion window's fee once, using inventory coins first.
+- Older bond rows left in Review are cleared once, on your first login: a bond conversion counted as a gain is removed from your totals (one that also paid coins keeps its fee and waits for Repair bond), and the untradeable bond's Grand Exchange collection leaves Review without changing them. Undo in the current run brings either back, and it stays back.
+- Redeeming a bond or gifting it to another player counts what you paid for it, or a bond's Grand Exchange price if GP Manager did not see you buy it; selling it shows its result like any other item. Old conversion Reviews stay together with Repair bond available; neutral bond state rows stay in Ledger.
+- Supported cooking, fletching, potion-making, smelting and crafting steps share an output item row with measured quantities and original ingredient prices in details.
+- Grand Exchange refunds no longer hide supported dough or pizza preparation; blue GE amounts show the actual Result, including losses and large partial collections.
+- Dropping two different items a tick apart now books one Dropped row, and picking them back up cancels it, even with a bank opened or closed in between. Before, the drop could count as a supply and the pickup as new loot, or one item went missing.
+- Loot and supplies from before a bank opens still count, and pickups immediately after closing it do not become new loot.
+- Blue Moon's Weapon Freeze keeps your weapon owned through the freeze, including changes to spare weapons or loose ammunition.
+- Deep sea trawling counts net catches as they happen, including crew catches, cargo deposits and catches after partial emptying; separate pickups still count.
+- Boat cargo deposits stay storage, and open gem bags count Wyrmscraig golem gifts; herbs, seeds, coal and Hunter-pouch catches sent into containers count normally.
+- Plank sacks, master scroll books, bow string spools and ring of the elements retain stored contents; using their supplies counts, including flax spun straight into a spool.
+- More charged items count their measured resources, including the Obligator, Zorya's tome, archivist's folio and Cowbell amulet; shared celestial stardust counts once.
+- Charging and uncharging supported amulets, teleport items and other charged gear stays neutral; their used charges count as supplies.
+- Reverting a crystal tool counts only its crystal shards, even when you take your time in its two confirmation dialogs; a Revert already left in Review is fixed once, on your first login.
+- Crystal shards are valued at what growing them costs, about 11,000 each (the OSRS Wiki's figure), instead of the teleport seed exchange, so shard charges and Reverts no longer read about 70% high.
+- Opening a casket, cache of runes, frozen cache, forgotten lockbox, mystery box, bounty crate or supply crate counts its contents without a Review.
+- Wintertodt's bruma roots, kindling, herbs and rejuvenation potions, Zalcano's tephra and the Mage Training Arena's room items no longer book anything; their rewards still count.
+- Seedlings take their sapling value; potting, watering and growth no longer create extra gains or Reviews.
+- Reward packs and Spoils of War count their contents when opened; item-currency purchases and sales are recognised as trades.
+- More currencies use their own alch value; merfolk tridents and Mermaid's tears use their correct identities, and active blood essence, blessed bone shards and blessed bone statuettes keep zero value.
+- Trading a spare Dizana's quiver to Minimus counts one exchange; Death's coffer confirmations remain storage.
+- Review hints, confirmations, splits and grouped Undo respect protected stock and keep accurate Net changes at very large values.
+- Price recovery retains the right later sale profit; items awaiting prices stay out of Recent while remaining in Ledger.
+- Large item values, Ledger details, potion costs, targets and Grind averages keep their correct signs and totals; platinum tokens count as cash.
+- Grand Exchange collections, raid rewards, borrowed supplies, blighted doses and armour repairs retain their proper costs after hops or restarts.
+- Recovered gear stays neutral and only the death fee counts; GP Manager no longer adds a gravestone icon or reclaim-pending display.
+- Save sessions in Grinds and rename saved sessions or finished runs; the Getting started guide and View recap sheet have been removed.
+- Open offers appear at the GE icon beside Recent, while settled results remain in Recent; Live tables share its row sizing and supplies use dose counts.
+- Gear and rune-pouch moves always stay neutral, history is always kept locally, and player chat cannot trigger accounting.
+- Save warnings, loading busy files, Ledger corrections and Undo are more reliable; undecided Reviews remain available until you decide.
+- Cannonballs returned from a deployed cannon no longer count as fresh income, and using a teleport tablet as tracking starts counts its cost.
+- Hardcore Worlds characters are tracked with their own economy: an item counts at its alch value until you trade it on the Hardcore Grand Exchange, then at the price your trade got; a death there counts the items its gravestone deletes, known looting-bag contents included. Leagues, Deadman and other special worlds stay paused.
 
 ## 1.6.0 - 2026-10-20
 

@@ -18,6 +18,8 @@ public class PlayerCombatLifecycleTest
         plugin.offers = new OfferSlots();
         plugin.idle = new CharacterIdleTracker(null, new CharacterIdleModel());
         plugin.targets = new InteractionContextTracker(null, plugin.engine, plugin.config);
+        // Injected in production; an owner switch also releases the frozen weapon it holds.
+        plugin.containers = new ContainerSnapshotFactory(null, null);
         plugin.storage = new Persistence(null, null, null, null, plugin.engine)
         {
             @Override boolean isTrackingReady() { return false; }

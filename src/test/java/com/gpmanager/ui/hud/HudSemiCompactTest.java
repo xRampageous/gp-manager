@@ -41,7 +41,7 @@ public class HudSemiCompactTest
     {
         var unknown = fixture(true, true, true, 225);
         unknown.book(41, NOW, 100, "Unpriced item", 2, 0);
-        assertEquals("? ×2", unknown.frame(NOW + 1000).rows.get(0).value);
+        assertEquals("Pending ×2", unknown.frame(NOW + 1000).rows.get(0).value);
         var worthless = fixture(true, true, true, 225);
         worthless.plugin.transactionBooked(receipt(NOW, TransactionType.LOOT,
             new Flow(101, "Valueless ticket", 2, 0, 0, PriceSource.NO_VALUE)), NOW);
@@ -58,6 +58,21 @@ public class HudSemiCompactTest
             assertEquals("Rune kiteshield ×1", row.name);
             assertEquals("+31.7k", row.value);
         }
+    }
+
+    @Test public void pendingPriceAndQuantityFitTheMinimumHudWidth() {
+        var fixture = fixture(true, true, true, 120);
+        fixture.book(41, NOW, 100, "Unpriced item", 2, 0);
+        var frame = fixture.frame(NOW + 1000);
+        var image = new BufferedImage(640, 300, BufferedImage.TYPE_INT_ARGB);
+        var graphics = image.createGraphics();
+        try {
+            var overlay = new HudOverlay(fixture.builder, fixture.config);
+            var size = overlay.render(graphics);
+            int valueWidth = graphics.getFontMetrics(overlay.body).stringWidth(frame.rows.get(0).value);
+            assertTrue("pending value and count fit beside the icon", overlay.indent + valueWidth + HudOverlay.PAD * 2 <= size.width);
+            assertEquals("Pending ×2", frame.rows.get(0).value);
+        } finally { graphics.dispose(); }
     }
 
     @Test public void narrowHudRendersTheCompleteCompactFallbackInsteadOfClippingFullFigures()

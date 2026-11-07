@@ -1,0 +1,26 @@
+# Minigame currencies worth their alch value (owner 2026-11-03). They buy rewards in their own
+#   shops, so unlike no_value.tsv items that value is real worth; the currency catalogue still
+#   keeps platform item mappings and market quotes away from them. RuneLite's alch price is 60%
+#   of the store value: abyssal pearls, stardust and unidentified minerals 50 -> 30, golden
+#   nugget 100 -> 60, hallowed mark 4,800 -> 2,880 (OSRS Wiki, 2026-11-03).
+# id <TAB> RuneLite gameval ItemID name
+26792	ABYSSAL_PEARL
+25527	STAR_DUST
+21341	MGUILD_MINERALS
+12012	MOTHERLODE_NUGGET
+24711	HALLOWED_MARK
+24713	HALLOWED_MARK_2
+24714	HALLOWED_MARK_3
+24715	HALLOWED_MARK_4
+24716	HALLOWED_MARK_5
+24717	HALLOWED_MARK_25
+# Other guarded currencies use their own alch value when no supported proxy quote exists.
+23964	PRIF_CRYSTAL_SHARD_CRUSHED
+4067	CASTLEWARS_TICKET
+21656	FOSSIL_MERMAID_TEAR
+23866	GAUNTLET_CRYSTAL_SHARD
+22820	AERIAL_FISHING_PEARL
+22822	MOLCH_PEARL_2
+22823	MOLCH_PEARL_3
+22824	MOLCH_PEARL_4
+22825	MOLCH_PEARL_5

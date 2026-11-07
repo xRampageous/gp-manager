@@ -74,7 +74,7 @@ public class LivePolishTest {
             panel.suspend();
 
             for (Component detail : new Component[]{page.hero, page.total, page.risk,
-                    page.hero.icons, page.counts, page.target, page.recent, page.offers})
+                    page.hero.icons, page.counts, page.target, page.recent})
                 assertFalse("no old owner detail is visible: " + detail.getClass().getSimpleName(), visible(detail, panel));
             assertEquals(owner, engine.session().id());
             assertEquals(net, engine.metrics(30L).net);
@@ -117,19 +117,18 @@ public class LivePolishTest {
         });
     }
 
-    @Test public void loadingResetsBothRecentAndOffersPagination() throws Exception {
+    @Test public void loadingResetsRecentPagination() throws Exception {
         onEdt(() -> {
             LivePage page = MilestoneTest.page();
             var rows = new ArrayList<Table.Row>();
             for (int i = 0; i < 20; i++) rows.add(TableRows.row("row-" + i, "Item " + i, "1", "+1", Kit.Tone.GAIN));
-            for (Table table : new Table[]{page.recent, page.offers}) {
+            for (Table table : new Table[]{page.recent}) {
                 table.setPageSize(5).setRows(rows);
                 table.next.doClick();
                 assertEquals(1, table.page);
             }
             page.clearOwner();
             assertEquals(0, page.recent.page);
-            assertEquals(0, page.offers.page);
             return null;
         });
     }

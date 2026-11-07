@@ -1,0 +1,10 @@
+# Untradeable items the game refuses to alch and that have no use left to sell, so they are worth nothing
+#   even though RuneLite gives them an alch value (OSRS Wiki: alchable No; coinflow ItemPricing, 2026-11-02).
+#   Crystal shards, Ecumenical keys and other unalchable items with a use keep their alch value (owner rule).
+#   tools/check_unalchable.py checks these ids and lists other candidates for review.
+# id <TAB> RuneLite gameval ItemID name
+26392	BLOOD_ESSENCE_ACTIVE
+29338	VARLAMORE_BONE_STATUETTE01
+29340	VARLAMORE_BONE_STATUETTE02
+29342	VARLAMORE_BONE_STATUETTE03
+29381	BLESSED_BONE_SHARD

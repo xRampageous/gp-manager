@@ -116,7 +116,9 @@ public class ArmourRepairTest {
             assertEquals(id,ItemID.class.getField(row[2]).getInt(null));assertTrue(seen.add(id));
             families.computeIfAbsent(row[1],key -> new ArrayList<>()).add(id);
         }
-        assertEquals(404,seen.size());assertEquals(131,families.size());
+        // Bonds use the same raw-id pairing, with separately tested native conversion proof.
+        assertEquals(Set.of(ItemID.OSRS_BOND,ItemID.OSRS_BOND_UNTRADEABLE),new HashSet<>(families.remove("bond")));
+        assertEquals(426,seen.size());assertEquals(141,families.size());
         for (var family : families.values()) for (int i = 1; i < family.size(); i++) {
             int a = family.get(0), b = family.get(i);
             var f = new Fixture(a);f.swap(a,b,0);f.feeOnly(0);

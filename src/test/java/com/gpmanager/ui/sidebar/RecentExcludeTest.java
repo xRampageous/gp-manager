@@ -51,6 +51,17 @@ public class RecentExcludeTest {
             onEdt(() -> { menu.action.run(); panel.refreshNow(); return null; });
         }
 
+        /** The whole-row question's own button. */
+        void removeAll() throws Exception {
+            onEdt(() -> {
+                var button = button(panel.shell.sheet, "Remove");
+                assertNotNull("Missing Remove control", button);
+                button.doClick();
+                panel.refreshNow();
+                return null;
+            });
+        }
+
         void press(String text) throws Exception {
             onEdt(() -> {
                 var button = button(panel.ledger.detail, text);
@@ -99,19 +110,141 @@ public class RecentExcludeTest {
         assertEquals(2, f.saves.get());
     }
 
-    @Test public void groupedRowsExplicitlyTargetOnlyTheLatestBooking() throws Exception {
+    /** Owner 2026-11-02: a grouped row removes every entry behind it, as one change with one Undo. */
+    @Test public void groupedRowsRemoveEveryEntryAsOneUndoableChange() throws Exception {
         var f = new Fixture();
         var first = f.book(NOW + 1_000, new Flow(536, "Dragon bones", 1, 100, 100));
         var latest = f.book(NOW + 2_000, new Flow(536, "Dragon bones", 2, 100, 200));
         var menu = f.exclude(536);
-        assertEquals("Remove latest entry…", menu.label);
+        assertEquals("Remove all 2 entries…", menu.label);
         f.open(menu);
-        assertEquals(latest.id(), f.panel.ledger.transaction);
-        assertEquals(-200, f.panel.ledger.preview.change);
-        f.press("Confirm");
-        assertTrue(first.counts());
+        assertTrue("asking first changes nothing", first.counts() && latest.counts());
+        assertEquals(0, f.saves.get());
+        String question = onEdt(() -> text(f.panel.shell.sheet));
+        assertTrue(question, question.contains("Remove all 2 entries") && question.contains("−300"));
+        f.removeAll();
+        assertFalse(first.counts());
         assertFalse(latest.counts());
-        assertEquals(100, f.engine.metrics(NOW + 3_000).net);
+        assertEquals(0, f.engine.metrics(NOW + 3_000).net);
+        assertEquals("one save for the whole row", 1, f.saves.get());
+        assertTrue("one Undo brings both back", f.engine.undoCorrection());
+        assertTrue(first.counts() && latest.counts());
+        assertEquals(300, f.engine.metrics(NOW + 3_000).net);
+    }
+
+    @Test public void aGroupedRemovalNeverAppliesToAChangedLedgerOrAnotherOwner() throws Exception {
+        var f = new Fixture();
+        var first = f.book(NOW + 1_000, new Flow(536, "Dragon bones", 1, 100, 100));
+        var latest = f.book(NOW + 2_000, new Flow(536, "Dragon bones", 2, 100, 200));
+        f.open(f.exclude(536));
+        f.book(NOW + 2_500, new Flow(385, "Shark", 1, 900, 900));
+        f.removeAll();
+        assertTrue("a booking after the question makes it stale", first.counts() && latest.counts());
+        assertEquals(1_200, f.engine.metrics(NOW + 3_000).net);
+        var menu = f.exclude(536);
+        onEdt(() -> { f.panel.suspend(); f.panel.resume(); menu.action.run(); return null; });
+        assertFalse("a stale menu asks nothing", onEdt(() -> f.panel.shell.sheet.isVisible()));
+        assertTrue(first.counts() && latest.counts());
+    }
+
+    @Test public void theWholeRowPreviewSaturatesAsNetDoes() throws Exception {
+        var f = new Fixture();
+        for (int i = 1; i <= 3; i++)
+            f.book(NOW + i * 600L, new Flow(536, "Dragon bones", 2_000_000_000L, 2_000_000_000L, 4_000_000_000_000_000_000L));
+        assertEquals(Long.MAX_VALUE, f.engine.metrics(NOW + 3_000).net);
+        f.open(f.exclude(536));
+        String question = onEdt(() -> text(f.panel.shell.sheet));
+        assertTrue("removing only gains can never preview a rise: " + question,
+                question.contains(Fmt.signed(-Long.MAX_VALUE)));
+        f.removeAll();
+        assertEquals(0, f.engine.metrics(NOW + 3_000).net);
+    }
+
+    @Test public void theWholeRowPreviewIsTheActualNetChangeBesideSaturationAndCosts() throws Exception {
+        var f = new Fixture();
+        var cheap = f.book(NOW + 1_000, new Flow(536, "Dragon bones", 1, 100, 100));
+        var dear = f.book(NOW + 1_500, new Flow(536, "Dragon bones", 1, 200, 200));
+        f.book(NOW + 2_000, new Flow(385, "Shark", 1, 900, Long.MAX_VALUE - 100));
+        var cost = Tx.of(NOW + 2_500, TransactionType.CONSUMPTION, Context.GENERIC, "", true,
+                List.of(new Flow(995, "Coins", -1, 50, -50)));
+        cost.confidence = Confidence.CONFIRMED;
+        f.engine.session().addTransaction(cost, 2_000, false);
+        long before = f.engine.metrics(NOW + 3_000).net;
+        f.open(f.exclude(536));
+        String question = onEdt(() -> text(f.panel.shell.sheet));
+        f.removeAll();
+        long after = f.engine.metrics(NOW + 3_000).net;
+        assertFalse(cheap.counts() || dear.counts());
+        assertTrue("the Shark and the cost stay", cost.counts());
+        assertNotEquals("a raw sum would say -300", -300, after - before);
+        assertTrue("preview " + question + " must be the real change " + (after - before),
+                question.contains("by " + Fmt.signed(after - before) + " gp"));
+    }
+
+    @Test public void aMissingOrAlreadyRemovedReceiptRefusesTheWholeRemoval() throws Exception {
+        var f = new Fixture();
+        var first = f.book(NOW + 1_000, new Flow(536, "Dragon bones", 1, 100, 100));
+        var latest = f.book(NOW + 2_000, new Flow(536, "Dragon bones", 2, 100, 200));
+        assertFalse("an unknown id refuses every row", f.engine.correctEntries(List.of(first.id(), "missing"), Correction.IGNORE));
+        assertTrue(first.counts() && latest.counts());
+        f.open(f.exclude(536));
+        assertTrue(f.engine.correctEntries(List.of(first.id()), Correction.IGNORE));
+        f.removeAll();
+        assertTrue("the question no longer matches the ledger", latest.counts());
+        assertEquals(200, f.engine.metrics(NOW + 3_000).net);
+        assertFalse("an already-removed row refuses the batch",
+                f.engine.correctEntries(List.of(first.id(), latest.id()), Correction.IGNORE));
+        assertTrue(latest.counts());
+    }
+
+    @Test public void cancellingTheWholeRowQuestionChangesNothing() throws Exception {
+        var f = new Fixture();
+        var first = f.book(NOW + 1_000, new Flow(536, "Dragon bones", 1, 100, 100));
+        var latest = f.book(NOW + 2_000, new Flow(536, "Dragon bones", 2, 100, 200));
+        f.open(f.exclude(536));
+        onEdt(() -> { button(f.panel.shell.sheet, "Cancel").doClick(); return null; });
+        assertFalse(onEdt(() -> f.panel.shell.sheet.isVisible()));
+        assertTrue(first.counts() && latest.counts());
+        assertEquals(0, f.saves.get());
+        assertFalse("nothing to undo", f.engine.undoCorrection());
+    }
+
+    @Test public void aQueuedWholeRowRemovalCannotCrossAnOwnerOrRunChange() throws Exception {
+        for (boolean ownerSwitch : new boolean[] {true, false}) {
+            var f = new Fixture();
+            var first = f.book(NOW + 1_000, new Flow(536, "Dragon bones", 1, 100, 100));
+            var latest = f.book(NOW + 2_000, new Flow(536, "Dragon bones", 2, 100, 200));
+            f.open(f.exclude(536));
+            var queued = new ArrayList<Runnable>();
+            f.panel.mutationOwner = queued::add;
+            f.removeAll();
+            onEdt(() -> {
+                if (ownerSwitch) { f.panel.suspend(); f.panel.resume(); }
+                else {
+                    f.engine.finishCustom(NOW + 3_000);
+                    f.engine.startCustom("Next Grind", NOW + 4_000);
+                }
+                return null;
+            });
+            queued.forEach(Runnable::run);
+            assertTrue(first.counts() && latest.counts());
+            assertFalse("nothing to undo", f.engine.undoCorrection());
+        }
+    }
+
+    @Test public void aGroupedRemovalSurvivesSaveAndReloadAsOneUndo() throws Exception {
+        var f = new Fixture();
+        var first = f.book(NOW + 1_000, new Flow(536, "Dragon bones", 1, 100, 100));
+        var latest = f.book(NOW + 2_000, new Flow(536, "Dragon bones", 2, 100, 200));
+        f.open(f.exclude(536));
+        f.removeAll();
+        var next = PresentationLifecycleTest.engine();
+        next.restore(SaveCopies.copy(f.engine.savedState()), NOW + 5_000);
+        assertEquals("the removal was saved", 0, next.metrics(NOW + 5_000).net);
+        assertTrue("one Undo after reload brings both back", next.undoCorrection());
+        assertEquals(300, next.metrics(NOW + 5_000).net);
+        assertTrue(next.session().transactions().stream()
+                .filter(row -> row.id().equals(first.id()) || row.id().equals(latest.id())).allMatch(Transaction::counts));
     }
 
     @Test public void aMultiItemBookingUsesItsWholeValueAndPreservesQuotes() throws Exception {
@@ -288,6 +421,17 @@ public class RecentExcludeTest {
             assertTrue(menu.stream().anyMatch(item -> item.label.equals("Open in Ledger")));
             return null;
         });
+    }
+
+    private static String text(Container root) {
+        var all = new StringBuilder();
+        for (Component child : root.getComponents()) {
+            if (child instanceof javax.swing.JLabel) all.append(((javax.swing.JLabel) child).getText()).append(' ');
+            if (child instanceof javax.swing.text.JTextComponent)
+                all.append(((javax.swing.text.JTextComponent) child).getText()).append(' ');
+            if (child instanceof Container) all.append(text((Container) child));
+        }
+        return all.toString();
     }
 
     private static JButton button(Container root, String text) {

@@ -54,7 +54,7 @@ public class InboxMoneyTest
     public void ownerFenceRetainsDurableGraveContinuityAndClearsTheInteraction()
     {
         Engine engine = engine();
-        engine.death.onPvmDeath(Map.of(BONES, 2L));
+        engine.death.onPvmDeath(Map.of(BONES, 2L), false);
         engine.death.ticks = 10;
         engine.stored.put(BONES, 1L);
         engine.events.owner(1001L);

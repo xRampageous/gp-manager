@@ -79,7 +79,7 @@ public class RecentVisibilityTest
         generic.label = "Cast";
         assertTrue("an unnamed spell can be hidden too", has(page, generic, "Hide spell from recent"));
         assertTrue(hides(page, new LiveSnapshot.Recent(385, "Shark", null, 900L, false, false, null, 1, "r", "c",
-            "", 1L, false, false, true, null, false, 0L, false, "", false, false, null)));
+            "", 1L, false, false, true, null, false, 0L, false, "", false, false, null, java.util.Set.of("r"))));
     }
 
     @Test
@@ -153,7 +153,7 @@ public class RecentVisibilityTest
     static LiveSnapshot.Recent recent(int itemId, String name, boolean market, boolean open)
     {
         return new LiveSnapshot.Recent(itemId, name, null, 1_000L, false, false, market ? "market" : null, 1, "r", "c",
-            "", 200L, true, market, true, null, false, 0L, market, market ? "Sold" : "", open, false, null);
+            "", 200L, true, market, true, null, false, 0L, market, market ? "Sold" : "", open, false, null, java.util.Set.of("r"));
     }
 
     static boolean hides(LivePage page, LiveSnapshot.Recent row)

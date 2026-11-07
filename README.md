@@ -2,7 +2,7 @@
 
 See what you make after costs. GP Manager tracks your loot, supplies, losses and Grand Exchange trades as you play. Keep everything in Free play, or start a Grind for an activity you want to follow.
 
-Works on normal, Ironman and Hardcore Ironman accounts. Ultimate Ironman isn't supported.
+Works on normal, Ironman and Hardcore Ironman accounts, and on Hardcore Worlds characters. Ultimate Ironman isn't supported.
 
 ## Getting started
 
@@ -33,7 +33,7 @@ Screenshots use illustrative sample data.
 
 ## What you can track
 
-- **Live:** Net after costs, GP/h and recent receipts. Right-click a Recent booking and choose **Remove entry…** to preview and confirm a correction. Grouped rows offer **Remove latest entry…**. Click GAINS, SUPPLY, LOSS or TRADE to inspect that session's entries. Click Net to set a target; ACTIVE opens the session controls. Restarting a session keeps the full run's totals recorded.
+- **Live:** Net after costs, GP/h and recent receipts. Right-click a Recent booking and choose **Remove entry…** to preview and confirm a correction. Grouped rows offer **Remove all N entries…**, which removes the whole row in one step that **Undo last removal** reverses. Click GAINS, SUPPLY, LOSS or TRADE to inspect that session's entries. Click Net to set a target; ACTIVE opens the session controls. Restarting a session keeps the full run's totals recorded.
 - **Ledger:** see why an entry counted and open its retained receipts. Uncertain entries wait in Review for your decision. In the current run, **Correct → Remove entry** removes a booking from tables and totals, even if you later used or sold the item. After a removal, **⚙ → Undo last removal** restores it at its original prices; the separate Corrected audit keeps the receipt. Other corrections can be refused when an item's value is tied to other entries; the panel explains why. Historical and saved-session receipts stay read-only.
 - **Grinds and saved sessions:** name an activity, set targets and compare finished runs. **Save session** keeps a session copy in Grinds without counting its money twice. Inside a finished session, use **⋯ → Rename…** to change its name. All time brings your runs together.
 - **Free play:** tracks activity outside Grinds. Set an optional milestone, or use **⚙ → Reset free-play** to start again and keep the previous run in Grinds.
@@ -56,7 +56,7 @@ An optional in-game overlay shows Net, GP/h, targets and a loot tray. Compact it
 - **Grand Exchange:** observed collections, partly filled offers, tax and platinum payments above max cash.
 - **Death and repair costs:** reclaimed gear stays neutral; observed fees and repairs count as costs. Barrows wear alone is not a loss.
 
-Banking, storage and gear swaps stay neutral. Prices use RuneLite's G.E. prices, your overrides or an alch fallback; ironmen can choose high-alch values. Leagues, Deadman, Hardcore Worlds, beta and tournament worlds pause regular tracking.
+Banking, storage and gear swaps stay neutral. Prices use RuneLite's G.E. prices, your overrides or an alch fallback; ironmen can choose high-alch values. Hardcore Worlds characters use alch values until they trade an item on the Hardcore G.E., then that trade's price. Leagues, Deadman, beta and tournament worlds pause regular tracking.
 
 When a change needs your decision, the Ledger explains it in Review.
 

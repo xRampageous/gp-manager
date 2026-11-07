@@ -30,8 +30,8 @@ servant	rick|maid|cook|butler|demon butler	2
 wood	.*(logs|plank)	2
 # A Barrows piece by its name without the 100/75/50/25/0 wear stage (OSRS Wiki: Barrows equipment).
 barrows	((?:ahrim|dharok|guthan|karil|torag|verac)'s [^0-9]+?|amulet of the damned)(?: (?:100|75|50|25|0)| \(full\))?	2
-# What an NPC takes in its dialogue for an item: coins, or a skilling currency (OSRS Wiki, 2026-08-19 update).
-cash	coins|spirit flakes|molch pearl|abyssal pearls	0
+# Physical shop currencies, not equipment identity proxies or points (OSRS Wiki shops, 2026-11-03).
+cash	coins|spirit flakes|molch pearl|abyssal pearls|tokkul|stardust|unidentified minerals|golden nugget|hallowed mark|castle wars ticket|mermaid's tear|mark of grace|anima-infused bark|trading sticks|ecto-tokens?|agility arena ticket|brimhaven voucher|pieces of eight|termites|archery ticket	0
 # Every Avernic defender variant (not the tradeable hilt): a death weighs it at its 600,000 repair cost.
 avernic	avernic defender(?! hilt).*	0
 # A Wilderness Agility dispenser award, every item it names (owner recording 2026-10-16).
@@ -94,3 +94,13 @@ target-net	\d+(?:\.\d+)?[kmb]?	0
 target-minutes	\d+(?:\.\d+)?	0
 target-time	^(?:(\d+(?:\.\d+)?)\s*h)?\s*(?:(\d+(?:\.\d+)?)\s*m)?$	0
 ghommal-save	^Ghommal's luck saves a charge on your .+\.$	2
+trawl-catch	^(?:you catch|.+ catches) (an?|one|two|three|four|five|six|seven|eight|nine|ten) (.+)!$	2
+bond-fee	([0-9][0-9,]*) coins	0
+# Owner recording 20261104-220235 (message box, same tick the bond leaves): "Your bond has been gifted to RampageHC."
+bond-gift	^your bond has been gifted to .+\.$	2
+# Owner recording 20261107-071643 (message box, same tick the parts arrive): "You take apart your crystal felling axe."
+take-apart	^you take apart your .+\.$	2
+spell-markup	<[^>]*>|@[a-zA-Z0-9]{3,6}@	0
+spell-label	(?=.{1,64}$)(?!.*[\x{10000}-\x{10ffff}])[\p{javaLetterOrDigit} ',-]*	0
+# RuneLite LootTrackerPlugin GOLEM_CRAFTING_PATTERN, 9fc69b64f418ab8166890dbd40fb7e63aa333918; only contained gems.
+gem-golem	^As you complete the golem it leaves a gift in your gem (?:bag|sack) for you: 1 x Uncut (diamond|emerald|ruby|sapphire)\.?$	2

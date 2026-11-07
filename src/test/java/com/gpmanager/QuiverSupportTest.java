@@ -228,7 +228,8 @@ public class QuiverSupportTest {
         }
         static Object zero(Class<?> type) { return type==int.class?0:type==boolean.class?false:type==long.class?0L:null; }
     }
-    static final Map<Integer,String> GEM_NAMES=Map.of(ItemID.UNCUT_RUBY,"Uncut ruby",ItemID.UNCUT_DIAMOND,"Uncut diamond",ItemID.UNCUT_OPAL,"Uncut opal");
+    static final Map<Integer,String> GEM_NAMES=Map.of(ItemID.UNCUT_RUBY,"Uncut ruby",ItemID.UNCUT_DIAMOND,"Uncut diamond",ItemID.UNCUT_OPAL,"Uncut opal",
+        ItemID.UNCUT_EMERALD,"Uncut emerald",ItemID.UNCUT_SAPPHIRE,"Uncut sapphire");
     static String name(int id) {
         if (GEM_NAMES.containsKey(id)) return GEM_NAMES.get(id);
         if (id==ItemID.DRAGON_ARROW) return "Dragon arrow";

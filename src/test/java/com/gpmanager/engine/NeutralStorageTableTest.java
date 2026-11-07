@@ -43,6 +43,11 @@ public class NeutralStorageTableTest
         {"deposit pool", null},
         {"seed vault deposit box", "Seed vault transfer"},
         {"shared storage raid bag", "GIM shared storage transfer"},
+        // A boat's cargo hold outside its window (coinflow 1753f9fe; Wiki: left-click Deposit-held since 2026-01-14).
+        {"deposit-held cargo hold", "Cargo hold"},
+        {"deposit-all cargo hold", "Cargo hold"},
+        {"use repair kit -> cargo hold", "Cargo hold"},
+        {"build cargo hold", null},
         {"  ", null},
         {null, null},
         {"bank", null},

@@ -71,17 +71,20 @@ public class WorldPauseAndWindowHoldTest
     }
 
     @Test
-    public void hardcoreWorldsPauseLikeOtherSeparateEconomies()
+    public void hardcoreWorldsTrackWhileDeadmanStillPauses()
     {
+        // Owner 2026-11-07: a Hardcore Worlds character never plays main worlds, so it tracks there
+        // with its own economy's prices; Deadman keeps the world pause.
         Engine engine = engine();
         ReviewFixesTest.Plugin p = plugin(engine, new int[] {11});
         p.client = clientOn(WorldType.HARDCORE_MAIN);
-        assertTrue("a Hardcore world is a separate economy", p.onUnsupportedWorld());
+        assertFalse("a Hardcore world tracks: no world pause", p.onUnsupportedWorld());
+        assertFalse(engine.separate);
+        p.client = clientOn(WorldType.DEADMAN);
+        assertTrue("Deadman is still a separate economy", p.onUnsupportedWorld());
         p.onGameTick(null);
         assertTrue(engine.separate);
         assertEquals(PauseReason.WORLD, engine.session().pauseReason());
-        p.client = clientOn(WorldType.MEMBERS);
-        assertFalse("a members world still tracks", p.onUnsupportedWorld());
     }
 
     @Test
