@@ -18,7 +18,7 @@ public class CapturedBlightedRecoveryTest {
         var flows=new ArrayList<Flow>();flows.add(new Flow(ids[dose-1],family+"("+dose+")",-1,unit*dose,-unit*dose,PriceSource.GRAND_EXCHANGE,at));
         if(dose>1)flows.add(new Flow(ids[dose-2],family+"("+(dose-1)+")",1,unit*(dose-1),unit*(dose-1),PriceSource.GRAND_EXCHANGE,at));
         var row=new Transaction(at,dose>1?TransactionType.UNCERTAIN:TransactionType.CONSUMPTION,Context.GENERIC,"","PKing",dose==1,flows,
-                dose>1?Confidence.UNCERTAIN:Confidence.LIKELY,dose>1?GameData.msg("consumed-dose"):"Consumed",null);
+                dose>1?Confidence.UNCERTAIN:Confidence.LIKELY,dose>1?GameData.msg("consumedDose"):"Consumed",null);
         row.setAction(ActionKind.DRINK);return row;
     }
     static String json(Object x){return new Gson().toJson(x);}
@@ -89,7 +89,7 @@ public class CapturedBlightedRecoveryTest {
                 groups.stream().map(g->g.name).collect(java.util.stream.Collectors.toSet()));
     }
     @Test public void savedProvenanceMarkerIsStable(){
-        assertEquals("Recovered from original blighted dose prices; later tracked item values are unchanged.",GameData.msg("captured-dose"));
+        assertEquals("Recovered from original blighted dose prices; later tracked item values are unchanged.",GameData.msg("capturedDose"));
     }
     static Engine previewEngine(){
         var e=engine();var pending=new ArrayList<Transaction>();for(int dose=4;dose>1;dose--)pending.add(add(e,dose));add(e,1);

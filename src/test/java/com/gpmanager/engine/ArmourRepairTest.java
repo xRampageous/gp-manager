@@ -191,7 +191,7 @@ public class ArmourRepairTest {
         assertFalse(f.engine.session().transactions().stream().anyMatch(t -> t.type() == TransactionType.TRANSFER));
         assertNull(Engine.piece(new Flow(999999,"Dharok's helm 75",1,10,10)));
         var different = new Fixture(MOONS[0][1]);different.swap(MOONS[0][1],MOONS[1][0],1500000);
-        assertFalse(different.engine.session().transactions().stream().anyMatch(t -> t.note().equals(GameData.msg("barrows-wear"))));
+        assertFalse(different.engine.session().transactions().stream().anyMatch(t -> t.note().equals(GameData.msg("barrowsWear"))));
     }
 
     @Test public void feeOnlyProjectionAndReloadKeepRecentLedgerAndMoneyAligned() {

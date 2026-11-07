@@ -61,7 +61,7 @@ public class TentacleWornOutTest
         engine.setBaseline(snapshot(ItemID.ABYSSAL_TENTACLE));
         Transaction row = settle(engine, FixtureReads.empty(), 1_600L);
         assertTrue("only a used-up or dissolved tentacle books this way",
-            row == null || !GameData.msg("tentacle-used").equals(row.note()));
+            row == null || !GameData.msg("tentacleUsed").equals(row.note()));
     }
 
     private static ContainerSnapshot snapshot(int itemId)

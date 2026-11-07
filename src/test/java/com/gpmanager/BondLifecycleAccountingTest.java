@@ -54,41 +54,11 @@ public class BondLifecycleAccountingTest {
         f.inventory.remove(BondConversionTest.NEW); f.f.become(f.inventory);
         offer(f,slots,GrandExchangeOfferState.SOLD,1,1_500_000);
         f.f.engine.noteGeCollect(f.f.at);
-        f.f.engine.markContext(Context.MARKET,10,GameData.msg("ge-collect"));
+        f.f.engine.markContext(Context.MARKET,10,GameData.msg("geCollect"));
         f.inventory.put(995,442877L+1_500_000); f.f.become(f.inventory);
         assertEquals("1500000 observed proceeds minus 1200000 purchase minus 357123 conversion",
             -57123,f.f.live().net);
         assertFalse(f.reviewed());
-    }
-
-    @Test public void undoRepairThenAcquireMustKeepCoverageThroughReload() {
-        var f=new BondConversionTest.Fixture(0);
-        f.f.engine.session().addTransaction(BondSettlementTest.acquired(f.f.at),2000,false);
-        var row=BondSettlementTest.newOnly(f.f.at+1);
-        f.f.engine.session().addTransaction(row,2000,false);
-        assertEquals(1,BondSettlementTest.repair(f.f.engine,List.of(row.id()),f.f.at+1200));
-        assertTrue(f.f.engine.undoCorrection());
-        var acquired=new Transaction(f.f.at+1800,TransactionType.GAIN,Context.GENERIC,"","",true,
-            List.of(new Flow(BondConversionTest.NEW,"Old school bond",1,2_000_000,2_000_000,
-                PriceSource.GRAND_EXCHANGE)),Confidence.CONFIRMED,"",null);
-        f.f.engine.session().addTransaction(acquired,2000,false);
-        assertEquals(1,f.f.engine.basis.known(BondConversionTest.NEW).availableQty);
-        var restored=ProductionRecipeTest.engine();
-        restored.restore(SaveCopies.copy(f.f.engine.savedState()),f.f.at+2400);
-        assertEquals("future stock must not be discarded because Undo restored an id-zero empty pool",
-            1,restored.basis.known(BondConversionTest.NEW).availableQty);
-    }
-
-    @Test public void aRepairCannotTakeAnAcquisitionLaterThanTheReceipt() {
-        var f=new BondConversionTest.Fixture(0);
-        var row=BondSettlementTest.newOnly(f.f.at);
-        f.f.engine.session().addTransaction(row,2000,false);
-        f.f.engine.session().addTransaction(BondSettlementTest.acquired(f.f.at+600),2000,false);
-        SafeMath.clock=()->f.f.at+1800;
-        BondSettlementTest.repair(f.f.engine,List.of(row.id()),f.f.at+1800);
-        assertEquals("later OLD acquisition is not coverage for an earlier conversion",
-            1,f.f.engine.basis.known(BondConversionTest.OLD).availableQty);
-        assertEquals(0,f.f.engine.basis.known(BondConversionTest.NEW).availableQty);
     }
 
     /** Owner 2026-11-07: purchase neutral, fee counted when paid; the bond's cost waits for its use. */

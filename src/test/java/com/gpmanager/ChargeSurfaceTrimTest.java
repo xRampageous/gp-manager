@@ -34,14 +34,14 @@ public class ChargeSurfaceTrimTest {
             // The sailors' amulet's own Check wording ("...has 106 charges." or "...charges
             // left."); the blood fury's hit-count line names itself below (owner 2026-10-14).
             return SAILORS_AMULET;
-        if (lower.startsWith(msg("tome-charged")))
+        if (lower.startsWith(msg("tomeCharged")))
         {
             // The page names the tome; a bare "your tome" line stays fire and the clicked row
             // redirects it (owner 2026-10-12).
             if (lower.contains("soaked")) return TOME_OF_WATER; return lower.contains("soiled") ? TOME_OF_EARTH : TOME_OF_FIRE;
         }
-        if (lower.startsWith(msg("amulet-blood"))) return BLOOD_FURY;
-        if (lower.startsWith(msg("eye-capacity")) || lower.startsWith(msg("eye-loaded")))
+        if (lower.startsWith(msg("amuletBlood"))) return BLOOD_FURY;
+        if (lower.startsWith(msg("eyeCapacity")) || lower.startsWith(msg("eyeLoaded")))
             return EYE_OF_AYAK;
         for (var variant : ChargedItem.values()) {
             if (variant == BLOWPIPE) continue; String name = lower(variant.displayName, false);

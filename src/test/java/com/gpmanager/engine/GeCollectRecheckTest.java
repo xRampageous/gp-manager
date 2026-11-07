@@ -45,7 +45,7 @@ public class GeCollectRecheckTest
         assertFalse(old.counts());
         assertTrue(ReviewRules.needsReview(old));
         assertEquals("Grand Exchange", old.note());
-        assertEquals(msg("ge-movement"), old.explanation());
+        assertEquals(msg("geMovement"), old.explanation());
         assertEquals("same row", id, old.id());
         assertEquals("same time", T0, old.timestamp);
         assertEquals("same activity", "Growler", old.activityName());
@@ -80,7 +80,7 @@ public class GeCollectRecheckTest
         {
             assertSame(TransactionType.UNCERTAIN, row.original());
             assertEquals("Grand Exchange", row.note());
-            assertEquals(msg("ge-movement"), row.explanation());
+            assertEquals(msg("geMovement"), row.explanation());
             assertFalse(row.counted);
         }
         assertSame("the owner's Count stays theirs", Correction.REVENUE, counted.correction());
@@ -96,7 +96,7 @@ public class GeCollectRecheckTest
     private static Transaction geReview(Context context, Flow... flows)
     {
         return new Transaction(T0, TransactionType.UNCERTAIN, context, "Grand Exchange", "Growler", false,
-            List.of(flows), Confidence.UNCERTAIN, msg("ge-movement"), null);
+            List.of(flows), Confidence.UNCERTAIN, msg("geMovement"), null);
     }
 
     /** The same coins landing in the pack today, with no Collect click. */

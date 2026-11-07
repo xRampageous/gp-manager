@@ -101,7 +101,7 @@ public class SessionTargetCountTest
         LiveSnapshot.Goal goal = LiveSnapshot.goal(session,
             new Metrics("General", false, elapsed, 100_000L, 0L, 100_000L, 85_714L, 0, 0, false), elapsed);
         assertEquals("100k in 10 minutes is 600k/h: 10 more minutes, not the run's 1h 10m",
-            "~10m" + GameData.msg("play-left"), goal.eta);
+            "~10m" + GameData.msg("playLeft"), goal.eta);
         assertEquals("the aim's own clock", 10L * 60_000L, session.profitTargetActiveMillis(elapsed));
     }
 }

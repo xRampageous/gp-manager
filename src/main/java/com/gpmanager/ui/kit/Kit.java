@@ -312,7 +312,7 @@ class Kit {
 
     /** Same escaped HTML and fixed wrapping width for notes and status messages. */
     String wrappedText(String text, int width) {
-        return msg("div-style") + width + "px'>" + text.replace("&", "&amp;")
+        return msg("divStyle") + width + "px'>" + text.replace("&", "&amp;")
                 .replace("<", "&lt;") + "</div></html>";
     }
 
@@ -669,17 +669,17 @@ class Hero extends JPanel {
      */
     static List<Cell> money(long income, long supplies, long lost, long cost, boolean split, Runnable open) {
         var cells = new ArrayList<Cell>();
-        cells.add(new Cell("GAINS", signed(income), GAIN, msg("loot-other") + exactGp(income),
+        cells.add(new Cell("GAINS", signed(income), GAIN, msg("lootOther") + exactGp(income),
                         open));
         if (split) {
             cells.add(new Cell("SUPPLY", signed(-supplies), SUPPLY,
-                            msg("food-potions") + exactGp(supplies)
+                            msg("foodPotions") + exactGp(supplies)
                                     + (income > 0 && supplies >= 0 ? format(ROOT,
-                                            msg("percent-gains"), 100d * supplies / income) : ""), open));
+                                            msg("percentGains"), 100d * supplies / income) : ""), open));
             cells.add(new Cell("LOSS", signed(-lost), LOSS,
-                            msg("deaths-tax") + exactGp(lost), open));
+                            msg("deathsTax") + exactGp(lost), open));
         } else
-            cells.add(new Cell("COSTS", signed(-cost), LOSS, msg("everything-spent"), open));
+            cells.add(new Cell("COSTS", signed(-cost), LOSS, msg("everythingSpent"), open));
         return cells;
     }
 
@@ -1093,9 +1093,9 @@ class Shell extends JPanel {
         pad(bar, 0, GAP, 2, GAP); var top = transparent(new BorderLayout());
         // The gear beside the tabs holds profile-wide data actions, reachable from any page.
         var strip = transparent(new BorderLayout()); strip.setBorder(createMatteBorder(0, 0, 1, 0, LINE));
-        var gear = new JButton(new ImageIcon(ImageUtil.loadImageResource(ConfigPlugin.class, msg("config-edit"))));
+        var gear = new JButton(new ImageIcon(ImageUtil.loadImageResource(ConfigPlugin.class, msg("configEdit"))));
         pad(gear, 0, 6, 0, 6); gear.setContentAreaFilled(false);
-        gear.setFocusPainted(false); gear.setToolTipText(msg("export-backups"));
+        gear.setFocusPainted(false); gear.setToolTipText(msg("exportBackups"));
         named(gear, "GP Manager actions"); focus(gear);
         gear.setName("GP Manager actions"); gear.addActionListener(e -> onGear.accept(gear));
         strip.add(tabs, CENTER); strip.add(gear, EAST); top.add(strip, NORTH); top.add(bar, CENTER);
@@ -1324,7 +1324,7 @@ class Shell extends JPanel {
  */
 @UtilityClass
 class Fmt {
-    final NumberFormat EXACT = NumberFormat.getIntegerInstance(UK); final String PRICE_PENDING = msg("price-pending");
+    final NumberFormat EXACT = NumberFormat.getIntegerInstance(UK); final String PRICE_PENDING = msg("pricePending");
 
     /** Curated short activity names (master plan, Activity presentation): exact names first. */
     final List<String[]> SHORT = rows("short_names");
@@ -1689,7 +1689,7 @@ class HudBuilder {
                     + (snapshot.reviews == 1 ? " item needs review" : " items need review");
         }
         if (snapshot.milestoneReached() || snapshot.milestone != null && snapshot.targetUntil > 0) {
-            color = GAIN.color; return msg("milestone-reached") + compact(snapshot.milestone);
+            color = GAIN.color; return msg("milestoneReached") + compact(snapshot.milestone);
         }
         return snapshot.warming ? "Calibrating…" : "";
     }
@@ -2640,7 +2640,7 @@ class LedgerPage extends Page {
         for (var table : tables())
             table.setFoldable(true).setPageSize(ROWS);
         receipts.setPageSize(ROWS); cost.setPicker(costPicker(CostView.ALL, new int[4]));
-        pending.setEmpty("Nothing waiting"); review.setEmpty(msg("nothing-needs")); pad(body, 0, GAP, GAP, 0);
+        pending.setEmpty("Nothing waiting"); review.setEmpty(msg("nothingNeeds")); pad(body, 0, GAP, GAP, 0);
     }
 
     public String id() {
@@ -2690,7 +2690,7 @@ class LedgerPage extends Page {
         scopeTitle();
         // Owner 2026-10-01 (F03): Runs today is whole runs that started today, never calendar-day
         // money.
-        scope.setToolTipText(next.scopeName + (next.entry.scope == TODAY ? SEPARATOR + msg("current-run") : ""));
+        scope.setToolTipText(next.scopeName + (next.entry.scope == TODAY ? SEPARATOR + msg("currentRun") : ""));
         if (scopeChanged)
             for (var table : tables())
                 table.resetPage();
@@ -2704,10 +2704,10 @@ class LedgerPage extends Page {
         }
         if (next.entry.scope == TODAY)
             // Owner 2026-10-01 (F03): whole runs that started today, never calendar-day money.
-            body.add(note(msg("runs-today"), LABEL));
-        if (next.readonly && !raid) body.add(note(msg("correction-help"), LABEL));
+            body.add(note(msg("runsToday"), LABEL));
+        if (next.readonly && !raid) body.add(note(msg("correctionHelp"), LABEL));
         if (!liveCategory() && next.compacted && !next.detailed)
-            body.add(note(msg("detailed-entries"), LABEL));
+            body.add(note(msg("detailedEntries"), LABEL));
         if (next.entry.table == KILL) body.add(note(msg("kn"), LABEL));
         if (next.detail != null) {
             buildDetail(next); body.add(detail);
@@ -2757,7 +2757,7 @@ class LedgerPage extends Page {
         if (data.review.total > 0 || data.entry.focusAudit == Audit.REVIEW) buildReview(data);
         if (corrections || data.entry.focusAudit == Audit.CORRECTED) {
             var rows = list(data.corrected, this::receiptRow);
-            corrected.setTitle(msg("correctedtag") + data.corrected.size()).setEmpty(msg("nothing-corrected"))
+            corrected.setTitle(msg("correctedtag") + data.corrected.size()).setEmpty(msg("nothingCorrected"))
                     .setRows(rows);
             body.add(corrected);
         }
@@ -2808,12 +2808,12 @@ class LedgerPage extends Page {
             } else if (settled(group, row)) {
                 value = signed(marketPrimary(data, group));
                 tip = group.name + SEPARATOR + marketLead(data, group)
-                                + msg("settlement-profit");
+                                + msg("settlementProfit");
             } else {
                 value = stateWord(row); shown = DIM; tip = group.name + SEPARATOR + group.context;
             }
         } else if (group.incomplete()) {
-            value = PRICE_PENDING; shown = DIM; tip = group.name + msg("incomplete-value");
+            value = PRICE_PENDING; shown = DIM; tip = group.name + msg("incompleteValue");
         } else
             value = worth(group.value);
         String qty = group.claim < 0 ? "−" + max(1, group.quantity) : !failed.isEmpty()
@@ -2861,8 +2861,8 @@ class LedgerPage extends Page {
                             gp(row.value), selected, open, singletonList(new Menu("Decide…", open))));
         }
         review.setTitle(msg("reviewtag") + data.review.total).setAction(null).setEmpty(data.readonly
-                                ? msg("review-read") : data.review.total == 0 ? msg("nothing-needs")
-                                        : msg("review-row")).setRows(rows);
+                                ? msg("reviewRead") : data.review.total == 0 ? msg("nothingNeeds")
+                                        : msg("reviewRow")).setRows(rows);
         body.add(review); if (chosen != null && !data.readonly) body.add(decisionPanel(chosen));
     }
 
@@ -2884,9 +2884,9 @@ class LedgerPage extends Page {
     static String netPreview(ReviewRow row, Map<Decision, Long> nets) {
         var text = new StringBuilder(); Long gain = nets.get(Decision.GAIN), cost = nets.get(Decision.COST);
         if (gain != null && row.decisions.contains(Decision.GAIN))
-            text.append(msg("gain-help")).append(signed(gain));
+            text.append(msg("gainHelp")).append(signed(gain));
         if (cost != null && row.decisions.contains(Decision.COST))
-            text.append(text.length() == 0 ? msg("if-counted-cost") : msg("as-cost-net")).append(signed(cost));
+            text.append(text.length() == 0 ? msg("ifCountedCost") : msg("asCostNet")).append(signed(cost));
         return text.toString();
     }
 
@@ -2898,7 +2898,7 @@ class LedgerPage extends Page {
                         }));
         // Owner 2026-10-01 (F01): undo mutates the live run only; read-only scopes disable it.
         boolean editable = data != null && !data.readonly && !actions.pinMenuTarget().isEmpty();
-        menu.add(item(msg("undo-tip"), editable, actions::undoCorrection)); menu.addSeparator();
+        menu.add(item(msg("undoTip"), editable, actions::undoCorrection)); menu.addSeparator();
         menu.add(item("Undo last change", editable, actions::undoLast));
         menu.add(item("Restore last undo", editable, actions::restoreUndo)); return menu;
     }
@@ -2920,7 +2920,7 @@ class LedgerPage extends Page {
         // A charged weapon always lists what it spent, even one rune type (owner 1.2).
         boolean bagOpen = group.ids.contains(bagDetail); if (bagOpen) detail.add(back(group.name, () -> bagDetail = ""));
         if (!group.market && (items.size() > 1 || group.claim < 0 || group.charge || (group.death || group.table == KILL) && !items.isEmpty())) {
-            detailItems.setTitle((bagOpen ? msg("looting-bag") : group.death && !group.neutral ? "LOST · " : group.charge || group.value < 0 ? "USED · " : "ITEMS · ") + items.size())
+            detailItems.setTitle((bagOpen ? msg("lootingBag") : group.death && !group.neutral ? "LOST · " : group.charge || group.value < 0 ? "USED · " : "ITEMS · ") + items.size())
                     .setRows(items);
             detail.add(detailItems);
         }
@@ -2933,7 +2933,7 @@ class LedgerPage extends Page {
         receipts(data, open);
         // An offer with nothing collected yet has no receipt to show or correct; none is invented.
         // One entry needs no list: the header names it and its detail opens below (owner 1.5.2).
-        if (open.entries.isEmpty()) detail.add(note(msg("collected-entries"), LABEL));
+        if (open.entries.isEmpty()) detail.add(note(msg("collectedEntries"), LABEL));
         else if (group.market || !LedgerData.oneEntry(open.entries)) detail.add(receipts);
         if (open.exact != null) detail.add(receipt(data, open.exact));
     }
@@ -2980,7 +2980,7 @@ class LedgerPage extends Page {
                                 receiptTitle(receipt), realized ? signed(primary)
                                         : stateWord(receipt.market), realized ? MARKET : DIM,
                                 receiptSub(receipt, data.at) + (receipt.corrected
-                                                ? msg("result-corrected") : ""),
+                                                ? msg("resultCorrected") : ""),
                                 realized ? gp(primary) : "", splittable(receipt)));
             }
         } else {
@@ -3050,7 +3050,7 @@ class LedgerPage extends Page {
         if (trade == null) {
             panel.add(note(row.why, LABEL));
             if (data.detail.group.death || pendingCorrection == Correction.IGNORE)
-                panel.add(note(msg("applies-whole-entry"), LABEL));
+                panel.add(note(msg("appliesWholeEntry"), LABEL));
             if (!row.tradedItems.isEmpty()) panel.add(note(row.tradedItems, LABEL));
             // Owner 2026-10-01 (F11): a Charges receipt discloses its captured unit price and
             // source.
@@ -3063,7 +3063,7 @@ class LedgerPage extends Page {
         }
         if (facts.lines() > 0) panel.add(facts);
         if (data.readonly)
-            panel.add(note(msg("correction-rules"), LABEL));
+            panel.add(note(msg("correctionRules"), LABEL));
         else if (preview != null && row.transaction.equals(transaction)) {
             var preview = new KeyValue("PREVIEW");
             if (share != null)
@@ -3074,12 +3074,12 @@ class LedgerPage extends Page {
                                     gp(this.preview.afterNet), PLAIN).put("Change",
                                     gp(this.preview.change), sign(this.preview.change)));
             panel.add(note(this.preview.note(), LABEL)); JButton confirm = button("Confirm", true, this::confirm);
-            named(confirm, msg("confirm-correction"));
+            named(confirm, msg("confirmCorrection"));
             panel.add(row(button("Cancel", () -> {
                                         clearPending(); actions.refresh();
                                     }), confirm));
         } else {
-            JButton correct = menuButton("Correct ⌄", () -> correctMenu(row)); named(correct, msg("correct-entry"));
+            JButton correct = menuButton("Correct ⌄", () -> correctMenu(row)); named(correct, msg("correctEntry"));
             panel.add(row(correct));
         }
         return panel;
@@ -3107,21 +3107,21 @@ class LedgerPage extends Page {
     }
 
     static String marketTip(MarketRows.Row trade, String label, String value) {
-        if (value.endsWith("Corrected")) return msg("result-adjusted");
+        if (value.endsWith("Corrected")) return msg("resultAdjusted");
         switch (label) {
             case "Received":
-                return "not proven".equals(value) ? msg("collected-cash") : msg("received-cash");
+                return "not proven".equals(value) ? msg("collectedCash") : msg("receivedCash");
             case "Spent":
-                return msg("spent-cash");
+                return msg("spentCash");
             case "GE tax":
-                return msg("proven-item");
+                return msg("provenItem");
             case "Previously counted":
-                return "Unknown".equals(value) ? msg("gp-manager-did") : null;
+                return "Unknown".equals(value) ? msg("gpManagerDid") : null;
             case "Result":
                 if ("—".equals(value))
-                    return msg("gp-manager-cannot") + msg("unknown-received")
-                            + (trade.knownCostOnly ? msg("proven-ge") : "");
-                return value.endsWith("Partial") ? msg("result-covered") : null;
+                    return msg("gpManagerCannot") + msg("unknownReceived")
+                            + (trade.knownCostOnly ? msg("provenGe") : "");
+                return value.endsWith("Partial") ? msg("resultCovered") : null;
             default:
                 return null;
         }
@@ -3145,7 +3145,7 @@ class LedgerPage extends Page {
                                         clearPending(); transaction = id; share = split; this.preview = preview;
                                         actions.selectionChanged(id, contributionId, null);
                                     }));
-        list.put(msg("undo-reason"), actions::undoCorrection); return list;
+        list.put(msg("undoReason"), actions::undoCorrection); return list;
     }
 
     void clearPending() {
@@ -3161,7 +3161,7 @@ class LedgerPage extends Page {
             return;
         var result = actions.correct(transaction, pendingCorrection, preview.revision); clearPending(); actions.refresh();
         if (result != null && result != CorrectionOutcome.APPLIED)
-            showNotice(result == CorrectionOutcome.STALE ? msg("entries-changed") : msg("correction-applied"));
+            showNotice(result == CorrectionOutcome.STALE ? msg("entriesChanged") : msg("correctionApplied"));
     }
 
     static String correctionLabel(Correction decision) {
@@ -3270,7 +3270,7 @@ class LedgerController implements LedgerPage.Actions {
                 menu.addSeparator();
             }
             for (var session : history.subList(from, to))
-                menu.add(item(msg("recent-grind") + session.name(),
+                menu.add(item(msg("recentGrind") + session.name(),
                                 () -> selectScope(HISTORY, session.id(), session.name())));
         }
         menu.show(anchor, 0, anchor.getHeight() + 2);
@@ -3302,7 +3302,7 @@ class LedgerController implements LedgerPage.Actions {
 
     public CorrectionPreview preview(String id, Correction decision) {
         var preview = LedgerData.preview(engine, id, decision, now());
-        if (preview == null) panel.shell.tell("Not applied", msg("correction-blocked"), true); return preview;
+        if (preview == null) panel.shell.tell("Not applied", msg("correctionBlocked"), true); return preview;
     }
 
     /**
@@ -3316,7 +3316,7 @@ class LedgerController implements LedgerPage.Actions {
                     // A toast, not a page note: the refresh after this edit rebuilds the page.
                     if (stale || !engine.correctEntries(List.of(id), decision))
                         later(owner, () -> panel.shell.tell("Not applied",
-                                        stale ? msg("entries-changed") : msg("correction-applied"), true));
+                                        stale ? msg("entriesChanged") : msg("correctionApplied"), true));
                 });
         return null;
     }
@@ -3351,7 +3351,7 @@ class LedgerController implements LedgerPage.Actions {
         }
         if (id <= 0 || total < 2) {
             // Owner 2026-10-01 (F02): only one kind of item in two or more units can be split.
-            panel.shell.tell("Not split", owner == null ? msg("entry-longer") : msg("split-needs"), true); return;
+            panel.shell.tell("Not split", owner == null ? msg("entryLonger") : msg("splitNeeds"), true); return;
         }
         int splitItem = id; long splitTotal = total;
         String splitName = empty(name) ? "this item" : name, splitOwner = owner;
@@ -3364,7 +3364,7 @@ class LedgerController implements LedgerPage.Actions {
                                 keep = -1;
                             }
                             if (keep <= 0 || keep >= splitTotal) {
-                                panel.shell.tell("Not split", msg("enter-number") + (splitTotal - 1), true); return;
+                                panel.shell.tell("Not split", msg("enterNumber") + (splitTotal - 1), true); return;
                             }
                             CorrectionPreview preview = null;
                             // Owner, session, item and quantity are re-checked in the preview's hold.
@@ -3375,7 +3375,7 @@ class LedgerController implements LedgerPage.Actions {
                                     preview = LedgerData.splitPreview(engine, identifier, splitItem, keep, now());
                             }
                             if (preview == null) {
-                                panel.shell.tell("Not split", msg("entry-changed"), true); return;
+                                panel.shell.tell("Not split", msg("entryChanged"), true); return;
                             }
                             // Owner 1.1: the split shows its Net preview first, like every other
                             // correction.
@@ -3392,10 +3392,10 @@ class LedgerController implements LedgerPage.Actions {
                     var now = engine.session();
                     Transaction current = now == null || !owner.equals(now.id()) ? null
                                     : now.findTransaction(id);
-                    String why = engine.revision() != previewRevision ? msg("entries-changed")
-                                    : !splittableSplit(current, (int) split[0], split[2]) ? msg("entry-changed")
+                    String why = engine.revision() != previewRevision ? msg("entriesChanged")
+                                    : !splittableSplit(current, (int) split[0], split[2]) ? msg("entryChanged")
                                     : engine.splitItem(id, (int) split[0], split[1], "Ledger split") ? null
-                                    : msg("split-applied");
+                                    : msg("splitApplied");
                     if (why != null) later(token, () -> panel.shell.tell("Not split", why, true));
                 });
     }
@@ -3450,17 +3450,17 @@ class LedgerController implements LedgerPage.Actions {
         var preview = engine.previewDecision(decision,
                         row -> row != null && id.equals(row.transaction), now());
         if (preview.rowCount() != 1) {
-            panel.shell.tell("Not applied", msg("correction-applied"), true); return;
+            panel.shell.tell("Not applied", msg("correctionApplied"), true); return;
         }
-        String message = LedgerPage.correctionLabel(decision.correction) + msg("decision-net")
+        String message = LedgerPage.correctionLabel(decision.correction) + msg("decisionNet")
                         + signed(preview.netDelta) + " gp.";
         Object owner = panel.ownerToken;
         panel.shell.confirm("Review decision", message, "Apply", () -> mutate(() -> {
                                             int applied = engine.applyDecision(preview);
                                             if (applied <= 0)
                                                 later(owner, () -> panel.shell.tell("Not applied",
-                                                                        applied < 0 ? msg("entries-changed")
-                                                                                        : msg("correction-applied"), true));
+                                                                        applied < 0 ? msg("entriesChanged")
+                                                                                        : msg("correctionApplied"), true));
                                         }));
     }
 
@@ -3554,8 +3554,8 @@ class LivePage extends Page {
         clickable(hero.name, "Rename Grind", actions::renameGrind);
         // Clicking the Net total sets or changes the target (owner 2026-09-28: no Target button).
         clickable(hero.net, msg("target"), actions::editTarget);
-        clickable(total, msg("save-session-run"), actions::showWholeRun);
-        risk.setToolTipText(msg("what-death")); hero.under.add(total); hero.under.add(risk); target.setBackground(CARD);
+        clickable(total, msg("saveSessionRun"), actions::showWholeRun);
+        risk.setToolTipText(msg("whatDeath")); hero.under.add(total); hero.under.add(risk); target.setBackground(CARD);
         pad(target, 4, 6, 5, 6);
         // Owner live 2026-10-14: Pause and Done ride the header's right; Again / Reset / Edit sit
         // under the card. Built once; only visibility follows the aim.
@@ -3564,7 +3564,7 @@ class LivePage extends Page {
         // carries the completed action set; while running the icons ride the header's right.
         againButton = button("↻", actions::againTarget); doneButton = button("✓", actions::doneTarget);
         editButton = button("…", actions::editTarget); pause = button("||", actions::toggleTimerPause);
-        againButton.setToolTipText(msg("again-session-tip"));
+        againButton.setToolTipText(msg("againSessionTip"));
         doneButton.setToolTipText("Clear goal"); editButton.setToolTipText("Edit targets"); pause.setToolTipText(msg("timer"));
         var head = transparent(new BorderLayout()); head.add(heading, CENTER); head.add(top, EAST); target.add(head, NORTH);
         var values = stack(CARD, 1); values.add(value); values.add(targetTime);
@@ -3572,7 +3572,7 @@ class LivePage extends Page {
         targetBar.setMaximumValue(1000); targetBar.setBackground(LINE); line.add(targetBar, CENTER); line.add(pace, SOUTH);
         target.add(line, CENTER); target.add(targetActions, SOUTH);
         // A set target is edited by clicking its card.
-        target.setToolTipText(msg("click-change"));
+        target.setToolTipText(msg("clickChange"));
         clickable(target, "Edit target", actions::editTarget); recent.setEmpty(msg("nothing")); breakdown.setVisible(false);
         pad(body, 0, GAP, GAP, 0); for (var part : new JComponent[] {hero, signals, target, recent, breakdown}) body.add(part);
     }
@@ -3604,7 +3604,7 @@ class LivePage extends Page {
         // Owner 1.5.2: Risk lives off the header, so a long name keeps its room.
         total.setVisible(snapshot.fresh);
         // Clicking it shows the whole run again; a running target keeps its own session.
-        total.setToolTipText((snapshot.goal == null ? msg("run-total") : msg("run-total-target"))
+        total.setToolTipText((snapshot.goal == null ? msg("runTotal") : msg("runTotalTarget"))
                         + (snapshot.milestone == null ? "" : " Milestone " + compact(snapshot.milestone) + ": "
                                         + percent((double) snapshot.run / snapshot.milestone)
                                         + "."));
@@ -3632,17 +3632,17 @@ class LivePage extends Page {
                                     : sign(snapshot.net) : DIM, exactSigned(snapshot.net) + " gp · gains "
                             + exact(snapshot.income) + (snapshot.split ? " · supplies "
                                             + exact(snapshot.supplies) + " · losses " + exact(snapshot.loss)
-                                    : " · costs " + exact(snapshot.cost) + msg("split-unavailable"))
-                            + (snapshot.goal == null ? msg("click-set") : snapshot.goal.time ? "" : " · aim "
+                                    : " · costs " + exact(snapshot.cost) + msg("splitUnavailable"))
+                            + (snapshot.goal == null ? msg("clickSet") : snapshot.goal.time ? "" : " · aim "
                                                     + exactSigned(snapshot.goal.current) + " of "
                                                     + exactGp(snapshot.goal.target)),
                     rateText(snapshot.ready, snapshot.rate), snapshot.ready,
                     clock(snapshot.elapsed) + " ACTIVE");
         } else
-            hero.big("—", DIM, msg("nothing-tracked"), "—", false, "");
+            hero.big("—", DIM, msg("nothingTracked"), "—", false, "");
         // Owner 2026-10-01 (F12): the hero names the rate basis and the tracked-time policy.
-        hero.rate.setToolTipText(snapshot.ready ? msg("gp-h") : null);
-        hero.clock.setToolTipText(snapshot.present ? msg("tracked-active") : null);
+        hero.rate.setToolTipText(snapshot.ready ? msg("gpH") : null);
+        hero.clock.setToolTipText(snapshot.present ? msg("trackedActive") : null);
         hero.strips(strips(snapshot)); applyTarget(snapshot); var rows = new ArrayList<Row>();
         var recentTotal = new ValueTotal();
         // GE offers still on the exchange show only as the GE count icon (owner 2026-11-03), then
@@ -3654,8 +3654,8 @@ class LivePage extends Page {
             }
         // Owner 2026-10-01 (F13): the empty card says which event starts tracking, never a fake
         // start.
-        String empty = snapshot.offline ? msg("tracking-waits") : !snapshot.general ? msg("nothing")
-                                : actions.autoStartArmed() ? msg("tracking-starts") : msg("press-grind");
+        String empty = snapshot.offline ? msg("trackingWaits") : !snapshot.general ? msg("nothing")
+                                : actions.autoStartArmed() ? msg("trackingStarts") : msg("pressGrind");
         if (!empty.equals(emptyRecent)) {
             emptyRecent = empty; recent.setEmpty(empty);
         }
@@ -3684,7 +3684,7 @@ class LivePage extends Page {
         targetBar.setValue((int) round(goal.fraction * 1000)); targetBar.setForeground(goal.reached ? GAIN.color : ACCENT);
         // A time target's line already counts down (owner 1.5.2: said once); a Net aim's pace line
         // carries its own wording, or waits for the rate.
-        String pace = goal.eta; this.pace.setText(pace == null ? msg("pace-once") : pace);
+        String pace = goal.eta; this.pace.setText(pace == null ? msg("paceOnce") : pace);
         // Button layout (owner live 2026-10-14): while the aim runs its icons sit on the header's
         // right with no bottom row; a completed aim lays them along the bottom. Pause is the timer's own —
         // the run keeps tracking.
@@ -3721,7 +3721,7 @@ class LivePage extends Page {
             // A grouped row removes every entry behind it (owner 2026-11-02).
             var exclude = actions.exclude(entry, row.receipts);
             if (exclude != null) menu.add(new Menu(row.receipts.size() > 1
-                            ? format(msg("remove-all-menu"), row.receipts.size()) : "Remove entry…", exclude));
+                            ? format(msg("removeAllMenu"), row.receipts.size()) : "Remove entry…", exclude));
         }
         // A finished trade is one item too (owner 2026-10-08: a sold Fire rune had no Hide).
         if (!row.open && row.item > 0 && (!row.composite || row.market))
@@ -3748,7 +3748,7 @@ class LivePage extends Page {
                         snapshot.split, ledger);
         if (snapshot.market != 0 || snapshot.pendingMarket > 0)
             money.add(new Cell("TRADE", snapshot.market == 0 ? "open" : signed(snapshot.market), MARKET,
-                            msg("realized-market"), ledger));
+                            msg("realizedMarket"), ledger));
         for (Cell cell : money)
             for (var table : Semantics.Table.values())
                 if (table.label.equals(cell.label)) cell.open = () -> actions.openCategory(table);
@@ -3759,11 +3759,11 @@ class LivePage extends Page {
             rows.add(asList(new Cell("KILLS", valueOf(snapshot.kills), GAIN, msg("kt"),
                             () -> actions.openCategory(KILL)),
                     new Cell("DEATHS", valueOf(snapshot.deaths), LOSS,
-                            "PvP deaths. " + msg("death-view"), () -> actions.openCategory(DEATH)),
+                            "PvP deaths. " + msg("deathView"), () -> actions.openCategory(DEATH)),
                     new Cell("BEST", snapshot.bestKill == 0 ? "—" : signed(snapshot.bestKill), GAIN,
                                         "Best kill · " + snapshot.kills + " kills · " + snapshot.deaths + " deaths", null),
                     new Cell("STREAK", valueOf(snapshot.streak), snapshot.streak > 0 ? GAIN : DIM,
-                                    msg("kills-since") + snapshot.bestStreak + " this Grind", null)));
+                                    msg("killsSince") + snapshot.bestStreak + " this Grind", null)));
         }
         return rows;
     }
@@ -3771,8 +3771,8 @@ class LivePage extends Page {
     List<Cell> statusIcons(LiveSnapshot snapshot) {
         var list = new ArrayList<Cell>();
         if (snapshot.reviews > 0)
-            list.add(new Cell("Review", "(!)" + snapshot.reviews, REVIEW, snapshot.reviews == 1 ? msg("item-needs")
-                                    : snapshot.reviews + msg("items-need"),
+            list.add(new Cell("Review", "(!)" + snapshot.reviews, REVIEW, snapshot.reviews == 1 ? msg("itemNeeds")
+                                    : snapshot.reviews + msg("itemsNeed"),
                             () -> actions.openLedger(Entry.current(Audit.REVIEW, null))));
         return list;
     }
@@ -3780,7 +3780,7 @@ class LivePage extends Page {
     /** Rebuilds the count icons only when a count changes, so hover survives a tick. */
     void counts(LiveSnapshot snapshot) {
         // The GE icon's tooltip names each open offer: "Rune platebody ×1 · Offering".
-        var offers = new StringBuilder(msg("ge-offers") + snapshot.pendingMarket);
+        var offers = new StringBuilder(msg("geOffers") + snapshot.pendingMarket);
         for (var row : snapshot.recent)
             if (row.open) offers.append("<br>").append(row.name).append(blank(row.qty) ? "" : " " + row.qty)
                             .append(blank(row.marketSide) ? "" : " · " + row.marketSide);
@@ -3788,8 +3788,8 @@ class LivePage extends Page {
         drawnCounts = key; var previous = focused(counts);
         var previousOffer = focused(recent.header); counts.removeAll();
         Runnable pending = () -> actions.openLedger(Entry.current()); var keyImage = sprites.apply(ItemID.WILDY_LOOT_KEY0);
-        String keyTip = msg("loot-keys") + snapshot.keys + (snapshot.keyValue > 0
-                                ? msg("loot-keys-worth") + compact(snapshot.keyValue) : "");
+        String keyTip = msg("lootKeys") + snapshot.keys + (snapshot.keyValue > 0
+                                ? msg("lootKeysWorth") + compact(snapshot.keyValue) : "");
         count(snapshot.keys, keyImage == null ? null : new ImageIcon(keyImage), "key", DIM, keyTip, pending);
         recent.setPicker(countButton(snapshot.pendingMarket, geIcon, "GE", MARKET, "<html>" + offers, pending));
         counts.setVisible(counts.getComponentCount() > 0); counts.revalidate();
@@ -3839,11 +3839,11 @@ class LivePage extends Page {
 
     static String tipOf(Recent row) {
         var tip = new StringBuilder(row.name).append(SEPARATOR).append(metaOf(row));
-        if ("review".equals(row.tag)) tip.append(" · needs review"); if (row.unknown) tip.append(msg("value-incomplete"));
+        if ("review".equals(row.tag)) tip.append(" · needs review"); if (row.unknown) tip.append(msg("valueIncomplete"));
         if (row.market && !row.known && !row.amount)
-            tip.append(msg("market-result"));
+            tip.append(msg("marketResult"));
         if (row.market && row.amount)
-            tip.append(row.known ? msg("primary-value") : msg("settlement-result"));
+            tip.append(row.known ? msg("primaryValue") : msg("settlementResult"));
         if (row.entries > 1 && !metaOf(row).contains("entries"))
             tip.append(SEPARATOR).append(row.entries).append(" entries");
         return tip.toString();
@@ -3889,10 +3889,10 @@ class LivePage extends Page {
     }
 
     static String statusTooltip(LiveSnapshot snapshot) {
-        String wording = snapshot.hopping ? "Reconnecting" : snapshot.offline ? msg("logged-out")
-                                : !snapshot.present ? msg("tracking-click") : snapshot.paused && !snapshot.idle
-                                                ? msg("tracking-paused-click") : snapshot.idle ? msg("waiting-activity")
-                                                        : msg("live-tracking");
+        String wording = snapshot.hopping ? "Reconnecting" : snapshot.offline ? msg("loggedOut")
+                                : !snapshot.present ? msg("trackingClick") : snapshot.paused && !snapshot.idle
+                                                ? msg("trackingPausedClick") : snapshot.idle ? msg("waitingActivity")
+                                                        : msg("liveTracking");
         return wording + (snapshot.present ? " · active " + duration(snapshot.elapsed) : "");
     }
 }
@@ -4130,7 +4130,7 @@ class SidebarPanel extends PluginPanel {
         }
         shell.clearSticky();
         if (!empty(status.origin))
-            shell.notify(msg("recovered-backup"), status.origin, false, null, null);
+            shell.notify(msg("recoveredBackup"), status.origin, false, null, null);
     }
 
     String activityLabel() {
@@ -4232,10 +4232,10 @@ class SidebarPanel extends PluginPanel {
                 }
                 // The whole row asks once with its Net change, then applies as one undoable change.
                 if (receipts.size() > 1) {
-                    shell.confirm("Remove entries", format(msg("remove-all"), receipts.size(), signed(net)),
+                    shell.confirm("Remove entries", format(msg("removeAll"), receipts.size(), signed(net)),
                                     "Remove", () -> mutate(() -> {
                                         if (engine.revision() != seen || !engine.correctEntries(receipts, Correction.IGNORE))
-                                            onEdt(() -> shell.tell("Not applied", msg("entries-changed"), true));
+                                            onEdt(() -> shell.tell("Not applied", msg("entriesChanged"), true));
                                     }));
                     return;
                 }
@@ -4340,11 +4340,11 @@ class NavButton {
 
     /** The runtime sidebar icon; never null so the required button cannot vanish silently. */
     static BufferedImage loadIcon() {
-        try (InputStream stream = NavButton.class.getResourceAsStream(msg("profit-manager"))) {
+        try (InputStream stream = NavButton.class.getResourceAsStream(msg("profitManager"))) {
             var image = stream == null ? null : ImageIO.read(stream); if (image != null) return image;
-            log.warn(msg("gp-manager-icon"));
+            log.warn(msg("gpManagerIcon"));
         } catch (IOException ex) {
-            log.warn(msg("gp-manager-icon-resource"), ex);
+            log.warn(msg("iconResource"), ex);
         }
         return new BufferedImage(16, 16, BufferedImage.TYPE_INT_ARGB);
     }
@@ -4430,7 +4430,7 @@ class GrindsPage extends Page {
         detail = stack(PANEL, GAP), running = new JPanel(new BorderLayout(GAP, 0));
     JLabel caption = label("", boldFont, TEXT), runningNet = label("", numbers(11.5f), TEXT);
     Table mine = new Table(msg("grindlist")); JPanel selectedPanel = stack(CARD, 0);
-    Table recent = new Table(msg("recent-grinds")), saved = new Table(msg("saved-sessions"));
+    Table recent = new Table(msg("recentGrinds")), saved = new Table(msg("savedSessions"));
 
     /** The current Free play and past ones Reset free-play kept (owner 1.5.2). */
     Table general = new Table("FREE PLAY");
@@ -4452,9 +4452,9 @@ class GrindsPage extends Page {
         onResize(caption, this::runningTitle); running.add(caption, NORTH);
         var facts = transparent(new BorderLayout(GAP, 0)); facts.add(runningNet, CENTER);
         JButton end = button("End", actions::endGrind); end.setForeground(LOSS.color);
-        end.setToolTipText(msg("end-grind")); facts.add(end, EAST);
-        running.add(facts, CENTER); mine.setEmpty(msg("saved-grinds"));
-        recent.setEmpty(msg("finished-grinds")).setFill(true); pad(selectedPanel, 0, 0, 4, 0);
+        end.setToolTipText(msg("endGrind")); facts.add(end, EAST);
+        running.add(facts, CENTER); mine.setEmpty(msg("savedGrinds"));
+        recent.setEmpty(msg("finishedGrinds")).setFill(true); pad(selectedPanel, 0, 0, 4, 0);
         // Owner 2026-09-28: My Grinds and Recent grinds first; All time closes the page.
         saved.setEmpty(msg("savelive"));
         for (var part : new JComponent[] {running, mine, selectedPanel, recent, saved, general, overall})
@@ -4507,7 +4507,7 @@ class GrindsPage extends Page {
             tip.append("<br>Supplies ").append(signed(-all.supplies)).append(" · Losses ")
                     .append(signed(-all.losses));
         if (all.rateName != null)
-            tip.append(msg("best-gph")).append(all.rateName).append(SEPARATOR).append(rate(all.bestRate));
+            tip.append(msg("bestGph")).append(all.rateName).append(SEPARATOR).append(rate(all.bestRate));
         String best = all.bestName == null ? ""
                         : "Best · " + all.bestName + " " + signed(all.bestNet);
         overall.removeAll(); var title = muted("ALL TIME · " + all.plans);
@@ -4605,8 +4605,8 @@ class GrindsPage extends Page {
                                     gp(run.net), false,
                                     current ? actions::back : () -> actions.openDetail(id), menus));
         }
-        recent.rowTitle(msg("recent-grinds"), rows);
-        this.saved.rowTitle(msg("saved-sessions"), saved); general.rowTitle("FREE PLAY", free);
+        recent.rowTitle(msg("recentGrinds"), rows);
+        this.saved.rowTitle(msg("savedSessions"), saved); general.rowTitle("FREE PLAY", free);
         general.setVisible(!free.isEmpty());
     }
 
@@ -4624,7 +4624,7 @@ class GrindsPage extends Page {
                 shown.ready ? rate(shown.rate) + "/h" : "—", shown.ready,
                 duration(shown.activeMillis) + " ACTIVE");
         // Owner 2026-10-01 (F12): a completed run's rate is the whole-run basis.
-        hero.rate.setToolTipText(shown.ready ? msg("gp-h") : null);
+        hero.rate.setToolTipText(shown.ready ? msg("gpH") : null);
         var strip = money(shown.income, shown.supplies, shown.losses, shown.income - shown.net,
                         shown.splitAvailable, null);
         hero.strips(singletonList(strip)); detail.add(hero);
@@ -4639,7 +4639,7 @@ class GrindsPage extends Page {
             // Owner 2026-10-01 (F10): a combined target also shows its required average.
             if (data.pace.second != null) result.put(timed ? "Pace" : "", data.pace.second, DIM);
         }
-        if (targeted) detail.add(result); if (shown.compacted) detail.add(note(msg("summary-detailed"), LABEL));
+        if (targeted) detail.add(result); if (shown.compacted) detail.add(note(msg("summaryDetailed"), LABEL));
         var buttons = transparent(new FlowLayout(LEFT, 4, 2));
         // A Free play run is restored, never started again as a Grind (owner 1.5.2).
         boolean free = any(data.recent, run -> run.general && run.session.equals(shown.session));
@@ -4649,7 +4649,7 @@ class GrindsPage extends Page {
         if (shown.closed) {
             buttons.add(menuButton("···", () -> menuOf(detailMenu(shown.session))));
         }
-        detail.add(buttons); detail.add(note(msg("open-ledger"), LABEL));
+        detail.add(buttons); detail.add(note(msg("openLedger"), LABEL));
     }
 
     /** Edits available inside a closed session's detail view. */
@@ -4739,19 +4739,19 @@ class GrindsController implements GrindsPage.Actions {
     /** The Live clock offers restart, new-session and original-time controls. */
     public void newSession() {
         var content = stack(CARD, 4); var help = note("Restart keeps Net.", LABEL, 110);
-        help.setToolTipText("<html>" + msg("new-session").replace(". ", ".<br>") + "</html>"); content.add(help);
+        help.setToolTipText("<html>" + msg("newSession").replace(". ", ".<br>") + "</html>"); content.add(help);
         var keep = new JCheckBox("Keep previous clock", true); keep.setOpaque(false);
-        keep.setFont(smallFont); keep.setForeground(TEXT); focus(keep); keep.setToolTipText(msg("restore-clock-tip"));
+        keep.setFont(smallFont); keep.setForeground(TEXT); focus(keep); keep.setToolTipText(msg("restoreClockTip"));
         content.add(keep); var pair = transparent(new GridLayout(1, 2, 4, 0));
         var compact = createCompoundBorder(createLineBorder(LINE),
                 createEmptyBorder(3, 4, 3, 4));
         JButton fresh = button("New session", () -> {
             shell.closeSheet(); mutate(() -> engine.newLive(now()));
-        }); fresh.setBorder(compact); fresh.setToolTipText(msg("session-new-tip"));
+        }); fresh.setBorder(compact); fresh.setToolTipText(msg("sessionNewTip"));
         pair.add(fresh);
         JButton restore = button("Restore time", () -> {
             shell.closeSheet(); mutate(() -> engine.restoreRate(now()));
-        }); restore.setBorder(compact); restore.setToolTipText(msg("session-restore-tip"));
+        }); restore.setBorder(compact); restore.setToolTipText(msg("sessionRestoreTip"));
         pair.add(restore); content.add(pair);
         shell.sheet("Session controls", null, content,
                 new Shell.Choice("Restart GP/h", true, () -> mutate(() -> engine.restartRate(now(), keep.isSelected()))));
@@ -4759,12 +4759,12 @@ class GrindsController implements GrindsPage.Actions {
 
     void saveSessionPrompt() {
         var source = session(); if (source == null) return; Long start = source.sessionStartAt;
-        shell.sheet("Save session?", msg("save-session"), null,
+        shell.sheet("Save session?", msg("saveSession"), null,
                 new Shell.Choice("Save session", true, () -> mutate(() -> {
                             boolean saved = engine.saveLiveSession(source, start, engine.captureLiveSession(source, start, now())) != null;
                             // A session that changed while its sheet was open saves nothing.
                             if (saved) engine.showWholeRun();
-                            shell.tell(saved ? "Session saved" : "Not saved", saved ? msg("grinds-saved-sessions") : msg("session-changed"), !saved);
+                            shell.tell(saved ? "Session saved" : "Not saved", saved ? msg("grindsSavedSessions") : msg("sessionChanged"), !saved);
                         })),
                 new Shell.Choice("Continue without saving", false, () -> mutate(() -> {
                             if (engine.sameLiveWindow(source,start))
@@ -4774,9 +4774,9 @@ class GrindsController implements GrindsPage.Actions {
 
     /** Reset free-play from the gear menu: the run so far moves to Grinds history (owner 1.5.2). */
     void startFreePlayOver() {
-        shell.confirm("Reset free-play?", msg("free-play-over"), "Reset", () -> {
+        shell.confirm("Reset free-play?", msg("freePlayOver"), "Reset", () -> {
                     mutate(() -> engine.startFreePlayOver(now())); shell.show(LIVE);
-                    shell.tell("Free play reset", msg("old-run-saved"), false);
+                    shell.tell("Free play reset", msg("oldRunSaved"), false);
                 });
     }
 
@@ -4801,7 +4801,7 @@ class GrindsController implements GrindsPage.Actions {
     void startGrind(String name, String id, Long net, Long time) {
         whenSwitchAllowed(name, () -> {
                     mutate(() -> engine.startGrind(name, id, net, time, now())); panel.selection = null;
-                    shell.show(LIVE); shell.tell(name + " started", msg("free-play-kept"), false);
+                    shell.show(LIVE); shell.tell(name + " started", msg("freePlayKept"), false);
                 });
     }
 
@@ -4811,7 +4811,7 @@ class GrindsController implements GrindsPage.Actions {
         // Free play's milestone counts all of Free play; a target counts fresh (owner 1.5.2).
         boolean general = !engine.customActive();
         if (general) {
-            form.add(muted(msg("milestone-free")));
+            form.add(muted(msg("milestoneFree")));
             picks(form, inline(form, "milestoneField", "Net",
                             active.milestoneGp == null ? "" : targetNet(active.milestoneGp)), "100m", "500m", "1b",
                     "2b", "5b", "Clear=");
@@ -4933,13 +4933,13 @@ class GrindsController implements GrindsPage.Actions {
         if (!archived) {
             mutate(() -> engine.archiveGrind(id, false)); return;
         }
-        shell.confirm("Archive Grind", msg("hides-my"), "Archive",
+        shell.confirm("Archive Grind", msg("hidesMy"), "Archive",
                 () -> mutate(() -> engine.archiveGrind(id, true)));
     }
 
     public void deleteSavedGrind(String id) {
         var definition = engine.plan(id); if (definition == null) return;
-        shell.confirm("Delete " + definition.name(), msg("removes-my"), "Delete",
+        shell.confirm("Delete " + definition.name(), msg("removesMy"), "Delete",
                 () -> mutate(() -> engine.deleteSavedGrind(id)));
     }
 
@@ -4961,15 +4961,15 @@ class GrindsController implements GrindsPage.Actions {
     }
 
     public void restoreFreePlay(String id) {
-        shell.confirm(msg("restorefp"), msg("restore-free-play"), "Restore", () -> {
+        shell.confirm(msg("restorefp"), msg("restoreFreePlay"), "Restore", () -> {
                     mutate(() -> engine.restoreFreePlay(id, now())); panel.selection = null;
-                    shell.show(LIVE); shell.tell(msg("free-play-restored"), msg("free-play-other"), false);
+                    shell.show(LIVE); shell.tell(msg("freePlayRestored"), msg("freePlayOther"), false);
                 });
     }
 
     public void deleteHistorical(String id) {
         var session = engine.historySession(id); if (session == null) return;
-        shell.confirm("Delete " + session.name(), msg("removes-run"), "Delete", () -> {
+        shell.confirm("Delete " + session.name(), msg("removesRun"), "Delete", () -> {
                     panel.selection = null; mutate(() -> engine.deleteHistory(id));
                 });
     }
@@ -4982,9 +4982,9 @@ class GrindsController implements GrindsPage.Actions {
     JPopupMenu dataMenu() {
         var menu = new JPopupMenu(); menu.add(item("Copy Live summary", session() != null, () -> copySummary(null)));
         menu.add(item("Back up profile", storage != null, () -> off(() -> storage.writeBackup(now()), backup -> shell.tell(
-                                msg("profile-backed"), valueOf(backup.getFileName()), false), msg("backup-failed"))));
-        menu.add(item(msg("copy-data"), () -> copyDataPath()));
-        menu.add(item("Report a bug", () -> LinkBrowser.browse(msg("bug-report"))));
+                                msg("profileBacked"), valueOf(backup.getFileName()), false), msg("backupFailed"))));
+        menu.add(item(msg("copyData"), () -> copyDataPath()));
+        menu.add(item("Report a bug", () -> LinkBrowser.browse(msg("bugReport"))));
         menu.add(item("Changelog", () -> LinkBrowser.browse(msg("changelog")))); menu.addSeparator();
         Session current; CorrectionRecord correction;
         synchronized (engine) {
@@ -4993,16 +4993,16 @@ class GrindsController implements GrindsPage.Actions {
         Object owner = panel.ownerToken;
         menu.add(item(correction == null || correction.changes().stream()
                         .allMatch(change -> change.newCorrection == Correction.IGNORE)
-                        ? msg("undo-removal") : msg("undo-tip"), correction != null, () -> mutate(() -> {
+                        ? msg("undoRemoval") : msg("undoTip"), correction != null, () -> mutate(() -> {
                             if (owner == panel.ownerToken && session() == current
                                     && current.latestCorrection() == correction && !engine.undoCorrection())
                                 SidebarPanel.onEdt(() -> {
                                     if (owner == panel.ownerToken)
-                                        shell.tell("Not applied", msg("correction-blocked"), true);
+                                        shell.tell("Not applied", msg("correctionBlocked"), true);
                                 });
                         })));
         menu.add(item("Reset free-play…", !engine.customActive(), this::startFreePlayOver));
-        menu.add(item(msg("factory-reset"), storage != null, () -> factoryReset())); return menu;
+        menu.add(item(msg("factoryReset"), storage != null, () -> factoryReset())); return menu;
     }
 
 
@@ -5016,7 +5016,7 @@ class GrindsController implements GrindsPage.Actions {
         var form = stack(CARD, 2); if (name != null) inline(form, "nameField", "Name", name); long bond = bondPrice.getAsLong();
         picks(form, inline(form, "netField", "Net", net == null ? "" : targetNet(net)), "5m",
                 bond > 0 ? "Bond=" + targetNet(bond) : "10m", "20m", "50m", "100m", "1b", "Clear=");
-        picks(form, inline(form, "timeField", "Time", time == null ? "" : targetTime(time)), msg("time-picks").split(" "));
+        picks(form, inline(form, "timeField", "Time", time == null ? "" : targetTime(time)), msg("timePicks").split(" "));
         return form;
     }
 
@@ -5065,7 +5065,7 @@ class GrindsController implements GrindsPage.Actions {
                                             != GrindsData.INVALID)
                                 save.save(field(form, "nameField"), net, time);
                             else {
-                                shell.tell("Targets not saved", msg("use-number"), true); targetSheet(title, form, action, save);
+                                shell.tell("Targets not saved", msg("useNumber"), true); targetSheet(title, form, action, save);
                             }
                         }));
     }
@@ -5092,7 +5092,7 @@ class GrindsController implements GrindsPage.Actions {
                 var live = LiveSnapshot.capture(engine, now, null); if (!live.present) return;
                 text = summary(live.general ? "Free play" : live.ownerLabel, live.net, live.income, live.cost,
                         live.supplies, live.loss, live.split, live.elapsed)
-                        + (live.market == 0 ? "" : format(ROOT, msg("summary-market"), exactSigned(live.market)));
+                        + (live.market == 0 ? "" : format(ROOT, msg("summaryMarket"), exactSigned(live.market)));
             } else {
                 var session = engine.historySession(id); if (session == null) return;
                 var money = engine.savedSession(id) != null ? session.metrics(now)
@@ -5114,9 +5114,9 @@ class GrindsController implements GrindsPage.Actions {
 
     static String summary(String name, long net, long income, long cost, long supplies, long lost,
             boolean split, long elapsed) {
-        return format(ROOT, msg("session-summary"), name, exactSigned(net), clock(elapsed),
+        return format(ROOT, msg("sessionSummary"), name, exactSigned(net), clock(elapsed),
                 RateReadiness.isEstablished(elapsed) ? exact(Session.hourly(net, elapsed)) : "Calculating…",
-                exact(income), exact(cost)) + (split ? format(ROOT, msg("summary-costs"),
+                exact(income), exact(cost)) + (split ? format(ROOT, msg("summaryCosts"),
                         exact(supplies), exact(lost)) : "");
     }
 
@@ -5162,7 +5162,7 @@ class GrindsController implements GrindsPage.Actions {
 
     void copyDataPath() {
         if (repository == null) return; String path = valueOf(repository.dataDir()); copyText(path);
-        shell.tell(msg("data-folder"), path, false);
+        shell.tell(msg("dataFolder"), path, false);
     }
 
     /**
@@ -5170,7 +5170,7 @@ class GrindsController implements GrindsPage.Actions {
      * failed copy refuses; Delete without backup cannot be undone.
      */
     void factoryReset() {
-        shell.sheet("Delete Profile", msg("resets-gp"), null,
+        shell.sheet("Delete Profile", msg("resetsGp"), null,
                 new Shell.Choice(msg("backupdel"), true, () -> resetNow(true)),
                 new Shell.Choice("Delete without backup", false, () -> resetNow(false)));
     }
@@ -5186,7 +5186,7 @@ class GrindsController implements GrindsPage.Actions {
         if (result.isApplied()) panel.resetProfile();
         if (result.isApplied())
             // The safety copy is one click from its folder (owner 2026-10-16).
-            shell.notify("Profile reset", msg("fresh-profile"), false, "Copy folder path", this::copyDataPath);
+            shell.notify("Profile reset", msg("freshProfile"), false, "Copy folder path", this::copyDataPath);
         else
             shell.tell("Reset refused", result.getDetail(), true);
     }
@@ -5504,13 +5504,13 @@ class GrindHistory {
 
     /** Factual target wording; never "Failed". Shared with the Grinds detail. */
     static String netOutcome(Long profit, long net, boolean closed) {
-        return profit == null ? "No Net target" : net >= profit ? "Reached " + compact(profit) + " Net" : closed ? msg("ended-before") + signed(profit - net) + " remaining"
+        return profit == null ? "No Net target" : net >= profit ? "Reached " + compact(profit) + " Net" : closed ? msg("endedBefore") + signed(profit - net) + " remaining"
                 : msg("reached") + signed(profit - net) + " remaining";
     }
 
     /** Factual Active-Time target wording; never "Failed". Shared with the Grinds detail. */
     static String timeOutcome(Long active, long activeMillis) {
-        return active == null ? msg("time-paused") : activeMillis >= active ? msg("time-target") : duration(active - activeMillis) + msg("active-time-remaining");
+        return active == null ? msg("timePaused") : activeMillis >= active ? msg("timeTarget") : duration(active - activeMillis) + msg("activeTimeRemaining");
     }
 
     /** Full-session rate: Net over canonical Active Time; zero Active Time has no rate. */

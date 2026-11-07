@@ -111,7 +111,7 @@ public class DirectHeaderControlsTest {
             assertEquals("blood rune", page.search.getText());
             JPopupMenu menu = page.moreMenu();
             for (String label : new String[]{"Undo last change", "Restore last undo"}) assertNotNull(find(menu, label));
-            assertNotNull(find(menu, GameData.msg("undo-tip")));
+            assertNotNull(find(menu, GameData.msg("undoTip")));
             assertTrue(((JMenuItem) menu.getComponent(0)).getText().startsWith("Show corrected"));
             return null;
         });

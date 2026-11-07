@@ -1,13 +1,13 @@
 # GP Manager changelog
 
-## 1.7.0 - 2026-11-07
+## 1.7.0 - 2026-11-08
 
 - Preview the Net change before removing one entry or a whole grouped Recent row, with one Undo to restore the removal.
 - Track CoX, ToB, ToA and The Fractured Archive loot and paid death fees in Raids; raid entry or retained raid receipts reveal the tab without opening it automatically.
 - Open KILLS for recorded PK loot and DEATHS for PvP losses, including known looting-bag contents and the booked skull tier.
 - Buying a bond on the Grand Exchange is neutral, like any purchase; converting it counts the conversion window's fee once, using inventory coins first.
-- Older bond rows left in Review are cleared once, on your first login: a bond conversion counted as a gain is removed from your totals (one that also paid coins keeps its fee and waits for Repair bond), and the untradeable bond's Grand Exchange collection leaves Review without changing them. Undo in the current run brings either back, and it stays back.
-- Redeeming a bond or gifting it to another player counts what you paid for it, or a bond's Grand Exchange price if GP Manager did not see you buy it; selling it shows its result like any other item. Old conversion Reviews stay together with Repair bond available; neutral bond state rows stay in Ledger.
+- Bond rows that older versions left in Review stay there for you to decide.
+- Redeeming a bond or gifting it to another player counts what you paid for it, or a bond's Grand Exchange price if GP Manager did not see you buy it; selling it shows its result like any other item. Neutral bond state rows stay in Ledger.
 - Supported cooking, fletching, potion-making, smelting and crafting steps share an output item row with measured quantities and original ingredient prices in details.
 - Grand Exchange refunds no longer hide supported dough or pizza preparation; blue GE amounts show the actual Result, including losses and large partial collections.
 - Dropping two different items a tick apart now books one Dropped row, and picking them back up cancels it, even with a bank opened or closed in between. Before, the drop could count as a supply and the pickup as new loot, or one item went missing.

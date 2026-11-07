@@ -207,12 +207,12 @@ public class GpManagerPlugin extends Plugin {
                     });
             sidebar = panel;
             if (!navigation.install(NavButton.toolbarHost(clientToolbar), panel, NavButton.loadIcon())) {
-                log.warn(msg("gp-manager-sidebar"), clientToolbar != null, NavButton.loadIcon() != null); removePresentation();
+                log.warn(msg("gpManagerSidebar"), clientToolbar != null, NavButton.loadIcon() != null); removePresentation();
                 return;
             }
-            log.info(msg("gp-manager-sidebar-button"));
+            log.info(msg("sidebarButton"));
         } catch (RuntimeException | LinkageError ex) {
-            log.warn(msg("gp-manager-presentation"), ex); removePresentation();
+            log.warn(msg("gpManagerPresentation"), ex); removePresentation();
         }
     }
 
@@ -344,7 +344,7 @@ public class GpManagerPlugin extends Plugin {
                     try {
                         repository.initialize(getPluginDirectory());
                     } catch (IOException ex) {
-                        throw new IllegalStateException(msg("startup-failed"), ex);
+                        throw new IllegalStateException(msg("startupFailed"), ex);
                     }
                     storage.start();
                     if (online)
@@ -795,7 +795,7 @@ public class GpManagerPlugin extends Plugin {
         // it with vials and blood runes moves the player's own items, and the scythe's charge
         // estimates book the use. Its line arrives as a message box too.
         if (matches("vyre-well-fill", message))
-            zone(msg("vyre-well"));
+            zone(msg("vyreWell"));
         // A bond gifted to another player leaves like a redeemed one: its purchase was the cost.
         if (matches("bond-gift", message)) engine.markBondRedeem();
         // A crystal tool's Revert asks twice before it comes apart, so its click can lapse; the
@@ -846,17 +846,17 @@ public class GpManagerPlugin extends Plugin {
         var fee = pattern("death-fee").matcher(message); var bank = pattern("bank-payment").matcher(message);
         var coffer = pattern("coffer-payment").matcher(message);
         if (fee.matches()) {
-            engine.events.drop(FEE); engine.bookDeathFee(digits(fee.group(1)), msg("death-s"), now);
+            engine.events.drop(FEE); engine.bookDeathFee(digits(fee.group(1)), msg("deathS"), now);
         } else if (bank.matches()) {
             int tick = tick();
             if (tick == instanceTick)
-                engine.bookDeathFee(digits(bank.group(1)), msg("instance-fee"), now);
+                engine.bookDeathFee(digits(bank.group(1)), msg("instanceFee"), now);
             else if (engine.death.isAwaitingReclaim())
                 engine.events.put(FEE, -1, digits(bank.group(1)), 10, "Reclaim fee (bank)").at = tick;
             else if (type == ChatMessageType.SPAM && tick - instanceTick > 1)
-                engine.bookDeathFee(digits(bank.group(1)), msg("instance-fee-bank"), now);
+                engine.bookDeathFee(digits(bank.group(1)), msg("instanceFeeBank"), now);
         } else if (coffer.matches()) {
-            instanceTick = tick(); engine.bookDeathFee(digits(coffer.group(1)), msg("instance-fee"), now);
+            instanceTick = tick(); engine.bookDeathFee(digits(coffer.group(1)), msg("instanceFee"), now);
         }
         // Deep sea trawling (Deep Sea Trawling, Trawling Plus, Wiki): with a net lowered, each catch
         // line (its count in words) puts fish in the nets, never the pack or an open barrel, so it
@@ -951,12 +951,12 @@ public class GpManagerPlugin extends Plugin {
         // inventory removal is GE evidence, not a prayer/altar spend. The proven GE UI context
         // disambiguates the shared "Offer" verb; a generic Offer elsewhere keeps its spend intent.
         if (consumption && "offer".equals(option) && ge) {
-            trading(CORRELATION_TICKS, msg("ge-offer") + (target.isEmpty() ? "" : " " + target)); return;
+            trading(CORRELATION_TICKS, msg("geOffer") + (target.isEmpty() ? "" : " " + target)); return;
         }
         // A Collect interaction with the open Grand Exchange is bounded collection evidence. It
         // never owns a movement by itself; it lets exact custody settlements correlate.
         if (option.startsWith("collect") && ge) {
-            engine.noteGeCollect(now()); trading(CORRELATION_TICKS, msg("ge-collect")); return;
+            engine.noteGeCollect(now()); trading(CORRELATION_TICKS, msg("geCollect")); return;
         }
         if ("revert".equals(option) || "dismantle".equals(option))
             engine.dismantle(dismantling = identifier);
@@ -979,7 +979,7 @@ public class GpManagerPlugin extends Plugin {
             // The filled Vyre well refunds its vials of blood and blood runes through its Empty
             // option; that return is the player's own storage coming back, never income
             // (owner live 2026-10-13).
-            zone(msg("vyre-well"));
+            zone(msg("vyreWell"));
         if (consumption) {
             // Always note intent — even when item id is unresolved (open intent). Spend is
             // confirmed on stable inventory removal / dose leftover; the verb lets the settled
@@ -1054,7 +1054,7 @@ public class GpManagerPlugin extends Plugin {
         // Clicks inside the store name the tool ("Withdraw-1 Rake"), never the leprechaun, so the
         // open store window is the storage evidence, as the bank window is below.
         if (Widgets.isToolStoreOpen(client)) {
-            zone(msg("tool-leprechaun")); return;
+            zone(msg("toolLeprechaun")); return;
         }
         // Other stores the same way (Elnock, the seed vault, a cargo hold, Death's coffer, item
         // sets...):
@@ -1076,9 +1076,9 @@ public class GpManagerPlugin extends Plugin {
         if (Widgets.isBankOpen(client) && (has(joined, "bank", "deposit")
                         || option.startsWith("withdraw") && !"withdraw-x".equals(option))) {
             if (joined.contains("deposit box"))
-                zone(msg("deposit-box-transfer-2"));
+                zone(msg("depositBoxTransfer2"));
             else
-                engine.markContext(TRANSFER, CORRELATION_TICKS, msg("bank-deposit"));
+                engine.markContext(TRANSFER, CORRELATION_TICKS, msg("bankDeposit"));
             return;
         }
         String neutral = NeutralTransfers.storage(joined); if (neutral == null) neutral = NeutralTransfers.storage(target);
@@ -1090,7 +1090,7 @@ public class GpManagerPlugin extends Plugin {
             boolean depositBox = joined.contains("deposit box"); var kind = UtilityContainerCatalogue.classify(option, depositBox);
             if (UtilityContainerCatalogue.isNeutral(kind)) {
                 String note = "Container " + lower(kind.name(), false) + " (" + containerFamily + ")";
-                if (joined.contains("plank sack")) note = msg("plank-sack"); engine.markContext(TRANSFER, CORRELATION_TICKS, note);
+                if (joined.contains("plank sack")) note = msg("plankSack"); engine.markContext(TRANSFER, CORRELATION_TICKS, note);
             }
             return;
         }
@@ -1168,7 +1168,7 @@ public class GpManagerPlugin extends Plugin {
         // NpcLootReceived / ServerNpcLoot for the same kill.
         if (skip(event) || event.getItems() == null) return; String name = fallback(event.getName(), "Reward");
         boolean pending = event.getType() == LootRecordType.EVENT && RewardChestCatalogue.isRewardChest(name);
-        if (pending && msg("fractured-archive").equalsIgnoreCase(name)) activity.observe(name, true);
+        if (pending && msg("fracturedArchive").equalsIgnoreCase(name)) activity.observe(name, true);
         offerReward(pending, name, event.getItems(), max(1, event.getAmount()));
     }
 
@@ -1522,9 +1522,9 @@ public class GpManagerPlugin extends Plugin {
             engine.markTransfer("PvP tutorial", stableTicks(8));
         var signal = zones.onRegion(region, varbit(BR_INGAME) == 1);
         if (signal == NeutralZoneTracker.Signal.ENTERED) {
-            engine.beginNeutralZone(); engine.markTransfer(msg("zone-left"), stableTicks(4));
+            engine.beginNeutralZone(); engine.markTransfer(msg("zoneLeft"), stableTicks(4));
         } else if (signal == NeutralZoneTracker.Signal.INSIDE)
-            engine.markTransfer(msg("zone-stored"), stableTicks(4));
+            engine.markTransfer(msg("zoneStored"), stableTicks(4));
         else if (signal == NeutralZoneTracker.Signal.LEFT)
             engine.endNeutralZone(consumeTicks());
     }
@@ -1601,7 +1601,7 @@ public class GpManagerPlugin extends Plugin {
     /** A visible raid HUD names the activity; it never creates a session or books money. */
     void raidActivity() {
         if (Widgets.visible(client, TfaHud.UNIVERSE))
-            activity.observe(msg("fractured-archive"), true);
+            activity.observe(msg("fracturedArchive"), true);
     }
 
     /** The shared subscriber gate: live tracking and a real event (owner 1.4.0 size pass). */
@@ -3602,14 +3602,14 @@ class ChargeCheck {
             // The sailors' amulet's own Check wording ("...has 106 charges." or "...charges
             // left."); the blood fury's hit-count line names itself below (owner 2026-10-14).
             return SAILORS_AMULET;
-        if (lower.startsWith(msg("tome-charged")))
+        if (lower.startsWith(msg("tomeCharged")))
         {
             // The page names the tome; a bare "your tome" line stays fire and the clicked row
             // redirects it (owner 2026-10-12).
             if (lower.contains("soaked")) return TOME_OF_WATER; return lower.contains("soiled") ? TOME_OF_EARTH : TOME_OF_FIRE;
         }
-        if (lower.startsWith(msg("amulet-blood"))) return BLOOD_FURY;
-        if (lower.startsWith(msg("eye-capacity")) || lower.startsWith(msg("eye-loaded")))
+        if (lower.startsWith(msg("amuletBlood"))) return BLOOD_FURY;
+        if (lower.startsWith(msg("eyeCapacity")) || lower.startsWith(msg("eyeLoaded")))
             return EYE_OF_AYAK;
         String subject = lower.startsWith("your ") ? lower.substring(5) : lower;
         for (var variant : ChargedItem.values()) {
@@ -3972,7 +3972,7 @@ class KeyClaims {
     static final int OPEN_WINDOW_TICKS = 4, DEATH_WINDOW_TICKS = 8, CLAIM_EVIDENCE_TICKS = 4;
     static final int[] KEY_ITEM_IDS = intColumn("loot_key_slots", 0),
         KEY_CONTAINER_IDS = intColumn("loot_key_slots", 1);
-    static final String LOOT_KEY_NOTE = msg("loot-key"); List<PendingClaim> claims = new ArrayList<>();
+    static final String LOOT_KEY_NOTE = msg("lootKey"); List<PendingClaim> claims = new ArrayList<>();
 
     /** The chest object click, armed for a few ticks. */
     ChestOpen open;
@@ -4326,7 +4326,7 @@ class ClueCostPairing {
     }
 
     synchronized String costNote() {
-        String label = this.label == null ? "clue" : this.label; return msg("clue-paired") + label;
+        String label = this.label == null ? "clue" : this.label; return msg("cluePaired") + label;
     }
 
     synchronized void clear() {

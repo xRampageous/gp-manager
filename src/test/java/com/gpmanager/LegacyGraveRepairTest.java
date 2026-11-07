@@ -95,7 +95,7 @@ public class LegacyGraveRepairTest
         session.addTransaction(pk, 2_000, false);
         session.addTransaction(chest, 2_000, false);
         session.addTransaction(Tx.of(T0 + 4_000L, TransactionType.TRANSFER, Context.GENERIC,
-                GameData.msg("death-items"), false,
+                GameData.msg("deathItems"), false,
                 List.of(new Flow(TWISTED_BOW, "Twisted bow", -1, 1_000_000L, -1_000_000L),
                         new Flow(AVA, "Ava's accumulator", -1, 12L, -12L),
                         new Flow(SEED_POD, "Royal seed pod", -1, 600L, -600L))), 2_000, false);
@@ -229,14 +229,14 @@ public class LegacyGraveRepairTest
 
     private static Transaction grave(long at, int item, String name, long value)
     {
-        return Tx.of(at, TransactionType.TRANSFER, Context.GENERIC, GameData.msg("death-items"),
+        return Tx.of(at, TransactionType.TRANSFER, Context.GENERIC, GameData.msg("deathItems"),
                 false, List.of(new Flow(item, name, -1, value, -value)));
     }
 
     private static Transaction recovery(long at, int item, String name, long value)
     {
         return Tx.of(at, TransactionType.TRANSFER, Context.GENERIC,
-                GameData.msg("death-reclaim-items"), false,
+                GameData.msg("deathReclaimItems"), false,
                 List.of(new Flow(item, name, 1, value, value)));
     }
 }

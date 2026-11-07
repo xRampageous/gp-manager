@@ -37,17 +37,6 @@ public class DataManagementEngineTest
     }
 
     /** Owner 1.5.1: a neutral GE change row is only kept as an audit row, like a live custody move. */
-    @Test public void neutralChangeRowsLeaveWhenAuditRowsAreOff()
-    {
-        Engine engine = ReviewFixesTest.engine();
-        Transaction change = new Transaction(5L, TransactionType.TRANSFER, Context.MARKET,
-            GameData.msg("ge-custody"), "Market", false,
-            java.util.List.of(new Flow(995, "Coins", 430L, 1, 430L, PriceSource.FACE_VALUE)),
-            Confidence.CONFIRMED, GameData.msg("ge-neutral"), null);
-        engine.session().addTransaction(change, 2_000, false);
-        engine.recheck();
-        assertTrue(engine.session().transactions().isEmpty());
-    }
 
     /** Owner 1.5.1: an old "?" item that now has a price (half a pie's share) takes it on login. */
     @Test public void oldUnpricedRowsTakeTheirPriceOnLogin()

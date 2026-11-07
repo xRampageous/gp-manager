@@ -118,7 +118,7 @@ public class HardcoreWorldPricesTest
             if (hardcore)
             {
                 assertEquals("Death: PvE", row.note());
-                assertEquals(GameData.msg("hardcore-deleted"), row.explanation());
+                assertEquals(GameData.msg("hardcoreDeleted"), row.explanation());
                 assertEquals("the whip at its alch value is gone", -72_000L, engine.metrics(3_000L).net);
             }
             else

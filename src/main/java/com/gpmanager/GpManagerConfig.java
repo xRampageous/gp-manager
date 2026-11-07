@@ -130,8 +130,8 @@ public interface GpManagerConfig extends Config {
      */
     @AllArgsConstructor
     enum LootFilter {
-        ALL_ITEMS("All items"), FOLLOW_GROUND_ITEMS(GameData.msg("follow-ground")),
-        HIGHLIGHTED_LIST_ONLY(GameData.msg("highlighted-list"));
+        ALL_ITEMS("All items"), FOLLOW_GROUND_ITEMS(GameData.msg("followGround")),
+        HIGHLIGHTED_LIST_ONLY(GameData.msg("highlightedList"));
         final String label;
 
         public String toString() {

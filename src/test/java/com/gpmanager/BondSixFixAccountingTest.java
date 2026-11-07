@@ -32,15 +32,6 @@ public class BondSixFixAccountingTest {
             Confidence.CONFIRMED,"",null);
     }
 
-    static BondConversionTest.Fixture repaired() {
-        var f=new BondConversionTest.Fixture(0);
-        f.f.engine.session().addTransaction(BondSettlementTest.acquired(f.f.at),2000,false);
-        var row=BondSettlementTest.newOnly(f.f.at+1);
-        f.f.engine.session().addTransaction(row,2000,false);
-        assertEquals(1,BondSettlementTest.repair(f.f.engine,List.of(row.id()),f.f.at+1200));
-        return f;
-    }
-
     @Test public void correctedFeeMustKeepGainAndCostTablesHonest() {
         var f=BondSettlementTest.buy();
         var fee=f.f.engine.bookFee(357123,GameData.msg("bond-fee"),"Bonds",f.f.at+600);
@@ -55,14 +46,6 @@ public class BondSixFixAccountingTest {
         var f=converted(); var row=project(List.of(fee(f))).groups.get(0);
         assertTrue("a fee period must not turn the linked bond row into a Coins item: "+row.name,
             row.name.startsWith("Old school bond"));
-    }
-
-    @Test public void unrelatedAcquisitionMustNotBlockBondRepairUndo() {
-        var f=repaired();
-        f.f.engine.session().addTransaction(gain(4151,f.f.at+1800),2000,false);
-        assertTrue("an unrelated item does not affect either repaired bond pool",f.f.engine.undoCorrection());
-        assertEquals(1,f.f.engine.basis.known(4151).availableQty);
-        assertEquals(1,f.f.engine.basis.known(BondConversionTest.OLD).availableQty);
     }
 
     @Test public void aTrackingFenceMustRetireRedeemEvidence() {

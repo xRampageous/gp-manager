@@ -16,7 +16,7 @@ public class DeathViewTest {
     static LedgerData.Entry ledgerAll() { return LedgerData.Entry.current(); }
     static Transaction grave(boolean recovered) {
         return new Transaction(3000, TransactionType.TRANSFER, Context.TRANSFER,
-                GameData.msg(recovered ? "death-reclaim-items" : "death-items"), "Death reclaim", false,
+                GameData.msg(recovered ? "deathReclaimItems" : "deathItems"), "Death reclaim", false,
                 List.of(new Flow(4151,"Abyssal whip",recovered?1:-1,2_000_000,recovered?2_000_000:-2_000_000)),
                 Confidence.CONFIRMED,"Owned items",null);
     }
@@ -154,7 +154,7 @@ public class DeathViewTest {
     }
     @Test public void expiredGraveGearIsNotARowAndReclassificationDoesNotDoubleCount() {
         var e=engine();var expiry=new Transaction(3000,TransactionType.TRANSFER,Context.TRANSFER,
-                GameData.msg("reclaim-expired"),"Death reclaim",false,List.of(),Confidence.CONFIRMED,"Still owned",null);
+                GameData.msg("reclaimExpired"),"Death reclaim",false,List.of(),Confidence.CONFIRMED,"Still owned",null);
         e.session().addTransaction(expiry,2000,false);
         var fee=e.bookDeathFee(100_000,"Zulrah retrieval",4000);
         assertTrue(e.correctTransaction(fee.id(),Correction.REVENUE,"Owner correction"));

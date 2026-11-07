@@ -8,8 +8,8 @@ import static org.junit.Assert.*;
 public class DeathRowGroupingTest {
     static Transaction loss(String fight, boolean bag, Flow... flows) {
         return new Transaction(bag ? 1000 : 1600, TransactionType.PK_DEATH_LOSS, Context.PK_DEATH,
-                bag ? GameData.msg("bag-loss") : "PK death loss", "PKing", true, Arrays.asList(flows),
-                Confidence.LIKELY, bag ? GameData.msg("bag-loss-proof") : "Measured gear loss", fight);
+                bag ? GameData.msg("bagLoss") : "PK death loss", "PKing", true, Arrays.asList(flows),
+                Confidence.LIKELY, bag ? GameData.msg("bagLossProof") : "Measured gear loss", fight);
     }
     static Transaction gear(String fight) {
         return loss(fight, false, new Flow(861, "Magic shortbow", -1, 715, -715),
@@ -65,7 +65,7 @@ public class DeathRowGroupingTest {
 
     @Test public void graveMovementsNeverBecomeRows() {
         var row = new Transaction(1000, TransactionType.TRANSFER, Context.TRANSFER,
-                GameData.msg("death-items"), "Death reclaim", false,
+                GameData.msg("deathItems"), "Death reclaim", false,
                 List.of(new Flow(10499, "Ava's accumulator", -1, 600, -600),
                         new Flow(19564, "Royal seed pod", -1, 12, -12)), Confidence.LIKELY, "Owned items", null);
         assertTrue(capture(row).groups.isEmpty());

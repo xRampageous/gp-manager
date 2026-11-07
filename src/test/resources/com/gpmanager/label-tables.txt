@@ -24,7 +24,6 @@ review GAIN = Count
 review COST = Count as cost
 review TRANSFER = Transfer
 review IGNORE = Remove entry
-review BOND = Repair bond
 type LOOT true 250 = Received | Counted automatically.
 type LOOT true -250 = Used | Counted automatically.
 type LOOT false 250 = Received | Not counted.

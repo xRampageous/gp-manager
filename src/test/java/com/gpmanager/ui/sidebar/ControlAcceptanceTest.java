@@ -97,7 +97,7 @@ public class ControlAcceptanceTest {
             SidebarPanel panel = DirectHeaderControlsTest.panel();
             AbstractButton more = find(panel.ledger.bar, "···");
             assertEquals("Ledger actions", more.getAccessibleContext().getAccessibleName());
-            AbstractButton gear = byTooltip(panel.shell, GameData.msg("export-backups"));
+            AbstractButton gear = byTooltip(panel.shell, GameData.msg("exportBackups"));
             assertNotNull(gear);
             assertEquals("GP Manager actions", gear.getAccessibleContext().getAccessibleName());
             assertEquals("GP Manager actions", gear.getToolTipText());

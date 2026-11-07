@@ -63,7 +63,7 @@ public class AccountingDepthTest
         assertFalse(RewardChestCatalogue.isRewardChest("Goblin"));
 
         assertEquals(GameData.msg("seed-vault"), NeutralTransfers.storage("Seed vault"));
-        assertEquals(GameData.msg("tool-leprechaun"), NeutralTransfers.storage("Tool Leprechaun"));
+        assertEquals(GameData.msg("toolLeprechaun"), NeutralTransfers.storage("Tool Leprechaun"));
         assertEquals(GameData.msg("motherlode-hopper"), NeutralTransfers.storage("Motherlode hopper"));
         assertEquals(GameData.msg("nmz-coffer"), NeutralTransfers.storage("NMZ coffer"));
         assertEquals(GameData.msg("deposit-pool"),

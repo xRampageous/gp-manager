@@ -244,7 +244,7 @@ class Transaction extends SaveCopies {
     void assignEncounter(String newEncounterId, boolean pkSupply) {
         encounterId = newEncounterId;
         if (pkSupply && original() == CONSUMPTION) {
-            type = PK_SUPPLY_COST; activityName = "PKing"; confidence = Confidence.LIKELY; explanation = msg("combat-supply");
+            type = PK_SUPPLY_COST; activityName = "PKing"; confidence = Confidence.LIKELY; explanation = msg("combatSupply");
         }
     }
 
@@ -487,6 +487,7 @@ class ItemSplits {
 }
 
 enum Correction {
+    /** BOND: the retired Repair bond's name, kept so no saved value can stop reading. */
     AUTO, REVENUE, COST, TRANSFER, IGNORE, BOND
 }
 
@@ -497,8 +498,8 @@ enum Confidence {
 /** A deliberate correction choice for an unresolved transaction. */
 @AllArgsConstructor
 enum Decision {
-    GAIN(REVENUE), COST(Correction.COST), TRANSFER(Correction.TRANSFER), IGNORE(Correction.IGNORE),
-    BOND(Correction.BOND); Correction correction;
+    GAIN(REVENUE), COST(Correction.COST), TRANSFER(Correction.TRANSFER), IGNORE(Correction.IGNORE);
+    Correction correction;
 
 }
 
@@ -506,7 +507,7 @@ enum Decision {
 class ReviewRules {
     /** Proven historical spend: financial correction only; never rewrite later item basis. */
     static boolean financialDose(Transaction transaction) {
-        return transaction.action() == DRINK && msg("captured-dose").equals(transaction.note());
+        return transaction.action() == DRINK && msg("capturedDose").equals(transaction.note());
     }
 
     /**
@@ -525,9 +526,6 @@ class CorrectionRecord extends SaveCopies {
 
     /** Set once the decision has been undone; an undone record is skipped by later undos. */
     boolean undone;
-
-    /** Basis pools before/after a bond conversion repair's coverage move; null for ordinary decisions. */
-    Map<Integer, BasisPool> bondBefore, bondAfter;
 
     CorrectionRecord() {
         // Gson
@@ -1431,7 +1429,7 @@ class Session extends SaveCopies {
         var next = decision == null ? AUTO : decision; if (empty(ids) || next == AUTO) return 0;
         var targets = matching(list(new LinkedHashSet<>(ids), this::findTransaction),
                 ReviewRules::needsReview);
-        return correct(targets, next, fallback(reason, msg("bulk-review"))) ? targets.size() : 0;
+        return correct(targets, next, fallback(reason, msg("bulkReview"))) ? targets.size() : 0;
     }
 
     /**
@@ -1440,24 +1438,13 @@ class Session extends SaveCopies {
      */
     boolean correct(List<Transaction> targets, Correction next, String reason) {
         if (!canCorrect(targets, next, now())) return false;
-        var ordered = correctionOrder(targets); var plans = next == BOND ? BondRepair.plans(ordered) : null;
         var changes = new ArrayList<Change>();
-        for (var transaction : ordered) {
+        for (var transaction : correctionOrder(targets)) {
             var previous = transaction.correction(); var flows = transaction.flows();
-            if (plans == null) transaction.applyCorrection(next, reason);
-            else BondRepair.apply(transaction, plans.get(transaction.id())); changed(transaction, previous, flows);
-            changes.add(new Change(transaction.id(), previous, transaction.correction(),
-                    plans == null ? null : flows, null));
+            transaction.applyCorrection(next, reason); changed(transaction, previous, flows);
+            changes.add(new Change(transaction.id(), previous, transaction.correction(), null, null));
         }
-        var record = new CorrectionRecord(reason, changes); correctionHistory.add(record);
-        if (plans != null && ownedValueObserver != null) {
-            // The financial corrections have already updated the observer; the physical images
-            // own only the handoff, so Undo cannot replay the receipt contribution twice.
-            record.bondBefore = ownedValueObserver.snapshot();
-            for (var transaction : ordered)
-                ownedValueObserver.bondHandoff(transaction, plans.get(transaction.id()).newQty, now(), ordered.get(0).id());
-            record.bondAfter = ownedValueObserver.snapshot();
-        }
+        correctionHistory.add(new CorrectionRecord(reason, changes));
         return true;
     }
 
@@ -1466,10 +1453,9 @@ class Session extends SaveCopies {
      * projected with the owned-value observer, and one blocked row rejects the whole decision.
      */
     boolean canCorrect(List<Transaction> targets, Correction next, long now) {
-        var ordered = correctionOrder(targets); var plans = next == BOND ? BondRepair.plans(ordered) : null;
-        return !ordered.isEmpty() && (next != BOND || plans != null) && (ownedValueObserver == null || (plans != null
-                ? ownedValueObserver.canBond(ordered, plans, now, ordered.get(0).id())
-                : ownedValueObserver.canChangeAll(ordered, copy -> copy.applyCorrection(next, ""))));
+        var ordered = correctionOrder(targets);
+        return !ordered.isEmpty() && (ownedValueObserver == null
+                || ownedValueObserver.canChangeAll(ordered, copy -> copy.applyCorrection(next, "")));
     }
 
     /**
@@ -1511,8 +1497,8 @@ class Session extends SaveCopies {
         if (targets.contains(null) || new HashSet<>(targets).size() != targets.size()) return false;
         // Validate in the exact reverse order Undo applies, without mutating receipts or snapshots.
         reverse(targets); var inverse = new ArrayList<Change>(changes); reverse(inverse);
-        if (ownedValueObserver != null && !ownedValueObserver.canUndoBond(last, targets, inverse)) return false;
-        if (ownedValueObserver != null && !ownedValueObserver.reverseBond(last, targets)) return false;
+        var undo = inverse.iterator();
+        if (ownedValueObserver != null && !ownedValueObserver.canChangeAll(targets, copy -> restoreChange(copy, undo.next()))) return false;
         reverse(targets);
         for (int index = changes.size() - 1; index >= 0; index--) {
             var change = changes.get(index); var transaction = targets.get(index);
@@ -1526,13 +1512,6 @@ class Session extends SaveCopies {
         if (change.hasFlowSnapshot()) transaction.replaceFlows(change.flowSnapshot());
         if (change.explanationSnapshot != null) transaction.setExplanation(change.explanationSnapshot);
         transaction.applyCorrection(change.previousCorrection(), "Manual correction");
-    }
-
-    /** Preview/edit projection: the conversion repair uses the same narrow plan. */
-    static void apply(Transaction transaction, Correction correction) {
-        if (correction == BOND) {
-            var plan = BondRepair.plan(transaction); if (plan != null) BondRepair.apply(transaction, plan);
-        } else transaction.applyCorrection(correction, "");
     }
 
     /** Restore metadata from the retained decision timeline without adding save fields. */
@@ -1572,12 +1551,6 @@ class Session extends SaveCopies {
         var flows = copiedList(drop.flows()); drop.takeQuantity(id, false, taken);
         if (!drop.spends()) drop.applyCorrection(IGNORE, "Picked back up"); changed(drop, previous, flows);
         return taken;
-    }
-
-    /** Drops a neutral row the engine no longer keeps (old bank-paid GE change, owner 1.5.1). */
-    void drop(Transaction transaction) {
-        if (!transactions.remove(transaction)) return; saveStamp++; notifyChanged();
-        if (ownedValueObserver != null) ownedValueObserver.onRemoved(transaction);
     }
 
     Transaction undoTransaction() {
@@ -2209,7 +2182,7 @@ class Semantics {
 
     /** Recoverable grave gear is neutral and never appears as a Recent/Ledger row. */
     boolean graveGear(Transaction transaction) {
-        return List.of(msg("death-items"), msg("death-reclaim-items"), msg("reclaim-expired")).contains(transaction.note());
+        return List.of(msg("deathItems"), msg("deathReclaimItems"), msg("reclaimExpired")).contains(transaction.note());
     }
 
     /** Stable group ids by merge key; hashing is paid once per key, not on every tick. */
@@ -2269,22 +2242,12 @@ class Semantics {
         groups.sort(Semantics.NEWEST_GROUP); return new Result(groups);
     }
 
-    /**
-     * Presentation-only: a conversion fee reads as the bond it was paid for, not as Coins, and an
-     * exact legacy conversion Review reads as one tradeable bond row.
-     */
+    /** Presentation-only: a conversion fee reads as the bond it was paid for, not as Coins. */
     static void bondRows(List<Group> units, Map<String, Transaction> receipts) {
         for (var unit : units) {
             var transaction = receipts.get(unit.transaction);
             if (transaction != null && msg("bond-fee").equals(transaction.note())) {
                 unit.item = OSRS_BOND_UNTRADEABLE; unit.name = "Old school bond (untradeable)"; unit.quantity = 0;
-            }
-            var repair = transaction == null ? null : BondRepair.plan(transaction);
-            if (repair != null && repair.oldQty > 0) {
-                unit.id = "bond-review:" + transaction.id() + ":" + unit.table;
-                unit.quantity = unit.item == OSRS_BOND ? repair.newQty : 0;
-                unit.item = OSRS_BOND;
-                unit.name = "Old school bond";
             }
         }
     }
@@ -2386,8 +2349,8 @@ class Semantics {
                 unit.search(primary, verb, source, id); unit.addReceipts(transaction, visible); return singletonList(unit);
             }
         }
-        boolean death = type == PK_DEATH_LOSS || transaction.note().equals(msg("pvm-loss")),
-            grave = neutral && List.of(msg("death-items"), msg("death-reclaim-items")).contains(transaction.note());
+        boolean death = type == PK_DEATH_LOSS || transaction.note().equals(msg("pvmLoss")),
+            grave = neutral && List.of(msg("deathItems"), msg("deathReclaimItems")).contains(transaction.note());
         // Legacy reclaim receipts already have this reserved activity and exact coin basis.
         boolean reclaim = type == CONSUMPTION && "Death reclaim".equals(transaction.activityName())
                         && transaction.explanation().equals(transaction.note())
@@ -2397,7 +2360,7 @@ class Semantics {
             for (var contribution : visible) {
                 missingFee |= contribution.unpriced(); feeValue = sum(feeValue, contribution.value);
             }
-            String feeName = death ? type == PK_DEATH_LOSS ? "Death: PvP" : msg("pvm-loss")
+            String feeName = death ? type == PK_DEATH_LOSS ? "Death: PvP" : msg("pvmLoss")
                             : grave ? "Gravestone" : transaction.note(),
                 key = death ? "death:" + (empty(transaction.encounterId()) ? id : transaction.encounterId())
                             + ":" + transaction.correction() + ":" + review
@@ -2405,7 +2368,7 @@ class Semantics {
                             : "fee:" + reclaim + ":" + feeName + ":" + coverageKey(missingFee) + ":" + Long.signum(feeValue);
             var unit = composite(key,
                             death ? -100000 : grave ? -1 : visible.get(0).item, tableFor(financialCategory(transaction, visible.get(0))), feeName,
-                            grave ? transaction.note().equals(msg("death-items")) ? "Stored" : "Recovered" : "",
+                            grave ? transaction.note().equals(msg("deathItems")) ? "Stored" : "Recovered" : "",
                             "", false, at, feeValue, missingFee, -1, neutral, review, fixed,
                             id, visible.get(0).id);
             unit.composite = !death && !grave; unit.death = death || grave || reclaim;
@@ -2420,7 +2383,7 @@ class Semantics {
             return singletonList(actionUnit(transaction, visible, source, at,
                             firstMatch(flows, flow -> flow.item == parseInt(recipe[0]))));
         // An estimated charge use is one row named by the weapon.
-        String note = transaction.note(), prefix = msg("estimated-charge"),
+        String note = transaction.note(), prefix = msg("estimatedCharge"),
             castName = note.startsWith(prefix) ? note.substring(prefix.length()).trim() : "",
             weapon = castName;
         if (!castName.isEmpty()) {
@@ -2551,7 +2514,7 @@ class Semantics {
             verb = verbOf(transaction), key = "note:" + id;
         var unit = composite(key, -1, tableFor(category), name, verb, verb, false, at, value, false, 0,
                         neutral, review, corrected, id, id + ":composite");
-        unit.death = neutral && name.equals(msg("reclaim-expired"));
+        unit.death = neutral && name.equals(msg("reclaimExpired"));
         unit.entries.add(new Receipt(id + ":composite", id, at, -1, name, 0, value,
                         transaction.autoNet(), false, neutral, review, corrected, Contribution.isSplit(transaction),
                         category, verb, transaction.spellName(), why(transaction, false, neutral),
@@ -2570,8 +2533,8 @@ class Semantics {
         // there is nothing left to decide, so it shows "result unavailable", never Review.
         boolean review = market.lifecycle == MarketRows.Lifecycle.AMBIGUOUS || market.lifecycle == UNAVAILABLE;
         String side = market.side.name().equals("SELL") ? "Sell" : "Buy",
-            status = knownResult ? side : knownCost ? side + msg("tax-counted") : market.realized()
-                                        ? side + msg("result-unavailable") : lifecycleLabel(market);
+            status = knownResult ? side : knownCost ? side + msg("taxCounted") : market.realized()
+                                        ? side + msg("resultUnavailable") : lifecycleLabel(market);
         long quantity = market.savedNet != null ? market.savedQuantity
                         : market.realized() ? market.settledQty : market.filledQty;
         String id = market.presentationId, key = "market:" + id;
@@ -2608,7 +2571,7 @@ class Semantics {
                 correctionLabel(transaction.correction()), Contribution.sourceOf(transaction),
                 string(usedBy), chargeBasis(transaction, entry), marketSettlement,
                 traded == null ? "" : traded[0] + " " + traded[1], traded == null ? "" : traded[1],
-                transaction.original() == PK_DEATH_LOSS && transaction.note().equals(msg("bag-loss")));
+                transaction.original() == PK_DEATH_LOSS && transaction.note().equals(msg("bagLoss")));
     }
 
     long semanticQuantity(Contribution entry) {
@@ -2621,7 +2584,7 @@ class Semantics {
         if (transaction.action() != null) return actionVerb(transaction.action());
         if (Contribution.isSplit(transaction) && transaction.correction() == AUTO)
             return "Split";
-        return transaction.type() == CONSUMPTION && transaction.context() == PRODUCTION ? msg("failed") : shopExchange(transaction) ? msg("verb-exchanged") : msg("verb." + transaction.type(), transaction.net() < 0 ? "Used" : "Received");
+        return transaction.type() == CONSUMPTION && transaction.context() == PRODUCTION ? msg("failed") : shopExchange(transaction) ? msg("verbExchanged") : msg("verb." + transaction.type(), transaction.net() < 0 ? "Used" : "Received");
     }
 
     String actionVerb(ActionKind kind) {
@@ -2632,18 +2595,18 @@ class Semantics {
     String why(Transaction transaction, boolean unknown, boolean neutral) {
         if (transaction.correction() != AUTO)
             return msg("why-correction." + transaction.correction());
-        if (neutral) return msg("ownership-neutral-move"); if (unknown) return msg("price-known");
+        if (neutral) return msg("ownershipNeutralMove"); if (unknown) return msg("priceKnown");
         if (!transaction.flows().isEmpty()
                 && transaction.flows().stream().allMatch(flow -> flow.source() == NO_VALUE))
-            return msg("no-value");
+            return msg("noValue");
         String note = transaction.note();
         // Owner 2026-10-01 (F11): a Charges receipt names its retained confidence.
-        if (note.startsWith(msg("estimated-charge")))
-            return msg("estimated-local");
-        if (note.startsWith(msg("measured-charge")))
-            return msg("measured-exact");
-        return needsReview(transaction) ? msg("awaiting-decision") : transaction.type() == CONSUMPTION && transaction.context() == PRODUCTION ? msg("failed-inputs") : msg("why-type." + transaction.type(),
-                transaction.counts() ? msg("automatic-count") : "Not counted.");
+        if (note.startsWith(msg("estimatedCharge")))
+            return msg("estimatedLocal");
+        if (note.startsWith(msg("measuredCharge")))
+            return msg("measuredExact");
+        return needsReview(transaction) ? msg("awaitingDecision") : transaction.type() == CONSUMPTION && transaction.context() == PRODUCTION ? msg("failedInputs") : msg("why-type." + transaction.type(),
+                transaction.counts() ? msg("automaticCount") : "Not counted.");
     }
 
     /**
@@ -2680,8 +2643,8 @@ class Semantics {
         }
         if (counts.isEmpty()) return null; var text = new StringBuilder();
         for (var entry : counts.entrySet()) appendItem(text, names.get(entry.getKey()), entry.getValue());
-        String label = buying ? gain && !anyCost ? msg("purchase-label") : msg("traded-paid")
-                        : gain && !anyCost ? msg("sale-unbased") : msg("sale-label");
+        String label = buying ? gain && !anyCost ? msg("purchaseLabel") : msg("tradedPaid")
+                        : gain && !anyCost ? msg("saleUnbased") : msg("saleLabel");
         return new String[] {label, text.toString()};
     }
 
@@ -2691,7 +2654,7 @@ class Semantics {
      */
     String chargeBasis(Transaction transaction, Contribution entry) {
         String note = transaction.note();
-        if (!note.startsWith(msg("estimated-charge")) && !note.startsWith(msg("measured-charge")))
+        if (!note.startsWith(msg("estimatedCharge")) && !note.startsWith(msg("measuredCharge")))
             return "";
         if (entry.unpriced() || entry.flows.isEmpty()
                 || entry.flows.get(0).unitPrice <= 0)
@@ -2733,7 +2696,7 @@ class Semantics {
     }
 
     String measuredChargeWeaponName(Transaction transaction) {
-        String note = transaction.note(), prefix = msg("measured-charge"); if (!note.startsWith(prefix)) return "";
+        String note = transaction.note(), prefix = msg("measuredCharge"); if (!note.startsWith(prefix)) return "";
         String weapon = note.substring(prefix.length()).trim();
         return weapon.length() > 80 ? weapon.substring(0, 80).trim() : weapon;
     }
@@ -3405,7 +3368,7 @@ class MarketText {
     List<String> humanLines(Row market, boolean corrected) {
         var lines = new ArrayList<String>();
         if (market.savedNet != null) {
-            lines.add("Saved session|" + gp(market.savedNet)); lines.add(msg("offer-context"));
+            lines.add("Saved session|" + gp(market.savedNet)); lines.add(msg("offerContext"));
         }
         String fillState = fillStateText(market); if (!fillState.isEmpty()) lines.add(fillState);
         if (!market.listedDuring.isEmpty())
@@ -3417,7 +3380,7 @@ class MarketText {
             if (sell && market.collectionAmbiguous && market.settledQty > 0)
                 // D1: a quarantined settlement's cash was never observed; Received is never shown
                 // as if the player had actually collected it.
-                lines.add(msg("received-proven"));
+                lines.add(msg("receivedProven"));
             return lines;
         }
         lines.add((sell ? "Received" : "Spent") + "|" + exact(Math.abs(market.observedSettlementGp)) + GP_UNIT);
@@ -3426,7 +3389,7 @@ class MarketText {
             if (market.receivedEachGp > 0)
                 // The actual after-tax settled unit value; shown only when exactly divisible.
                 lines.add("Received each|" + exactGp(market.receivedEachGp));
-            lines.add(msg("previously-counted") + (unknown ? "Unknown" : exactGp(market.trackedBasisConsumedGp)));
+            lines.add(msg("previouslyCounted") + (unknown ? "Unknown" : exactGp(market.trackedBasisConsumedGp)));
             lines.add("Result|" + (unknown && !market.manualFinancialResult ? "—"
                                     : market.realizedResultCorrectionAware ? exactSigned(market.realizedResultGp)
                                                     + GP_UNIT + (market.coverage == MarketRows.Coverage.PARTIALLY_KNOWN
@@ -3858,7 +3821,7 @@ class LedgerData {
                                     : "Key or chest";
             // One chest per key type: stacked claims of it name the same worth once.
             long value = valued.add(claim.itemOrKeyId) ? engine.pendingKeyValue(claim.itemOrKeyId, now) : 0;
-            items.add(new PendingItem(claim.itemOrKeyId, name, claim.quantity(), name + msg("opened-books"), value));
+            items.add(new PendingItem(claim.itemOrKeyId, name, claim.quantity(), name + msg("openedBooks"), value));
         }
         return items;
     }
@@ -3955,7 +3918,7 @@ class LedgerData {
         }
 
         String note() {
-            return change == 0 ? msg("net-gp") : "Net changes by " + signed(change) + " gp.";
+            return change == 0 ? msg("netGp") : "Net changes by " + signed(change) + " gp.";
         }
     }
 
@@ -4294,7 +4257,7 @@ class LiveSnapshot {
                 long minutes = rate > 0 ? round((target - current) * 60d / rate) : 0;
                 eta = rate <= 0 ? "Not earning at this rate"
                                         : (minutes < 1 ? "<1m" : "~" + GrindsData.durationMinutes(minutes))
-                                                + msg("play-left");
+                                                + msg("playLeft");
             }
             return new Goal(target, current, reached, compact(target), reached ? "reached" : percent(fraction), eta,
                     fraction, false, timeDetail, timeRemaining, timeDone, timerPaused);
@@ -4729,7 +4692,7 @@ class GroundItemsConfigReader {
         try {
             config = this.config.getConfig(GroundItemsConfig.class);
         } catch (RuntimeException ex) {
-            log.debug(msg("ground-items"), ex); return GroundItemsPrefs.disabled();
+            log.debug(msg("groundItems"), ex); return GroundItemsPrefs.disabled();
         }
         if (config == null) return GroundItemsPrefs.disabled();
         var read = new GroundItemsPrefs(enabled, config.getHighlightItems(), config.getHiddenItems(),
@@ -4780,7 +4743,7 @@ class GroundItemsPrefs {
 
     /** Empty / disabled fallback — callers treat filtering as pass-through. */
     static GroundItemsPrefs disabled() {
-        return new GroundItemsPrefs(false, "", msg("vial-ashes"), false);
+        return new GroundItemsPrefs(false, "", msg("vialAshes"), false);
     }
 
 
@@ -5664,7 +5627,7 @@ class Persistence {
             closing = false; loading = false; failed = false; switchBlocked = false;
             needsSnapshot = false; readySignal.set(false); closed.set(false);
             if (worker == null || worker.isShutdown())
-                worker = OrderedPersistenceWriter.daemonExecutor(msg("gp-manager-lifecycle"));
+                worker = OrderedPersistenceWriter.daemonExecutor(msg("gpManagerLifecycle"));
         }
     }
 
@@ -5692,11 +5655,11 @@ class Persistence {
                             if (!closing && epoch == this.epoch.get())
                                 initialization.run();
                         } catch (RuntimeException ex) {
-                            if (epoch == this.epoch.get()) failed = true; log.warn(msg("startup-error"), ex);
+                            if (epoch == this.epoch.get()) failed = true; log.warn(msg("startupError"), ex);
                         }
                     });
         } catch (RuntimeException ex) {
-            failed = true; log.warn(msg("schedule-failed"), ex);
+            failed = true; log.warn(msg("scheduleFailed"), ex);
         }
     }
 
@@ -5762,12 +5725,12 @@ class Persistence {
 
                             if (!closing) ready = job.getAsBoolean();
                         } catch (RuntimeException ex) {
-                            log.warn(msg("unable-complete") + what, ex);
+                            log.warn(msg("unableComplete") + what, ex);
                         }
                         finishRequest(request, ready);
                     });
         } catch (RuntimeException ex) {
-            log.warn(msg("save-schedule-error") + what, ex); finishRequest(request, false);
+            log.warn(msg("saveScheduleError") + what, ex); finishRequest(request, false);
         }
     }
 
@@ -5775,7 +5738,7 @@ class Persistence {
         synchronized (lock) {
             if (closing) return null;
             if (worker == null || worker.isShutdown())
-                worker = OrderedPersistenceWriter.daemonExecutor(msg("lifecycle-thread"));
+                worker = OrderedPersistenceWriter.daemonExecutor(msg("lifecycleThread"));
             return worker;
         }
     }
@@ -5800,7 +5763,7 @@ class Persistence {
             if (capturePrevious) scheduleSave();
             // The previous owner stays bound until its latest snapshot is durable.
             if (!flush(Duration.ofSeconds(5))) {
-                log.warn(msg("refusing-account-switch")); switchBlocked = true; return false;
+                log.warn(msg("refusingAccountSwitch")); switchBlocked = true; return false;
             }
         }
         var previous = activeIdentity;
@@ -5814,7 +5777,7 @@ class Persistence {
             engine.restoreProfile(next.rsProfileKey, loaded, now());
         } catch (RuntimeException ex) {
             rollBack(previous, previousAppliedRevision, previousNextRevision); switchBlocked = true;
-            log.warn(msg("switch-profile-conflict"), ex); return false;
+            log.warn(msg("switchProfileConflict"), ex); return false;
         }
         fence(next.accountHash, request.get()); switchBlocked = false;
         if (previous == null || !previous.equals(next)) engine.beginPriming(); return true;
@@ -5868,7 +5831,7 @@ class Persistence {
             scheduleSaveLocked();
             // An unsaved owner is kept, fenced, rather than cleared; the next bind retries its save.
             if (!flush(Duration.ofSeconds(5))) {
-                log.warn(msg("account-clear")); return;
+                log.warn(msg("accountClear")); return;
             }
             if (closing) return;
         }
@@ -5901,11 +5864,11 @@ class Persistence {
 
     /** In-memory persistence health for a restrained panel warning; performs no file I/O. */
     SaveStatus saveStatus() {
-        return switchBlocked ? new SaveStatus(FAILED, msg("switch-save-paused"), false, "") : writer.status();
+        return switchBlocked ? new SaveStatus(FAILED, msg("switchSavePaused"), false, "") : writer.status();
     }
 
     String scopeRefusal() {
-        return activeIdentity == null || !repository.isBound() || !identityMatches() ? msg("current-runescape") : writer.conflicted(repository.generation) ? writer.status().detail : reason;
+        return activeIdentity == null || !repository.isBound() || !identityMatches() ? msg("currentRunescape") : writer.conflicted(repository.generation) ? writer.status().detail : reason;
     }
 
     /** Outcome of a reset: whether it was applied, and why not when refused. */
@@ -5938,12 +5901,12 @@ class Persistence {
 
     /** Commits a fresh owner (the factory reset) after a validated safety copy, or rolls back. */
     ResetOutcome replaceLocked(long now, boolean backup) {
-        if (!saveNow()) return new ResetOutcome(false, msg("current-profile")); SavedState protectedState = null;
+        if (!saveNow()) return new ResetOutcome(false, msg("currentProfile")); SavedState protectedState = null;
         if (backup)
             try {
                 protectedState = SessionRepository.parseBackup(JsonCodec.gson(), writeBackup(now));
             } catch (IOException | RuntimeException ex) {
-                return new ResetOutcome(false, msg("pre-restore") + ex.getMessage());
+                return new ResetOutcome(false, msg("preRestore") + ex.getMessage());
             }
 
         SavedState before;
@@ -5951,17 +5914,17 @@ class Persistence {
             // Sidebar edits use the engine lock, but are not ingestion. Refuse a stale safety copy
             // before replacing data, with check/snapshot/mutation atomic and all file IO outside.
             if (protectedState != null && !backupContent(engine.exportState()).equals(backupContent(protectedState)))
-                return new ResetOutcome(false, msg("reset-refused") + msg("reset-data-changed"));
+                return new ResetOutcome(false, msg("resetRefused") + msg("resetDataChanged"));
             before = snapshot(); fence(); engine.resetData(now);
         }
         var result = replaceNow();
         if (!result.isCommitted()) {
             engine.restoreProfile(activeIdentity.rsProfileKey, before, now);
-            String why = result.kind == ReplaceOutcome.Kind.CONFLICT ? msg("another-client-changed") + " " : "";
+            String why = result.kind == ReplaceOutcome.Kind.CONFLICT ? msg("anotherClientChanged") + " " : "";
             // Owner 2026-10-01 (F25): the shared outcome names the operation that was refused.
-            return new ResetOutcome(false, msg("reset-refused") + why + result.message);
+            return new ResetOutcome(false, msg("resetRefused") + why + result.message);
         }
-        engine.beginPriming(); return new ResetOutcome(true, msg("fresh-general"));
+        engine.beginPriming(); return new ResetOutcome(true, msg("freshGeneral"));
     }
 
     /**
@@ -6037,7 +6000,7 @@ class Persistence {
 
     synchronized ReplaceOutcome replaceNow() {
         var intent = currentIntent();
-        return intent == null ? ReplaceOutcome.unchanged(msg("account-identity-bound")) : writer.replaceNow(intent);
+        return intent == null ? ReplaceOutcome.unchanged(msg("accountIdentityBound")) : writer.replaceNow(intent);
     }
 
     synchronized boolean flush(Duration timeout) {
@@ -6073,7 +6036,7 @@ class Persistence {
         try {
             if (repository.isBound()) scheduleSave();
         } catch (RuntimeException ex) {
-            log.warn(msg("unable-capture"), ex);
+            log.warn(msg("unableCapture"), ex);
         } finally {
             writer.shutdown(Duration.ofSeconds(5));
             synchronized (lock) {
@@ -6090,7 +6053,7 @@ class Persistence {
     SavedState loadScope() {
         reason = null; var loaded = repository.load();
         if (!loaded.isSupportedSchema()) {
-            reason = msg("local-data") + loaded.schemaVersion + msg("version-modify"); log.warn(reason);
+            reason = msg("localData") + loaded.schemaVersion + msg("versionModify"); log.warn(reason);
             return new SavedState();
         }
         return loaded;
@@ -6166,7 +6129,7 @@ class JsonCodec {
 
 
     static Gson gson() {
-        Gson bound = gson; if (bound == null) throw new IllegalStateException(msg("jsoncodec-bind"));
+        Gson bound = gson; if (bound == null) throw new IllegalStateException(msg("jsoncodecBind"));
         return bound;
     }
 }
@@ -6211,7 +6174,7 @@ class TrackingIdentity {
     }
 
     public String toString() {
-        return msg("profile-key") + (accountHash != ACCOUNT_HASH_INVALID) + "}";
+        return msg("profileKey") + (accountHash != ACCOUNT_HASH_INVALID) + "}";
     }
 }
 
@@ -6538,7 +6501,7 @@ class SessionRepository {
         Filepath rooted = pluginDirectory.rooted();
         if (initialized) {
             if (!root.equals(rooted))
-                throw new IllegalStateException(msg("gp-manager-repository"));
+                throw new IllegalStateException(msg("gpManagerRepository"));
             return;
         }
         root = rooted; backup = rooted.joinSegment("backups"); initialized = true;
@@ -6552,7 +6515,7 @@ class SessionRepository {
     }
 
     void requireInit() {
-        if (!initialized) throw new IllegalStateException(msg("repository-ready"));
+        if (!initialized) throw new IllegalStateException(msg("repositoryReady"));
     }
 
     /** One scope directory's primary, backup, next and write-lock files. */
@@ -6560,7 +6523,7 @@ class SessionRepository {
         Filepath dir, state, backup, next, lock;
 
         ScopeFiles(Filepath dir) {
-            this.dir = dir; state = dir.joinSegment("sessions.json"); backup = dir.joinSegment(msg("backup-suffix"));
+            this.dir = dir; state = dir.joinSegment("sessions.json"); backup = dir.joinSegment(msg("backupSuffix"));
             next = dir.joinSegment("sessions.next.json"); lock = dir.joinSegment("sessions.write.lock");
         }
     }
@@ -6619,17 +6582,17 @@ class SessionRepository {
                 // high-water mark from a primary that was later discarded.
                 revision = positive(state.revision); return state;
             } catch (IOException ex) {
-                log.warn(msg("unable-load"), ex);
+                log.warn(msg("unableLoad"), ex);
                 // An unavailable primary is not evidence that its older backup is current.
                 if (!(ex instanceof InvalidSaveException)) throw new UncheckedIOException(ex); setAside(bound);
             }
 
         if (bound.backup.exists())
             try {
-                var i = readState(bound.backup); log.warn(msg("recovered-gp"), bound.backup.getFileName());
+                var i = readState(bound.backup); log.warn(msg("recoveredGp"), bound.backup.getFileName());
                 revision = positive(i.revision); recovery = bound.backup.getFileName().toString(); return i;
             } catch (IOException j) {
-                log.warn(msg("unable-read"), bound.backup, j);
+                log.warn(msg("unableRead"), bound.backup, j);
                 if (!(j instanceof InvalidSaveException)) throw new UncheckedIOException(j);
             }
 
@@ -6642,7 +6605,7 @@ class SessionRepository {
         } catch (RuntimeException ex) {
             if (ex instanceof JsonIOException && ex.getCause() instanceof IOException)
                 throw (IOException) ex.getCause();
-            throw new InvalidSaveException(msg("unreadable-session"), ex);
+            throw new InvalidSaveException(msg("unreadableSession"), ex);
         }
     }
 
@@ -6655,9 +6618,9 @@ class SessionRepository {
 
     /** Parses one payload. */
     static SavedState parseState(Gson codec, JsonElement json) throws IOException {
-        if (json == null || !json.isJsonObject()) throw new InvalidSaveException(msg("empty-session"), null);
+        if (json == null || !json.isJsonObject()) throw new InvalidSaveException(msg("emptySession"), null);
         var state = codec.fromJson(json, SavedState.class);
-        if (state == null) throw new InvalidSaveException(msg("empty-session"), null); return state;
+        if (state == null) throw new InvalidSaveException(msg("emptySession"), null); return state;
     }
 
     /** Backup parse/validation with the caller's existing Gson policy and error behavior. */
@@ -6694,7 +6657,7 @@ class SessionRepository {
         if (intent == null || intent.state == null) throw new IllegalArgumentException("intent"); var state = intent.state;
         var identity = intent.identity;
         if (accounts && identity == null) {
-            log.warn(msg("refusing-gp")); return ReplaceOutcome.unchanged(msg("account-identity-write"));
+            log.warn(msg("refusingGp")); return ReplaceOutcome.unchanged(msg("accountIdentityWrite"));
         }
         var target = new ScopeFiles(scopeDir(identity));
         // Owner key is taken from the intent, never from a later live bind.
@@ -6707,7 +6670,7 @@ class SessionRepository {
         try {
             target.dir.createDirectories(); lock = lockForWrite(target.lock);
             if (lock == null) {
-                log.warn(msg("another-gp")); return ReplaceOutcome.unchanged(msg("another-client-holds"));
+                log.warn(msg("anotherGp")); return ReplaceOutcome.unchanged(msg("anotherClientHolds"));
             }
             retireOlder(target);
             // The disk header is authoritative: an unreadable file is a retryable refusal, never
@@ -6715,7 +6678,7 @@ class SessionRepository {
             var disk = header(target.state); int diskSchema = disk == null ? SavedState.CURRENT_SCHEMA_VERSION : schemaOf(disk);
             if (diskSchema != SavedState.CURRENT_SCHEMA_VERSION) {
                 // Any other schema (a newer version) is preserved read-only.
-                log.warn(msg("refusing-overwrite"), diskSchema); return ReplaceOutcome.unchanged(msg("disk-state") + diskSchema);
+                log.warn(msg("refusingOverwrite"), diskSchema); return ReplaceOutcome.unchanged(msg("diskState") + diskSchema);
             }
             // The readable header is the authoritative CAS evidence even when its body fails
             // validation below, so a damaged optional field can never authorize a stale intent
@@ -6726,15 +6689,15 @@ class SessionRepository {
             // must not both succeed — and a destructive reset is no exception:
             // a newer revision written by another client wins and the reset aborts.
             if (revision != intent.base) {
-                log.warn(msg("refusing-concurrent"), reset ? "reset" : "save", revision, intent.base);
-                if (sameScope(identity)) this.revision = revision; return ReplaceOutcome.conflict(msg("disk-revision"));
+                log.warn(msg("refusingConcurrent"), reset ? "reset" : "save", revision, intent.base);
+                if (sameScope(identity)) this.revision = revision; return ReplaceOutcome.conflict(msg("diskRevision"));
             }
             if (state.revision <= 0)
                 state.setRevision(revision + 1);
             else if (state.revision <= revision) {
-                log.warn(msg("refusing-non"), state.revision, revision);
+                log.warn(msg("refusingNon"), state.revision, revision);
                 return ReplaceOutcome.unchanged(
-                        msg("advance-disk"));
+                        msg("advanceDisk"));
             }
             try (Writer writer = target.next.openWriter(CREATE, TRUNCATE_EXISTING,
                             WRITE)) {
@@ -6753,22 +6716,22 @@ class SessionRepository {
                 preserve(target, null);
 
             // Both guards above used this parsed primary, read under the account lock.
-            if (!reset && previous != null) replaceBackup(target, msg("backup-prefix")); primaryAttempted = true;
+            if (!reset && previous != null) replaceBackup(target, msg("backupPrefix")); primaryAttempted = true;
             // One atomic move: a crash leaves either the old save or the new one, never neither.
             replaceFile(target.next, target.state); if (sameScope(identity)) this.revision = validated.revision;
             if (reset) {
                 // After a reset the crash copy must not resurrect the cleared data.
                 try {
-                    replaceBackup(target, msg("backup-reset"));
+                    replaceBackup(target, msg("backupReset"));
                 } catch (IOException backupEx) {
-                    invalidateBackup(target, msg("reset-flush-error")); log.warn(msg("reset-backup-error"), backupEx);
-                    return ReplaceOutcome.primaryOnly(msg("primary-reset"));
+                    invalidateBackup(target, msg("resetFlushError")); log.warn(msg("resetBackupError"), backupEx);
+                    return ReplaceOutcome.primaryOnly(msg("primaryReset"));
                 }
-                return ReplaceOutcome.committed(msg("reset-committed"));
+                return ReplaceOutcome.committed(msg("resetCommitted"));
             }
             return ReplaceOutcome.committed("Save committed");
         } catch (IOException ex) {
-            log.warn(reset ? msg("unable-replace") : msg("unable-save"), ex);
+            log.warn(reset ? msg("unableReplace") : msg("unableSave"), ex);
             // Still under the account lock, so a primary holding our revision can
             // only be ours: classify, never re-issue the write.
             long verified = -1;
@@ -6778,9 +6741,9 @@ class SessionRepository {
                 // The replacement cannot be verified during I/O; stay unchanged and retry.
             }
             if (primaryAttempted && verified == state.revision) {
-                if (sameScope(identity)) revision = state.revision; return ReplaceOutcome.primaryOnly(msg("primary-already"));
+                if (sameScope(identity)) revision = state.revision; return ReplaceOutcome.primaryOnly(msg("primaryAlready"));
             }
-            return ReplaceOutcome.unchanged(reset ? msg("reset-did") : msg("save-did"));
+            return ReplaceOutcome.unchanged(reset ? msg("resetDid") : msg("saveDid"));
         } finally {
             releaseLock(lock);
         }
@@ -6823,7 +6786,7 @@ class SessionRepository {
 
     void invalidateBackup(ScopeFiles files, String reason) throws IOException {
         if (files.backup.exists()) {
-            var tombstone = files.dir.joinSegment(msg("backup-invalidated") + now() + ".json");
+            var tombstone = files.dir.joinSegment(msg("backupInvalidated") + now() + ".json");
             files.backup.moveTo(tombstone, REPLACE_EXISTING); log.warn("{} ({})", reason, tombstone.getFileName());
         }
     }
@@ -6857,9 +6820,9 @@ class SessionRepository {
                 String name = path.getFileName().toString().replace(".json", "");
                 path.moveTo(files.dir.joinSegment(name + ".schema" + schema + "-" + now() + ".json"),
                         REPLACE_EXISTING);
-                log.warn(msg("older-save"), schema);
+                log.warn(msg("olderSave"), schema);
             } catch (IOException ex) {
-                log.warn(msg("unable-preserve"), ex);
+                log.warn(msg("unablePreserve"), ex);
             }
 
     }
@@ -6916,7 +6879,7 @@ class SessionRepository {
         try {
             var channel = lock.channel(); lock.release(); channel.close();
         } catch (IOException ex) {
-            log.debug(msg("unable-release"), ex);
+            log.debug(msg("unableRelease"), ex);
         }
     }
 
@@ -6925,7 +6888,7 @@ class SessionRepository {
      * when the preservation itself failed, so no payload is ever replaced unrecovered.
      */
     private void preserve(ScopeFiles files, IOException cause) throws IOException {
-        setAside(files); if (files.state.exists()) throw new IOException(msg("cannot-preserve"), cause);
+        setAside(files); if (files.state.exists()) throw new IOException(msg("cannotPreserve"), cause);
     }
 
     void setAside(ScopeFiles files) {
@@ -6934,7 +6897,7 @@ class SessionRepository {
                 var backup = files.dir.joinSegment("sessions.corrupt-" + now() + ".json"); files.state.moveTo(backup, REPLACE_EXISTING);
             }
         } catch (IOException backupError) {
-            log.warn(msg("unable-preserve"), backupError);
+            log.warn(msg("unablePreserve"), backupError);
         }
     }
 
@@ -7031,7 +6994,7 @@ class OrderedPersistenceWriter {
         var next = new PendingWrite(intent); asked = new long[] {intent.generation, next.revision};
         if (conflicted(intent.generation)) return false;
         if (!accept) {
-            status.set(new SaveStatus(FAILED, msg("saving-stopped"), true, "")); return false;
+            status.set(new SaveStatus(FAILED, msg("savingStopped"), true, "")); return false;
         }
         while (true) {
             var current = merged.get();
@@ -7044,7 +7007,7 @@ class OrderedPersistenceWriter {
                 // abandoned that scope. Drop stale-scope work if a newer scope
                 // is already queued.
                 if (current.intent.generation > next.intent.generation) {
-                    status.set(new SaveStatus(FAILED, msg("pending-save"), false, "")); return false;
+                    status.set(new SaveStatus(FAILED, msg("pendingSave"), false, "")); return false;
                 }
             }
             if (merged.compareAndSet(current, next)) break;
@@ -7075,7 +7038,7 @@ class OrderedPersistenceWriter {
         boolean conflict = result.kind == ReplaceOutcome.Kind.CONFLICT;
         if (conflict) this.conflict.accumulateAndGet(intent.generation, Math::max);
         status.set(new SaveStatus(conflict ? CONFLICT : FAILED,
-                        conflict ? result.message + msg("tracking-paused-back") : result.message, false, ""));
+                        conflict ? result.message + msg("trackingPausedBack") : result.message, false, ""));
         return result;
     }
 
@@ -7132,8 +7095,8 @@ class OrderedPersistenceWriter {
         try {
             active.execute(this::drain); return true;
         } catch (RuntimeException ex) {
-            scheduled.set(false); log.warn(msg("lifecycle-schedule-error"), ex);
-            status.set(new SaveStatus(FAILED, msg("persistence-executor"), true, "")); return false;
+            scheduled.set(false); log.warn(msg("lifecycleScheduleError"), ex);
+            status.set(new SaveStatus(FAILED, msg("persistenceExecutor"), true, "")); return false;
         }
     }
 
@@ -7153,7 +7116,7 @@ class OrderedPersistenceWriter {
                 try {
                     ok = repository.save(intent);
                 } catch (RuntimeException ex) {
-                    log.warn(msg("gp-manager-background"), ex);
+                    log.warn(msg("gpManagerBackground"), ex);
                 }
                 // Only the bound scope's disk revision can prove a competing writer.
                 long disk = intent.generation == repository.generation ? repository.revision : intent.base;
@@ -7165,13 +7128,13 @@ class OrderedPersistenceWriter {
                     if (intent.generation == repository.generation)
                         publish(work.revision, "", repository.recovery);
                     else
-                        log.debug(msg("ignoring-late"), intent.generation, repository.generation);
+                        log.debug(msg("ignoringLate"), intent.generation, repository.generation);
                     continue;
                 }
-                State state = FAILED; String detail = msg("save-failed");
+                State state = FAILED; String detail = msg("saveFailed");
                 if (disk != intent.base) {
                     state = CONFLICT; conflict.accumulateAndGet(intent.generation, Math::max);
-                    detail = msg("disk-revision") + msg("tracking-paused-back"); merged.compareAndSet(work, null);
+                    detail = msg("diskRevision") + msg("trackingPausedBack"); merged.compareAndSet(work, null);
                 } else if (attempt < 3 && merged.get() == work
                         && (accept || System.nanoTime() - until < 0)
                         && retryLater(50L * attempt * attempt)) {
@@ -7292,10 +7255,7 @@ class SaveCopies implements Cloneable {
     }
 
     static CorrectionRecord copy(CorrectionRecord source) {
-        return copy(source, result -> {
-            result.changes = list(result.changes, SaveCopies::copy);
-            result.bondBefore = copyPools(result.bondBefore); result.bondAfter = copyPools(result.bondAfter);
-        });
+        return copy(source, result -> result.changes = list(result.changes, SaveCopies::copy));
     }
 
     static Map<Integer, BasisPool> copyPools(Map<Integer, BasisPool> source) {
@@ -7343,7 +7303,7 @@ class Engine {
     /** After a resume the sidebar/HUD show CALIBRATING this long; bookings stay immediate. */
     static final long CALIBRATING_MILLIS = 2500;
 
-    static final String UNCLASSIFIED_LOCAL_DEATH_NOTE = msg("unclassified-local"); FlowValuator valuation;
+    static final String UNCLASSIFIED_LOCAL_DEATH_NOTE = msg("unclassifiedLocal"); FlowValuator valuation;
     TransactionClassifier classifier; GpManagerConfig config;
     LootPresentationFilterService eligibility; List<Session> history = new ArrayList<>();
 
@@ -7525,8 +7485,8 @@ class Engine {
     }
 
     /**
-     * Ongoing load-time repricing and GE audit-row cleanup. The bounded worker owns missing-price
-     * Drink pairs; historical spell and GE compatibility repairs have been retired. Owner
+     * Ongoing load-time repricing. The bounded worker owns missing-price Drink pairs; historical
+     * spell, GE, GE audit-row and bond compatibility repairs have been retired. Owner
      * corrections stay unchanged, and an unchanged second pass does not advance the revision.
      * Historical grave-looking rows are never rewritten: item overlap cannot prove a recovery, so
      * ambiguous old income waits for the owner's explicit correction.
@@ -7535,58 +7495,39 @@ class Engine {
         boolean changed = false; var drops = new ArrayList<Runnable>();
         for (var session : sessions()) {
             var decided = decisions(session);
-                for (var row : session.transactions()) {
-                    if (row.correction() != AUTO || Contribution.isSplit(row)) continue;
-                    // 1.7.0 only, remove in the next release: pre-1.7 builds had no bond handling. A bond
-                    // conversion sat in Review as a counted gain, and the untradeable bond's GE collect as an
-                    // uncounted Review. The exact pair (an untradeable bond left, a tradeable one arrived) and
-                    // an uncounted Review whose one flow is an untradeable bond arriving get the Ledger's
-                    // Remove entry: money only, the booked physical history stays, and Undo restores either
-                    // one. A tradeable-only Review, and a pair that also paid coins (its fee is real), still
-                    // wait for the owner's Repair bond; a row already decided (an undone cleanup included)
-                    // is left alone (Codex review 2026-11-07).
-                    var plan = BondRepair.plan(row);
-                    boolean repairable = decided != null && !decided.contains(row.id());
-                    if (repairable && (plan != null && plan.oldQty > 0 && plan.next != COST || needsReview(row) && !row.counts()
-                            && row.flows().size() == 1 && row.quantity(OSRS_BOND_UNTRADEABLE, true) > 0)) {
-                        row.ownershipCorrection = AUTO; session.correct(List.of(row), IGNORE, "Bond conversion repair");
-                    }
-                    // 1.7.0 only, remove in the next release: a crystal tool Revert whose two dialogs outlasted
-                    // its click sat in Review (the tool left, its seed and dragon tool arrived). It gets the
-                    // Ledger's Remove and the one shard row a live Revert books. A row with any earlier
-                    // decision, including an undone repair, is left alone so the shards never book twice.
-                    var tool = revertReview(row);
-                    if (repairable && tool != null) {
-                        row.ownershipCorrection = AUTO; session.correct(List.of(row), IGNORE, "Crystal tool repair");
-                        var shards = dismantleLoss(row.timestamp, "Dismantled " + tool.name, row.activityName(), DISMANTLE.get(tool.item));
-                        drops.add(() -> session.addTransaction(shards, config.maxTransactionsPerSession(), false));
-                    }
-                    // Neutral GE change stays only as an audit row, like a live custody move.
-                    if (row.type() == TransactionType.TRANSFER && msg("ge-custody").equals(row.note())
-                            && row.flows().size() == 1 && row.flows().get(0).item == COINS) {
-                        if (!config.keepTransferAuditRows()) drops.add(() -> session.drop(row)); continue;
-                    }
-                    // The bounded worker owns dose repricing; the login scan cannot publish half a pair.
-                    if (delayedDose(row) || !any(row.flows(), flow -> flow.source() == UNPRICED)) continue;
-                    var previous = row.flows(); var next = list(previous, SaveCopies::copy);
-                    boolean priced = false;
-                    for (Flow flow : next) {
-                        if (flow.source() != UNPRICED) continue;
-                        // An item that had no price now has one: its alch value, worth nothing, or a share
-                        // of the whole (half a pie, owner 1.5.1).
-                        for (Flow now : valuation.value(Map.of(flow.item, flow.quantity)))
-                            if (now.source() != UNPRICED) {
-                                flow.unitPrice = now.unitPrice; flow.value = now.value; flow.priceSource = now.source(); priced = true;
-                            }
-
-                    }
-                    if (priced && (row.timestamp < basis.epoch
-                            || basis.canChange(row, AUTO, previous, AUTO, next))) {
-                        // Publish price and ownership together; used/reserved stock cannot be recreated.
-                        row.replaceFlows(next); if (row.timestamp >= basis.epoch) basis.onChanged(row, AUTO, previous);
-                        session.notifyChanged(); changed = true;
-                    }
+            for (var row : session.transactions()) {
+                if (row.correction() != AUTO || Contribution.isSplit(row)) continue;
+                // 1.7.0 only, remove in the next release: a crystal tool Revert whose two dialogs outlasted
+                // its click sat in Review (the tool left, its seed and dragon tool arrived). It gets the
+                // Ledger's Remove and the one shard row a live Revert books. A row with any earlier
+                // decision, including an undone repair, is left alone so the shards never book twice.
+                var tool = revertReview(row);
+                if (tool != null && decided != null && !decided.contains(row.id())) {
+                    row.ownershipCorrection = AUTO; session.correct(List.of(row), IGNORE, "Crystal tool repair");
+                    var shards = dismantleLoss(row.timestamp, "Dismantled " + tool.name, row.activityName(), DISMANTLE.get(tool.item));
+                    drops.add(() -> session.addTransaction(shards, config.maxTransactionsPerSession(), false));
                 }
+                // The bounded worker owns dose repricing; the login scan cannot publish half a pair.
+                if (delayedDose(row) || !any(row.flows(), flow -> flow.source() == UNPRICED)) continue;
+                var previous = row.flows(); var next = list(previous, SaveCopies::copy);
+                boolean priced = false;
+                for (Flow flow : next) {
+                    if (flow.source() != UNPRICED) continue;
+                    // An item that had no price now has one: its alch value, worth nothing, or a share
+                    // of the whole (half a pie, owner 1.5.1).
+                    for (Flow now : valuation.value(Map.of(flow.item, flow.quantity)))
+                        if (now.source() != UNPRICED) {
+                            flow.unitPrice = now.unitPrice; flow.value = now.value; flow.priceSource = now.source(); priced = true;
+                        }
+
+                }
+                if (priced && (row.timestamp < basis.epoch
+                        || basis.canChange(row, AUTO, previous, AUTO, next))) {
+                    // Publish price and ownership together; used/reserved stock cannot be recreated.
+                    row.replaceFlows(next); if (row.timestamp >= basis.epoch) basis.onChanged(row, AUTO, previous);
+                    session.notifyChanged(); changed = true;
+                }
+            }
         }
 
         drops.forEach(Runnable::run); if (changed || !drops.isEmpty()) changed();
@@ -7594,7 +7535,7 @@ class Engine {
 
     static boolean delayedDose(Transaction row) {
         return needsReview(row) && row.action() == DRINK && !Contribution.isSplit(row)
-                && msg("consumed-dose").equals(row.explanation());
+                && msg("consumedDose").equals(row.explanation());
     }
 
     Set<String> decisions(Session session) {
@@ -7643,7 +7584,7 @@ class Engine {
         if (!physical && !captured) return false; row.replaceFlows(draft.flows()); row.type = CONSUMPTION;
         row.counted = true; row.confidence = confidenceFor(row.context(), CONSUMPTION);
         row.explanation = explain(row.context(), CONSUMPTION, true); if (physical) basis.onAdded(row, false);
-        else row.note = msg("captured-dose"); session.notifyChanged();
+        else row.note = msg("capturedDose"); session.notifyChanged();
         return true;
     }
 
@@ -8083,9 +8024,9 @@ class Engine {
     /** A measured Bank-all decrease is received directly; bank callbacks cannot hide it. */
     synchronized Transaction banked(Observation e, long qty, long now) {
         if (!live() || e.owner != events.owner || e.kind != CHEST || e.item < 0) return null;
-        long received = events.take(e.kind, e.item, qty, v -> v == e); return received <= 0 ? null : add(new Transaction(now, TransactionType.LOOT, LOOT, msg("banked-reward"),
+        long received = events.take(e.kind, e.item, qty, v -> v == e); return received <= 0 ? null : add(new Transaction(now, TransactionType.LOOT, LOOT, msg("bankedReward"),
                         current.activityHint(), true, valuation.value(singletonMap(e.item, received)),
-                        CONFIRMED, msg("banked-proof"), null), false);
+                        CONFIRMED, msg("bankedProof"), null), false);
     }
 
     /**
@@ -8127,7 +8068,7 @@ class Engine {
     /** The catch line proves new fish outside the pack; a simultaneous deposit owns no part of it. */
     synchronized Transaction trawled(int id, long quantity, long now) {
         return !live() || warming || baseline == null || quantity <= 0 ? null : add(new Transaction(now, GAIN, GENERIC, msg("trawled"), current.activityHint(), true,
-                        valuation.value(singletonMap(id, quantity), now), CONFIRMED, msg("trawled-proof"), null), false);
+                        valuation.value(singletonMap(id, quantity), now), CONFIRMED, msg("trawledProof"), null), false);
     }
 
     /** Clears the export identity when persistence invalidates the active account. */
@@ -8141,7 +8082,7 @@ class Engine {
         var detached = state == null ? null : codec.fromJson(codec.toJson(state), SavedState.class);
         String stateOwner = detached == null ? null : detached.ownerKey;
         if (!next.isEmpty() && !blank(stateOwner) && !next.equals(stateOwner))
-            throw new IllegalArgumentException(msg("savedstate-owner"));
+            throw new IllegalArgumentException(msg("savedstateOwner"));
         var draft = prepareProfile(next, detached, now); installProfile(draft, next);
     }
 
@@ -8347,7 +8288,7 @@ class Engine {
     }
 
     void armDeathReclaim(int ticks, Map<Integer, Long> heldItems, Map<Integer, Long> graveBag) {
-        markContext(TRANSFER, max(1, ticks), msg("death-items"));
+        markContext(TRANSFER, max(1, ticks), msg("deathItems"));
         // Start after the transfer marker so this new death cannot cancel its own
         // bounded whitelist when strong-context supersession is evaluated.
         death.onPvmDeath(heldItems, valuation.hardcore());
@@ -8357,7 +8298,7 @@ class Engine {
         var bag = cash(graveBag);
         if (!death.deleted) bag.forEach((id, quantity) -> death.items.merge(id, quantity, SafeMath::sum));
         else if (live() && !bag.isEmpty()) {
-            bag.replaceAll((id, quantity) -> -quantity); deathLoss(now(), valuation.value(bag), msg("hardcore-deleted"));
+            bag.replaceAll((id, quantity) -> -quantity); deathLoss(now(), valuation.value(bag), msg("hardcoreDeleted"));
         }
         if (!death.items.isEmpty()) death.awaitingReclaim = true;
     }
@@ -8409,14 +8350,14 @@ class Engine {
         long coinsPaid = amount(losses(flows, id -> id == COINS), COINS);
         boolean hasOtherLoss = hasLoss(flows, identifier -> identifier != COINS); Transaction recovered = null;
         if (!returned.isEmpty()) {
-            String source = service == null ? msg("grave-retrieval") : service.interactable;
-            recovered = bookNeutral(now, msg("death-reclaim-items"), "Death reclaim", returned,
-                            msg("items-recovered") + source + msg("after-death"), null);
+            String source = service == null ? msg("graveRetrieval") : service.interactable;
+            recovered = bookNeutral(now, msg("deathReclaimItems"), "Death reclaim", returned,
+                            msg("itemsRecovered") + source + msg("afterDeath"), null);
             audit(recovered);
         }
         boolean feeEvidence = service != null || !returned.isEmpty();
         if (allowObservedFee && coinsPaid > 0 && feeEvidence && (!hasOtherLoss || !returned.isEmpty())) {
-            String why = service == null ? msg("reclaim-fee") : service.why(coinsPaid);
+            String why = service == null ? msg("reclaimFee") : service.why(coinsPaid);
             flows.removeIf(flow -> flow.item == COINS && flow.cost()); return bookDeathFee(coinsPaid, why, now);
         }
         return recovered;
@@ -8432,16 +8373,16 @@ class Engine {
         // resets or transfers: there the whole measured wipe is the death's loss (owner 2026-11-07).
         var bags = claim(transferred, Flow::cost, (flow, quantity) -> death.deleted || destroyedBag(flow.item) ? quantity : 0);
         Transaction loss = null;
-        if (!bags.isEmpty()) loss = deathLoss(now, bags, death.deleted ? msg("hardcore-deleted") : msg("bag-destroyed"));
+        if (!bags.isEmpty()) loss = deathLoss(now, bags, death.deleted ? msg("hardcoreDeleted") : msg("bagDestroyed"));
         if (transferred.isEmpty()) return loss;
-        Transaction transfer = bookNeutral(now, msg("death-items"), "Death reclaim", transferred,
-                        msg("ownership-neutral-transfer"), null);
+        Transaction transfer = bookNeutral(now, msg("deathItems"), "Death reclaim", transferred,
+                        msg("ownershipNeutralTransfer"), null);
         audit(transfer); return first(loss, transfer);
     }
 
     /** One counted PvE death loss: a destroyed looting bag, or a Hardcore World's deleted grave. */
     Transaction deathLoss(long now, List<Flow> flows, String why) {
-        return add(new Transaction(now, CONSUMPTION, GENERIC, msg("pvm-loss"), "Death reclaim", true, flows, CONFIRMED, why, null), false);
+        return add(new Transaction(now, CONSUMPTION, GENERIC, msg("pvmLoss"), "Death reclaim", true, flows, CONFIRMED, why, null), false);
     }
 
     static boolean destroyedBag(int id) {
@@ -8468,7 +8409,7 @@ class Engine {
         var restored = claim(flows, Flow::gain, (flow, quantity) -> take(stored, flow.item,
                                         quantity - take(sourceBacked, flow.item, quantity)));
         if (restored.isEmpty()) return null; if (stored.isEmpty()) restoreTicks = 0;
-        return bookNeutral(now, msg("neutral-zone-exit"), "Gauntlet", restored, msg("items-restored"), null);
+        return bookNeutral(now, msg("neutralZoneExit"), "Gauntlet", restored, msg("itemsRestored"), null);
     }
 
     static final Set<Integer> PVP_GRAVE = byId("pvp_gravestone").keySet();
@@ -8480,8 +8421,8 @@ class Engine {
         String fight = current.addEncounter(false, now);
         setContext(PK_DEATH, max(30, config.stabilizationTicks() + 4), "PK death loss", emptyMap(), fight);
         var lost = positive(bag); if (lost.isEmpty()) return null; lost.replaceAll((id, quantity) -> -quantity);
-        return add(new Transaction(now, PK_DEATH_LOSS, PK_DEATH, msg("bag-loss"), "PKing", true,
-                        valuation.value(lost, now), Confidence.LIKELY, msg("bag-loss-proof"), fight), false);
+        return add(new Transaction(now, PK_DEATH_LOSS, PK_DEATH, msg("bagLoss"), "PKing", true,
+                        valuation.value(lost, now), Confidence.LIKELY, msg("bagLossProof"), fight), false);
     }
 
     /**
@@ -8524,8 +8465,8 @@ class Engine {
                 basis.handoff(flow.item, parseInt(target), Math.abs(flow.quantity), now, null);
         }
         String part = piece(stepped.get(0));
-        return bookNeutral(now, msg("state." + part, msg("barrows-wear")), "Equipment", stepped,
-                        msg("state-why." + part, msg("barrows-gear")), null);
+        return bookNeutral(now, msg("state." + part, msg("barrowsWear")), "Equipment", stepped,
+                        msg("state-why." + part, msg("barrowsGear")), null);
     }
 
     /**
@@ -8564,7 +8505,7 @@ class Engine {
         var pair = claim(flows, flow -> flow.item == ABYSSAL_TENTACLE ? flow.cost()
                                         : flow.item == KRAKEN_TENTACLE && flow.gain(),
                         (flow, quantity) -> 1);
-        return bookCharge(now, msg("tentacle-used"), CONFIRMED, msg("tentacle-whip"), pair, null, false);
+        return bookCharge(now, msg("tentacleUsed"), CONFIRMED, msg("tentacleWhip"), pair, null, false);
     }
 
     /** A dwarf multicannon's parts set up or picked up: the same items, yours wherever they stand. */
@@ -8576,7 +8517,7 @@ class Engine {
             long take = min(quantity, cannonSeed); cannonSeed -= take;
             return take;
         }); parts.addAll(seeded);
-        return parts.isEmpty() ? null : bookNeutral(now, msg("cannon-parts"), "Cannon", parts, msg("cannon-why"), null);
+        return parts.isEmpty() ? null : bookNeutral(now, msg("cannonParts"), "Cannon", parts, msg("cannonWhy"), null);
     }
 
     /** Known wear/repair states, including Barrows, Moons and Perdu; never a display-name guess. */
@@ -8599,8 +8540,8 @@ class Engine {
         // The sawmill trip ends when its planks come back.
         if (sawmill && any(flows, flow -> flow.gain() && wood(flow)))
             drop(SAWMILL);
-        return moved.isEmpty() ? null : bookNeutral(now, msg("servant-bank"), "Construction", moved,
-                        msg("house-servant"), null);
+        return moved.isEmpty() ? null : bookNeutral(now, msg("servantBank"), "Construction", moved,
+                        msg("houseServant"), null);
     }
 
     /** Logs a sawmill trip takes, or the planks it brings back. */
@@ -8717,9 +8658,9 @@ class Engine {
         boolean zoneWasActive = zoneTransfer; zoneTransfer = false;
         stopCapture(); restoreTicks = stored.isEmpty() ? 0 : max(1, ticks);
         boolean pendingZone = pending().context == TRANSFER && pending().note != null
-                        && pending().note.startsWith(msg("neutral-zone-instance")),
+                        && pending().note.startsWith(msg("neutralZoneInstance")),
             activeZone = context().context == TRANSFER && context().note != null
-                        && context().note.startsWith(msg("zone-expired"));
+                        && context().note.startsWith(msg("zoneExpired"));
         if (pendingZone) pending().clear();
         if (activeZone) {
             context().clear(); drop(CLOCK);
@@ -8773,7 +8714,7 @@ class Engine {
     /** What taking an item apart loses (owner 1.2: a crystal tool's 120 shards), as one confirmed row. */
     Transaction dismantleLoss(long at, String note, String activity, String[] lost) {
         return new Transaction(at, CONSUMPTION, GENERIC, note, activity, true,
-                valuation.value(Map.of(parseInt(lost[2]), -Long.parseLong(lost[1]))), CONFIRMED, msg("lost-dismantled"), null);
+                valuation.value(Map.of(parseInt(lost[2]), -Long.parseLong(lost[1]))), CONFIRMED, msg("lostDismantled"), null);
     }
 
     /**
@@ -8979,7 +8920,7 @@ class Engine {
 
     /** Death storage stays visible; unrelated neutral moves follow the audit preference. */
     void audit(Transaction row) {
-        boolean death = deathNote(row.note()) || row.note().equals(msg("death-reclaim-items"));
+        boolean death = deathNote(row.note()) || row.note().equals(msg("deathReclaimItems"));
         if (!(death && raids.find(raids.state.death) != null) && (death || config.keepTransferAuditRows())) add(row, false);
     }
 
@@ -9006,14 +8947,14 @@ class Engine {
      */
     synchronized void spent(String item, List<Flow> charges, long now) {
         if (live())
-            bookCharge(now, msg("measured-charge") + item, CONFIRMED, msg("game-counted") + item + ".",
+            bookCharge(now, msg("measuredCharge") + item, CONFIRMED, msg("gameCounted") + item + ".",
                     charges, CAST, false);
     }
 
     /** One chug from the chugging barrel: its doses as one Drank row titled by the barrel. */
     synchronized void chug(List<Flow> doses, long now) {
         if (live())
-            bookCharge(now, "Chugging barrel", CONFIRMED, msg("drunk-chugging"), doses, DRINK,
+            bookCharge(now, "Chugging barrel", CONFIRMED, msg("drunkChugging"), doses, DRINK,
                             false).setActionLabel(ActionLabel.of("Chugging barrel"));
     }
 
@@ -9027,7 +8968,7 @@ class Engine {
         String target = fallback(identity, null), label = fallback(family, null);
         if (!live() || target == null || label == null || empty(removed))
             return null;
-        Transaction transaction = bookCharge(now, msg("estimated-charge") + label, Confidence.LIKELY, "Estimated",
+        Transaction transaction = bookCharge(now, msg("estimatedCharge") + label, Confidence.LIKELY, "Estimated",
                         removed, kind == null ? CAST : kind, true);
         String id = current.id();
         for (Flow flow : transaction.flows())
@@ -9103,14 +9044,14 @@ class Engine {
         }
         // The spend belongs to what the player is doing, not to the weapon: Top activities
         // must never grow a "Toxic blowpipe" row. The weapon stays in the note.
-        return bookCharge(now, msg("measured-charge") + fallback(name, "Measured charges"),
-                        CONFIRMED, msg("measured-check") + measuredDelta.variant.getDisplayName() + ".",
+        return bookCharge(now, msg("measuredCharge") + fallback(name, "Measured charges"),
+                        CONFIRMED, msg("measuredCheck") + measuredDelta.variant.getDisplayName() + ".",
                         booked, measuredDelta.variant == ChargedItem.BLOWPIPE ? FIRE : CAST, false);
     }
 
     /** Book a death reclaim fee as a plain counted CONSUMPTION cost under "Death reclaim". */
     synchronized Transaction bookDeathFee(long fee, String why, long now) {
-        String label = why == null ? msg("grave-fee") : why;
+        String label = why == null ? msg("graveFee") : why;
         var row = bookFee(fee, label, "Death reclaim", now); raids.fee(row); return row;
     }
 
@@ -9156,12 +9097,12 @@ class Engine {
         bag.forEach((id, quantity) -> this.bag.merge(id, quantity, Long::sum));
         return add(new Transaction(now, TransactionType.LOOT, LOOT, msg("bag-reward"),
                         current.activityHint(), true, valuation.value(bag), Confidence.LIKELY,
-                        msg("bag-proof"), null), false);
+                        msg("bagProof"), null), false);
     }
 
     /** The Blast Furnace coffer's drain while you work it (owner 2026-10-16, after Coin Flow 1.9). */
     synchronized Transaction bookCofferDrain(long gp, long now) {
-        return bookFee(gp, msg("bf-coffer"), "Smithing", now);
+        return bookFee(gp, msg("bfCoffer"), "Smithing", now);
     }
 
     /** The Blast Furnace coffer's last balance (-1 until read) and its tick; unbooked drain, when and whose. */
@@ -9258,14 +9199,13 @@ class Engine {
         if (current != null && decision != null && scope != null) {
             var rows = matching(current.transactions(), transaction -> {
                 var row = reviewRow(current, transaction, now);
-                return needsReview(transaction) && scope.test(row)
-                        && (decision != Decision.BOND || row.decisions.contains(Decision.BOND));
+                return needsReview(transaction) && scope.test(row);
             });
             // The projected batch is the same validation application uses.
             if (current.canCorrect(rows, decision.correction, now)) for (var transaction : rows) selectedIds.add(transaction.id());
         }
         long net = selectedIds.isEmpty() ? 0 : subtract(current.netAfter(selectedIds,
-                        copy -> Session.apply(copy, decision.correction)), current.metrics(now).net);
+                        copy -> copy.applyCorrection(decision.correction, "")), current.metrics(now).net);
         return new DecisionPreview(decision, selectedIds, net, revision());
     }
 
@@ -9299,13 +9239,10 @@ class Engine {
                         flow -> new Item(flow.item, flow.name, flow.quantity, flow.value));
         if (items.isEmpty())
             items.add(new Item(-1, transaction.note(), 0, transaction.autoNet()));
-        String why = transaction.explanation(); if (blank(why)) why = msg("uncertain-transaction");
+        String why = transaction.explanation(); if (blank(why)) why = msg("uncertainTransaction");
         long timestamp = transaction.timestamp, age = now > timestamp ? now - timestamp : 0;
-        var decisions = EnumSet.allOf(Decision.class);
-        if (BondRepair.plan(transaction) == null) decisions.remove(Decision.BOND);
-        else items.sort(comparing(item -> item.item != OSRS_BOND));
         return new ReviewRow(transaction.id(), session.id(), timestamp, age, items, transaction.autoNet(), why,
-                decisions);
+                EnumSet.allOf(Decision.class));
     }
 
     synchronized boolean splitItem(String id, int identifier, long keep, String note) {
@@ -9348,7 +9285,7 @@ class Engine {
         int retrieval = RaidHistory.kind(raids.state.death); if (retrieval > 0 && retrieval < 3) death.age = 0;
         String expired = death.tick(events.hold);
         if (expired != null) {
-            return add(bookNeutral(now, msg("reclaim-expired"), "Death reclaim", emptyList(), expired, null), false);
+            return add(bookNeutral(now, msg("reclaimExpired"), "Death reclaim", emptyList(), expired, null), false);
         }
         if (this.current.paused) {
             // An inventory gain during an Idle pause is the action that ended it (a
@@ -9552,12 +9489,12 @@ class Engine {
                 // while tracked, else a bond's Grand Exchange price (the untradeable one has none).
                 batch.flows.removeAll(redeemed); drop(BOND_REDEEM);
                 long price = valuation.value(Map.of(OSRS_BOND, 1L)).get(0).unitPrice;
-                var row = new Transaction(batch.now, CONSUMPTION, GENERIC, msg("bond-spent"), "Bonds", true,
+                var row = new Transaction(batch.now, CONSUMPTION, GENERIC, msg("bondSpent"), "Bonds", true,
                         list(redeemed, flow -> {
                             var pool = basis.known(flow.item); long used = -flow.quantity, known = min(used, pool.availableQty),
                                 cost = sum(BasisMath.shareOf(pool.availableQty, pool.availableBasisGp, known), multiply(used - known, price));
                             return new Flow(flow.item, flow.name, flow.quantity, cost / used, -cost, GRAND_EXCHANGE, batch.now);
-                        }), CONFIRMED, msg("bond-spent-why"), null);
+                        }), CONFIRMED, msg("bondSpentWhy"), null);
                 add(row, false); if (batch.flows.isEmpty()) return row;
             }
             if (any(batch.flows, flow -> bondItem(flow.item))) batch.pricingReview = true;
@@ -9685,7 +9622,7 @@ class Engine {
         var changes = committed.diff(baseline); baseline = committed; invalidateChargeBaselines(changes);
         if (capture && storedBaseline != null) {
             if (batch.context == TRANSFER && batch.note != null
-                    && batch.note.startsWith(msg("zone-restored")))
+                    && batch.note.startsWith(msg("zoneRestored")))
                 recordZoneEntry(committed.diff(storedBaseline));
             storedBaseline = committed;
         }
@@ -9999,7 +9936,7 @@ class Engine {
     /** Classifies what is left of the change and books it as one receipt. */
     Transaction book(Settle batch) {
         if (batch.used && raids.supplies(batch.flows, true, emptyMap())) {
-            if (batch.flows.isEmpty()) return null; batch.note = msg("raid-supply-credit");
+            if (batch.flows.isEmpty()) return null; batch.note = msg("raidSupplyCredit");
         }
         // The offer ledger is item/direction-scoped evidence of a Grand Exchange movement. It may
         // only own a settle that no stronger source-specific evidence already owns — matched
@@ -10114,10 +10051,10 @@ class Engine {
         Confidence confidence = unclaimed || batch.pricingReview ? Confidence.UNCERTAIN
                         : confidenceFor(batch.context, type);
         // Non-bank transfers explain themselves (minigame wipe, neutral zone, death).
-        String reason = batch.pricingReview ? msg("consumed-dose") : geReview ? msg("ge-movement")
+        String reason = batch.pricingReview ? msg("consumedDose") : geReview ? msg("geMovement")
                                 : type == TransactionType.TRANSFER && !empty(batch.note)
-                                                && !batch.note.matches(msg("i-bank"))
-                                        ? msg("neutral-prefix") + batch.note + "."
+                                                && !batch.note.matches(msg("iBank"))
+                                        ? msg("neutralPrefix") + batch.note + "."
                                         : explain(batch.context, type, included);
         Transaction transaction = new Transaction(batch.now, type, batch.context, batch.note, batch.activity,
                         included, batch.flows, confidence, reason, batch.fight);
@@ -10227,7 +10164,7 @@ class Engine {
     }
 
     Transaction recordKeyAudit(List<Flow> keys, String encounter, long now) {
-        Transaction audit = bookNeutral(now, KeyClaims.LOOT_KEY_NOTE, "PKing", keys, msg("settled-loot"),
+        Transaction audit = bookNeutral(now, KeyClaims.LOOT_KEY_NOTE, "PKing", keys, msg("settledLoot"),
                         encounter);
         add(audit, false); var receivedKeys = gains(keys, KeyClaims::lootKey);
         // Claim identity must follow the key item, not incidental flow order. The normal valuator
@@ -10253,7 +10190,7 @@ class Engine {
                 continue;
             var entry = forKey(flow.item); if (entry == null || entry.tradeable) continue;
             Transaction audit = bookNeutral(now, "Key held · " + fallback(entry.chestName, "Chest"), entry.chestName,
-                            singletonList(flow), msg("untradeable-chest"), null);
+                            singletonList(flow), msg("untradeableChest"), null);
             audit.setAction(ActionKind.DEFERRED_CLAIM); add(audit, false);
             claims.open(audit.id(), flow.item, flow.quantity, now); last = audit;
         }
@@ -10367,7 +10304,7 @@ class Engine {
         }
         if (picked.isEmpty()) return null; batch.flows = rest;
         Transaction row = new Transaction(batch.now, TransactionType.TRANSFER, TRANSFER, "Picked back up",
-                        "Transfer", false, picked, CONFIRMED, msg("picked-back-up"), null);
+                        "Transfer", false, picked, CONFIRMED, msg("pickedBackUp"), null);
         if (config.keepTransferAuditRows()) add(row, false); return row;
     }
 
@@ -10489,11 +10426,11 @@ class Engine {
     }
 
     String explain(Context context, TransactionType type, boolean counted) {
-        if (context == MARKET) return counted ? msg("trade-inventory") : msg("grand-exchange-shop");
-        if (context == PRODUCTION) return type == CONSUMPTION ? msg("failed-inputs") : msg("simultaneous-inputs");
+        if (context == MARKET) return counted ? msg("tradeInventory") : msg("grandExchangeShop");
+        if (context == PRODUCTION) return type == CONSUMPTION ? msg("failedInputs") : msg("simultaneousInputs");
         if (context == GENERIC) {
-            if (type == UNCERTAIN) return counted ? msg("mixed-flows") : msg("mixed-confirmed");
-            if (type == GAIN) return msg("stable-value"); return type == CONSUMPTION ? msg("stable-stock") : msg("stable-change");
+            if (type == UNCERTAIN) return counted ? msg("mixedFlows") : msg("mixedConfirmed");
+            if (type == GAIN) return msg("stableValue"); return type == CONSUMPTION ? msg("stableStock") : msg("stableChange");
         }
         return text(msg("context-proof." + context.name()));
     }
@@ -10504,8 +10441,8 @@ class Engine {
      */
     Transaction recordAmbiguousLoad(LoadTarget partition, long now) {
         if (partition == null || partition.unknown.isEmpty() || !live()) return null;
-        Transaction transfer = bookNeutral(now, msg("charge-load-transfer"), "Charge load",
-                        partition.unknown, msg("load-confirmed"), null);
+        Transaction transfer = bookNeutral(now, msg("chargeLoadTransfer"), "Charge load",
+                        partition.unknown, msg("loadConfirmed"), null);
         transfer.setAction(CHARGE_LOAD_AMBIGUOUS); add(transfer, false);
         // The weapon's next Check adds these back, so a reload is never read as darts unused.
         for (Flow flow : partition.unknown)
@@ -10522,8 +10459,8 @@ class Engine {
      * piece keeps no Check baseline to reconcile.
      */
     Transaction recordCommittedLoad(LoadTarget partition, long now) {
-        return partition == null || partition.unknown.isEmpty() || !live() ? null : bookCharge(now, msg("committed-load") + fallback(partition.variant.getDisplayName(), "Crystal charges"),
-                CONFIRMED, msg("committed-proof") + partition.variant.getDisplayName() + ".",
+        return partition == null || partition.unknown.isEmpty() || !live() ? null : bookCharge(now, msg("committedLoad") + fallback(partition.variant.getDisplayName(), "Crystal charges"),
+                CONFIRMED, msg("committedProof") + partition.variant.getDisplayName() + ".",
                 partition.unknown, partition.variant.action, false);
     }
 
@@ -11407,8 +11344,8 @@ class DeathReclaimLifecycle {
                     labels.add(quantity == 1 ? name : name + " ×" + exact(quantity));
                 });
         labels.sort(String.CASE_INSENSITIVE_ORDER);
-        return msg("gravestone-timer") + outstanding() + msg("item-s") + String.join(", ", labels)
-                + msg("item-loss");
+        return msg("gravestoneTimer") + outstanding() + msg("itemS") + String.join(", ", labels)
+                + msg("itemLoss");
     }
 
     void reset() {
@@ -11498,7 +11435,7 @@ class BossRetrievalCatalogue {
 
         /** Ledger explanation for an observed coin payment at this service. */
         String why(long coins) {
-            var why = new StringBuilder(msg("item-retrieval")).append(activity).append(" (").append(interactable)
+            var why = new StringBuilder(msg("itemRetrieval")).append(activity).append(" (").append(interactable)
                             .append(")");
             if (fee > 0) {
                 why.append(", published ").append(exact(fee));
@@ -11630,7 +11567,7 @@ class ActionReader {
                                             name -> !isRune(name) && named(name) == null) ? CAST
                             : doseStep ? SUPPLIES : null;
                 case SUPPLIES:
-                    return lossOnly && all(flows, 0, name -> name.matches(msg("logs-kindling"))) ? SUPPLIES
+                    return lossOnly && all(flows, 0, name -> name.matches(msg("logsKindling"))) ? SUPPLIES
                             : null;
                 default:
                     return matchedIntent;
@@ -11889,48 +11826,6 @@ class ActionSignals {
     }
 }
 
-/** A validated legacy bond-conversion Review shape; generic Transfer semantics stay untouched. */
-@AllArgsConstructor
-class BondRepairPlan {
-    long oldQty, newQty;
-    Correction next;
-}
-
-/** Narrow conversion-specific repair over one or more selected legacy receipts. */
-class BondRepair {
-    static BondRepairPlan plan(Transaction transaction) {
-        if (!needsReview(transaction) || Contribution.isSplit(transaction)) return null;
-        long old = 0, now = 0; boolean fee = false;
-        for (Flow flow : transaction.flows()) {
-            if (flow.quantity == 0) return null;
-            if (flow.item == OSRS_BOND_UNTRADEABLE) {
-                if (flow.quantity >= 0 || old != 0) return null; old = -flow.quantity;
-            } else if (flow.item == OSRS_BOND) {
-                if (flow.quantity <= 0 || now != 0) return null; now = flow.quantity;
-            } else if (flow.item == COINS && flow.quantity < 0) fee = true; else return null;
-        }
-        return now <= 0 || old != 0 && old != now ? null : new BondRepairPlan(old, now, fee ? COST : Correction.TRANSFER);
-    }
-
-    /** Each row's plan by id, or null when any row is not an exact conversion shape. */
-    static Map<String, BondRepairPlan> plans(List<Transaction> rows) {
-        var plans = new HashMap<String, BondRepairPlan>();
-        for (var row : rows) {
-            var plan = plan(row); if (plan == null) return null;
-            plans.put(row.id(), plan);
-        }
-        return plans;
-    }
-
-    static void apply(Transaction transaction, BondRepairPlan plan) {
-        if (plan.next == COST) {
-            transaction.takeQuantity(OSRS_BOND_UNTRADEABLE, false, plan.oldQty);
-            transaction.takeQuantity(OSRS_BOND, true, plan.newQty);
-        }
-        transaction.applyCorrection(plan.next, "Bond conversion repair");
-    }
-}
-
 /**
  * Schema-106 pooled known-basis coverage memory.
  *
@@ -12006,49 +11901,6 @@ class TrackedBasisLedger {
         return copyPools(stock);
     }
 
-    void restore(Map<Integer, BasisPool> snapshot) {
-        stock.clear();
-        if (snapshot != null) stock.putAll(copyPools(snapshot));
-    }
-
-    Set<Integer> affected(CorrectionRecord record) {
-        var ids = new LinkedHashSet<Integer>();
-        var before = record.bondBefore; var after = record.bondAfter;
-        if (before != null) ids.addAll(before.keySet());
-        if (after != null) ids.addAll(after.keySet());
-        ids.removeIf(id -> {
-            var oldPool = before == null ? null : before.get(id);
-            var newPool = after == null ? null : after.get(id);
-            return oldPool == null ? newPool == null : oldPool.equals(newPool);
-        });
-        return ids;
-    }
-
-    BasisPool repairPool(CorrectionRecord record, int id, boolean before) {
-        var pools = before ? record.bondBefore : record.bondAfter; return pools == null ? null : pools.get(id);
-    }
-
-    boolean sameAffected(CorrectionRecord record) {
-        for (var id : affected(record)) {
-            var after = repairPool(record, id, false);
-            if (after == null) {
-                var pool = stock.get(id);
-                if (pool != null && (pool.availableQty > 0 || pool.availableBasisGp > 0
-                        || pool.fencedAt > 0)) return false;
-            } else if (!known(id).equals(after)) return false;
-        }
-        return true;
-    }
-
-    void restore(CorrectionRecord record) {
-        for (var id : affected(record)) {
-            var pool = repairPool(record, id, true);
-            if (pool == null || pool.itemId <= 0 || pool.availableQty == 0
-                    && pool.availableBasisGp == 0 && pool.fencedAt == 0) stock.remove(id);
-            else stock.put(id, copy(pool));
-        }
-    }
-
     /**
      * Validate a complete mutation sequence in application order against a detached projection, so
      * one target's decision cannot silently change an earlier one's eligibility.
@@ -12069,74 +11921,10 @@ class TrackedBasisLedger {
         return true;
     }
 
-    /** The receipt-aware projection for a whole conversion repair batch, including physical moves. */
-    synchronized boolean canBond(List<Transaction> ordered, Map<String, BondRepairPlan> plans, long now,
-            String owner) {
-        var projected = projection();
-        for (var original : ordered) {
-            var plan = plans.get(original.id());
-            if (plan == null || !projected.change(original, copy -> BondRepair.apply(copy, plan))
-                    || !projected.bondHandoff(original, plan.newQty, now, owner)) return false;
-        }
-        return true;
-    }
-
-    /**
-     * Only available known coverage, proven to exist when the repaired receipt was booked, moves to
-     * the received raw id. False only when the destination's quantity/GP capacity cannot hold a
-     * separating-saturating release; the caller's snapshot owns Undo.
-     */
-    synchronized boolean bondHandoff(Transaction row, long quantity, long now, String owner) {
-        var source = known(OSRS_BOND_UNTRADEABLE); long moved = min(positive(quantity), source.availableQty);
-        if (!tracks(row) || source.acquiredAt > max(0, row.timestamp) || moved <= 0) return true;
-        long basis = BasisMath.shareOf(source.availableQty, source.availableBasisGp, moved);
-        var destination = known(OSRS_BOND);
-        if (moved > Long.MAX_VALUE - destination.availableQty || basis > Long.MAX_VALUE - destination.availableBasisGp)
-            return false;
-        if (canApply(OSRS_BOND_UNTRADEABLE, -moved, -basis, now, owner) && canApply(OSRS_BOND, moved, basis, now, owner))
-            handoff(OSRS_BOND_UNTRADEABLE, OSRS_BOND, moved, now, owner);
-        return true;
-    }
-
     /** Move known coverage between two raw ids of one owned item and fence both states. */
     synchronized void handoff(int from, int to, long quantity, long now, String owner) {
         var moved = reserve(from, quantity); release(to, moved.trackedQty, moved.basisGp);
         fenceRealized(from, now, owner); fenceRealized(to, now, owner);
-    }
-
-    boolean validPool(int id, BasisPool pool) {
-        return pool == null || pool.availableQty >= 0 && pool.availableBasisGp >= 0
-                && pool.fencedAt >= 0 && pool.acquiredAt >= 0
-                && (pool.itemId == id || pool.itemId == 0 && pool.availableQty == 0
-                        && pool.availableBasisGp == 0 && pool.fencedAt == 0 && pool.acquiredAt == 0);
-    }
-
-    /**
-     * A repair's pools go back only while its two images are present together, every image it would
-     * restore is a valid pool, every pool it touched still holds exactly its after image and the
-     * reservation/fence boundary at the repair's time and owner is open; anything later (a sale, an
-     * open reservation, a fence) refuses the Undo.
-     */
-    boolean undoable(CorrectionRecord record, List<Transaction> ordered) {
-        long timestamp = ordered.stream().mapToLong(row -> row.timestamp).max().orElse(0);
-        String owner = record.changes().isEmpty() ? "" : record.changes().get(0).transactionId(); var ids = affected(record);
-        return (record.bondBefore == null) == (record.bondAfter == null)
-                && ids.stream().allMatch(id -> id != null && id > 0 && validPool(id, repairPool(record, id, true)))
-                && sameAffected(record) && ids.stream().allMatch(id -> canApply(id, 0, 0, timestamp, owner));
-    }
-
-    /** Validate only the pools the repair changed, then the same correction restore. */
-    synchronized boolean canUndoBond(CorrectionRecord record, List<Transaction> ordered,
-            List<CorrectionRecord.Change> inverse) {
-        if (!undoable(record, ordered)) return false;
-        var projected = projection(); projected.restore(record);
-        var changes = inverse.iterator();
-        return projected.canChangeAll(ordered,
-                copy -> Session.restoreChange(copy, changes.next()));
-    }
-
-    synchronized boolean reverseBond(CorrectionRecord record, List<Transaction> ordered) {
-        boolean undoable = undoable(record, ordered); if (undoable) restore(record); return undoable;
     }
 
     synchronized void onUsedUp(Transaction transaction) {
@@ -12720,7 +12508,7 @@ class GeCustodyLedger {
                 // quarantine the next; never inherit prior basis or progress.
                 var old = touch(slot, base);
                 if (old != null) {
-                    old.confidence = AMBIGUOUS; handoff(old, msg("offer-identity"));
+                    old.confidence = AMBIGUOUS; handoff(old, msg("offerIdentity"));
                 }
                 replaced.add(slot);
             }
@@ -12779,7 +12567,7 @@ class GeCustodyLedger {
         }
         if (previous != null)
             // Slot reuse: a new offer never inherits prior basis or progress.
-            handoff(previous, msg("slot-reused"));
+            handoff(previous, msg("slotReused"));
         // A settled (CLOSED) lifecycle in this slot stays as bounded market history for its
         // booked sale; only its unrealized reservation leaves with the slot.
         releaseRemaining(latestClosed(slot)); var record = newRecord(offer, name, offer.state);
@@ -12947,8 +12735,8 @@ class GeCustodyLedger {
         claimBuyRefunds(collection); claimSellReturns(); claimBuyCollections(collection); claimSellSettlements(collection);
         if (!claimed.isEmpty())
             transfers.add(new Transaction(now, TransactionType.TRANSFER, TRANSFER,
-                            msg("ge-custody"), "Market", false, copiedList(claimed),
-                            CONFIRMED, msg("ge-neutral"), null));
+                            msg("geCustody"), "Market", false, copiedList(claimed),
+                            CONFIRMED, msg("geNeutral"), null));
         // A hold created by this settle retries immediately: a batch whose evidence is complete
         // fails closed at once instead of waiting invisibly for a later event.
         reconcilePending();
@@ -12999,7 +12787,7 @@ class GeCustodyLedger {
                 continue;
             boolean buyTerminal = record.side != SELL && record.isTerminal() && !record.unbased();
             if ((clear || buyTerminal) && now - record.lastSeenAtEpochMillis > UNOBSERVED_GRACE_MILLIS)
-                handoff(record, msg("settlement-observed"));
+                handoff(record, msg("settlementObserved"));
         }
         clearAt.values().removeIf(at -> now - at > UNOBSERVED_GRACE_MILLIS);
         // Spent offer evidence goes with its offer.
@@ -13146,7 +12934,7 @@ class GeCustodyLedger {
         // like any item and arrives untradeable; its redemption or gift is where its cost counts.
         var flows = flowList(); var item = itemFlow(record, quantity, execution / quantity, execution);
         item.item = custodyItem(record); flows.add(item); flows.add(coins(-execution));
-        var row = buildMarket(flows, clean, clean, msg("ge-purchase"));
+        var row = buildMarket(flows, clean, clean, msg("gePurchase"));
         settled(record, row, quantity, execution, execution);
         record.collectedQty = positive(record.settledQty); record.collectedValueGp = 0;
     }
@@ -13267,10 +13055,10 @@ class GeCustodyLedger {
                             // Legacy (non-collect) batch adjustment row; collect interactions never
                             // produce one.
                             rows.add(new Transaction(now, clean ? TRADE : UNCERTAIN, MARKET,
-                                            msg("ge-settlement"), "Market", clean,
+                                            msg("geSettlement"), "Market", clean,
                                             singletonList(coins(claimCash - allocated)),
                                             clean ? CONFIRMED : Confidence.UNCERTAIN,
-                                            msg("ge-batch"), null));
+                                            msg("geBatch"), null));
                     } else {
                         var record = options.get(0); long execution = record.pendingExecution();
                         boolean over = original > execution; record.collectionAmbiguous = record.collectionAmbiguous || over;
@@ -13471,7 +13259,7 @@ class GeCustodyLedger {
     /** Fail closed: the observed cash stays visible as an uncounted Review row, never guessed. */
     void releasePendingSettlement() {
         long held = cash; clearPending(); if (held <= 0) return;
-        rows.add(reviewRow(singletonList(coins(held)), msg("ge-collection")));
+        rows.add(reviewRow(singletonList(coins(held)), msg("geCollection")));
     }
 
     void bookSellSettlement(GeOffer record, long quantity, long cash, long execution, boolean clean) {
@@ -13509,9 +13297,9 @@ class GeCustodyLedger {
             }
             flows.add(coins(proceeds));
         }
-        String reason = costOnly ? msg("sale-proven") : fullyUnknown
-                                ? msg("sale-settled") : known < quantity
-                                        ? msg("sale-quantity") : msg("grand-exchange-sale");
+        String reason = costOnly ? msg("saleProven") : fullyUnknown
+                                ? msg("saleSettled") : known < quantity
+                                        ? msg("saleQuantity") : msg("grandExchangeSale");
         // Counted when the lifecycle is exact AND either the realized quantity carries known
         // coverage
         // or the actual GE tax is proven. An unknown sale without a proven tax stays an exact,
@@ -13556,7 +13344,7 @@ class GeCustodyLedger {
     Transaction buildMarket(List<Flow> flows, boolean exact, boolean countsInNet, String reason) {
         return new Transaction(now, exact ? TRADE : UNCERTAIN, MARKET, "Grand Exchange", "Market", countsInNet, flows,
                 exact ? CONFIRMED : Confidence.UNCERTAIN, exact ? reason : reason
-                                + msg("lifecycle-evidence") + msg("stays-uncounted"), null);
+                                + msg("lifecycleEvidence") + msg("staysUncounted"), null);
     }
 
     boolean cleanSettlement(GeOffer record) {
@@ -13784,7 +13572,7 @@ class GeCustodyLedger {
             flows.add(itemFlow(record, buy ? pending : -pending, unit, buy ? value : -value));
         }
         if (execution > 0) flows.add(coins(buy ? -execution : execution));
-        return reviewRow(flows, msg("ge-lifecycle") + reason + msg("known-facts"));
+        return reviewRow(flows, msg("geLifecycle") + reason + msg("knownFacts"));
     }
 
     void captureBasis(GeOffer record, Flow flow) {

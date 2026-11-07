@@ -152,7 +152,7 @@ public class CogRemovalUndoTest {
         assertEquals(0, fixture.engine.metrics(NOW + 10).net);
         assertEquals(0, EngineProbe.knownCoverageQty(fixture.engine, 1275));
         assertTrue(onEdt(() -> ShellProbe.noticeText(fixture.panel.shell))
-                .contains(GameData.msg("correction-blocked")));
+                .contains(GameData.msg("correctionBlocked")));
     }
 
     @Test public void viewingHistoryDoesNotMakeTheCogUndoThatHistoricalRun() throws Exception {

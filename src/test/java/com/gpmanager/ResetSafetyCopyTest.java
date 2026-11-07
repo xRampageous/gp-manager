@@ -163,7 +163,7 @@ public class ResetSafetyCopyTest
             JsonObject before = Persistence.backupContent(persistence.engine.exportState());
             Persistence.ResetOutcome reset = persistence.factoryReset(NOW, true);
             assertFalse(reset.isApplied());
-            assertTrue(reset.getDetail(), reset.getDetail().startsWith(GameData.msg("pre-restore")));
+            assertTrue(reset.getDetail(), reset.getDetail().startsWith(GameData.msg("preRestore")));
             assertEquals(before, Persistence.backupContent(persistence.engine.exportState()));
             assertEquals("Before reset", fixture.repository.load().generalSession.name());
             assertFalse(persistence.maintenance);

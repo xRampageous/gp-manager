@@ -70,7 +70,7 @@ public class EthereumChargeTest
 
         assertEquals(TransactionType.CONSUMPTION, load.original());
         assertTrue(load.counts());
-        assertEquals(GameData.msg("committed-load") + "Bracelet of ethereum", load.note());
+        assertEquals(GameData.msg("committedLoad") + "Bracelet of ethereum", load.note());
         assertEquals(ActionKind.SUPPLIES, load.action());
         assertEquals(-1_250L, load.net());
         assertEquals(1_250L, engine.metrics(start + 2_400L).cost);
@@ -114,7 +114,7 @@ public class EthereumChargeTest
         for (Transaction row : engine.session().transactions())
         {
             assertFalse("a bank load cannot phantom-book as a charge load",
-                row.note() != null && row.note().startsWith(GameData.msg("committed-load")));
+                row.note() != null && row.note().startsWith(GameData.msg("committedLoad")));
         }
     }
 
@@ -194,7 +194,7 @@ public class EthereumChargeTest
         assertEquals(0L, engine.metrics(start + 6_000L).net);
         for (Transaction row : engine.session().transactions())
         {
-            assertFalse(row.note() != null && row.note().startsWith(GameData.msg("committed-load")));
+            assertFalse(row.note() != null && row.note().startsWith(GameData.msg("committedLoad")));
         }
     }
 

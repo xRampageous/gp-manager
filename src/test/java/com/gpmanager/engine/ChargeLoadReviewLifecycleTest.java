@@ -459,7 +459,7 @@ public class ChargeLoadReviewLifecycleTest
 
             assertEquals(piece.name(), TransactionType.CONSUMPTION, load.original());
             assertTrue(piece.name(), load.counts());
-            assertEquals(piece.name(), GameData.msg("committed-load") + piece.getDisplayName(),
+            assertEquals(piece.name(), GameData.msg("committedLoad") + piece.getDisplayName(),
                 load.note());
             assertEquals(piece.name(), ActionKind.SUPPLIES, load.action());
             assertEquals(piece.name(), -2_000L, load.net());

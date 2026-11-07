@@ -9,7 +9,7 @@ m6	group storage|shared storage|gim	GIM_SHARED_DEPOSIT	@gim-shared-storage
 m7.lms	leave|exit	LMS_EXIT	@lms-invent-restore
 m8.lms	=|enter|join|wipe	LMS_ENTER	@lms-invent-wipe
 SEED_VAULT	seed vault	SEED_VAULT	@seed-vault
-TOOL_LEPRECHAUN	@leprechaun-tool	TOOL_LEPRECHAUN	@tool-leprechaun
+TOOL_LEPRECHAUN	@leprechaun-tool	TOOL_LEPRECHAUN	@toolLeprechaun
 NMZ_COFFER	@nightmare-zone	NMZ_COFFER	@nmz-coffer
 BLAST_FURNACE_COFFER	@blast-furnace-coffer	BLAST_FURNACE_COFFER	@blast-furnace-coffer-transfer
 LMS_COFFER	@last-man	LMS_COFFER	@lms-coffer

@@ -77,9 +77,9 @@ public class PvpDeathSkullTest {
 
     @Test public void pveUsesThePlainSkullAndGravestonesRemainNeutral() {
         var pve = new Transaction(1000, TransactionType.CONSUMPTION, Context.GENERIC,
-                GameData.msg("pvm-loss"), "Death reclaim", true,
+                GameData.msg("pvmLoss"), "Death reclaim", true,
                 List.of(new Flow(995, "Coins", -9_000_000, 1, -9_000_000, PriceSource.FACE_VALUE)),
-                Confidence.CONFIRMED, GameData.msg("pvm-loss"), null);
+                Confidence.CONFIRMED, GameData.msg("pvmLoss"), null);
         assertEquals(-100000, group(pve).item);
         for (boolean recovered : new boolean[]{false, true})
             assertTrue(DeathRowGroupingTest.capture(DeathViewTest.grave(recovered)).groups.isEmpty());

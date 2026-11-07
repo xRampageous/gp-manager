@@ -125,7 +125,7 @@ public class RaidSupplyLoanTest {
         f.engine.noteConsume(TWO,6,false,ActionKind.DRINK,null);settle(f,Map.of(ONE,2L));
         assertEquals(100,f.engine.metrics(f.now()).cost);assertTrue(f.engine.getReviewRows(f.now()).isEmpty());
         var row=f.engine.session().transactions().stream().filter(t->t.counts()).findFirst().orElseThrow();
-        assertEquals(GameData.msg("raid-supply-credit"),row.note());
+        assertEquals(GameData.msg("raidSupplyCredit"),row.note());
         assertEquals(200,row.flows().stream().filter(Flow::cost).findFirst().orElseThrow().unitPrice);
         assertEquals(-2,row.flows().stream().filter(Flow::cost).findFirst().orElseThrow().quantity);
     }

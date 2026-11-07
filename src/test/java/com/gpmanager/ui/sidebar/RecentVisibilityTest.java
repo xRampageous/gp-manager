@@ -236,7 +236,7 @@ public class RecentVisibilityTest
         // Owner 1.3.4: charge rows are no longer hardcoded out of Recent; the Hidden Recent
         // charges list hides them like any supply spend.
         Transaction estimate = new Transaction(1_000L, TransactionType.CONSUMPTION, Context.GENERIC,
-            GameData.msg("estimated-charge") + "Trident of the Seas", "Vorkath", true,
+            GameData.msg("estimatedCharge") + "Trident of the Seas", "Vorkath", true,
             List.of(new Flow(560, "Death rune", -1L, 100, -100L, PriceSource.GRAND_EXCHANGE)),
             Confidence.LIKELY, "Estimated", null);
         estimate.setAction(ActionKind.CAST);

@@ -54,7 +54,7 @@ public class SufferingCommittedLoadTest
 
         assertEquals(TransactionType.CONSUMPTION, load.original());
         assertTrue(load.counts());
-        assertEquals(GameData.msg("committed-load") + "Ring of suffering", load.note());
+        assertEquals(GameData.msg("committedLoad") + "Ring of suffering", load.note());
         assertEquals(ActionKind.SUPPLIES, load.action());
         assertEquals(-2_500L, load.net());
         assertEquals(2_500L, engine.metrics(start + 2_400L).cost);
@@ -117,7 +117,7 @@ public class SufferingCommittedLoadTest
         for (Transaction row : engine.session().transactions())
         {
             assertFalse("a bank load cannot phantom-book as a charge load",
-                row.note() != null && row.note().startsWith(GameData.msg("committed-load")));
+                row.note() != null && row.note().startsWith(GameData.msg("committedLoad")));
         }
         assertTrue("the recoils still book ordinarily",
             engine.session().transactions().stream().anyMatch(Transaction::counts));

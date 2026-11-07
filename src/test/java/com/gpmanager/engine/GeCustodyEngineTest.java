@@ -860,14 +860,14 @@ public class GeCustodyEngineTest
             h.offer(3,BUYING,LOGS,200,0,1054,0);
             if(!bank)h.settle(with(h.inventory,COINS,789200L));
             h.offer(3,BUYING,LOGS,200,156,1054,158496);
-            h.engine.noteGeCollect(h.now);h.engine.markContext(Context.MARKET,10,GameData.msg("ge-collect"));
+            h.engine.noteGeCollect(h.now);h.engine.markContext(Context.MARKET,10,GameData.msg("geCollect"));
             h.settle(with(h.inventory,LOGS,156L,COINS,h.inventory.getOrDefault(COINS,0L)+5928));
             assertEquals("a partial buy returns its own price improvement",0,h.reviews().size());
             assertEquals(0,h.net());
             var record=h.engine.exchange.records().get(0);
             assertEquals(5928,record.refundedGp);assertEquals(156,record.settledQty);
             h.offer(3,CANCELLED_BUY,LOGS,200,156,1054,158496);
-            h.offer(3,EMPTY,0,0,0,0,0);h.engine.noteGeCollect(h.now);h.engine.markContext(Context.MARKET,10,GameData.msg("ge-collect"));
+            h.offer(3,EMPTY,0,0,0,0,0);h.engine.noteGeCollect(h.now);h.engine.markContext(Context.MARKET,10,GameData.msg("geCollect"));
             h.settle(with(h.inventory,COINS,h.inventory.getOrDefault(COINS,0L)+46376));
             assertEquals(0,h.reviews().size());assertEquals(0,h.net());assertEquals(52304,record.refundedGp);
             assertEquals(158496,EngineProbe.knownCoverageBasisGp(h.engine,LOGS));
@@ -875,8 +875,8 @@ public class GeCustodyEngineTest
     }
     @Test public void changeCanArriveJustAfterThePartialItems() {
         Harness h=new Harness(1016);h.offer(3,BUYING,LOGS,200,0,1054,0);
-        h.offer(3,BUYING,LOGS,200,156,1054,158496);h.engine.noteGeCollect(h.now);h.engine.markContext(Context.MARKET,10,GameData.msg("ge-collect"));
-        h.settle(with(h.inventory,LOGS,156L));h.engine.noteGeCollect(h.now);h.engine.markContext(Context.MARKET,10,GameData.msg("ge-collect"));
+        h.offer(3,BUYING,LOGS,200,156,1054,158496);h.engine.noteGeCollect(h.now);h.engine.markContext(Context.MARKET,10,GameData.msg("geCollect"));
+        h.settle(with(h.inventory,LOGS,156L));h.engine.noteGeCollect(h.now);h.engine.markContext(Context.MARKET,10,GameData.msg("geCollect"));
         h.settle(with(h.inventory,COINS,h.inventory.getOrDefault(COINS,0L)+5928));
         assertEquals(0,h.reviews().size());assertEquals(0,h.net());
     }
@@ -884,18 +884,18 @@ public class GeCustodyEngineTest
         Harness h=new Harness(1016);h.inventory=with(h.inventory,COINS,1000000L);h.engine.setBaseline(new ContainerSnapshot(h.inventory));
         h.offer(3,BUYING,LOGS,200,0,1054,0);h.settle(with(h.inventory,COINS,789200L));
         h.offer(3,BUYING,LOGS,200,156,1054,158496);
-        h.engine.noteGeCollect(h.now);h.engine.markContext(Context.MARKET,10,GameData.msg("ge-collect"));h.settle(with(h.inventory,LOGS,156L,COINS,841504L));
+        h.engine.noteGeCollect(h.now);h.engine.markContext(Context.MARKET,10,GameData.msg("geCollect"));h.settle(with(h.inventory,LOGS,156L,COINS,841504L));
         assertEquals(5928,h.engine.exchange.records().get(0).refundedGp);
         assertEquals("the unfilled reserve is not released",1,h.reviews().size());
     }
 
     @Test public void anOldUnmatchedGeReviewIsNotGuessedIntoARefund() {
         Harness h=new Harness(1016);h.offer(3,BUYING,LOGS,200,0,1054,0);
-        h.offer(3,BUYING,LOGS,200,156,1054,158496);h.engine.noteGeCollect(h.now);h.engine.markContext(Context.MARKET,10,GameData.msg("ge-collect"));
+        h.offer(3,BUYING,LOGS,200,156,1054,158496);h.engine.noteGeCollect(h.now);h.engine.markContext(Context.MARKET,10,GameData.msg("geCollect"));
         var purchase=h.settle(with(h.inventory,LOGS,156L));
         Transaction old=new Transaction(purchase.timestamp+600,TransactionType.UNCERTAIN,Context.MARKET,
-            GameData.msg("ge-collect"),"Trading",false,List.of(new Flow(COINS,"Coins",5928,1,5928,PriceSource.FACE_VALUE)),
-            Confidence.UNCERTAIN,GameData.msg("ge-movement"),null);
+            GameData.msg("geCollect"),"Trading",false,List.of(new Flow(COINS,"Coins",5928,1,5928,PriceSource.FACE_VALUE)),
+            Confidence.UNCERTAIN,GameData.msg("geMovement"),null);
         h.engine.session().addTransaction(old,2000,false);
         h.engine.recheck();assertEquals(TransactionType.UNCERTAIN,old.type());
     }
@@ -903,7 +903,7 @@ public class GeCustodyEngineTest
     @Test public void bankPaidFinishedBuyCanReturnChangeWithItsItemsBeforeSlotClear() {
         Harness h=new Harness(48);h.inventory=with(h.inventory,COINS,0L);h.engine.setBaseline(new ContainerSnapshot(h.inventory));
         h.offer(0,BUYING,LOGS,10,0,50,0);h.offer(0,BOUGHT,LOGS,10,10,50,480);
-        h.engine.noteGeCollect(h.now);h.engine.markContext(Context.MARKET,10,GameData.msg("ge-collect"));
+        h.engine.noteGeCollect(h.now);h.engine.markContext(Context.MARKET,10,GameData.msg("geCollect"));
         h.settle(with(h.inventory,LOGS,10L,COINS,20L));assertEquals(0,h.reviews().size());assertEquals(0,h.net());
     }
     @Test public void anActivePartialBuyDoesNotOwnAnUnrelatedCoinPickup() {

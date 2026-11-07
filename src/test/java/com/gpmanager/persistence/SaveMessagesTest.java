@@ -29,9 +29,9 @@ public class SaveMessagesTest {
     }
 
     @Test public void stickyResourcesArePlain() {
-        for (String key : new String[] {"tracking-paused-back", "disk-revision", "advance-disk",
-                "another-client-holds", "save-failed", "pending-save", "persistence-executor",
-                "disk-state", "reset-did", "save-did", "primary-reset", "primary-already"}) plain(GameData.msg(key));
+        for (String key : new String[] {"trackingPausedBack", "diskRevision", "advanceDisk",
+                "anotherClientHolds", "saveFailed", "pendingSave", "persistenceExecutor",
+                "diskState", "resetDid", "saveDid", "primaryReset", "primaryAlready"}) plain(GameData.msg(key));
     }
 
     private static void plain(String message) {
